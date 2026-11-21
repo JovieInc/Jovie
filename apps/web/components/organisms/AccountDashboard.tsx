@@ -30,7 +30,7 @@ export function AccountDashboard() {
               <CreditCard className='h-7 w-7 text-(--accent-analytics)' />
             </div>
             <div className='ml-4'>
-              <h2 className='text-mid font-semibold text-primary-token'>
+              <h2 className='text-balance text-mid font-semibold text-primary-token'>
                 Billing & Subscription
               </h2>
               <p className='text-app text-secondary-token'>
@@ -52,7 +52,7 @@ export function AccountDashboard() {
               <User className='h-7 w-7 text-(--accent-speed)' />
             </div>
             <div className='ml-4'>
-              <h2 className='text-mid font-semibold text-primary-token'>
+              <h2 className='text-balance text-mid font-semibold text-primary-token'>
                 Creator Profile
               </h2>
               <p className='text-app text-secondary-token'>
@@ -74,7 +74,7 @@ export function AccountDashboard() {
               <Settings className='h-7 w-7 text-(--accent-conv)' />
             </div>
             <div className='ml-4'>
-              <h2 className='text-mid font-semibold text-primary-token'>
+              <h2 className='text-balance text-mid font-semibold text-primary-token'>
                 General Settings
               </h2>
               <p className='text-app text-secondary-token'>
@@ -99,7 +99,7 @@ export function AccountDashboard() {
         />
         <div className='space-y-4 px-5 py-4'>
           <div>
-            <h2 className='text-app font-caption text-primary-token'>
+            <h2 className='text-balance text-app font-caption text-primary-token'>
               Account Status
             </h2>
             <p className='text-app text-secondary-token'>
@@ -107,7 +107,7 @@ export function AccountDashboard() {
             </p>
           </div>
           <div>
-            <h2 className='text-app font-caption text-primary-token'>
+            <h2 className='text-balance text-app font-caption text-primary-token'>
               Data & Privacy
             </h2>
             <p className='text-app text-secondary-token'>
