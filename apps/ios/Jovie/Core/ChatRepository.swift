@@ -445,7 +445,7 @@ final class ChatRepository {
   private func appendOptimisticTurn(text: String, clientTurnId: String) {
     // Stamp once here (not in persistCache) so the cached createdAt stays
     // stable across rewrites and restart pagination uses it as-is.
-    let sentAt = ISO8601DateFormatter().string(from: Date())
+    let sentAt = Date().ISO8601Format()
     timeline.append(
       MobileChatTimelineItem(
         id: "user:\(clientTurnId)",
@@ -486,7 +486,7 @@ final class ChatRepository {
     }
 
     let clientMessageId = "\(idempotencyKey):msg"
-    let sentAt = ISO8601DateFormatter().string(from: Date())
+    let sentAt = Date().ISO8601Format()
     timeline.removeAll { $0.clientTurnId == idempotencyKey }
     timeline.append(
       MobileChatTimelineItem(
@@ -949,7 +949,7 @@ final class ChatRepository {
       // an `olderCursor` from restart-time timestamps and load-earlier would
       // refetch the current window instead of older history. Optimistic rows
       // have no server timestamp yet, so they fall back to now.
-      createdAt: item.createdAt ?? ISO8601DateFormatter().string(from: Date()),
+      createdAt: item.createdAt ?? Date().ISO8601Format(),
       requiresWebHandoff: item.requiresWebHandoff
     )
   }

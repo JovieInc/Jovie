@@ -14,28 +14,29 @@ import {
 } from '@/lib/merch/orders';
 import { stripe } from '@/lib/stripe/client';
 import {
+  MERCH_STALE_PROCESSING_CLAIM_MS,
+  resolveMerchWebhookAction,
+} from '@/lib/stripe/webhooks/merch-event-routing';
+import {
   isStripeReconciliationRequiredError,
   markStripeEventNeedsReconciliation,
   reconciledAtOnSuccess,
   reconciledStatusOnSuccess,
 } from '@/lib/stripe/webhooks/reconciliation';
+import {
+  getStripeObjectId,
+  stripeTimestampToDate,
+} from '@/lib/stripe/webhooks/utils';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
-
-function getStripeObjectId(event: Stripe.Event): string | null {
-  const object = event.data.object as { readonly id?: string };
-  return object.id ?? null;
-}
-
-const STALE_PROCESSING_CLAIM_MS = 10 * 60 * 1000;
 
 async function claimStripeWebhookEvent(params: {
   readonly eventId: string;
   readonly webhookRecordId: string;
 }): Promise<boolean> {
   const now = new Date();
-  const staleBefore = new Date(now.getTime() - STALE_PROCESSING_CLAIM_MS);
+  const staleBefore = new Date(now.getTime() - MERCH_STALE_PROCESSING_CLAIM_MS);
   const [claimed] = await withSystemIngestionSession(tx =>
     tx
       .update(stripeWebhookEvents)
@@ -106,7 +107,7 @@ export async function POST(request: NextRequest) {
           stripeEventId: event.id,
           type: event.type,
           stripeObjectId: getStripeObjectId(event),
-          stripeCreatedAt: new Date(event.created * 1000),
+          stripeCreatedAt: stripeTimestampToDate(event.created),
           payload: event as unknown as Record<string, unknown>,
         })
         .onConflictDoNothing()
@@ -160,19 +161,19 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      switch (event.type) {
-        case 'checkout.session.completed':
-        case 'checkout.session.async_payment_succeeded':
+      const action = resolveMerchWebhookAction(event.type);
+      switch (action) {
+        case 'checkout_completed':
           await handleMerchCheckoutCompleted(
             event.data.object as Stripe.Checkout.Session
           );
           break;
-        case 'checkout.session.async_payment_failed':
+        case 'payment_failed':
           await handleMerchCheckoutPaymentFailed(
             event.data.object as Stripe.Checkout.Session
           );
           break;
-        case 'charge.refunded':
+        case 'charge_refunded':
           await handleMerchChargeRefunded(event.data.object as Stripe.Charge);
           break;
         default:
