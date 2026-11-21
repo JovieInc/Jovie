@@ -46,13 +46,19 @@ function parseArgs(argv: readonly string[]): {
     const arg = argv[i];
     // pnpm forwards a literal `--` before script args.
     if (arg === '--') continue;
-    if (arg === '--out' && argv[i + 1]) {
-      outPath = argv[i + 1]!;
-      i += 1;
+    if (arg === '--out') {
+      const next = argv[i + 1];
+      if (typeof next === 'string' && next.length > 0) {
+        outPath = next;
+        i += 1;
+      }
       continue;
     }
-    if (arg === '--mode' && argv[i + 1]) {
-      const next = argv[i + 1]!;
+    if (arg === '--mode') {
+      const next = argv[i + 1];
+      if (typeof next !== 'string' || next.length === 0) {
+        throw new Error('Missing value for --mode');
+      }
       if (next === 'relay' || next === 'injected' || next === 'live') {
         mode = next;
       } else {
