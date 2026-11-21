@@ -414,7 +414,7 @@ final class ChatRepository {
         // A nil fixture callback never grants managed cancellation persistence.
         if let expected = identity.ownership, context.authorization != .managed(expected) { return }
         markAssistantCanceled(clientTurnId: clientTurnId)
-        notePostIdentityFirstSendOutcome(.cancelled)
+        notePostIdentityFirstSendCancelled()
         await persistCache(generation: generation, selection: selection, allowingCancellation: true)
       } else {
         context.acceptingEvents = true
@@ -423,10 +423,7 @@ final class ChatRepository {
         applySendFailure(error, clientTurnId: clientTurnId)
         // 409 keeps the turn in retrying — not a terminal first-send failure.
         if assistantStatus(clientTurnId: clientTurnId) == .failed || sessionExpired {
-          notePostIdentityFirstSendOutcome(
-            .failed,
-            failureReason: PostIdentityChatMeasurement.failureReason(for: error)
-          )
+          notePostIdentityFirstSendFailed(error: error)
         }
         await persistCache(generation: generation, selection: selection)
       }
