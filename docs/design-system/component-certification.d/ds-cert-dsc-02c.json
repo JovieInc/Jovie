@@ -36,15 +36,6 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/features/dashboard/organisms/settings-profile-section/SettingsProfileSection.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
     "apps/web/components/features/demo/DemoReleaseTasksSurface.tsx": [
       "ds-owner",
       "tokens",

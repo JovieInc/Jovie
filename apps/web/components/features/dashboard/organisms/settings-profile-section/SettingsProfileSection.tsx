@@ -1,6 +1,6 @@
 'use client';
 
-import { Input, Textarea } from '@jovie/ui';
+import { Input } from '@jovie/ui';
 import { AlertCircle } from 'lucide-react';
 import { type CSSProperties, useEffect, useRef } from 'react';
 import { toast } from '@/components/feedback';
@@ -229,7 +229,7 @@ export function SettingsProfileSection({
             </p>
           </div>
           <div className={`relative ${PROFILE_FIELD_COLUMN_CLASS}`}>
-            <Textarea
+            <textarea
               name='careerHighlights'
               id='careerHighlights'
               value={formData.careerHighlights}
