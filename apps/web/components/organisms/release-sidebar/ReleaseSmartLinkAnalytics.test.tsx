@@ -1,3 +1,4 @@
+// Drift T2.1: IconButton alias retirement — callsite migration coverage.
 import { render, screen, within } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -106,9 +107,15 @@ describe('ReleaseSmartLinkAnalytics', () => {
     );
 
     // Deliberate-red: the trigger had only a title, so it announced as "button".
-    expect(
-      screen.getByRole('button', { name: 'Share Smart Link' })
-    ).toHaveAttribute('aria-label', 'Share Smart Link');
+    const share = screen.getByRole('button', { name: 'Share Smart Link' });
+    expect(share).toHaveAttribute('aria-label', 'Share Smart Link');
+    // Drift T2.1: sm (28px) + fade=visible — tertiary lives on the glyph.
+    expect(share.className).toMatch(/\bh-7\b/);
+    expect(share.className).toMatch(/\bw-7\b/);
+    expect(share.className).toMatch(/\bopacity-60\b/);
+    expect(share.querySelector('svg')?.getAttribute('class') ?? '').toMatch(
+      /\btext-tertiary-token\b/
+    );
   });
 });
 
