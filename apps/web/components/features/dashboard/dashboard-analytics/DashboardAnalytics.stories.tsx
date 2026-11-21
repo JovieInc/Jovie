@@ -164,7 +164,7 @@ export const PartialOnlyProfileViews: Story = {
   parameters: {
     analyticsData: {
       profile_views: 40,
-    } satisfies DashboardAnalyticsResponse,
+    } satisfies Partial<DashboardAnalyticsResponse>,
   },
 };
 
