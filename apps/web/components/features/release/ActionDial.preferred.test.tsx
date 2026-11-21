@@ -121,7 +121,7 @@ describe('ActionDial preferred state', () => {
       'w-7'
     );
     expect(screen.getByText('Stream Now')).toHaveClass(
-      'text-sm',
+      'text-base',
       'font-semibold'
     );
     const selection = screen.getByTestId('action-dial-selection');

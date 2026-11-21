@@ -526,7 +526,7 @@ export function ActionDial({
             primary
             disabled={disabled}
             ariaLabel={`${actionLabel} with ${active.label}`}
-            className='w-full gap-3 text-sm font-semibold tracking-tight [&_svg]:h-7 [&_svg]:w-7'
+            className='w-full gap-3 tracking-tight [&_svg]:h-7 [&_svg]:w-7'
             onClick={event => {
               if (suppressClickRef.current) {
                 event.preventDefault();

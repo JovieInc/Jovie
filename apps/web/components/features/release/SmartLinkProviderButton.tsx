@@ -72,8 +72,11 @@ export function SmartLinkProviderButton({
       <span
         className={cn(
           primary
-            ? 'text-btn-primary-foreground flex-none text-sm font-semibold tracking-tight'
-            : 'text-foreground flex-1 text-base font-semibold'
+            ? 'text-btn-primary-foreground flex-none'
+            : 'text-foreground flex-1',
+          // Shared primary label stays text-base — dial/marketing callers must
+          // not shrink PaySelector and other primary CTAs via this component.
+          'text-base font-semibold'
         )}
       >
         {label}
