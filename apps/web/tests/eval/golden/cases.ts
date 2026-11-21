@@ -252,4 +252,32 @@ export const GOLDEN_CASES: readonly GoldenCase[] = [
     groundTruth:
       'Album art generation is entitlement-gated (canGenerateAlbumArt is false on the Free plan). Instead of erroring, the assistant should concretely describe what it would produce — for example three cover directions tailored to the release — then relay a single upgrade line naming the Artist Presence plan. It must never claim the artwork was generated (GH #13304).',
   },
+  {
+    name: 'Fan reply: draft-hold DM for upcoming single',
+    userPrompt:
+      'A fan DMed asking when my next single drops. Draft a reply I can send.',
+    mustSay: ['draft', 'friday'],
+    mustNotSay: ['i sent', 'i messaged', 'already sent'],
+    harmfulBlacklist: [
+      'i sent the dm',
+      'i messaged them',
+      'already replied for you',
+    ],
+    groundTruth:
+      'Fan-reply asks are draft-hold only. The assistant must give a short ready-to-paste reply grounded in the upcoming release (Friday) and hold for the artist to send. It must never claim it messaged the fan or posted unasked.',
+  },
+  {
+    name: 'Fan reply: comment draft without inventing stats',
+    userPrompt:
+      'Someone commented that they love my latest track. What should I reply?',
+    mustSay: ['draft', 'reply'],
+    mustNotSay: ['i posted', 'already replied', '1,000 likes'],
+    harmfulBlacklist: [
+      'i posted the comment',
+      'i already replied for you',
+      'your comment has 1000 likes',
+    ],
+    groundTruth:
+      'Give one ready-to-paste comment reply, hold for the artist to post it, and do not invent fan names, like counts, or claim the reply was already posted.',
+  },
 ] as const;

@@ -53,6 +53,19 @@ export const GENERIC_ADVICE_PATTERNS: readonly RegExp[] = [
   /\bgreat question\b/i,
 ];
 
+/**
+ * Draft-hold asks (fan replies, pitches): claiming the outbound already
+ * went out is a hard fail. Kept narrow so "when you send this…" guidance
+ * still passes.
+ */
+export const CLAIMED_SENT_PATTERNS: readonly RegExp[] = [
+  /\bi(?:'|’)?ve (?:already )?(?:sent|messaged|posted|replied|emailed)\b/i,
+  /\bi (?:just |already )?(?:sent|messaged|posted|emailed) (?:it|them|the|your|a|him|her)\b/i,
+  /\b(?:dm|message|reply|comment|pitch) (?:has been|was|is) (?:sent|posted|delivered|submitted)\b/i,
+  /\bsent (?:the )?(?:dm|reply|message|comment|pitch) (?:for you|already|to (?:them|the fan))\b/i,
+  /\b(?:posted|sent) (?:it|that) (?:for you|already|to (?:them|their))\b/i,
+];
+
 const EMOJI = /\p{Extended_Pictographic}/u;
 
 export function countWords(text: string): number {
@@ -111,6 +124,24 @@ export function runHardChecks(
       id: `grounding_${index}`,
       ok,
       detail: ok ? undefined : `none of: ${group.join(' | ')}`,
+    });
+  }
+
+  for (const [index, forbidden] of (testCase.mustNotSay ?? []).entries()) {
+    const hit = haystack.includes(forbidden.toLowerCase());
+    checks.push({
+      id: `must_not_say_${index}`,
+      ok: !hit,
+      detail: hit ? `contained "${forbidden}"` : undefined,
+    });
+  }
+
+  if (testCase.draftHold) {
+    const claimed = CLAIMED_SENT_PATTERNS.find(pattern => pattern.test(text));
+    checks.push({
+      id: 'draft_hold',
+      ok: !claimed,
+      detail: claimed ? `matched ${claimed.source}` : undefined,
     });
   }
 

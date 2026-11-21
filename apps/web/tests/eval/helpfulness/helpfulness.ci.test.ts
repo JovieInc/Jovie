@@ -27,7 +27,7 @@ describe('helpfulness case set', () => {
     expect(HELPFULNESS_EVAL_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/);
     const ids = HELPFULNESS_CASES.map(c => c.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.length).toBeLessThanOrEqual(45);
+    expect(ids.length).toBeLessThanOrEqual(55);
     expect(HELPFULNESS_CASES.filter(c => c.ciSubset).length).toBeGreaterThan(4);
   });
 
@@ -36,6 +36,14 @@ describe('helpfulness case set', () => {
     expect(fixtures).toEqual(new Set(['established', 'new', 'lapsed']));
     for (const c of HELPFULNESS_CASES)
       expect(c.great.length).toBeGreaterThan(20);
+  });
+
+  it('meets the fan-reply draft quota with draft-hold flags', () => {
+    const fanReplies = HELPFULNESS_CASES.filter(c =>
+      c.id.startsWith('fan-reply-')
+    );
+    expect(fanReplies.length).toBeGreaterThanOrEqual(10);
+    expect(fanReplies.every(c => c.draftHold === true)).toBe(true);
   });
 
   it('places the upcoming single on the next Friday', () => {
@@ -81,6 +89,29 @@ describe('hard checks', () => {
     const checks = runHardChecks(songOutFriday, good);
     expect(checks.every(c => c.ok)).toBe(true);
     expect(scoreCase(songOutFriday.id, checks, null).score).toBe(100);
+  });
+
+  it('hard-fails a fan-reply draft that claims it already sent', () => {
+    const fanReply = HELPFULNESS_CASES.find(c => c.id === 'fan-reply-dm');
+    if (!fanReply) throw new Error('missing fan-reply-dm');
+    const claimed = {
+      text: 'I sent the DM for you: Night Swim drops Friday. They already have the date.',
+      toolCalls: [],
+    };
+    const checks = runHardChecks(fanReply, claimed);
+    expect(checks.find(c => c.id === 'draft_hold')?.ok).toBe(false);
+    expect(scoreCase(fanReply.id, checks, null).passed).toBe(false);
+  });
+
+  it('passes a held fan-reply draft', () => {
+    const fanReply = HELPFULNESS_CASES.find(c => c.id === 'fan-reply-dm');
+    if (!fanReply) throw new Error('missing fan-reply-dm');
+    const held = {
+      text: 'Draft for your yes: "Night Swim is out Friday - I will drop the link that morning." Nothing sent until you say yes.',
+      toolCalls: [],
+    };
+    const checks = runHardChecks(fanReply, held);
+    expect(checks.every(c => c.ok)).toBe(true);
   });
 });
 

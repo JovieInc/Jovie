@@ -7,6 +7,7 @@
  * your own words, map the artist onto a fixture, never paste user text.
  */
 
+import { FAN_REPLY_QUOTA_CASES } from './cases-fan-reply';
 import type { FixtureId } from './fixtures';
 
 export interface HelpfulnessCase {
@@ -20,6 +21,16 @@ export interface HelpfulnessCase {
    * case-insensitive match in the reply or in a tool call's input.
    */
   readonly mustMentionAny?: readonly (readonly string[])[];
+  /**
+   * Forbidden substrings (case-insensitive) in the reply or tool-call input.
+   * Mirrors golden `mustNotSay`.
+   */
+  readonly mustNotSay?: readonly string[];
+  /**
+   * Draft-hold asks: hard-fail replies that claim the message was already
+   * sent, posted, or messaged without an explicit artist yes.
+   */
+  readonly draftHold?: boolean;
   /** At least one of these tools must be called. */
   readonly expectToolsAny?: readonly string[];
   /** Word cap for the final text; default DEFAULT_MAX_WORDS. */
@@ -272,6 +283,7 @@ export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = [
     fixture: 'established',
     ask: 'a fan DMed asking when Night Swim drops. draft a reply I can send',
     mustMentionAny: [['night swim'], ['friday', 'days', 'tomorrow', 'today']],
+    draftHold: true,
     great:
       'Drafts a short fan reply that names Night Swim and the Friday drop, then holds for the artist to send. Never claims it messaged the fan or sends unasked.',
     ciSubset: true,
@@ -281,9 +293,11 @@ export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = [
     fixture: 'established',
     ask: 'someone commented on my Neon Reef post saying they love it. what should I reply?',
     mustMentionAny: [['neon reef']],
+    draftHold: true,
     great:
       'Gives one ready-to-paste reply that references Neon Reef, holds for the artist to post it, and does not invent the fan name or engagement stats.',
   },
+  ...FAN_REPLY_QUOTA_CASES,
   {
     id: 'approvals-pending',
     fixture: 'established',
