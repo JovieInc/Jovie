@@ -64,6 +64,8 @@ describe('performance-smooth-baseline helpers', () => {
     expect(
       parseSmoothBaselineCliArgs([
         '--write',
+        '--compare',
+        '--allow-raise',
         '--platform',
         'mobile',
         '--surface',
@@ -73,10 +75,13 @@ describe('performance-smooth-baseline helpers', () => {
       ])
     ).toMatchObject({
       write: true,
+      compare: true,
+      allowRaise: true,
       platforms: ['mobile'],
       surfaceIds: ['chat'],
       runs: 3,
     });
+    expect(parseSmoothBaselineCliArgs(['--no-compare']).compare).toBe(false);
     const shared = parseSmoothBaselineCliArgs([
       '--share-url',
       'https://jovie-example-jovie.vercel.app/?_vercel_share=abc',
