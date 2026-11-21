@@ -11,6 +11,7 @@ import {
 import { extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { validateControllerHopChanges } from './invariants/controller-hop-contract.mjs';
+import { screenshotBinaryRule } from './lib/moved-binary.mjs';
 import { findOrphanReviewImages } from './lib/orphan-screenshot-guard.mjs';
 import {
   GEN_JSON_SIZE_ALLOWLIST,
@@ -618,6 +619,7 @@ export function evaluateRepoHygiene({
   rootAllowlist = REPO_ROOT_ALLOWLIST,
   trackedPaths = [],
 }) {
+  const rule = screenshotBinaryRule(root);
   const errors = [
     ...validateRepoHealthBaseline(baseline),
     ...validateRepoHealthRollout(rollout),
@@ -676,10 +678,8 @@ export function evaluateRepoHygiene({
       errors.push(`${path}: binary files are not allowed at repository root`);
     if (TEMP_FILE_PATTERN.test(path))
       errors.push(`${path}: temporary/backup files are not tracked`);
-    if (isBinary(path) && !isAllowedBinary(path))
-      errors.push(
-        `${path}: binary addition is outside the allowlisted asset paths`
-      );
+    if (isBinary(path) && (!isAllowedBinary(path) || rule.isMoved(path)))
+      errors.push(rule.error(path, HYGIENE_POLICY_DOC, isAllowedBinary(path)));
   }
 
   let changedBytes = 0;

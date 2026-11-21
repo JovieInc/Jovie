@@ -1,0 +1,76 @@
+name: Screenshots to R2 upload
+
+# Manual, repeatable upload of screenshot binaries to the PRIVATE, content-
+# addressed R2 bucket that holds them instead of git. Idempotent: objects already
+# in the store are skipped, and every byte is verified against its pointer's
+# sha256 before it is sent.
+#
+# workflow_dispatch only: never on push or pull_request, so it runs only when
+# someone with write access dispatches it, and the only secrets it reads are the
+# R2 WRITE key pair. A dispatch workflow must exist on the default branch before
+# it can run, so it cannot unblock the migration PR itself. The first upload is
+# run once, locally, by whoever holds the write key:
+#
+#   R2_ACCOUNT_ID=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... \
+#     node scripts/screenshot-store.mjs upload \
+#       --from f96bd589a1c4840ee3a3c7578acd68caeed9f34c
+#
+# After the migration merges, this workflow can re-upload from any git ref that
+# still holds the bytes (binaries_ref, default the commit the migration branched
+# from).
+#
+# Needs: secrets R2_SCREENSHOTS_WRITE_ACCESS_KEY_ID and
+# R2_SCREENSHOTS_WRITE_SECRET_ACCESS_KEY (R2 API token, Object Read & Write,
+# scoped to the jovie-screenshots bucket only) and variable R2_ACCOUNT_ID.
+on:
+  workflow_dispatch:
+    inputs:
+      binaries_ref:
+        description: 'Git ref that still holds the binaries (default: the commit the migration branched from)'
+        required: false
+        default: 'f96bd589a1c4840ee3a3c7578acd68caeed9f34c'
+
+permissions: {}
+
+concurrency:
+  group: screenshots-r2-upload
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    name: Upload screenshots to R2
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_SCREENSHOTS_WRITE_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SCREENSHOTS_WRITE_SECRET_ACCESS_KEY }}
+      BINARIES_REF: ${{ inputs.binaries_ref || 'f96bd589a1c4840ee3a3c7578acd68caeed9f34c' }}
+    steps:
+      - name: Require R2 write credentials
+        shell: bash
+        run: |
+          if [ -z "$R2_ACCOUNT_ID" ] || [ -z "$R2_ACCESS_KEY_ID" ] || [ -z "$R2_SECRET_ACCESS_KEY" ]; then
+            echo "::error::Screenshot upload not done: add secrets R2_SCREENSHOTS_WRITE_ACCESS_KEY_ID and R2_SCREENSHOTS_WRITE_SECRET_ACCESS_KEY (Object Read & Write on bucket jovie-screenshots) and variable R2_ACCOUNT_ID, then re-run."
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prime Node toolcache
+        uses: ./.github/actions/prime-node-toolcache
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+
+      - name: Upload missing objects (sha256 verified)
+        run: node scripts/screenshot-store.mjs upload --from "$BINARIES_REF"
+
+      - name: Verify every pointer's object is in the store
+        run: node scripts/screenshot-store.mjs verify --remote

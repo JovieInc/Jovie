@@ -1101,6 +1101,9 @@ jobs:
 
           git checkout -b "$BRANCH"
           git add apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/
+          # Only images the live site serves are committed; the rest of the catalog is
+          # gitignored (private R2 store). `served` lists the committed ones, new included.
+          node scripts/screenshot-store.mjs served | xargs -r git add -f
           git commit -m "chore: update product screenshots [auto]
 
           Triggered by ${GITHUB_SHA::8} (run ${GITHUB_RUN_ID})"

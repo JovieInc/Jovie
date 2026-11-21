@@ -1,7 +1,7 @@
-import react from '@vitejs/plugin-react';
 import dotenv from 'dotenv';
 import path from 'path';
 import { defineConfig } from 'vitest/config';
+import { react } from './tests/vitest-catalog-image-stub';
 
 // Load environment variables from .env.test if it exists
 dotenv.config({ path: '.env.test' });

@@ -414,6 +414,7 @@ jobs:
           if git diff --quiet "$PR_DIFF_BASE" HEAD -- \
             apps/web/lib/screenshots/ \
             apps/web/screenshot-catalog/current/ \
+            apps/web/screenshot-catalog/pointers/ \
             apps/web/public/product-screenshots/ \
             'apps/web/scripts/check-screenshot-catalog*.ts'; then
             echo "required=false" >> "$GITHUB_OUTPUT"
@@ -422,6 +423,20 @@ jobs:
             [[ "$status" -eq 1 ]] || exit "$status"
             echo "required=true" >> "$GITHUB_OUTPUT"
           fi
+
+      # Screenshot binaries are not in git. A PR that adds or changes a pointer
+      # must not go green (or merge) until every object is in the PRIVATE R2
+      # store. The check reads the store with a READ-ONLY R2 key; with no key it
+      # fails ("upload not verified"), it never passes. No install needed.
+      - name: Require screenshot objects in R2
+        env:
+          R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_SCREENSHOTS_READ_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SCREENSHOTS_READ_SECRET_ACCESS_KEY }}
+          PR_DIFF_BASE: ${{ steps.pr-merge-base.outputs.sha }}
+        run: |
+          node --test scripts/lib/__tests__/screenshot-store.test.mjs scripts/lib/__tests__/moved-binary.test.mjs
+          node scripts/screenshot-store.mjs verify --remote --base "$PR_DIFF_BASE"
 
       - name: Set up Node and pnpm for screenshot integrity
         if: steps.screenshot-integrity.outputs.required == 'true'

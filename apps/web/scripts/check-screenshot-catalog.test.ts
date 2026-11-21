@@ -234,4 +234,52 @@ describe('checkScreenshotCatalog', () => {
       publicExportFiles: 2,
     });
   });
+
+  it('lets an image kept in the private R2 store be absent when it has a pointer, and only then', async () => {
+    const paths = await createFixture();
+    const stored = {
+      id: 'docs-only',
+      title: 'Docs only',
+      group: 'marketing',
+      groupLabel: 'Marketing',
+      route: '/docs-only',
+      viewport: 'desktop' as const,
+      theme: 'dark' as const,
+      consumers: ['admin'],
+    };
+    const withStored = [scenarios[0], stored];
+    await writeFile(
+      paths.manifestPath,
+      `${JSON.stringify(
+        withStored.map(scenario => ({
+          ...scenario,
+          imagePath: `${scenario.id}.png`,
+          capturedAt: '2026-07-13T00:00:00.000Z',
+          gitSha: null,
+        })),
+        null,
+        2
+      )}\n`
+    );
+    const pointerDirectory = join(paths.catalogDirectory, '../pointers');
+
+    await expect(
+      checkScreenshotCatalog({
+        paths: { ...paths, pointerDirectory },
+        scenarios: withStored,
+      })
+    ).rejects.toThrow(/missing expected file: docs-only\.png/);
+
+    await mkdir(pointerDirectory, { recursive: true });
+    await writeFile(
+      join(pointerDirectory, 'docs-only.png.pointer.json'),
+      '{}\n'
+    );
+    await expect(
+      checkScreenshotCatalog({
+        paths: { ...paths, pointerDirectory },
+        scenarios: withStored,
+      })
+    ).resolves.toMatchObject({ manifestEntries: 2, catalogFiles: 1 });
+  });
 });
