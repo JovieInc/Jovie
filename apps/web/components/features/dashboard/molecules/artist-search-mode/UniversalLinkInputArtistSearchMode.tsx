@@ -1,6 +1,11 @@
 'use client';
 
-import { Input, Spinner as LoadingSpinner } from '@jovie/ui';
+import {
+  HostDrawnSelect,
+  Input,
+  Spinner as LoadingSpinner,
+  PlainButton,
+} from '@jovie/ui';
 import { X } from 'lucide-react';
 import Image from 'next/image';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -8,7 +13,10 @@ import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 
 import type { ArtistSearchModeProps } from './types';
-import { useArtistSearchMode } from './useArtistSearchMode';
+import {
+  type UseArtistSearchModeReturn,
+  useArtistSearchMode,
+} from './useArtistSearchMode';
 import { formatFollowers } from './utils';
 
 const ARTIST_SEARCH_LOADING_KEYS = Array.from(
@@ -26,24 +34,7 @@ export function UniversalLinkInputArtistSearchMode({
   inputRef,
   focusInput,
 }: Readonly<ArtistSearchModeProps>) {
-  const {
-    searchQuery,
-    showResults,
-    activeResultIndex,
-    results,
-    state,
-    error,
-    resultsListRef,
-    searchPlatform,
-    iconColor,
-    iconBg,
-    handleSearchInputChange,
-    handleSearchKeyDown,
-    handleArtistSelect,
-    exitSearchMode,
-    setActiveResultIndex,
-    setShowResults,
-  } = useArtistSearchMode({
+  const mode = useArtistSearchMode({
     provider,
     creatorName,
     onSelect,
@@ -52,6 +43,42 @@ export function UniversalLinkInputArtistSearchMode({
     focusInput,
   });
 
+  return (
+    <UniversalLinkInputArtistSearchModeView
+      {...mode}
+      disabled={disabled}
+      inputRef={inputRef}
+    />
+  );
+}
+
+export interface UniversalLinkInputArtistSearchModeViewProps
+  extends UseArtistSearchModeReturn {
+  readonly disabled?: boolean;
+  readonly inputRef: React.RefObject<HTMLInputElement | null>;
+}
+
+/** Presentational half: renders the search field and results from hook state. */
+export function UniversalLinkInputArtistSearchModeView({
+  disabled,
+  inputRef,
+  searchQuery,
+  showResults,
+  activeResultIndex,
+  results,
+  state,
+  error,
+  resultsListRef,
+  searchPlatform,
+  iconColor,
+  iconBg,
+  handleSearchInputChange,
+  handleSearchKeyDown,
+  handleArtistSelect,
+  exitSearchMode,
+  setActiveResultIndex,
+  setShowResults,
+}: Readonly<UniversalLinkInputArtistSearchModeViewProps>) {
   return (
     <div className='relative w-full'>
       <div
@@ -109,14 +136,14 @@ export function UniversalLinkInputArtistSearchMode({
           {state === 'loading' && (
             <LoadingSpinner size='sm' tone='muted' label='Searching' />
           )}
-          <button
+          <PlainButton
             type='button'
             onClick={exitSearchMode}
             className='flex items-center justify-center w-5 h-5 rounded-full text-tertiary-token hover:bg-surface-2 hover:text-secondary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
             aria-label='Exit Search Mode'
           >
             <X className='w-4 h-4' />
-          </button>
+          </PlainButton>
         </div>
       </div>
 
@@ -139,13 +166,13 @@ export function UniversalLinkInputArtistSearchMode({
           {state === 'empty' && (
             <div className='p-4 text-center'>
               <p className='text-app text-secondary-token'>No artists found</p>
-              <button
+              <PlainButton
                 type='button'
                 onClick={exitSearchMode}
                 className='mt-2 text-app text-accent hover:underline'
               >
                 Add link manually
-              </button>
+              </PlainButton>
             </div>
           )}
 
@@ -154,21 +181,21 @@ export function UniversalLinkInputArtistSearchMode({
               <p className='text-app text-destructive'>
                 {error || 'Search failed'}
               </p>
-              <button
+              <PlainButton
                 type='button'
                 onClick={exitSearchMode}
                 className='mt-2 text-app text-accent hover:underline'
               >
                 Add link manually
-              </button>
+              </PlainButton>
             </div>
           )}
 
           {results.length > 0 && (
             <>
-              <select
+              <HostDrawnSelect
+                visuallyHidden
                 id='artist-search-results'
-                className='sr-only'
                 size={Math.min(results.length, 5)}
                 aria-label='Artist Search Results'
                 value={
@@ -200,14 +227,14 @@ export function UniversalLinkInputArtistSearchMode({
                       : ''}
                   </option>
                 ))}
-              </select>
+              </HostDrawnSelect>
               <div
                 ref={resultsListRef}
                 className='max-h-64 overflow-y-auto'
                 aria-hidden='true'
               >
                 {results.map((artist, index) => (
-                  <button
+                  <PlainButton
                     key={artist.id}
                     type='button'
                     tabIndex={0}
@@ -272,7 +299,7 @@ export function UniversalLinkInputArtistSearchMode({
                         </svg>
                       </div>
                     )}
-                  </button>
+                  </PlainButton>
                 ))}
               </div>
             </>

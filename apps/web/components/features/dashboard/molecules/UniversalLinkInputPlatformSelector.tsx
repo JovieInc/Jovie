@@ -4,6 +4,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  PlainButton,
 } from '@jovie/ui';
 import { Plus, Search } from 'lucide-react';
 
@@ -11,6 +12,7 @@ import {
   getPlatformIconMetadata,
   SocialIcon,
 } from '@/components/atoms/SocialIcon';
+import { NEUTRAL_BRAND_FALLBACK_HEX } from '@/constants/platforms/brand-colors';
 import { getContrastTextOnBrand } from '@/lib/utils/color';
 
 import {
@@ -19,6 +21,11 @@ import {
   PLATFORM_OPTIONS,
 } from './universalLinkInput.constants';
 import { type CursorPosition } from './useInputFocusController';
+
+function brandHexFor(icon: string): string {
+  const meta = getPlatformIconMetadata(icon);
+  return `#${meta?.hex || NEUTRAL_BRAND_FALLBACK_HEX}`;
+}
 
 interface PlatformSelectorProps {
   readonly onPlatformSelect: (
@@ -37,15 +44,14 @@ export function UniversalLinkInputPlatformSelector({
 }: PlatformSelectorProps) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type='button'
+      <DropdownMenuTrigger asChild disabled={disabled}>
+        <PlainButton
           disabled={disabled}
           className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-2 text-secondary-token transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:z-10 disabled:cursor-not-allowed disabled:opacity-60'
           aria-label='Add link from platform'
         >
           <Plus className='h-4 w-4' aria-hidden='true' />
-        </button>
+        </PlainButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align='start'
@@ -56,8 +62,7 @@ export function UniversalLinkInputPlatformSelector({
         }}
       >
         {ARTIST_SEARCH_PLATFORMS.map(platform => {
-          const meta = getPlatformIconMetadata(platform.icon);
-          const hex = meta?.hex ? `#${meta.hex}` : '#6b7280';
+          const hex = brandHexFor(platform.icon);
 
           return (
             <DropdownMenuItem
@@ -86,8 +91,7 @@ export function UniversalLinkInputPlatformSelector({
         <DropdownMenuSeparator />
 
         {PLATFORM_OPTIONS.map(platform => {
-          const meta = getPlatformIconMetadata(platform.icon);
-          const hex = meta?.hex ? `#${meta.hex}` : '#6b7280';
+          const hex = brandHexFor(platform.icon);
           return (
             <DropdownMenuItem
               key={platform.id}

@@ -14,3 +14,6 @@ export const GOOGLE_BRAND_COLORS = {
 
 /** Colour for a platform with no published brand colour (bare hex, no #). */
 export const NEUTRAL_BRAND_FALLBACK_HEX = '6b7280';
+
+/** Bare hex (no leading #) used for on-brand white icon contrast checks. */
+export const ON_BRAND_WHITE_HEX = 'ffffff';

@@ -20,7 +20,7 @@ interface UseArtistSearchModeOptions
     | 'focusInput'
   > {}
 
-interface UseArtistSearchModeReturn {
+export interface UseArtistSearchModeReturn {
   // State
   searchQuery: string;
   showResults: boolean;
