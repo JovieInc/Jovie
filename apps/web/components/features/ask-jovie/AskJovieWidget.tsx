@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
+import { Button, IconButton, Input } from '@jovie/ui';
 import { Send, X } from 'lucide-react';
 import {
   type ComponentProps,
@@ -10,7 +10,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { JovieIcon } from '@/components/atoms/JovieIcon';
 import { FilterChip } from '@/components/molecules/filters';
 import { EntityCard } from '@/components/organisms/entity-card';
@@ -315,18 +314,18 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
   return (
     <>
       {!open && (
-        <CircleIconButton
+        <IconButton
           ref={launcherRef}
           type='button'
           variant='surface'
-          size='lg'
+          size='xl'
           onClick={openWidget}
           ariaLabel={`Ask Jovie about ${artistName}`}
           data-ask-jovie-launcher=''
           className={cn('fixed right-4 bottom-4', PROFILE_Z.DRAWER_CONTENT)}
         >
           <JovieIcon size={22} className='shrink-0' />
-        </CircleIconButton>
+        </IconButton>
       )}
 
       {open && (
@@ -348,14 +347,14 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
                 <p className='text-xs text-tertiary-token'>{artistName}</p>
               </div>
             </div>
-            <CircleIconButton
+            <IconButton
               variant='ghost'
-              size='xs'
+              size='lg'
               onClick={() => setOpen(false)}
               ariaLabel='Close Ask Jovie'
             >
               <X className='h-4 w-4' aria-hidden='true' />
-            </CircleIconButton>
+            </IconButton>
           </div>
 
           <div
@@ -511,15 +510,15 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
                 }
               />
             </div>
-            <CircleIconButton
+            <IconButton
               type='submit'
               variant='surface'
-              size='xs'
+              size='lg'
               disabled={pending || !input.trim()}
               ariaLabel='Send'
             >
               <Send className='h-4 w-4' aria-hidden='true' />
-            </CircleIconButton>
+            </IconButton>
           </form>
         </div>
       )}
