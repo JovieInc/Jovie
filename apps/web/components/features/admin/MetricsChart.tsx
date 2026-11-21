@@ -9,6 +9,7 @@ import {
 import { ContentMetricDelta } from '@/components/molecules/ContentMetricDelta';
 import { ContentMetricStat } from '@/components/molecules/ContentMetricStat';
 import type { AdminUsagePoint } from '@/lib/admin/types';
+import { DATA_SERIES } from '@/lib/design/metric-tone';
 
 const LazyLineChart = dynamic(
   () =>
@@ -47,16 +48,16 @@ const LazyLineChart = dynamic(
             <Line
               type='monotone'
               dataKey='users'
-              stroke='hsl(var(--color-accent))'
+              stroke={DATA_SERIES.primary}
               strokeWidth={2}
               dot={{
-                fill: 'hsl(var(--color-accent))',
+                fill: DATA_SERIES.primary,
                 r: 3,
                 strokeWidth: 0,
               }}
               activeDot={{
                 r: 5,
-                fill: 'hsl(var(--color-accent))',
+                fill: DATA_SERIES.primary,
                 strokeWidth: 0,
               }}
             />
@@ -118,6 +119,7 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
         {stats ? (
           <ContentMetricDelta
             direction={usageDeltaDirection(stats.deltaPct)}
+            polarity='higher-is-better'
             value={`${stats.deltaPct >= 0 ? '+' : ''}${stats.deltaPct.toFixed(1)}%`}
             aria-label={`Daily active users changed by ${stats.deltaPct.toFixed(1)}%`}
           />

@@ -2847,13 +2847,14 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Green/red carry semantic meaning here: measured lift vs measured drop. */
-:where(.system-b-opportunity-inbox-report-delta[data-direction="up"]) {
-  color: var(--color-accent-green);
+/* Green/red carry sentiment (ASR-041): direction combined with the metric's
+   polarity, in the -text tokens that hold contrast in light and dark. */
+:where(.system-b-opportunity-inbox-report-delta[data-sentiment="positive"]) {
+  color: var(--color-success-text);
 }
 
-:where(.system-b-opportunity-inbox-report-delta[data-direction="down"]) {
-  color: var(--color-accent-red);
+:where(.system-b-opportunity-inbox-report-delta[data-sentiment="negative"]) {
+  color: var(--color-error-text);
 }
 
 :where(.system-b-opportunity-inbox-report-delta-icon) {
@@ -2932,15 +2933,15 @@
 }
 
 :where(
-  .system-b-opportunity-inbox-report-breakdown-delta[data-direction="up"]
+  .system-b-opportunity-inbox-report-breakdown-delta[data-sentiment="positive"]
 ) {
-  color: var(--color-accent-green);
+  color: var(--color-success-text);
 }
 
 :where(
-  .system-b-opportunity-inbox-report-breakdown-delta[data-direction="down"]
+  .system-b-opportunity-inbox-report-breakdown-delta[data-sentiment="negative"]
 ) {
-  color: var(--color-accent-red);
+  color: var(--color-error-text);
 }
 
 :where(.system-b-chat-generation-artifact-surface) {

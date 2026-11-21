@@ -1,6 +1,12 @@
 'use client';
 
 import { type MouseEvent as ReactMouseEvent, useRef } from 'react';
+import {
+  DELTA_FILL,
+  DELTA_STROKE,
+  deltaSentiment,
+  type MetricPolarity,
+} from '@/lib/design/metric-tone';
 
 export type SparklineTrend = 'up' | 'down' | 'flat';
 
@@ -12,6 +18,11 @@ export interface SparklineProps {
   readonly points: readonly number[];
   /** Tone palette — tints the line, fill, and hover playhead. */
   readonly trend: SparklineTrend;
+  /**
+   * Whether a rise is good news (ASR-041). The line is green only when it
+   * moves the good way. Defaults to higher-is-better.
+   */
+  readonly polarity?: MetricPolarity;
   /** Index of the currently hovered point, or null when none. */
   readonly hoverIdx?: number | null;
   /** Called as the cursor moves over the chart; null on leave. */
@@ -24,19 +35,8 @@ export interface SparklineProps {
 const VIEWBOX_W = 340;
 const VIEWBOX_H = 120;
 
-// Status TEXT tokens, not the neon accent fills: --color-accent-green is
-// about 1.3:1 on white cards, while the -text tokens hold contrast in light
-// and dark, so the line clears 3:1 for graphics in both modes.
-const STROKE_BY_TREND: Record<SparklineTrend, string> = {
-  up: 'var(--color-success-text)',
-  down: 'var(--color-error-text)',
-  flat: 'var(--color-text-tertiary-token)',
-};
-const FILL_BY_TREND: Record<SparklineTrend, string> = {
-  up: 'color-mix(in oklab, var(--color-success-text) 12%, transparent)',
-  down: 'color-mix(in oklab, var(--color-error-text) 12%, transparent)',
-  flat: 'color-mix(in oklab, var(--color-text-tertiary-token) 8%, transparent)',
-};
+// Colors come from the shared delta sentiment maps, which use the status
+// TEXT tokens (not the neon fills) so the line clears 3:1 in both modes.
 const PLAYHEAD_STROKE = 'var(--color-border-strong)';
 const POINT_OUTLINE = 'var(--color-bg-base)';
 
@@ -63,6 +63,7 @@ const POINT_OUTLINE = 'var(--color-bg-base)';
 export function Sparkline({
   points,
   trend,
+  polarity = 'higher-is-better',
   hoverIdx,
   onHover,
   ariaLabel = 'Trend over time',
@@ -81,8 +82,9 @@ export function Sparkline({
     )
     .join(' ');
   const fillPath = `${path} L ${VIEWBOX_W} ${VIEWBOX_H} L 0 ${VIEWBOX_H} Z`;
-  const stroke = STROKE_BY_TREND[trend];
-  const fill = FILL_BY_TREND[trend];
+  const sentiment = deltaSentiment(trend, polarity);
+  const stroke = DELTA_STROKE[sentiment];
+  const fill = DELTA_FILL[sentiment];
   const svgRef = useRef<SVGSVGElement>(null);
 
   function handleMove(e: ReactMouseEvent<SVGSVGElement>) {
