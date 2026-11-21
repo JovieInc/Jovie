@@ -54,9 +54,17 @@ export const SCREEN_CERTIFICATION_TEST_MARKER =
  * pool. Covers the certification module, screen-proof-emit, screen-* /
  * browser-owned-input / product-reference helpers, registry data,
  * screenshots.yml + product-screenshots specs the suite reads, and
- * pool-control modules. Shared child-process.mjs stays out (too broad).
+ * pool-control modules.
+ *
+ * Excludes scripts/lib/child-process.mjs even though the *test* imports it:
+ * screen-certification.mjs (production cert) uses node:child_process only, so
+ * a wrapper-only PR cannot change cert behavior. Wrapper edits force a full
+ * script-contract run (forcesScriptContractFullRun) including
+ * child-process.test.mjs; merge-group structural still runs full
+ * `pnpm invariants:check`. Listing the shared harness would erase the gate.
+ *
  * Latency-sensitive stays a separate always-on segment after the package.json
- * split. Merge-group structural still runs full `invariants:check`.
+ * split.
  */
 export const SCREEN_CERTIFICATION_TEST_PATHS =
   /^(?:scripts\/invariants\/(?:screen-certification|screen-registry|screen-decision-routing|screen-proof-resolver|screen-proof-emit|browser-owned-input|product-reference-coherence|registry\.mjs$)|apps\/web\/tests\/product-screenshots\/|\.github\/workflows\/screenshots\.yml$|canon\/invariants\.jsonl$|scripts\/lib\/merged-with-base-pool-config\.mjs$|scripts\/lib\/ci-source-guard-pool\.mjs$|scripts\/ci-fast-lanes\.mjs$|package\.json$)/u;
