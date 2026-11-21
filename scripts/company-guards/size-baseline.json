@@ -232,7 +232,7 @@
   "apps/web/components/features/profile/templates/ProfileCompactTemplate.tsx": 1322,
   "apps/web/components/features/profile/templates/ProfileDesktopSurface.test.tsx": 1208,
   "apps/web/components/features/profile/templates/ProfileDesktopSurface.tsx": 1174,
-  "apps/web/components/features/release/ActionDial.tsx": 618,
+  "apps/web/components/features/release/ActionDial.tsx": 560,
   "apps/web/components/features/release/AudioWaveformEditor.tsx": 535,
   "apps/web/components/features/waitlist/WaitlistSpotifySearch.tsx": 516,
   "apps/web/components/jovie/JovieChat.draft-ownership.test.tsx": 531,
