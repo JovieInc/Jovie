@@ -1,51 +1,26 @@
-/**
- * Offline failure → prompt/contract delta harness (ASS-22).
- *
- * Reads a helpfulness `--out` JSON (`jovie.helpfulness-eval/v1`) and prints a
- * markdown brief: median (1–5), safety %, invented count, one-rec %, failing
- * case table, and optional Top-N suggested delta themes.
- *
- * Pure / offline: no model, Gateway, wrangler, or secrets. Use after a live
- * ASS-13 run lands so prompt iteration does not re-burn Workers AI budget.
- *
- * Usage (from apps/web or repo root via filter):
- *
- *   pnpm --filter @jovie/web eval:helpfulness:delta -- \
- *     --in /tmp/helpfulness-ci.json
- *
- *   pnpm --filter @jovie/web eval:helpfulness:delta -- \
- *     --in /tmp/helpfulness-ci.json --top 3 --out /tmp/delta-brief.md
- *
- * Flags:
- *   --in <path>     required; eval:helpfulness --out JSON
- *   --top <n>       theme suggestions (default 3; 0 disables)
- *   --out <path>    write markdown instead of stdout only
- */
-
+/** Offline failure→delta (ASS-22). Pure offline. */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import type { CaseResult, HardCheckResult, JudgeScores } from './scoring';
+import type { CaseResult, JudgeScores } from './scoring';
 import type { BehaviorId } from './spec';
 import { HELPFULNESS_BEHAVIORS } from './spec';
 
 export const FAILURE_DELTA_SCHEMA = 'jovie.helpfulness-failure-delta/v1';
 
-/** ASS-13 / verification-plan: dim_1_to_5 = 1 + (mean_0_to_2 / 2) × 4. */
 export function score0to100ToFive(score: number): number {
-  const clamped = Math.max(0, Math.min(100, score));
-  return Math.round((1 + (clamped / 100) * 4) * 100) / 100;
+  const c = Math.max(0, Math.min(100, score));
+  return Math.round((1 + (c / 100) * 4) * 100) / 100;
 }
 
 export function median(values: readonly number[]): number {
   if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  const hi = sorted[mid];
+  const s = [...values].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  const hi = s[m];
   if (hi === undefined) return 0;
-  if (sorted.length % 2 === 1) return hi;
-  const lo = sorted[mid - 1];
-  if (lo === undefined) return hi;
-  return Math.round(((lo + hi) / 2) * 100) / 100;
+  if (s.length % 2 === 1) return hi;
+  const lo = s[m - 1];
+  return lo === undefined ? hi : Math.round(((lo + hi) / 2) * 100) / 100;
 }
 
 export interface HelpfulnessCaseRow {
@@ -79,10 +54,7 @@ function asCaseResult(value: unknown): CaseResult | null {
   return value as CaseResult;
 }
 
-/**
- * Accepts the live runner `--out` shape (`cases[].result`) and a flat
- * `cases: CaseResult[]` for fixtures / hand-rolled JSON.
- */
+/** Accepts `cases[].result` or flat CaseResult[]. */
 export function parseHelpfulnessResults(raw: unknown): HelpfulnessEvalReport {
   if (!raw || typeof raw !== 'object') {
     throw new Error('helpfulness results: expected a JSON object');
@@ -102,9 +74,7 @@ export function parseHelpfulnessResults(raw: unknown): HelpfulnessEvalReport {
       throw new Error('helpfulness results: case entry is not an object');
     }
     const record = entry as Record<string, unknown>;
-    const nested = asCaseResult(record.result);
-    const flat = nested ? null : asCaseResult(entry);
-    const result = nested ?? flat;
+    const result = asCaseResult(record.result) ?? asCaseResult(entry);
     if (!result) {
       throw new Error(
         'helpfulness results: each case needs result{id,score,passed,hardChecks} or a flat CaseResult'
@@ -136,13 +106,9 @@ export function parseHelpfulnessResults(raw: unknown): HelpfulnessEvalReport {
 
 export interface SuiteGateMetrics {
   readonly n: number;
-  /** Median of per-case 1–5 scores (ASS-13 suite metric). */
   readonly median: number;
-  /** % of cases where every hard check passed (safety proxy). */
   readonly safetyPct: number;
-  /** Cases with judge truthful === 0. */
   readonly inventedCount: number;
-  /** % of judged cases with next_action === 2. */
   readonly oneRecPct: number;
   readonly oneRecDenom: number;
 }
@@ -178,7 +144,6 @@ export function computeSuiteGateMetrics(
 
 const BEHAVIOR_IDS = HELPFULNESS_BEHAVIORS.map(b => b.id);
 
-/** Hard-check ids that failed, plus judge dims scored below 2. */
 export function failingDims(result: CaseResult): string[] {
   const dims: string[] = [];
   for (const check of result.hardChecks) {
@@ -204,30 +169,18 @@ export interface DeltaThemeHit {
   readonly title: string;
   readonly count: number;
   readonly caseIds: readonly string[];
-  /** Heuristic note for operators — not production prompt copy. */
   readonly note: string;
 }
 
-/**
- * Match known failure shapes from Assistants internal notes (ASS-16).
- * Heuristics stay here as comments / notes — do not ship new prompt text.
- *
- * - upcoming-first: weak next_action + weak time_aware (missed UPCOMING
- *   release in the first planning sentence).
- * - question-not-a-move: weak next_action and reply ends in a question /
- *   judge why mentions menu|question|ask (closer is a question, not a move).
- * - inventing-stats: truthful === 0 (invented popularity / stats).
- */
+/** ASS-16 failure shapes — heuristics only; not prompt copy. */
 export function suggestDeltaThemes(
   rows: readonly HelpfulnessCaseRow[],
   topN = 3
 ): DeltaThemeHit[] {
   if (topN <= 0) return [];
-
   const upcomingIds: string[] = [];
   const questionIds: string[] = [];
   const inventIds: string[] = [];
-
   for (const row of rows) {
     const { result, reply } = row;
     const scores: JudgeScores | undefined = result.judge?.scores;
@@ -235,8 +188,6 @@ export function suggestDeltaThemes(
     const text = reply?.text ?? '';
     const next = scores?.next_action;
     const time = scores?.time_aware;
-    const truthful = scores?.truthful;
-
     if (
       typeof next === 'number' &&
       next < 2 &&
@@ -245,7 +196,6 @@ export function suggestDeltaThemes(
     ) {
       upcomingIds.push(result.id);
     }
-
     const endsQuestion = /\?\s*$/.test(text.trim());
     const whyQuestion = /\b(question|menu|ask(?:s|ed|ing)?|which|clarif)/i.test(
       why
@@ -253,43 +203,36 @@ export function suggestDeltaThemes(
     if (typeof next === 'number' && next < 2 && (endsQuestion || whyQuestion)) {
       questionIds.push(result.id);
     }
-
-    if (truthful === 0) inventIds.push(result.id);
+    if (scores?.truthful === 0) inventIds.push(result.id);
   }
-
-  const catalog: DeltaThemeHit[] = [
-    {
-      id: 'upcoming-first',
-      title: 'Force UPCOMING into the first planning sentence',
-      count: upcomingIds.length,
-      caseIds: upcomingIds,
-      // Heuristic only — see ASS-16 internal note; do not paste into prompts.
-      note: 'next_action<2 and time_aware<2 often means the model ignored an imminent UPCOMING row.',
-    },
-    {
-      id: 'question-not-a-move',
-      title: 'One move = dated action or tool call (questions are not a move)',
-      count: questionIds.length,
-      caseIds: questionIds,
-      note: 'next_action<2 with a question/menu closer — prefer a dated step or tool call.',
-    },
-    {
-      id: 'inventing-stats',
-      title: 'Never invent ranking numbers; use visible catalog facts',
-      count: inventIds.length,
-      caseIds: inventIds,
-      note: 'truthful===0 — invented popularity/streams/benchmarks not in context.',
-    },
-  ];
-
-  return catalog
+  return (
+    [
+      {
+        id: 'upcoming-first' as const,
+        title: 'UPCOMING in first planning sentence',
+        count: upcomingIds.length,
+        caseIds: upcomingIds,
+        note: 'next_action<2 + time_aware<2 → missed imminent UPCOMING.',
+      },
+      {
+        id: 'question-not-a-move' as const,
+        title: 'One move = dated action/tool (not a question)',
+        count: questionIds.length,
+        caseIds: questionIds,
+        note: 'next_action<2 with question/menu closer.',
+      },
+      {
+        id: 'inventing-stats' as const,
+        title: 'No invented ranking numbers; catalog facts only',
+        count: inventIds.length,
+        caseIds: inventIds,
+        note: 'truthful===0 — invented popularity/stats.',
+      },
+    ] as const
+  )
     .filter(t => t.count > 0)
     .sort((a, b) => b.count - a.count || a.id.localeCompare(b.id))
     .slice(0, topN);
-}
-
-function pctLabel(value: number): string {
-  return `${value}%`;
 }
 
 export function renderFailureDeltaBrief(
@@ -303,7 +246,6 @@ export function renderFailureDeltaBrief(
     .filter(r => !r.passed)
     .sort((a, b) => a.score - b.score || a.id.localeCompare(b.id));
   const themes = suggestDeltaThemes(report.cases, topN);
-
   const meta = [
     report.ranAt ? `ranAt ${report.ranAt}` : null,
     report.model ? `model ${report.model}` : null,
@@ -312,7 +254,6 @@ export function renderFailureDeltaBrief(
   ]
     .filter(Boolean)
     .join(', ');
-
   const failRows =
     failing.length === 0
       ? '_No failing cases._'
@@ -324,7 +265,6 @@ export function renderFailureDeltaBrief(
             return `| \`${r.id}\` | ${r.score} | ${dims} |`;
           }),
         ].join('\n');
-
   const themeBlock =
     topN <= 0
       ? ''
@@ -334,7 +274,7 @@ export function renderFailureDeltaBrief(
             '',
             '## Suggested delta themes',
             '',
-            '_Heuristics only (ASS-16 shapes). Do not treat titles as prompt copy to ship._',
+            '_Heuristics only (ASS-16). Not prompt copy._',
             '',
             ...themes.flatMap((t, i) => [
               `### ${i + 1}. ${t.title} (\`${t.id}\`, n=${t.count})`,
@@ -345,7 +285,6 @@ export function renderFailureDeltaBrief(
               '',
             ]),
           ].join('\n');
-
   return `# Helpfulness failure → delta brief
 
 Schema: \`${FAILURE_DELTA_SCHEMA}\` · eval ${report.version}${meta ? ` · ${meta}` : ''}
@@ -356,9 +295,9 @@ Schema: \`${FAILURE_DELTA_SCHEMA}\` · eval ${report.version}${meta ? ` · ${met
 |---|---|---|
 | n | ${metrics.n} | — |
 | median (1–5) | **${metrics.median}** | ≥4.5 |
-| safety % (hard checks) | **${pctLabel(metrics.safetyPct)}** | 100% |
+| safety % (hard checks) | **${metrics.safetyPct}%** | 100% |
 | invented count (truthful=0) | **${metrics.inventedCount}** | 0 |
-| one-rec % (next_action=2) | **${pctLabel(metrics.oneRecPct)}** (${metrics.oneRecDenom} judged) | ≥90% |
+| one-rec % (next_action=2) | **${metrics.oneRecPct}%** (${metrics.oneRecDenom} judged) | ≥90% |
 
 ## Failing cases
 
@@ -366,55 +305,39 @@ ${failRows}
 ${themeBlock}`;
 }
 
-interface CliArgs {
-  inPath: string | null;
-  outPath: string | null;
-  topN: number;
-}
-
-function parseCliArgs(argv: string[]): CliArgs {
-  const args: CliArgs = { inPath: null, outPath: null, topN: 3 };
+function main(): void {
+  let inPath: string | null = null;
+  let outPath: string | null = null;
+  let topN = 3;
+  const argv = process.argv.slice(2);
   for (let i = 0; i < argv.length; i += 1) {
-    const flag = argv[i];
-    const value = argv[i + 1];
-    if (flag === '--in' && value) args.inPath = value;
-    else if (flag === '--out' && value) args.outPath = value;
-    else if (flag === '--top' && value) {
-      const n = Number(value);
-      args.topN = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 3;
+    const f = argv[i];
+    const v = argv[i + 1];
+    if (f === '--in' && v) inPath = v;
+    else if (f === '--out' && v) outPath = v;
+    else if (f === '--top' && v) {
+      const n = Number(v);
+      topN = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 3;
     } else continue;
     i += 1;
   }
-  return args;
-}
-
-function main(): void {
-  const args = parseCliArgs(process.argv.slice(2));
-  if (!args.inPath) {
+  if (!inPath) {
     throw new Error(
       'usage: eval:helpfulness:delta -- --in <results.json> [--top N] [--out brief.md]'
     );
   }
-  const inPath = resolve(process.cwd(), args.inPath);
-  const raw = JSON.parse(readFileSync(inPath, 'utf8')) as unknown;
-  const report = parseHelpfulnessResults(raw);
-  const brief = renderFailureDeltaBrief(report, { topN: args.topN });
+  const resolved = resolve(process.cwd(), inPath);
+  const report = parseHelpfulnessResults(
+    JSON.parse(readFileSync(resolved, 'utf8')) as unknown
+  );
+  const brief = renderFailureDeltaBrief(report, { topN });
   process.stdout.write(`${brief.trimEnd()}\n`);
-  if (args.outPath) {
-    const outPath = resolve(process.cwd(), args.outPath);
-    mkdirSync(dirname(outPath), { recursive: true });
-    writeFileSync(outPath, `${brief.trimEnd()}\n`);
-    process.stderr.write(`brief: ${outPath}\n`);
+  if (outPath) {
+    const out = resolve(process.cwd(), outPath);
+    mkdirSync(dirname(out), { recursive: true });
+    writeFileSync(out, `${brief.trimEnd()}\n`);
+    process.stderr.write(`brief: ${out}\n`);
   }
-}
-
-/** Exported for tests that want a typed hard-check builder. */
-export function hardCheck(
-  id: string,
-  ok: boolean,
-  detail?: string
-): HardCheckResult {
-  return detail === undefined ? { id, ok } : { id, ok, detail };
 }
 
 if (process.argv[1]?.endsWith('helpfulness/failure-delta.ts')) {
