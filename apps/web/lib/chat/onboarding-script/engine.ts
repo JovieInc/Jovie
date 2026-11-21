@@ -22,8 +22,8 @@ import {
 } from '@/lib/onboarding/profile-draft';
 import { validateUsername } from '@/lib/validation/username';
 import {
+  keepAuthTurnAfterHandleConfirmed,
   resolveAwaitingHandleConfirm,
-  socialTurnAfterHandleConfirmed,
 } from './handle-confirm-turn';
 import { loadScriptBank, pickFromBank } from './line-source';
 import { renderLine, type ScriptLine, type ScriptStepId } from './script';
@@ -42,9 +42,10 @@ import {
  * UIMessage history (tool outputs persist across turns on the client and in
  * `chat_messages.tool_calls`). When the LLM is down, this walks the same
  * intake rail the LLM walks with explicit guards:
- * Role → ArtistSearch → ArtistSelect → Handle → Social → Contact →
- * Waitlist/Complete. Widget completions emit structured events; free-text
- * acks ("ok", "k") never complete waitlist/reservation.
+ * Role → ArtistSearch → ArtistSelect → Handle (Keep) → Waitlist/Complete.
+ * Social/audience are deferred after handle Keep (handle-by-default).
+ * Widget completions emit structured events; free-text acks ("ok", "k")
+ * never complete waitlist/reservation.
  */
 
 export interface FallbackToolEvent {
@@ -355,7 +356,13 @@ export function resolveGuardedStep(input: {
     return 'handle';
   }
 
-  if (!hasSocialAttached(uiMessages)) {
+  // Handle-by-default: after Keep, social/audience are deferred — route to
+  // access decision. Mid-flight sessions that already opened social still
+  // resolve via decideFallbackTurn's social branches below.
+  if (
+    findLatestToolOutput(uiMessages, 'propose_social_link') &&
+    !hasSocialAttached(uiMessages)
+  ) {
     return 'social';
   }
 
@@ -796,12 +803,13 @@ export async function decideFallbackTurn(
       (typeof existingHandleCheck.handle === 'string'
         ? String(existingHandleCheck.handle)
         : handleFromArtistName(state.spotifyArtistName ?? ''));
-    // Social-link card ships with this turn; audience waits until attach.
-    return socialTurnAfterHandleConfirmed(handle, pick);
+    // Keep → auth: skip social/audience enrichment after accepting the
+    // match-derived handle (Boardy handle-by-default).
+    return keepAuthTurnAfterHandleConfirmed(handle, state, pick);
   }
 
-  // Handle shown but not confirmed — free-text claim/sign-up can lock it;
-  // acks ("ok" / "k") still do not advance.
+  // Handle shown but not confirmed — free-text claim/sign-up/keep can lock
+  // it; acks ("ok" / "k") still do not advance.
   if (!hasHandleConfirmed(uiMessages)) {
     const shownHandle =
       typeof existingHandleCheck.handle === 'string'
@@ -814,6 +822,7 @@ export async function decideFallbackTurn(
       latest,
       latestIsWidgetEvent: Boolean(latestEvent),
       typedHandle,
+      state,
       pick,
     });
   }
