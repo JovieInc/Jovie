@@ -15,6 +15,8 @@ if [ -z "${VERCEL_TOKEN:-}" ]; then
   exit 1
 fi
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
 VERCEL_SCOPE_ARGS=()
 if [ -n "${VERCEL_ORG_ID:-}" ]; then
   VERCEL_SCOPE_ARGS=(--scope "$VERCEL_ORG_ID")
@@ -61,20 +63,9 @@ count_prebuilt_files() {
   find .vercel/output -type f | wc -l | tr -d ' '
 }
 
-# Vercel CLI >= 59 applies the repo .vercelignore to prebuilt functions'
-# `.vc-config.json` filePathMap entries and drops every match from the upload
-# (PREBUILT_FILEPATHMAP_IGNORED, "excludes at least 20 files the prebuilt
-# functions need"). CLI 56.x uploaded the full traced closure. (Restoring
-# that closure did not fix the 59.x "Extracting deployment files ...
-# Unexpected error" failures; the CLI is pinned to 56.3.2 for that, see
-# .github/dependabot.yml.) The prebuilt file walk ignores everything outside .vercel/output regardless
-# of .vercelignore, so that file only shapes source uploads. For prebuilt
-# uploads it only removes files `vercel build` traced (CHANGELOG.md,
-# docs/FEATURE_REGISTRY.md, tests/quarantine.json, ...). The dropped set
-# depends on the trace and the CLI truncates it at 20, so no fixed re-include
-# list can cover it. Hide the file for the prebuilt CLI call only; source
-# deploys keep it. assert_prebuilt_upload_has_no_secrets bounds what the
-# upload set may contain.
+# CLI >=59 drops .vercelignore matches from prebuilt filePathMap uploads
+# (PREBUILT_FILEPATHMAP_IGNORED). Pin is 56.3.2 (.github/dependabot.yml).
+# Hide .vercelignore for prebuilt only; source keeps it.
 HIDDEN_VERCELIGNORE=""
 
 restore_vercelignore() {
@@ -188,53 +179,43 @@ NODE
 run_deploy() {
   local mode="$1"
   shift
-
-  # One realistically budgeted archive attempt plus the source fallback must
-  # leave a full minute beneath the workflow step's 10-minute ceiling.
+  # Archive+source budgets leave ≥1m under the 10m step. --no-wait returns as
+  # soon as Vercel accepts a URL; BLOCKED is polled immediately (JOV-12620).
   local timeout_seconds="${VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS:-480}"
   if [ "$mode" = "source" ]; then
     timeout_seconds="${VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS:-30}"
   fi
   local kill_grace_seconds="${VERCEL_DEPLOY_KILL_GRACE_SECONDS:-5}"
-
   local deploy_cmd=(timeout --signal=TERM --kill-after="${kill_grace_seconds}s" "$timeout_seconds")
+  local prebuilt=(run_prebuilt_cli "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt)
 
-  if [ "$mode" = "tgz" ]; then
-    run_prebuilt_cli "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt --archive=tgz "$@" "${VERCEL_SCOPE_ARGS[@]}"
-    return
-  fi
-
-  if [ "$mode" = "split-tgz" ]; then
-    run_prebuilt_cli "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt --archive=split-tgz "$@" "${VERCEL_SCOPE_ARGS[@]}"
-    return
-  fi
-
-  if [ "$mode" = "plain" ]; then
-    run_prebuilt_cli "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --prebuilt "$@" "${VERCEL_SCOPE_ARGS[@]}"
-    return
-  fi
+  case "$mode" in
+    tgz) "${prebuilt[@]}" --archive=tgz --no-wait "$@" "${VERCEL_SCOPE_ARGS[@]}"; return ;;
+    split-tgz) "${prebuilt[@]}" --archive=split-tgz --no-wait "$@" "${VERCEL_SCOPE_ARGS[@]}"; return ;;
+    plain) "${prebuilt[@]}" --no-wait "$@" "${VERCEL_SCOPE_ARGS[@]}"; return ;;
+  esac
 
   if [ -f ".vercel/jovie-generated-public-files" ]; then
     while IFS= read -r generated_file; do
-      if [ -n "$generated_file" ]; then
-        rm -f -- "$generated_file"
-      fi
+      [ -n "$generated_file" ] && rm -f -- "$generated_file"
     done < ".vercel/jovie-generated-public-files"
   fi
 
   if [ -n "${VERCEL_GIT_COMMIT_SHA:-}" ]; then
-    local build_sha="${VERCEL_GIT_COMMIT_SHA:0:7}"
-    export NEXT_PUBLIC_BUILD_SHA="$build_sha"
-    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy "$@" \
-      --build-env VERCEL_GIT_COMMIT_SHA \
-      --env VERCEL_GIT_COMMIT_SHA \
-      --build-env NEXT_PUBLIC_BUILD_SHA \
-      --env NEXT_PUBLIC_BUILD_SHA \
+    export NEXT_PUBLIC_BUILD_SHA="${VERCEL_GIT_COMMIT_SHA:0:7}"
+    "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --no-wait "$@" \
+      --build-env VERCEL_GIT_COMMIT_SHA --env VERCEL_GIT_COMMIT_SHA \
+      --build-env NEXT_PUBLIC_BUILD_SHA --env NEXT_PUBLIC_BUILD_SHA \
       "${VERCEL_SCOPE_ARGS[@]}"
     return
   fi
+  "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --no-wait "$@" "${VERCEL_SCOPE_ARGS[@]}"
+}
 
-  "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy "$@" "${VERCEL_SCOPE_ARGS[@]}"
+# Settle after --no-wait: BLOCKED→75, ERROR/CANCELED→1 (fallback), else 0.
+assert_deployment_not_blocked() {
+  VERCEL_CLI_JSON="$(node -e 'process.stdout.write(JSON.stringify(process.argv.slice(1)))' -- "${VERCEL_CMD[@]}")" \
+    node "$SCRIPT_DIR/vercel-blocked-breaker.mjs" poll "$1"
 }
 
 emit_failure_diagnostic() {
@@ -318,7 +299,6 @@ NODE
 # modes, symlink targets; never contents or env) right before the tgz attempt
 # so an "Extracting deployment files" failure can be diffed against the last
 # success. Failure of the manifest itself never changes deploy behavior.
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_MANIFEST_FILE="${VERCEL_OUTPUT_MANIFEST_FILE:-${RUNNER_TEMP:-/tmp}/jovie-vercel-output-manifest.json}"
 OUTPUT_MANIFEST_WRITTEN=false
 
@@ -368,23 +348,27 @@ try_mode() {
     fi
   fi
   rm -f "$deploy_output_file"
+  local settle_seconds="${VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS:-480}"
+  [ "$mode" = "source" ] && settle_seconds="${VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS:-30}"
+  settle_seconds="${VERCEL_DEPLOY_SETTLE_SECONDS:-$settle_seconds}"
   if [ "$deploy_status" -eq 0 ]; then
     if [ -z "$deployment_url" ]; then
       echo "Deploy succeeded but no preview URL was found in Vercel output" >&2
       return 1
     fi
+    VERCEL_DEPLOY_SETTLE_SECONDS="$settle_seconds" \
+      assert_deployment_not_blocked "$deployment_url" || return $?
     write_deployment_url "$deployment_url"
     echo "Deploy succeeded on attempt $attempt with ${mode} upload"
     return 0
   fi
-
   if [ "$deploy_status" -eq 124 ] || [ "$deploy_status" -eq 137 ]; then
     echo "Deploy attempt $attempt with ${mode} upload exceeded its time budget" >&2
-    local accepted_deployment_url=""
-    accepted_deployment_url="$deployment_url"
-    if [ -n "$accepted_deployment_url" ]; then
-      write_deployment_url "$accepted_deployment_url"
-      echo "Vercel accepted ${accepted_deployment_url}; downstream health gates will verify readiness"
+    if [ -n "$deployment_url" ]; then
+      VERCEL_DEPLOY_SETTLE_SECONDS="$settle_seconds" \
+        assert_deployment_not_blocked "$deployment_url" || return $?
+      write_deployment_url "$deployment_url"
+      echo "Vercel accepted ${deployment_url}; downstream health gates will verify readiness"
       return 0
     fi
   fi
@@ -484,8 +468,15 @@ for mode in "${deploy_modes[@]}"; do
       ;;
   esac
 
-  if try_mode "$mode" "$attempt" "${deploy_args[@]}"; then
+  try_status=0
+  try_mode "$mode" "$attempt" "${deploy_args[@]}" || try_status=$?
+  if [ "$try_status" -eq 0 ]; then
     exit 0
+  fi
+  # BLOCKED is terminal for this generation: do not burn source fallback or
+  # another archive attempt while the provider is refusing deploys.
+  if [ "$try_status" -eq 75 ]; then
+    exit 75
   fi
 done
 
