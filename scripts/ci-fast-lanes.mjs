@@ -37,6 +37,7 @@ import {
   lanesCoverageRun,
   selectStructuralShard,
 } from './lib/ci-structural-shards.mjs';
+
 export {
   LANES_COVERAGE_FLOORS,
   LANES_COVERAGE_GROUP_SHARDS,
@@ -1009,7 +1010,6 @@ const LANES_COVERAGE_REPORT_COMMANDS = LANES_COVERAGE_FLOORS.map(
     '" --fail-under=' +
     floor
 );
-
 // Run the CPU-heavy coverage shards alone; keep every main-branch floor.
 export const LANES_COVERAGE_COMMAND = structuralPythonRegression(
   [LANES_COVERAGE_RUN, ...LANES_COVERAGE_REPORT_COMMANDS].join(' && ')
