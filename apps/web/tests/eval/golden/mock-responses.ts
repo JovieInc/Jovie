@@ -76,7 +76,6 @@ export const GOLDEN_MOCK_RESPONSES: Readonly<Record<string, string>> = {
 
   'One-rec gap: do-it calls the pitch tool':
     'Drafting the Night Swim curator pitch now. I will hold the draft for your one-tap yes before anything sends.',
-
 };
 
 export function getGoldenMockResponse(caseName: string): string {
