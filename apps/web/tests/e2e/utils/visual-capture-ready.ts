@@ -6,7 +6,7 @@ import { findErrorCopy } from './visual-capture-copy';
  * committed a loading skeleton as `admin-home` and then the "Revenue state
  * unavailable" error card. Call it before every `toHaveScreenshot` in a suite
  * that refreshes baselines: it waits for placeholders to settle, then fails
- * the test if the capture would show a skeleton, a busy region or an error.
+ * the test if the capture would show a skeleton, a busy region or error copy.
  * A failed test publishes no baselines, so the bad capture is never adopted.
  */
 
@@ -20,7 +20,7 @@ export const LOADING_SELECTORS = [
 ] as const;
 
 export interface CaptureProblem {
-  readonly kind: 'loading' | 'error-copy' | 'alert';
+  readonly kind: 'loading' | 'error-copy';
   readonly detail: string;
 }
 
@@ -50,16 +50,12 @@ export async function findCaptureProblems(
   for (const selector of await visibleLoadingMarkers(root)) {
     problems.push({ kind: 'loading', detail: selector });
   }
+  // Error copy is read from the rendered text, alerts included. A visible
+  // role="alert" alone is not an error: the route announcer and toasts use it
+  // for ordinary copy ("Move your music forward."), so it is never a problem
+  // by itself.
   const errorCopy = findErrorCopy(await root.innerText());
   if (errorCopy) problems.push({ kind: 'error-copy', detail: errorCopy });
-  const alerts = root.locator('[role="alert"]');
-  const alertCount = await alerts.count();
-  for (let index = 0; index < alertCount; index += 1) {
-    const alert = alerts.nth(index);
-    if (!(await alert.isVisible())) continue;
-    const text = (await alert.innerText()).trim();
-    if (text) problems.push({ kind: 'alert', detail: text.slice(0, 120) });
-  }
   return problems;
 }
 

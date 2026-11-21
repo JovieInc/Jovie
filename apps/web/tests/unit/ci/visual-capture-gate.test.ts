@@ -65,5 +65,16 @@ describe('visual capture gate', () => {
     expect(findErrorCopy('Nothing is blocking revenue')).toBeNull();
     expect(findErrorCopy('No artist has paid yet.')).toBeNull();
     expect(findErrorCopy('Sign in to Jovie')).toBeNull();
+    // The sign-in modal's live regions; the first proof refresh refused them.
+    expect(findErrorCopy('Jovie')).toBeNull();
+    expect(findErrorCopy('Move your music forward.')).toBeNull();
+  });
+
+  it('does not treat a bare role="alert" region as a problem', () => {
+    const gate = readFileSync(
+      resolve(e2eDirectory, 'utils/visual-capture-ready.ts'),
+      'utf8'
+    );
+    expect(gate).not.toMatch(/locator\(['"]\[role="alert"\]['"]\)/);
   });
 });
