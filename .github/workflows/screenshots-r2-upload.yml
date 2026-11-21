@@ -13,7 +13,7 @@ name: Screenshots to R2 upload
 #
 #   R2_ACCOUNT_ID=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... \
 #     node scripts/screenshot-store.mjs upload \
-#       --from 8c091d12237d4488cac447ada35465da261866a8
+#       --from f96bd589a1c4840ee3a3c7578acd68caeed9f34c
 #
 # After the migration merges, this workflow can re-upload from any git ref that
 # still holds the bytes (binaries_ref, default the commit the migration branched
@@ -28,7 +28,7 @@ on:
       binaries_ref:
         description: 'Git ref that still holds the binaries (default: the commit the migration branched from)'
         required: false
-        default: '8c091d12237d4488cac447ada35465da261866a8'
+        default: 'f96bd589a1c4840ee3a3c7578acd68caeed9f34c'
 
 permissions: {}
 
@@ -47,7 +47,7 @@ jobs:
       R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
       R2_ACCESS_KEY_ID: ${{ secrets.R2_SCREENSHOTS_WRITE_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SCREENSHOTS_WRITE_SECRET_ACCESS_KEY }}
-      BINARIES_REF: ${{ inputs.binaries_ref || '8c091d12237d4488cac447ada35465da261866a8' }}
+      BINARIES_REF: ${{ inputs.binaries_ref || 'f96bd589a1c4840ee3a3c7578acd68caeed9f34c' }}
     steps:
       - name: Require R2 write credentials
         shell: bash

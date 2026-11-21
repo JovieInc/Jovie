@@ -1,9 +1,9 @@
 {
   "schema": "jovie.screenshot-pointer/v1",
-  "sha256": "f1f9a4e00cce694a8a8b2a0e0ef324b8e2ecf47744c3ea7c900563d53bc520e5",
-  "bytes": 572402,
+  "sha256": "08f540a95c2dbf7c621c7b4009ac4bf409f8a745a1a3de19fa04baeb7c756bae",
+  "bytes": 538039,
   "contentType": "image/png",
-  "url": "r2://jovie-screenshots/sha256/f1/f1f9a4e00cce694a8a8b2a0e0ef324b8e2ecf47744c3ea7c900563d53bc520e5.png",
+  "url": "r2://jovie-screenshots/sha256/08/08f540a95c2dbf7c621c7b4009ac4bf409f8a745a1a3de19fa04baeb7c756bae.png",
   "viewport": "2880x994",
   "capturedAt": "2026-11-19T18:57:45.909Z"
 }
