@@ -6,6 +6,7 @@ import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkele
 vi.mock('@/components/organisms/Dialog', () => ({
   Dialog: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DialogBody: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DialogTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
 }));
 
 vi.mock('@/components/molecules/drawer', () => ({

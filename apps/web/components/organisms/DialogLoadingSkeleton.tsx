@@ -2,7 +2,7 @@
 
 import { Skeleton } from '@jovie/ui';
 import { DrawerSurfaceCard } from '@/components/molecules/drawer';
-import { Dialog, DialogBody } from '@/components/organisms/Dialog';
+import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
 
@@ -26,6 +26,7 @@ export function DialogLoadingSkeleton({
 
   return (
     <Dialog open={open} onClose={onClose} size={size}>
+      <DialogTitle className='sr-only'>Loading</DialogTitle>
       <Skeleton className='h-6 w-36' />
       <Skeleton className='mt-2 h-4 w-72 max-w-full' />
 
