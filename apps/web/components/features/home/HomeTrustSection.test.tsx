@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { TRUST_LOGO_ASSETS } from '@/components/media/trustLogoAssets';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { LOGO_PERMISSION_FIXTURES } from '@/data/product-truth/logo-permissions.fixture';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { HomeTrustSection } from './HomeTrustSection';
 
 const granted = {
@@ -88,6 +89,28 @@ describe('HomeTrustSection', () => {
       'data-pen-contract',
       MARKETING_PEN_CONTRACT_IDS.section.logoCloud
     );
+  });
+});
+
+describe('HomeTrustSection surface', () => {
+  it('draws the always-dark card with media tokens and no raw colour', async () => {
+    const { container } = render(
+      <HomeTrustSection {...granted} label='Trusted by artists' />
+    );
+    const card = container.querySelector('.public-container');
+    expect(card).toHaveClass('bg-ink-on-media', 'border-on-media/8');
+    expect(card?.className).not.toMatch(/rgba|white\/|black\//);
+    expect(screen.getByText('Trusted by artists')).toHaveClass(
+      'text-on-media/56'
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no accessibility violations on the artist-profile bar', async () => {
+    const { container } = render(
+      <HomeTrustSection {...granted} presentation='artist-profile' />
+    );
+    await expectNoA11yViolations(container);
   });
 });
 

@@ -68,8 +68,7 @@ export function OnboardingExperienceShell({
     <div
       className={cn(
         ROOT_CLASSNAME[mode],
-        visualVariant === 'v1' &&
-          'bg-(--color-bg-base) bg-[radial-gradient(circle_at_52%_12%,rgba(103,232,249,0.10),transparent_32%)]',
+        visualVariant === 'v1' && 'bg-base',
         className
       )}
       data-testid={testId}
