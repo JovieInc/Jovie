@@ -75,11 +75,16 @@ import {
 
 export {
   expandSourcePoolEntries,
+  mergedWithBasePoolConcurrency,
   runSourceGuardPool,
   runSourceGuards,
   sourceGuardConcurrency,
   sourceGuardLocks,
 } from './lib/ci-source-guard-pool.mjs';
+export {
+  MERGED_WITH_BASE_POOL_CONCURRENCY,
+  MERGED_WITH_BASE_POOL_LONG_POLES,
+} from './lib/merged-with-base-pool-config.mjs';
 
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
 import { isInvariantScannedPath } from './invariants/scanned-paths.mjs';
@@ -96,6 +101,7 @@ import {
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
 import { STRUCTURAL_PYTEST_FILES } from './lib/ci-structural-pytest-files.mjs';
+import { MERGED_WITH_BASE_POOL_CONCURRENCY } from './lib/merged-with-base-pool-config.mjs';
 import { scriptContractNodeArgs } from './lib/script-contract-node-args.mjs';
 import { testsAffectedBy } from './lib/test-file-dependencies.mjs';
 import { TEST_PLANNER_CONTRACT_TESTS } from './lib/test-planner-contract-tests.mjs';
@@ -205,20 +211,6 @@ export const STRUCTURAL_STATIC_SCAN_EXEMPT = Object.freeze({
     'run on the PR merged with base by merged-with-base-invariants (~88s)',
   'pnpm ci:control:test': 'control-plane suite, ~40s; merge-group only',
 });
-
-/**
- * The merged-with-base guard runs its scans as one bounded pool instead of a
- * serial `;` chain. Same commands, same fail-closed outcome (any failure fails
- * the guard); run-all means a failure no longer hides later failures.
- */
-export const MERGED_WITH_BASE_POOL_CONCURRENCY = 4;
-
-/** Measured long poles inside the merged-with-base pool (ordering only). */
-export const MERGED_WITH_BASE_POOL_LONG_POLES = Object.freeze([
-  // The node --test invariants batch (~120s) and the web vitest run.
-  'scripts/invariants/registry.test.mjs',
-  'tests/unit/api/webhooks/linear.test.ts',
-]);
 
 /** Short, stable pool id for a scan command. */
 function mergedBasePoolId(command) {
