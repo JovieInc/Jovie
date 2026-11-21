@@ -24,3 +24,16 @@ Optional `--out /tmp/delta-brief.md` writes the markdown brief to disk.
 
 Hermetic proof: `failure-delta.ci.test.ts` (picked up by
 `vitest.config.golden-eval.mts` via `tests/eval/helpfulness/**/*.ci.test.ts`).
+
+## Offline ASS-13 targets gate (ASS-27, $0)
+
+Exit 0 iff median≥4.5, safety 100%, invented=0, one-rec≥90%. On fail, prints
+Top themes (same heuristics as `:delta`). Offline only — pass an existing
+`--out` JSON; never calls live models.
+
+```bash
+pnpm --filter @jovie/web eval:helpfulness:targets -- \
+  --out /tmp/helpfulness-ci.json
+```
+
+Hermetic proof: `targets.ci.test.ts`.
