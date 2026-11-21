@@ -27,7 +27,6 @@
     "decorative-color apps/web/components/features/admin/SentryMetricsCard.tsx: iconClassName='text-error'",
     "decorative-color apps/web/components/features/admin/SentryMetricsCard.tsx: iconClassName='text-info'",
     "decorative-color apps/web/components/features/admin/SentryMetricsCard.tsx: iconClassName='text-warning'",
-    "raw-status-palette apps/web/components/features/admin/CreatorAvatarCell.tsx: <Star className='h-3 w-3 text-yellow-400 dark:text-yellow-300 fill-current' />",
     "raw-status-palette apps/web/components/features/admin/ImpersonationBanner.tsx: <code className='rounded bg-amber-600/30 px-1 py-0.5 font-mono text-xs'>",
     "raw-status-palette apps/web/components/features/admin/ImpersonationBanner.tsx: <span className='text-sm text-amber-900'>",
     "raw-status-palette apps/web/components/features/admin/ImpersonationBanner.tsx: className='flex items-center gap-2 bg-amber-500 text-black dark:text-white hover:bg-amber-400'",
@@ -38,8 +37,6 @@
     "raw-status-palette apps/web/components/features/admin/admin-releases-table/AdminReleasesTableUnified.tsx: <div className='flex size-full items-center justify-center text-amber-500'>",
     "raw-status-palette apps/web/components/features/admin/admin-releases-table/AdminReleasesTableUnified.tsx: compilation: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',",
     "raw-status-palette apps/web/components/features/admin/admin-releases-table/AdminReleasesTableUnified.tsx: ingested: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',",
-    "raw-status-palette apps/web/components/features/admin/creator-actions-menu/CreatorActionsMenu.tsx: profile.isFeatured && 'fill-yellow-400 text-yellow-400'",
-    "raw-status-palette apps/web/components/features/admin/creator-actions-menu/CreatorActionsMenuContent.tsx: profile.isFeatured && 'fill-yellow-400 text-yellow-400'",
     "raw-status-palette apps/web/components/features/admin/table/TableRowActions.tsx: isClaimed ? 'fill-current text-yellow-500' : 'opacity-40'",
     "raw-status-palette apps/web/components/features/dashboard/molecules/universal-link-input/MultiLinkPasteDialog.tsx: <span className='flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-3xs font-caption text-amber-600 dark:text-amber-400'>",
     "raw-status-palette apps/web/components/features/dashboard/molecules/universal-link-input/MultiLinkPasteDialog.tsx: <span className='text-amber-600 dark:text-amber-400'>",
@@ -49,8 +46,6 @@
     "raw-status-palette apps/web/components/features/dashboard/organisms/dashboard-audience-table/row-contract.ts: rising: 'bg-amber-500/15 text-amber-300 ring-amber-500/25',",
     "raw-status-palette apps/web/components/features/dashboard/organisms/dsp-presence/CatalogHealthSection.tsx: if (allClear) return <CheckCircle2 className='h-3.5 w-3.5 text-green-500' />;",
     "raw-status-palette apps/web/components/features/dashboard/organisms/onboarding/OnboardingProfileReviewStep.tsx: <div className='mt-2 flex max-w-80 items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-left text-xs text-secondary-token'>",
-    "raw-status-palette apps/web/components/features/dashboard/organisms/onboarding/OnboardingProfileReviewStep.tsx: className='mt-0.5 h-4 w-4 shrink-0 text-amber-600'",
-    "raw-status-palette apps/web/components/features/dashboard/organisms/settings-profile-section/SettingsProfileSection.tsx: <div className='flex items-start gap-3 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-secondary-token'>",
-    "raw-status-palette apps/web/components/features/dashboard/organisms/settings-profile-section/SettingsProfileSection.tsx: className='mt-0.5 h-4 w-4 shrink-0 text-amber-600'"
+    "raw-status-palette apps/web/components/features/dashboard/organisms/onboarding/OnboardingProfileReviewStep.tsx: className='mt-0.5 h-4 w-4 shrink-0 text-amber-600'"
   ]
 }
