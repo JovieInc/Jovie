@@ -155,8 +155,8 @@ test.describe('Auth modal visual regression', () => {
           return;
         }
 
-        await neutralizeAuthScreenshotPointer(page);
         await expectCaptureReady(page.locator('body'));
+        await neutralizeAuthScreenshotPointer(page);
         await expect(page).toHaveScreenshot(`modal-signin-${bp.name}.png`, {
           fullPage: false,
           maxDiffPixels: 200,
@@ -192,8 +192,8 @@ test.describe('Auth modal visual regression', () => {
           return;
         }
 
-        await neutralizeAuthScreenshotPointer(page);
         await expectCaptureReady(page.locator('body'));
+        await neutralizeAuthScreenshotPointer(page);
         await expect(page).toHaveScreenshot(`modal-signup-${bp.name}.png`, {
           fullPage: false,
           maxDiffPixels: 200,
@@ -240,8 +240,8 @@ test.describe('/signin page visual regression', () => {
       // glm/auth-focal-polish: the tab title is the heading copy verbatim.
       await expect(page).toHaveTitle('Log in to Jovie');
 
-      await neutralizeAuthScreenshotPointer(page);
       await expectCaptureReady(page.locator('body'));
+      await neutralizeAuthScreenshotPointer(page);
       await expect(page).toHaveScreenshot(`signin-page-${bp.name}.png`, {
         fullPage: false,
         maxDiffPixels: 200,
@@ -285,8 +285,8 @@ test.describe('/signup page visual regression', () => {
       // glm/auth-focal-polish: the tab title is the heading copy verbatim.
       await expect(page).toHaveTitle('Continue to Jovie');
 
-      await neutralizeAuthScreenshotPointer(page);
       await expectCaptureReady(page.locator('body'));
+      await neutralizeAuthScreenshotPointer(page);
       await expect(page).toHaveScreenshot(`signup-page-${bp.name}.png`, {
         fullPage: false,
         maxDiffPixels: 200,
