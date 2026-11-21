@@ -251,10 +251,14 @@ function shortTitle(blocker: CompanyBlocker): string {
 /**
  * One bottleneck story for the flat hero. Revenue blocker wins; shipping
  * constraint is the floor when revenue is clear (same as homeConstraint).
+ * A failed revenue read uses the shipping floor — never a stuck loading
+ * skeleton, and never "clear" without a successful revenue read.
  */
 export function buildStoryFirstBottleneck(input: {
   readonly revenue: CompanyBlocker | null;
   readonly revenueRead: boolean;
+  /** True when the blocker query failed (distinct from still pending). */
+  readonly revenueFailed?: boolean;
   readonly constraint: HomeLoopConstraint | null;
   readonly highlight: StoryFirstStageHighlight | null;
   readonly clearTitle?: string;
@@ -304,7 +308,9 @@ export function buildStoryFirstBottleneck(input: {
       tone: input.constraint.tone,
       eyebrow: 'Bottleneck · Shipping',
       title: input.constraint.text,
-      body: 'Revenue is clear; shipping needs attention.',
+      body: input.revenueFailed
+        ? 'Revenue state is unavailable; shipping needs attention.'
+        : 'Revenue is clear; shipping needs attention.',
       moving: input.highlight
         ? {
             label: `${input.highlight.identifier} · ${input.highlight.title}`,
@@ -314,6 +320,24 @@ export function buildStoryFirstBottleneck(input: {
       needs: null,
       since: null,
       detailsHref: input.constraint.detailsHref ?? null,
+    };
+  }
+
+  if (input.revenueFailed) {
+    return {
+      tone: 'unknown',
+      eyebrow: 'Bottleneck',
+      title: 'Revenue state unavailable',
+      body: 'Company state could not be read. Retry or check Summer.',
+      moving: input.highlight
+        ? {
+            label: `${input.highlight.identifier} · ${input.highlight.title}`,
+            href: input.highlight.href,
+          }
+        : null,
+      needs: null,
+      since: null,
+      detailsHref: null,
     };
   }
 

@@ -114,4 +114,19 @@ describe('OvieHomeCanvas revenue blocker (Story First)', () => {
       )
     );
   });
+
+  it('leaves loading and uses the shipping floor when revenue fails', async () => {
+    delete responses['/api/ovie/home/blocker'];
+    const hero = renderCanvas();
+    await waitFor(() =>
+      expect(panelAlert).toHaveBeenCalledWith(
+        'revenue-blocker',
+        'company-state-unavailable'
+      )
+    );
+    await waitFor(() =>
+      expect(hero).not.toHaveAttribute('data-tone', 'loading')
+    );
+    expect(hero.getAttribute('data-tone')).not.toBe('clear');
+  });
 });

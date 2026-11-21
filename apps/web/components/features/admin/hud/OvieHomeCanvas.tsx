@@ -206,12 +206,15 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       ? { tone: 'warn' as const, text: 'Shipping data is disconnected' }
       : null);
   // Home leads with the revenue blocker; shipping health is the floor shown
-  // only when revenue is clear. An unreadable blocker never reads as clear.
+  // only when revenue is clear. Pending stays loading; a failed read falls
+  // through to the shipping floor (never a permanent skeleton, never "clear").
   const revenueData = revenueBlocker.data;
-  const revenueRead = revenueData !== undefined;
-  const constraint = revenueRead
-    ? homeConstraint(revenueData.blocker, shippingConstraint)
-    : shippingConstraint;
+  const revenueFailed = revenueBlocker.isError && revenueData === undefined;
+  const revenueRead = revenueData !== undefined || revenueFailed;
+  const constraint =
+    revenueData !== undefined
+      ? homeConstraint(revenueData.blocker, shippingConstraint)
+      : shippingConstraint;
 
   const loopErrorReason =
     loopStatus === 'error'
@@ -241,10 +244,11 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       buildStoryFirstBottleneck({
         revenue: revenueData?.blocker ?? null,
         revenueRead,
+        revenueFailed,
         constraint,
         highlight,
       }),
-    [revenueData, revenueRead, constraint, highlight]
+    [revenueData, revenueRead, revenueFailed, constraint, highlight]
   );
   const glance = useMemo(
     () =>

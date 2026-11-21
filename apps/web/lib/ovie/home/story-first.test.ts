@@ -128,6 +128,34 @@ describe('buildStoryFirstBottleneck', () => {
       }).tone
     ).toBe('loading');
   });
+
+  it('falls to the shipping floor when revenue read fails', () => {
+    const story = buildStoryFirstBottleneck({
+      revenue: null,
+      revenueRead: true,
+      revenueFailed: true,
+      constraint: { tone: 'warn', text: 'JOV-1 is stuck in review' },
+      highlight: null,
+    });
+    expect(story).toMatchObject({
+      tone: 'warn',
+      eyebrow: 'Bottleneck · Shipping',
+      title: 'JOV-1 is stuck in review',
+      body: 'Revenue state is unavailable; shipping needs attention.',
+    });
+  });
+
+  it('never reads clear when revenue failed with no shipping floor', () => {
+    expect(
+      buildStoryFirstBottleneck({
+        revenue: null,
+        revenueRead: true,
+        revenueFailed: true,
+        constraint: null,
+        highlight: null,
+      }).tone
+    ).toBe('unknown');
+  });
 });
 
 describe('buildStoryFirstStages', () => {
