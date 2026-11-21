@@ -40,6 +40,9 @@ export const ExpandButton = memo(function ExpandButton({
       variant='inline'
       onClick={onClick}
       disabled={isLoading}
+      // Pre-migration DrawerInlineIconButton used h-4 w-4 so album rows
+      // align with the single-track spacer (size=xs alone is h-6/24px).
+      className='h-4 w-4 rounded p-0 text-tertiary-token disabled:cursor-not-allowed disabled:opacity-50'
       aria-expanded={isExpanded}
       aria-label={isExpanded ? 'Collapse tracks' : 'Expand tracks'}
     >
