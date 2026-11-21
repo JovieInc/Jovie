@@ -1777,9 +1777,34 @@ export function validateLaneGroups(groups, laneIds = LANE_IDS) {
 }
 
 validateLaneGroups(LANE_GROUPS);
-export function selectLanes(groupId) {
+
+/**
+ * Parse CI_FAST_SKIP_LANE_IDS (comma-separated). Unknown ids are ignored so a
+ * stale skip list cannot invent lanes; empty/missing means skip nothing.
+ * @param {string | undefined} raw
+ * @returns {Set<string>}
+ */
+export function parseSkipLaneIds(raw) {
+  const skipped = new Set();
+  if (typeof raw !== 'string' || raw.trim() === '') return skipped;
+  for (const part of raw.split(',')) {
+    const id = part.trim();
+    if (id) skipped.add(id);
+  }
+  return skipped;
+}
+
+export function selectLanes(groupId, { skipLaneIds } = {}) {
   // Local callers historically ran the complete cluster with no selector.
-  if (groupId === undefined) return LANES;
+  const skip =
+    skipLaneIds instanceof Set
+      ? skipLaneIds
+      : parseSkipLaneIds(process.env.CI_FAST_SKIP_LANE_IDS);
+  /** @param {typeof LANES} lanes */
+  const withoutSkipped = lanes =>
+    skip.size === 0 ? lanes : lanes.filter(lane => !skip.has(lane.id));
+
+  if (groupId === undefined) return withoutSkipped(LANES);
   if (typeof groupId !== 'string' || groupId.trim() === '') {
     throw new Error('CI_FAST_LANE_GROUP must be a non-empty known group');
   }
@@ -1790,7 +1815,9 @@ export function selectLanes(groupId) {
       `Unknown CI_FAST_LANE_GROUP ${JSON.stringify(groupId)}; expected one of ${Object.keys(LANE_GROUPS).join(', ')}`
     );
   }
-  return selectedLaneIds.map(laneId => LANES.find(lane => lane.id === laneId));
+  return withoutSkipped(
+    selectedLaneIds.map(laneId => LANES.find(lane => lane.id === laneId))
+  );
 }
 
 function shell(command, opts = {}) {

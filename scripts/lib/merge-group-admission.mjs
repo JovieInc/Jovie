@@ -1156,6 +1156,10 @@ function createRunContextFromEnv(env = process.env) {
 
 async function writeAdmissionOutputs(receipt, env = process.env) {
   if (env.GITHUB_OUTPUT) {
+    const sourceHeadSha =
+      typeof receipt.liveEntry?.sourceHeadSha === 'string'
+        ? receipt.liveEntry.sourceHeadSha
+        : '';
     await appendFile(
       env.GITHUB_OUTPUT,
       [
@@ -1163,6 +1167,7 @@ async function writeAdmissionOutputs(receipt, env = process.env) {
         `obsolete=${receipt.outcome === 'obsolete' ? 'true' : 'false'}`,
         `pr_number=${receipt.pr}`,
         `synthetic_head_sha=${receipt.syntheticSha}`,
+        `source_head_sha=${sourceHeadSha}`,
         `current_queue_state=${receipt.currentQueueState}`,
         `replacement_combined_head=${receipt.replacementCombinedHead ?? ''}`,
         '',

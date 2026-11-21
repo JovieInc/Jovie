@@ -1,0 +1,112 @@
+import { createHash } from 'node:crypto';
+import { describe, expect, it } from 'vitest';
+import {
+  decideTypecheckLintReuse,
+  MERGE_GROUP_BASE_SENSITIVE_CI_FAST_LANES,
+  REUSABLE_TYPECHECK_LINT_LANE_IDS,
+  reusableLaneDefinitionHash,
+} from '../merge-group-typecheck-lint-reuse.mjs';
+import { LANE_GROUPS } from '../../ci-fast-lanes.mjs';
+
+const TREE_A = 'a'.repeat(40);
+const TREE_B = 'b'.repeat(40);
+const HEAD = 'c'.repeat(40);
+const LANE_HASH = reusableLaneDefinitionHash();
+
+describe('merge-group typecheck/lint same-tree reuse (JOV-12618 / JOV-13081)', () => {
+  it('red: refuses reuse when merge tree differs from the source PR head tree', () => {
+    const decision = decideTypecheckLintReuse({
+      mergeTreeSha: TREE_A,
+      sourceTreeSha: TREE_B,
+      sourceHeadSha: HEAD,
+      sourceProofOk: true,
+      laneDefinitionHash: LANE_HASH,
+      expectedLaneDefinitionHash: LANE_HASH,
+    });
+    expect(decision.reuse).toBe(false);
+    expect(decision.reason).toMatch(/differs/);
+    expect(decision.skipLaneIds).toEqual([]);
+  });
+
+  it('red: refuses reuse when trees match but the source head has no green proof', () => {
+    const decision = decideTypecheckLintReuse({
+      mergeTreeSha: TREE_A,
+      sourceTreeSha: TREE_A,
+      sourceHeadSha: HEAD,
+      sourceProofOk: false,
+      laneDefinitionHash: LANE_HASH,
+      expectedLaneDefinitionHash: LANE_HASH,
+    });
+    expect(decision.reuse).toBe(false);
+    expect(decision.reason).toMatch(/green/);
+    expect(decision.skipLaneIds).toEqual([]);
+  });
+
+  it('red: refuses reuse when the reusable lane definition hash drifts', () => {
+    const decision = decideTypecheckLintReuse({
+      mergeTreeSha: TREE_A,
+      sourceTreeSha: TREE_A,
+      sourceHeadSha: HEAD,
+      sourceProofOk: true,
+      laneDefinitionHash: createHash('sha256').update('drift').digest('hex'),
+      expectedLaneDefinitionHash: LANE_HASH,
+    });
+    expect(decision.reuse).toBe(false);
+    expect(decision.reason).toMatch(/definition hash/);
+  });
+
+  it('green: reuses typecheck/lint lanes when same tree + proof + definition match', () => {
+    const decision = decideTypecheckLintReuse({
+      mergeTreeSha: TREE_A,
+      sourceTreeSha: TREE_A,
+      sourceHeadSha: HEAD,
+      sourceProofOk: true,
+      laneDefinitionHash: LANE_HASH,
+      expectedLaneDefinitionHash: LANE_HASH,
+    });
+    expect(decision.reuse).toBe(true);
+    expect(decision.skipLaneIds).toEqual([...REUSABLE_TYPECHECK_LINT_LANE_IDS]);
+    expect(decision.skipLaneIds).toEqual(
+      expect.arrayContaining([
+        'typecheck',
+        'biome',
+        'eslint-server-boundaries',
+        'shadcn-lint-contracts',
+        'scripts-typecheck',
+      ])
+    );
+  });
+
+  it('keeps base-sensitive ratchets out of the reusable skip set', () => {
+    for (const laneId of MERGE_GROUP_BASE_SENSITIVE_CI_FAST_LANES) {
+      expect(REUSABLE_TYPECHECK_LINT_LANE_IDS).not.toContain(laneId);
+    }
+    expect(MERGE_GROUP_BASE_SENSITIVE_CI_FAST_LANES).toEqual(
+      expect.arrayContaining([
+        'design-exception-registry',
+        'guardrails',
+        'structural',
+        'source-guards',
+      ])
+    );
+  });
+
+  it('reusable lanes are a subset of the hosted ci-fast lane table', () => {
+    const known = new Set(Object.values(LANE_GROUPS).flat());
+    for (const laneId of REUSABLE_TYPECHECK_LINT_LANE_IDS) {
+      expect(known.has(laneId)).toBe(true);
+    }
+    expect(LANE_GROUPS.typecheck).toEqual(
+      expect.arrayContaining(['typecheck', 'web-tests-typecheck'])
+    );
+    expect(LANE_GROUPS.remaining).toEqual(
+      expect.arrayContaining([
+        'biome',
+        'eslint-server-boundaries',
+        'shadcn-lint-contracts',
+        'scripts-typecheck',
+        'design-exception-registry',
+      ])
+    );
+  });
+});
