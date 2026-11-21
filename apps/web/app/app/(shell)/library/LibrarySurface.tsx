@@ -2836,16 +2836,22 @@ function AssetDrawer({
 function LibraryStatusBar({
   visibleCount,
   totalCount,
+  hiddenNote,
   activePreviewTitle,
 }: {
   readonly visibleCount: number;
   readonly totalCount: number;
+  /** Names the default-hidden set (archived items) so "N of M" is never an unexplained gap (JOV-9022). */
+  readonly hiddenNote: string | null;
   readonly activePreviewTitle: string | null;
 }) {
   return (
     <div className='system-b-library-status-bar hidden h-(--app-shell-footer-row-height) shrink-0 items-center justify-between gap-3 border-t border-(--app-shell-frame-seam) px-(--app-shell-header-padding-x) sm:flex'>
       <span className='min-w-0 truncate'>
         {visibleCount} of {pluralize(totalCount, 'Item')}
+        {hiddenNote ? (
+          <span data-testid='library-status-hidden-note'> · {hiddenNote}</span>
+        ) : null}
       </span>
       {activePreviewTitle ? (
         <span className='min-w-0 truncate text-right'>
@@ -3556,6 +3562,17 @@ export function LibrarySurface({
     filters.providers.size +
     (preset === 'all' ? 0 : 1);
 
+  // Every non-Archived tab excludes lifecycle-archived assets by design (the
+  // Archived preset owns them). The status bar names that hidden set so the
+  // footer never reads "N of M Items" with no filter in sight (JOV-9022).
+  const statusHiddenNote = useMemo(() => {
+    if (preset === 'archived') return null;
+    const hiddenArchived = effectiveAssets.filter(
+      asset => asset.lifecycleStatus === 'archived'
+    ).length;
+    return hiddenArchived > 0 ? `Hiding ${hiddenArchived} archived` : null;
+  }, [effectiveAssets, preset]);
+
   const filterPanel = useMemo(
     () => (
       <LibraryFilterPanel
@@ -3859,6 +3876,7 @@ export function LibrarySurface({
           <LibraryStatusBar
             visibleCount={visibleAssets.length}
             totalCount={effectiveAssets.length}
+            hiddenNote={statusHiddenNote}
             activePreviewTitle={activePreviewTitle}
           />
         </div>
