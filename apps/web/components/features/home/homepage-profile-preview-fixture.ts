@@ -836,8 +836,8 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     id: 'events-empty',
     latestReleaseKey: 'none',
     label: 'Events Empty',
-    helper: 'The empty Events tab should still offer alerts.',
-    drawerView: 'tour',
+    helper: 'Empty Events stays hidden; Get Updates remains the entry.',
+    drawerView: 'menu',
   }),
   'more-menu': createQuietButtonShowcaseState({
     id: 'more-menu',

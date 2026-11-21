@@ -14,7 +14,7 @@ vi.mock('../profile/templates/ProfileCompactSurface', () => ({
 describe('HomeProfileShowcase certificate', () => {
   beforeEach(() => captureSurface.mockClear());
 
-  it('renders an empty Events tab with no tour dates or releases', async () => {
+  it('keeps empty Events off-stage with no tour dates or releases', async () => {
     const { container } = render(
       <HomeProfileShowcase stateId='events-empty' />
     );
@@ -26,8 +26,9 @@ describe('HomeProfileShowcase certificate', () => {
         releases: [],
         latestRelease: null,
         drawerOpen: true,
-        drawerView: 'tour',
-        activeMode: 'tour',
+        drawerView: 'menu',
+        // JOV-14241: empty Events is not a destination; stay on home.
+        activeMode: 'profile',
       })
     );
     await expectNoA11yViolations(container);
