@@ -39,6 +39,15 @@ export function freshShippingProjection() {
     freshnessDeadline: new Date(now + 3_600_000).toISOString(),
     state: 'fresh',
     sources,
+    // A reconciled task cache. The projection's own empty feed reads as
+    // `syncing` with no observation, which Home and Ops render as loading.
+    operationalTasks: {
+      ...base.operationalTasks,
+      syncState: 'fresh',
+      observedAt: at(30_000),
+      lastSyncedAt: at(30_000),
+      freshnessDeadline: new Date(now + 3_600_000).toISOString(),
+    },
     delivery: {
       lanes: {
         running: measured(7),

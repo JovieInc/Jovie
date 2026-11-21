@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { parseShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
+import { freshShippingProjection } from '../../e2e/utils/admin-visual-shipping-fixture';
 import { findErrorCopy } from '../../e2e/utils/visual-capture-copy';
 
 /**
@@ -88,6 +90,17 @@ describe('visual capture gate', () => {
     );
     expect(source).toContain("'**/api/ovie/home/blocker'");
     expect(source).toContain("'**/api/hud/shipping-state**'");
+  });
+
+  it('answers the shipping read with a projection Home renders as ready', () => {
+    const projection = parseShippingCockpitProjection(
+      freshShippingProjection()
+    );
+    expect(projection).not.toBeNull();
+    // Home and Ops show a skeleton while the task cache is `syncing` with no
+    // observation; the first proof refresh refused Admin Home for it.
+    expect(projection?.operationalTasks.syncState).toBe('fresh');
+    expect(projection?.operationalTasks.observedAt).not.toBeNull();
   });
 
   it('does not treat a bare role="alert" region as a problem', () => {
