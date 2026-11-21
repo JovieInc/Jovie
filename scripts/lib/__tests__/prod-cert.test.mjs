@@ -100,23 +100,18 @@ describe('runProductionCertification', () => {
   });
 
   it('turns browser steps into passed checks and keeps a failed step failed', async () => {
+    const passed = (surface, id) => ({
+      surface,
+      id,
+      status: 'passed',
+      startedAt: T,
+      endedAt: T,
+      summary: 'ok',
+    });
     const steps = [
-      {
-        surface: 'onboarding',
-        id: 'dashboard-first-value',
-        status: 'passed',
-        startedAt: T,
-        endedAt: T,
-        summary: 'ok',
-      },
-      {
-        surface: 'onboarding',
-        id: 'fresh-user-onboarding-first-value',
-        status: 'passed',
-        startedAt: T,
-        endedAt: T,
-        summary: 'ok',
-      },
+      ...EXPECTED_BROWSER_CHECKS.onboarding.map(id =>
+        passed('onboarding', id)
+      ),
       {
         surface: 'checkout',
         id: 'checkout-entry-renders',
