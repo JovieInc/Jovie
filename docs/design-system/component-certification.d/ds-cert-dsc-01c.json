@@ -9,7 +9,25 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/admin/customer-recovery/CustomerRecoveryPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/admin/hud/FounderConversionHud.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/hud/HudDrilldownSearch.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -27,6 +45,15 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/admin/hud/OvieInbox.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/admin/hud/VisualQaReviewPanel.tsx": [
       "ds-owner",
       "tokens",
@@ -36,5 +63,10 @@
       "frontend-rules",
       "forced-caps"
     ]
+  },
+  "waivers": {
+    "apps/web/components/features/admin/hud/HudDrilldownSearch.tsx": {
+      "permission-denied": "The search renders only inside the admin HUD, which the page gates before mounting it; the component has no role or permission branch. The detector matched the word exceptions, which are live operational exceptions, not access errors."
+    }
   }
 }
