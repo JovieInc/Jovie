@@ -15,7 +15,7 @@
   "assets": [
     {"id": "workflow:actionlint", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/actionlint.yml"},
     {"id": "workflow:actions-cache-gc", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/actions-cache-gc.yml", "note": "Workflow header names TimWhite as accountable writer; the routine owner is the agent role here."},
-    {"id": "workflow:agent-harness-health-report", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/agent-harness-health-report.yml"},
+    {"id": "workflow:agent-harness-health-report", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/agent-harness-health-report.yml", "note": "Report-only; reclaim mutations live in summer-pr-no-stall.yml."},
     {"id": "workflow:auto-ready-agent-drafts", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/auto-ready-agent-drafts.yml"},
     {"id": "workflow:automation-liveness", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/automation-liveness.yml", "note": "Dead-man check over canon/automation-registry.jsonl; registry entry github:jovie:automation-liveness."},
     {"id": "workflow:buyer-eval-gate", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/buyer-eval-gate.yml"},
@@ -77,6 +77,7 @@
     {"id": "workflow:main-red-eject", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/main-red-eject.yml"},
     {"id": "workflow:merge-group-dead-run-sweep", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/merge-group-dead-run-sweep.yml"},
     {"id": "workflow:merge-queue-green-enroll", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/merge-queue-green-enroll.yml"},
+    {"id": "workflow:summer-pr-no-stall", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/summer-pr-no-stall.yml", "note": "Summer open-PR no-stall reclaim; companion script scripts/summer/pr-no-stall.mjs."},
     {"id": "workflow:merge-queue-ruleset-verify", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/merge-queue-ruleset-verify.yml"},
     {"id": "workflow:mutation-diff", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/mutation-diff.yml"},
     {"id": "workflow:neon-scheduled-cleanup", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/neon-scheduled-cleanup.yml"},

@@ -59,9 +59,13 @@ jobs:
           fresh_after="$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)"
           last_green="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/$REPO/actions/workflows/ci.yml/runs?event=workflow_dispatch&branch=main&status=completed&created=>=$fresh_after&per_page=20" \
             --jq '.workflow_runs[].id' | while read -r run; do
-              ok="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/$REPO/actions/runs/$run/jobs?per_page=100" \
-                --jq '[.jobs[] | select(.name == "Golden Path (manual)" and .conclusion == "success")] | length')"
-              if [ "$ok" != "0" ]; then bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/$REPO/actions/runs/$run" --jq .head_sha; break; fi
+              conclusion="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/$REPO/actions/runs/$run/jobs?per_page=100" \
+                --jq '[.jobs[] | select(.name == "Golden Path (manual)" and .conclusion != null and .conclusion != "skipped")][0].conclusion // empty')"
+              if [ -z "$conclusion" ]; then continue; fi
+              if [ "$conclusion" = "success" ]; then
+                bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api "repos/$REPO/actions/runs/$run" --jq .head_sha
+              fi
+              break
             done)"
           if [ "${{ github.event_name }}" = "schedule" ] && [ "$last_green" = "$main_sha" ]; then
             echo "Golden Path already green on $main_sha within 24 h; skipping."

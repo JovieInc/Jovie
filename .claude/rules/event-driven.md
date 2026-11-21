@@ -39,6 +39,7 @@ record is a defect, even when it exits 0.
 | Linear Triage → classified (team, priority, labels, out of Triage, or Ovie card) | Linear `Issue` create / entered-triage webhook → Summer scoped triage turn | Summer [`triage-sweep` source](https://github.com/JovieInc/summer-config/blob/main/apps/summer/agent/lib/event-catch-ups.ts) | 15 min | `summer:triage-dwell` |
 | Required-green ready PR → in merge queue | `workflow_run` of required checks, `pull_request_target` `ready_for_review` (no `synchronize`: a new head has no green verdict to act on) → Merge Queue Green Enroll | push-to-main roster sweep | 10 min | `github:jovie:green-to-enqueue` |
 | Green lane draft → ready | lane gate verdict on the exact head → lanes `publish_verified` (writer proof, JOV-INV-022) | lanes tick | measured in the `green-to-enqueue` reason (`draft-green`) | lanes-owned |
+| Orphaned ready PR (admission deadlock / idle Cursor owner) | new head after reclaim bump → queue-breaker release → Merge Queue Green Enroll | Summer PR No-Stall on push to main (`scripts/summer/pr-no-stall.mjs`) | 6h idle classify; enroll dwell still 10 min after release | `summer:pr-no-stall` |
 
 Summer's `summerCatchUpJobs` owns the recovery cadence; read the linked source
 instead of copying its interval here. Verify the running generation and observed

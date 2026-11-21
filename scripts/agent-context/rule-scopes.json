@@ -51,7 +51,7 @@
       "canon/automation-registry.jsonl",
       "docs/metrics/**"
     ],
-    "bodySha256": "a76df58a1cfe405e9df2ef9e78e7a5150a4056a8a177ac27443005aa5fd0b428"
+    "bodySha256": "75f921f49b129ee4392c581b6997613dc262552ffa97a50893d4b45916d49496"
   },
   {
     "file": ".claude/rules/external-apis.md",
@@ -153,7 +153,7 @@
   {
     "file": ".claude/rules/pen.md",
     "paths": ["**/*.pen", "scripts/agent/pen*", "docs/design-system/**"],
-    "bodySha256": "7c5f12d61a0952c616c5f03f801a8742a61d33a9ab9a697fe3db259df5fe74a6"
+    "bodySha256": "c8ead93f857dfb686fe7398a57adf6f7837446cd7b0c1c2ec08c27cd325c1b1e"
   },
   {
     "file": ".claude/rules/pr-stacking.md",
@@ -181,7 +181,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "f566f0df3d70659a7146b7388695f74745fef4fd459484e86dd9707d5b2c76e4"
+    "bodySha256": "a8b91b26bdb6b9f0f0c769433b44e9c846b5c58f5e050f1611e16710b663c4ff"
   },
   {
     "file": ".claude/rules/security.md",
@@ -192,7 +192,7 @@
       ".github/**",
       "scripts/**"
     ],
-    "bodySha256": "8fc3a2864799b7d08f7512eeda0c5ec7a074e6b2f1c283ab750fc50d60b77e30"
+    "bodySha256": "dbccde7862e8cbdaa28366bd4fbe29c0c582b8f9170e4dd3cd3acbc618092258"
   },
   {
     "file": ".claude/rules/source-of-truth.md",

@@ -64,6 +64,12 @@ Linear may project coordination state but is not the delivery authority.
   accelerate output or raise quality). Never use a Project for single-ticket
   Gem drain, triage/admission, or to skip review, merge, or production receipts.
   Prefer Symphony → Gem when the Project would be coordination tax.
+- Own continuous open-PR no-stall for JovieInc/Jovie. Cursor agents going IDLE
+  must not leave admission-deadlock heads (`lane-fix-red` + green/mergeable +
+  idle). Use `docs/operations/SUMMER_NO_STALL.md` and
+  `scripts/summer/pr-no-stall.mjs` (and the Summer PR No-Stall workflow). Reclaim
+  through empty-head bump → queue-breaker release → green-enroll / auto-ready —
+  never by opening a Cursor Project as the watchdog.
 - The `ovie-summer-shadow` source stays Read-only: observe and report only.
 - The `ovie-summer-bottleneck` source remains deterministic and source-bound:
   v3 dispatch requires a fresh host assignment and task admissions joined by

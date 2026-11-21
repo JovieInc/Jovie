@@ -130,6 +130,7 @@
     "staging-controller.yml": {"runsPerMergedPr":0.9,"triggers":["workflow_run:CI"]},
     "stale-branch-sweep.yml": {"runsPerMergedPr":0,"triggers":["repository_dispatch:clock_stale_branch_sweep","workflow_dispatch"]},
     "summer-eve-pin.yml": {"runsPerMergedPr":3.6,"triggers":["pull_request","schedule","workflow_dispatch"]},
+    "summer-pr-no-stall.yml": {"runsPerMergedPr":1,"triggers":["push","workflow_dispatch"]},
     "surface-recertify.yml": {"runsPerMergedPr":0.4,"triggers":["push","workflow_dispatch"]},
     "synthetic-monitoring.yml": {"runsPerMergedPr":0.1,"triggers":["schedule","workflow_dispatch"]},
     "test-coverage-audit.yml": {"runsPerMergedPr":0.1,"triggers":["repository_dispatch:clock_test_coverage_audit","workflow_dispatch"]},

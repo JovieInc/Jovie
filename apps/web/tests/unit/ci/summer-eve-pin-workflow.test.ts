@@ -61,6 +61,8 @@ describe('summer eve identity workflow', () => {
     }
   });
 
+  // Git fixture merges are I/O-heavy; keep above the fast-suite 12s default so
+  // web-source-read selection (e.g. workflows README edits) does not flake.
   it('boots the identity runner only for non-PR events or a Summer bridge diff', () => {
     const doc = parseYaml(workflow) as {
       jobs: Record<
@@ -141,5 +143,5 @@ describe('summer eve identity workflow', () => {
     git(root, 'add', '.');
     git(root, 'commit', '-qm', 'only');
     expect(run(root, 'pull_request')).toBe('identity=true');
-  });
+  }, 60_000);
 });

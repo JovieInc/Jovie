@@ -11,6 +11,8 @@ CSP, webhooks, secrets, email, fail-closed persistence, biome-ignore, environmen
 - **NEVER** rely on in-memory rate-limit, dedupe, or coordination state for public endpoints, webhooks, or automation triggers.
 - Public traffic controls and webhook dedupe MUST use durable storage (Redis, database, or another cross-instance store).
 - Cold starts, deploys, and horizontal scale must not reset critical protections or duplicate suppression.
+- Public abuse writers (feedback, report, claim entry/start/agent claim, and similar anonymous durable writers) MUST fail closed when the rate-limit backend is unavailable: return 429 on exhaustion and 503 on `unavailable`. Do **not** wrap those call sites with `allowIfRateLimitBackendDegraded`.
+- `allowIfRateLimitBackendDegraded` is reserved for documented UX-critical authenticated paths only (native auth exchange/handback, AI chat hourly burst). Auth storage fail-closed policy is owned separately (SEC-02 / `rate-limit-storage.ts`).
 
 For webhook signature verification: verify before parsing business logic.
 
