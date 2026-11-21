@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 
 export interface DrawerTab<T extends string = string> {
@@ -55,7 +56,7 @@ export function DrawerTabStrip<T extends string>({
         {tabs.map(t => {
           const on = active === t.value;
           return (
-            <button
+            <PlainButton
               key={t.value}
               type='button'
               role='tab'
@@ -69,7 +70,7 @@ export function DrawerTabStrip<T extends string>({
               )}
             >
               {t.label}
-            </button>
+            </PlainButton>
           );
         })}
       </div>
