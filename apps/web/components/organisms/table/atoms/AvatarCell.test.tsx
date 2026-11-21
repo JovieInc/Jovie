@@ -101,3 +101,20 @@ describe('AvatarCell link affordance (JOV-8873)', () => {
     );
   });
 });
+
+describe('AvatarCell featured star token', () => {
+  it('colors the featured star with the warning token, not a yellow palette class', () => {
+    const { container } = render(
+      <AvatarCell
+        profileId='creator'
+        username='artist'
+        displayName='An Artist'
+        avatarUrl={null}
+        isFeatured
+      />
+    );
+    const star = screen.getByLabelText('Featured');
+    expect(star).toHaveClass('text-warning');
+    expect(container.innerHTML).not.toMatch(/yellow-/);
+  });
+});

@@ -132,8 +132,6 @@
     "apps/web/components/organisms/table/molecules/TableHeaderCell.tsx": "a11y,ds-owner,states",
     "apps/web/components/providers/ErrorBoundary.tsx": "a11y,ds-owner,states,tests",
     "apps/web/components/shell/ContextMenuOverlay.tsx": "a11y,ds-owner,forced-caps,states",
-    "apps/web/components/shell/HeaderSearchSurfaceFromContext.tsx": "a11y,ds-owner,states",
-    "apps/web/components/shell/IconBtn.tsx": "a11y,ds-owner,states",
     "apps/web/components/shell/ScrubGradient.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens"
   }
 }

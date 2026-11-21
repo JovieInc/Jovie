@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { EntityThreadGlyph } from './EntityThreadGlyph';
 
@@ -26,5 +27,25 @@ describe('EntityThreadGlyph', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Running Chat' }));
     expect(onOpen).toHaveBeenCalledOnce();
     expect(onParentClick).not.toHaveBeenCalled();
+  });
+});
+
+describe('EntityThreadGlyph PlainButton and accent tokens', () => {
+  it('is a type=button that fires onOpen on userEvent.click', async () => {
+    const user = userEvent.setup();
+    const onOpen = vi.fn();
+    render(<EntityThreadGlyph threadTitle='t' onOpen={onOpen} />);
+    const button = screen.getByRole('button', { name: 'Open Running Chat' });
+    expect(button).toHaveAttribute('type', 'button');
+    await user.click(button);
+    expect(onOpen).toHaveBeenCalledOnce();
+  });
+
+  it('renders accent tokens and no cyan palette class', () => {
+    render(<EntityThreadGlyph threadTitle='t' onOpen={() => undefined} />);
+    const button = screen.getByRole('button', { name: 'Open Running Chat' });
+    expect(button).toHaveClass('text-accent-text/85');
+    expect(button.innerHTML).toContain('bg-accent/30');
+    expect(button.outerHTML).not.toContain('cyan-');
   });
 });
