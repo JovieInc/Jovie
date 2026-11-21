@@ -1,0 +1,135 @@
+{
+  "schema": "jovie.helpfulness-eval/v1",
+  "version": "2026-11-21.1",
+  "ranAt": "2026-11-21T10:00:00.000Z",
+  "model": "@cf/zai-org/glm-5.3",
+  "judge": "@cf/openai/gpt-oss-120b",
+  "subset": "ci",
+  "summary": {
+    "score": 55,
+    "passRate": 0.25,
+    "hardPassRate": 0.5,
+    "cases": 4
+  },
+  "cases": [
+    {
+      "result": {
+        "id": "greeting",
+        "score": 40,
+        "passed": false,
+        "hardChecks": [
+          { "id": "non_empty", "ok": true },
+          { "id": "copy_floor", "ok": true },
+          { "id": "not_generic", "ok": true },
+          { "id": "no_emoji", "ok": true },
+          { "id": "length", "ok": true }
+        ],
+        "judge": {
+          "scores": {
+            "grounded": 1,
+            "next_action": 0,
+            "time_aware": 0,
+            "no_dead_end": 2,
+            "specific": 1,
+            "concise": 2,
+            "truthful": 2
+          },
+          "why": "Ignores UPCOMING Night Swim and ends with a clarifying question."
+        }
+      },
+      "ask": "hey",
+      "reply": { "text": "Hey — what are we working on?" }
+    },
+    {
+      "result": {
+        "id": "lapsed-flopped",
+        "score": 35,
+        "passed": false,
+        "hardChecks": [
+          { "id": "non_empty", "ok": true },
+          { "id": "copy_floor", "ok": true },
+          { "id": "not_generic", "ok": true },
+          { "id": "no_emoji", "ok": true },
+          { "id": "length", "ok": true }
+        ],
+        "judge": {
+          "scores": {
+            "grounded": 1,
+            "next_action": 1,
+            "time_aware": 1,
+            "no_dead_end": 1,
+            "specific": 1,
+            "concise": 1,
+            "truthful": 0
+          },
+          "why": "Invents popularity 19 and asks which title to push."
+        }
+      },
+      "ask": "that last one flopped, what now?",
+      "reply": {
+        "text": "Low Tide Choir sat at popularity 19. Which track should we push next?"
+      }
+    },
+    {
+      "result": {
+        "id": "presave",
+        "score": 45,
+        "passed": false,
+        "hardChecks": [
+          { "id": "non_empty", "ok": true },
+          { "id": "copy_floor", "ok": true },
+          { "id": "not_generic", "ok": false, "detail": "matched tip pattern" },
+          { "id": "no_emoji", "ok": true },
+          { "id": "length", "ok": true }
+        ],
+        "judge": {
+          "scores": {
+            "grounded": 1,
+            "next_action": 0,
+            "time_aware": 0,
+            "no_dead_end": 1,
+            "specific": 1,
+            "concise": 1,
+            "truthful": 1
+          },
+          "why": "Misses tomorrow drop and asks which release."
+        }
+      },
+      "ask": "should I do a pre-save?",
+      "reply": {
+        "text": "Here are some tips: wait two weeks out. Which release is it for?"
+      }
+    },
+    {
+      "result": {
+        "id": "song-out-friday",
+        "score": 90,
+        "passed": true,
+        "hardChecks": [
+          { "id": "non_empty", "ok": true },
+          { "id": "copy_floor", "ok": true },
+          { "id": "not_generic", "ok": true },
+          { "id": "no_emoji", "ok": true },
+          { "id": "length", "ok": true },
+          { "id": "grounding_0", "ok": true }
+        ],
+        "judge": {
+          "scores": {
+            "grounded": 2,
+            "next_action": 2,
+            "time_aware": 2,
+            "no_dead_end": 2,
+            "specific": 2,
+            "concise": 2,
+            "truthful": 2
+          },
+          "why": "Names Night Swim tomorrow and one dated prep step."
+        }
+      },
+      "ask": "my song is out friday — what should I do?",
+      "reply": {
+        "text": "Night Swim drops tomorrow. Put the pre-save on Instagram today."
+      }
+    }
+  ]
+}
