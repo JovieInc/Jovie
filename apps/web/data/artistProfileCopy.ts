@@ -429,10 +429,9 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   hero: {
     eyebrow: '',
-    // Two short beats — fits line-clamp-2 in the left-phone column without
-    // orphaning (ch bumps did not change layout under display-size Satoshi).
+    // Two short beats, ≥2 words each — taste ratchet rejects a one-word last line.
     // Avoid new ICP "music" debt; artists page may shrink existing ids only.
-    headline: 'One link.\nEverywhere.',
+    headline: 'One link.\nAlways ready.',
     subhead: 'Bio, socials, and your next release in one free profile.',
     ctaLabel: 'Claim your profile',
     secondaryCtaLabel: 'See how it adapts',
