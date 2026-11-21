@@ -10,7 +10,8 @@ export function getStepBlock(workflow: string, stepName: string): string {
   const block: string[] = [];
 
   for (let index = start; index < lines.length; index++) {
-    const line = lines[index]!;
+    const line = lines[index];
+    if (line === undefined) break;
 
     if (index > start && line.startsWith('      - name: ')) break;
     if (index > start && /^[a-zA-Z0-9_-]+:/.test(line)) break;
@@ -31,7 +32,8 @@ export function getJobBlock(workflow: string, jobKey: string): string {
   const block: string[] = [];
 
   for (let index = start; index < lines.length; index++) {
-    const line = lines[index]!;
+    const line = lines[index];
+    if (line === undefined) break;
 
     if (index > start && /^  [a-zA-Z0-9_-]+:/.test(line)) break;
 
@@ -46,13 +48,18 @@ export function getShellRunBlocks(workflow: string): string[] {
   const lines = workflow.split('\n');
   const blocks: string[] = [];
   for (let index = 0; index < lines.length; index++) {
-    const line = lines[index]!;
+    const line = lines[index];
+    if (line === undefined) continue;
     const match = /^(\s*)run:\s*(.*)$/.exec(line);
     if (!match) continue;
-    const indentation = match[1]!.length;
-    const block = [match[2]!];
+    const indentGroup = match[1];
+    const runBody = match[2];
+    if (indentGroup === undefined || runBody === undefined) continue;
+    const indentation = indentGroup.length;
+    const block = [runBody];
     while (index + 1 < lines.length) {
-      const next = lines[index + 1]!;
+      const next = lines[index + 1];
+      if (next === undefined) break;
       if (next.trim() && next.search(/\S/) <= indentation) break;
       block.push(next);
       index += 1;
