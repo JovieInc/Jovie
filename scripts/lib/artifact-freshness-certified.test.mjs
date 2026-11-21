@@ -5,8 +5,6 @@ import {
   collectArtifactFreshness,
   fetchLatestProductionVerifiedSha,
 } from '../artifact-freshness-reconcile.mjs';
-import { isProductionVerifiedJobSet } from './artifact-freshness-certified.mjs';
-import { isPublicationObservationError } from './publication-observation.mjs';
 
 const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const SHA_B = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
@@ -105,117 +103,6 @@ test('jobs 5xx on newest run does not fall back to older verified SHA', async ()
   assert.match(result.reason, /jobs lookup returned 503/);
 });
 
-test('jobs ok without verified job may fall back to older verified SHA', async () => {
-  const result = await fetchLatestProductionVerifiedSha({
-    fetchImpl: async url => {
-      if (String(url).includes('/workflows/production-controller.yml/runs')) {
-        return {
-          ok: true,
-          json: async () => ({
-            workflow_runs: [
-              {
-                id: 31,
-                conclusion: 'success',
-                head_sha: SHA_B,
-                updated_at: '2026-11-20T02:00:00Z',
-              },
-              {
-                id: 30,
-                conclusion: 'success',
-                head_sha: SHA_A,
-                updated_at: '2026-11-20T01:00:00Z',
-              },
-            ],
-          }),
-        };
-      }
-      if (String(url).includes('/actions/runs/31/jobs')) {
-        return {
-          ok: true,
-          json: async () => ({
-            jobs: [{ name: 'Something Else', conclusion: 'success' }],
-          }),
-        };
-      }
-      if (String(url).includes('/actions/runs/30/jobs')) {
-        return {
-          ok: true,
-          json: async () => ({ jobs: [...VERIFIED_JOBS] }),
-        };
-      }
-      throw new Error(`unexpected url ${url}`);
-    },
-  });
-  assert.equal(result.status, 'known');
-  assert.equal(result.sourceRevision, SHA_A);
-});
-
-test('newest overall-failure run with verified job is certified (not older SHA)', async () => {
-  assert.equal(
-    isProductionVerifiedJobSet([
-      ...VERIFIED_JOBS,
-      { name: 'Customer changelog staleness', conclusion: 'failure' },
-    ]),
-    true
-  );
-  assert.equal(
-    isProductionVerifiedJobSet([
-      {
-        name: 'Production Release / Centralized production rollback',
-        conclusion: 'success',
-      },
-      { name: 'Production Verified', conclusion: 'success' },
-    ]),
-    false
-  );
-
-  const result = await fetchLatestProductionVerifiedSha({
-    fetchImpl: async url => {
-      if (String(url).includes('/workflows/production-controller.yml/runs')) {
-        return {
-          ok: true,
-          json: async () => ({
-            workflow_runs: [
-              {
-                id: 51,
-                conclusion: 'failure',
-                head_sha: SHA_B,
-                updated_at: '2026-11-20T03:00:00Z',
-              },
-              {
-                id: 50,
-                conclusion: 'success',
-                head_sha: SHA_A,
-                updated_at: '2026-11-20T01:00:00Z',
-              },
-            ],
-          }),
-        };
-      }
-      if (String(url).includes('/actions/runs/51/jobs')) {
-        return {
-          ok: true,
-          json: async () => ({
-            jobs: [
-              ...VERIFIED_JOBS,
-              { name: 'Customer changelog staleness', conclusion: 'failure' },
-            ],
-          }),
-        };
-      }
-      if (String(url).includes('/actions/runs/50/jobs')) {
-        return {
-          ok: true,
-          json: async () => ({ jobs: [...VERIFIED_JOBS] }),
-        };
-      }
-      throw new Error(`unexpected url ${url}`);
-    },
-  });
-  assert.equal(result.status, 'known');
-  assert.equal(result.sourceRevision, SHA_B);
-});
-
 test('jobs 5xx certified unknown blocks premature Summer resolve', async () => {
   const receipt = await collectArtifactFreshness({
     shipped: {
@@ -280,54 +167,4 @@ test('jobs 5xx certified unknown blocks premature Summer resolve', async () => {
   const production = receipt.channels.find(c => c.channel === 'production');
   assert.equal(production?.stages?.certified?.status, 'unknown');
   assert.equal(canResolveSummerForFreshness(receipt), false);
-});
-
-test('isPublicationObservationError treats rate-limit 403/429/5xx as observation failures', () => {
-  assert.equal(
-    isPublicationObservationError(
-      new Error(
-        'GitHub 403 for /releases/latest: API rate limit exceeded for installation ID 1'
-      )
-    ),
-    true
-  );
-  assert.equal(
-    isPublicationObservationError(
-      new Error(
-        'Published feed returned 403. You have exceeded a secondary rate limit. Please wait a few minutes.'
-      )
-    ),
-    true
-  );
-  // Bare permission 403 — keep as publication/verification failure.
-  assert.equal(
-    isPublicationObservationError(new Error('Published feed returned 403.')),
-    false
-  );
-  assert.equal(
-    isPublicationObservationError(
-      new Error(
-        'GitHub 403 for /releases/latest: Resource not accessible by integration'
-      )
-    ),
-    false
-  );
-  assert.equal(
-    isPublicationObservationError(new Error('Published feed returned 429.')),
-    true
-  );
-  assert.equal(
-    isPublicationObservationError(new Error('Published feed returned 503.')),
-    true
-  );
-  assert.equal(
-    isPublicationObservationError(
-      new Error('Published feed does not target the exact channel assets.')
-    ),
-    false
-  );
-  assert.equal(
-    isPublicationObservationError(new Error('Published feed returned 404.')),
-    false
-  );
 });

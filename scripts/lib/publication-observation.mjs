@@ -1,7 +1,4 @@
-/**
- * Classify shipped-desktop publication failures: incomplete observation vs
- * verification mismatch. Shared by desktop audit + artifact freshness.
- */
+/** Classify publication failures: observation vs verification. */
 import { isInstallationQuota403 } from './github-installation-quota.mjs';
 import { classifyGitHubFailure } from './github-rate-limit.mjs';
 

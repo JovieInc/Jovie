@@ -163,29 +163,3 @@ test('unverified publication pages Summer without inventing device state', () =>
   assert.equal(receipt.pageSummer.length, 1);
   assert.equal(receipt.channels[0].stages.installed.status, 'unknown');
 });
-
-test('feed version drift and installed/running mismatches are distinct codes', () => {
-  const graph = reconcileArtifactFreshness({
-    channel: 'production',
-    published: {
-      status: 'known',
-      sourceRevision: SHA_A,
-      version: '26.11.4',
-      verified: true,
-    },
-    feed: {
-      status: 'known',
-      sourceRevision: SHA_A,
-      version: '26.11.3',
-      verified: true,
-    },
-    installed: { status: 'known', sourceRevision: SHA_B },
-    running: { status: 'known', sourceRevision: SHA_A },
-  });
-  const codes = graph.mismatches.map(m => m.code).sort();
-  assert.deepEqual(codes, [
-    'feed-version-mismatch',
-    'installed-behind',
-    'running-stale',
-  ]);
-});

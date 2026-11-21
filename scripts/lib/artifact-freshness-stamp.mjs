@@ -1,10 +1,8 @@
 /**
  * Stamp-PR awareness for artifact freshness (JOV-5368).
- *
  * Keep-owned cursor/stable-desktop-publish-* means publish is in the normal
  * path — suppress Summer page, still block resolve. DIRTY/exhausted do not.
  * Keep-owned stamps older than STAMP_IN_FLIGHT_MAX_AGE_MS escalate (page).
- *
  * api-budget: github-actions-token 40/hr - desktop-release completion reconcile: open PR pages plus one stamp detail GET
  */
 import { GITHUB_API } from '../../packages/api-client/github.ts';

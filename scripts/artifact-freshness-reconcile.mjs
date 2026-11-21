@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
  * Server-side artifact freshness reconciler (JOV-5368 slice).
- *
  * Observes certified → published → feed for production and staging desktop
  * channels. Installed/running stay explicit unknown until a device heartbeat
  * exists. Pages Summer via Linear upsert when a stage mismatch is red; closes
@@ -205,7 +204,6 @@ export async function collectArtifactFreshness(input = {}) {
  * (`[artifact-freshness]`) so title-contains dedupe cannot latch onto a human
  * issue that merely mentions the bare phrase. labelKey still owns
  * `remediation:artifact-freshness` for label/footer matching on close/reuse.
- *
  * @param {{
  *   readonly receipt: ReturnType<typeof buildArtifactFreshnessReceipt>;
  *   readonly sourceUrl?: string;
@@ -260,7 +258,6 @@ export async function pageSummerForFreshness(input) {
  * Installed/running stay unknown by design. Staging certified stays unknown
  * (rolling tag). Unknown published/feed — including stagingObservationError —
  * must not green-close an open stall.
- *
  * @param {ReturnType<typeof buildArtifactFreshnessReceipt>} receipt
  */
 export function canResolveSummerForFreshness(receipt) {

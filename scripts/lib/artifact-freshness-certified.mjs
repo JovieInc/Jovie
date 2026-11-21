@@ -83,7 +83,6 @@ export function desktopRelevantBetween(publishedSha, certifiedSha, deps = {}) {
 /**
  * Production Verified lives on production-controller.yml, which triggers on
  * workflow_run (not push). Query that workflow's runs — never event=push.
- *
  * @param {{
  *   readonly repo?: string;
  *   readonly token?: string | null;

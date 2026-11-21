@@ -1,29 +1,20 @@
 name: Artifact Freshness
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Summer
-# necessary-trust-boundary: GitHub Actions observes desktop release/feed identity
-# outside the founder device; Linear upsert pages Summer when certified →
-# published → feed diverge. Installed/running stay unknown without a heartbeat.
-# removal-trigger: Remove after Ovi Shipping owns the same stage graph end-to-end
-# with device heartbeats and no longer needs this safety-net hop.
+# necessary-trust-boundary: Actions observes desktop release/feed identity off-device; pages Summer on certified→published→feed divergence.
+# removal-trigger: Remove once Ovi Shipping owns the stage graph with device heartbeats.
 
 on:
   workflow_run:
     workflows: ['desktop-release']
     types: [completed]
-  # No cron: JOV-INV-042 cron allowlist is frozen (no new GitHub schedules).
-  # Stamp dwell escalation therefore waits on the next desktop-release
-  # completion or a manual workflow_dispatch — there is no sibling scheduled
-  # freshness reconciler to piggyback. Quiet periods without a release event
-  # do not mint a new clock; reopen via Gem lanes tick only if dwell latency
-  # becomes an owner-tracked gap.
+  # No cron (JOV-INV-042). Stamp dwell waits on next desktop-release or workflow_dispatch.
   workflow_dispatch:
 
 permissions:
   actions: read
   contents: read
-  # fetchDesktopPublishInFlight lists open PRs (+ stamp detail GET) with github.token
-  pull-requests: read
+  pull-requests: read # stamp list/detail via github.token
 
 concurrency:
   group: artifact-freshness

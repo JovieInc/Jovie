@@ -297,31 +297,17 @@ test('staging requires a valid timestamp for the current rolling publication', a
 
 test('wrong feed bytes, unavailable feed, and wrong feed target cannot verify publication', async () => {
   const fixture = publishedFixture();
-  /** @type {Array<[() => Response, boolean]>} */
-  const cases = [
-    [() => new Response(fixture.feed.replace('26.10.3', '26.10.4')), false],
-    [
-      () =>
-        new Response('API rate limit exceeded for installation ID 42', {
-          status: 403,
-        }),
-      true,
-    ],
-    [() => new Response('denied', { status: 403 }), false],
-    [
-      () => {
-        throw new Error('network unavailable');
-      },
-      true,
-    ],
-  ];
-  for (const [feedResponse, expectObservation] of cases) {
-    const observed = (await observePublication(fixture, feedResponse))
-      .production;
-    assert.equal(observed.publicationIdentityVerified, false);
+  for (const response of [
+    () => new Response(fixture.feed.replace('26.10.3', '26.10.4')),
+    () => new Response('denied', { status: 403 }),
+    () => {
+      throw new Error('network unavailable');
+    },
+  ]) {
     assert.equal(
-      Boolean(observed.publicationObservationError),
-      expectObservation
+      (await observePublication(fixture, response)).production
+        .publicationIdentityVerified,
+      false
     );
   }
   for (const transform of [

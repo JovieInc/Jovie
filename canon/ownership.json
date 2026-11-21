@@ -16,6 +16,7 @@
     {"id": "workflow:actionlint", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/actionlint.yml"},
     {"id": "workflow:actions-cache-gc", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/actions-cache-gc.yml", "note": "Workflow header names TimWhite as accountable writer; the routine owner is the agent role here."},
     {"id": "workflow:agent-harness-health-report", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/agent-harness-health-report.yml", "note": "Report-only; reclaim mutations live in summer-pr-no-stall.yml."},
+    {"id": "workflow:artifact-freshness", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/artifact-freshness.yml", "note": "Workflow header names Summer as accountable writer; observes certified → published → feed and pages Summer on red."},
     {"id": "workflow:auto-ready-agent-drafts", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/auto-ready-agent-drafts.yml"},
     {"id": "workflow:automation-liveness", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/automation-liveness.yml", "note": "Dead-man check over canon/automation-registry.jsonl; registry entry github:jovie:automation-liveness."},
     {"id": "workflow:buyer-eval-gate", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/buyer-eval-gate.yml"},

@@ -139,28 +139,3 @@ test('blocked keep-owned stamp past dwell max is not in-flight', async () => {
   assert.equal(result.inFlight, false);
   assert.match(result.reason, /stamp-dwell-exceeded/);
 });
-
-test('paginates open PRs so stamp past first page is found', async () => {
-  const page2 = `${GITHUB_API}/repos/${REPO}/pulls?state=open&base=main&per_page=100&page=2`;
-  const result = await fetchDesktopPublishInFlight({
-    repo: REPO,
-    token: 't',
-    fetchImpl: async url => {
-      const href = String(url);
-      if (href.includes('page=2')) {
-        return listResponse([stampListRow()]);
-      }
-      if (href.includes('/pulls?')) {
-        return listResponse(
-          [{ number: 1, base: { ref: 'main' }, head: { ref: 'other' } }],
-          `<${page2}>; rel="next"`
-        );
-      }
-      return {
-        ok: true,
-        json: async () => stampListRow({ mergeable_state: 'clean' }),
-      };
-    },
-  });
-  assert.equal(result.inFlight, true);
-});

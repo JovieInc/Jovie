@@ -1,6 +1,5 @@
 /**
  * Artifact freshness stage graph (JOV-5368 slice).
- *
  * Invariant: merged ≠ certified ≠ published ≠ feed ≠ installed ≠ running.
  * No stage may infer the next from a green workflow name or version string.
  * Device stages (installed/running) stay explicit `unknown` until a heartbeat
@@ -26,7 +25,6 @@ export const STAGES = Object.freeze([
  *   readonly verified?: boolean;
  *   readonly reason?: string | null;
  * }} StageReceipt
- *
  * @typedef {{
  *   readonly channel: 'production' | 'staging';
  *   readonly stages: Readonly<Record<string, StageReceipt>>;
@@ -65,7 +63,6 @@ function isKnownSha(stage) {
  *   readonly verified?: boolean;
  *   readonly reason?: string | null;
  * }} StageReceiptInput
- *
  * Reconcile one channel's stage receipts into a mismatch list.
  * @param {{
  *   readonly channel: 'production' | 'staging';
