@@ -41,3 +41,21 @@ export function getNavGroupVariantClass({
 
   return 'gap-1 lg:gap-1.5';
 }
+
+export function getNavContainerVariantClass({
+  containerSize,
+  isMarketingGlass,
+}: Readonly<{
+  containerSize: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage' | undefined;
+  isMarketingGlass: boolean;
+}>) {
+  if (isMarketingGlass) {
+    return 'public-container marketing-glass-header__shell';
+  }
+
+  if (containerSize === 'homepage') {
+    return 'max-w-public-content lg:px-0';
+  }
+
+  return 'max-w-public-content';
+}

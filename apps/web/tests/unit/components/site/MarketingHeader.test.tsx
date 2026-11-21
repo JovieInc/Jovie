@@ -196,7 +196,11 @@ describe('MarketingHeader', () => {
 
     const navItems = Array.from(
       document.querySelector('.marketing-glass-header__nav')?.children ?? []
-    ).map(item => item.textContent);
+    ).map(item => {
+      // Flyouts stay mounted for native popover entry; read the trigger only.
+      const trigger = item.querySelector('button, a');
+      return (trigger?.textContent ?? item.textContent ?? '').trim();
+    });
 
     // LogoLink is the home control; do not duplicate "Jovie" in the nav (JOV-14240).
     expect(navItems).toEqual(['Customers', 'Product', 'Pricing']);

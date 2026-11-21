@@ -1557,17 +1557,17 @@ body {
 }
 
 /* ============================================
-   SCROLL-REVEAL (marketing motion system, JOV-7757)
+   SCROLL-REVEAL (marketing motion system, JOV-14244)
    `.reveal-on-scroll` fades in with a short rise as it enters the viewport.
 
-   1. Browsers with scroll-driven animations (Chrome 115+, Safari 26+) run it
-      on the compositor from CSS alone: no JS, no observer, and content that
-      is already in view at load is simply visible. The range is a fixed
-      distance past the viewport edge so tall sections are never half-faded.
-   2. Elsewhere ScrollRevealInit adds `.reveal-js` and toggles `.revealed`
-      with an IntersectionObserver. Without JS, content stays visible.
+   1. Browsers with scroll-driven animations run it on the compositor from
+      CSS alone: no JS, no observer. Content already in view at load is
+      simply visible. The range is a fixed distance past the viewport edge
+      so tall sections are never half-faded.
+   2. Without `animation-timeline: view()`, content stays fully visible
+      immediately (static fallback). No IntersectionObserver path.
    3. Reduced motion keeps the opacity change and drops the movement.
-   `data-delay="80|160|240"` staggers siblings in both paths.
+   `data-delay="80|160|240"` staggers siblings via --reveal-offset.
    ============================================ */
 
 .reveal-on-scroll {
@@ -1615,35 +1615,73 @@ body {
   }
 }
 
-@supports not (animation-timeline: view()) {
-  .reveal-js .reveal-on-scroll {
-    opacity: 0;
-    transform: translateY(var(--reveal-distance));
+/* ============================================
+   ROUTE VIEW TRANSITIONS (JOV-14244)
+   Quiet morph / crossfade for persistent chrome, avatar, cover, titles.
+   Uses System B cinematic tokens only. Reduced motion kills the group.
+   ============================================ */
+
+::view-transition-group(.jovie-morph) {
+  animation-duration: var(--duration-cinematic);
+  animation-timing-function: var(--ease-cinematic);
+}
+
+::view-transition-old(.jovie-crossfade),
+::view-transition-new(.jovie-crossfade) {
+  animation-duration: var(--duration-subtle);
+  animation-timing-function: var(--ease-out);
+}
+
+::view-transition-group(site-header),
+::view-transition-old(site-header),
+::view-transition-new(site-header) {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* ============================================
+   NATIVE POPOVER ENTRY (JOV-14244)
+   Platform popover attribute + @starting-style. Existing tokens only.
+   ============================================ */
+
+@supports (transition-behavior: allow-discrete) {
+  [popover] {
     transition:
-      opacity var(--duration-cinematic) var(--ease-out),
-      transform var(--duration-cinematic) var(--ease-out);
+      opacity var(--duration-subtle) var(--ease-out),
+      transform var(--duration-subtle) var(--ease-out),
+      overlay var(--duration-subtle) var(--ease-out) allow-discrete,
+      display var(--duration-subtle) var(--ease-out) allow-discrete;
   }
 
-  .reveal-js .reveal-on-scroll.revealed {
+  [popover]:popover-open {
     opacity: 1;
-    transform: none;
+    transform: scale(1);
   }
 
-  .reveal-on-scroll[data-delay="80"] {
-    transition-delay: calc(var(--stagger-block) * 1);
-  }
-  .reveal-on-scroll[data-delay="160"] {
-    transition-delay: calc(var(--stagger-block) * 2);
-  }
-  .reveal-on-scroll[data-delay="240"] {
-    transition-delay: calc(var(--stagger-block) * 3);
+  @starting-style {
+    [popover]:popover-open {
+      opacity: 0;
+      transform: scale(0.98);
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .reveal-js .reveal-on-scroll {
-      opacity: 1;
-      transform: none;
+    [popover] {
       transition: none;
+    }
+
+    @starting-style {
+      [popover]:popover-open {
+        opacity: 1;
+        transform: none;
+      }
     }
   }
 }

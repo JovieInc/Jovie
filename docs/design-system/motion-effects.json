@@ -78,6 +78,57 @@
         "fpsCap": null,
         "pausesOffscreen": false
       }
+    },
+    {
+      "id": "scroll-reveal",
+      "summary": "CSS scroll-driven section reveals (animation-timeline: view()). Unsupported browsers show content immediately; no JS observer.",
+      "files": ["apps/web/app/globals.css"],
+      "fallback": "content stays fully visible",
+      "reducedMotion": {
+        "marker": "prefers-reduced-motion",
+        "requiredIn": ["apps/web/app/globals.css"]
+      },
+      "budget": { "gzipBytes": 8192, "fpsCap": null, "pausesOffscreen": true }
+    },
+    {
+      "id": "marketing-glass-flyout",
+      "summary": "Marketing glass nav flyouts via native popover, CSS anchor/position-area, and @starting-style entry.",
+      "files": [
+        "apps/web/components/organisms/HeaderNav.tsx",
+        "apps/web/components/organisms/HeaderNav.css"
+      ],
+      "fallback": "class-toggled fixed panel",
+      "reducedMotion": {
+        "marker": "prefers-reduced-motion",
+        "requiredIn": ["apps/web/components/organisms/HeaderNav.css"]
+      },
+      "budget": {
+        "gzipBytes": 12288,
+        "fpsCap": null,
+        "pausesOffscreen": false
+      }
+    },
+    {
+      "id": "route-view-transitions",
+      "summary": "Quiet React ViewTransition morph for persistent avatar, cover, titles, and site header.",
+      "files": [
+        "apps/web/lib/motion/view-transition-names.ts",
+        "apps/web/components/features/profile/ProfileIdentityHeader.tsx",
+        "apps/web/components/features/release/SmartLinkShell.tsx"
+      ],
+      "fallback": "default=.none.|prefers-reduced-motion",
+      "reducedMotion": {
+        "marker": "prefers-reduced-motion",
+        "requiredIn": ["apps/web/lib/motion/view-transition-names.ts"]
+      },
+      "budget": {
+        "gzipBytes": 16384,
+        "perFileGzipBytes": {
+          "apps/web/lib/motion/view-transition-names.ts": 1024
+        },
+        "fpsCap": null,
+        "pausesOffscreen": false
+      }
     }
   ]
 }
