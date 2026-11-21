@@ -138,6 +138,11 @@ describe('HomepageEditorial chapters', () => {
       'action',
       claim.href
     );
+    // JOV-10127 entry hygiene: display names must not become handle= (form
+    // owns the handoff; this asserts the close still mounts the claim field).
+    expect(
+      within(section).getByRole('textbox', { name: 'Your handle' })
+    ).toHaveAttribute('placeholder', COPY.claim.handlePlaceholder);
     expect(
       within(section).queryByTestId('waitlist-role-form')
     ).not.toBeInTheDocument();

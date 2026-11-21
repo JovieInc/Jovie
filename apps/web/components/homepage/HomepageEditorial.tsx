@@ -2,8 +2,8 @@
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, type ReactNode } from 'react';
+import { HomepageClaimEntryForm } from '@/app/(marketing)/home/HomepageClaimEntryForm';
 import { WaitlistRoleForm } from '@/components/features/waitlist/WaitlistRoleForm';
-import { HomepageClaimEntryForm } from '@/components/homepage/HomepageClaimEntryForm';
 import { HomepageProfilePhone } from '@/components/homepage/HomepageProfilePhone';
 import {
   HOMEPAGE_EDITORIAL_COPY,

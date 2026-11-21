@@ -146,7 +146,8 @@ export function ProductClaimHandleForm({
             type='submit'
             size='marketing'
             variant='primary'
-            disabled={navigating || (Boolean(handleError) && !displayNamePrior)}
+            // Design-noise: never grey-disable for field validity; validate on submit.
+            disabled={navigating}
             data-testid={submitTestId}
             data-primary-action='true'
             aria-busy={checkingAvail || navigating}

@@ -62,7 +62,6 @@ export function HomepageClaimEntryForm() {
         // chars so `handle=Taylor+Swift` never lands. Client submit converts
         // those values into a Spotify-search starter instead.
         pattern='[A-Za-z0-9._-]{3,30}'
-        title='Use letters, numbers, dots, underscores, or hyphens (3–30). Or leave blank and find yourself on Spotify in chat.'
       />
       <Button
         type='submit'

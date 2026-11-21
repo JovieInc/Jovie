@@ -47,9 +47,12 @@ describe('HomepageClaimEntryForm', () => {
     const form = screen.getByTestId('homepage-claim-entry');
     expect(form).toHaveAttribute('method', 'get');
     expect(form).toHaveAttribute('action');
+    const input = screen.getByRole('textbox', { name: 'Your handle' });
+    expect(input).toHaveAttribute('pattern', '[A-Za-z0-9._-]{3,30}');
+    expect(input).toHaveAttribute('name', 'handle');
     expect(
-      screen.getByRole('textbox', { name: 'Your handle' })
-    ).toHaveAttribute('pattern', '[A-Za-z0-9._-]{3,30}');
+      form.querySelector('input[type="hidden"][name="starter_prompt"]')
+    ).not.toBeNull();
   });
 
   it('does not double-navigate while a handoff is in flight', async () => {
