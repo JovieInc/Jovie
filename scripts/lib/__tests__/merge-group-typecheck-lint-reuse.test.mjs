@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { LANE_GROUPS, selectLanes } from '../../ci-fast-lanes.mjs';
 import {
   decideTypecheckLintReuse,
   MERGE_GROUP_BASE_SENSITIVE_CI_FAST_LANES,
@@ -9,7 +10,6 @@ import {
   SOURCE_VALIDATION_WORKFLOW_PATH,
   sourceHeadHasGreenValidationProof,
 } from '../merge-group-typecheck-lint-reuse.mjs';
-import { LANE_GROUPS, selectLanes } from '../../ci-fast-lanes.mjs';
 
 const TREE_A = 'a'.repeat(40);
 const TREE_B = 'b'.repeat(40);
@@ -111,17 +111,17 @@ describe('merge-group typecheck/lint same-tree reuse (JOV-12618 / JOV-13081)', (
     const urls = [];
     const fetchImpl =
       /** @type {typeof fetch} */
-      (async url => {
-        urls.push(String(url));
-        return /** @type {Response} */ ({
-          ok: true,
-          async json() {
-            return {
+      (
+        async url => {
+          urls.push(String(url));
+          return new Response(
+            JSON.stringify({
               workflow_runs: [{ head_sha: HEAD, conclusion: 'success' }],
-            };
-          },
-        });
-      });
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } }
+          );
+        }
+      );
     await expect(
       sourceHeadHasGreenValidationProof({
         repository: 'JovieInc/Jovie',
@@ -142,13 +142,13 @@ describe('merge-group typecheck/lint same-tree reuse (JOV-12618 / JOV-13081)', (
   it('proof lookup fails open when the workflow-scoped query is empty', async () => {
     const fetchImpl =
       /** @type {typeof fetch} */
-      (async () =>
-        /** @type {Response} */ ({
-          ok: true,
-          async json() {
-            return { workflow_runs: [] };
-          },
-        }));
+      (
+        async () =>
+          new Response(JSON.stringify({ workflow_runs: [] }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+      );
     await expect(
       sourceHeadHasGreenValidationProof({
         repository: 'JovieInc/Jovie',
@@ -171,7 +171,10 @@ describe('merge-group typecheck/lint same-tree reuse (JOV-12618 / JOV-13081)', (
         'biome,shadcn-lint-contracts,scripts-typecheck';
       // selectLanes itself does not skip; main() filters with parseSkipLaneIds.
       const remaining = selectLanes('remaining')
-        .filter(lane => !parseSkipLaneIds(process.env.CI_FAST_SKIP_LANE_IDS).has(lane.id))
+        .filter(
+          lane =>
+            !parseSkipLaneIds(process.env.CI_FAST_SKIP_LANE_IDS).has(lane.id)
+        )
         .map(lane => lane.id);
       expect(remaining).not.toContain('biome');
       expect(remaining).toContain('eslint-server-boundaries');

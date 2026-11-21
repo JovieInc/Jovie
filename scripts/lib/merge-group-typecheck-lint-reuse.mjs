@@ -6,11 +6,17 @@
  * definitions in-tree match the proof commit's definitions.
  *
  * Fail open: any missing input or lookup error returns reuse=false.
+ *
+ * api-budget: github-actions-token 60/hr - one Source Validation workflow-runs
+ * proof lookup per same-tree merge_group reuse decision (skip when trees differ)
  */
-import { createHash } from 'node:crypto';
+
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+
+export { parseSkipLaneIds } from './ci-fast-skip-lanes.mjs';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 
@@ -169,21 +175,6 @@ export function gitTreeSha(cwd, rev) {
 export const SOURCE_VALIDATION_WORKFLOW_PATH = 'source-validation.yml';
 
 /**
- * Parse CI_FAST_SKIP_LANE_IDS (comma-separated). Empty/missing → skip nothing.
- * @param {string | undefined} raw
- * @returns {Set<string>}
- */
-export function parseSkipLaneIds(raw) {
-  const skipped = new Set();
-  if (typeof raw !== 'string' || raw.trim() === '') return skipped;
-  for (const part of raw.split(',')) {
-    const id = part.trim();
-    if (id) skipped.add(id);
-  }
-  return skipped;
-}
-
-/**
  * True when Source Validation already concluded success on the exact source
  * head (PR Ready aggregate). Fail open on transport errors.
  *
@@ -194,7 +185,6 @@ export function parseSkipLaneIds(raw) {
  *   repository: string,
  *   sourceHeadSha: string,
  *   token: string,
- *   apiUrl?: string,
  *   fetchImpl?: typeof fetch,
  * }} args
  */
@@ -202,7 +192,6 @@ export async function sourceHeadHasGreenValidationProof({
   repository,
   sourceHeadSha,
   token,
-  apiUrl = 'https://api.github.com',
   fetchImpl = fetch,
 }) {
   const head = normalizeSha(sourceHeadSha);
@@ -216,24 +205,30 @@ export async function sourceHeadHasGreenValidationProof({
     status: 'completed',
     per_page: '100',
   });
-  const response = await fetchImpl(
-    `${apiUrl}/repos/${owner}/${repo}/actions/workflows/${SOURCE_VALIDATION_WORKFLOW_PATH}/runs?${query}`,
-    {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${token}`,
-        'User-Agent': 'jovie-merge-group-typecheck-lint-reuse',
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
-    }
-  );
-  if (!response.ok) return false;
-  const body = /** @type {{ workflow_runs?: Array<Record<string, unknown>> }} */ (
-    await response.json()
-  );
-  return (body.workflow_runs ?? []).some(
-    run => run.head_sha === head && run.conclusion === 'success'
-  );
+  const path = `repos/${owner}/${repo}/actions/workflows/${SOURCE_VALIDATION_WORKFLOW_PATH}/runs?${query}`;
+  try {
+    const { createGitHubClient } = await import(
+      '../../packages/api-client/github.ts'
+    );
+    const response = await createGitHubClient({
+      token,
+      fetch: fetchImpl,
+    }).rest('GET', path, undefined, {
+      priority: 'default',
+      maxWaitMs: 0,
+      timeoutMs: 15000,
+    });
+    if (response.status < 200 || response.status >= 300) return false;
+    const body =
+      /** @type {{ workflow_runs?: Array<Record<string, unknown>> }} */ (
+        response.json()
+      );
+    return (body.workflow_runs ?? []).some(
+      run => run.head_sha === head && run.conclusion === 'success'
+    );
+  } catch {
+    return false;
+  }
 }
 
 function writeGithubOutput(env, lines) {
@@ -299,7 +294,6 @@ export async function runTypecheckLintReuseFromEnv(env = process.env) {
             repository,
             sourceHeadSha: sourceHead,
             token,
-            apiUrl: env.GITHUB_API_URL || 'https://api.github.com',
           });
         } catch {
           sourceProofOk = false;

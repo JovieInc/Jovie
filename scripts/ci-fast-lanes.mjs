@@ -101,6 +101,7 @@ import {
   laneFailureExcerpt,
   structuralFailureExcerpt,
 } from './lib/ci-failure-excerpts.mjs';
+import { parseSkipLaneIds } from './lib/ci-fast-skip-lanes.mjs';
 import {
   affectsJovieTypecheck,
   affectsWebTestTypecheck,
@@ -108,7 +109,6 @@ import {
 } from './lib/ci-repo-lanes.mjs';
 import { STRUCTURAL_PYTEST_FILES } from './lib/ci-structural-pytest-files.mjs';
 import { MERGED_WITH_BASE_POOL_CONCURRENCY } from './lib/merged-with-base-pool-config.mjs';
-import { parseSkipLaneIds } from './lib/merge-group-typecheck-lint-reuse.mjs';
 import { scriptContractNodeArgs } from './lib/script-contract-node-args.mjs';
 import { testsAffectedBy } from './lib/test-file-dependencies.mjs';
 import { TEST_PLANNER_CONTRACT_TESTS } from './lib/test-planner-contract-tests.mjs';
@@ -1493,7 +1493,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ci-unit-selection.test.mjs',
   'scripts/lib/__tests__/merge-group-fail-fast.test.mjs',
   'scripts/lib/__tests__/merge-group-local-evidence.test.mjs',
-  'scripts/lib/__tests__/merge-group-token-budget.test.mjs',
+  'scripts/lib/__tests__/merge-group-token-budget.test.mjs scripts/lib/__tests__/merge-group-typecheck-lint-reuse.test.mjs',
   'scripts/lib/__tests__/merge-group-dead-run-sweep.test.mjs',
   'scripts/lib/__tests__/workflow-triggers.test.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
