@@ -307,16 +307,18 @@ export function coneScoreboard(receipts) {
       checkIndex.set(`${receipt.surface}:${check.id}`, check);
     }
     // A whole-surface block (e.g. served-sha mismatch) also blocks the
-    // surface's produced cases that never ran.
+    // surface's produced cases that never ran. Never clobber a check that
+    // already executed (passed/failed/blocked) — only fill absent keys.
     if (receipt.status === 'blocked' && receipt.blocker) {
       for (const producer of Object.values(CONE_CASE_PRODUCERS)) {
-        if (producer.surface === receipt.surface) {
-          checkIndex.set(`${receipt.surface}:${producer.checkId}`, {
-            id: producer.checkId,
-            status: 'blocked',
-            summary: receipt.blocker,
-          });
-        }
+        if (producer.surface !== receipt.surface) continue;
+        const key = `${receipt.surface}:${producer.checkId}`;
+        if (checkIndex.has(key)) continue;
+        checkIndex.set(key, {
+          id: producer.checkId,
+          status: 'blocked',
+          summary: receipt.blocker,
+        });
       }
     }
   }
