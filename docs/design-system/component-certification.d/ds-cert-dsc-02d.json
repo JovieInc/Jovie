@@ -1,0 +1,28 @@
+{
+  "gates": {
+    "apps/web/components/features/demo/DemoShowcaseSurface.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/library/LibraryFirstArrivalAdapter.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/demo/DemoShowcaseSurface.tsx": {
+      "long-content": "The router renders fixed demo fixtures and takes only a surface id; no user-supplied text reaches it.",
+      "offline": "The router makes no network requests; every surface renders from static fixtures."
+    }
+  }
+}
