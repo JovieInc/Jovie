@@ -1566,7 +1566,8 @@ body {
       so tall sections are never half-faded.
    2. Without `animation-timeline: view()`, content stays fully visible
       immediately (static fallback). No IntersectionObserver path.
-   3. Reduced motion keeps the opacity change and drops the movement.
+   3. Reduced motion cancels the timeline and shows content at full opacity
+      immediately (static fallback).
    `data-delay="80|160|240"` staggers siblings via --reveal-offset.
    ============================================ */
 
@@ -1594,12 +1595,6 @@ body {
   }
 }
 
-@keyframes reveal-fade {
-  from {
-    opacity: 0.01;
-  }
-}
-
 @supports (animation-timeline: view()) {
   .reveal-on-scroll {
     animation: reveal-rise linear both;
@@ -1610,7 +1605,9 @@ body {
 
   @media (prefers-reduced-motion: reduce) {
     .reveal-on-scroll {
-      animation-name: reveal-fade;
+      animation: none;
+      opacity: 1;
+      transform: none;
     }
   }
 }

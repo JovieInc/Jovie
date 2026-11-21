@@ -81,9 +81,9 @@
     },
     {
       "id": "scroll-reveal",
-      "summary": "CSS scroll-driven section reveals (animation-timeline: view()). Unsupported browsers show content immediately; no JS observer.",
+      "summary": "CSS scroll-driven section reveals (animation-timeline: view()). Unsupported browsers and reduced-motion show content immediately; no JS observer.",
       "files": ["apps/web/app/globals.css"],
-      "fallback": "content stays fully visible",
+      "fallback": "animation: none|opacity: 1|content stays fully visible",
       "reducedMotion": {
         "marker": "prefers-reduced-motion",
         "requiredIn": ["apps/web/app/globals.css"]
