@@ -78,7 +78,7 @@
   --color-btn-primary-foreground: var(--color-btn-primary-fg);
   --color-btn-secondary: var(--color-btn-secondary-bg);
   --color-btn-secondary-foreground: var(--color-btn-secondary-fg);
-  /* Platform brand colors - exposed as Tailwind utilities */
+  /* Platform brand colors - exposed as Tailwind utilities (v4 @theme is source of truth) */
   --color-brand-spotify: var(--color-brand-spotify);
   --color-brand-spotify-hover: var(--color-brand-spotify-hover);
   --color-brand-spotify-subtle: var(--color-brand-spotify-subtle);
@@ -88,6 +88,34 @@
   --color-brand-youtube: var(--color-brand-youtube);
   --color-brand-youtube-hover: var(--color-brand-youtube-hover);
   --color-brand-youtube-subtle: var(--color-brand-youtube-subtle);
+  --color-brand-soundcloud: var(--color-brand-soundcloud);
+  --color-brand-soundcloud-hover: var(--color-brand-soundcloud-hover);
+  --color-brand-soundcloud-subtle: var(--color-brand-soundcloud-subtle);
+  --color-brand-tidal: var(--color-brand-tidal);
+  --color-brand-tidal-hover: var(--color-brand-tidal-hover);
+  --color-brand-tidal-subtle: var(--color-brand-tidal-subtle);
+  --color-brand-amazon: var(--color-brand-amazon);
+  --color-brand-amazon-hover: var(--color-brand-amazon-hover);
+  --color-brand-amazon-subtle: var(--color-brand-amazon-subtle);
+  --color-brand-deezer: var(--color-brand-deezer);
+  --color-brand-deezer-hover: var(--color-brand-deezer-hover);
+  --color-brand-deezer-subtle: var(--color-brand-deezer-subtle);
+  --color-brand-pandora: var(--color-brand-pandora);
+  --color-brand-pandora-hover: var(--color-brand-pandora-hover);
+  --color-brand-pandora-subtle: var(--color-brand-pandora-subtle);
+  --color-brand-audiomack: var(--color-brand-audiomack);
+  --color-brand-audiomack-hover: var(--color-brand-audiomack-hover);
+  --color-brand-audiomack-subtle: var(--color-brand-audiomack-subtle);
+  --color-brand-bandcamp: var(--color-brand-bandcamp);
+  --color-brand-qq-music: var(--color-brand-qq-music);
+  --color-brand-netease: var(--color-brand-netease);
+  --color-brand-beatport: var(--color-brand-beatport);
+  --color-brand-napster: var(--color-brand-napster);
+  --color-brand-qobuz: var(--color-brand-qobuz);
+  --color-brand-anghami: var(--color-brand-anghami);
+  --color-brand-boomplay: var(--color-brand-boomplay);
+  --color-brand-iheartradio: var(--color-brand-iheartradio);
+  --color-brand-instagram: var(--color-brand-instagram);
   /* Error token — generates text-error, bg-error, border-error */
   --color-error: var(--color-error);
   /* Surface backgrounds. `base` is bridged below because registering
