@@ -82,6 +82,9 @@ export {
   sourceGuardLocks,
 } from './lib/ci-source-guard-pool.mjs';
 export {
+  DESIGN_CI_JUDGE_VITEST_MARKER,
+  DESIGN_CI_JUDGE_VITEST_PATHS,
+  filterMergedWithBasePoolEntries,
   MERGED_WITH_BASE_POOL_CONCURRENCY,
   MERGED_WITH_BASE_POOL_LONG_POLES,
 } from './lib/merged-with-base-pool-config.mjs';
