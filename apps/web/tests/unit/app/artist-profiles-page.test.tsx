@@ -392,7 +392,7 @@ describe('ArtistProfilesPage', () => {
       FAQ: false,
     });
     expect(
-      screen.getByText(ARTIST_PROFILE_COPY.hero.headline)
+      screen.getByRole('heading', { name: /The link your\s+music deserves/ })
     ).toBeInTheDocument();
     // Short-circuit hero still mounts the one mode-morphing mock.
     expect(

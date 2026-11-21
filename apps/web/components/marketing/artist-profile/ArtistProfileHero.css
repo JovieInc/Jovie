@@ -8,7 +8,8 @@
 }
 
 .ap-hero .homepage-poster-hero__headline {
-  max-width: 13ch;
+  /* Fits "music deserves." on one line after the forced soft break. */
+  max-width: 16ch;
 }
 
 .ap-hero .homepage-poster-hero__subtitle {
@@ -116,7 +117,7 @@
   }
 
   .ap-hero .homepage-poster-hero__headline {
-    max-width: 12ch;
+    max-width: 16ch;
   }
 
   .ap-hero__mode-switcher {

@@ -37,6 +37,7 @@ export const PRODUCT_EXPLORE_GROUPS: readonly ProductExploreGroup[] = [
     title: 'More',
     links: [
       { href: APP_ROUTES.SOLUTIONS_ARTISTS, label: 'Solutions' },
+      { href: APP_ROUTES.INSTANT_MERCH, label: 'Instant Merch' },
       { href: APP_ROUTES.LAUNCH, label: 'Release system' },
       { href: APP_ROUTES.COMPARE, label: 'Compare Jovie' },
       { href: APP_ROUTES.ALTERNATIVES, label: 'Alternatives' },

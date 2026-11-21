@@ -429,7 +429,8 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   hero: {
     eyebrow: '',
-    headline: 'The link your music deserves.',
+    // Soft break keeps line-clamp-2 + taste ratchet balanced (no orphan last word).
+    headline: 'The link your\nmusic deserves.',
     subhead:
       'Your music, artist bio, and social links in one free profile. Review the details, then share your Jovie link.',
     ctaLabel: 'Claim your profile',
