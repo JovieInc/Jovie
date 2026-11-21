@@ -90,6 +90,12 @@ export function buildPublicProfileScriptedFalseSuccess(input: {
   readonly completedAt: string;
 }): DogfoodReceipt {
   const mission = getCanonicalSurface('public-profile').outcomeMission;
+  const [firstCriterion] = mission.outcome.successCriteria;
+  if (!firstCriterion) {
+    throw new Error(
+      'public-profile outcome mission requires at least one success criterion'
+    );
+  }
   return dogfoodReceiptFromOutcomeMission(mission, {
     subjectId: PUBLIC_PROFILE_DOGFOOD_SUBJECT_ID,
     product: 'jov',
@@ -112,7 +118,7 @@ export function buildPublicProfileScriptedFalseSuccess(input: {
       resultingState: 'Scripted selectors completed without customer proof.',
       checks: [
         {
-          criterion: mission.outcome.successCriteria[0]!,
+          criterion: firstCriterion,
           status: 'passed',
           evidenceRefs: ['artifact:public-profile/scripted-click-trace'],
         },

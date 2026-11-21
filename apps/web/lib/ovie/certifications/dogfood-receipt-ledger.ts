@@ -311,10 +311,7 @@ export function dogfoodFeedStatus(ledger: DogfoodReceiptLedger | null): {
   let status: 'disconnected' | 'fixture' | 'production' = 'disconnected';
   if (sources.includes('production')) {
     status = 'production';
-  } else if (
-    sources.length > 0 ||
-    Object.keys(ledger.receipts).length > 0
-  ) {
+  } else if (sources.length > 0 || Object.keys(ledger.receipts).length > 0) {
     status = 'fixture';
   }
   return {

@@ -24,13 +24,10 @@ import {
   computeFleetHardeningMetrics,
   type FleetHardeningMetrics,
 } from '@/lib/agent-os/fleet-hardening';
+import { type DogfoodFeedProjection, projectDogfoodFeed } from './dogfood-feed';
 import {
-  type DogfoodFeedProjection,
-  projectDogfoodFeed,
-} from './dogfood-feed';
-import {
-  metric,
   type MetricValue,
+  metric,
   minutesBetween,
   per100,
   percentile,
