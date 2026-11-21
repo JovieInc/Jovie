@@ -42,6 +42,7 @@ import {
 } from '../../../../../scripts/lib/playwright-png.mjs';
 import { allowanceEnabled } from './artifact-allowance';
 import productionSmokeProducers from './fixtures/production-smoke-producers.json';
+
 const webRoot = resolve(import.meta.dirname, '../../..');
 const repoRoot = resolve(webRoot, '../..');
 const githubRoot = join(repoRoot, '.github');
@@ -258,12 +259,10 @@ function fixture(prefix = 'jovie-artifact-', parent = tmpdir()) {
   generated.push(path);
   return path;
 }
-
 function write(path: string, contents: string | Buffer) {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, contents);
 }
-
 const fileMode = (path: string) => lstatSync(path).mode & 0o777;
 const jobBlock = (source: string, job: string) =>
   source.match(new RegExp(`\\n  ${job}:[\\s\\S]*?(?=\\n  [\\w-]+:|$)`))?.[0] ??
@@ -1603,7 +1602,7 @@ ${fixtureCheckout}
       expect(yamlPropertyBlock(source, 'env', 0), item).not.toContain(
         'PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN'
       );
-      // JOV-9826: Preview – jovie GH Stripe TEST custody (not Doppler price/account).
+      // JOV-9826: Preview env GH Stripe TEST custody (not Doppler price/account).
       if (producer.includes('canary-claim-checkout.spec.ts')) {
         for (const s of [
           'STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}',
