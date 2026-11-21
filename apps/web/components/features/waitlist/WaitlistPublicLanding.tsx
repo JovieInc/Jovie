@@ -45,7 +45,7 @@ export function WaitlistPublicLanding({
       >
         <AuthRoutePrefetch href={APP_ROUTES.SIGNIN} />
         {signupClosed ? (
-          <WaitlistRoleForm qualify title='Request an invite' />
+          <WaitlistRoleForm qualify title='Join the waitlist' />
         ) : (
           <AuthShell
             mode='sign-up'

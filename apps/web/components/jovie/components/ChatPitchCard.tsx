@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, PlainButton } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { CopyToggleIcon } from '@/components/atoms/CopyToggleIcon';
 import { toast } from '@/components/feedback';
@@ -118,13 +118,13 @@ function PitchBlock({
         {text}
       </p>
       {isLong && (
-        <button
+        <PlainButton
           type='button'
           onClick={() => setExpanded(!expanded)}
           className='system-b-chat-pitch-toggle focus-ring'
         >
           {expanded ? 'Show less' : 'Show more'}
-        </button>
+        </PlainButton>
       )}
     </div>
   );

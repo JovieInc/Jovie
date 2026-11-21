@@ -91,6 +91,7 @@ jobs:
       cert_reused: ${{ steps.cert-reuse.outputs.reuse == 'true' }}
       cert_reused_from_run: ${{ steps.cert-reuse.outputs.source_run_id }}
       cert_reused_artifact: ${{ steps.cert-reuse.outputs.source_artifact_id }}
+      crawl_public_reuse_b64: ${{ steps.crawl-public-reuse.outputs.crawl_public_reuse_b64 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -484,6 +485,22 @@ jobs:
             --github-output "$GITHUB_OUTPUT" ||
             echo "::warning::Receipt reuse lookup did not finish; certifying again."
 
+      - name: Find original public crawl observations
+        id: crawl-public-reuse
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && steps.target.outputs.commit_sha != '' && steps.trigger.outputs.quota_deferred != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_COMMIT_SHA: ${{ steps.target.outputs.commit_sha }}
+          TARGET_ORIGIN_B64: ${{ steps.target.outputs.deployment_url_b64 }}
+          TARGET_DEPLOYMENT_ID: ${{ steps.target.outputs.deployment_id }}
+          FORCE_RECERTIFY: ${{ inputs.force }}
+        run: |
+          origin="$(printf '%s' "$TARGET_ORIGIN_B64" | base64 --decode)"
+          node scripts/product-crawl/receipt-adoption.mjs --origin "$origin" \
+            --sha "$TARGET_COMMIT_SHA" --deployment-id "$TARGET_DEPLOYMENT_ID" \
+            --force "$FORCE_RECERTIFY" --github-output "$GITHUB_OUTPUT" ||
+            echo "::warning::Public crawl reuse unavailable; retain cold coverage."
+
   smoke:
     name: Post-Deploy Smoke (Landed Production)
     needs: [resolve-target]
@@ -756,6 +773,7 @@ jobs:
           CRAWL_SHARD: ${{ matrix.shard }}/4
           CRAWL_DEPLOYMENT_ID: ${{ needs.resolve-target.outputs.deployment_id }}
           CRAWL_INVOCATION_ID: ${{ github.run_id }}.${{ github.run_attempt }}.${{ matrix.shard }}
+          CRAWL_PUBLIC_REUSE_B64: ${{ needs.resolve-target.outputs.crawl_public_reuse_b64 }}
           SHARD_INDEX: ${{ matrix.shard }}
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}

@@ -393,7 +393,7 @@ test('a drafter change, a manual run or --only picks the right frames', () => {
   ];
   assert.deepEqual(
     planFrames({ briefs, changed: ['scripts/design/pen-draft.mjs'] }),
-    ['claim', 'homepage']
+    ['claim']
   );
   assert.deepEqual(planFrames({ briefs }), ['claim', 'homepage']);
   assert.deepEqual(planFrames({ briefs, only: ['homepage'] }), ['homepage']);

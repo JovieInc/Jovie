@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { AlertCircle, FileAudio2, Loader2, X, XCircle } from 'lucide-react';
 
 import type { PendingAudio } from '../hooks/useChatAudioAttachments';
@@ -51,14 +52,14 @@ export function AudioPreviewStrip({ audio, onRemove }: AudioPreviewStripProps) {
       <div className='flex items-center justify-between gap-3'>
         <p className='system-b-image-preview-strip-title'>Audio</p>
         {onRemove ? (
-          <button
+          <PlainButton
             type='button'
             onClick={onRemove}
             className='system-b-image-preview-remove'
             aria-label={`Remove ${audio.name}`}
           >
             <X className='h-3.5 w-3.5' />
-          </button>
+          </PlainButton>
         ) : null}
       </div>
 
