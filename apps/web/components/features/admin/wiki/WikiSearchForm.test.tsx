@@ -7,7 +7,7 @@ import { WikiSearchForm } from './WikiSearchForm';
 describe('WikiSearchForm', () => {
   it('submits a GET search to the wiki and stays axe-clean', async () => {
     const { container } = render(<WikiSearchForm />);
-    const input = screen.getByRole('searchbox', { name: 'Search wiki' });
+    const input = screen.getByRole('searchbox', { name: 'Search Wiki' });
     expect(input).toHaveAttribute('name', 'q');
     expect(input).toHaveValue('');
     expect(input.closest('form')).toHaveAttribute('action', '/hud/wiki');
@@ -19,7 +19,7 @@ describe('WikiSearchForm', () => {
   it('keeps typed text and focus across a rerender and blur', async () => {
     const user = userEvent.setup();
     const { rerender } = render(<WikiSearchForm initialQuery='runbook' />);
-    const input = screen.getByRole('searchbox', { name: 'Search wiki' });
+    const input = screen.getByRole('searchbox', { name: 'Search Wiki' });
     expect(input).toHaveValue('runbook');
     await user.type(input, ' deploy');
     rerender(<WikiSearchForm initialQuery='runbook' />);

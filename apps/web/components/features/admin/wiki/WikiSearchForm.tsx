@@ -1,7 +1,7 @@
 import { Input } from '@jovie/ui';
 
 interface Props {
-  initialQuery?: string;
+  readonly initialQuery?: string;
 }
 
 export function WikiSearchForm({ initialQuery }: Props) {
@@ -10,7 +10,7 @@ export function WikiSearchForm({ initialQuery }: Props) {
       <Input
         type='search'
         name='q'
-        aria-label='Search wiki'
+        aria-label='Search Wiki'
         defaultValue={initialQuery || ''}
         placeholder='Search wiki...'
       />

@@ -136,7 +136,7 @@ function ListSection({
       <div className='min-h-52 p-4 lg:p-5'>
         <div className='mb-3 flex items-center gap-2'>
           <Icon className='h-4 w-4 text-tertiary-token' />
-          <h2 className='text-app font-caption text-secondary-token'>
+          <h2 className='text-balance text-app font-caption text-secondary-token'>
             {title}
           </h2>
         </div>
