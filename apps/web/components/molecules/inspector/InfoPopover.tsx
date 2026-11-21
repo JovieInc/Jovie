@@ -46,6 +46,7 @@ export function InfoPopover({
       <PopoverContent
         side={side}
         align={align}
+        aria-label={label}
         className={cn(
           'max-w-64 text-2xs leading-4 text-secondary-token',
           contentClassName

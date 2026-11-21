@@ -44,6 +44,33 @@
       "a11y",
       "frontend-rules",
       "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingCtaPendingLabel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/inspector/InfoPopover.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/AccountDashboard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ]
   },
   "waivers": {
@@ -55,6 +82,13 @@
     },
     "apps/web/components/features/opportunity-inbox/OpportunityInboxTourDateRow.tsx": {
       "offline": "The row never fetches; it only calls the handlers it is given. The detector matched the isBusy pending flag."
+    },
+    "apps/web/components/marketing/MarketingCtaPendingLabel.tsx": {
+      "offline": "The label never fetches; it only reads the link pending status from next/link."
+    },
+    "apps/web/components/organisms/AccountDashboard.tsx": {
+      "empty": "The page is static quick-action cards with no data list; the detector matched the word links in its copy.",
+      "long-content": "All copy is fixed in source; no user-supplied text reaches the cards."
     }
   }
 }
