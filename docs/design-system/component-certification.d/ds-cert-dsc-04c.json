@@ -1,0 +1,121 @@
+{
+  "waivers": {
+    "apps/web/components/organisms/CmdKMainPlaneSearchInput.tsx": {
+      "loading": "The input renders a locally owned draft and fires onQueryChange; it fetches nothing and has no pending UI. The detector matched the open prop and the aria-expanded wiring.",
+      "offline": "The input makes no request; results and any connectivity state live in CmdKPalette. It renders identically offline.",
+      "permission-denied": "The input has no role or gated branch; it is shown to every signed-in user whenever the palette is open. The detector matched the role='combobox' attribute."
+    },
+    "apps/web/components/organisms/CmdKPalette.tsx": {
+      "loading": "Searching is driven by useArtistSearchQuery and useReleasesQuery inside the palette, with no prop that can force it, so a story cannot render it; the palette shows the same rows while a query is pending.",
+      "empty": "The no-results state is rendered by PaletteList in SharedCommandPalette and needs a typed query against live registry data; a story has no prop to drive it. CmdKPalette.test.tsx covers the keep-open-with-no-result behavior.",
+      "error": "hasSearchError comes from the registry search hook, not a prop, so a story cannot reach it; the retry row is owned by SharedCommandPalette.",
+      "partial": "Result sections come from the command registry and the query hooks; the palette takes no partial-data prop, and the section list is a pure projection.",
+      "long-content": "Row labels come from the command registry, not caller props; rows truncate inside PaletteList, which owns that styling.",
+      "offline": "The palette makes no request of its own; the query hooks own connectivity and render the same rows offline.",
+      "permission-denied": "No role or gated branch; operatorMode only filters registry rows and CmdKPalette.test.tsx covers the operator and customer split. The detector matched the role='combobox' attribute.",
+      "rtl-overflow": "Layout uses flex with min-w-0 and truncation owned by PaletteList; the palette sets no directional offsets."
+    },
+    "apps/web/components/organisms/DesktopTitlebar.tsx": {
+      "loading": "The titlebar fetches nothing; the placeholder skeleton shown before the sidebar context mounts only renders inside the Electron runtime, which Storybook cannot enter (useIsElectronRuntime is false there). DesktopTitlebar.interaction.test.tsx covers the provider-less path.",
+      "empty": "The titlebar owns no collection; it renders two history buttons and a drag strip. The detector matched the items-center class.",
+      "long-content": "The titlebar renders only icon buttons and fixed-width regions; the release identity label truncates with max-w-64 and is covered by the unverified-build test.",
+      "offline": "The titlebar makes no request; its state comes from the Electron bridge and the sidebar context, which behave identically offline.",
+      "permission-denied": "No role or gated branch; the controls show whenever the Electron runtime is present.",
+      "rtl-overflow": "The row is a flex strip pinned to the window titlebar by the Electron shell; the traffic-light safe area is physically left on macOS regardless of document direction."
+    },
+    "apps/web/components/organisms/combobox/Combobox.tsx": {
+      "offline": "The combobox never fetches: options, loading and error arrive as props from the parent, so it renders identically offline.",
+      "permission-denied": "The combobox has no role or gated branch; every visitor can search and pick. The detector matched the role attribute on the headless input wiring.",
+      "rtl-overflow": "The field is a flex row inside an overflow-hidden surface with min-w-0 content; it sets no direction-specific offsets beyond the dropdown chevron slot."
+    },
+    "apps/web/components/organisms/desktop-update/DesktopUpdateModal.tsx": {
+      "offline": "The view takes only the update phase and notes as props; a failed release-notes fetch resolves to the same changelog-link fallback shown in the base AvailableFallbackLink story, and the error phase is already a story.",
+      "rtl-overflow": "The dialog is a portal-rendered Radix dialog whose layout uses flex gap and min-w-0 with no directional offsets; the surrounding Dialog owns direction handling."
+    },
+    "apps/web/components/organisms/entity-card/EntityCard.tsx": {
+      "permission-denied": "The card is presentational over a model; it has no role or gated branch (a disabled CTA is the sold-out state, shown in UnavailableShow). The detector matched the person entity kind.",
+      "rtl-overflow": "The card lays out with flex and truncation on a model's text and takes no directional offsets; the surrounding grid owns direction."
+    },
+    "apps/web/components/organisms/entity-card/EntityCarousel.tsx": {
+      "permission-denied": "The carousel lays out cards from props and has no role or gated branch. The detector matched the role semantics on its list items.",
+      "rtl-overflow": "Scrolling uses the browser's snap track, which mirrors under dir=rtl natively; the carousel sets no physical offsets of its own beyond scrollTo by index."
+    },
+    "apps/web/components/organisms/footer-module/Footer.tsx": {
+      "rtl-overflow": "The footer is a flex and grid layout with wrapping link rows and no physical offsets except the profile legal links pinned to the viewport corner by design; direction is owned by the page."
+    }
+  },
+  "gates": {
+    "apps/web/components/organisms/CmdKMainPlaneSearchInput.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/CmdKPalette.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/DesktopTitlebar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/combobox/Combobox.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/desktop-update/DesktopUpdateModal.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/entity-card/EntityCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/entity-card/EntityCarousel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/footer-module/Footer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  }
+}

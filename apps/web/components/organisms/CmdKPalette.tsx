@@ -13,7 +13,7 @@
  *     `onAdditionalSelect`
  */
 
-import { Button, Dialog, DialogContent } from '@jovie/ui';
+import { Button, Dialog, DialogContent, HostDrawnInput } from '@jovie/ui';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -206,13 +206,16 @@ export function CmdKPalette({
   const generatedListId = useId();
   const paletteDescriptionId = `${generatedListId}-description`;
 
-  // Reset when closing so the next open starts clean.
-  useEffect(() => {
+  // Reset when closing so the next open starts clean. Adjusting state while
+  // rendering (rather than in an effect) avoids a stale-query frame on reopen.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
     if (!open) {
       setQuery('');
       setSelectedIndex(0);
     }
-  }, [open]);
+  }
 
   useLayoutEffect(() => {
     if (presentation === 'dialog' && open) inputRef.current?.focus();
@@ -455,7 +458,7 @@ export function CmdKPalette({
         className='size-4 shrink-0 text-tertiary-token'
         aria-hidden='true'
       />
-      <input
+      <HostDrawnInput
         ref={inputRef}
         id={`${generatedListId}-input`}
         type='search'

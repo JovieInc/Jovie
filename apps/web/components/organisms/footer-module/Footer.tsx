@@ -205,7 +205,7 @@ export function Footer({
           </div>
 
           <div className='mt-14'>
-            <div className='flex flex-col items-start gap-4 border-t border-white/8 pt-6 sm:flex-row sm:items-center sm:justify-between'>
+            <div className='flex flex-col items-start gap-4 border-t border-(--linear-border-footer) pt-6 sm:flex-row sm:items-center sm:justify-between'>
               <div className='flex items-center gap-4'>
                 <Link
                   href={APP_ROUTES.LEGAL_PRIVACY}

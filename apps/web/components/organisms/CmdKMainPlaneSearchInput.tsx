@@ -1,5 +1,6 @@
 'use client';
 
+import { HostDrawnInput } from '@jovie/ui';
 import { Search } from 'lucide-react';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -61,7 +62,7 @@ export function CmdKMainPlaneSearchInput({
         className='size-4 shrink-0 text-tertiary-token'
         aria-hidden='true'
       />
-      <input
+      <HostDrawnInput
         ref={inputRef}
         id={`${listId}-input`}
         type='search'

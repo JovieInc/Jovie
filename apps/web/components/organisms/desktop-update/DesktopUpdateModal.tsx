@@ -39,6 +39,12 @@ export interface DesktopUpdateModalViewProps {
 
 const COPY = DESKTOP_UPDATE_COPY.modal;
 
+// Moves focus to the dialog's one primary action as it mounts, so Return
+// confirms it. Dialog opening is the explicit user action.
+const focusOnMount = (element: HTMLButtonElement | null) => {
+  element?.focus();
+};
+
 const MB = 1024 * 1024;
 function formatDownloadSize(bytes: number): string {
   if (bytes >= MB) return `${Math.round(bytes / MB)} MB`;
@@ -135,7 +141,7 @@ export function DesktopUpdateModalView({
           }
           actions={
             <>
-              <Button variant='secondary' onClick={onLater} autoFocus>
+              <Button variant='secondary' onClick={onLater} ref={focusOnMount}>
                 {COPY.hideAction}
               </Button>
               <Button variant='ghost' asChild>
@@ -176,7 +182,7 @@ export function DesktopUpdateModalView({
             </div>
           ) : notes && (notes.summary || notes.items.length) ? (
             <div className='space-y-2'>
-              <h3 className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
+              <h3 className='text-2xs font-medium tracking-wide text-tertiary-token'>
                 {COPY.notesHeading}
               </h3>
               {notes.summary ? (
@@ -211,7 +217,11 @@ export function DesktopUpdateModalView({
         </Button>
         {primary ? (
           // Focus the one primary action so Return confirms it.
-          <Button variant='primary' onClick={primary.onClick} autoFocus>
+          <Button
+            variant='primary'
+            onClick={primary.onClick}
+            ref={focusOnMount}
+          >
             {primary.label}
           </Button>
         ) : null}
