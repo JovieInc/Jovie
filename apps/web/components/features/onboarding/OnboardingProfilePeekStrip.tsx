@@ -28,10 +28,11 @@ export function OnboardingProfilePeekStrip({
   const imageUrl = artist.imageUrl ?? null;
 
   return (
-    <aside
+    <div
       className={cn('system-b-onboarding-profile-peek', className)}
       data-testid='onboarding-profile-peek-strip'
       aria-label='Profile Preview'
+      role='status'
     >
       <div className='system-b-onboarding-profile-peek-inner'>
         {imageUrl ? (
@@ -61,6 +62,6 @@ export function OnboardingProfilePeekStrip({
         </div>
         <span className='system-b-onboarding-profile-peek-badge'>Preview</span>
       </div>
-    </aside>
+    </div>
   );
 }

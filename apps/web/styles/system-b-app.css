@@ -156,7 +156,7 @@
   list-style: none;
 }
 
-:where(.system-b-onboarding-step-rail-item[data-status="todo"])
+:where(.system-b-onboarding-step-rail-item[data-status="upcoming"])
   .system-b-onboarding-step-rail-label {
   color: var(--color-text-tertiary-token);
   font-size: var(--text-xs);

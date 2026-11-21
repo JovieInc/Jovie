@@ -40,7 +40,7 @@ export function OnboardingStartStepRail({
               ? 'done'
               : index === activeIndex
                 ? 'active'
-                : 'todo';
+                : 'upcoming';
           return (
             <li
               key={step.id}

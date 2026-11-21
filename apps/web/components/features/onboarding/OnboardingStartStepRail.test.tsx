@@ -57,7 +57,7 @@ describe('OnboardingStartStepRail', () => {
     );
     expect(screen.getByTestId('onboarding-start-step-live')).toHaveAttribute(
       'data-status',
-      'todo'
+      'upcoming'
     );
     expect(screen.getByText('Claim Your Name')).toBeInTheDocument();
     await expectNoA11yViolations(container);
