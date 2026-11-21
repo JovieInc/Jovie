@@ -1,8 +1,7 @@
 'use client';
 
-import { IconButton } from '@jovie/ui';
 // @coverage-via apps/web/tests/components/releases/ReleaseCell.test.tsx
-import { PlainButton } from '@jovie/ui';
+import { IconButton, PlainButton } from '@jovie/ui';
 import { Pause, Play, VolumeX } from 'lucide-react';
 import { memo, useCallback } from 'react';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
