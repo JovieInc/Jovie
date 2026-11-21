@@ -470,30 +470,22 @@ describe('ActionDial edge cases', () => {
 });
 
 describe('ActionDial preferred state', () => {
-  it('shows Remembered when preferred is centered and keeps row metadata', async () => {
+  it('shows Remembered when preferred is centered and keeps row metadata', () => {
     mockMotion(true);
+    const props = {
+      options: OPTIONS,
+      onSelect: vi.fn(),
+      actionLabel: 'Stream Now',
+      groupLabel: 'G',
+    };
     const { rerender } = render(
-      <ActionDial
-        options={OPTIONS}
-        selectedId='apple'
-        preferredId='apple'
-        onSelect={vi.fn()}
-        actionLabel='Stream Now'
-        groupLabel='G'
-      />
+      <ActionDial {...props} selectedId='apple' preferredId='apple' />
     );
     expect(screen.getByTestId('action-dial-selection')).toHaveTextContent(
       'Remembered'
     );
     rerender(
-      <ActionDial
-        options={OPTIONS}
-        selectedId='spotify'
-        preferredId='deezer'
-        onSelect={vi.fn()}
-        actionLabel='Stream Now'
-        groupLabel='G'
-      />
+      <ActionDial {...props} selectedId='spotify' preferredId='deezer' />
     );
     expect(screen.getByRole('option', { name: 'Deezer' })).toHaveAttribute(
       'data-preferred',
