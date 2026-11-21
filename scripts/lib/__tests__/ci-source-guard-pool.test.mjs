@@ -372,36 +372,22 @@ describe('merged-with-base-invariants pool', () => {
     expect(started[0]).toContain('design-ci-judge-router');
   });
 
-  it('path-gates the design-ci-judge vitest cluster when unrelated', () => {
+  it('path-gates design-ci-judge vitest by related paths', () => {
     const entries = expandSourcePoolEntries(MERGED_WITH_BASE_POOL_SPEC);
-    const judge = entries.find(entry =>
-      entry.command.includes(DESIGN_CI_JUDGE_VITEST_MARKER)
-    );
-    expect(judge).toBeTruthy();
+    const isJudge = e => e.command.includes(DESIGN_CI_JUDGE_VITEST_MARKER);
+    expect(entries.some(isJudge)).toBe(true);
     const { kept, skipped } = filterMergedWithBasePoolEntries(entries, [
       'docs/qa/README.md',
       'scripts/lib/__tests__/ci-source-guard-pool.test.mjs',
     ]);
+    expect(skipped.some(isJudge)).toBe(true);
+    expect(kept.some(isJudge)).toBe(false);
     expect(
-      skipped.some(entry =>
-        entry.command.includes(DESIGN_CI_JUDGE_VITEST_MARKER)
+      kept.some(e =>
+        e.command.includes('design-ci-judge-router-contract.test.mjs')
       )
     ).toBe(true);
-    expect(
-      kept.some(entry => entry.command.includes(DESIGN_CI_JUDGE_VITEST_MARKER))
-    ).toBe(false);
-    // Cheaper contract batch that only mentions design-ci-judge in a different
-    // path must still run.
-    expect(
-      kept.some(entry =>
-        entry.command.includes('design-ci-judge-router-contract.test.mjs')
-      )
-    ).toBe(true);
-  });
-
-  it('keeps design-ci-judge vitest when a related path changes', () => {
-    const entries = expandSourcePoolEntries(MERGED_WITH_BASE_POOL_SPEC);
-    const relatedPaths = [
+    for (const related of [
       'apps/web/scripts/design-ci-judge-router.ts',
       'canon/invariants.jsonl',
       'scripts/invariants/registry.mjs',
@@ -409,35 +395,19 @@ describe('merged-with-base-invariants pool', () => {
       'scripts/invariants/screen-registry.mjs',
       'apps/web/data/appScreens/registry.ts',
       'apps/web/data/marketing/componentRegistry.ts',
-    ];
-    for (const related of relatedPaths) {
+    ]) {
       expect(DESIGN_CI_JUDGE_VITEST_PATHS.test(related), related).toBe(true);
-      const { kept, skipped } = filterMergedWithBasePoolEntries(entries, [
-        related,
-      ]);
-      expect(skipped, related).toEqual([]);
-      expect(
-        kept.some(entry =>
-          entry.command.includes(DESIGN_CI_JUDGE_VITEST_MARKER)
-        ),
-        related
-      ).toBe(true);
+      const r = filterMergedWithBasePoolEntries(entries, [related]);
+      expect(r.skipped, related).toEqual([]);
+      expect(r.kept.some(isJudge), related).toBe(true);
     }
-    // Unit source content paths are registry metadata, not vitest inputs.
     expect(
       DESIGN_CI_JUDGE_VITEST_PATHS.test('apps/web/app/(home)/page.tsx')
     ).toBe(false);
-  });
-
-  it('fail-closes the path-gate on empty or unreadable diffs', () => {
-    const entries = expandSourcePoolEntries(MERGED_WITH_BASE_POOL_SPEC);
     for (const changed of [null, undefined, []]) {
-      const { kept, skipped } = filterMergedWithBasePoolEntries(
-        entries,
-        changed
-      );
-      expect(skipped, String(changed)).toEqual([]);
-      expect(kept.length, String(changed)).toBe(entries.length);
+      const r = filterMergedWithBasePoolEntries(entries, changed);
+      expect(r.skipped, String(changed)).toEqual([]);
+      expect(r.kept.length, String(changed)).toBe(entries.length);
     }
   });
 
