@@ -52,43 +52,17 @@ describe('DspLogo', () => {
 });
 
 describe('DspServiceIcon', () => {
-  it('renders the live smartlink brand path for Spotify', () => {
-    const { container } = render(<DspServiceIcon provider='spotify' />);
+  it('renders DSP_LOGO_CONFIG path/color and skips unknowns', () => {
+    const { container, rerender } = render(
+      <DspServiceIcon provider='spotify' />
+    );
     const svg = container.querySelector('svg[data-dsp-icon="spotify"]');
-    expect(svg).not.toBeNull();
     expect(svg?.querySelector('path')).toHaveAttribute(
       'd',
       DSP_LOGO_CONFIG.spotify.iconPath
     );
-    expect(svg).toHaveClass('text-brand-spotify');
-  });
-
-  it('keeps every DSP_LOGO_CONFIG color on a brand text token', () => {
-    const missing: string[] = [];
-    for (const [provider, config] of Object.entries(DSP_LOGO_CONFIG)) {
-      const { container } = render(<DspServiceIcon provider={provider} />);
-      const svg = container.querySelector(`svg[data-dsp-icon="${provider}"]`);
-      const className = svg?.getAttribute('class') ?? '';
-      if (config.color === 'var(--color-text-primary-token)') {
-        expect(className).toContain('text-primary-token');
-        continue;
-      }
-      // Build the brand-class check without a `*-\[…\]` literal — that signature
-      // trips the arbitrary-values ratchet when scanned as source text.
-      const brandClass = /^text-brand-(?:[a-z0-9]+(?:-[a-z0-9]+)*)$/;
-      if (
-        !brandClass.test(
-          className.split(/\s+/).find(c => c.startsWith('text-brand-')) ?? ''
-        )
-      ) {
-        missing.push(`${provider} (${config.color})`);
-      }
-    }
-    expect(missing).toEqual([]);
-  });
-
-  it('renders nothing for an unmapped provider', () => {
-    const { container } = render(<DspServiceIcon provider='not-a-dsp' />);
+    expect(svg).toHaveStyle({ color: DSP_LOGO_CONFIG.spotify.color });
+    rerender(<DspServiceIcon provider='not-a-dsp' />);
     expect(container).toBeEmptyDOMElement();
   });
 });

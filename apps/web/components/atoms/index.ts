@@ -34,12 +34,7 @@ export type { DotBadgeProps, DotBadgeVariant } from './DotBadge';
 export { DotBadge } from './DotBadge';
 export type { DSPButtonProps } from './DSPButton';
 export { DSPButton } from './DSPButton';
-export {
-  DSP_LOGO_CONFIG,
-  DspLogo,
-  DspServiceIcon,
-  VIDEO_LOGO_CONFIG,
-} from './DspLogo';
+export { DSP_LOGO_CONFIG, DspLogo, VIDEO_LOGO_CONFIG } from './DspLogo';
 export { EmptyCell } from './EmptyCell';
 export type { FooterLinkProps } from './FooterLink';
 export { FooterLink } from './FooterLink';

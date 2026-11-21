@@ -3,7 +3,6 @@
 import type { CSSProperties } from 'react';
 import { memo } from 'react';
 import type { ProviderKey, VideoProviderKey } from '@/lib/discography/types';
-import { cn } from '@/lib/utils';
 
 interface DspLogoProps {
   readonly provider: ProviderKey;
@@ -174,58 +173,19 @@ function DspLogoInner({
 export const DspLogo = memo(DspLogoInner);
 DspLogo.displayName = 'DspLogo';
 
-interface DspServiceIconProps {
-  readonly provider: string;
-  readonly className?: string;
-}
-
-/**
- * Tokenized text classes for every DSP_LOGO_CONFIG / VIDEO_LOGO_CONFIG color
- * (avoids inline style growth). Keep in sync with Tailwind brand-* tokens.
- */
-const DSP_BRAND_TEXT_CLASS: Readonly<Record<string, string>> = {
-  'var(--color-brand-spotify)': 'text-brand-spotify',
-  'var(--color-brand-apple)': 'text-brand-apple',
-  'var(--color-brand-youtube)': 'text-brand-youtube',
-  'var(--color-brand-soundcloud)': 'text-brand-soundcloud',
-  'var(--color-brand-deezer)': 'text-brand-deezer',
-  'var(--color-brand-tidal)': 'text-brand-tidal',
-  'var(--color-brand-amazon)': 'text-brand-amazon',
-  'var(--color-brand-bandcamp)': 'text-brand-bandcamp',
-  'var(--color-brand-qq-music)': 'text-brand-qq-music',
-  'var(--color-brand-netease)': 'text-brand-netease',
-  'var(--color-brand-beatport)': 'text-brand-beatport',
-  'var(--color-brand-pandora)': 'text-brand-pandora',
-  'var(--color-brand-napster)': 'text-brand-napster',
-  'var(--color-brand-audiomack)': 'text-brand-audiomack',
-  'var(--color-brand-qobuz)': 'text-brand-qobuz',
-  'var(--color-brand-anghami)': 'text-brand-anghami',
-  'var(--color-brand-boomplay)': 'text-brand-boomplay',
-  'var(--color-brand-iheartradio)': 'text-brand-iheartradio',
-  'var(--color-brand-instagram)': 'text-brand-instagram',
-  'var(--color-text-primary-token)': 'text-primary-token',
-};
-
-/**
- * Icon-only brand glyph from `DSP_LOGO_CONFIG` — the same path/color source
- * MusicServiceDial and SmartLinkProviderButton use on live smart links.
- * Prefer this over colored-circle placeholders or one-off SVG copies.
- */
+/** Icon-only brand glyph from `DSP_LOGO_CONFIG` (live smart-link path/color). */
 export function DspServiceIcon({
   provider,
   className = 'h-7 w-7 shrink-0',
-}: Readonly<DspServiceIconProps>) {
+}: Readonly<{ provider: string; className?: string }>) {
   const config = DSP_LOGO_CONFIG[provider];
   if (!config?.iconPath) return null;
-
   return (
     <svg
       viewBox='0 0 24 24'
       fill='currentColor'
-      className={cn(
-        DSP_BRAND_TEXT_CLASS[config.color] ?? 'text-primary-token',
-        className
-      )}
+      className={className}
+      style={{ color: config.color }}
       aria-hidden='true'
       data-dsp-icon={provider}
     >

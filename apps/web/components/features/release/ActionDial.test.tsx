@@ -468,3 +468,36 @@ describe('ActionDial edge cases', () => {
     ).toBe('2');
   });
 });
+
+describe('ActionDial preferred state', () => {
+  it('shows Remembered when preferred is centered and keeps row metadata', async () => {
+    mockMotion(true);
+    const { rerender } = render(
+      <ActionDial
+        options={OPTIONS}
+        selectedId='apple'
+        preferredId='apple'
+        onSelect={vi.fn()}
+        actionLabel='Stream Now'
+        groupLabel='G'
+      />
+    );
+    expect(screen.getByTestId('action-dial-selection')).toHaveTextContent(
+      'Remembered'
+    );
+    rerender(
+      <ActionDial
+        options={OPTIONS}
+        selectedId='spotify'
+        preferredId='deezer'
+        onSelect={vi.fn()}
+        actionLabel='Stream Now'
+        groupLabel='G'
+      />
+    );
+    expect(screen.getByRole('option', { name: 'Deezer' })).toHaveAttribute(
+      'data-preferred',
+      'true'
+    );
+  });
+});

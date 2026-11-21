@@ -15,24 +15,15 @@ import {
   useState,
 } from 'react';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
-import { DialEngine, type DialState } from '@/lib/dial/dial-engine';
-import {
-  DIAL_ICON_OPTICAL_CLASS,
-  ROW_ORIGIN_TOP_PX,
-  ROW_STEP_PX,
-  rowIsTappable,
-  rowLayout,
-  WINDOW_RADIUS,
-} from '@/lib/dial/dial-layout';
-import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
-import { cn } from '@/lib/utils';
 import {
   ActionDialIconTrack,
   ActionDialSelectionCue,
   actionDialStreamIcon,
-} from './ActionDialChrome';
+} from '@/lib/dial/action-dial-chrome';
+import { DialEngine, type DialState } from '@/lib/dial/dial-engine';
 import {
   DIAL_HINT_SEEN_KEY,
+  DIAL_ICON_OPTICAL_CLASS,
   type DialGesture,
   dialBrowserScheduler,
   isWheelNotch,
@@ -41,11 +32,18 @@ import {
   NO_HAPTIC,
   normalizeWheel,
   PAGE_STEP,
+  ROW_ORIGIN_TOP_PX,
+  ROW_STEP_PX,
   readHintSeen,
+  rowIsTappable,
+  rowLayout,
   TAP_SLOP_PX,
   TYPEAHEAD_RESET_MS,
+  WINDOW_RADIUS,
   writeHintSeen,
-} from './action-dial-helpers';
+} from '@/lib/dial/dial-layout';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
+import { cn } from '@/lib/utils';
 import { SmartLinkProviderButton } from './SmartLinkProviderButton';
 
 export { DIAL_HINT_SEEN_KEY };

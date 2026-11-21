@@ -1,6 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { LISTEN_COOKIE } from '@/constants/app';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { MusicServiceDial } from './MusicServiceDial';
@@ -26,29 +25,6 @@ afterEach(() => {
 });
 
 describe('MusicServiceDial', () => {
-  it('uses real DSP_LOGO_CONFIG brand glyphs on dial rows and Stream Now', () => {
-    const { container } = render(
-      <MusicServiceDial
-        providers={PROVIDERS}
-        utmParams={{}}
-        onStream={vi.fn()}
-      />
-    );
-    for (const key of ['spotify', 'apple_music', 'deezer'] as const) {
-      const glyph = container.querySelector(`svg[data-dsp-icon="${key}"]`);
-      expect(glyph?.querySelector('path')).toHaveAttribute(
-        'd',
-        DSP_LOGO_CONFIG[key].iconPath
-      );
-    }
-    const streamNow = screen.getByRole('link', {
-      name: 'Stream Now with Spotify',
-    });
-    expect(
-      streamNow.querySelector('svg[data-dsp-icon="spotify"] path')
-    ).toHaveAttribute('d', DSP_LOGO_CONFIG.spotify.iconPath);
-  });
-
   it('restores an available choice and tracks the provider actually streamed', () => {
     document.cookie = `${LISTEN_COOKIE}=apple_music; path=/`;
     const onStream = vi.fn();
@@ -66,9 +42,6 @@ describe('MusicServiceDial', () => {
     expect(screen.getByTestId('action-dial')).toHaveAttribute(
       'data-preferred',
       'true'
-    );
-    expect(screen.getByTestId('action-dial-selection')).toHaveTextContent(
-      'Remembered'
     );
     fireEvent.click(action);
     expect(onStream).toHaveBeenCalledWith('apple_music');

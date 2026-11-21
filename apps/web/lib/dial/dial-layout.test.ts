@@ -3,7 +3,6 @@ import {
   ACTION_HIT_PX,
   ACTION_TOP_PX,
   DIAL_ICON_OPTICAL_CLASS,
-  DIAL_ICON_OPTICAL_Y_PX,
   OUTER_STEP_PX,
   ROW_HIT_PX,
   ROW_ORIGIN_TOP_PX,
@@ -54,21 +53,14 @@ describe('rowLayout', () => {
     expect(rowLayout(1.5).opacity).toBeCloseTo(0.63, 12);
     expect(rowLayout(2.5).opacity).toBeCloseTo(0.24, 12);
   });
-  it('keeps hit height above the HIG floor and a 1px optical icon drop', () => {
-    expect(ROW_HIT_PX).toBeGreaterThanOrEqual(44);
-    expect(ROW_HIT_PX).toBeLessThanOrEqual(ROW_STEP_PX);
-    expect(DIAL_ICON_OPTICAL_Y_PX).toBe(1);
+  it('aligns reel midlines to Stream Now with on-scale hits', () => {
+    expect(ROW_HIT_PX).toBe(48);
     expect(DIAL_ICON_OPTICAL_CLASS).toBe('translate-y-px');
-  });
-  it('centers reel rows on Stream Now so neighbor gaps stay symmetric', () => {
-    const actionCenter = ACTION_TOP_PX + ACTION_HIT_PX / 2;
-    const rowCenter = ROW_ORIGIN_TOP_PX + ROW_HIT_PX / 2;
-    expect(rowCenter).toBe(actionCenter);
-    const actionTop = ACTION_TOP_PX;
-    const actionBottom = ACTION_TOP_PX + ACTION_HIT_PX;
-    const upperBottom = rowCenter - ROW_STEP_PX + ROW_HIT_PX / 2;
-    const lowerTop = rowCenter + ROW_STEP_PX - ROW_HIT_PX / 2;
-    expect(actionTop - upperBottom).toBe(lowerTop - actionBottom);
+    const mid = ROW_ORIGIN_TOP_PX + ROW_HIT_PX / 2;
+    expect(mid).toBe(ACTION_TOP_PX + ACTION_HIT_PX / 2);
+    expect(ACTION_TOP_PX - (mid - ROW_STEP_PX + ROW_HIT_PX / 2)).toBe(
+      mid + ROW_STEP_PX - ROW_HIT_PX / 2 - (ACTION_TOP_PX + ACTION_HIT_PX)
+    );
   });
 });
 
