@@ -1459,6 +1459,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/seo-certify-workflow-contract.test.mjs',
   'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs',
   'scripts/lib/__tests__/shipping-slo-collector.test.mjs',
+  'scripts/lib/__tests__/shipping-slo-ranked-intake.test.mjs',
   'scripts/lib/__tests__/shipping-slo.test.mjs',
   'scripts/lib/__tests__/shipping-slo-snapshot.test.mjs',
   'scripts/lib/__tests__/shipping-slo-history.test.mjs',
@@ -1835,8 +1836,7 @@ function argv(command, args, opts = {}) {
  * merge_group.base_sha is the entry ahead, so HEADGREEN landed a red entry
  * behind a docs-only green head (#23600, 2026-10-29). Prefer the merge base
  * with live origin/main (fetched by the ci-fast job); fall back to the event base.
- * @param {string} cwd
- * @param {string} fallback
+ * @param {string} cwd @param {string} fallback
  */
 export function mergeGroupDiffBase(cwd, fallback) {
   const mergeBase = argv('git', ['merge-base', 'HEAD', 'origin/main'], { cwd });

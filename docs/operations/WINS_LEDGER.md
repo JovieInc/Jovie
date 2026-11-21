@@ -45,6 +45,24 @@ Queryable metric shapes for `measure-due` v1:
 - JSON file: `source`/`query` like `docs/metrics/shipping-slo-latest.json#queueEjectionRate` (or source = file, query = dotted path).
 - Gateway: `source: Gateway report feature:<tag>` and `query: node scripts/ai-gateway-report.mjs`.
 
+## Ranked shipping-SLO intake (improve hop)
+
+`shipping-slo.yml` files **exactly one** Linear child of JOV-6783 for the current
+top shipping-SLO regression (`scripts/shipping-slo-intake.mjs`):
+
+1. **Rank** regressions by `|changeFraction|` (largest first); stable tie-break
+   follows `METRIC_DEFS` order. Flat growth is only selected when no absolute
+   regressions remain.
+2. **Sticky open work.** If an open/triage/started child already matches a live
+   regression fingerprint, intake keeps updating that issue instead of opening a
+   second one when the absolute top flips.
+3. **Required `## Win`.** The issue body includes a paste-ready `## Win` that
+   points at `docs/metrics/shipping-slo-latest.json` so `measure-due` can verify
+   after the fix merges.
+4. **Re-rank.** When that issue is completed or canceled (win verified or
+   not-reproduced), the next shipping-slo run selects the new top remaining
+   regression. No flood of per-metric issues.
+
 ## Clustering and posts
 
 `clusters()` groups by `theme`. A theme with ten verified wins, or a win flagged
