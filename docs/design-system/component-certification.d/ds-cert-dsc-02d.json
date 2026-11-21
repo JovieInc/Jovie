@@ -9,6 +9,33 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/demo/DemoVideoPlayer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/FounderDemoRecordingSurface.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/ProductDemoCarousel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/library/LibraryFirstArrivalAdapter.tsx": [
       "ds-owner",
       "tokens",
@@ -23,6 +50,21 @@
     "apps/web/components/features/demo/DemoShowcaseSurface.tsx": {
       "long-content": "The router renders fixed demo fixtures and takes only a surface id; no user-supplied text reaches it.",
       "offline": "The router makes no network requests; every surface renders from static fixtures."
+    },
+    "apps/web/components/features/demo/DemoVideoPlayer.tsx": {
+      "empty": "The component renders from a fixed video url or fixed slide list; there is no data set that can be empty.",
+      "long-content": "The component shows fixed copy and a fixed accessible label; no user-supplied text reaches it."
+    },
+    "apps/web/components/features/demo/FounderDemoRecordingSurface.tsx": {
+      "loading": "The recording plays a fixed scripted timeline from static fixtures; nothing is fetched.",
+      "empty": "The scripted timeline always has its fixed scenes; there is no data set that can be empty.",
+      "error": "The surface has no failure path; it renders a fixed script and takes no props.",
+      "long-content": "All copy is fixed script text; no user-supplied text reaches the surface.",
+      "offline": "The surface makes no network requests; it plays from static fixtures."
+    },
+    "apps/web/components/features/demo/ProductDemoCarousel.tsx": {
+      "empty": "The component renders from a fixed video url or fixed slide list; there is no data set that can be empty.",
+      "long-content": "The component shows fixed copy and a fixed accessible label; no user-supplied text reaches it."
     }
   }
 }
