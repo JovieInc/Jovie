@@ -124,28 +124,31 @@ describe('docs-only product-lane classification', () => {
       ).toBe(false);
     }
   });
-  it('never counts staged runtime copy as documentation', () => {
-    // apps/web/scripts/stage-runtime-data.mjs copies these into the deploy;
-    // read as text because importing the script copies files.
-    const stager = readFileSync(
-      resolve(REPO_ROOT, 'apps/web/scripts/stage-runtime-data.mjs'),
-      'utf8'
-    );
-    const listed = (name, suffix = '') =>
-      [
-        ...(
-          stager.match(
-            new RegExp(`${name} = Object\\.freeze\\(\\[([^\\]]*)\\]`)
-          )?.[1] ?? ''
-        ).matchAll(/'([^']+)'/g),
-      ].map(match => `${match[1]}${suffix}`);
-    const runtimePaths = [
-      ...listed('RUNTIME_DATA_FILES'),
-      ...listed('RUNTIME_DATA_DIRECTORIES', '/packet.md'),
-    ];
-    expect(runtimePaths).toContain('docs/FEATURE_REGISTRY.md');
-    expect(runtimePaths).toContain('docs/certification/packet.md');
-    for (const path of runtimePaths.filter(item => item.endsWith('.md'))) {
+  it('keeps FEATURE_REGISTRY and certification packets docs-only (JOV-14231)', () => {
+    // JOV-12616 leftover / CI-30: these are staged into apps/web/runtime-data
+    // for request-time reads, but a docs-only edit still only selects the
+    // operations lane. Treating them as documentationOnly lets Path Changes
+    // emit docs_only=true so product lanes and (when not structural-asserted)
+    // the structural lane can skip.
+    for (const path of [
+      'docs/FEATURE_REGISTRY.md',
+      'docs/certification/packet.md',
+      'docs/certification/2026-09-27/signup.md',
+    ]) {
+      const receipt = classifyProductLanes([path]);
+      expect(receipt.selectedLanes, path).toEqual(['operations']);
+      expect(receipt.documentationOnly, path).toBe(true);
+    }
+  });
+
+  it('still excludes identity and funnel-judge Markdown from docs-only', () => {
+    // Remaining stage-runtime Markdown that is agent/product instruction
+    // input, not documentation-only copy.
+    for (const path of [
+      'apps/eve-pilot/identities/jovie/instructions.md',
+      'apps/eve-pilot/identities/summer/instructions.md',
+      'scripts/funnel-judge/README.md',
+    ]) {
       expect(classifyProductLanes([path]).documentationOnly, path).toBe(false);
     }
     expect(classifyProductLanes([]).documentationOnly).toBe(false);
@@ -171,6 +174,12 @@ describe('docs-only product-lane classification', () => {
       const docs = run(['apps/web/AGENTS.md', 'docs/REVIEW_BAR.md']);
       expect(docs).toContain('run_web=false\n');
       expect(docs).toContain('docs_only=true\n');
+      const registry = run(['docs/FEATURE_REGISTRY.md']);
+      expect(registry).toContain('run_web=false\n');
+      expect(registry).toContain('docs_only=true\n');
+      const certification = run(['docs/certification/packet.md']);
+      expect(certification).toContain('run_web=false\n');
+      expect(certification).toContain('docs_only=true\n');
       const mixed = run(['apps/web/AGENTS.md', 'apps/web/app/page.tsx']);
       expect(mixed).toContain('run_web=true\n');
       expect(mixed).toContain('docs_only=false\n');
@@ -288,6 +297,17 @@ describe('merge-group docs-only structural decision', () => {
       decide({
         docsOnly: 'true',
         changes: ['apps/web/AGENTS.md', 'docs/REVIEW_BAR.md'],
+      })
+    ).toBe('skip=true');
+  });
+
+  it('skips the structural lane for certification packet docs (JOV-14231)', () => {
+    // docs/certification/** is not structural-asserted; with docs_only=true
+    // the merge-group structural lane must skip.
+    expect(
+      decide({
+        docsOnly: 'true',
+        changes: ['docs/certification/packet.md'],
       })
     ).toBe('skip=true');
   });

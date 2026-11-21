@@ -37,8 +37,7 @@ const lazyOverlays = vi.hoisted(() => ({
   >(),
 }));
 
-// Execute the App Router's actual lazy/Suspense implementation. Only module
-// arrival is controlled; preserve each source call's loading/SSR options.
+// App Router lazy/Suspense stays real; only module arrival is controlled.
 vi.mock('next/dynamic', async () => {
   const { default: appDynamic } = await vi.importActual<
     typeof import('next/dist/shared/lib/app-dynamic')
@@ -721,5 +720,6 @@ describe('ProfileCompactSurface', () => {
       'utf8'
     );
     expect(source).toContain('onOpenReleaseCredits={onOpenReleaseCredits}');
+    expect(source.includes('IconButton')).toBe(true); // T2.1
   });
 });
