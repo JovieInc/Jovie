@@ -2,6 +2,14 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { test } from 'node:test';
 import { createDirectFetch } from './direct-fetch.mjs';
+import { adoptionFixture } from './fixtures/receipt-adoption.mjs';
+import { lookupPublicReceipt } from './receipt-adoption.mjs';
+import { receiptAt } from './receipt-producer.mjs';
+import {
+  PUBLIC_REUSE_MAX_AGE_MS,
+  publicPacket,
+  readPublicAdoption,
+} from './receipt-reuse.mjs';
 import { judgeOnQuietReload, wasThrottled } from './throttle.mjs';
 import {
   createTrafficEvidence,
@@ -53,6 +61,212 @@ test("the browser's console line for a 429 is judged on the quiet reload too", (
 const origin = 'https://fixture.invalid';
 const make = opts =>
   createTrafficEvidence({ origin, pageIntervalMs: 0, ...opts });
+
+test('missing signed-in measurements cannot certify an original for public reuse', () => {
+  const f = adoptionFixture();
+  delete f.document.pages.find(p => p.identity === 'signed-in').cls;
+  assert.equal(lookupPublicReceipt({ ...f }), null);
+});
+
+test('validated original provenance yields only bounded stranger data for this invocation', () => {
+  const f = adoptionFixture();
+  f.document.pages.find(p => p.identity === 'signed-in').privateCookie =
+    'private-session-state';
+  f.document.pages[0].collected = { secret: 'private-discovery-state' };
+  f.document.privateState = 'private-producer-state';
+  const packet = lookupPublicReceipt({ ...f });
+  assert.ok(packet);
+  assert.equal(f.calls(), 3);
+  const json = JSON.stringify(packet);
+  assert.doesNotMatch(json, /private-|signed-in|collected/);
+  const consumer = readPublicAdoption(
+    Buffer.from(json).toString('base64'),
+    { ...f.scope, shard: { index: 1, count: 4 } },
+    f.inventory,
+    () => f.now
+  );
+  const job = {
+    route: '/',
+    target: '/',
+    viewport: 'desktop',
+    identity: 'stranger',
+  };
+  const row = consumer.find(job);
+  assert.equal(row.measurementAdoption.runId, 10);
+  assert.equal(Date.parse(receiptAt(f.now, [row])), Date.parse(row.measuredAt));
+  for (const mismatch of [
+    { identity: 'signed-in' },
+    { collect: true },
+    { target: '/?x=1' },
+    { target: '/#part' },
+    { fixture: 'unclaimed' },
+    { viewport: 'tablet' },
+    { route: '/other' },
+  ])
+    assert.equal(consumer.find({ ...job, ...mismatch }), null);
+  assert.equal(
+    readPublicAdoption(
+      Buffer.from(json).toString('base64'),
+      { ...f.scope, invocation: { ...f.scope.invocation, runId: 21 } },
+      f.inventory,
+      () => f.now
+    ),
+    null
+  );
+});
+
+for (const [
+  name,
+  breakEvidence,
+] of /** @type {Array<[string, (f:any)=>void]>} */ ([
+  [
+    'legacy stamp',
+    f => {
+      delete f.document.producerScope;
+    },
+  ],
+  [
+    'source checkout',
+    f => {
+      f.document.producerScope.sourceSha = 'd'.repeat(40);
+    },
+  ],
+  [
+    'deployment',
+    f => {
+      f.document.producerScope.target.deploymentId = 'dpl_other';
+    },
+  ],
+  [
+    'producer',
+    f => {
+      f.document.producerScope.target.policyDigest = 'd'.repeat(64);
+    },
+  ],
+  [
+    'missing phone',
+    f => {
+      f.document.pages = f.document.pages.filter(p => p.viewport !== 'phone');
+    },
+  ],
+  [
+    'missing start time',
+    f => {
+      delete f.document.pages[0].measuredAt;
+    },
+  ],
+  [
+    'future measurement',
+    f => {
+      f.document.pages[0].measuredAt = '2099-01-01T00:00:00Z';
+    },
+  ],
+  [
+    'wrong full target',
+    f => {
+      f.document.pages[0].url = '/wrong';
+    },
+  ],
+  [
+    'reviewed policy mismatch',
+    f => {
+      f.document.closedInProduction = [];
+    },
+  ],
+  [
+    'prior adoption',
+    f => {
+      f.document.publicAdoption = { count: 1 };
+    },
+  ],
+  [
+    'wrong run attempt',
+    f => {
+      f.run.run_attempt = 2;
+    },
+  ],
+  [
+    'foreign workflow',
+    f => {
+      f.run.path = '.github/workflows/other.yml';
+    },
+  ],
+  [
+    'fork',
+    f => {
+      f.run.head_repository.full_name = 'foreign/Jovie';
+    },
+  ],
+  [
+    'wrong artifact head',
+    f => {
+      f.artifact.workflow_run.head_sha = 'd'.repeat(40);
+    },
+  ],
+]))
+  test(`${name} never substitutes for current crawl coverage`, () => {
+    const f = adoptionFixture();
+    breakEvidence(f);
+    assert.equal(lookupPublicReceipt({ ...f }), null);
+  });
+
+test('original measurement age expires without renewal and unknown transport stays cold', () => {
+  const f = adoptionFixture();
+  const original = Date.parse(f.document.at);
+  assert.ok(
+    publicPacket(
+      f.document,
+      f.scope,
+      f.inventory,
+      f.source,
+      original + PUBLIC_REUSE_MAX_AGE_MS
+    )
+  );
+  assert.equal(
+    publicPacket(
+      f.document,
+      f.scope,
+      f.inventory,
+      f.source,
+      original + PUBLIC_REUSE_MAX_AGE_MS + 1
+    ),
+    null
+  );
+  assert.equal(lookupPublicReceipt({ ...f, force: true }), null);
+  assert.equal(f.calls(), 0);
+  assert.equal(
+    lookupPublicReceipt({
+      ...f,
+      transport: {
+        getJson() {
+          throw new Error('quota deferred');
+        },
+      },
+    }),
+    null
+  );
+  const packet = publicPacket(
+    f.document,
+    f.scope,
+    f.inventory,
+    f.source,
+    f.now
+  );
+  packet.rows[0].cookie = 'private';
+  assert.equal(
+    readPublicAdoption(
+      Buffer.from(JSON.stringify(packet)).toString('base64'),
+      f.scope,
+      f.inventory,
+      () => f.now
+    ),
+    null
+  );
+  assert.equal(
+    readPublicAdoption('!invalid', f.scope, f.inventory, () => f.now),
+    null
+  );
+});
 
 test('direct bodies, clones and bodyless responses finish with wire sizes unknown', async () => {
   const evidence = make();
@@ -185,5 +399,58 @@ test('custom metadata is exact-origin only and rejects unsafe invocation values'
       { run: '12', deployment: 'bad\r\nvalue' }
     ),
     { 'x-synthetic-monitoring': 'product-crawl', 'x-jovie-crawl-run': '12' }
+  );
+});
+
+test('an original requires desktop walk evidence and every shard ledger', () => {
+  const f = adoptionFixture();
+  const row = f.document.pages.find(
+    p =>
+      p.route === '/pricing' &&
+      p.identity === 'stranger' &&
+      p.viewport === 'desktop'
+  );
+  row.overlaySurface.hoverables = 2;
+  f.document.overlayWalks.walks = [
+    {
+      route: '/pricing',
+      url: '/pricing',
+      identity: 'stranger',
+      viewport: 'desktop',
+      steps: [{ step: 'loaded', sequence: 'baseline' }],
+    },
+  ];
+  assert.ok(lookupPublicReceipt({ ...f }));
+  f.document.overlayWalks.walks[0].viewport = 'phone';
+  assert.equal(lookupPublicReceipt({ ...f }), null);
+  f.document.overlayWalks.walks[0].viewport = 'desktop';
+  f.document.traffic.accounting.missingShardLedgers = 1;
+  assert.equal(lookupPublicReceipt({ ...f }), null);
+});
+
+test('oversize public hints and malformed scope never change current coverage', () => {
+  const f = adoptionFixture();
+  const packet = publicPacket(
+    f.document,
+    f.scope,
+    f.inventory,
+    f.source,
+    f.now
+  );
+  const consumerScope = { ...f.scope, shard: { index: 1, count: 4 } };
+  const clock = () => f.now;
+  assert.equal(
+    readPublicAdoption('eA=='.repeat(20000), consumerScope, f.inventory, clock),
+    null
+  );
+  packet.scope.config.extraSession = 'private';
+  assert.equal(
+    readPublicAdoption(
+      Buffer.from(JSON.stringify(packet)).toString('base64'),
+      consumerScope,
+      f.inventory,
+      clock
+    ),
+    null
   );
 });

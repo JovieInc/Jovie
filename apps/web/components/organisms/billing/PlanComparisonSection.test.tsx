@@ -63,3 +63,12 @@ describe('PlanComparisonSection', () => {
     expect(screen.getAllByText('•••').length).toBeGreaterThan(0);
   });
 });
+
+describe('PlanComparisonSection feature check token', () => {
+  it('colors feature checkmarks with the success token, not an emerald palette class', () => {
+    const { container } = renderSection();
+    const checks = container.querySelectorAll('svg.lucide-check.text-success');
+    expect(checks.length).toBeGreaterThan(0);
+    expect(container.innerHTML).not.toContain('emerald-');
+  });
+});

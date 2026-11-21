@@ -25,7 +25,7 @@ workspace:
   root: ~/code/symphony-workspaces
 hooks:
   after_create: |
-    git clone --depth 1 git@github.com:JovieInc/Jovie.git .
+    git clone --filter=blob:none git@github.com:JovieInc/Jovie.git .
     JOVIE_AGENT_PROFILE=coder ./scripts/setup.sh
 agent:
   max_concurrent_agents: 10

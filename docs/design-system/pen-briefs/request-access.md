@@ -2,6 +2,7 @@
 frame: request-access
 route: /waitlist
 context: waitlist, onboarding, access, sign in, auth
+model: claude-opus-5-5
 ---
 Design Jovie's onboarding as one living form, desktop 1440 wide and mobile 390 wide, dark mode first.
 
@@ -19,4 +20,4 @@ Every question after email has a quiet Skip.
 
 The last step stays on the same canvas: their profile coming together from their public music (photo, name, latest release), their email echoed back, one line on what happens next and one primary button. If signup is closed when they finish, that one line says their spot is saved and they'll get an email when it opens.
 
-Draw the artist question with its inline match, the role choice, the spend choice and the last step as their own frames. Compose every piece from the components already in this file (input, button, chip, avatar) as instances, never hand-drawn shapes. No stock photos, no feature grid, no invite-only headline, nothing that shifts after load.
+It is one form that grows, not a set of pages. Draw it as the same canvas at four moments, each frame keeping the identical layout with the trail one answer longer: the artist question with its inline match, the role choice, the spend choice, and the last step. Set the current question in the display size and centre the form in a column about 640 wide on desktop, so it fills the screen with calm, generous space rather than a small strip in an empty frame. The answer trail uses the body size in the secondary text colour, readable at a glance, each line with its small edit affordance. Inputs and buttons are full size (48 tall), pill-shaped. Behind the form, one soft radial glow from the editorial gradient sits low and off-centre on the near-black canvas, a plain radial gradient, so the page feels alive without any card or panel. The avatar in the artist match has no ring. Compose every piece from the components already in this file (input, button, chip, avatar) as instances, never hand-drawn shapes. No stock photos, no feature grid, no invite-only headline, nothing that shifts after load.
