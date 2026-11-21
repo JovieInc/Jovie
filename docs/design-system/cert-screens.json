@@ -74,6 +74,7 @@
     "apps/web/components/features/alerts/AlertGrowthLanding.tsx": "a11y,ds-owner,frontend-rules,states,tests",
     "apps/web/components/features/ask-jovie/AskJovieWidget.tsx": "a11y,ds-owner,frontend-rules,states",
     "apps/web/components/features/auth/AuthProviderButtons.tsx": "ds-owner",
+    "apps/web/components/features/dashboard/organisms/DashboardFeedbackModal.tsx": "frontend-rules",
     "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens",
     "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileContactSidebar.tsx": "a11y,states",
     "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/SidebarLinkInput.tsx": "a11y,ds-owner,frontend-rules,states,tokens",

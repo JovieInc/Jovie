@@ -28,11 +28,6 @@ export function DashboardFeedbackModal({
   const [feedback, setFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  // The dialog is opened by an explicit action, so the field takes focus once
-  // when it mounts. A stable callback ref avoids refocusing on every render.
-  const focusOnOpen = useCallback((node: HTMLTextAreaElement | null) => {
-    node?.focus();
-  }, []);
 
   const handleSubmit = useCallback(async () => {
     if (!feedback.trim() || isSubmitting) return;
@@ -128,7 +123,7 @@ export function DashboardFeedbackModal({
                 onKeyDown={handleKeyDown}
                 placeholder="What's working? What's not? What should we build next?"
                 rows={5}
-                ref={focusOnOpen}
+                autoFocus
                 className='bg-surface-1 border-subtle text-primary-token placeholder:text-secondary-token'
               />
             </FormField>
