@@ -2,8 +2,9 @@
 frame: homepage
 route: /
 context: home, marketing, landing
+model: claude-opus-5-5
 ---
-Design Jovie's homepage, desktop 1440 wide and mobile 390 wide, dark mode first.
+Design Jovie's homepage, desktop 1440 wide and mobile 390 wide, dark mode first. On mobile the footer stacks into one column: the logo, then the link groups as short lists, then one row with the theme and language controls, then the legal links on their own line. Nothing in the footer overlaps or runs past the screen edge. Section row numbers (01, 02, 03) sit inside the content padding, never flush to the frame edge.
 
 This is a general editorial page for creators and entertainment, in the spirit of the ElevenLabs or Lovable homepages: a confident headline, one line on what Jovie does (an always-on marketing department that turns a creator's existing catalog into growth loops with their fans), and one primary call to action: the existing name search, a "Search your name" field with a "Find me" button (the certified homepage conversion lock, JOV-5085). No "Request access", "Get started" or waitlist link on this page; the waitlist gate comes later in the flow. Below, three short editorial sections that show outcomes rather than features: more of the right fans, brand deals and bookings, higher earnings per fan. Music-specific detail belongs on product pages, not here.
 

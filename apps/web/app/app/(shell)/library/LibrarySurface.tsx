@@ -66,6 +66,10 @@ import {
   archiveLibraryMerchCard,
   restoreLibraryMerchCard,
 } from '@/app/app/(shell)/library/actions';
+import {
+  computeLibraryStatusHiddenNote,
+  LibraryStatusBar,
+} from '@/app/app/(shell)/library/library-status-bar';
 import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
@@ -180,7 +184,6 @@ import {
   type RowSelectionState,
 } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
-import { pluralize } from '@/lib/utils/pluralize';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import {
   LIBRARY_CATALOG_ROW_MODE,
@@ -2833,29 +2836,6 @@ function AssetDrawer({
   );
 }
 
-function LibraryStatusBar({
-  visibleCount,
-  totalCount,
-  activePreviewTitle,
-}: {
-  readonly visibleCount: number;
-  readonly totalCount: number;
-  readonly activePreviewTitle: string | null;
-}) {
-  return (
-    <div className='system-b-library-status-bar hidden h-(--app-shell-footer-row-height) shrink-0 items-center justify-between gap-3 border-t border-(--app-shell-frame-seam) px-(--app-shell-header-padding-x) sm:flex'>
-      <span className='min-w-0 truncate'>
-        {visibleCount} of {pluralize(totalCount, 'Item')}
-      </span>
-      {activePreviewTitle ? (
-        <span className='min-w-0 truncate text-right'>
-          Playing {activePreviewTitle}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 const EMPTY_MERCH_PRODUCTS: readonly LibraryMerchProductOption[] = [];
 const EMPTY_WORK_LAUNCHES: readonly WorkLaunchSummary[] = [];
 
@@ -3556,6 +3536,11 @@ export function LibrarySurface({
     filters.providers.size +
     (preset === 'all' ? 0 : 1);
 
+  const statusHiddenNote = useMemo(
+    () => computeLibraryStatusHiddenNote(preset, effectiveAssets),
+    [effectiveAssets, preset]
+  );
+
   const filterPanel = useMemo(
     () => (
       <LibraryFilterPanel
@@ -3859,6 +3844,7 @@ export function LibrarySurface({
           <LibraryStatusBar
             visibleCount={visibleAssets.length}
             totalCount={effectiveAssets.length}
+            hiddenNote={statusHiddenNote}
             activePreviewTitle={activePreviewTitle}
           />
         </div>

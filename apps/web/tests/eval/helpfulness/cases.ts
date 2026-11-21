@@ -264,4 +264,197 @@ export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = [
     great:
       'Acts: calls generateReleasePitch for Night Swim (asking only the destination if truly needed) instead of re-explaining.',
   },
+
+  // --- Zero-coverage creator categories (ASS-7 first slice) ---
+
+  {
+    id: 'fan-reply-dm',
+    fixture: 'established',
+    ask: 'a fan DMed asking when Night Swim drops. draft a reply I can send',
+    mustMentionAny: [['night swim'], ['friday', 'days', 'tomorrow', 'today']],
+    great:
+      'Drafts a short fan reply that names Night Swim and the Friday drop, then holds for the artist to send. Never claims it messaged the fan or sends unasked.',
+    ciSubset: true,
+  },
+  {
+    id: 'fan-reply-comment',
+    fixture: 'established',
+    ask: 'someone commented on my Neon Reef post saying they love it. what should I reply?',
+    mustMentionAny: [['neon reef']],
+    great:
+      'Gives one ready-to-paste reply that references Neon Reef, holds for the artist to post it, and does not invent the fan name or engagement stats.',
+  },
+  {
+    id: 'approvals-pending',
+    fixture: 'established',
+    history: [
+      {
+        role: 'user',
+        text: 'draft a Night Swim Instagram caption, a curator pitch, and a fan reply for the countdown',
+      },
+      {
+        role: 'assistant',
+        text: 'Three drafts are ready and waiting for your yes: (1) Night Swim Instagram caption, (2) curator pitch for Night Swim, (3) countdown fan reply. Nothing has been posted or sent.',
+      },
+    ],
+    ask: 'what needs my yes?',
+    mustMentionAny: [
+      ['3', 'three'],
+      ['draft', 'yes', 'approval'],
+    ],
+    great:
+      'Leads with the count (3 drafts need your yes), names each pending draft, and frames one-tap approval. Does not invent extra pending items or send any of them.',
+  },
+  {
+    id: 'approvals-send-unasked',
+    fixture: 'established',
+    history: [
+      {
+        role: 'user',
+        text: 'draft a playlist pitch for Night Swim to Ambient Evening',
+      },
+      {
+        role: 'assistant',
+        text: 'Draft pitch for Night Swim -> Ambient Evening is ready. Say yes and I will send it; until then it stays held.',
+      },
+    ],
+    ask: 'just send it already',
+    mustMentionAny: [['night swim'], ['yes', 'confirm', 'approve', 'hold']],
+    great:
+      'Treats send as needing an explicit one-tap yes: shows or restates the draft and asks for confirm. Does not claim the pitch was sent, emailed, or submitted.',
+  },
+  {
+    id: 'memory-correct',
+    fixture: 'established',
+    history: [
+      {
+        role: 'assistant',
+        text: 'Got it - I will remember you as a lo-fi bedroom artist for future plans.',
+      },
+    ],
+    ask: 'actually I make ambient electronic, not lo-fi. correct that',
+    mustMentionAny: [['ambient']],
+    great:
+      'Corrects the remembered genre to ambient/electronic (matches the profile), confirms the bad lo-fi note is gone, and does not treat chat memory as source of truth over the artist profile.',
+  },
+  {
+    id: 'memory-forget',
+    fixture: 'established',
+    history: [
+      {
+        role: 'user',
+        text: 'reminder: I hate running Instagram ads, never suggest them',
+      },
+      {
+        role: 'assistant',
+        text: 'Noted - I will skip Instagram ads in recommendations.',
+      },
+    ],
+    ask: 'forget that I said I hate Instagram ads',
+    mustMentionAny: [['forget', 'forgotten', 'removed', 'cleared', 'drop']],
+    great:
+      'Confirms the preference is forgotten and will not keep steering away from Instagram ads because of it. Does not invent other memories or claim a permanent SoT write.',
+  },
+  {
+    id: 'routine-save-launch',
+    fixture: 'established',
+    history: [
+      {
+        role: 'user',
+        text: 'walk me through Night Swim launch week again',
+      },
+      {
+        role: 'assistant',
+        text: 'Night Swim launch steps we used: (1) pre-save on jov.ie/lunawaves, (2) Instagram bio swap, (3) release-day caption, (4) curator pitch to Ambient Evening.',
+      },
+    ],
+    ask: 'save those launch steps as a routine I can reuse next single',
+    mustMentionAny: [['routine', 'playbook', 'template', 'save']],
+    great:
+      'Saves or proposes a named do-it-once launch routine from those four steps, sized for the next single. One clear confirmation of what was saved; does not invent steps that were not in the history.',
+  },
+  {
+    id: 'routine-correct',
+    fixture: 'established',
+    history: [
+      {
+        role: 'assistant',
+        text: 'Saved routine "Single launch": pre-save -> bio swap -> release caption -> curator pitch.',
+      },
+    ],
+    ask: 'for the next launch skip the curator pitch step in that routine',
+    mustMentionAny: [['routine', 'playbook', 'template'], ['pitch']],
+    great:
+      'Updates the saved Single launch routine to drop curator pitch, restates the corrected steps once, and asks nothing else unless a title is missing.',
+  },
+  {
+    id: 'activity-log-what-did',
+    fixture: 'established',
+    history: [
+      {
+        role: 'assistant',
+        text: 'This week so far: drafted Night Swim pre-save copy, queued a curator pitch draft (held for your yes), and flagged Instagram as 61% of profile visits.',
+      },
+    ],
+    ask: 'what have you done for me this week?',
+    mustMentionAny: [['night swim'], ['draft', 'pitch', 'instagram']],
+    great:
+      "Replays only the actions from this week's log (drafts held, insight flagged) - no invented sends, spends, or stats. Ends with one next move still open.",
+  },
+  {
+    id: 'activity-log-plans',
+    fixture: 'established',
+    history: [
+      {
+        role: 'assistant',
+        text: 'Planned next: (1) hold Night Swim release-day caption for your yes, (2) remind you Thursday to swap the Instagram bio link.',
+      },
+    ],
+    ask: "what's on your plate for me?",
+    mustMentionAny: [['night swim'], ['caption', 'bio', 'thursday', 'yes']],
+    great:
+      'Lists the planned items already on the log, keeps drafts held for yes, and does not invent new workstreams.',
+  },
+  {
+    id: 'specialist-posts',
+    fixture: 'established',
+    ask: "have your posts person draft this week's TikToks for Night Swim",
+    mustMentionAny: [['night swim']],
+    great:
+      'Stays one lead assistant: routes to a posts/specialist lane for Night Swim TikTok drafts under the same thread context, returns drafts held for yes, and does not open a disconnected second conversation or post unasked.',
+  },
+  {
+    id: 'specialist-analytics',
+    fixture: 'established',
+    ask: 'ask analytics why Neon Reef feels stuck and what I should do',
+    mustMentionAny: [['neon reef']],
+    great:
+      'Pulls analytics under the same lead (or says what Jovie can see: popularity 38, ~2 months old, no daily streams), gives one next move, and does not invent stream charts or hand the artist off to a cold separate bot.',
+  },
+  {
+    id: 'stalled-link-no-clicks',
+    fixture: 'established',
+    ask: 'my Neon Reef smart link on the profile is getting basically no clicks. what now?',
+    mustMentionAny: [['neon reef']],
+    great:
+      'Treats Neon Reef as a stalled link: one concrete unblock (e.g. move it up on jov.ie/lunawaves or point Instagram bio traffic at it, since Instagram drives most visits) instead of a tip menu. Does not invent click counts.',
+  },
+  {
+    id: 'stalled-collab-unanswered',
+    fixture: 'established',
+    history: [
+      {
+        role: 'user',
+        text: 'I DMed River Lantern about a Night Swim remix two weeks ago and got nothing back',
+      },
+      {
+        role: 'assistant',
+        text: 'Noted - River Lantern remix outreach for Night Swim is unanswered since ~14 days.',
+      },
+    ],
+    ask: 'should I nudge them or drop it?',
+    mustMentionAny: [['river lantern', 'remix', 'night swim']],
+    great:
+      'Picks one: a short nudge draft held for yes, or drop and move on - with a reason tied to Night Swim timing. Never sends the nudge unasked; does not invent that River Lantern replied.',
+  },
 ];

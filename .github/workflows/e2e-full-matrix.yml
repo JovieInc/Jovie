@@ -272,8 +272,11 @@ jobs:
           set -o pipefail
           cd apps/web
           log="$RUNNER_TEMP/e2e-full.log"
+          # Do not pass --reporter=*: playwright.config.ts already uses line +
+          # JSON so flaky retry passes land in test-results/results.json for the
+          # flakiness report on green runs (JOV-12621).
           if [ -n "${{ github.event.inputs.test_filter }}" ]; then
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test "${{ github.event.inputs.test_filter }}" --project=${{ matrix.browser }} --reporter=line 2>&1 | tee "$log"
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test "${{ github.event.inputs.test_filter }}" --project=${{ matrix.browser }} 2>&1 | tee "$log"
           else
             # The nightly-tagged chaos lane remains owned by nightly-tests.yml.
             # @red is the intentional Sentry failure lane. The OAuth suite is a
@@ -285,7 +288,7 @@ jobs:
             # signup open (see FEATURE_PUBLIC_SIGNUP_CLOSED below), so the
             # closed-signup handoff test is inverted here; canary-health-gate
             # still runs it against the deployed origin.
-            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --ignore-snapshots --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/4 --grep-invert "@red|candidate-bound Better Auth OAuth runtime|Authenticated prod chat turn|signup lands on the live waitlist role form while public signup is closed" --reporter=line 2>&1 | tee "$log"
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --ignore-snapshots --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/4 --grep-invert "@red|candidate-bound Better Auth OAuth runtime|Authenticated prod chat turn|signup lands on the live waitlist role form while public signup is closed" 2>&1 | tee "$log"
           fi
         env:
           BASE_URL: ${{ (github.event_name == 'repository_dispatch' || github.event.inputs.test_filter == '') && 'http://127.0.0.1:3100' || '' }}
@@ -333,6 +336,17 @@ jobs:
           REMEDIATION_EVIDENCE_LOG: ${{ runner.temp }}/e2e-full.log
           REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: node scripts/remediation-signal-intake.mjs
+
+      - name: Upload Playwright flaky JSON status
+        # Green-run retries only exist in this JSON report. Upload it on every
+        # completed shard so the flakiness report can count status "flaky"
+        # (JOV-12621). Name includes "playwright" for the analyzer artifact filter.
+        if: ${{ always() && steps.e2e-matrix.outcome != 'skipped' && hashFiles('apps/web/test-results/results.json') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: playwright-e2e-flaky-json-${{ matrix.browser }}-shard${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-results/results.json
+          retention-days: 7
 
       - name: Upload failure results or filtered public review captures
         if: ${{ always() && (failure() || (github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter == 'tests/e2e/profile/public-profile-cta-identity.spec.ts')) && hashFiles('apps/web/test-results/**') != '' }}

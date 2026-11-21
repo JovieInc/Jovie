@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   type ReactNode,
@@ -376,7 +377,7 @@ export function EntityCarousel({
           className='mt-1 flex min-h-11 items-center justify-center gap-1 px-1'
           data-testid='profile-carousel-controls'
         >
-          <button
+          <PlainButton
             type='button'
             aria-label='Previous Card'
             disabled={currentIndex === 0}
@@ -384,7 +385,7 @@ export function EntityCarousel({
             className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-transparent hover:text-primary-token disabled:pointer-events-none disabled:opacity-30'
           >
             <ChevronLeft className='h-4 w-4' aria-hidden='true' />
-          </button>
+          </PlainButton>
           <nav
             aria-label='Profile Cards'
             className='flex min-h-11 items-center justify-center gap-0.5'
@@ -393,7 +394,7 @@ export function EntityCarousel({
               const index = visibleDotStart + offset;
               const isCurrent = index === currentIndex;
               return (
-                <button
+                <PlainButton
                   key={index}
                   type='button'
                   aria-label={`Go to card ${index + 1}`}
@@ -408,11 +409,11 @@ export function EntityCarousel({
                       isCurrent && 'h-2 w-2 bg-(--profile-pearl-primary-bg)'
                     )}
                   />
-                </button>
+                </PlainButton>
               );
             })}
           </nav>
-          <button
+          <PlainButton
             type='button'
             aria-label='Next Card'
             disabled={currentIndex === slotCount - 1}
@@ -420,7 +421,7 @@ export function EntityCarousel({
             className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-transparent hover:text-primary-token disabled:pointer-events-none disabled:opacity-30'
           >
             <ChevronRight className='h-4 w-4' aria-hidden='true' />
-          </button>
+          </PlainButton>
           <span className='sr-only' aria-live='polite'>
             Card {currentIndex + 1} of {slotCount} — profile cards include the
             featured highlight and alerts, not releases only

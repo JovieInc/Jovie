@@ -446,6 +446,9 @@ test('metadata-only edits and label events still use the exact-head proof path i
     );
     assert.match(reuse.run, /\.head_sha == \$sha/);
     assert.match(reuse.run, /\.conclusion == "success"/);
+    // CI-28: reuse also requires a successful unit 4/4 conclusion (fail closed).
+    assert.match(reuse.run, /Affected Unit Tests \(4\/4\)/);
+    assert.match(reuse.run, /\[\[\s*"\$guard_job"\s*==\s*success\s*\]\]/);
     assert.ok(
       job.steps
         .slice(index + 1)

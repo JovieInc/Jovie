@@ -14,7 +14,7 @@
  * Flags:
  *   --judge strong | cheap | none | <@cf model>  (default cheap)
  *   --model <@cf model>                         subject (default glm-5.3)
- *   --subset ci                                 7-case subset
+ *   --subset ci                                 cheap CI live subset
  *   --case <id>                                 one case (repeatable)
  *   --out <path>                                JSON report path
  *   --concurrency <n>                           default 3
@@ -70,7 +70,7 @@ import {
 } from './workers-ai';
 
 /** Hard cap on cases per run so a loop can never fan out unbounded spend. */
-export const MAX_CASES_PER_RUN = 30;
+export const MAX_CASES_PER_RUN = 45;
 
 interface Args {
   judge: string;

@@ -41,6 +41,12 @@ SKIP_LABELS = {"lane-fix-exhausted", "queue-poison", "swarm-gave-up", "hold", "d
 EXCLUDED = {23495, 23499, 23500, 23506, 23511, 23512, 23514, 23517, 23519}
 MAX_ATTEMPTS = 2           # swarm attempts per (PR, failure fingerprint) before handing back to the lanes
 MAX_FILES, MAX_LINES = 8, 250
+
+
+def model_mode_on() -> bool:
+    """Kill switch for every model path: only SWARM_MODEL_MODE == "on" allows a model call. Missing,
+    empty or any other value is off (a switch that fails open is not a switch)."""
+    return os.environ.get("SWARM_MODEL_MODE") == "on"
 # The cheap model never edits these; PRs touching them go to the Codex/Opus ladder.
 SENSITIVE = re.compile(
     r"(^|/)(auth|billing|entitlement|stripe|clerk|secrets?|credentials?)[^/]*"
@@ -128,15 +134,16 @@ def cmd_select(a) -> int:
     spent = day_spend_cents(a.ledger_issue)
     # Each attempt costs ~8 calls; keep a quarter of the remaining quota in reserve.
     by_quota = int((remaining * 0.75) // 8)
-    credits_ok = credits_available(gateway_base(), os.environ.get("SWARM_API_KEY", ""))
+    credits_ok = model_mode_on() and credits_available(gateway_base(), os.environ.get("SWARM_API_KEY", ""))
     matrix = plan_matrix(modes, limit=a.limit, by_quota=by_quota, spent_cents=spent,
                          daily_cap_usd=a.daily_cap_usd, attempt_cap_usd=a.attempt_cap_usd, credits_ok=credits_ok)
     agents = sum(1 for m in matrix if m["agent"])
     print(f"red={len(modes)} take={len(matrix)} agent_slots={agents} quota={remaining}/{limit} "
+          f"model_mode={'on' if model_mode_on() else 'OFF (model slots closed)'} "
           f"credits={'ok' if credits_ok else 'NONE (model slots closed)'} "
           f"spent_cents={'UNREADABLE (fail closed: no model attempts)' if spent is None else spent}")
     out_var("matrix", json.dumps(matrix))
-    out_var("reason", "ledger-unreadable" if spent is None else "no-credits" if not credits_ok else ("daily-cap" if agents == 0 and matrix else ("ok" if matrix else "none")))
+    out_var("reason", "ledger-unreadable" if spent is None else "model-mode-off" if not model_mode_on() else "no-credits" if not credits_ok else ("daily-cap" if agents == 0 and matrix else ("ok" if matrix else "none")))
     return 0
 
 
@@ -445,8 +452,8 @@ def prepare_red(a, plan: dict, pr: dict) -> int:
             skip = "no-concrete-error"
         elif plan.get("sensitive"):
             skip = "sensitive-paths->codex"
-        elif a.agent != "true":
-            skip = "model-budget-closed"
+        elif a.agent != "true" or not model_mode_on():
+            skip = "model-budget-closed"  # before any claim or receipt: turning the switch on later finds a clean head
     elif action == classes.WIRE_CI_FAST and plan.get("sensitive"):
         skip = "sensitive-paths->codex"
     if not skip:
@@ -721,6 +728,12 @@ def cmd_agent(a) -> int:
     """Run opencode with no shell, no key in its env (provider key is read from a file outside the
     checkout), and a hard stop when the running cost passes the per-attempt cap."""
     plan = json.loads(Path(a.plan).read_text())
+    if not model_mode_on():  # defence in depth: no model call even if a workflow edit skips the gates
+        Path(a.key_file).unlink(missing_ok=True)
+        plan.update(outcome="gave-up", reason="model-mode-off")
+        Path(a.plan).write_text(json.dumps(plan))
+        Path(a.meta).write_text(json.dumps({"costUsd": 0, "aborted": "model-mode-off"}))
+        return 0
     base = gateway_base()
     key_file = Path(a.key_file)
     key = key_file.read_text().strip()
@@ -855,91 +868,7 @@ def cmd_summarize(a) -> int:
 MIN_GH = (2, 40, 0)
 
 
-def gh_version() -> str:
-    try:
-        first = run_gh(["--version"])["stdout"].splitlines()[0]
-        return first.split()[2] if first.startswith("gh version") else first
-    except (OSError, IndexError):
-        return "unknown"
-
-
-def cmd_smoke(a) -> int:
-    """Prove the production log-read path before fanout; absent evidence fails closed.
-
-    Conclusion-filtered lists avoid skipped/cancelled firehose starvation. Bound
-    collection to two lists, forty job reads and six actual log attempts.
-    """
-    version = gh_version()
-    parts = tuple(int(x) for x in re.findall(r"\d+", version)[:3]) or (0,)
-    print(f"gh version {version} (minimum {'.'.join(map(str, MIN_GH))})")
-    out_var("gh_version", version)
-    if parts < MIN_GH:
-        print(f"::error title=swarm smoke::gh {version} is older than the supported minimum")
-        return 1
-    conclusions: dict[str, int] = {}
-    scanned = eligible_runs = eligible_jobs = tried = 0
-    seen_runs = set()
-    for status in ("failure", "success"):
-        runs = gh_json(["api", f"repos/{REPO}/actions/runs?status={status}&per_page=20"], priority="report")["workflow_runs"]
-        for run in runs[:20]:
-            if run["id"] in seen_runs:
-                continue
-            seen_runs.add(run["id"])
-            conc = run.get("conclusion") or "none"
-            conclusions[conc] = conclusions.get(conc, 0) + 1
-            scanned += 1
-            if conc not in {"success", "failure"}:
-                continue
-            jobs = gh_json(["api", f"repos/{REPO}/actions/runs/{run['id']}/jobs?per_page=100"], priority="report")["jobs"]
-            eligible = [j for j in jobs[:100] if j.get("conclusion") in {"success", "failure"} and j.get("started_at")]
-            if eligible:
-                eligible_runs += 1
-            for job in eligible:
-                eligible_jobs += 1
-                log = fetch_job_log(job["id"])
-                size = len(log.stdout or "")
-                tried += 1
-                print(f"smoke job {job['id']} ({job['name']}): rc={log.returncode} bytes={size} err={(log.stderr or '')[:100]!r}")
-                if log.returncode == 0 and size > 0:
-                    return 0
-                if "escape" in (log.stderr or "") or tried >= 6:
-                    print(f"::error title=swarm smoke::job log fetch returned rc={log.returncode} bytes={size}; gh {version} cannot read job logs")
-                    return 1
-    print(f"::error title=swarm smoke::no readable completed job log to smoke-test the log fetch "
-          f"(scanned {scanned} runs, conclusions={json.dumps(conclusions, sort_keys=True)}, "
-          f"eligible_runs={eligible_runs}, eligible_jobs={eligible_jobs}, log_attempts={tried}); log path unverified")
-    return 1
-
-
-def cmd_diagnose(a) -> int:
-    """Local, read-only replay of the runner's gate for PRs: the same API calls, job selection and
-    extraction as prepare_red, with whatever token `gh` holds. Posts nothing, claims nothing."""
-    for n in (int(x) for x in a.prs.split(",") if x.strip()):
-        pr = gh_json(["api", f"repos/{REPO}/pulls/{n}"])
-        sha = pr["head"]["sha"]
-        runs = gh_json(["api", f"repos/{REPO}/commits/{sha}/check-runs?per_page=100"])["check_runs"]
-        latest: dict[str, dict] = {}
-        for r in runs:
-            if r["name"] not in latest or r["id"] > latest[r["name"]]["id"]:
-                latest[r["name"]] = r
-        print(f"== #{n} {sha[:9]} state={pr['mergeable_state']} check-runs={len(runs)} distinct={len(latest)}")
-        failures, pending = latest_failures(sha)
-        print(f"   failing={[r['name'] for r in failures]} pending={pending}")
-        for r in failures[:4]:
-            app = (r.get("app") or {}).get("slug")
-            m = re.search(r"/runs/(\d+)/job/(\d+)", r.get("details_url") or "")
-            out = fetch_job_log(r["id"])
-            attempt = ""
-            if m:
-                job = gh_json(["api", f"repos/{REPO}/actions/jobs/{m.group(2)}"])
-                attempt = f" run_attempt={job.get('run_attempt')} job_conclusion={job.get('conclusion')} id_match={str(job['id']) == str(r['id'])}"
-            text = extract_failure(out.stdout) if out.returncode == 0 else ""
-            print(f"   - {r['name']!r} id={r['id']} app={app} conclusion={r['conclusion']} details={'job' if m else 'NO-JOB-URL'}"
-                  f" logs rc={out.returncode} bytes={len(out.stdout or '')} err={(out.stderr or '')[:80]!r}{attempt}")
-            print(f"     extract_lines={len(text.splitlines())} concrete={concrete_error(text)} classify={classes.classify({'mergeStateStatus': 'BLOCKED', 'statusCheckRollup': [{'name': r['name'], 'conclusion': r['conclusion'].upper()}]}, {r['name']: text})['cls']}")
-            if a.show:
-                print("     " + text.split("--- tail ---")[0][-600:].replace("\n", "\n     "))
-    return 0
+from swarm_ops import gh_version, cmd_smoke, cmd_diagnose  # noqa: E402
 
 
 def main() -> int:
