@@ -40,7 +40,7 @@ large task-specific gstack playbooks remain and should be evaluated before split
 
 ## Live trials and failures
 
-[Raw structured results](eval-results.json) include all frozen-v2 decisions, input
+Raw structured results (archived off-tree) include all frozen-v2 decisions, input
 hashes, usage and failed gateway attempts. Expected answers were withheld; models
 received case inputs and decision field names. Pass requires every case and no
 extra claims, with key order ignored. These deliberately small cases primarily
