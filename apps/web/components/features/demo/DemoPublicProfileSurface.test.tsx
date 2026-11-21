@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { DemoPublicProfileSurface } from './DemoPublicProfileSurface';
 
 describe('DemoPublicProfileSurface', () => {
@@ -24,5 +25,12 @@ describe('DemoPublicProfileSurface', () => {
       `/${INTERNAL_DJ_DEMO_PERSONA.profile.handle}/${release.slug}`
     );
     expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
+  });
+
+  it('takes the persona accent from authored RGB data', async () => {
+    const { container } = render(<DemoPublicProfileSurface />);
+
+    expect(INTERNAL_DJ_DEMO_PERSONA.profile.accentRgb).toHaveLength(3);
+    await expectNoA11yViolations(container);
   });
 });

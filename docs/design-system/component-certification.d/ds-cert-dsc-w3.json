@@ -1,0 +1,72 @@
+{
+  "gates": {
+    "apps/web/components/features/dashboard/organisms/socials-form/SocialLinkSuggestionRows.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/socials-form/SocialsForm.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/DemoPublicProfileSurface.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/DemoReleaseLandingSurface.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/DemoReleaseTrackedLinksSurface.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/dashboard/organisms/socials-form/SocialsForm.tsx": {
+      "loading": "Loading, error and offline come from the TanStack query and mutation state (an in-flight or failed fetch), which a seeded-cache story cannot hold open; SocialsForm.test.tsx covers the loading skeleton and the error banner with a mocked hook.",
+      "error": "Loading, error and offline come from the TanStack query and mutation state (an in-flight or failed fetch), which a seeded-cache story cannot hold open; SocialsForm.test.tsx covers the loading skeleton and the error banner with a mocked hook.",
+      "offline": "Loading, error and offline come from the TanStack query and mutation state (an in-flight or failed fetch), which a seeded-cache story cannot hold open; SocialsForm.test.tsx covers the loading skeleton and the error banner with a mocked hook."
+    },
+    "apps/web/components/features/demo/DemoPublicProfileSurface.tsx": {
+      "empty": "Fixed demo fixture: the artist, releases and links are authored constants in source (a catalog of one featured release), so empty, overlong or right-to-left runtime content cannot reach this surface.",
+      "long-content": "Fixed demo fixture: the artist, releases and links are authored constants in source (a catalog of one featured release), so empty, overlong or right-to-left runtime content cannot reach this surface.",
+      "rtl-overflow": "Fixed demo fixture: the artist, releases and links are authored constants in source (a catalog of one featured release), so empty, overlong or right-to-left runtime content cannot reach this surface."
+    },
+    "apps/web/components/features/demo/DemoReleaseLandingSurface.tsx": {
+      "empty": "Static capture surface fed only by the authored demo release and persona; no empty, overlong, permission-gated or right-to-left runtime input exists.",
+      "long-content": "Static capture surface fed only by the authored demo release and persona; no empty, overlong, permission-gated or right-to-left runtime input exists.",
+      "permission-denied": "Static capture surface fed only by the authored demo release and persona; no empty, overlong, permission-gated or right-to-left runtime input exists.",
+      "rtl-overflow": "Static capture surface fed only by the authored demo release and persona; no empty, overlong, permission-gated or right-to-left runtime input exists."
+    },
+    "apps/web/components/features/demo/DemoReleaseTrackedLinksSurface.tsx": {
+      "empty": "Static capture surface: the UTM presets and release row come from authored demo constants, so empty, overlong or right-to-left runtime content cannot reach it.",
+      "long-content": "Static capture surface: the UTM presets and release row come from authored demo constants, so empty, overlong or right-to-left runtime content cannot reach it.",
+      "rtl-overflow": "Static capture surface: the UTM presets and release row come from authored demo constants, so empty, overlong or right-to-left runtime content cannot reach it."
+    }
+  }
+}

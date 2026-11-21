@@ -87,6 +87,8 @@ export interface DemoPersonaProfile {
   readonly handle: string;
   readonly displayName: string;
   readonly avatarSrc: string;
+  /** Extracted profile accent as [r, g, b] for personas that carry one. */
+  readonly accentRgb?: readonly [number, number, number];
   readonly bio: string;
   readonly creatorType: 'artist';
   readonly location: string;
@@ -295,6 +297,7 @@ export const INTERNAL_DJ_DEMO_PERSONA: DemoPersona = {
     handle: 'calvin-demo',
     displayName: 'Calvin Harris',
     avatarSrc: '/avatars/default-user.png',
+    accentRgb: [207, 130, 76],
     bio: 'Festival-headlining DJ and producer with a catalog built for clubs, stadiums, and late-night drive time.',
     creatorType: 'artist',
     location: 'London, UK',

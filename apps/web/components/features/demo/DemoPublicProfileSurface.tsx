@@ -4,12 +4,16 @@ import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import { DemoClientProviders } from './DemoClientProviders';
 
+function personaAccentHex(rgb: readonly [number, number, number] = [0, 0, 0]) {
+  return `#${rgb.map(channel => channel.toString(16).padStart(2, '0')).join('')}`;
+}
+
 const DEMO_PUBLIC_PROFILE = buildDemoProfile();
 const DEMO_PUBLIC_THEME = {
   ...DEMO_PUBLIC_PROFILE.theme,
   profileAccent: {
     version: 1 as const,
-    primaryHex: '#cf824c',
+    primaryHex: personaAccentHex(INTERNAL_DJ_DEMO_PERSONA.profile.accentRgb),
     sourceUrl:
       DEMO_PUBLIC_PROFILE.avatarUrl ??
       INTERNAL_DJ_DEMO_PERSONA.profile.avatarSrc ??
