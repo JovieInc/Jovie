@@ -27,6 +27,15 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/dashboard/organisms/dashboard-theme-toggle/DashboardThemeToggle.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/dashboard/organisms/release-provider-matrix/FilterSubmenu.tsx": [
       "ds-owner",
       "tokens",
@@ -54,6 +63,15 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/dashboard/organisms/releases/cells/ReleaseCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/dashboard/release-tasks/ReleaseTaskExplainerPopover.tsx": [
       "ds-owner",
       "tokens",
@@ -64,6 +82,15 @@
       "forced-caps"
     ],
     "apps/web/components/features/dashboard/tasks/TaskDescriptionHelper.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/tasks/TaskListRow.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -100,6 +127,15 @@
       "forced-caps"
     ],
     "apps/web/components/features/home/TestimonialCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/onboarding/OnboardingMessageRecoveryRow.tsx": [
       "ds-owner",
       "tokens",
       "states",
