@@ -3,18 +3,23 @@
  * Keep-owned cursor/stable-desktop-publish-* suppresses Summer page.
  * After stamp merge, queued/in_progress desktop-release for the certified SHA
  * still counts as in-flight (closes the post-merge false-page window).
+ * When stamp+release miss, a Production Controller run for a newer generation
+ * also counts as in-flight (certified lags tip until verification lands).
  * api-budget: github-actions-token 60/hr - open PR pages + stamp detail + up to
- * two desktop-release run pages (queued/in_progress by display_title) per reconcile
+ * two desktop-release + two production-controller run pages (queued/in_progress)
+ * per reconcile
  */
 import { GITHUB_API } from '../../packages/api-client/github.ts';
 import {
   findOpenDesktopStampPr,
   stampOwnershipDecision,
 } from '../desktop-stamp-ownership.mjs';
+import { productionControllerGenerationSha } from './artifact-freshness-certified.mjs';
 
 const DEFAULT_REPO = 'JovieInc/Jovie';
 const MAX_PULL_PAGES = 10;
 const DESKTOP_RELEASE_WORKFLOW = 'desktop-release.yml';
+const PRODUCTION_CONTROLLER_WORKFLOW = 'production-controller.yml';
 const RELEASE_IN_FLIGHT_STATUSES = Object.freeze(['queued', 'in_progress']);
 /** Ship now: 6h grace. Re-evaluate when queue dwell norms change. */
 export const STAMP_IN_FLIGHT_MAX_AGE_MS = 6 * 60 * 60 * 1000;
@@ -115,6 +120,70 @@ export async function fetchDesktopReleaseInFlight(input) {
 }
 
 /**
+ * True when Production Controller is queued/in_progress for a generation
+ * other than certifiedSha (tip awaiting verification after stamp merge).
+ * Matches display_title generation SHA — tip head_sha can advance past it.
+ * @param {{
+ *   readonly repo?: string;
+ *   readonly certifiedSha?: string | null;
+ *   readonly fetchImpl?: (input: any, init?: any) => Promise<any>;
+ *   readonly headers?: Record<string, string>;
+ * }} input
+ */
+export async function fetchProductionControllerInFlight(input) {
+  const repo = input.repo ?? DEFAULT_REPO;
+  const fetchImpl = input.fetchImpl ?? fetch;
+  const certifiedSha =
+    typeof input.certifiedSha === 'string' &&
+    /^[0-9a-f]{40}$/i.test(input.certifiedSha)
+      ? input.certifiedSha.toLowerCase()
+      : null;
+  if (!certifiedSha) {
+    return { inFlight: false, reason: 'no-certified-sha' };
+  }
+  const headers = input.headers ?? {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'jovie-artifact-freshness',
+  };
+  try {
+    for (const status of RELEASE_IN_FLIGHT_STATUSES) {
+      const url = `${GITHUB_API}/repos/${repo}/actions/workflows/${PRODUCTION_CONTROLLER_WORKFLOW}/runs?branch=main&status=${status}&per_page=20`;
+      const response = await fetchImpl(url, {
+        headers,
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!response.ok) {
+        return {
+          inFlight: null,
+          reason: `production-controller ${status} lookup returned ${response.status}`,
+        };
+      }
+      const body = await response.json();
+      const runs = Array.isArray(body?.workflow_runs) ? body.workflow_runs : [];
+      if (
+        runs.some(run => {
+          const generationSha = productionControllerGenerationSha(run);
+          return generationSha != null && generationSha !== certifiedSha;
+        })
+      ) {
+        return {
+          inFlight: true,
+          reason: `production-controller-${status}`,
+        };
+      }
+    }
+    return { inFlight: false, reason: 'no-production-controller-inflight' };
+  } catch (error) {
+    return {
+      inFlight: null,
+      reason: `production-controller lookup failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    };
+  }
+}
+
+/**
  * @param {{
  *   readonly repo?: string;
  *   readonly headSha?: string | null;
@@ -136,7 +205,7 @@ export async function fetchDesktopPublishInFlight(input = {}) {
   const token = input.token ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  /** Prefer release-inflight over a false stamp result when observation is complete. */
+  /** Prefer release/controller-inflight over a false stamp when observation is complete. */
   const withReleaseFallback = async stampResult => {
     const release = await fetchDesktopReleaseInFlight({
       repo,
@@ -145,6 +214,15 @@ export async function fetchDesktopPublishInFlight(input = {}) {
       headers,
     });
     if (release.inFlight === true || release.inFlight == null) return release;
+    const controller = await fetchProductionControllerInFlight({
+      repo,
+      certifiedSha: input.headSha,
+      fetchImpl,
+      headers,
+    });
+    if (controller.inFlight === true || controller.inFlight == null) {
+      return controller;
+    }
     return stampResult;
   };
 
