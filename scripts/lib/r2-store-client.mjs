@@ -75,7 +75,13 @@ export function sigV4Authorization({
   return `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 }
 
-/** Signed request to one object in the private bucket (GET, HEAD or PUT). */
+/**
+ * Signed request to one object in the private bucket (GET, HEAD or PUT).
+ * @param {{ accountId: string, accessKeyId: string, secretAccessKey: string, bucket: string }} config
+ * @param {string} method
+ * @param {string} key
+ * @param {{ body?: Buffer | string, contentType?: string, fetchImpl?: typeof fetch, now?: Date }} [options]
+ */
 export function storeRequest(
   config,
   method,
@@ -108,6 +114,6 @@ export function storeRequest(
       authorization,
       ...(contentType ? { 'content-type': contentType } : {}),
     },
-    body,
+    body: /** @type {BodyInit | undefined} */ (/** @type {unknown} */ (body)),
   });
 }
