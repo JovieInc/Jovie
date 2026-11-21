@@ -243,13 +243,10 @@ export function suggestDeltaThemes(
     }
 
     const endsQuestion = /\?\s*$/.test(text.trim());
-    const whyQuestion =
-      /\b(question|menu|ask(?:s|ed|ing)?|which|clarif)/i.test(why);
-    if (
-      typeof next === 'number' &&
-      next < 2 &&
-      (endsQuestion || whyQuestion)
-    ) {
+    const whyQuestion = /\b(question|menu|ask(?:s|ed|ing)?|which|clarif)/i.test(
+      why
+    );
+    if (typeof next === 'number' && next < 2 && (endsQuestion || whyQuestion)) {
       questionIds.push(result.id);
     }
 
