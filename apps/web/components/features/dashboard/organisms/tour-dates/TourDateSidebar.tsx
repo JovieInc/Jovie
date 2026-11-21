@@ -8,6 +8,7 @@ import {
   ConfirmDialog,
   Input,
   Label,
+  PlainButton,
 } from '@jovie/ui';
 import { parseISO } from 'date-fns';
 import { Globe, MapPin } from 'lucide-react';
@@ -504,7 +505,7 @@ export function TourDateSidebar({
                 <div className='flex gap-2'>
                   {(['available', 'sold_out', 'cancelled'] as const).map(
                     status => (
-                      <button
+                      <PlainButton
                         key={status}
                         type='button'
                         onClick={() =>
@@ -524,7 +525,7 @@ export function TourDateSidebar({
                         {status === 'available' && 'On Sale'}
                         {status === 'sold_out' && 'Sold Out'}
                         {status === 'cancelled' && 'Cancelled'}
-                      </button>
+                      </PlainButton>
                     )
                   )}
                 </div>

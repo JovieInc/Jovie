@@ -117,6 +117,15 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/dashboard/organisms/tour-dates/TourDateSidebar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/dashboard/organisms/tour-dates/TourDatesTable.tsx": [
       "ds-owner",
       "tokens",
@@ -145,6 +154,24 @@
       "forced-caps"
     ],
     "apps/web/components/features/dashboard/tasks/TaskBoard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/DemoReleasesPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/landing/VoiceDemoVisual.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -211,8 +238,23 @@
       "offline": "Presentational dialog; network failures arrive as verificationError props (ErrorDnsNotFound story) and ownership conflicts as domain_already_claimed",
       "permission-denied": "Presentational dialog; network failures arrive as verificationError props (ErrorDnsNotFound story) and ownership conflicts as domain_already_claimed"
     },
+    "apps/web/components/features/dashboard/organisms/tour-dates/TourDateSidebar.tsx": {
+      "loading": "Analytics loading and error come from the useTourDateAnalyticsQuery hook inside the analytics card and are exercised in the unit test with a mocked hook; the form itself has no loading, error, offline or rtl-specific branch",
+      "error": "Analytics loading and error come from the useTourDateAnalyticsQuery hook inside the analytics card and are exercised in the unit test with a mocked hook; the form itself has no loading, error, offline or rtl-specific branch",
+      "offline": "Analytics loading and error come from the useTourDateAnalyticsQuery hook inside the analytics card and are exercised in the unit test with a mocked hook; the form itself has no loading, error, offline or rtl-specific branch",
+      "rtl-overflow": "Analytics loading and error come from the useTourDateAnalyticsQuery hook inside the analytics card and are exercised in the unit test with a mocked hook; the form itself has no loading, error, offline or rtl-specific branch"
+    },
     "apps/web/components/features/dashboard/release-tasks/ReleaseTaskCompactRow.tsx": {
       "empty": "A row always renders exactly one task; an empty list is rendered by the parent checklist"
+    },
+    "apps/web/components/features/demo/DemoReleasesPanel.tsx": {
+      "permission-denied": "Presentational demo panel driven by fixture props; it has no permission gating and no rtl-specific layout",
+      "rtl-overflow": "Presentational demo panel driven by fixture props; it has no permission gating and no rtl-specific layout"
+    },
+    "apps/web/components/features/landing/VoiceDemoVisual.tsx": {
+      "empty": "Self-contained local demo with fixed copy; it takes no data, so there is no empty, long-content or rtl-overflow variant",
+      "long-content": "Self-contained local demo with fixed copy; it takes no data, so there is no empty, long-content or rtl-overflow variant",
+      "rtl-overflow": "Self-contained local demo with fixed copy; it takes no data, so there is no empty, long-content or rtl-overflow variant"
     }
   }
 }
