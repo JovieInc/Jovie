@@ -233,8 +233,13 @@ export {
 export type {
   HostDrawnInputProps,
   HostDrawnSelectProps,
+  HostDrawnTextareaProps,
 } from './atoms/host-drawn-field';
-export { HostDrawnInput, HostDrawnSelect } from './atoms/host-drawn-field';
+export {
+  HostDrawnInput,
+  HostDrawnSelect,
+  HostDrawnTextarea,
+} from './atoms/host-drawn-field';
 export type {
   IconButtonFade,
   IconButtonName,
