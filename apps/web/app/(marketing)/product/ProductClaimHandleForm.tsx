@@ -8,7 +8,10 @@ import { HandleStatusIcon } from '@/components/features/home/claim-handle/Handle
 import { useHandleValidation } from '@/components/features/home/claim-handle/useHandleValidation';
 import { InputAuraFrame } from '@/components/features/home/InputAuraFrame';
 import { APP_ROUTES } from '@/constants/routes';
-import { buildClaimProfileStartHref } from '@/data/marketingCtaIntents';
+import {
+  buildHomepageClaimEntryHref,
+  isHomepageDisplayNamePrior,
+} from '@/data/homepageClaimEntry';
 import { cn } from '@/lib/utils';
 
 interface ProductClaimHandleFormProps {
@@ -44,32 +47,48 @@ export function ProductClaimHandleForm({
     if (earlyDraft) setHandle(earlyDraft.toLowerCase());
   }, []);
 
-  const unavailable = Boolean(handleError || availError || available === false);
+  const displayNamePrior = isHomepageDisplayNamePrior(handle);
+  // Format errors still show, but display-name priors remain claimable: they
+  // route to Spotify search instead of locking `handle=`.
+  const unavailable = Boolean(
+    (!displayNamePrior && handleError) || availError || available === false
+  );
   const statusVisible = Boolean(handle || formSubmitted);
-  const statusText = handleError
-    ? handleError
-    : checkingAvail
-      ? 'Checking availability…'
-      : availError
-        ? availError
-        : available === false
-          ? 'Handle already taken'
-          : available === true
-            ? `@${handle} is available. Select Claim to continue.`
-            : 'Use lowercase letters, numbers, or hyphens (3–24 chars).';
+  const statusText = displayNamePrior
+    ? 'We’ll look that name up on Spotify after you continue.'
+    : handleError
+      ? handleError
+      : checkingAvail
+        ? 'Checking availability…'
+        : availError
+          ? availError
+          : available === false
+            ? 'Handle already taken'
+            : available === true
+              ? `@${handle} is available. Select Claim to continue.`
+              : 'Use lowercase letters, numbers, or hyphens (3–24 chars).';
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormSubmitted(true);
 
-    const normalizedHandle = handle.trim().toLowerCase();
+    const raw = handle.trim();
+    // Display names (spaces / invalid handle chars) become a Spotify-search
+    // prior — never `handle=Taylor+Swift` (JOV-10127 entry hygiene).
+    if (raw && isHomepageDisplayNamePrior(raw)) {
+      setNavigating(true);
+      router.push(buildHomepageClaimEntryHref(raw));
+      return;
+    }
+
+    const normalizedHandle = raw.toLowerCase();
     if (!normalizedHandle || handleError) {
       inputRef.current?.focus();
       return;
     }
 
     setNavigating(true);
-    router.push(buildClaimProfileStartHref(normalizedHandle));
+    router.push(buildHomepageClaimEntryHref(normalizedHandle));
   }
 
   return (
@@ -127,7 +146,7 @@ export function ProductClaimHandleForm({
             type='submit'
             size='marketing'
             variant='primary'
-            disabled={navigating || Boolean(handleError)}
+            disabled={navigating || (Boolean(handleError) && !displayNamePrior)}
             data-testid={submitTestId}
             data-primary-action='true'
             aria-busy={checkingAvail || navigating}

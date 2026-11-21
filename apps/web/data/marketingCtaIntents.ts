@@ -1,5 +1,10 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
+import {
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+  USERNAME_PATTERN,
+} from '@/lib/validation/username-core';
 
 /**
  * Single shared CTA intent registry for public marketing surfaces.
@@ -31,6 +36,18 @@ export function buildClaimProfileStarterPrompt(handle?: string): string {
     : CLAIM_PROFILE_STARTER_PROMPT;
 }
 
+function normalizeClaimHrefHandle(handle?: string): string {
+  const candidate = handle?.trim().replace(/^@/, '').toLowerCase() ?? '';
+  if (
+    candidate.length < USERNAME_MIN_LENGTH ||
+    candidate.length > USERNAME_MAX_LENGTH ||
+    !USERNAME_PATTERN.test(candidate)
+  ) {
+    return '';
+  }
+  return candidate;
+}
+
 function buildOpenClaimProfileStartHref(trimmedHandle: string): string {
   const params = new URLSearchParams({
     starter_prompt: buildClaimProfileStarterPrompt(trimmedHandle),
@@ -39,8 +56,13 @@ function buildOpenClaimProfileStartHref(trimmedHandle: string): string {
   return `${APP_ROUTES.START}?${params.toString()}`;
 }
 
+/**
+ * Claim → `/start` href. Only emits `handle=` for values `/start` accepts;
+ * display names and invalid handle chars are dropped (use
+ * `buildHomepageClaimEntryHref` when the field may hold a search prior).
+ */
 export function buildClaimProfileStartHref(handle?: string): string {
-  return buildOpenClaimProfileStartHref(handle?.trim().replace(/^@/, '') ?? '');
+  return buildOpenClaimProfileStartHref(normalizeClaimHrefHandle(handle));
 }
 
 // Every claim enters the /start qualify chat (Tim 2026-09-28, JOV-3379): the

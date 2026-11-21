@@ -1,4 +1,8 @@
 import {
+  buildClaimProfileArtistSearchStarterPrompt,
+  isHomepageDisplayNamePrior,
+} from '@/data/homepageClaimEntry';
+import {
   buildClaimProfileStarterPrompt,
   CLAIM_PROFILE_STARTER_PROMPT,
 } from '@/data/marketingCtaIntents';
@@ -87,10 +91,18 @@ export function resolveStartEntryHandoff(
   if (!sanitizedPrompt) return null;
 
   const entryHandle = readStartEntryHandle(params);
+  const rawHandle = readSingleParam(params, 'handle');
+  // Homepage close historically posted display names as `handle=` (live:
+  // Taylor+Swift). Never lock that as a handle — rewrite to a Spotify search
+  // prior so identity stays on the picker path (JOV-10127 entry hygiene).
   const prompt =
     sanitizedPrompt === CLAIM_PROFILE_STARTER_PROMPT && entryHandle
       ? buildClaimProfileStarterPrompt(entryHandle)
-      : sanitizedPrompt;
+      : sanitizedPrompt === CLAIM_PROFILE_STARTER_PROMPT &&
+          rawHandle &&
+          isHomepageDisplayNamePrior(rawHandle)
+        ? buildClaimProfileArtistSearchStarterPrompt(rawHandle)
+        : sanitizedPrompt;
 
   const rawSpotifyUrl = readSingleParam(params, 'spotify_url');
   const spotifyUrl = rawSpotifyUrl
