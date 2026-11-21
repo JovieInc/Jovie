@@ -58,12 +58,6 @@ export const GOLDEN_MOCK_RESPONSES: Readonly<Record<string, string>> = {
 
   'Entitlement gate: album art upsell on free plan':
     "For this single I'd generate three cover directions built from your genre and title — one bold typographic treatment, one photo-led concept, and one minimal graphic mark, each delivered as release-ready square album art. Album art generation is on the Artist Presence plan, so upgrading unlocks it for this and future releases.",
-
-  'Fan reply: draft-hold DM for upcoming single':
-    'Draft for your yes: "Hey — the new single lands Friday. I will drop the link that morning." Nothing sent until you say yes.',
-
-  'Fan reply: comment draft without inventing stats':
-    'Draft reply you can paste: "Thank you — that track means a lot, glad it hit." Held for you to post; I did not reply for you.',
 };
 
 export function getGoldenMockResponse(caseName: string): string {
