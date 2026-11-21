@@ -483,5 +483,13 @@
       "evalGap": "measure with a mutation run on the campaign's target suites before and after",
       "screens": ["same-family-successor"]
     }
-  ]
+  ],
+  "successorPolicy": {
+    "note": "Auto-successor routing rule (JOV-13153, PENDING TIM CONFIRMATION on the +5% threshold): for the covered flash-tier models, switch to a clear successor automatically only when the blended per-token cost (input + output on the real usage mix) is at or below current, or at most +5% higher; otherwise refuse the switch and flag Tim with the delta. Missing pricing on either side refuses (fail closed). Trigger is event-driven only (Cloudflare changelog / deprecation notices or model-catalog change events) — never polling, never cron.",
+    "coveredModels": [
+      "zai/glm-5.3-flash",
+      "@cf/deepseek-ai/deepseek-v4.1-flash-1017"
+    ],
+    "sourceOfTruth": "apps/web/lib/ai/successor-policy.ts; config default mirrored in apps/web/lib/ai/routing.json successorPolicy (cross-checked by apps/web/tests/unit/lib/ai/successor-policy.test.ts)"
+  }
 }

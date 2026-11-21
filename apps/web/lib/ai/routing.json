@@ -200,5 +200,18 @@
   ],
   "gatewayUsdPerDayMax": {
     "oidc:jovie-eve-shadow": 0.9
+  },
+  "successorPolicy": {
+    "status": "draft-pending-tim-confirmation (JOV-13153): the auto-switch rule and the +5% threshold are Grok-relayed and NOT yet confirmed by Tim in his own words to Symphony. Nothing routes on this policy until the confirmation and the event trigger land.",
+    "rule": "When a covered model has a clear successor available (Cloudflare or elsewhere), route to the successor automatically without asking — spend guard first: compare blended per-token cost (input + output weighted by the real usage mix); switch only when the successor costs the same or less, or at most +5% above current (PENDING TIM CONFIRMATION). Above that, never switch silently — flag Tim with the price delta. Missing pricing on either side refuses and flags (fail closed).",
+    "coveredModels": [
+      "zai/glm-5.3-flash",
+      "@cf/deepseek-ai/deepseek-v4.1-flash-1017"
+    ],
+    "maxBlendedDeltaPct": 5,
+    "usageMix": { "inputTokens": 20000, "outputTokens": 1000 },
+    "trigger": "event-driven only: Cloudflare changelog / deprecation notices or model-catalog change events (repository_dispatch; the producer and workflow land via the Eve Runtime Owner's Mac/gh lane — proposed diff in the JOV-13153 PR body). Never polling, never cron, no feature flag.",
+    "flagTo": "Tim",
+    "sourceOfTruth": "apps/web/lib/ai/successor-policy.ts (pure decision + constants) and apps/web/tests/unit/lib/ai/successor-policy.test.ts (fail-closed guard). This block mirrors the module and is cross-checked by the test so it can never drift."
   }
 }
