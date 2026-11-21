@@ -294,10 +294,9 @@ extension View {
 }
 
 struct JoviePillButtonStyle: ButtonStyle {
-  /// Visible face projects web ActionButton KEEP (`JovieActionButtonMetrics.height`).
+  /// Projects `JovieActionButtonMetrics.height` (web KEEP 28).
   static let visibleHeight = JovieActionButtonMetrics.height
-  /// Hit target projects web ActionButton KEEP (`JovieActionButtonMetrics.hitTarget`).
-  /// The frame is applied after the pill is painted, so it adds no paint.
+  /// Projects `JovieActionButtonMetrics.hitTarget` (web KEEP 44). Frame after paint.
   static let minimumHitHeight = JovieActionButtonMetrics.hitTarget
   static let hitInset = JovieSpacing.small
   static let pressedOpacity: Double = 0.8

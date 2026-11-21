@@ -35,7 +35,7 @@ import {
   swiftColor,
   trustedPaintCeiling,
 } from './native-design-system.mjs';
-import { nativeDesignFixturePaths } from './native-design-system-fixture-paths.mjs';
+import { nativeDesignFixturePaths } from './native-design-system-action-button.mjs';
 
 const manifest = JSON.parse(readFileSync(resolve(ROOT, MANIFEST), 'utf8'));
 const palette = JSON.parse(
