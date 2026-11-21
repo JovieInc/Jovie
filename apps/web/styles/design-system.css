@@ -111,6 +111,11 @@
      retired), 28px nav/history rows, 16px sidebar icons. */
   --app-shell-sidebar-width: 224px;
   --app-shell-sidebar-icon-size: 1rem;
+  /* JOV-14004 optical stroke ladder (Lucide viewBox units). JS SoT:
+     apps/web/lib/design/icon-stroke.ts — keep values in sync. */
+  --icon-stroke-chrome: 1.5;
+  --icon-stroke-mid: 1.65;
+  --icon-stroke-feature: 1.75;
   --app-shell-sidebar-badge-font-size: 0.5rem;
   --app-shell-sidebar-history-font-size: 0.78125rem;
   /* One optical column from the rail. 12px inset, 8px icon gap, 28px rows.
