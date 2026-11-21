@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   type ReactNode,
@@ -131,7 +132,7 @@ export function MarketingSnapRail({
 
   const navButtons = (
     <>
-      <button
+      <PlainButton
         type='button'
         disabled={!scrollState.canScrollPrevious}
         aria-controls={railId}
@@ -142,8 +143,8 @@ export function MarketingSnapRail({
         className='marketing-snap-rail__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl transition-colors disabled:cursor-default disabled:opacity-35'
       >
         <ChevronLeft className='h-4 w-4 rtl:rotate-180' aria-hidden='true' />
-      </button>
-      <button
+      </PlainButton>
+      <PlainButton
         type='button'
         disabled={!scrollState.canScrollNext}
         aria-controls={railId}
@@ -154,7 +155,7 @@ export function MarketingSnapRail({
         className='marketing-snap-rail__nav-btn pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl transition-colors disabled:cursor-default disabled:opacity-35'
       >
         <ChevronRight className='h-4 w-4 rtl:rotate-180' aria-hidden='true' />
-      </button>
+      </PlainButton>
     </>
   );
 
@@ -212,7 +213,7 @@ export function MarketingSnapRail({
         {!showMobileControls ? (
           <div className='hidden sm:block lg:hidden'>
             <div className='sr-only focus-within:not-sr-only focus-within:absolute focus-within:left-6 focus-within:top-4 focus-within:z-20 focus-within:flex focus-within:gap-2'>
-              <button
+              <PlainButton
                 type='button'
                 disabled={!scrollState.canScrollPrevious}
                 aria-controls={railId}
@@ -223,8 +224,8 @@ export function MarketingSnapRail({
                 className='marketing-snap-rail__rail-btn min-h-11 min-w-11 rounded-full bg-(--color-cell-hover) px-3 py-2 text-xs font-semibold'
               >
                 Prev
-              </button>
-              <button
+              </PlainButton>
+              <PlainButton
                 type='button'
                 disabled={!scrollState.canScrollNext}
                 aria-controls={railId}
@@ -235,7 +236,7 @@ export function MarketingSnapRail({
                 className='marketing-snap-rail__rail-btn min-h-11 min-w-11 rounded-full bg-(--color-cell-hover) px-3 py-2 text-xs font-semibold'
               >
                 Next
-              </button>
+              </PlainButton>
             </div>
           </div>
         ) : null}
