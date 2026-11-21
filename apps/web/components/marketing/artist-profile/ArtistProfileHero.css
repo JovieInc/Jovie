@@ -1,5 +1,5 @@
-/* Artist Profiles reuses the homepage poster hero. These rules only size the
-   profile product stage that occupies its shared media slot. */
+/* Artist Profiles reuses the homepage poster hero. Split rules left-align
+   copy and keep one mode-morphing phone in the shared media slot. */
 
 .ap-hero {
   --homepage-header-height: 56px;
@@ -44,22 +44,69 @@
   opacity: 0.34;
 }
 
-.ap-hero__phone {
+.ap-hero__mode-switcher {
   position: relative;
   z-index: 2;
-  width: min(17.5rem, 74vw);
-  max-width: none;
-  margin: 2rem 0 -9rem;
+  width: min(22rem, 92vw);
+  margin: 1.5rem 0 2rem;
+  padding-inline: var(--space-3);
 }
 
-@media (min-width: 48rem) {
-  .ap-hero__product-stage {
-    min-height: 31rem;
+@media (min-width: 64rem) {
+  .ap-hero--split .homepage-poster-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(22rem, 0.95fr);
+    grid-template-rows: auto auto;
+    align-items: center;
+    justify-items: stretch;
+    column-gap: clamp(var(--space-10), 4vw, var(--space-16));
+    padding-inline: var(--homepage-page-gutter);
   }
 
-  .ap-hero__phone {
-    width: 19rem;
-    margin-bottom: -10.5rem;
+  .ap-hero--split .homepage-poster-hero__copy {
+    grid-column: 1;
+    grid-row: 1;
+    align-items: flex-start;
+    width: 100%;
+    max-width: 36rem;
+    text-align: left;
+  }
+
+  .ap-hero--split .homepage-poster-hero__actions {
+    justify-content: flex-start;
+  }
+
+  .ap-hero--split .homepage-poster-hero__seam {
+    grid-column: 1;
+    grid-row: 2;
+    width: min(28rem, 100%);
+    margin-block: var(--space-4) 0;
+  }
+
+  .ap-hero--split .homepage-poster-hero__media {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: stretch;
+    width: 100%;
+    min-height: 36rem;
+  }
+
+  .ap-hero--split .ap-hero__product-stage {
+    min-height: 100%;
+    align-items: center;
+    border-top: none;
+    background: transparent;
+  }
+
+  .ap-hero--split .ap-hero__mode-switcher {
+    width: min(20rem, 100%);
+    margin: 0;
+  }
+}
+
+@media (min-width: 48rem) and (max-width: 63.99rem) {
+  .ap-hero__product-stage {
+    min-height: 31rem;
   }
 }
 
@@ -70,5 +117,10 @@
 
   .ap-hero .homepage-poster-hero__headline {
     max-width: 12ch;
+  }
+
+  .ap-hero__mode-switcher {
+    width: min(18rem, 88vw);
+    margin-bottom: 1.25rem;
   }
 }

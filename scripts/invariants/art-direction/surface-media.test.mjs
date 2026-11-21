@@ -116,7 +116,7 @@ describe('surface media', () => {
     assert.deepEqual(registryProblems(registry), []);
     assert.deepEqual(
       registry.effects.map(effect => effect.id),
-      ['homepage-hero', 'marketing-hero-zoom']
+      ['homepage-hero', 'marketing-hero-zoom', 'artist-profile-mode-morph']
     );
     assert.equal(scopeIdFor(ZOOM), 'marketing-hero-zoom');
     assert.equal(scopeIdFor(`${MOTION}matte-field-gl.ts`), null);

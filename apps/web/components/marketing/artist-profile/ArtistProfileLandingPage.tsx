@@ -7,20 +7,16 @@ import { ARTIST_PROFILE_SECTION_TEST_IDS } from '@/data/artistProfilePageOrder';
 import type { LogoPlacement } from '@/data/product-truth/logo-permissions';
 import type { ArtistProfileSectionFlags } from '@/lib/featureFlags';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
-import { MarketingPlatformSpecBento } from '../MarketingPlatformSpecBento';
 import { MarketingShippedSitesShowcase } from '../MarketingShippedSitesShowcase';
 import { ArtistProfileCaptureSection } from './ArtistProfileCaptureSection';
-import { ArtistProfileFaq } from './ArtistProfileFaq';
 import { ArtistProfileFinalCta } from './ArtistProfileFinalCta';
 import { ArtistProfileHero } from './ArtistProfileHero';
 import { ArtistProfileHeroAdaptiveIntro } from './ArtistProfileHeroAdaptiveIntro';
 import { ArtistProfileHowItWorks } from './ArtistProfileHowItWorks';
-import { ArtistProfileOpinionatedSection } from './ArtistProfileOpinionatedSection';
 import { ArtistProfileOutcomesCarousel } from './ArtistProfileOutcomesCarousel';
 import { ArtistProfilePhoneFrame } from './ArtistProfilePhoneFrame';
 import { ArtistProfileSectionHeader } from './ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from './ArtistProfileSectionShell';
-import { ArtistProfileReleaseCycleGallery } from './ArtistProfileSocialProof';
 
 const LIVE_PROFILE = getMarketingExportImage('tim-white-profile-live-mobile');
 
@@ -181,6 +177,7 @@ interface ArtistProfileLandingPageProps {
   readonly logoPlacement: LogoPlacement;
 }
 
+/** Six-section artist LP (JOV-14242). Matches /solutions/artists composition. */
 export function ArtistProfileLandingPage({
   copy,
   flags,
@@ -189,7 +186,7 @@ export function ArtistProfileLandingPage({
   if (!flags.FULL_PAGE) {
     return (
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.hero}>
-        <ArtistProfileHero hero={copy.hero} />
+        <ArtistProfileHero hero={copy.hero} adaptive={copy.adaptive} />
       </div>
     );
   }
@@ -210,32 +207,12 @@ export function ArtistProfileLandingPage({
           id='capture-every-fan'
         />
       </div>
-      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.opinionated}>
-        <ArtistProfileOpinionatedSection opinionated={copy.opinionated} />
-      </div>
-      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.specWall}>
-        <ArtistProfileAnnotatedTruth specWall={copy.specWall} />
+      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.howItWorks}>
+        <ArtistProfileHowItWorks howItWorks={copy.howItWorks} />
       </div>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.showcase}>
         <MarketingShippedSitesShowcase testId='artist-profile-shipped-sites-showcase' />
       </div>
-      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.specBento}>
-        <MarketingPlatformSpecBento testId='artist-profile-platform-spec-bento' />
-      </div>
-      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.howItWorks}>
-        <ArtistProfileHowItWorks howItWorks={copy.howItWorks} />
-      </div>
-      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.releaseCycle}>
-        <ArtistProfileReleaseCycleGallery
-          releaseCycle={copy.releaseCycle}
-          id='bring-them-back-automatically'
-        />
-      </div>
-      {flags.FAQ ? (
-        <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.faq}>
-          <ArtistProfileFaq faq={copy.faq} />
-        </div>
-      ) : null}
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.finalCta}>
         <ArtistProfileFinalCta finalCta={copy.finalCta} />
       </div>

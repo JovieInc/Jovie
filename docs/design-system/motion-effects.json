@@ -34,6 +34,28 @@
         "fpsCap": null,
         "pausesOffscreen": false
       }
+    },
+    {
+      "id": "artist-profile-mode-morph",
+      "summary": "Artist LP mode switcher morphs one profile phone between modes via React ViewTransition; static in-place swap when reduced-motion.",
+      "files": [
+        "apps/web/components/marketing/artist-profile/ArtistProfileModeSwitcher.tsx"
+      ],
+      "fallback": "static|data-reduced-motion|ViewTransition|transitionClass",
+      "reducedMotion": {
+        "marker": "useReducedMotion",
+        "requiredIn": [
+          "apps/web/components/marketing/artist-profile/ArtistProfileModeSwitcher.tsx"
+        ]
+      },
+      "budget": {
+        "gzipBytes": 8192,
+        "perFileGzipBytes": {
+          "apps/web/components/marketing/artist-profile/ArtistProfileModeSwitcher.tsx": 8192
+        },
+        "fpsCap": null,
+        "pausesOffscreen": false
+      }
     }
   ]
 }
