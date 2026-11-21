@@ -55,3 +55,27 @@ export const ConfirmingInFlight: Story = {
     isConfirming: true,
   },
 };
+
+export const LoadingRejecting: Story = {
+  args: { isRejecting: true },
+};
+
+export const EmptyNoIsrcMatches: Story = {
+  args: { matchingIsrcCount: 0, confidenceScore: 0.12 },
+};
+
+export const PartialNoLinkOrBreakdown: Story = {
+  args: { externalArtistUrl: null, confidenceBreakdown: undefined },
+};
+
+export const LongContentArtistName: Story = {
+  args: {
+    externalArtistName:
+      'The Extraordinarily Long Named Midnight Orchestra Featuring Many Special Guests',
+    matchingIsrcCount: 1284,
+  },
+};
+
+export const RtlArtistName: Story = {
+  args: { externalArtistName: 'فرقة منتصف الليل' },
+};
