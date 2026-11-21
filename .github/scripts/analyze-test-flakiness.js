@@ -1,17 +1,9 @@
 #!/usr/bin/env node
 
 /**
- * Test Flakiness Analyzer
- *
- * Analyzes Playwright test results from CI runs to identify flaky tests.
- * Tracks failure rates, retry rates, and generates actionable reports.
- *
- * Usage:
- *   node analyze-test-flakiness.js <github-token> <owner> <repo>
- *
- * Environment:
- *   - GITHUB_TOKEN: GitHub API token (or passed as arg)
- *   - GITHUB_REPOSITORY: owner/repo (or passed as args)
+ * Test Flakiness Analyzer — Playwright CI results, failure/retry rates, reports.
+ * Usage: node analyze-test-flakiness.js <github-token> <owner> <repo>
+ * Env: GITHUB_TOKEN / GITHUB_REPOSITORY (or args).
  */
 
 const fs = require('fs');
@@ -690,31 +682,21 @@ async function analyzeFlakiness(token, owner, repo, options = {}) {
 
   const svRuns = await fetchSourceValidationRuns(token, owner, repo);
   const unitRuns = [...runs, ...svRuns];
+  // SV without unit-flaky-* never ran units — omit from runsAnalyzed.
   const unitFlakeRuns = await runsWithUnitFlakeArtifacts(
-    token,
-    owner,
-    repo,
-    unitRuns
+    token, owner, repo, unitRuns
   );
   const unitStats = await collectCachedUnitRetryFlakes(
     unitFlakeRuns,
     `${owner}/${repo}`,
     options.download ? { download: options.download } : {}
   );
-
-  // CI runs always count in the unit-retry denominator. Source Validation
-  // runs that never uploaded unit-flaky-* (docs-only / label-reuse / skipped
-  // unit shards) cannot contribute retries, so counting them dilutes
-  // retryRate and severity (Sentry LOW on #26281 / JOV-12621 follow-up).
-  const svRunIds = new Set(svRuns.map(run => run.id));
-  const svRunsWithUnitFlaky = unitFlakeRuns.filter(run =>
-    svRunIds.has(run.id)
-  ).length;
-
+  const svIds = new Set(svRuns.map(r => r.id));
   return {
     testStats,
     unitStats,
-    unitRunsAnalyzed: runs.length + svRunsWithUnitFlaky,
+    unitRunsAnalyzed:
+      runs.length + unitFlakeRuns.filter(r => svIds.has(r.id)).length,
     sourceValidationRunsAnalyzed: svRuns.length,
     totalRuns,
     runsWithRetries,
