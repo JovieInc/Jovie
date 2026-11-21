@@ -1,5 +1,23 @@
 {
   "gates": {
+    "apps/web/components/features/dashboard/organisms/SettingsTouringSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/SidebarLinkInput.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/dashboard/organisms/socials-form/SocialLinkSuggestionRows.tsx": [
       "ds-owner",
       "tokens",
@@ -27,6 +45,15 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/demo/DemoReleaseDetail.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/demo/DemoReleaseLandingSurface.tsx": [
       "ds-owner",
       "tokens",
@@ -44,9 +71,46 @@
       "a11y",
       "frontend-rules",
       "forced-caps"
+    ],
+    "apps/web/components/features/demo/DemoSettingsPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/DemoShowcaseSurface.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/FounderDemoRecordingSurface.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ]
   },
   "waivers": {
+    "apps/web/components/features/dashboard/organisms/SettingsTouringSection.tsx": {
+      "loading": "Loading, error and offline come from the connection query and server actions and are covered in SettingsTouringSection.test.tsx with a mocked query; a seeded-cache story cannot hold a fetch open or fail it.",
+      "error": "Loading, error and offline come from the connection query and server actions and are covered in SettingsTouringSection.test.tsx with a mocked query; a seeded-cache story cannot hold a fetch open or fail it.",
+      "offline": "Loading, error and offline come from the connection query and server actions and are covered in SettingsTouringSection.test.tsx with a mocked query; a seeded-cache story cannot hold a fetch open or fail it."
+    },
+    "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/SidebarLinkInput.tsx": {
+      "empty": "The field starts empty by design (the Empty state is the initial render) and its text is user-typed; long and right-to-left input is exercised in SidebarLinkInput.test.tsx, since the field is a single unwrapped input that cannot overflow its container.",
+      "long-content": "The field starts empty by design (the Empty state is the initial render) and its text is user-typed; long and right-to-left input is exercised in SidebarLinkInput.test.tsx, since the field is a single unwrapped input that cannot overflow its container.",
+      "rtl-overflow": "The field starts empty by design (the Empty state is the initial render) and its text is user-typed; long and right-to-left input is exercised in SidebarLinkInput.test.tsx, since the field is a single unwrapped input that cannot overflow its container."
+    },
     "apps/web/components/features/dashboard/organisms/socials-form/SocialsForm.tsx": {
       "loading": "Loading, error and offline come from the TanStack query and mutation state (an in-flight or failed fetch), which a seeded-cache story cannot hold open; SocialsForm.test.tsx covers the loading skeleton and the error banner with a mocked hook.",
       "error": "Loading, error and offline come from the TanStack query and mutation state (an in-flight or failed fetch), which a seeded-cache story cannot hold open; SocialsForm.test.tsx covers the loading skeleton and the error banner with a mocked hook.",
@@ -56,6 +120,11 @@
       "empty": "Fixed demo fixture: the artist, releases and links are authored constants in source (a catalog of one featured release), so empty, overlong or right-to-left runtime content cannot reach this surface.",
       "long-content": "Fixed demo fixture: the artist, releases and links are authored constants in source (a catalog of one featured release), so empty, overlong or right-to-left runtime content cannot reach this surface.",
       "rtl-overflow": "Fixed demo fixture: the artist, releases and links are authored constants in source (a catalog of one featured release), so empty, overlong or right-to-left runtime content cannot reach this surface."
+    },
+    "apps/web/components/features/demo/DemoReleaseDetail.tsx": {
+      "empty": "Demo drawer fed by the authored demo release fixtures: the release, activity and comment draft are constants, so empty, overlong or right-to-left runtime content cannot reach it.",
+      "long-content": "Demo drawer fed by the authored demo release fixtures: the release, activity and comment draft are constants, so empty, overlong or right-to-left runtime content cannot reach it.",
+      "rtl-overflow": "Demo drawer fed by the authored demo release fixtures: the release, activity and comment draft are constants, so empty, overlong or right-to-left runtime content cannot reach it."
     },
     "apps/web/components/features/demo/DemoReleaseLandingSurface.tsx": {
       "empty": "Static capture surface fed only by the authored demo release and persona; no empty, overlong, permission-gated or right-to-left runtime input exists.",
@@ -67,6 +136,11 @@
       "empty": "Static capture surface: the UTM presets and release row come from authored demo constants, so empty, overlong or right-to-left runtime content cannot reach it.",
       "long-content": "Static capture surface: the UTM presets and release row come from authored demo constants, so empty, overlong or right-to-left runtime content cannot reach it.",
       "rtl-overflow": "Static capture surface: the UTM presets and release row come from authored demo constants, so empty, overlong or right-to-left runtime content cannot reach it."
+    },
+    "apps/web/components/features/demo/DemoSettingsPanel.tsx": {
+      "empty": "Settings and capture cards render authored demo copy and a fixed platform list; empty, overlong or right-to-left runtime content cannot reach them.",
+      "long-content": "Settings and capture cards render authored demo copy and a fixed platform list; empty, overlong or right-to-left runtime content cannot reach them.",
+      "rtl-overflow": "Settings and capture cards render authored demo copy and a fixed platform list; empty, overlong or right-to-left runtime content cannot reach them."
     }
   }
 }

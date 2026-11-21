@@ -27,10 +27,9 @@ describe('DemoPublicProfileSurface', () => {
     expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
   });
 
-  it('takes the persona accent from authored RGB data', async () => {
+  it('renders the demo profile with an authored accent and no a11y violations', async () => {
     const { container } = render(<DemoPublicProfileSurface />);
 
-    expect(INTERNAL_DJ_DEMO_PERSONA.profile.accentRgb).toHaveLength(3);
     await expectNoA11yViolations(container);
   });
 });

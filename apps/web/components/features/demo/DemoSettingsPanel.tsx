@@ -1,8 +1,8 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Switch } from '@jovie/ui';
 import { useSearchParams } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { type ReactNode, useId } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
@@ -61,7 +61,7 @@ export function DemoSettingsPanel() {
             {PLATFORM_CONNECTIONS.map(platform => (
               <div
                 key={platform.name}
-                className='flex items-center justify-between gap-4 border-b border-[color-mix(in_oklab,var(--app-shell-border)_72%,transparent)] px-2 py-2.5 last:border-b-0'
+                className='flex items-center justify-between gap-4 border-b border-subtle px-2 py-2.5 last:border-b-0'
               >
                 <div className='flex min-w-0 items-center gap-2'>
                   <span
@@ -123,7 +123,7 @@ function AudienceQualityCaptureCard() {
   return (
     <div className='mx-auto max-w-220 px-4 py-4 sm:px-5 sm:py-5'>
       <div
-        className='overflow-hidden rounded-3xl border border-subtle bg-surface-0 shadow-[0_24px_80px_rgba(0,0,0,0.28)]'
+        className='overflow-hidden rounded-3xl border border-subtle bg-surface-0 shadow-popover'
         data-testid='demo-settings-audience-quality-capture'
       >
         <div className='border-b border-subtle px-5 py-4'>
@@ -138,14 +138,14 @@ function AudienceQualityCaptureCard() {
                 traffic, repeat self-visits, and low-signal activity.
               </p>
             </div>
-            <span className='rounded-full border border-[color:color-mix(in_srgb,var(--color-success)_38%,transparent)] bg-[color:color-mix(in_srgb,var(--color-success)_16%,transparent)] px-3 py-1 text-xs font-semibold text-primary-token'>
+            <span className='rounded-full bg-[color:color-mix(in_srgb,var(--color-success)_16%,transparent)] px-3 py-1 text-xs font-semibold text-primary-token'>
               Active
             </span>
           </div>
         </div>
 
-        <div className='grid gap-0 border-t border-subtle md:grid-cols-[minmax(0,0.92fr)_minmax(18rem,0.78fr)]'>
-          <div className='border-b border-subtle p-5 md:border-b-0 md:border-r'>
+        <div className='grid gap-0 md:grid-cols-[minmax(0,0.92fr)_minmax(18rem,0.78fr)]'>
+          <div className='p-5'>
             <div className='space-y-3'>
               <QualitySignalRow
                 label='Filter Self Visits'
@@ -169,7 +169,7 @@ function AudienceQualityCaptureCard() {
           </div>
 
           <div className='p-5'>
-            <div className='rounded-2xl border border-subtle bg-surface-1 p-4'>
+            <div className='rounded-2xl bg-surface-1 p-4'>
               <div className='flex items-start justify-between gap-4'>
                 <div>
                   <p className='text-app font-semibold text-primary-token'>
@@ -203,7 +203,7 @@ function SyncSettingsCaptureCard() {
   return (
     <div className='mx-auto max-w-190 px-4 py-4 sm:px-5 sm:py-5'>
       <div
-        className='overflow-hidden rounded-3xl border border-subtle bg-surface-0 shadow-[0_24px_80px_rgba(0,0,0,0.28)]'
+        className='overflow-hidden rounded-3xl border border-subtle bg-surface-0 shadow-popover'
         data-testid='demo-settings-sync-capture'
       >
         <div className='border-b border-subtle px-5 py-4'>
@@ -218,7 +218,7 @@ function SyncSettingsCaptureCard() {
         </div>
 
         <div className='space-y-3 p-5'>
-          <div className='rounded-2xl border border-subtle bg-surface-1 p-4'>
+          <div className='rounded-2xl bg-surface-1 p-4'>
             <div className='flex items-start justify-between gap-4'>
               <div>
                 <p className='text-app font-semibold text-primary-token'>
@@ -238,7 +238,7 @@ function SyncSettingsCaptureCard() {
             <SyncSurfacePill label='Profile Pages' value='Updated' />
           </div>
 
-          <div className='rounded-2xl border border-subtle bg-surface-1 p-4'>
+          <div className='rounded-2xl bg-surface-1 p-4'>
             <p className='text-xs font-semibold text-secondary-token'>
               Connected surfaces
             </p>
@@ -275,9 +275,13 @@ function AlwaysInSyncToggle() {
       <span className='text-xs font-semibold text-primary-token'>
         Always In Sync
       </span>
-      <span className='flex h-7 w-12 items-center rounded-full bg-accent px-1 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]'>
-        <span className='ml-auto h-5 w-5 rounded-full bg-white shadow-[0_2px_8px_rgba(0,0,0,0.22)] dark:bg-white' />
-      </span>
+      <Switch
+        defaultChecked
+        aria-label='Always in sync'
+        onCheckedChange={() =>
+          runDemoAction({ successMessage: 'Setting updated (demo).' })
+        }
+      />
     </div>
   );
 }
@@ -294,7 +298,7 @@ function QualitySignalRow({
   tone: 'success' | 'neutral';
 }>) {
   return (
-    <div className='rounded-2xl border border-subtle bg-surface-1 p-4'>
+    <div className='rounded-2xl bg-surface-1 p-4'>
       <div className='flex items-start justify-between gap-3'>
         <div>
           <p className='text-app font-semibold text-primary-token'>{label}</p>
@@ -340,7 +344,7 @@ function SyncSurfacePill({
   value: string;
 }>) {
   return (
-    <div className='rounded-2xl border border-subtle bg-surface-1 px-3 py-3'>
+    <div className='rounded-2xl bg-surface-1 px-3 py-3'>
       <p className='text-2xs font-semibold tracking-tight text-secondary-token'>
         {label}
       </p>
@@ -359,13 +363,7 @@ function SettingsSection({
   bordered?: boolean;
 }>) {
   return (
-    <section
-      className={
-        bordered
-          ? 'border-t border-[color-mix(in_oklab,var(--app-shell-border)_72%,transparent)]'
-          : ''
-      }
-    >
+    <section className={bordered ? 'border-t border-subtle' : ''}>
       <ContentSectionHeader
         title={title}
         variant='plain'
@@ -400,23 +398,24 @@ function ToggleRow({
   description: string;
   defaultChecked: boolean;
 }>) {
+  const controlId = useId();
+
   return (
-    <label
-      aria-label={label}
-      className='flex cursor-pointer items-start justify-between gap-3 border-b border-[color-mix(in_oklab,var(--app-shell-border)_72%,transparent)] py-2.5 last:border-b-0'
-    >
-      <div>
-        <p className='text-app font-caption text-primary-token'>{label}</p>
-        <p className='text-xs text-tertiary-token'>{description}</p>
-      </div>
-      <input
-        type='checkbox'
+    <div className='flex items-start justify-between gap-3 border-b border-subtle py-2.5 last:border-b-0'>
+      <label htmlFor={controlId} className='cursor-pointer'>
+        <span className='block text-app font-caption text-primary-token'>
+          {label}
+        </span>
+        <span className='block text-xs text-tertiary-token'>{description}</span>
+      </label>
+      <Switch
+        id={controlId}
         defaultChecked={defaultChecked}
-        className='mt-0.5 size-4 shrink-0 rounded-sm accent-(--color-accent)'
-        onChange={() =>
+        aria-label={label}
+        onCheckedChange={() =>
           runDemoAction({ successMessage: 'Setting updated (demo).' })
         }
       />
-    </label>
+    </div>
   );
 }

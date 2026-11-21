@@ -1,6 +1,8 @@
-import { act, render } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { FounderDemoRecordingSurface } from './FounderDemoRecordingSurface';
 
 const motionPreference = vi.hoisted(() => ({ reduced: true }));
@@ -18,7 +20,7 @@ vi.mock('@/features/demo/DemoTimWhiteProfileSurface', () => ({
   DemoTimWhiteProfileSurface: () => null,
 }));
 vi.mock('@/components/shell/ThreadView', () => ({
-  ThreadView: () => null,
+  ThreadView: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 vi.mock('@/components/jovie/components/ChatInput', () => ({
   ChatInput: () => null,
@@ -55,5 +57,29 @@ describe('Founder demo reduced motion', () => {
     rerender(<FounderDemoRecordingSurface />);
     expect(cancelFrame).toHaveBeenCalledWith(7);
     expect(requestFrame).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('Founder demo approval step', () => {
+  it('shows the Approve drop button mid-timeline and keeps it inert to clicks', async () => {
+    const user = userEvent.setup();
+    motionPreference.reduced = false;
+    let tick: FrameRequestCallback | undefined;
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+      tick = callback;
+      return 1;
+    });
+    const now = vi.spyOn(performance, 'now');
+    now.mockReturnValue(0);
+    const { container } = render(<FounderDemoRecordingSurface />);
+
+    now.mockReturnValue(50_000);
+    act(() => tick?.(50_000));
+
+    const approve = screen.getByRole('button', { name: 'Approve drop' });
+    await user.click(approve);
+    expect(approve).toBeInTheDocument();
+    expect(approve.className).not.toContain('--linear-btn');
+    await expectNoA11yViolations(container);
   });
 });

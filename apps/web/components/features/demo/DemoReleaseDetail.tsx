@@ -1,6 +1,6 @@
 'use client';
 
-import { IconButton } from '@jovie/ui';
+import { CompositeField, HostDrawnTextarea, IconButton } from '@jovie/ui';
 import { MessageSquare, Paperclip, SendHorizontal, X } from 'lucide-react';
 import {
   DrawerButton,
@@ -189,13 +189,22 @@ export function DemoReleaseDetail({
               <label htmlFor='release-comment' className='sr-only'>
                 Add comment
               </label>
-              <textarea
-                id='release-comment'
-                rows={3}
-                readOnly
-                value='Leave a short update for your team. Demo comments stay local to this preview.'
-                className='w-full resize-none bg-transparent text-xs leading-[1.45] text-secondary-token outline-none placeholder:text-tertiary-token'
-              />
+              <div className='text-xs leading-[1.45] text-secondary-token'>
+                <CompositeField
+                  shape='md'
+                  size='sm'
+                  surface='none'
+                  className='h-auto items-start'
+                >
+                  <HostDrawnTextarea
+                    id='release-comment'
+                    rows={3}
+                    readOnly
+                    value='Leave a short update for your team. Demo comments stay local to this preview.'
+                    className='w-full resize-none bg-transparent'
+                  />
+                </CompositeField>
+              </div>
               <div className='mt-2 flex items-center justify-between border-t border-subtle/65 pt-2'>
                 <div className='inline-flex items-center gap-1.5 text-2xs text-tertiary-token'>
                   <MessageSquare className='size-3.5' aria-hidden />
