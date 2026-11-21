@@ -225,10 +225,10 @@ const BLOBLESS_BASE_FETCH_JOBS = new Set([
   'ci-exact-head-coverage-shard',
   'ci-exact-head-coverage',
   'ci-profile-admission-browser',
-  'ci-fast-remaining',
+  'ci-fast-remaining-shards',
 ]);
 
-const BACKGROUND_BASE_FETCH_JOBS = new Set(['ci-fast-remaining']);
+const BACKGROUND_BASE_FETCH_JOBS = new Set(['ci-fast-remaining-shards']);
 
 describe('merge_group workflow contract', () => {
   it('runs the web build for changelog-only releases without turning ordinary docs into builds', () => {
@@ -307,7 +307,7 @@ describe('merge_group workflow contract', () => {
     );
 
     const consumers =
-      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-fast-structural-lanes ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes drizzle-migration-guard';
+      'ci-fast-typecheck ci-fast-remaining-shards ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-fast-structural-lanes-shards ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes drizzle-migration-guard';
     for (const jobId of consumers.split(' ')) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
       expect(job, jobId).toContain('ci-merge-group-workspace');
@@ -573,7 +573,7 @@ describe('merge_group workflow contract', () => {
       admissionTimeoutMinutes * 60_000 - MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS
     ).toBeGreaterThanOrEqual(MERGE_GROUP_ADMISSION_WAIT_MS + 90_000);
 
-    for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
+    for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining-shards']) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
       expect(job, jobId).toContain('ci-merge-group-admission');
       expect(job, jobId).toMatch(/if: (&[\w-]+ )?>-\s+!cancelled\(\) &&/);
@@ -587,10 +587,14 @@ describe('merge_group workflow contract', () => {
       );
     }
 
-    const remaining = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining');
+    const remaining = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining-shards');
     expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
     expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
-    expect(remaining).toContain('github.event_name }}" != "pull_request"');
+    // JOV-12618: PRs path-gate; docs-only merge groups may skip; else skip=false.
+    expect(remaining).toContain('github.event_name }}" == "pull_request"');
+    expect(remaining).toContain(
+      '"${{ github.event_name }}" == "merge_group" && "${STRUCTURAL_DOCS_ONLY:-}" == "true"'
+    );
     expect(remaining).toContain('echo "skip=false"');
     expect(remaining).toContain('apps/web/\\.storybook/');
     expect(remaining).toContain('apps/web/package\\.json$');
@@ -1104,9 +1108,10 @@ describe('merge_group workflow contract', () => {
     );
     expect(macos).toContain("needs.mac.outputs.run_hosted == 'true'");
     // Node-only web inputs run the Mac lane's node checks on ubuntu; swift
-    // and the MenuMonitor artifact stay macOS-only.
+    // and the MenuMonitor artifact stay macOS-only. Queue-proven main recovers
+    // native via ci-apple-post-queue when Path Changes was skipped.
     expect(macosCaller).toContain(
-      "native: ${{ needs.ci-path-changes.outputs.run_macos_native != 'false' }}"
+      "native: ${{ (needs.ci-apple-post-queue.outputs.run_macos_native || needs.ci-path-changes.outputs.run_macos_native) != 'false' }}"
     );
     expect(CI_WORKFLOW).toContain(
       "run_macos_native: ${{ steps.detect.outputs.run_macos_native || 'true' }}"
@@ -1270,7 +1275,7 @@ describe('merge_group workflow contract', () => {
 
   it('fetches only HEAD ancestry and the base branch for diff-base jobs', () => {
     for (const jobId of [
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser',
       'ci-exact-head-coverage-shard',
       'ci-exact-head-coverage',
@@ -1309,7 +1314,7 @@ describe('merge_group workflow contract', () => {
   });
 
   it('overlaps the full ci-fast (remaining) base fetch with dependency install and fails closed', () => {
-    const job = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining');
+    const job = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining-shards');
     const start = getStepRunScript(job, 'Start base-branch history fetch');
     const wait = getStepRunScript(job, 'Fetch base-branch history');
     const startAt = job.indexOf('- name: Start base-branch history fetch');
@@ -2003,14 +2008,22 @@ describe('merge_group workflow contract', () => {
     expect(units).toContain("outputs.run_web == 'true'");
     expect(buildLayout).toContain("outputs.run_web == 'true'");
     expect(ios).toContain("outputs.run_ios == 'true'");
+    expect(ios).toContain('ci-apple-post-queue');
+    expect(ios).toContain(
+      "needs.ci-apple-post-queue.outputs.run_ios == 'true'"
+    );
     expect(macos).toContain("outputs.run_macos == 'true'");
+    expect(macos).toContain('ci-apple-post-queue');
+    expect(macos).toContain(
+      "needs.ci-apple-post-queue.outputs.run_macos == 'true'"
+    );
     expect(crossProduct).toContain("outputs.run_cross_product == 'true'");
     expect(
       getStepRunScript(crossProduct, 'Run model-free shared contracts')
         .trim()
         .split('\n')
     ).toContain('pnpm --filter @jovie/release-channel-contracts test');
-    expect(getJobBlock(CI_WORKFLOW, 'ci-fast-remaining')).toContain(
+    expect(getJobBlock(CI_WORKFLOW, 'ci-fast-remaining-shards')).toContain(
       'CI_PRODUCT_LANES: ${{ needs.ci-path-changes.outputs.selected_lanes }}'
     );
     expect(aggregate).toContain(
@@ -2382,6 +2395,44 @@ ${selectedGateScript}`,
     expect(iosCaller).toContain(
       "concurrency-key: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || '' }}"
     );
+  });
+
+  it('recovers path-selected Apple lanes on queue-proven main (post-queue)', () => {
+    const apple = getJobBlock(CI_WORKFLOW, 'ci-apple-post-queue');
+    const ios = getJobBlock(CI_WORKFLOW, 'ci-ios');
+    const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
+    const release = getJobBlock(CI_WORKFLOW, 'main-release-ready');
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+
+    expect(apple).toContain("queue_proven == 'true'");
+    expect(apple).toContain('apple-post-queue-selection.mjs');
+    expect(apple).toContain('product-lane-classifier.mjs');
+    expect(apple).toContain('actions/setup-node@');
+    expect(apple).toContain("node-version-file: '.nvmrc'");
+    expect(apple).toContain(
+      "run_ios: ${{ steps.classify.outputs.run_ios || 'false' }}"
+    );
+    expect(ios).toContain('ci-apple-post-queue');
+    expect(macos).toContain('ci-apple-post-queue');
+    expect(release).toContain('ci-apple-post-queue');
+    expect(release).toContain('Queue-proven main deferred');
+    expect(release).not.toContain('"iOS Fast Unit + Coverage:$IOS_RESULT"');
+    // Queue still drops Apple lanes; only selected ones are recorded as deferred.
+    expect(pathChanges).toContain(
+      'merge queue does not wait on the hosted macOS pool'
+    );
+    expect(pathChanges).toContain('($selected | index($lane)) != null');
+  });
+
+  it('runs JovieMac Release boundary only on full regression', () => {
+    const iosGate = getJobBlock(IOS_CI_WORKFLOW, 'test');
+    const macBoundary = getStepBlock(
+      iosGate,
+      'Test native Mac development boundary'
+    );
+    expect(macBoundary).toContain('mac_configurations=(Debug)');
+    expect(macBoundary).toContain('mac_configurations=(Debug Release)');
+    expect(macBoundary).toContain('inputs.full-regression');
   });
 
   it('avoids redundant SwiftPM uploads on persistent Mac runners (JOV-7346)', () => {

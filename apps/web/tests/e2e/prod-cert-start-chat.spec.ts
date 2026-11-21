@@ -7,6 +7,7 @@ import {
   PASSAGE_TOKEN_HEADER,
 } from '@/lib/synthetic/passage-token';
 import {
+  resolveExpectedMinCatalogReleases,
   SHARED_E2E_ARTIST_POOL,
   selectUnclaimedCertArtist,
 } from '@/lib/synthetic/prodcert-artist-fixture';
@@ -222,6 +223,8 @@ test('anonymous /start reaches a real catalog preview on production', async ({
         )
         .filter({ visible: true })
         .first();
+      const expectedMinReleases =
+        resolveExpectedMinCatalogReleases(TEST_ARTIST);
       let releases = 0;
       await expect
         .poll(
@@ -229,18 +232,26 @@ test('anonymous /start reaches a real catalog preview on production', async ({
             releases = Number(
               (await rail.getAttribute('data-catalog-releases')) ?? 0
             );
-            return releases;
+            return Number.isFinite(releases) ? releases : -1;
           },
-          { timeout: 60_000, message: 'preview showed no real release' }
+          {
+            timeout: 60_000,
+            message:
+              expectedMinReleases > 0
+                ? 'preview showed no real release'
+                : 'preview did not report catalog release count',
+          }
         )
-        .toBeGreaterThanOrEqual(1);
+        .toBeGreaterThanOrEqual(expectedMinReleases);
       const checkoutLinks = await page
         .locator('a[href^="/onboarding/checkout"]')
         .count();
       expect(checkoutLinks, 'pricing rendered before the preview').toBe(0);
-      // Truthful preview: painted portrait and artwork, filled required fields,
-      // no forced caps.
-      await expectPreviewMediaPainted(rail);
+      // Truthful preview: painted portrait and (when catalog releases exist)
+      // release artwork, filled required fields, no forced caps.
+      if (releases > 0) {
+        await expectPreviewMediaPainted(rail);
+      }
       await expectRequiredFieldsPainted(rail);
       await expectNoForcedCaps(page.locator('main'));
 
@@ -258,7 +269,9 @@ test('anonymous /start reaches a real catalog preview on production', async ({
           'phone showed no inline preview of the draft profile'
         ).toBeVisible({ timeout: 15_000 });
         await phoneRail.scrollIntoViewIfNeeded();
-        await expectPreviewMediaPainted(phoneRail);
+        if (releases > 0) {
+          await expectPreviewMediaPainted(phoneRail);
+        }
         await expectRequiredFieldsPainted(phoneRail);
         await expectNoForcedCaps(page.locator('main'));
       } finally {

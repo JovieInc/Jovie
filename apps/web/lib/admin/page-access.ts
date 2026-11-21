@@ -15,8 +15,8 @@ export interface AdminPageAccess {
 
 /**
  * Admin page navigation is role-gated so stale MFA does not dump an admin out
- * of the workspace. Admin mutations stay MFA-gated through requireAdmin() and
- * entitlement-backed API checks.
+ * of the workspace. Mutations stay MFA-gated via requireAdmin() /
+ * operatorAccess() / privileged HUD (`hasRecentAdminMfaReverification`).
  */
 export const getCurrentAdminPageAccess = cache(
   async function getCurrentAdminPageAccess(): Promise<AdminPageAccess> {

@@ -2572,12 +2572,12 @@ if waiting_lane_allows_clean_enroll \
       continue
     fi
     echo "  #$n  $t  ✗ $reason"
-    if ! dequeue_strict "$n"; then
-      echo "::error::Failed to prove UNMERGEABLE PR #$n is outside native merge queue" >&2
-      exit 1
-    fi
     if ! record_unmergeable_eject_receipt "$n" "$head_oid" "$reason"; then
       echo "::error::Failed to record typed UNMERGEABLE eject for #$n at $head_oid" >&2
+      exit 1
+    fi
+    if ! dequeue_strict "$n"; then
+      echo "::error::Failed to prove UNMERGEABLE PR #$n is outside native merge queue" >&2
       exit 1
     fi
   done < <(echo "$SNAP" | jq -c '.[]

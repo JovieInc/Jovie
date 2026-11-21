@@ -33,21 +33,6 @@ export function isVercelProductionDeployment(): boolean {
   return process.env.VERCEL_ENV === 'production';
 }
 
-function extractHostname(value: string | null): string | null {
-  const normalized = value?.split(',')[0]?.trim();
-  if (!normalized) return null;
-
-  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
-    try {
-      return new URL(normalized).hostname.toLowerCase();
-    } catch {
-      return null;
-    }
-  }
-
-  return normalized.replace(/:\d+$/, '').toLowerCase();
-}
-
 export function isLocalDevelopmentAutomationHostname(
   hostname: string | null
 ): boolean {
@@ -65,29 +50,58 @@ export function isLocalDevelopmentAutomationHostname(
  * Local-only automation escape hatch for production-built test servers.
  * This intentionally requires an existing E2E opt-in and a loopback host.
  */
+function isHostedOrNonProductionBuiltRuntime(): boolean {
+  return (
+    process.env.VERCEL === '1' ||
+    process.env.VERCEL_ENV === 'preview' ||
+    process.env.VERCEL_ENV === 'development'
+  );
+}
+
 export function isLocalDevelopmentAutomationRequest(
   headerReader: HeaderReader
 ): boolean {
-  if (process.env.E2E_USE_TEST_AUTH_BYPASS !== '1') return false;
+  if (
+    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1' ||
+    isHostedOrNonProductionBuiltRuntime()
+  ) {
+    return false;
+  }
 
-  const hostname =
-    extractHostname(headerReader.get('x-forwarded-host')) ??
-    extractHostname(headerReader.get('host')) ??
-    extractHostname(headerReader.get('origin')) ??
-    extractHostname(headerReader.get('referer'));
-
-  return isLocalDevelopmentAutomationHostname(hostname);
+  // Never derive authority from spoofable x-forwarded-host, origin, or referer
+  // ahead of host; require host itself (and x-forwarded-host when present) to
+  // resolve to a valid loopback authority.
+  const host = screenshotAuthorityHostname(headerReader.get('host'));
+  if (!host) return false;
+  const forwardedHost = headerReader.get('x-forwarded-host');
+  return (
+    forwardedHost === null ||
+    screenshotAuthorityHostname(forwardedHost) !== null
+  );
 }
 
 function isLoopbackE2eAutomationHost(
   hostname: string | null,
   headerReader: HeaderReader
 ): boolean {
-  return (
-    isLocalDevelopmentAutomationRequest(headerReader) ||
-    (process.env.E2E_USE_TEST_AUTH_BYPASS === '1' &&
-      isLocalDevelopmentAutomationHostname(hostname))
-  );
+  if (
+    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1' ||
+    isHostedOrNonProductionBuiltRuntime()
+  ) {
+    return false;
+  }
+  if (hostname !== null && !isLocalDevelopmentAutomationHostname(hostname)) {
+    return false;
+  }
+  if (
+    headerReader.get('host') !== null ||
+    headerReader.get('x-forwarded-host') !== null ||
+    headerReader.get('origin') !== null ||
+    headerReader.get('referer') !== null
+  ) {
+    return isLocalDevelopmentAutomationRequest(headerReader);
+  }
+  return isLocalDevelopmentAutomationHostname(hostname);
 }
 
 /** Synthetic shell fixtures require the local server and request authorities. */

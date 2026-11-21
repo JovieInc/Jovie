@@ -207,10 +207,8 @@ export async function GET(
       recordAnonymousBotMetric(botDetection, 'redirect');
       return NextResponse.redirect(destinationUrl, { status: 302 });
     }
-    const rateLimitResult = await publicClickLimiter.limit(clientIP);
-    if (!rateLimitResult.success) {
-      return NextResponse.redirect(destinationUrl, { status: 302 });
-    }
+
+    // Rate limit + analytics after the 302 flush — never before Location.
     const geoCity = request.headers.get('x-vercel-ip-city');
     const geoCountry =
       request.headers.get('x-vercel-ip-country') ??
@@ -231,10 +229,11 @@ export async function GET(
         ?.value,
     });
 
-    // Analytics must never sit on the redirect critical path (time to
-    // destination); run it after the 302 is flushed.
     scheduleAfter(async () => {
       try {
+        const rateLimitResult = await publicClickLimiter.limit(clientIP);
+        if (!rateLimitResult.success) return;
+
         await withSystemIngestionSession(async tx => {
           await tx
             .update(audienceSourceLinks)

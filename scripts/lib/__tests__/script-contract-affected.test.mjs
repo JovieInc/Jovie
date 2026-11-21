@@ -16,6 +16,7 @@ import { buildAffectedTestPlan } from '../../run-affected-tests.mjs';
 import {
   COPY_INVENTORY_TEST,
   copyInventoryScanPath,
+  forcesScriptContractFullRun,
   SHELL_IA_SCAN_ROOTS,
   SHELL_IA_TEST,
   selectScriptContracts,
@@ -120,6 +121,45 @@ test('script, workflow and toolchain diffs run both full contract lists', () => 
       vitest,
     }).node,
     node
+  );
+});
+
+test('script test files use derived selection, not the full contract lists', () => {
+  // Matches the file-header rule: only non-test JS/TS under scripts/ forces
+  // full. A Mut floor / contract-test edit must not pay 240+242 (~205s).
+  for (const path of [
+    'scripts/lib/__tests__/mutation-score-floor.test.mjs',
+    'scripts/lib/__tests__/script-contract-affected.test.mjs',
+    'scripts/invariants/registry.test.mjs',
+    'scripts/funnel-judge/rubric.spec.mjs',
+  ]) {
+    assert.equal(forcesScriptContractFullRun(path), false, path);
+  }
+  for (const path of [
+    'scripts/lib/pr-size-guard.mjs',
+    'scripts/lib/script-contract-affected.mjs',
+    'package.json',
+  ]) {
+    assert.equal(forcesScriptContractFullRun(path), true, path);
+  }
+
+  const floor = 'scripts/lib/__tests__/mutation-score-floor.test.mjs';
+  const selected = selectScriptContracts([floor], { root: ROOT });
+  assert.equal(selected.full, false);
+  assert.ok(selected.vitest.includes(floor));
+  assert.ok(
+    selected.node.length + selected.vitest.length < 120,
+    `expected derived << full, got ${selected.node.length}+${selected.vitest.length}`
+  );
+  // #26235 shape: test + baseline json must stay derived (json is not toolchain).
+  const floorWithJson = selectScriptContracts(
+    [floor, 'scripts/mutation-score-baseline.json'],
+    { root: ROOT }
+  );
+  assert.equal(floorWithJson.full, false);
+  assert.ok(
+    floorWithJson.node.length + floorWithJson.vitest.length < 120,
+    `expected derived << full for test+json, got ${floorWithJson.node.length}+${floorWithJson.vitest.length}`
   );
 });
 

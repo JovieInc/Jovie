@@ -26,71 +26,75 @@ type MockButtonProps = ComponentProps<'button'> & {
   readonly variant?: string;
 };
 
-vi.mock('@jovie/ui', () => ({
-  Button: ({
-    children,
-    asChild,
-    className,
-    'aria-label': ariaLabel,
-    'aria-labelledby': ariaLabelledBy,
-    title,
-    size: _size,
-    variant: _variant,
-    ...props
-  }: MockButtonProps) => {
-    const mergeClassNames = (...classNames: Array<string | undefined>) =>
-      classNames.filter(Boolean).join(' ');
+vi.mock('@jovie/ui', async importOriginal => {
+  const actual = await importOriginal<typeof import('@jovie/ui')>();
+  return {
+    ...actual,
+    Button: ({
+      children,
+      asChild,
+      className,
+      'aria-label': ariaLabel,
+      'aria-labelledby': ariaLabelledBy,
+      title,
+      size: _size,
+      variant: _variant,
+      ...props
+    }: MockButtonProps) => {
+      const mergeClassNames = (...classNames: Array<string | undefined>) =>
+        classNames.filter(Boolean).join(' ');
 
-    if (
-      asChild &&
-      children &&
-      typeof children === 'object' &&
-      'props' in children
-    ) {
-      const childProps = (
-        children as {
-          readonly props?: {
-            readonly children?: ReactNode;
-            readonly className?: string;
-            readonly href?: string;
-          };
-        }
-      ).props;
+      if (
+        asChild &&
+        children &&
+        typeof children === 'object' &&
+        'props' in children
+      ) {
+        const childProps = (
+          children as {
+            readonly props?: {
+              readonly children?: ReactNode;
+              readonly className?: string;
+              readonly href?: string;
+            };
+          }
+        ).props;
+
+        return (
+          <a
+            aria-label={ariaLabel}
+            aria-labelledby={ariaLabelledBy}
+            title={title}
+            href={childProps?.href}
+            className={mergeClassNames(className, childProps?.className)}
+          >
+            {childProps?.children}
+          </a>
+        );
+      }
 
       return (
-        <a
+        <button
+          type='button'
+          className={className}
           aria-label={ariaLabel}
           aria-labelledby={ariaLabelledBy}
           title={title}
-          href={childProps?.href}
-          className={mergeClassNames(className, childProps?.className)}
+          {...props}
         >
-          {childProps?.children}
-        </a>
+          {children}
+        </button>
       );
-    }
-
-    return (
-      <button
-        type='button'
-        className={className}
-        aria-label={ariaLabel}
-        aria-labelledby={ariaLabelledBy}
-        title={title}
-        {...props}
-      >
-        {children}
-      </button>
-    );
-  },
-  TooltipShortcut: ({
-    children,
-    contentVariant,
-  }: {
-    readonly children: ReactNode;
-    readonly contentVariant?: 'compact' | 'rich';
-  }) => <span data-tooltip-content-variant={contentVariant}>{children}</span>,
-}));
+    },
+    TooltipShortcut: ({
+      children,
+      contentVariant,
+    }: {
+      readonly children: ReactNode;
+      readonly contentVariant?: 'compact' | 'rich';
+    }) => <span data-tooltip-content-variant={contentVariant}>{children}</span>,
+  };
+});
 
 describe('PageToolbar buttons', () => {
   it('renders a flat toolbar shell by default', () => {
@@ -372,5 +376,6 @@ describe('PageToolbar class re-exports (JOV-8873)', () => {
       pageToolbarClasses.PAGE_TOOLBAR_ACTION_BUTTON_CLASS
     );
     expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain('h-7');
+    expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).not.toContain('h-8');
   });
 });

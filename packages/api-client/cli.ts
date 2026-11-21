@@ -9,7 +9,7 @@ import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 import { PRIORITIES, PROVIDERS, type PriorityName } from './contract.ts';
-import { runGh } from './gh.ts';
+import { ghStdoutBytes, runGh } from './gh.ts';
 import {
   liveBucket,
   type ProviderLedger,
@@ -138,12 +138,14 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     const priority = (flag('--priority') ?? 'default') as PriorityName;
     if (!PRIORITIES.includes(priority))
       throw new Error(`unknown priority ${priority}`);
-    const result = await runGh(rest.slice(split + 1), {
+    const ghArgs = rest.slice(split + 1);
+    const result = await runGh(ghArgs, {
       priority,
       credential: flag('--credential'),
       ...(flags.includes('--once') ? { maxAttempts: 1, maxWaitMs: 0 } : {}),
     });
-    process.stdout.write(result.stdout);
+    // Zip bodies are latin1-encoded strings; write raw bytes so redirects stay valid.
+    process.stdout.write(ghStdoutBytes(result.stdout, ghArgs));
     process.stderr.write(result.stderr);
     return result.code;
   }

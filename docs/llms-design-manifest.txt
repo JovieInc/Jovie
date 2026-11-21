@@ -39,7 +39,7 @@
 - `marketing-o-mark-32` — The marketing O-mark is visibly 32px and control-aligned.
 - `no-serif-product-source` — Product source uses Inter and Satoshi only; serif media requires an exact approved exception.
 - `one-hero-per-story` — A page has one hero; adjacent sections never restate the same introduction.
-- `pen-source-identity-boundary` — Pen is proposal/review evidence until source identity and required persistence receipts pass.
+- `pen-source-identity-boundary` — Pen (+ZiaWI for color) is the publishable design SoT; unmapped Pen nodes stay proposal until source identity and required persistence receipts pass. Figma and Paper are never publishable SoT.
 - `product-page-shows-product` — Every product page demonstrates the real product UI, callouts never overlap unintentionally, and no section below the hero ships as unstyled text.
 - `rail-owned-overlay-retention` — Open interactive overlays belong to their rail through open ARIA control relationships, including nested portals. Retain rail presentation until dismissal or detachment, release afterward, ignore unrelated/opposite portals, and preserve persistent pin intent.
 - `semantic-accent-only` — Accent color communicates semantic state or a named data category, never decoration.
@@ -62,7 +62,7 @@
 - `border-subtle`, `border-default`, `border-strong`
 - `focus-ring-themed` or `focus-visible:*` on interactive elements
 
-## Design Tokens (295 contract tokens; 599 total in CSS)
+## Design Tokens (295 contract tokens; 602 total in CSS)
 
 Contract tokens below are the semantic surface for AI edits. DSP brand colors and extended accent palettes live in `apps/web/styles/design-system.css` only.
 
@@ -284,7 +284,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--profile-action-radius`: 14px
 - `--profile-bottom-nav-height`: calc( var(--space-8) + max(10px, env(safe-area-inset-bottom)) + var(--space-2) + var(--space-6) )
 - `--profile-card-radius`: 22px
-- `--profile-drawer-bg`: rgb(14, 16, 20)
+- `--profile-drawer-bg`: var(--noir-ion-card)
 - `--profile-drawer-highlight`: linear-gradient( 180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02) 36%, transparent 100% )
 - `--profile-drawer-radius-desktop`: 20px
 - `--profile-drawer-radius-mobile`: 22px

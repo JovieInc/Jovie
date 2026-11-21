@@ -16,16 +16,25 @@ const dequeuePullRequest = vi.fn(async () => ({ ok: true }));
 vi.mock('../../merge-queue-backend.mjs', () => ({ dequeuePullRequest }));
 
 const { stuckHead } = await import('../../main-red-eject.mjs');
+const { marker, supersededIncidents } = await import('../main-red-eject.mjs');
 const {
+  applyFailingHeadEpisode,
   decideFailingHead,
+  ejectHoldSha,
   failingHeadComment,
   failingRequiredChecks,
-  marker,
-  supersededIncidents,
-} = await import('../main-red-eject.mjs');
+} = await import('../main-red-eject-failing-head.mjs');
+
+const MERGE_GROUP_SHA = 'mgdeadbeef01';
+const PR_HEAD_SHA = 'prcafe012345';
 
 const run = (id, name, conclusion) => ({ id, name, conclusion });
-const queue = (state, sha = 'abc123', dwellMin = 10) => ({
+const queue = (
+  state,
+  sha = MERGE_GROUP_SHA,
+  dwellMin = 10,
+  headRefOid = PR_HEAD_SHA
+) => ({
   data: {
     repository: {
       mergeQueue: {
@@ -38,7 +47,11 @@ const queue = (state, sha = 'abc123', dwellMin = 10) => ({
                 Date.now() - dwellMin * 60_000
               ).toISOString(),
               headCommit: sha ? { oid: sha } : null,
-              pullRequest: { number: 23966, labels: { nodes: [] } },
+              pullRequest: {
+                number: 23966,
+                headRefOid: headRefOid ?? null,
+                labels: { nodes: [] },
+              },
             },
           ],
         },
@@ -91,12 +104,54 @@ describe('decideFailingHead', () => {
     ).toBe(false);
   });
   it('names every failing check in the comment', () => {
-    const body = failingHeadComment({ sha: 'abc' }, [
+    const body = failingHeadComment({ headRefOid: 'abc' }, [
       'PR Ready',
       'Migration Guard',
     ]);
     expect(body).toContain('`PR Ready`');
     expect(body).toContain('`Migration Guard`');
+    expect(body).toContain('will not re-enter the queue');
+    expect(body).toContain('lane-fix-red');
+    expect(body).not.toContain('re-admits it when checks pass');
+  });
+
+  it('does not claim lane-fix-red when label apply failed', () => {
+    const body = failingHeadComment({ headRefOid: 'abc' }, ['PR Ready'], {
+      labeled: false,
+    });
+    expect(body).toContain('JOV-6620');
+    expect(body).toContain('repair-label apply failed');
+    expect(body).not.toContain('`lane-fix-red` keeps');
+  });
+
+  it('holds on PR headRefOid, never the merge-group synthetic sha', () => {
+    expect(
+      ejectHoldSha({ sha: MERGE_GROUP_SHA, headRefOid: PR_HEAD_SHA })
+    ).toBe(PR_HEAD_SHA);
+    expect(ejectHoldSha({ sha: MERGE_GROUP_SHA })).toBe(null);
+  });
+
+  it('undoes lane-fix-red when eject-hold status write fails', async () => {
+    const ghCalls = [];
+    const gh = async args => {
+      const line = args.join(' ');
+      ghCalls.push(line);
+      // Path is repos/.../statuses/<sha>, not a bare statuses/<sha> argv.
+      if (line.includes(`statuses/${PR_HEAD_SHA}`)) {
+        throw new Error('HTTP 403: Resource not accessible by integration');
+      }
+    };
+    const out = await applyFailingHeadEpisode({
+      gh,
+      repo: 'JovieInc/Jovie',
+      head: { number: 23966, sha: MERGE_GROUP_SHA, headRefOid: PR_HEAD_SHA },
+      failing: ['PR Ready'],
+    });
+    expect(out).toEqual({ labeled: false, held: false });
+    expect(ghCalls.some(c => c.includes('labels[]=lane-fix-red'))).toBe(true);
+    expect(
+      ghCalls.some(c => c.includes('DELETE') && c.includes('lane-fix-red'))
+    ).toBe(true);
   });
 });
 
@@ -115,17 +170,32 @@ describe('stuckHead failing-head pass', () => {
     };
   };
 
-  it('dequeues, comments with the failing checks, and never enqueues or dispatches', async () => {
-    wire({ checks: [run(1, 'PR Ready', 'failure')], sha: 'abc123' });
+  it('dequeues, labels lane-fix-red, stamps eject-hold on PR tip, comments, and never enqueues or dispatches', async () => {
+    wire({ checks: [run(1, 'PR Ready', 'failure')], sha: MERGE_GROUP_SHA });
+    routes['issues/23966/labels'] = {};
+    routes[`statuses/${PR_HEAD_SHA}`] = {};
     const out = await stuckHead({ doApply: true });
     expect(out).toMatchObject({ failingHead: true, dequeued: true });
     expect(dequeuePullRequest).toHaveBeenCalledWith(
       expect.objectContaining({ number: 23966 })
     );
     const posted = writes();
-    expect(posted).toHaveLength(1);
-    expect(posted[0]).toContain('issues/23966/comments');
-    expect(posted[0]).toContain('PR Ready');
+    expect(posted).toHaveLength(3);
+    expect(posted.some(c => c.includes('issues/23966/labels'))).toBe(true);
+    expect(posted.some(c => c.includes('labels[]=lane-fix-red'))).toBe(true);
+    // Sentry HIGH: status must hit PR headRefOid, not merge-group headCommit.
+    expect(posted.some(c => c.includes(`statuses/${PR_HEAD_SHA}`))).toBe(true);
+    expect(posted.some(c => c.includes(`statuses/${MERGE_GROUP_SHA}`))).toBe(
+      false
+    );
+    expect(
+      posted.some(c => c.includes('jovie-merge-group-eject-hold/v1'))
+    ).toBe(true);
+    expect(posted.some(c => c.includes('issues/23966/comments'))).toBe(true);
+    expect(posted.find(c => c.includes('comments'))).toContain('PR Ready');
+    expect(
+      calls.some(c => c.includes('check-runs') && c.includes(MERGE_GROUP_SHA))
+    ).toBe(true);
     expect(
       calls.some(c => /workflow run|enqueuePullRequest|jump/i.test(c))
     ).toBe(false);
@@ -135,7 +205,7 @@ describe('stuckHead failing-head pass', () => {
     wire({
       checks: [run(1, 'PR Ready', 'failure')],
       main: 'failure',
-      sha: 'abc123',
+      sha: MERGE_GROUP_SHA,
     });
     const out = await stuckHead({ doApply: true });
     expect(out).toMatchObject({ failingHead: true, dequeue: false });
@@ -144,14 +214,14 @@ describe('stuckHead failing-head pass', () => {
   });
 
   it('leaves a head with no failed required check, without reading main CI', async () => {
-    wire({ checks: [run(1, 'PR Ready', 'in_progress')], sha: 'abc123' });
+    wire({ checks: [run(1, 'PR Ready', 'in_progress')], sha: MERGE_GROUP_SHA });
     await stuckHead({ doApply: true });
     expect(dequeuePullRequest).not.toHaveBeenCalled();
     expect(calls.some(c => c.includes('event=push'))).toBe(false);
   });
 
   it('does nothing in dry mode', async () => {
-    wire({ checks: [run(1, 'PR Ready', 'failure')], sha: 'abc123' });
+    wire({ checks: [run(1, 'PR Ready', 'failure')], sha: MERGE_GROUP_SHA });
     const out = await stuckHead({ doApply: false });
     expect(out).toMatchObject({ dequeue: true });
     expect(dequeuePullRequest).not.toHaveBeenCalled();
@@ -185,7 +255,7 @@ describe('stale queue-head-stuck alerts', () => {
 
   it('closes older heads alerts when a new head alerts, and keeps its own', async () => {
     routes = {
-      'api graphql': queue('AWAITING_CHECKS', 'abc123', 60),
+      'api graphql': queue('AWAITING_CHECKS', MERGE_GROUP_SHA, 60),
       'check-runs': { check_runs: [] },
       'labels=main-health-incident': [
         alert(24100, 'queue-head-stuck:24099'),
@@ -222,6 +292,13 @@ describe('wake fan-out wiring (2026-10-31 installation 112037986 exhaustion)', (
     expect(t.slice(gate, eject)).toContain('GH_TOKEN: ${{ github.token }}');
     expect(t).toContain("needs.gate.outputs.active == 'true'");
     expect(t).toContain('queue-read-failed'); // fails open
+  });
+
+  it('grants statuses:write so GITHUB_TOKEN failover can stamp eject holds', () => {
+    const t = wf('main-red-eject.yml');
+    const ejectPerms = t.slice(t.indexOf('  eject:'), t.indexOf('  land:'));
+    expect(ejectPerms).toContain('statuses: write');
+    expect(ejectPerms).toContain('GH_FALLBACK_TOKEN: ${{ github.token }}');
   });
   it.each([
     ['dependabot-pin-sync.yml', "branches: ['dependabot/npm_and_yarn/**']"],

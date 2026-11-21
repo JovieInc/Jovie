@@ -21,6 +21,10 @@ import {
   onboardingDraftQuestion,
 } from '@/lib/onboarding/profile-draft';
 import { validateUsername } from '@/lib/validation/username';
+import {
+  keepAuthTurnAfterHandleConfirmed,
+  resolveAwaitingHandleConfirm,
+} from './handle-confirm-turn';
 import { loadScriptBank, pickFromBank } from './line-source';
 import { renderLine, type ScriptLine, type ScriptStepId } from './script';
 import {
@@ -38,9 +42,10 @@ import {
  * UIMessage history (tool outputs persist across turns on the client and in
  * `chat_messages.tool_calls`). When the LLM is down, this walks the same
  * intake rail the LLM walks with explicit guards:
- * Role → ArtistSearch → ArtistSelect → Handle → Social → Contact →
- * Waitlist/Complete. Widget completions emit structured events; free-text
- * acks ("ok", "k") never complete waitlist/reservation.
+ * Role → ArtistSearch → ArtistSelect → Handle (Keep) → Waitlist/Complete.
+ * Social/audience are deferred after handle Keep (handle-by-default).
+ * Widget completions emit structured events; free-text acks ("ok", "k")
+ * never complete waitlist/reservation.
  */
 
 export interface FallbackToolEvent {
@@ -351,7 +356,13 @@ export function resolveGuardedStep(input: {
     return 'handle';
   }
 
-  if (!hasSocialAttached(uiMessages)) {
+  // Handle-by-default: after Keep, social/audience are deferred — route to
+  // access decision. Mid-flight sessions that already opened social still
+  // resolve via decideFallbackTurn's social branches below.
+  if (
+    findLatestToolOutput(uiMessages, 'propose_social_link') &&
+    !hasSocialAttached(uiMessages)
+  ) {
     return 'social';
   }
 
@@ -375,8 +386,7 @@ function decideAccess(
   extraBand: AudienceBand | null,
   options?: { readonly forceTurnCap?: boolean }
 ): AccessDecision {
-  // Incomplete acks must not force waitlist via turn cap — freeze turnCount
-  // under the force threshold unless we have real signal this turn.
+  // Freeze turnCount under the force threshold on incomplete acks.
   const turnCount =
     options?.forceTurnCap === false
       ? Math.min(state.turnCount, 2)
@@ -389,6 +399,7 @@ function decideAccess(
     spotifyArtistId: state.spotifyArtistId,
     publicProfileUrl: state.publicProfileUrl,
     spotifyFollowers: state.spotifyFollowers,
+    catalogReleases: state.catalogPreview?.total ?? null,
     metrics: state.artistMetrics,
     signals: state.signals,
     turnCount,
@@ -792,69 +803,28 @@ export async function decideFallbackTurn(
       (typeof existingHandleCheck.handle === 'string'
         ? String(existingHandleCheck.handle)
         : handleFromArtistName(state.spotifyArtistName ?? ''));
-    // The social-link card ships with this turn, so the line asks for the
-    // link; the audience question waits until the link is attached.
-    const line = pick('attach_social');
-    return {
-      line,
-      text: renderLine(line, {}),
-      toolEvents: [
-        {
-          toolName: 'checkHandle',
-          input: { handle },
-          output: {
-            action: WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED,
-            handle,
-            summary: `Handle @${handle} confirmed.`,
-          },
-        },
-        {
-          toolName: 'proposeSocialLink',
-          input: { url: '' },
-          output: {
-            action: 'propose_social_link',
-            url: null,
-            summary: 'Attach a public social account.',
-          },
-        },
-      ],
-      guardedStep: 'social',
-    };
+    // Keep → auth: skip social/audience enrichment after accepting the
+    // match-derived handle (Boardy handle-by-default).
+    return keepAuthTurnAfterHandleConfirmed(handle, state, pick);
   }
 
-  // Handle shown but not confirmed via widget event — stay on handle.
-  // Free-text "ok" / "k" does not advance.
+  // Handle shown but not confirmed — free-text claim/sign-up/keep can lock
+  // it; acks ("ok" / "k") still do not advance.
   if (!hasHandleConfirmed(uiMessages)) {
     const shownHandle =
       typeof existingHandleCheck.handle === 'string'
         ? existingHandleCheck.handle
         : handleFromArtistName(state.spotifyArtistName ?? '');
-    // A handle typed in chat replaces the suggested one: check it instead of
-    // repeating the old line (2026-10-29 canary walk: typed handles were
-    // ignored and the only way forward was editing the card's field).
+    // Typed handle replaces the suggestion (2026-10-29 canary walk).
     const typedHandle = latestEvent ? null : typedHandleFrom(latest);
-    const handle =
-      typedHandle && typedHandle !== shownHandle ? typedHandle : shownHandle;
-    const line = pick('handle');
-    return {
-      line,
-      text: renderLine(line, { handle }),
-      toolEvents:
-        handle === shownHandle
-          ? []
-          : [
-              {
-                toolName: 'checkHandle',
-                input: { handle },
-                output: {
-                  action: 'check_handle',
-                  handle,
-                  summary: `Checking @${handle}.`,
-                },
-              },
-            ],
-      guardedStep: 'handle',
-    };
+    return resolveAwaitingHandleConfirm({
+      shownHandle,
+      latest,
+      latestIsWidgetEvent: Boolean(latestEvent),
+      typedHandle,
+      state,
+      pick,
+    });
   }
 
   const attachedNow = socialAttachedEventFromLatest(latest);

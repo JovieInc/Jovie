@@ -17,6 +17,8 @@ const HOSTED_MACOS_ALLOWED = {
   'codeql.yml': 'post-merge scan; nothing waits on it',
   'desktop-release.yml':
     'signs/notarizes with Developer ID and uploads the DMG (slow home uplink)',
+  'desktop-dogfood.yml':
+    'signs/notarizes founder Staging with Developer ID and uploads the DMG (slow home uplink; same trust boundary as desktop-release)',
   'ios-app-store-graphics.yml':
     'path-filtered and advisory; also a release call; nothing in the queue waits on it',
   'ios-signing-bootstrap.yml': 'rare manual keychain/match bootstrap',

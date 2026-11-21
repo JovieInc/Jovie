@@ -25,10 +25,16 @@ vi.mock('@/lib/spotify', () => ({
   spotifyClient: { getArtist: mocks.getArtist },
 }));
 vi.mock('@/lib/rate-limit', () => ({
-  allowIfRateLimitBackendDegraded: (result: unknown) => result,
   claimTokenAccessLimiter: { limit: mocks.limit },
   createRateLimitHeaders: () => ({}),
   getClientIP: () => '203.0.113.7',
+  rateLimitDenialStatus: (result: { unavailable?: boolean }) =>
+    result.unavailable === true ? 503 : 429,
+  rateLimitDenialMessage: (
+    result: { unavailable?: boolean },
+    exhausted: string,
+    unavailable = 'Temporarily unavailable.'
+  ) => (result.unavailable === true ? unavailable : exhausted),
 }));
 vi.mock('@/lib/db', () => {
   const chain = (): Record<string, unknown> => {
@@ -210,5 +216,15 @@ describe('GET /claim/start', () => {
 
     mocks.limit.mockResolvedValue({ success: false });
     expect((await GET(request(`spotify=${SPOTIFY_ID}`))).status).toBe(429);
+  });
+
+  it('fails closed with 503 when the rate-limit backend is unavailable', async () => {
+    mocks.limit.mockResolvedValue({
+      success: false,
+      unavailable: true,
+    });
+    const response = await GET(request(`spotify=${SPOTIFY_ID}`));
+    expect(response.status).toBe(503);
+    expect(mocks.recordStage).not.toHaveBeenCalled();
   });
 });

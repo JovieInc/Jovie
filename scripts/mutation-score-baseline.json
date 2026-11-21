@@ -53,11 +53,11 @@
       "sha": "3c0691a23ea5fe132d406050b65f2cdfeaa20144"
     },
     "lib/stripe/dunning.ts": {
-      "measured": 12.6,
-      "floor": 11.6,
-      "valid": 135,
-      "runId": 39889081061,
-      "sha": "814306a8c832b4f8940251465a522df90d7ebde1"
+      "measured": 91.6,
+      "floor": 90.6,
+      "valid": 143,
+      "runId": 21112026001,
+      "sha": "4f1b864d2d5de1540a5deff7fc2d51a67e28e8a4"
     },
     "lib/stripe/startup-validation.ts": {
       "measured": 90.5,

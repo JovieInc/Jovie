@@ -68,6 +68,75 @@ describe('POST /api/webhooks/voice-pipeline (gh-9810)', () => {
     expect(mockCaptureCriticalError).toHaveBeenCalled();
   });
 
+  it('rejects missing provider event id before ack', async () => {
+    const { POST } = await import('@/app/api/webhooks/voice-pipeline/route');
+    const body = JSON.stringify({
+      type: 'voice_generation.completed',
+      status: 'success',
+    });
+    const sig = sign(body);
+    const req = new Request('http://localhost/api/webhooks/voice-pipeline', {
+      method: 'POST',
+      headers: { 'elevenlabs-signature': sig },
+      body,
+    });
+
+    const res = await POST(req as any);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Missing event id in payload' });
+    expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+    expect(mockClearRecentDispatch).not.toHaveBeenCalled();
+  });
+
+  it('rejects empty provider event id before ack', async () => {
+    const { POST } = await import('@/app/api/webhooks/voice-pipeline/route');
+    const body = JSON.stringify({
+      id: '',
+      data: { id: '' },
+      type: 'voice_generation.completed',
+    });
+    const sig = sign(body);
+    const req = new Request('http://localhost/api/webhooks/voice-pipeline', {
+      method: 'POST',
+      headers: { 'elevenlabs-signature': sig },
+      body,
+    });
+
+    const res = await POST(req as any);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: 'Missing event id in payload' });
+    expect(mockAcquireRecentDispatch).not.toHaveBeenCalled();
+  });
+
+  it('accepts event id nested under data.id', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockClearRecentDispatch.mockResolvedValue(undefined);
+
+    const { POST } = await import('@/app/api/webhooks/voice-pipeline/route');
+    const body = JSON.stringify({
+      data: { id: 'evt_nested_1' },
+      type: 'voice_cloning.completed',
+    });
+    const sig = sign(body);
+    const req = new Request('http://localhost/api/webhooks/voice-pipeline', {
+      method: 'POST',
+      headers: { 'elevenlabs-signature': sig },
+      body,
+    });
+
+    const res = await POST(req as any);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: true });
+    expect(mockAcquireRecentDispatch).toHaveBeenCalledWith(
+      'voice-pipeline',
+      'evt_nested_1',
+      expect.any(Number)
+    );
+  });
+
   it('deduplicates recent events', async () => {
     mockAcquireRecentDispatch.mockResolvedValue({
       acquired: false,

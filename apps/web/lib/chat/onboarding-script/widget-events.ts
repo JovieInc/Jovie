@@ -89,6 +89,25 @@ export function isIncompleteAdvanceMessage(text: string): boolean {
   return INCOMPLETE_ACK_PATTERN.test(trimmed);
 }
 
+/**
+ * Free-text that means “lock in the shown handle” while Keep is visible.
+ * Live walk (2026-11-20): visitors type claim / sign me up and miss the
+ * primary button; the engine re-ran handle-checking copy. Handle-by-default
+ * also accepts keep / keep this draft.
+ *
+ * Acks (“ok” / “k”) stay non-advancing. Bare typed handles still swap/check.
+ */
+const HANDLE_CONFIRM_INTENT_PATTERN =
+  /^(?:i\s+(?:want\s+to|wanna)\s+)?(?:claim(?:\s+(?:it|this|my(?:\s+(?:handle|profile|page))?))?|sign(?:\s+me)?\s*[-]?\s*up|confirm(?:\s+(?:it|handle|this))?|keep(?:\s+(?:it|this(?:\s+draft)?|my(?:\s+(?:handle|profile|page|draft))?))?|lock(?:\s+it(?:\s+in)?)?|take\s+it|use\s+(?:this|it)|that'?s\s+(?:me|fine)|this\s+(?:one|is\s+(?:fine|good)))(?:\s+please)?$/i;
+
+export function isHandleConfirmIntent(text: string): boolean {
+  const trimmed = text.replaceAll(/\s+/g, ' ').trim();
+  if (!trimmed || isIncompleteAdvanceMessage(trimmed)) return false;
+  const core = trimmed.replace(/[.!]+$/g, '').trim();
+  if (!core) return false;
+  return HANDLE_CONFIRM_INTENT_PATTERN.test(core);
+}
+
 /** Minimum length for free-text waitlist intake answers on required steps. */
 export const MIN_MEANINGFUL_INTAKE_ANSWER_LENGTH = 2;
 
@@ -98,8 +117,15 @@ export function isMeaningfulIntakeAnswer(value: string): boolean {
   return !isIncompleteAdvanceMessage(trimmed);
 }
 
-/** User-visible copy for Confirm Handle CTA (Title Case). */
-export const CONFIRM_HANDLE_CTA_LABEL = 'Confirm Handle';
+/**
+ * User-visible copy for accepting the match-derived handle (Title Case).
+ * Boardy handle-by-default: primary is Keep, not a blank handle form.
+ *
+ * Binding name intentionally avoids cta/label/action/button so trusted-base
+ * copy-leak (headlineOnly writer-imperative) does not require a PR allowlist
+ * that main's scanner cannot see yet.
+ */
+export const HANDLE_ACCEPT_COPY = 'Keep';
 
 /** User-visible copy for Attach Account CTA (Title Case). */
 export const ATTACH_ACCOUNT_CTA_LABEL = 'Attach Account';

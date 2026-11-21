@@ -52,3 +52,14 @@ This file tracks legacy implementations that should not be used for new work and
 | --- | --- | --- | --- |
 | Direct `var(--linear-*)` usage for shared public semantics | Gradual migration | semantic aliases in `design-system.css` | Keep primitives, add aliases first |
 | Page-local max-width wrappers duplicating marketing widths | Deprecated | `MarketingContainer` | Search public routes before adding new wrappers |
+
+## Media generation parallel owners (JOV-13852)
+
+Canonical inventory + routing: [`MEDIA_GENERATION.md`](./MEDIA_GENERATION.md) / [`media-generation-routes.json`](./media-generation-routes.json).
+
+| Legacy item | Status | Replacement | Notes |
+| --- | --- | --- | --- |
+| `apps/web/scripts/merch-{image,alpha,knockout}-spike.ts` as product gen | Aliased | `apps/web/lib/merch/graphic-engine.ts` | Throwaway spikes only; do not extend |
+| New adapters beside `apps/web/scripts/marketing-media/` | Deprecated for new work | `marketing-media` lane + factory providers | Factory must consume `marketing-media`, not fork adapters |
+| gstack `design` binary for product/marketing pixels | Tooling only | marketing-media / merch-graphic / album-art lanes | Agent mockups only; never SoT |
+| Figma MCP shaders / generative plugins as publishable gen | Scratch only | Pen + lanes above | Optional bridge; never authority |

@@ -40,7 +40,7 @@ describe('allowIfRateLimitBackendDegraded', () => {
     expect(allowIfRateLimitBackendDegraded(result)).toEqual(result);
   });
 
-  it('allows degraded memory-fallback denials and breadcrumbs', () => {
+  it('allows degraded memory-fallback denials and breadcrumbs (UX-critical auth/chat only)', () => {
     const result = allowIfRateLimitBackendDegraded(denied({ degraded: true }), {
       limiter: 'ai-chat',
     });
@@ -55,7 +55,7 @@ describe('allowIfRateLimitBackendDegraded', () => {
     );
   });
 
-  it('allows unavailable-backend denials', () => {
+  it('allows unavailable-backend denials only for documented UX-critical paths', () => {
     const result = allowIfRateLimitBackendDegraded(
       denied({ unavailable: true })
     );
