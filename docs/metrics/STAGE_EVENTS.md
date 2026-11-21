@@ -108,6 +108,10 @@ neither registered under `producers.workflows` nor exempted with a reason.
 Append contract rows to a rolling NDJSON file and publish it as
 `stage-events.ndjson` in the existing lanes status gist (same writer, same
 PATCH as `lanes-status.json`). Keep 28 days, drop older rows, cap at 8 MB.
+Live emitter: `scripts/lanes/stage_events.py` via `lanes-stage-feed`. The five
+shipping-critical stages below are **pushed** (Law 2 closed): collector reads
+them, and `stage-timings-latest.json` already reports p50/p95/n (gate-seat and
+gate are active shipping-slo regressions).
 
 | Stage | entityType / entityId | enteredAt | exitedAt | Source |
 | --- | --- | --- | --- | --- |

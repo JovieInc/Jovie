@@ -15,8 +15,8 @@ Rules:
 - Do not auto-land generated tests that touch billing, auth, onboarding ownership, migrations, proxy, or middleware without human review.
 
 Loop:
-1. Load the repo profile and recent telemetry memory.
-2. Rank targets by criticality, recent failures, mutation debt, flake cost, quarantine age, and runtime.
+1. Load the repo profile, recent telemetry memory, and prior `skill-delta.json` (consume before select).
+2. Rank targets by criticality, recent failures, mutation debt, flake cost, quarantine age, runtime, and prior skill-delta preference.
 3. Run low-cost deterministic lanes first.
 4. Run mutation testing on changed high-risk files (`node scripts/mutation-diff.mjs --base origin/main`).
 5. For weak behaviors, generate candidates using the smallest viable mode:
