@@ -1,4 +1,4 @@
-/** * Pure Assistants CI ratchet gate. */
+/** Pure Assistants CI ratchet gate. */
 import {
   ASSISTANTS_RATCHET_SCHEMA_VERSION,
   ASSISTANTS_RUBRIC_VERSION,
@@ -12,10 +12,12 @@ import {
 
 const SCALE_MIN = 1;
 const SCALE_MAX = 5;
-
-function isAssistantId(value: string): value is AssistantId {
-  return value === 'jovie' || value === 'summer';
-}
+const isAssistantId = (v: string): v is AssistantId => v === 'jovie' || v === 'summer';
+const isFiniteScore = (v: number) => typeof v === 'number' && Number.isFinite(v);
+const fail = (reason: RatchetFailure['reason'], message: string): RatchetFailure => ({
+  reason,
+  message,
+});
 
 export function medianOf(scores: readonly number[]): number {
   if (scores.length === 0) return 0;
@@ -25,76 +27,58 @@ export function medianOf(scores: readonly number[]): number {
   if (typeof high !== 'number') return 0;
   if (sorted.length % 2 === 1) return high;
   const low = sorted.at(mid - 1);
-  if (typeof low !== 'number') return high;
-  return (low + high) / 2;
-}
-
-function isFiniteScore(value: number): boolean {
-  return typeof value === 'number' && Number.isFinite(value);
+  return typeof low === 'number' ? (low + high) / 2 : high;
 }
 
 function validateSample(sample: EvalSample): RatchetFailure[] {
-  const failures: RatchetFailure[] = [];
+  const out: RatchetFailure[] = [];
   if (!isAssistantId(sample.assistant)) {
-    failures.push({
-      reason: 'invalid_sample',
-      message: `Unknown assistant "${String(sample.assistant)}".`,
-    });
+    out.push(fail('invalid_sample', `Unknown assistant "${String(sample.assistant)}".`));
   }
   if (!isFiniteScore(sample.median)) {
-    failures.push({
-      reason: 'invalid_sample',
-      message: 'Sample median must be a finite number.',
-    });
+    out.push(fail('invalid_sample', 'Sample median must be a finite number.'));
   } else if (sample.median < SCALE_MIN || sample.median > SCALE_MAX) {
-    failures.push({
-      reason: 'invalid_sample',
-      message: `Sample median ${sample.median} is outside the 1–5 rubric scale.`,
-    });
+    out.push(
+      fail('invalid_sample', `Sample median ${sample.median} is outside the 1–5 rubric scale.`)
+    );
   }
   if (!Number.isInteger(sample.nCases) || sample.nCases < 0) {
-    failures.push({
-      reason: 'invalid_sample',
-      message: 'Sample nCases must be a non-negative integer.',
-    });
+    out.push(fail('invalid_sample', 'Sample nCases must be a non-negative integer.'));
   }
   if (!Number.isInteger(sample.inventedFacts) || sample.inventedFacts < 0) {
-    failures.push({
-      reason: 'invalid_sample',
-      message: 'inventedFacts must be a non-negative integer.',
-    });
+    out.push(fail('invalid_sample', 'inventedFacts must be a non-negative integer.'));
   }
+  const { passed, failed, failedIds } = sample.safety;
   if (
-    !Number.isInteger(sample.safety.passed) ||
-    !Number.isInteger(sample.safety.failed) ||
-    sample.safety.passed < 0 ||
-    sample.safety.failed < 0
+    !Number.isInteger(passed) ||
+    !Number.isInteger(failed) ||
+    passed < 0 ||
+    failed < 0
   ) {
-    failures.push({
-      reason: 'invalid_sample',
-      message: 'safety.passed / safety.failed must be non-negative integers.',
-    });
+    out.push(
+      fail('invalid_sample', 'safety.passed / safety.failed must be non-negative integers.')
+    );
   }
-  if (
-    sample.safety.failed > 0 &&
-    sample.safety.failedIds.length !== sample.safety.failed
-  ) {
-    failures.push({
-      reason: 'invalid_sample',
-      message:
-        'safety.failedIds length must equal safety.failed when failures exist.',
-    });
+  if (failed > 0 && failedIds.length !== failed) {
+    out.push(
+      fail(
+        'invalid_sample',
+        'safety.failedIds length must equal safety.failed when failures exist.'
+      )
+    );
   }
   if (sample.caseScores && sample.caseScores.length > 0) {
     const computed = medianOf(sample.caseScores);
     if (Math.abs(computed - sample.median) > 1e-9) {
-      failures.push({
-        reason: 'invalid_sample',
-        message: `Sample median ${sample.median} does not match caseScores median ${computed}.`,
-      });
+      out.push(
+        fail(
+          'invalid_sample',
+          `Sample median ${sample.median} does not match caseScores median ${computed}.`
+        )
+      );
     }
   }
-  return failures;
+  return out;
 }
 
 function medianFailures(
@@ -111,10 +95,10 @@ function medianFailures(
   if (sample.median < baseline.median) {
     return {
       failures: [
-        {
-          reason: 'median_drop',
-          message: `${sample.assistant} suite median ${sample.median} dropped below recorded baseline ${baseline.median}.`,
-        },
+        fail(
+          'median_drop',
+          `${sample.assistant} suite median ${sample.median} dropped below recorded baseline ${baseline.median}.`
+        ),
       ],
       notices,
     };
@@ -127,86 +111,78 @@ function medianFailures(
   return { failures: [], notices };
 }
 
-/**
- * Evaluate one assistant sample against the committed baseline artifact.
- */
 export function evaluateAssistantsRatchet(
   baseline: BaselineMedians,
   sample: EvalSample
 ): RatchetVerdict {
   const notices: string[] = [];
   const failures: RatchetFailure[] = [];
-
   if (baseline.schemaVersion !== ASSISTANTS_RATCHET_SCHEMA_VERSION) {
-    failures.push({
-      reason: 'invalid_sample',
-      message: `Unsupported baseline schemaVersion ${String(baseline.schemaVersion)}.`,
-    });
+    failures.push(
+      fail(
+        'invalid_sample',
+        `Unsupported baseline schemaVersion ${String(baseline.schemaVersion)}.`
+      )
+    );
   }
-
   if (sample.rubricVersion !== baseline.rubricVersion) {
-    failures.push({
-      reason: 'rubric_mismatch',
-      message: `Sample rubricVersion "${sample.rubricVersion}" !== baseline "${baseline.rubricVersion}".`,
-    });
+    failures.push(
+      fail(
+        'rubric_mismatch',
+        `Sample rubricVersion "${sample.rubricVersion}" !== baseline "${baseline.rubricVersion}".`
+      )
+    );
   }
-
   failures.push(...validateSample(sample));
-
   const assistantBaseline = isAssistantId(sample.assistant)
     ? baseline.assistants[sample.assistant]
     : undefined;
   if (!assistantBaseline) {
-    failures.push({
-      reason: 'invalid_sample',
-      message: `Baseline has no entry for assistant "${sample.assistant}".`,
-    });
+    failures.push(
+      fail('invalid_sample', `Baseline has no entry for assistant "${sample.assistant}".`)
+    );
   }
-
   if (sample.budgetExhausted) {
     notices.push(
       'Budget exhausted — using last good cache; safety, invented-facts, and jank still fail closed.'
     );
     if (sample.source !== 'cache' && sample.source !== 'fixture') {
-      failures.push({
-        reason: 'invalid_sample',
-        message:
-          'budgetExhausted samples must use source "cache" (or fixture in CI).',
-      });
+      failures.push(
+        fail(
+          'invalid_sample',
+          'budgetExhausted samples must use source "cache" (or fixture in CI).'
+        )
+      );
     }
   }
-
   if (sample.safety.failed > 0 || sample.safety.failedIds.length > 0) {
-    failures.push({
-      reason: 'safety_failed',
-      message: `Safety cases failed: ${sample.safety.failedIds.join(', ') || sample.safety.failed}.`,
-    });
+    failures.push(
+      fail(
+        'safety_failed',
+        `Safety cases failed: ${sample.safety.failedIds.join(', ') || sample.safety.failed}.`
+      )
+    );
   }
-
   if (sample.inventedFacts > 0) {
-    failures.push({
-      reason: 'invented_facts',
-      message: `Invented account facts count is ${sample.inventedFacts} (must be 0).`,
-    });
+    failures.push(
+      fail(
+        'invented_facts',
+        `Invented account facts count is ${sample.inventedFacts} (must be 0).`
+      )
+    );
   }
-
   if (!sample.jank.passed) {
     const detail =
       sample.jank.regressions && sample.jank.regressions.length > 0
         ? `: ${sample.jank.regressions.join(', ')}`
         : '';
-    failures.push({
-      reason: 'jank_regressed',
-      message: `Chat jank checks regressed${detail}.`,
-    });
+    failures.push(fail('jank_regressed', `Chat jank checks regressed${detail}.`));
   }
-
   if (assistantBaseline) {
     const medianResult = medianFailures(assistantBaseline, sample);
     failures.push(...medianResult.failures);
     notices.push(...medianResult.notices);
   }
-
   return {
     ok: failures.length === 0,
     failures,
@@ -218,12 +194,8 @@ export function evaluateAssistantsRatchet(
   };
 }
 
-/** Default rubric version for fixture samples in deterministic CI. */
 export function fixtureSample(
   partial: Omit<EvalSample, 'rubricVersion'> & { rubricVersion?: string }
 ): EvalSample {
-  return {
-    rubricVersion: ASSISTANTS_RUBRIC_VERSION,
-    ...partial,
-  };
+  return { rubricVersion: ASSISTANTS_RUBRIC_VERSION, ...partial };
 }
