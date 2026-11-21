@@ -44,6 +44,33 @@
       "a11y",
       "frontend-rules",
       "forced-caps"
+    ],
+    "apps/web/components/organisms/AvatarUpload.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/AvatarUploadable.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/billing/GrowthAccessRequestModal.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ]
   },
   "waivers": {
@@ -66,6 +93,17 @@
     },
     "apps/web/components/marketing/artist-profile/ArtistProfileMonetizationSection.tsx": {
       "empty": "The section renders a fixed four-card earning loop from required copy; it owns no collection that could be empty."
+    },
+    "apps/web/components/organisms/AvatarUpload.tsx": {
+      "loading": "The uploading label shows only while the avatar mutation is in flight, and a story has no prop or fast path that holds it on screen.",
+      "offline": "The form never fetches on render; an offline upload fails into the same alert shown by ErrorInvalidFileType.",
+      "partial": "The form renders one avatar and one button from required props; nothing loads in parts, and the no-photo variant is EmptyNoPhoto.",
+      "permission-denied": "The component reads no session or permission; the upload is available to whoever mounts it."
+    },
+    "apps/web/components/organisms/billing/GrowthAccessRequestModal.tsx": {
+      "loading": "The submitting state lasts only while the mutation is in flight, and a story has no prop that holds it; GrowthAccessRequestModal.test.tsx renders the pending state through the mutation mock.",
+      "error": "The form has no error face: a failed request leaves the dialog open and re-enables Submit, so nothing distinct could be shown.",
+      "offline": "The dialog never fetches on render; an offline submit is a failed request, which leaves the form open as described for error."
     }
   }
 }

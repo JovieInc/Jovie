@@ -95,6 +95,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
       <Textarea
         aria-label='Your Feedback'
         resizable={false}
+        textareaSize='lg'
         ref={textareaRef}
         value={feedbackText}
         onChange={e => setFeedbackText(e.target.value)}
@@ -102,12 +103,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
         rows={4}
         maxLength={2000}
         disabled={feedbackMutation.isPending}
-        className={cn(
-          'mt-4 w-full rounded-lg border border-(--app-shell-frame-seam) bg-surface-0 px-3.5 py-3',
-          'text-sm text-primary-token placeholder:text-tertiary-token',
-          'focus:border-default focus:outline-none',
-          'disabled:opacity-50'
-        )}
+        className='mt-4 w-full'
       />
 
       <div className='mt-3 flex items-center justify-between gap-3 text-xs'>

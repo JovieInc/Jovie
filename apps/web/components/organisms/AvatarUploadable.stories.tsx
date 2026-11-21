@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
+import { userEvent, within } from 'storybook/test';
 import {
   AvatarUploadable,
   type AvatarUploadableProps,
@@ -84,4 +85,45 @@ export const ReadOnly: Story = {
     src: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&auto=format&fit=crop',
     uploadable: false,
   },
+};
+
+/** Error: a rejected file type puts the avatar in its error state. */
+export const ErrorInvalidFileType: Story = {
+  args: { src: null },
+  play: async ({ canvasElement }) => {
+    const input = await within(canvasElement).findByLabelText(
+      'Choose Profile Photo File'
+    );
+    await userEvent.upload(
+      input,
+      new File(['pdf'], 'notes.pdf', { type: 'application/pdf' }),
+      { applyAccept: false }
+    );
+  },
+};
+
+/** Partial: no image yet, so the avatar falls back to initials. */
+export const PartialInitialsFallback: Story = {
+  args: { src: null, uploadable: false },
+};
+
+/** Long content: a very long name still fits the avatar fallback. */
+export const LongContentName: Story = {
+  args: {
+    src: null,
+    name: 'Alexandria Montgomery-Featherstonehaugh III',
+    alt: 'Alexandria Montgomery-Featherstonehaugh III',
+  },
+};
+
+/** Rtl: an Arabic name renders in a right-to-left frame. */
+export const RtlName: Story = {
+  args: { src: null, name: 'جوردان لي', alt: 'جوردان لي' },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
 };
