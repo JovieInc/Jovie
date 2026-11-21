@@ -7,6 +7,9 @@ import { planDailyPublication } from '../daily-changelog-publication.mjs';
 import {
   compactDailyReceipts,
   countAuditReasons,
+  insertCompactedDigest,
+  MAX_RECEIPT_BYTES,
+  oversizedReceipts,
 } from '../daily-changelog-receipts.mjs';
 
 const HEAD = 'a'.repeat(40);
@@ -120,5 +123,18 @@ describe('daily changelog receipt compaction (repo-size budget)', () => {
       sourceReceiptIds: ['old'],
       auditCounts: { internal: 1, unavailable: 2 },
     });
+  });
+
+  it('refuses a publish whose receipt outgrows the refill cap', () => {
+    const big = receiptComment({
+      schema: DAILY_RECEIPT_SCHEMA,
+      window: { key: '2026-10-03' },
+      pending: Array.from({ length: 2000 }, (_, i) => `JovieInc/Jovie#${i}`),
+    });
+    expect(oversizedReceipts(`# Changelog\n${big}\n`)).toHaveLength(1);
+    expect(Buffer.byteLength(big)).toBeGreaterThan(MAX_RECEIPT_BYTES);
+    expect(() =>
+      insertCompactedDigest('# Changelog\n', `## Day\n${big}\n`, '2026-10-03')
+    ).toThrow(/persist counts, not per-candidate rows/);
   });
 });

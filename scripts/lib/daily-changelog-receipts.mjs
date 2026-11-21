@@ -42,7 +42,29 @@ export function compactDailyReceipts(markdown) {
   });
 }
 
+// Refill guard: the largest compacted receipt measured 7.7 KB (2026-11-21).
+// A receipt over this cap means a new per-candidate list crept back in, so
+// the publish fails loudly instead of quietly regrowing the tracked tree.
+export const MAX_RECEIPT_BYTES = 32 * 1024;
+
+/** Receipt comments in `markdown` larger than MAX_RECEIPT_BYTES. */
+export function oversizedReceipts(markdown) {
+  return [...markdown.matchAll(RECEIPT_COMMENT_RE)]
+    .map(([comment]) => Buffer.byteLength(comment))
+    .filter(bytes => bytes > MAX_RECEIPT_BYTES);
+}
+
 /** Insert a digest block after compacting older receipts (see above). */
 export function insertCompactedDigest(markdown, block, windowKey) {
-  return insertDailyDigest(compactDailyReceipts(markdown), block, windowKey);
+  const content = insertDailyDigest(
+    compactDailyReceipts(markdown),
+    block,
+    windowKey
+  );
+  const oversized = oversizedReceipts(content);
+  if (oversized.length)
+    throw new Error(
+      `daily changelog receipt over ${MAX_RECEIPT_BYTES} bytes (${oversized.join(', ')}); persist counts, not per-candidate rows (docs/ci/repository-health.md)`
+    );
+  return content;
 }
