@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { formatTourDateDisplay } from '@/lib/connectors/opportunity-inbox-tour-dates';
 import type { OpportunityInboxTourDateItem } from '@/lib/connectors/opportunity-inbox-types';
@@ -92,14 +93,14 @@ export function OpportunityInboxRejectedTourDates({
             key={item.id}
             item={item}
             action={
-              <button
+              <PlainButton
                 type='button'
                 className='system-b-opportunity-inbox-dismiss shrink-0'
                 disabled={pendingUndoId === item.id}
                 onClick={() => onUndoReject(item.id)}
               >
                 {pendingUndoId === item.id ? 'Restoring…' : 'Undo'}
-              </button>
+              </PlainButton>
             }
           />
         ))}
