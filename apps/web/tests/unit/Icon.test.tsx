@@ -50,6 +50,19 @@ describe('Icon', () => {
 
     render(<Icon name='User' data-testid='mid' className='size-5' />);
     expect(screen.getByTestId('mid')).toHaveAttribute('stroke-width', '1.65');
+
+    render(<Icon name='Rocket' data-testid='xl' className='size-14' />);
+    expect(screen.getByTestId('xl')).toHaveAttribute('stroke-width', '1.75');
+  });
+
+  it('honors raw aria-label when the dedicated ariaLabel prop is omitted', () => {
+    render(
+      <Icon name='Settings' data-testid='labeled' aria-label='Settings' />
+    );
+    const icon = screen.getByTestId('labeled');
+    expect(icon).toHaveAttribute('aria-label', 'Settings');
+    expect(icon).toHaveAttribute('aria-hidden', 'false');
+    expect(icon).toHaveAttribute('role', 'img');
   });
 
   it('normalizes various icon name formats', () => {

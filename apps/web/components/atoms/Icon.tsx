@@ -240,18 +240,23 @@ export function Icon({
   ariaHidden,
   size,
   strokeWidth,
+  'aria-label': ariaLabelAttr,
   ...props
 }: IconProps) {
   const iconName = resolveIconName(String(name));
   if (!iconName) return null;
 
-  // Accessibility logic:
-  // - If no ariaLabel: always hide from screen readers (ignore ariaHidden prop)
-  // - If ariaLabel provided: default to visible, but allow explicit ariaHidden override
-  const shouldHide = ariaLabel ? (ariaHidden ?? false) : true;
+  // Prefer the dedicated prop; still honor raw aria-label from Lucide/SVG props
+  // so spreading {...props} first cannot wipe a caller-supplied label (Sentry 20808968).
+  const resolvedAriaLabel = ariaLabel ?? ariaLabelAttr;
 
-  // Development warning: ariaHidden=false without ariaLabel is an a11y violation
-  if (ariaHidden === false && !ariaLabel) {
+  // Accessibility logic:
+  // - If no label: always hide from screen readers (ignore ariaHidden prop)
+  // - If label provided: default to visible, but allow explicit ariaHidden override
+  const shouldHide = resolvedAriaLabel ? (ariaHidden ?? false) : true;
+
+  // Development warning: ariaHidden=false without a label is an a11y violation
+  if (ariaHidden === false && !resolvedAriaLabel) {
     logger.warn(
       'Setting ariaHidden={false} without providing ariaLabel creates an accessibility violation. ' +
         'Either provide an ariaLabel or remove ariaHidden to allow the default behavior.',
@@ -274,8 +279,8 @@ export function Icon({
       {...props}
       className={cn(className)}
       aria-hidden={shouldHide}
-      role={ariaLabel && !shouldHide ? 'img' : undefined}
-      aria-label={ariaLabel}
+      role={resolvedAriaLabel && !shouldHide ? 'img' : undefined}
+      aria-label={resolvedAriaLabel}
       size={size}
       strokeWidth={resolvedStroke}
     />

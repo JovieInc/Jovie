@@ -41,29 +41,36 @@ export function iconStrokeForSize(
   return ICON_STROKE.feature;
 }
 
-/** Tailwind spacing scale → CSS px (default theme). */
-const TAILWIND_SPACING_PX: Readonly<Record<string, number>> = {
+/** Fractional / non-formula Tailwind spacing overrides (default theme). */
+const TAILWIND_SPACING_OVERRIDES: Readonly<Record<string, number>> = {
   '2.5': 10,
-  '3': 12,
   '3.5': 14,
-  '4': 16,
-  '5': 20,
-  '6': 24,
-  '7': 28,
-  '8': 32,
-  '9': 36,
-  '10': 40,
-  '11': 44,
-  '12': 48,
 };
 
 const CLASS_SIZE_RE =
   /(?:^|\s)(?:!)?(?:size|h|w)-(\d+(?:\.\d+)?)(?=\s|$)/g;
 
+const CLASS_ARBITRARY_SIZE_RE =
+  /(?:^|\s)(?:!)?(?:size|h|w)-\[(\d+(?:\.\d+)?)(px|rem)\](?=\s|$)/g;
+
+/** Default Tailwind spacing: N → N×4px (0.25rem). */
+function spacingTokenToPx(token: string): number | undefined {
+  const override = TAILWIND_SPACING_OVERRIDES[token];
+  if (override !== undefined) return override;
+  const n = Number(token);
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  return n * 4;
+}
+
+function considerMax(current: number | undefined, next: number): number {
+  return current === undefined ? next : Math.max(current, next);
+}
+
 /**
  * Infer painted optical size from Tailwind `size-*` / `h-*` / `w-*` classes
  * when callers omit the Lucide `size` prop (common Icon pattern).
- * Returns the largest matched spacing so `h-6 w-6` → 24.
+ * Supports formula spacing (`size-14` → 56), fractions (`h-3.5`), and
+ * arbitrary values (`h-[28px]`, `size-[1.5rem]`). Returns the largest match.
  */
 export function opticalSizeFromClassName(
   className: string | undefined
@@ -71,11 +78,20 @@ export function opticalSizeFromClassName(
   if (!className) return undefined;
 
   let maxPx: number | undefined;
+
   for (const match of className.matchAll(CLASS_SIZE_RE)) {
-    const token = match[1];
-    const px = TAILWIND_SPACING_PX[token];
+    const px = spacingTokenToPx(match[1] ?? '');
     if (px === undefined) continue;
-    maxPx = maxPx === undefined ? px : Math.max(maxPx, px);
+    maxPx = considerMax(maxPx, px);
   }
+
+  for (const match of className.matchAll(CLASS_ARBITRARY_SIZE_RE)) {
+    const value = Number(match[1]);
+    const unit = match[2];
+    if (!Number.isFinite(value) || value <= 0) continue;
+    const px = unit === 'rem' ? value * 16 : value;
+    maxPx = considerMax(maxPx, px);
+  }
+
   return maxPx;
 }

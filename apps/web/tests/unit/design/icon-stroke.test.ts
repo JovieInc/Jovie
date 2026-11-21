@@ -44,6 +44,16 @@ describe('opticalSizeFromClassName (JOV-14004)', () => {
     expect(opticalSizeFromClassName('h-3.5 w-3.5')).toBe(14);
   });
 
+  it('uses the spacing formula for tokens beyond the override table', () => {
+    expect(opticalSizeFromClassName('size-14')).toBe(56);
+    expect(opticalSizeFromClassName('h-16')).toBe(64);
+  });
+
+  it('parses arbitrary px/rem size utilities', () => {
+    expect(opticalSizeFromClassName('h-[28px]')).toBe(28);
+    expect(opticalSizeFromClassName('size-[1.5rem]')).toBe(24);
+  });
+
   it('returns undefined when no size utility is present', () => {
     expect(opticalSizeFromClassName(undefined)).toBeUndefined();
     expect(opticalSizeFromClassName('text-accent shrink-0')).toBeUndefined();
