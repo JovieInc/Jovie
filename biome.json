@@ -152,6 +152,10 @@
   },
   "overrides": [
     {
+      "includes": ["scripts/copy-inventory/ids.gen.json"],
+      "formatter": { "indentWidth": 1 }
+    },
+    {
       "includes": ["workers/mesh-hub/src/**"],
       "javascript": {
         "globals": ["WebSocketPair", "WebSocketRequestResponsePair"]

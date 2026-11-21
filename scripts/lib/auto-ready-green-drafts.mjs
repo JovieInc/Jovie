@@ -68,8 +68,7 @@ export function withVerifiedDraftPush({
   const head = exactSha(state.head);
   const parkedAt = Date.parse(state.parkedAt ?? '');
   if (!head || !state.branch || !Number.isFinite(parkedAt)) return state;
-  // A bounded, complete page only. Later CI suites retain the original
-  // before/after pair, so only the earliest matching creation can end a park.
+  // Reruns retain before/after; use the earliest suite on a complete page.
   const rows = suites?.check_suites;
   if (
     !Array.isArray(rows) ||
