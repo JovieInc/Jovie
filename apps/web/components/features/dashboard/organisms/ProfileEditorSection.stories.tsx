@@ -22,7 +22,7 @@ const meta = {
     onDisplayNameChange: () => undefined,
     onUsernameChange: () => undefined,
     onAvatarUpload: async () => 'https://example.com/avatar.png',
-    onInputKeyDown: () => undefined,
+    onInputKeyDown: e => void e.key,
     onInputBlur: () => undefined,
   },
 } satisfies Meta<typeof ProfileEditorSection>;
