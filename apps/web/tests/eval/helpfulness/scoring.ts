@@ -4,8 +4,8 @@
  */
 
 import { lintVoice } from '@/lib/chat/voice-lint';
-import { deniesVisibleCatalog, fixtureHasCatalog } from './catalog-deny';
 import { DEFAULT_MAX_WORDS, type HelpfulnessCase } from './cases';
+import { deniesVisibleCatalog, fixtureHasCatalog } from './catalog-deny';
 import { runFailThemeChecks, upcomingTitleFromFacts } from './fail-themes';
 import type { EvalFixture } from './fixtures';
 import {
