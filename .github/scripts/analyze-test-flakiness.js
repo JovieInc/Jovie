@@ -19,12 +19,21 @@ const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const crypto = require('crypto');
+const {
+  parseJunitXml,
+  parsePlaywrightJsonReport,
+  readPlaywrightJsonRecords,
+} = require('./flakiness-report-parsers');
 
 // Configuration
 const ANALYSIS_LIMIT = 30; // Number of recent workflow runs to analyze
 const MAIN_BRANCH = 'main'; // Only main-branch runs — PR failures are deterministic, not flaky
 const ARTIFACT_RUN_LIMIT = 12; // Max main runs to scan JUnit artifacts from
 const MERGE_GROUP_ARTIFACT_LIMIT = 12; // Max merge_group runs to scan (queue-only flakes)
+// Affected Unit Tests (source-validation.yml) runs PR heads with --retry and
+// uploads unit-flaky-* reports. Only retried-then-passed entries are read from
+// these runs: a PR's terminal failures stay deterministic, never flakiness.
+const SOURCE_VALIDATION_RUN_LIMIT = 20;
 const QUARANTINE_WINDOW_HOURS = 24; // Rolling window for quarantine candidacy
 const QUARANTINE_MIN_OCCURRENCES = 3; // Flakes in window -> quarantine candidate
 const FLAKY_FAILURE_THRESHOLD = 5; // % failure rate to flag as flaky
@@ -89,6 +98,41 @@ function buildWorkflowRunsApiPath(
     branch,
   });
   return `/repos/${owner}/${repo}/actions/workflows/ci.yml/runs?${params}`;
+}
+
+/**
+ * Completed pull_request Source Validation runs, newest first.
+ */
+function buildSourceValidationRunsApiPath(
+  owner,
+  repo,
+  { limit = SOURCE_VALIDATION_RUN_LIMIT } = {}
+) {
+  const params = new URLSearchParams({
+    per_page: String(limit),
+    status: 'completed',
+    event: 'pull_request',
+  });
+  return `/repos/${owner}/${repo}/actions/workflows/source-validation.yml/runs?${params}`;
+}
+
+/**
+ * PR unit retry evidence is additive: an unreadable run list leaves the CI
+ * report intact. A quota shed or budget stop still defers the whole wake.
+ */
+async function fetchSourceValidationRuns(token, owner, repo) {
+  try {
+    const data = await githubRequest(
+      buildSourceValidationRunsApiPath(owner, repo),
+      token
+    );
+    return Array.isArray(data.workflow_runs) ? data.workflow_runs : [];
+  } catch (error) {
+    if (['shed', 'budget', 'budget_exhausted'].includes(error?.kind))
+      throw error;
+    console.warn(`Could not fetch Source Validation runs: ${error.message}`);
+    return [];
+  }
 }
 
 /**
@@ -256,76 +300,9 @@ function failureSignature(testId, errorText) {
   return crypto.createHash('sha256').update(input).digest('hex').slice(0, 16);
 }
 
-function decodeXml(text) {
-  return String(text || '')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/&amp;/g, '&');
-}
-
-function xmlAttr(tag, attr) {
-  const match = tag.match(new RegExp(`${attr}="([^"]*)"`));
-  return match ? decodeXml(match[1]) : '';
-}
-
 /**
- * Parse JUnit XML into failure/flaky-retry records.
- * `flakyFailure` elements mean the test failed then passed on retry within one
- * run — the strongest flake signal (vitest/Playwright retries).
- */
-function parseJunitXml(xml) {
-  const records = [];
-  const testcaseRegex = /<testcase\b[^>]*?(?:\/>|>([\s\S]*?)<\/testcase>)/g;
-  let m;
-  while ((m = testcaseRegex.exec(xml)) !== null) {
-    const openTag = m[0].slice(0, m[0].indexOf('>') + 1);
-    const body = m[1] || '';
-    const name = xmlAttr(openTag, 'name');
-    const file = xmlAttr(openTag, 'file') || xmlAttr(openTag, 'classname');
-    const testId = `${file}::${name}`;
-
-    const terminal = body.match(
-      /<(?:failure|error)\b[^>]*>([\s\S]*?)<\/(?:failure|error)>/
-    );
-    if (terminal) {
-      records.push({
-        testId,
-        file,
-        name,
-        kind: 'failure',
-        error: decodeXml(terminal[1]).slice(0, 2000),
-      });
-      continue;
-    }
-
-    const flakyRegex = /<flakyFailure\b[^>]*>([\s\S]*?)<\/flakyFailure>/g;
-    let f;
-    let sawFlaky = false;
-    while ((f = flakyRegex.exec(body)) !== null) {
-      sawFlaky = true;
-      const error = decodeXml(f[1]).slice(0, 2000);
-      records.push({ testId, file, name, kind: 'flaky-retry', error });
-    }
-
-    if (!sawFlaky) {
-      const failMatch = body.match(
-        /<(?:failure|error)\b[^>]*>([\s\S]*?)<\/(?:failure|error)>/
-      );
-      if (failMatch) {
-        const error = decodeXml(failMatch[1]).slice(0, 2000);
-        records.push({ testId, file, name, kind: 'failure', error });
-      }
-    }
-  }
-  return records;
-}
-
-/**
- * Download and parse JUnit artifacts for a run, returning failure records
- * annotated with run metadata.
+ * Download and parse JUnit and Playwright JSON artifacts for a run, returning
+ * failure records annotated with run metadata.
  */
 async function collectRunFailureRecords(token, owner, repo, run) {
   const artifacts = await runEvidence('artifacts', run, () =>
@@ -333,7 +310,8 @@ async function collectRunFailureRecords(token, owner, repo, run) {
   );
   const junitArtifacts = artifacts.filter(
     a =>
-      !a.expired && /unit-test|test-report|junit|playwright/i.test(a.name || '')
+      !a.expired &&
+      /unit-test|test-report|junit|playwright|e2e|smoke/i.test(a.name || '')
   );
   if (junitArtifacts.length === 0) return [];
 
@@ -362,9 +340,12 @@ async function collectRunFailureRecords(token, owner, repo, run) {
       });
       for (const file of fs
         .readdirSync(artifactDir)
-        .filter(f => f.endsWith('.xml'))) {
-        const xml = fs.readFileSync(path.join(artifactDir, file), 'utf8');
-        for (const rec of parseJunitXml(xml)) {
+        .filter(f => f.endsWith('.xml') || f.endsWith('.json'))) {
+        const filePath = path.join(artifactDir, file);
+        const parsed = file.endsWith('.xml')
+          ? parseJunitXml(fs.readFileSync(filePath, 'utf8'))
+          : readPlaywrightJsonRecords(filePath);
+        for (const rec of parsed) {
           records.push({
             ...rec,
             artifactFile: file,
@@ -644,8 +625,9 @@ function shouldCountAsRetry({ attemptOneConclusion, runAttempt, conclusion }) {
 
 /**
  * Analyze workflow runs for test flakiness
+ * @param {{ download?: typeof downloadUnitFlakeArtifacts }} [options]
  */
-async function analyzeFlakiness(token, owner, repo) {
+async function analyzeFlakiness(token, owner, repo, options = {}) {
   const runs = await fetchWorkflowRuns(token, owner, repo);
   console.log(`Analyzing ${runs.length} workflow runs...`);
 
@@ -706,14 +688,19 @@ async function analyzeFlakiness(token, owner, repo) {
     if (runHadFailure) runsWithFailures++;
   }
 
+  const svRuns = await fetchSourceValidationRuns(token, owner, repo);
+  const unitRuns = [...runs, ...svRuns];
   const unitStats = await collectCachedUnitRetryFlakes(
-    await runsWithUnitFlakeArtifacts(token, owner, repo, runs),
-    `${owner}/${repo}`
+    await runsWithUnitFlakeArtifacts(token, owner, repo, unitRuns),
+    `${owner}/${repo}`,
+    options.download ? { download: options.download } : {}
   );
 
   return {
     testStats,
     unitStats,
+    unitRunsAnalyzed: unitRuns.length,
+    sourceValidationRunsAnalyzed: svRuns.length,
     totalRuns,
     runsWithRetries,
     runsWithFailures,
@@ -1030,7 +1017,8 @@ function generateReport(
   totalRuns,
   runsWithRetries,
   runsWithFailures,
-  clusters = []
+  clusters = [],
+  { sourceValidationRuns = 0 } = {}
 ) {
   const reportDate = new Date().toISOString().split('T')[0];
   const retryRate = ((runsWithRetries / totalRuns) * 100).toFixed(1);
@@ -1041,6 +1029,9 @@ function generateReport(
   // Summary section
   report += `## Summary\n\n`;
   report += `- **Analysis Period**: Last ${totalRuns} \`${MAIN_BRANCH}\` branch CI runs\n`;
+  if (sourceValidationRuns > 0) {
+    report += `- **PR Unit Retry Evidence**: Last ${sourceValidationRuns} Source Validation runs (retried-then-passed tests only)\n`;
+  }
   report += `- **Runs with Retries**: ${runsWithRetries} (${retryRate}%)\n`;
   report += `- **Runs with Failures**: ${runsWithFailures} (${failureRate}%)\n`;
   report += `- **Flaky Tests Detected**: ${flakyTests.length}\n\n`;
@@ -1178,6 +1169,8 @@ async function main() {
     const {
       testStats,
       unitStats,
+      unitRunsAnalyzed,
+      sourceValidationRunsAnalyzed,
       totalRuns,
       runsWithRetries,
       runsWithFailures,
@@ -1186,7 +1179,7 @@ async function main() {
 
     const flakyTests = [
       ...calculateMetrics(testStats),
-      ...calculateUnitRetryFlakes(unitStats, totalRuns),
+      ...calculateUnitRetryFlakes(unitStats, unitRunsAnalyzed),
     ].sort(
       (a, b) => parseFloat(b.flakinessScore) - parseFloat(a.flakinessScore)
     );
@@ -1204,7 +1197,8 @@ async function main() {
       totalRuns,
       runsWithRetries,
       runsWithFailures,
-      clusters
+      clusters,
+      { sourceValidationRuns: sourceValidationRunsAnalyzed }
     );
 
     // Write report to file
@@ -1308,6 +1302,7 @@ module.exports = {
   readUnitFlakeReports,
   buildAttemptOneOutcomes,
   buildWorkflowRunsApiPath,
+  buildSourceValidationRunsApiPath,
   calculateMetrics,
   collectRunExecutions,
   extractTestExecutions,
@@ -1320,6 +1315,7 @@ module.exports = {
   normalizeFailureText,
   failureSignature,
   parseJunitXml,
+  parsePlaywrightJsonReport,
   clusterFailureRecords,
   retryFailureRecords,
   analyzeFailureSignatures,
