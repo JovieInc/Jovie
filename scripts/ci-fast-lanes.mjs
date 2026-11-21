@@ -1029,6 +1029,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/design/pen-draft-picture.test.mjs',
   'scripts/design/pen-draft-frames.test.mjs',
   'scripts/design/pen-data-backed-ship.test.mjs',
+  'scripts/design/bind-golden-path-nodes.test.mjs',
   'scripts/design-write-swarm/design-write-swarm.test.mjs',
   'scripts/hostops/pen-files-worker/src/index.test.mjs',
   'scripts/runner-pool-routing.test.mjs',
@@ -1689,7 +1690,6 @@ const LANES = [
     run: runStructural,
   },
 ];
-
 const LANE_IDS = Object.freeze(LANES.map(lane => lane.id));
 
 /**
