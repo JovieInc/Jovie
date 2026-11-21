@@ -29,9 +29,6 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-    env:
-      OUT_JSON: ${{ runner.temp }}/helpfulness-ci-subset.json
-      RUN_LOG: ${{ runner.temp }}/helpfulness-ci-subset.log
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -45,6 +42,8 @@ jobs:
         id: run
         env:
           WORKERS_AI_TOKEN: ${{ secrets.GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN }}
+          OUT_JSON: ${{ runner.temp }}/helpfulness-ci-subset.json
+          RUN_LOG: ${{ runner.temp }}/helpfulness-ci-subset.log
         run: |
           set -uo pipefail
           if [ -z "${WORKERS_AI_TOKEN:-}" ]; then
@@ -80,6 +79,8 @@ jobs:
 
       - name: Summarize median / safety / invented / one-rec
         if: ${{ steps.run.outputs.outcome == 'success' }}
+        env:
+          OUT_JSON: ${{ runner.temp }}/helpfulness-ci-subset.json
         run: |
           set -euo pipefail
           node --input-type=module <<'EOF'
