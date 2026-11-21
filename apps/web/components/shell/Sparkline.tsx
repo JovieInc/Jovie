@@ -4,6 +4,8 @@ import { type MouseEvent as ReactMouseEvent, useRef } from 'react';
 
 export type SparklineTrend = 'up' | 'down' | 'flat';
 
+export type SparklineVariant = 'area' | 'pulse';
+
 export interface SparklineProps {
   /**
    * Y-values for each evenly-spaced x. Must contain at least two points;
@@ -12,6 +14,11 @@ export interface SparklineProps {
   readonly points: readonly number[];
   /** Tone palette — tints the line, fill, and hover playhead. */
   readonly trend: SparklineTrend;
+  /**
+   * `area` (default): filled track under the line.
+   * `pulse`: line-only glance chart — no fill panel (Story First flat rail).
+   */
+  readonly variant?: SparklineVariant;
   /** Index of the currently hovered point, or null when none. */
   readonly hoverIdx?: number | null;
   /** Called as the cursor moves over the chart; null on leave. */
@@ -63,6 +70,7 @@ const POINT_OUTLINE = 'var(--color-bg-base)';
 export function Sparkline({
   points,
   trend,
+  variant = 'area',
   hoverIdx,
   onHover,
   ariaLabel = 'Trend over time',
@@ -71,9 +79,12 @@ export function Sparkline({
   const max = Math.max(...points, 1);
   const min = Math.min(...points, 0);
   const range = max - min || 1;
+  // Pulse charts keep vertical padding so a flat series is not a hard edge.
+  const padY = variant === 'pulse' ? VIEWBOX_H * 0.18 : 0;
   const xFor = (i: number) =>
     points.length <= 1 ? VIEWBOX_W / 2 : (i / (points.length - 1)) * VIEWBOX_W;
-  const yFor = (v: number) => VIEWBOX_H - ((v - min) / range) * VIEWBOX_H;
+  const yFor = (v: number) =>
+    VIEWBOX_H - padY - ((v - min) / range) * (VIEWBOX_H - padY * 2);
   const path = points
     .map(
       (p, i) =>
@@ -83,6 +94,7 @@ export function Sparkline({
   const fillPath = `${path} L ${VIEWBOX_W} ${VIEWBOX_H} L 0 ${VIEWBOX_H} Z`;
   const stroke = STROKE_BY_TREND[trend];
   const fill = FILL_BY_TREND[trend];
+  const strokeWidth = variant === 'pulse' ? 2 : 1.5;
   const svgRef = useRef<SVGSVGElement>(null);
 
   function handleMove(e: ReactMouseEvent<SVGSVGElement>) {
@@ -119,8 +131,17 @@ export function Sparkline({
       onMouseLeave={() => onHover?.(null)}
     >
       <title>{ariaLabel}</title>
-      <path d={fillPath} fill={fill} />
-      <path d={path} fill='none' stroke={stroke} strokeWidth={1.5} />
+      {variant === 'area' ? <path d={fillPath} fill={fill} /> : null}
+      <path
+        d={path}
+        fill='none'
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        strokeLinecap='round'
+        strokeLinejoin='round'
+        vectorEffect='non-scaling-stroke'
+        data-sparkline-variant={variant}
+      />
       {playheadX != null && playheadY != null && (
         <>
           <line
