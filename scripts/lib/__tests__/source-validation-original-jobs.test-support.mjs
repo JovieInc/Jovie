@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-/** @typedef {{name?: string, id?: string, shell?: string, if?: string, run?: string, uses?: string, env?: Record<string, string>, 'continue-on-error'?: boolean}} Step */
+/** @typedef {{name?: string, id?: string, shell?: string, if?: string, run?: string, uses?: string, env?: Record<string, string>, 'continue-on-error'?: boolean, with?: Record<string, unknown>}} Step */
 /** @typedef {{steps: Step[], 'runs-on'?: string}} Job */
 /** @typedef {{jobs: Record<string, Job>, permissions: unknown, on: unknown}} Workflow */
 
