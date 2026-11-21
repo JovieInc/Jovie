@@ -28,7 +28,8 @@ const glance: readonly StoryFirstGlancePulse[] = [
     delta: '+3',
     tone: 'good',
     measured: true,
-    points: [11, 14],
+    // ≥3 points required to paint a sparkline (#26311).
+    points: [11, 12, 14],
     trend: 'up',
     href: '/app/ov/shipping',
   },
@@ -39,7 +40,7 @@ const glance: readonly StoryFirstGlancePulse[] = [
     delta: 'alive',
     tone: 'good',
     measured: true,
-    points: [12, 12.4],
+    points: [11.8, 12, 12.4],
     trend: 'up',
     href: '/app/ov/ops',
   },
@@ -50,7 +51,7 @@ const glance: readonly StoryFirstGlancePulse[] = [
     delta: '+18',
     tone: 'good',
     measured: true,
-    points: [230, 248],
+    points: [230, 240, 248],
     trend: 'up',
     href: '/app/ov/growth',
   },
@@ -113,7 +114,11 @@ describe('StoryFirstCanvas', () => {
       <StoryFirstCanvas
         bottleneck={bottleneck}
         glance={glance}
-        stages={stages.map(stage => ({ ...stage, count: 0, highlight: null }))}
+        stages={stages.map(stage => ({
+          ...stage,
+          count: 0,
+          highlight: null,
+        }))}
         stagesStatus='error'
         onRetryStages={onRetry}
       />
@@ -143,12 +148,32 @@ describe('StoryFirstCanvas', () => {
       'data-melting',
       'true'
     );
-    expect(screen.getByTestId('story-first-board')).toHaveAttribute(
-      'aria-hidden',
-      'true'
-    );
-    expect(screen.getByTestId('story-first-board')).toHaveAttribute('inert');
+    const board = screen.getByTestId('story-first-board');
+    expect(board).toHaveAttribute('aria-hidden', 'true');
+    expect(board).toHaveAttribute('inert');
+    // Opacity + lift + blur; reduced-motion clears translate/blur only.
+    expect(board.className).toMatch(/opacity-40/);
+    expect(board.className).toMatch(/-translate-y-1/);
+    expect(board.className).toMatch(/blur-sm/);
+    expect(board.className).toMatch(/ease-cinematic/);
     expect(screen.getByTestId('fixture-answer')).toBeVisible();
+  });
+
+  it('uses pulse sparklines without area fill chrome on the glance rail', () => {
+    const { container } = render(
+      <StoryFirstCanvas
+        bottleneck={bottleneck}
+        glance={glance}
+        stages={stages}
+      />
+    );
+    const pulseLines = container.querySelectorAll(
+      'path[data-sparkline-variant="pulse"]'
+    );
+    expect(pulseLines.length).toBe(3);
+    expect(
+      container.querySelectorAll('path[fill]:not([fill="none"])')
+    ).toHaveLength(0);
   });
 
   it('is axe-clean in clear and melting states', async () => {

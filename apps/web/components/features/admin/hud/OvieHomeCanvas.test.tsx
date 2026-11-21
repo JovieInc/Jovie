@@ -303,6 +303,8 @@ describe('OvieHomeCanvas Story First flat', () => {
     await screen.findByTestId('story-first-canvas');
 
     const answer = screen.getByTestId('home-loop-answer');
+    // Story First melt keeps the answer editorial (no card chrome).
+    expect(answer).toHaveAttribute('data-surface', 'flat');
     expect(answer).toHaveTextContent('Shipping?');
     expect(answer).toHaveTextContent('2 of 2');
     expect(answer).toHaveTextContent('Shipping Now');
