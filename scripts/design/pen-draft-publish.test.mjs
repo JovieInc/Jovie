@@ -294,7 +294,6 @@ test('the workflow publishes the run that drafted, with read-only tokens', () =>
   assert.deepEqual(workflow.on.workflow_run, {
     workflows: [draft.name],
     types: ['completed'],
-    branches: ['main'],
   });
   assert.equal(workflow.on.workflow_dispatch.inputs.run_id.required, true);
   assert.deepEqual(workflow.permissions, {});

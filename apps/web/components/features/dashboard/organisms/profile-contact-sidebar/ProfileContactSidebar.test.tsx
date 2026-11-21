@@ -133,20 +133,6 @@ vi.mock('@/components/feedback', () => ({
   },
 }));
 
-vi.mock('@/components/atoms/AppIconButton', () => ({
-  AppIconButton: ({
-    children,
-    ariaLabel,
-    ...props
-  }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-    ariaLabel: string;
-  }) => (
-    <button type='button' aria-label={ariaLabel} {...props}>
-      {children}
-    </button>
-  ),
-}));
-
 vi.mock(
   '@/components/molecules/drawer',
   () => import('@/tests/utils/profile-contact-sidebar-drawer-doubles')
