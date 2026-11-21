@@ -262,6 +262,21 @@ describe('Golden Path UI & UX closed-loop invariants', () => {
     );
   });
 
+  it('Keep → auth: golden-path E2E must not wait for social-link after handle confirm', () => {
+    const goldenPathSpec = readWebSource('tests/e2e/golden-path.spec.ts');
+    // JOV-14011 / #26243: after Keep the journey asserts auth handoff, not
+    // the deferred social enrichment card.
+    expect(goldenPathSpec).not.toMatch(
+      /onboarding-confirm-handle[\s\S]{0,1200}?getByTestId\(['"]onboarding-social-link['"]\)\)\.toBeVisible/
+    );
+    expect(goldenPathSpec).toContain(
+      "getByTestId('onboarding-social-link')).toHaveCount(0)"
+    );
+    expect(goldenPathSpec).toMatch(
+      /x-onboarding-fallback[\s\S]{0,200}instant_access\|golden_path_admitted\|waitlist/
+    );
+  });
+
   it('forbids undefined --color-text-primary CSS variable in auth shell and theme styles', () => {
     for (const cssFile of [
       'styles/theme.css',
