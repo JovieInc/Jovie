@@ -81,6 +81,17 @@ describe('MarketingHeader states', () => {
     ).toBeGreaterThan(0);
   });
 
+  it('keeps the glass nav free of a duplicate Jovie wordmark link (JOV-14240)', () => {
+    render(<MarketingHeader />);
+
+    const nav = document.querySelector('.marketing-glass-header__nav');
+    expect(nav?.textContent).not.toMatch(/(?:^|[^a-z])Jovie(?:[^a-z]|$)/i);
+    expect(
+      nav?.querySelector('.marketing-glass-header__brand-wordmark')
+    ).toBeNull();
+    expect(screen.getByTestId('site-logo-link')).toBeInTheDocument();
+  });
+
   it('sends the default landing CTA into the one /start flow', () => {
     render(<MarketingHeader />);
 

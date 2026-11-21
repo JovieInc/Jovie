@@ -458,11 +458,11 @@ function matchesVariant(
 ): boolean {
   // hero
   if (sectionId === 'hero') {
-    if (variantId === 'centered-handle-claim') {
+    if (variantId === 'left-phone') {
       return (
         brief.targetAudience === 'artist' &&
-        brief.desiredConversion === 'claim-handle' &&
-        recipeId === 'artist-lp'
+        recipeId === 'artist-lp' &&
+        brief.desiredConversion === 'claim-handle'
       );
     }
     if (variantId === 'centered-phone') {

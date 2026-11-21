@@ -1,0 +1,13 @@
+{
+  "schema": "jovie.assistants-chat-first-token/v1",
+  "schemaVersion": 1,
+  "metric": "chat_first_token",
+  "status": "unrun",
+  "surface": "/app/chat",
+  "mode": "relay",
+  "account": "test",
+  "targetMs": 1000,
+  "recordedAt": null,
+  "samplesMs": [],
+  "p50Ms": null
+}

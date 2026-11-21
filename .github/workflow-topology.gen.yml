@@ -104,6 +104,17 @@ nodes:
       - workflow_run
     terminalReceipt: job:reconcile
     jobCount: 1
+  - name: Assistants scheduled check
+    path: .github/workflows/assistants-scheduled-check.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:assistants-scheduled-check
+    jobCount: 1
   - name: Auto-Merge Base Guard
     path: .github/workflows/auto-merge-base-guard.yml
     active: true
@@ -160,6 +171,17 @@ nodes:
     triggeringStateTransition:
       - workflow_call
     terminalReceipt: job:canary-health-gate
+    jobCount: 1
+  - name: Chat first-token sample
+    path: .github/workflows/chat-first-token-sample.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:chat-first-token-sample
     jobCount: 1
   - name: Cheap Fixer
     path: .github/workflows/cheap-fixer.yml
@@ -600,6 +622,17 @@ nodes:
     triggeringStateTransition:
       - push
     terminalReceipt: job:affected-articles
+    jobCount: 1
+  - name: Helpfulness live CI-subset
+    path: .github/workflows/helpfulness-live-ci-subset.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:helpfulness-ci-subset
     jobCount: 1
   - name: Hermes CLI Worker
     path: .github/workflows/hermes-cli-worker.yml
@@ -1604,7 +1637,7 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:docs-deploy-jovie
-    jobCount: 6
+    jobCount: 7
   - name: Test Coverage Audit
     path: .github/workflows/test-coverage-audit.yml
     active: true

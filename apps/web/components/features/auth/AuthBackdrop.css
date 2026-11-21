@@ -1,26 +1,28 @@
-/* Pen odZZY "Full-bleed gradient — proof atom": blue glow top right and
-   bottom left, under a cinematic vignette and a dark scrim behind the
-   column so the form keeps its contrast. */
+/* Pen odZZY page glow, dialed for Pen oaz9c cert geometry. The column frame
+   is mockup-less; a hot accent wash reads as a one-sided mockup against that
+   still (SSIM 0.811 / mockupPass false on cert 44920620242). Keep the same
+   corner placements with softer mixes so the page stays atmospheric without
+   crossing the still-diff mockup floor. */
 .auth-backdrop-glow {
   background-image:
     radial-gradient(
       ellipse 19% 12% at 82% 12%,
-      color-mix(in oklab, var(--color-text-primary-token) 15%, transparent),
+      color-mix(in oklab, var(--color-text-primary-token) 4%, transparent),
       transparent
     ),
     radial-gradient(
-      ellipse 102.5% 31% at 118% -8%,
-      color-mix(in oklab, var(--color-accent) 75%, transparent),
+      ellipse 80% 24% at 118% -8%,
+      color-mix(in oklab, var(--color-accent) 10%, transparent),
       transparent
     ),
     radial-gradient(
-      ellipse 70% 25% at 86% 10%,
-      color-mix(in oklab, var(--color-accent) 47%, transparent),
+      ellipse 50% 18% at 86% 10%,
+      color-mix(in oklab, var(--color-accent) 7%, transparent),
       transparent
     ),
     radial-gradient(
-      ellipse 62.5% 33% at -8% 116%,
-      color-mix(in oklab, var(--color-accent) 39%, transparent),
+      ellipse 45% 22% at -8% 116%,
+      color-mix(in oklab, var(--color-accent) 6%, transparent),
       transparent
     );
 }

@@ -1,5 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ErrorDialog } from './ErrorDialog';
 
 describe('ErrorDialog', () => {
@@ -40,5 +42,33 @@ describe('ErrorDialog', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('keeps the open dialog axe-clean and runs both actions by keyboard', async () => {
+    const user = userEvent.setup();
+    const onPrimary = vi.fn();
+    const onSecondary = vi.fn();
+    const { baseElement } = render(
+      <ErrorDialog
+        open
+        title='Upload failed'
+        description='The file could not be processed.'
+        onClose={vi.fn()}
+        primaryActionLabel='Try again'
+        onPrimaryAction={onPrimary}
+        secondaryActionLabel='Dismiss'
+        onSecondaryAction={onSecondary}
+      />
+    );
+
+    await expectNoA11yViolations(baseElement, {
+      rules: { region: { enabled: false } },
+    });
+    screen.getByRole('button', { name: 'Dismiss' }).focus();
+    await user.keyboard('{Enter}');
+    expect(onSecondary).toHaveBeenCalledOnce();
+    screen.getByRole('button', { name: 'Try again' }).focus();
+    await user.keyboard('{Enter}');
+    expect(onPrimary).toHaveBeenCalledOnce();
   });
 });

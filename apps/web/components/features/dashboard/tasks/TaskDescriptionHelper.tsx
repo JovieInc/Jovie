@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import type { TaskDescriptionHelperPayload } from '@/lib/tasks/task-description-helper';
 
 interface TaskDescriptionHelperProps {
@@ -17,7 +18,7 @@ export function TaskDescriptionHelper({
 
   return (
     <div className='absolute inset-0 min-h-130'>
-      <button
+      <PlainButton
         type='button'
         aria-label={`Open ${helper.title} description helper`}
         data-testid='task-description-helper'
