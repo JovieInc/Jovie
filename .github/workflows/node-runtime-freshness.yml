@@ -1,8 +1,8 @@
 name: Node Runtime Freshness
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Summer
-# necessary-trust-boundary: Node.js publishes releases outside the repo, so this daily job is the only hop that reads nodejs.org and Docker Hub, rewrites the exact pin files and opens one jovie-bot PR; that PR merges only through the normal required checks and never deploys or publishes.
-# removal-trigger: Remove the bump job when Renovate or Dependabot can move every exact pin file, tarball checksum and image digest in one PR that passes the pin contract tests.
+# necessary-trust-boundary: Node.js publishes releases outside the repo, so this daily job is the only hop that reads nodejs.org and Docker Hub, rewrites the exact pin files and opens one jovie-bot PR; that PR merges only through the normal required checks and never deploys or publishes. The same upstream-advisory clock also runs the read-only Apple developer RSS classifier (scripts/apple-change-ingest) because Apple offers no verified push webhook and the cron allowlist cannot grow a second timer.
+# removal-trigger: Remove the bump job when Renovate or Dependabot can move every exact pin file, tarball checksum and image digest in one PR that passes the pin contract tests. Remove the apple-change job when Summer heartbeat or cron-hub owns scripts/apple-change-ingest with the same receipt contract.
 # clock-class: upstream-advisory
 on:
   schedule:
@@ -10,10 +10,99 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: node-runtime-freshness
   cancel-in-progress: true
 jobs:
+  apple-change:
+    name: Classify Apple developer changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+      # github-token-budget: 2 calls/run - list + binary zip (api-client file stdout)
+      - name: Restore previous Apple change receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/apple-prior"
+          # api-client writes artifact /zip bodies to a real file (not a pipe) and
+          # returns raw bytes — UTF-8 pipe decode would corrupt the archive.
+          # Fail closed on list errors (network/rate-limit/5xx/exit 75 deferred);
+          # only a successful empty jq result means "no prior yet".
+          set +e
+          id="$(node packages/api-client/cli.ts gh --priority poll -- api \
+            "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=apple-change-receipt&per_page=100" \
+            --jq '([(.artifacts // [])[] | select(.expired|not)] | sort_by(.created_at) | last | .id) // empty')"
+          list_status=$?
+          set -e
+          if [ "$list_status" -ne 0 ]; then
+            echo "::error::Failed to list apple-change-receipt artifacts (exit ${list_status})."
+            exit "$list_status"
+          fi
+          if [ -z "${id}" ]; then
+            echo "No prior apple-change-receipt artifact yet; revision detection starts next run."
+            exit 0
+          fi
+          node packages/api-client/cli.ts gh --priority poll -- api \
+            "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}/zip" \
+            > "$RUNNER_TEMP/apple-prior/prior.zip"
+          unzip -p "$RUNNER_TEMP/apple-prior/prior.zip" apple-change-receipt.json \
+            > "$RUNNER_TEMP/apple-prior/apple-change-receipt.json"
+          # Node is provisioned in this job; avoid unprovisioned python3 (hermetic-ci).
+          # Refuse failed/partial priors (ok!==true) so they cannot undercount revisions.
+          node -e '
+            const fs = require("node:fs");
+            const path = process.argv[1];
+            const receipt = JSON.parse(fs.readFileSync(path, "utf8"));
+            if (receipt.ok !== true) {
+              console.log("Prior receipt ok!==true; discarding (treat as no prior)");
+              fs.unlinkSync(path);
+              process.exit(0);
+            }
+            console.log("prior receipt ok");
+          ' "$RUNNER_TEMP/apple-prior/apple-change-receipt.json"
+
+      - name: Ingest and classify
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/apple-change-receipt.json"
+          args=(--out "$out")
+          prior="$RUNNER_TEMP/apple-prior/apple-change-receipt.json"
+          if [ -f "$prior" ]; then args+=(--prior "$prior"); fi
+          node scripts/apple-change-ingest/apple-change-ingest.mjs "${args[@]}" \
+            | tee "$RUNNER_TEMP/apple-change-summary.json"
+          {
+            echo "## Apple change ingest"
+            echo '```json'
+            cat "$RUNNER_TEMP/apple-change-summary.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      # Only successful receipts may become the next run's --prior baseline.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: success()
+        with:
+          name: apple-change-receipt
+          path: |
+            ${{ runner.temp }}/apple-change-receipt.json
+            ${{ runner.temp }}/apple-change-summary.json
+          if-no-files-found: ignore
+          retention-days: 90
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: apple-change-failure-summary
+          path: ${{ runner.temp }}/apple-change-summary.json
+          if-no-files-found: ignore
+          retention-days: 14
   policy:
     name: Enforce official Node lifecycle and patch SLA
     runs-on: ubuntu-24.04

@@ -1,14 +1,12 @@
 # Generated audio fixtures
 
-These files are one-second, 440 Hz synthetic tones generated locally by
-`apps/web/scripts/generate-audio-test-fixtures.sh`. They contain no third-party
-music, speech, metadata, user data, URLs, or credentials.
+Decodable formats (mp3/wav/flac/aac/m4a) are one-second, 440 Hz synthetic tones
+from `apps/web/scripts/generate-audio-test-fixtures.sh`. They contain no
+third-party music, speech, metadata, user data, URLs, or credentials.
 
-The corpus intentionally covers every format in `AUDIO_FORMAT_REGISTRY`, plus a
-32-byte truncated copy of each container. Browser decode expectations live in
-`manifest.ts`; acceptance and direct playback are separate capabilities. In
-particular, Chromium accepts an AIFF upload by name and MIME but cannot decode
-the valid AIFF fixture through `decodeAudioData`.
+`tone.aiff` is a minimal valid AIFF (COMM+SSND) kept tiny on purpose: Chromium
+accepts AIFF by name/MIME but cannot `decodeAudioData` it, so a full-second PCM
+tone only burned tracked bytes. Sniff/acceptance still require a real container.
 
-Regenerate only when intentionally changing the corpus. The checked-in manifest
-hashes make accidental fixture replacement fail closed.
+The corpus covers every `AUDIO_FORMAT_REGISTRY` format plus a 32-byte truncated
+copy of each. Manifest hashes fail closed on accidental replacement.
