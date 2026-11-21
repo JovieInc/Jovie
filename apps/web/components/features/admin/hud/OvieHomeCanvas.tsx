@@ -1,19 +1,15 @@
 'use client';
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { toast } from '@/components/feedback';
+import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
 import { ChatOpsDataCard } from '@/components/jovie/components/ChatOpsDataCard';
 import type { HomeCanvasState } from '@/components/jovie/types';
 import {
   HomeLoopAnswerPanel,
-  HomeLoopCanvas,
-  type HomeLoopCopy,
   type HomeLoopSectionStatus,
+  StoryFirstCanvas,
 } from '@/components/organisms/home-loop';
-import { useUndoableAnswers } from '@/components/organisms/home-loop/useUndoableAnswers';
 import { APP_ROUTES } from '@/constants/routes';
-import type { HomeLoopAsk } from '@/lib/home-loop/contract';
 import {
   buildCanvasTurns,
   partitionCanvasCards,
@@ -27,45 +23,23 @@ import {
   type OvieFunnelInput,
   type OvieGoldenPathRow,
 } from '@/lib/ovie/home/company-tiles';
-import { summarizeSourceIssues } from '@/lib/ovie/home/operator-copy';
 import { reportOvieHomePanelError } from '@/lib/ovie/home/panel-alerts';
 import {
-  buildOvieAsks,
   buildOvieHomeShipping,
-  OVIE_SHIP_STAGES,
   type OviePulseMemory,
-  ovieAskAction,
 } from '@/lib/ovie/home/shipping-home';
-import { inboxDecisionRequest, type OvieInbox } from '@/lib/ovie/inbox';
+import {
+  buildStoryFirstBottleneck,
+  buildStoryFirstGlance,
+  buildStoryFirstStages,
+} from '@/lib/ovie/home/story-first';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
 import type { HudMetrics } from '@/types/hud';
 import { useCanvasHistory } from './useCanvasHistory';
 import { useHudShippingStateQuery } from './useHudShippingStateQuery';
 import { useOvieHomeReadyTiming } from './useOvieHomeReadyTiming';
 
-const OVIE_HOME_COPY: HomeLoopCopy = {
-  constraintClear: 'Shipping is on target',
-  constraintUnknown: 'Shipping status is unknown',
-  asksTitle: 'Needs you',
-  asksEmpty: 'Nothing needs your decision.',
-  asksError: 'Decisions could not load.',
-  inFlightTitle: 'In Flight',
-  inFlightEmpty: 'No work in flight.',
-  inFlightError: 'Shipping data could not load.',
-  doneTitle: 'Done Today',
-  doneEmpty: 'Nothing has landed yet today.',
-};
-
-/** Once the revenue blocker reads, a clear banner means revenue is clear. */
-const OVIE_HOME_REVENUE_COPY: HomeLoopCopy = {
-  ...OVIE_HOME_COPY,
-  constraintClear: 'Nothing is blocking revenue',
-};
-
-const INBOX_QUERY_KEY = ['ovie', 'inbox'] as const;
 const LAST_VISIT_KEY = 'ovie.home.last-visit.v1';
-/** Home shows at most this many asks; the rest resolve by their defaults. */
-export const OVIE_HOME_MAX_ASKS = 3;
 
 interface OvieLastVisit {
   readonly at: number | null;
@@ -112,18 +86,6 @@ function writeLastVisit(
   }
 }
 
-function sinceLabel(at: number | null, now: number): string {
-  if (at === null) return 'Shipping';
-  const minutes = Math.max(0, Math.round((now - at) / 60_000));
-  const ago =
-    minutes < 60
-      ? `${minutes}m`
-      : minutes < 48 * 60
-        ? `${Math.round(minutes / 60)}h`
-        : `${Math.round(minutes / 1440)}d`;
-  return `Shipping · compared with your visit ${ago} ago`;
-}
-
 async function fetchJson<T>(url: string, signal: AbortSignal): Promise<T> {
   const response = await fetch(url, { signal, cache: 'no-store' });
   if (!response.ok) throw new Error(`${url} ${response.status}`);
@@ -141,19 +103,12 @@ interface OvieHomeBlockerResponse {
   readonly generatedAt: string;
 }
 
-async function fetchInbox(signal: AbortSignal): Promise<OvieInbox> {
-  const response = await fetch('/api/ovie/inbox', {
-    signal,
-    cache: 'no-store',
-  });
-  if (!response.ok) throw new Error('Decisions could not load.');
-  return (await response.json()) as OvieInbox;
-}
-
 /**
- * Ovie Home: the company loop rendered through the shared Home loop canvas.
- * Shipping comes from `ovie.shipping-state.v1` and asks from the Ovie inbox;
- * this component adds no polling of its own beyond those existing queries.
+ * Ovie Home — Story First flat (Tim 2026-11-21): bottleneck owns the fold,
+ * three glance pulses as a right rail, stage buckets + one highlight, docked
+ * composer with melt-to-chat on typing. Shipping from `ovie.shipping-state.v1`;
+ * revenue blocker from company-state. Needs You and the metric wall stay off
+ * the first fold (Inbox / Shipping own them).
  */
 export interface OvieHomeCanvasProps {
   /** Shell chat state; absent when Home renders outside the composer slot. */
@@ -161,15 +116,7 @@ export interface OvieHomeCanvasProps {
 }
 
 export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
-  const queryClient = useQueryClient();
   const shipping = useHudShippingStateQuery(null);
-  const inbox = useQuery<OvieInbox>({
-    queryKey: INBOX_QUERY_KEY,
-    queryFn: ({ signal }) => fetchInbox(signal),
-    ...FREQUENT_CACHE,
-    refetchOnWindowFocus: true,
-    refetchInterval: 30_000,
-  });
 
   // The one revenue blocker, from the cached company snapshot (no
   // third-party calls). Summer's brief reads the same field.
@@ -184,7 +131,6 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
   });
 
   const [lastVisit] = useState<OvieLastVisit>(readLastVisit);
-  const [mountedAt] = useState(() => Date.now());
   const company = useQuery({
     queryKey: ['ovie', 'home', 'company'],
     queryFn: async ({ signal }) => {
@@ -214,6 +160,7 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
             : null,
       });
     },
+    ...FREQUENT_CACHE,
     refetchInterval: 60_000,
     refetchIntervalInBackground: false,
     staleTime: 30_000,
@@ -237,76 +184,6 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     if (home) writeLastVisit(home.pulse);
   }, [home]);
 
-  const allAsks = useMemo(
-    () => (inbox.data ? buildOvieAsks(inbox.data) : []),
-    [inbox.data]
-  );
-  // Only the top few reach Home (Tim 2026-10-30); every other ask carries a
-  // declared default and resolves on its own unless he opens the inbox.
-  const asks = allAsks.slice(0, OVIE_HOME_MAX_ASKS);
-  const deferredAsks = allAsks.length - asks.length;
-
-  const onCommitted = useCallback(
-    (id: string) => {
-      queryClient.setQueryData<OvieInbox>(INBOX_QUERY_KEY, current =>
-        current
-          ? {
-              ...current,
-              cases: current.cases.filter(entry => entry.id !== id),
-            }
-          : current
-      );
-      void queryClient.invalidateQueries({ queryKey: INBOX_QUERY_KEY });
-    },
-    [queryClient]
-  );
-  const { answers, answer } = useUndoableAnswers({ onCommitted });
-
-  const decide = useCallback(
-    (ask: HomeLoopAsk, decision: 'approve' | 'reject', notes: string) => {
-      const target = inbox.data?.cases.find(
-        item => item.id === ask.id
-      )?.decisionTarget;
-      answer({
-        id: ask.id,
-        label:
-          decision === 'approve'
-            ? notes
-              ? `Answered: ${notes}`
-              : ovieAskAction(target?.kind).committedLabel
-            : `Replied: ${notes}`,
-        commit: async () => {
-          if (!target) throw new Error('This decision is no longer open.');
-          const request = inboxDecisionRequest(
-            target,
-            decision,
-            notes,
-            crypto.randomUUID()
-          );
-          const response = await fetch(request.url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(request.body),
-          });
-          if (!response.ok)
-            throw new Error(
-              response.status === 409
-                ? 'This decision changed. Review it and retry.'
-                : 'Not recorded. Try again.'
-            );
-        },
-      });
-    },
-    [answer, inbox.data]
-  );
-
-  // Empty stage columns are dead space on a dense Home; the verdict already
-  // names a stalled queue. The full six-stage path lives on Shipping.
-  const activeStages = useMemo(() => {
-    const used = new Set(home?.rows.map(row => row.stage));
-    const active = OVIE_SHIP_STAGES.filter(stage => used.has(stage));
-    return active.length > 0 ? active : OVIE_SHIP_STAGES;
-  }, [home]);
   const connection = snapshot?.view.connection ?? null;
   // The task feed reports `syncing` with no observation until its first
   // reconciled read; that is loading, not an empty pipeline.
@@ -314,28 +191,6 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     snapshot?.operationalTasks.syncState === 'syncing' &&
     snapshot.operationalTasks.observedAt === null &&
     snapshot.operationalTasks.tasks.length === 0;
-  const sendFeedback = useCallback(
-    (ask: HomeLoopAsk, comment: string) => {
-      const target = inbox.data?.cases.find(
-        item => item.id === ask.id
-      )?.decisionTarget;
-      if (target?.kind !== 'summer') return;
-      void fetch(
-        `/api/ovie/summer-cards/${encodeURIComponent(target.id)}/feedback`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ comment }),
-        }
-      )
-        .then(response => {
-          if (!response.ok) throw new Error('Feedback was not recorded.');
-          toast.success('Feedback sent');
-        })
-        .catch(() => toast.error('Feedback was not recorded. Try again.'));
-    },
-    [inbox.data]
-  );
 
   const loopStatus: HomeLoopSectionStatus =
     connection === 'unauthorized' ||
@@ -352,21 +207,12 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       : null);
   // Home leads with the revenue blocker; shipping health is the floor shown
   // only when revenue is clear. An unreadable blocker never reads as clear.
-  // Until it reads (or if it can't), the banner keeps its shipping behavior,
-  // so an unreadable blocker never reads as "nothing is blocking revenue".
-  // A failed refetch keeps the last good read rather than dropping to
-  // shipping health (the failure still raises a panel alert below).
   const revenueData = revenueBlocker.data;
   const revenueRead = revenueData !== undefined;
   const constraint = revenueRead
     ? homeConstraint(revenueData.blocker, shippingConstraint)
     : shippingConstraint;
-  const asksStatus: HomeLoopSectionStatus = inbox.data
-    ? 'ready'
-    : inbox.isError
-      ? 'error'
-      : 'loading';
-  // Every panel error state is an incident (panel-alerts.ts), not just copy.
+
   const loopErrorReason =
     loopStatus === 'error'
       ? connection === 'unauthorized'
@@ -381,30 +227,34 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     if (loopErrorReason)
       reportOvieHomePanelError('shipping-loop', loopErrorReason);
   }, [loopErrorReason]);
-  useEffect(() => {
-    if (asksStatus === 'error')
-      reportOvieHomePanelError('asks', 'inbox-unavailable');
-  }, [asksStatus]);
-  // Mirror the inbox: a successful read can still omit a source. Showing the
-  // loaded asks alone would claim the section is complete.
-  // First meaningful paint: both sections past their skeletons.
-  useOvieHomeReadyTiming(loopStatus !== 'loading' && asksStatus !== 'loading');
-  // The rest resolve by their declared defaults; a missing source is still
-  // named so a short list never reads as complete.
-  const sourceIssues = inbox.data?.issues.length ?? 0;
-  const asksNotice =
-    [
-      deferredAsks > 0
-        ? `${deferredAsks} more resolve by their defaults`
-        : null,
-      inbox.data ? summarizeSourceIssues(inbox.data.issues) : null,
-    ]
-      .filter(Boolean)
-      .join(' · ') || null;
-  useEffect(() => {
-    if (sourceIssues > 0)
-      reportOvieHomePanelError('asks', `${sourceIssues} inbox source issues`);
-  }, [sourceIssues]);
+
+  useOvieHomeReadyTiming(
+    loopStatus !== 'loading' && !company.isPending && revenueRead
+  );
+
+  const { buckets, highlight } = useMemo(
+    () => buildStoryFirstStages(home?.rows ?? []),
+    [home]
+  );
+  const bottleneck = useMemo(
+    () =>
+      buildStoryFirstBottleneck({
+        revenue: revenueData?.blocker ?? null,
+        revenueRead,
+        constraint,
+        highlight,
+      }),
+    [revenueData, revenueRead, constraint, highlight]
+  );
+  const glance = useMemo(
+    () =>
+      buildStoryFirstGlance({
+        delivery: snapshot?.view.delivery ?? null,
+        company: company.data ?? COMPANY_PLACEHOLDER,
+        shippingPulse: home?.pulse ?? [],
+      }),
+    [snapshot, company.data, home]
+  );
 
   const turns = useMemo(
     () => buildCanvasTurns(chat?.messages ?? [], chat?.isStreaming ?? false),
@@ -434,55 +284,29 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
             />
           ))
         : null}
+      {generated?.inFlight.length
+        ? generated.inFlight.map((card, index) => (
+            <ChatOpsDataCard
+              key={`${turn.id}:flight:${card.kind}:${card.title}:${index}`}
+              card={card}
+            />
+          ))
+        : null}
     </HomeLoopAnswerPanel>
   ) : null;
-  const inFlightOverride = generated?.inFlight.length ? (
-    <div
-      className='flex flex-col gap-2'
-      data-testid='home-loop-in-flight-generated'
-    >
-      {generated.inFlight.map((card, index) => (
-        <ChatOpsDataCard
-          key={`${turn?.id}:${card.kind}:${card.title}:${index}`}
-          card={card}
-        />
-      ))}
-    </div>
-  ) : undefined;
+
+  const melting = Boolean(chat?.composerHasIntent || chat?.isStreaming);
 
   return (
-    <HomeLoopCanvas
+    <StoryFirstCanvas
+      bottleneck={bottleneck}
+      glance={glance}
+      stages={buckets}
+      inFlightHref={APP_ROUTES.ADMIN_SHIPPING}
+      melting={melting}
       answer={answerPanel}
-      inFlightOverride={inFlightOverride}
-      copy={revenueRead ? OVIE_HOME_REVENUE_COPY : OVIE_HOME_COPY}
-      stages={activeStages}
-      constraint={constraint}
-      constraintStatus={revenueRead ? 'ready' : undefined}
-      pulse={home?.pulse ?? []}
-      reservePulseSourceCaption
-      asks={asks}
-      rows={home?.rows ?? []}
-      done={home?.done ?? []}
-      doneSummary={
-        home?.mergesToday != null
-          ? `${home.mergesToday} ${home.mergesToday === 1 ? 'merge' : 'merges'}`
-          : null
-      }
-      loopStatus={loopStatus}
-      asksStatus={asksStatus}
-      asksNotice={asksNotice}
-      asksNoticeHref={APP_ROUTES.ADMIN_INBOX}
-      answers={answers}
-      onApprove={(ask, option) => decide(ask, 'approve', option ?? '')}
-      onReply={(ask, text) => decide(ask, 'reject', text)}
-      onFeedback={sendFeedback}
-      onRetryLoop={() => void shipping.refetch()}
-      onRetryAsks={() => void inbox.refetch()}
-      asksMoreHref={APP_ROUTES.ADMIN_INBOX}
-      company={company.data ?? COMPANY_PLACEHOLDER}
-      companyLoading={company.isPending}
-      pulseCaption={sinceLabel(lastVisit.at, mountedAt)}
-      inFlightMoreHref={APP_ROUTES.ADMIN_SHIPPING}
+      glanceLoading={company.isPending || loopStatus === 'loading'}
+      stagesLoading={loopStatus === 'loading'}
     />
   );
 }
