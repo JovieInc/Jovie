@@ -31,12 +31,7 @@ export function ReleaseTaskExplainerPopover({
           <Info className='h-3.5 w-3.5' />
         </PlainButton>
       </PopoverTrigger>
-      <PopoverContent
-        align='end'
-        side='top'
-        sideOffset={4}
-        className='w-72 rounded-lg border border-subtle bg-surface-1 p-3 shadow-lg'
-      >
+      <PopoverContent align='end' side='top' sideOffset={4} className='w-72'>
         <p className='text-2xs leading-relaxed text-secondary-token'>
           {explainerText}
         </p>

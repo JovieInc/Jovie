@@ -9,7 +9,7 @@ describe('TaskRowActionMenu certificate', () => {
     const items = [{ id: 'archive', label: 'Archive', onClick: vi.fn() }];
     const always = render(<TaskRowActionMenu items={items} />);
     expect(
-      screen.getByRole('button', { name: 'Open task actions' })
+      screen.getByRole('button', { name: 'Open Task Actions' })
     ).toBeVisible();
     await expectNoA11yViolations(always.container);
     always.unmount();
@@ -29,7 +29,7 @@ describe('TaskRowActionMenu certificate', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: 'Open task actions' }));
+    await user.click(screen.getByRole('button', { name: 'Open Task Actions' }));
     await user.click(await screen.findByRole('menuitem', { name: 'Archive' }));
     expect(onArchive).toHaveBeenCalledOnce();
   });
