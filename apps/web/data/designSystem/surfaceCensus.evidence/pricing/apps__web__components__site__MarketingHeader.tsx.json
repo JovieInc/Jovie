@@ -1,6 +1,6 @@
 {
   "file": "apps/web/components/site/MarketingHeader.tsx",
-  "sha256": "e7525674584370918d4a804b019db5ec5888e9d5e384dfbc07e3d70e1756ff73",
-  "at": "2026-11-13T14:57:14.310Z",
-  "ref": "WAITLIST_ENABLED removed and constant-true SHOW_MARKETING_CENTER_NAV / SHOW_MARKETING_FULL_FOOTER gates removed. Default marketing header CTA is Claim your free profile -> /start; homepage header stays Claim your profile -> /start. Verified with MarketingHeader and HeaderNav vitest render suites (jsdom), not a browser capture."
+  "sha256": "8567b38a4714c8dd8fe6244da4b34529a86bfb4836b41b9eeb4add1f605bc0b1",
+  "at": "2026-11-21T15:17:13.443Z",
+  "ref": "MarketingHeader: remove duplicate Jovie wordmark nav link on glass header (JOV-14240); logo remains the home control. Verified on /solutions/artists and /pricing dark desktop."
 }

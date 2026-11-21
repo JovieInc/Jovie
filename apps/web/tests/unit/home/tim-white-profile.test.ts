@@ -29,8 +29,9 @@ describe('Tim White canonical mock identity', () => {
 
   it('keeps the homepage real-profile fixture aligned with the canonical profile', () => {
     expect(HOMEPAGE_PROFILE_PREVIEW_ARTIST.name).toBe(TIM_WHITE_PROFILE.name);
+    // ICP mock paints the live public handle, not the legacy slug (JOV-14240).
     expect(HOMEPAGE_PROFILE_PREVIEW_ARTIST.handle).toBe(
-      TIM_WHITE_PROFILE.handle
+      TIM_WHITE_PROFILE.publicProfileHandle
     );
     expect(HOMEPAGE_PROFILE_PREVIEW_ARTIST.image_url).toBe(
       TIM_WHITE_PROFILE.avatarSrc

@@ -528,7 +528,7 @@ test.describe('Artist Profiles Landing', () => {
       specWallSection.getByTestId('artist-profile-truth-tile')
     ).toHaveCount(4);
     await expect(
-      specWallSection.getByText('They Know It Is You')
+      specWallSection.getByText('They know it is you')
     ).toBeVisible();
     await expect(
       specWallSection.getByText('The Right Next Move')

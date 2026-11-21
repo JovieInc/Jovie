@@ -41,6 +41,12 @@ describe('ArtistProfileHero', () => {
         name: ARTIST_PROFILE_COPY.hero.ctaLabel,
       })
     ).toBeInTheDocument();
+    // Secondary CTA stays sentence case (JOV-14240).
+    expect(
+      screen.getByRole('link', {
+        name: ARTIST_PROFILE_COPY.hero.secondaryCtaLabel,
+      })
+    ).toHaveTextContent('See how it adapts');
 
     const productStage = screen.getByTestId('artist-profile-hero-product');
     expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
