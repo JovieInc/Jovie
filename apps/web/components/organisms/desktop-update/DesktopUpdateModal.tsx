@@ -113,7 +113,7 @@ export function DesktopUpdateModalView({
         <UpdatingScreen
           layout='embedded'
           title={
-            <DialogTitle className='text-center text-lg'>{title}</DialogTitle>
+            <DialogTitle className='text-center'>{title}</DialogTitle>
           }
           description={
             <DialogDescription className='text-center'>
