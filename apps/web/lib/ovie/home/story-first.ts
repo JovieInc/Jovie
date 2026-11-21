@@ -109,6 +109,20 @@ function trendFromPoints(points: readonly number[]): StoryFirstSparkTrend {
   return 'flat';
 }
 
+/**
+ * Prefer real series movement. When history is missing or endpoints match
+ * (flat), paint the sparkline from the pulse tone so it does not contradict
+ * a green "alive" / good delta label.
+ */
+function sparkTrendForPulse(
+  points: readonly number[],
+  tone: HomeLoopTone
+): StoryFirstSparkTrend {
+  const moved = trendFromPoints(points);
+  if (moved !== 'flat') return moved;
+  return glanceTrendFromTone(tone);
+}
+
 function formatDelta(
   current: number,
   prior: number | null,
@@ -185,6 +199,7 @@ export function buildStoryFirstGlance(input: {
   const usersPoints =
     usersNow !== null && Number.isFinite(usersNow) ? [usersNow, usersNow] : [];
 
+  const shippingTone = merges?.tone ?? 'neutral';
   const shipping: StoryFirstGlancePulse = {
     key: 'shipping',
     label: 'Shipping · 7D',
@@ -193,25 +208,27 @@ export function buildStoryFirstGlance(input: {
       currentMerges !== null
         ? formatDelta(currentMerges, priorMerges, 'flat-label')
         : null,
-    tone: merges?.tone ?? 'neutral',
+    tone: shippingTone,
     measured: merges?.measured ?? false,
     points: shippingPoints,
-    trend: trendFromPoints(shippingPoints),
+    trend: sparkTrendForPulse(shippingPoints, shippingTone),
     href: merges?.href ?? APP_ROUTES.ADMIN_SHIPPING,
   };
 
+  const revenueTone = mrr?.tone ?? 'neutral';
   const revenue: StoryFirstGlancePulse = {
     key: 'revenue',
     label: 'Revenue',
     value: mrr?.measured ? mrr.value : HOME_LOOP_NOT_MEASURED,
     delta: mrrNow !== null ? formatDelta(mrrNow, mrrWas, 'alive') : null,
-    tone: mrr?.tone ?? 'neutral',
+    tone: revenueTone,
     measured: mrr?.measured ?? false,
     points: revenuePoints,
-    trend: trendFromPoints(revenuePoints),
+    trend: sparkTrendForPulse(revenuePoints, revenueTone),
     href: mrr?.href ?? APP_ROUTES.ADMIN_OPERATIONS,
   };
 
+  const usersTone = users?.tone ?? 'neutral';
   const usersPulse: StoryFirstGlancePulse = {
     key: 'users',
     label: 'Users',
@@ -220,10 +237,10 @@ export function buildStoryFirstGlance(input: {
       usersNow !== null && Number.isFinite(usersNow)
         ? formatDelta(usersNow, null, 'flat-label')
         : null,
-    tone: users?.tone ?? 'neutral',
+    tone: usersTone,
     measured: users?.measured ?? false,
     points: usersPoints,
-    trend: trendFromPoints(usersPoints),
+    trend: sparkTrendForPulse(usersPoints, usersTone),
     href: users?.href ?? APP_ROUTES.ADMIN_GROWTH,
   };
 

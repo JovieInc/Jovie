@@ -97,6 +97,34 @@ describe('buildStoryFirstGlance', () => {
       tone: 'bad',
     });
   });
+
+  it('paints sparkline from tone when MRR has no prior series', () => {
+    const company = buildCompanyTiles({
+      overview: {
+        mrrUsd: 4200,
+        activeSubscribers: 12,
+        balanceUsd: 50_000,
+        burnRateUsd: 5_000,
+        runwayMonths: 10,
+        defaultStatus: 'alive',
+        defaultStatusDetail: '',
+        financialDataAvailable: true,
+      },
+      funnel: null,
+      goldenPath: null,
+    });
+    const glance = buildStoryFirstGlance({
+      delivery: emptyDeliverySummary(),
+      company,
+      shippingPulse: buildPulse(emptyDeliverySummary()),
+    });
+    expect(glance[1]).toMatchObject({
+      delta: 'alive',
+      tone: 'good',
+      points: [4200, 4200],
+      trend: 'up',
+    });
+  });
 });
 
 describe('buildStoryFirstBottleneck', () => {
