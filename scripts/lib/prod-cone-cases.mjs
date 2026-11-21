@@ -191,26 +191,6 @@ export const CONE_UNCOVERED_REASONS = Object.freeze({
     'no producer: needs the authenticated free-vs-offer comparison walk (JOV-9826 canary reset)',
   'cone-offer-one-time-state-correct':
     'no producer: one-time offer state needs the authenticated onboarding walk (JOV-9826 canary reset)',
-  'cone-checkout-success-truthful':
-    'no producer: a verified Stripe test-mode payment on production is the sanctioned canary checkout walk, not yet folded into this cert',
-  'cone-checkout-cancel-truthful':
-    'no producer: the cancel path needs the sanctioned canary checkout walk (Stripe test mode)',
-  'cone-checkout-failure-truthful':
-    'no producer: the failure path needs the sanctioned canary checkout walk (Stripe test mode)',
-  'cone-checkout-payment-is-authority':
-    'no producer: payment authority needs a verified test-mode payment (canary checkout walk)',
-  'cone-checkout-entitlement-agrees':
-    'no producer: entitlement agreement needs a verified test-mode payment (canary checkout walk)',
-  'cone-checkout-retry-idempotent':
-    'no producer: webhook redelivery/retry reconciliation needs the canary checkout walk',
-  'cone-activation-immediate-value':
-    'no producer: post-pay activation needs a verified test-mode payment (canary checkout walk)',
-  'cone-activation-no-dead-end':
-    'no producer: post-pay dead-end audit needs a verified test-mode payment (canary checkout walk)',
-  'cone-activation-visible-path':
-    'no producer: post-pay activation path needs a verified test-mode payment (canary checkout walk)',
-  'cone-activation-continue-without-rescue':
-    'no producer: post-pay continuation needs a verified test-mode payment (canary checkout walk)',
 });
 
 /**
@@ -264,9 +244,51 @@ export const CONE_CASE_PRODUCERS = Object.freeze({
     surface: 'checkout',
     checkId: 'checkout-entry-renders',
   },
+  // JOV-9826 canary-claim-checkout.spec.ts (Stripe TEST mode only) — check
+  // ids match the case ids the producer emits via certStep.
+  'cone-checkout-success-truthful': {
+    surface: 'checkout',
+    checkId: 'cone-checkout-success-truthful',
+  },
+  'cone-checkout-cancel-truthful': {
+    surface: 'checkout',
+    checkId: 'cone-checkout-cancel-truthful',
+  },
+  'cone-checkout-failure-truthful': {
+    surface: 'checkout',
+    checkId: 'cone-checkout-failure-truthful',
+  },
+  'cone-checkout-payment-is-authority': {
+    surface: 'checkout',
+    checkId: 'cone-checkout-payment-is-authority',
+  },
+  'cone-checkout-entitlement-agrees': {
+    surface: 'checkout',
+    checkId: 'cone-checkout-entitlement-agrees',
+  },
+  'cone-checkout-retry-idempotent': {
+    surface: 'checkout',
+    checkId: 'cone-checkout-retry-idempotent',
+  },
   'cone-checkout-no-false-paid-return': {
     surface: 'checkout',
     checkId: 'return-page-no-false-paid',
+  },
+  'cone-activation-immediate-value': {
+    surface: 'onboarding',
+    checkId: 'cone-activation-immediate-value',
+  },
+  'cone-activation-no-dead-end': {
+    surface: 'onboarding',
+    checkId: 'cone-activation-no-dead-end',
+  },
+  'cone-activation-visible-path': {
+    surface: 'onboarding',
+    checkId: 'cone-activation-visible-path',
+  },
+  'cone-activation-continue-without-rescue': {
+    surface: 'onboarding',
+    checkId: 'cone-activation-continue-without-rescue',
   },
 });
 

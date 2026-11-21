@@ -228,7 +228,15 @@ export const EXPECTED_BROWSER_CHECKS = Object.freeze({
     'start-chat-first-reply',
     'golden-path-preview-has-release',
   ],
-  onboarding: ['dashboard-first-value', 'fresh-user-onboarding-first-value'],
+  onboarding: [
+    'dashboard-first-value',
+    'fresh-user-onboarding-first-value',
+    // JOV-9826 canary claim-checkout walk (Stripe TEST mode).
+    'cone-activation-immediate-value',
+    'cone-activation-visible-path',
+    'cone-activation-no-dead-end',
+    'cone-activation-continue-without-rescue',
+  ],
   chat: ['composer-ready', 'first-reply'],
   'public-profile': [
     'owned-profile-renders-publicly',
@@ -238,7 +246,17 @@ export const EXPECTED_BROWSER_CHECKS = Object.freeze({
   // fresh-user-checkout-entry: an account that signed up through the public
   // path reaches checkout. Blocked until the browser run walks it (truthful
   // certification, 2026-11-08); the seeded canary alone proves nothing.
-  checkout: ['checkout-entry-renders', 'fresh-user-checkout-entry'],
+  // cone-checkout-*: JOV-9826 canary claim-checkout walk (Stripe TEST mode).
+  checkout: [
+    'checkout-entry-renders',
+    'fresh-user-checkout-entry',
+    'cone-checkout-success-truthful',
+    'cone-checkout-cancel-truthful',
+    'cone-checkout-failure-truthful',
+    'cone-checkout-payment-is-authority',
+    'cone-checkout-entitlement-agrees',
+    'cone-checkout-retry-idempotent',
+  ],
 });
 
 export function missingBrowserChecks({
