@@ -38,10 +38,13 @@ export const MAX_RETAINED_DRIZZLE_SNAPSHOTS = 3;
 // budget, so surface shrinking headroom before it becomes a queue outage.
 export const TRACKED_BYTES_WARNING_RATIO = 0.95;
 
-// Planning-level threshold, one band earlier: fires while there is still time
-// to schedule the next prune through the census (dead or regenerable bytes)
-// before the 95% shrink-now line turns the signal urgent.
-export const TRACKED_BYTES_PLAN_RATIO = 0.9;
+// Planning-level threshold: fires once free space drops under 20% of the
+// budget, while there is still time to schedule the next prune of dead or
+// regenerable bytes before the 95% shrink-now line turns the signal urgent.
+// Lowered 0.9 -> 0.8 on 2026-11-21 (founder ask: 20% headroom is the alert
+// line). The lanes doctor raises the matching repo-headroom-low alert on
+// origin/main (scripts/lanes/repo_headroom.py) so Summer routes the prune.
+export const TRACKED_BYTES_PLAN_RATIO = 0.8;
 
 export function trackedBytesBudgetWarning(
   bytes,
@@ -57,8 +60,8 @@ export function trackedBytesBudgetWarning(
   return `tracked regular files total ${bytes} bytes (${percent}% of the ${maxTrackedBytes}-byte combined-tree budget; ${headroomText}); shrink tracked bytes before the merge queue starts ejecting PRs`;
 }
 
-// Non-failing plan warning for the 90%-to-95% band. Above 95% the shrink-now
-// warning owns the signal; below 90% there is nothing to plan yet.
+// Non-failing plan warning for the 80%-to-95% band. Above 95% the shrink-now
+// warning owns the signal; below 80% there is nothing to plan yet.
 export function trackedBytesBudgetPlanWarning(
   bytes,
   maxTrackedBytes = HYGIENE_LIMITS.maxTrackedBytes
@@ -67,7 +70,7 @@ export function trackedBytesBudgetPlanWarning(
   if (bytes > maxTrackedBytes * TRACKED_BYTES_WARNING_RATIO) return null;
   const headroom = maxTrackedBytes - bytes;
   const percent = ((bytes / maxTrackedBytes) * 100).toFixed(2);
-  return `tracked regular files total ${bytes} bytes (${percent}% of the ${maxTrackedBytes}-byte combined-tree budget; ${(headroom / 1_000_000).toFixed(2)} MB headroom); past the 90% plan line — schedule the next prune of dead or regenerable bytes before queued PRs start ejecting`;
+  return `tracked regular files total ${bytes} bytes (${percent}% of the ${maxTrackedBytes}-byte combined-tree budget; ${(headroom / 1_000_000).toFixed(2)} MB headroom); past the 80% plan line (under 20% headroom) — schedule the next prune of dead or regenerable bytes before queued PRs start ejecting`;
 }
 
 // Every warning level for `bytes`, shrink-now first, so an emitter that logs

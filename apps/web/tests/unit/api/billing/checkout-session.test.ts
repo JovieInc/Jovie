@@ -15,6 +15,32 @@ const mocks = vi.hoisted(() => ({
   proofPending: false,
   proofPendingArgs: [] as Array<[string, string | null | undefined]>,
   recordedStages: [] as string[],
+  entitlement: {
+    userId: 'app-user-1',
+    plan: 'pro',
+    isPro: true,
+    billingVerification: 'verified',
+  } as {
+    userId: string | null;
+    plan: string;
+    isPro: boolean;
+    billingVerification: string;
+  },
+  billing: {
+    success: true,
+    data: {
+      stripeCustomerId: 'cus_test',
+      stripeSubscriptionId: 'sub_test',
+      stripePriceId: 'price_pro',
+    },
+  } as {
+    success: boolean;
+    data?: {
+      stripeCustomerId: string | null;
+      stripeSubscriptionId: string | null;
+      stripePriceId: string | null;
+    };
+  },
 }));
 vi.mock('@/lib/waitlist/golden-path-admission.server', () => ({
   hasProofPendingProfile: async (
@@ -40,8 +66,11 @@ vi.mock('@/lib/stripe/client', () => ({
     checkout: { sessions: { retrieve: async () => mocks.session } },
   },
 }));
-vi.mock('@/lib/stripe/config', () => ({
-  getPriceMappingDetails: () => null,
+vi.mock('@/lib/entitlements/server', () => ({
+  getCurrentUserEntitlements: async () => mocks.entitlement,
+}));
+vi.mock('@/lib/stripe/customer-sync', () => ({
+  getUserBillingInfo: async () => mocks.billing,
 }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 vi.mock('@/lib/db', () => ({
@@ -73,8 +102,29 @@ describe('GET /api/billing/checkout-session', () => {
       mode: 'subscription',
       status: 'complete',
       payment_status: 'paid',
+      customer: 'cus_test',
       metadata: { clerk_user_id: 'app-user-1', plan: 'pro' },
       line_items: { data: [{ price: { id: 'price_pro' } }] },
+      subscription: {
+        id: 'sub_test',
+        status: 'active',
+        customer: 'cus_test',
+        items: { data: [{ price: { id: 'price_pro' } }] },
+      },
+    };
+    mocks.entitlement = {
+      userId: 'app-user-1',
+      plan: 'pro',
+      isPro: true,
+      billingVerification: 'verified',
+    };
+    mocks.billing = {
+      success: true,
+      data: {
+        stripeCustomerId: 'cus_test',
+        stripeSubscriptionId: 'sub_test',
+        stripePriceId: 'price_pro',
+      },
     };
     mocks.profileRows = [
       { activeProfileId: 'profile-1', isClaimed: true, isPublic: true },
@@ -90,6 +140,8 @@ describe('GET /api/billing/checkout-session', () => {
 
     const body = await (await GET(request())).json();
     expect(body).toEqual({
+      status: 'confirmed',
+      paymentStatus: 'paid',
       plan: 'pro',
       priceId: 'price_pro',
       needsProfile: true,
@@ -195,12 +247,86 @@ describe('GET /api/billing/checkout-session', () => {
     };
     const { GET } = await import('@/app/api/billing/checkout-session/route');
     const body = await (await GET(request())).json();
-    expect(body).toEqual({ plan: null, priceId: null });
+    expect(body).toEqual({
+      status: 'pending',
+      plan: null,
+      priceId: 'price_pro',
+    });
+    expect(mocks.recordedStages).toEqual([]);
+  });
+
+  it('does not confirm a paid session when the current entitlement does not match', async () => {
+    mocks.entitlement = {
+      userId: 'app-user-1',
+      plan: 'free',
+      isPro: false,
+      billingVerification: 'verified',
+    };
+    const { GET } = await import('@/app/api/billing/checkout-session/route');
+    const body = await (await GET(request())).json();
+    expect(body).toEqual({
+      status: 'pending',
+      plan: null,
+      priceId: 'price_pro',
+    });
+    expect(mocks.recordedStages).toEqual([]);
+  });
+
+  it('does not confirm a paid session whose subscription id is not the current one', async () => {
+    mocks.billing = {
+      success: true,
+      data: {
+        stripeCustomerId: 'cus_test',
+        stripeSubscriptionId: 'sub_old',
+        stripePriceId: 'price_pro',
+      },
+    };
+    const { GET } = await import('@/app/api/billing/checkout-session/route');
+    const body = await (await GET(request())).json();
+    expect(body.status).toBe('pending');
+    expect(body.plan).toBeNull();
+    expect(mocks.recordedStages).toEqual([]);
+  });
+
+  it('confirms a trialing entitlement when checkout required no payment', async () => {
+    mocks.session = {
+      ...mocks.session,
+      payment_status: 'no_payment_required',
+      subscription: {
+        id: 'sub_test',
+        status: 'trialing',
+        customer: 'cus_test',
+        items: { data: [{ price: { id: 'price_pro' } }] },
+      },
+    };
+    mocks.entitlement = {
+      userId: 'app-user-1',
+      plan: 'trial',
+      isPro: true,
+      billingVerification: 'verified',
+    };
+    const { GET } = await import('@/app/api/billing/checkout-session/route');
+    const body = await (await GET(request())).json();
+    expect(body.status).toBe('confirmed');
+    expect(body.paymentStatus).toBe('no_payment_required');
+    expect(body.plan).toBe('trial');
+  });
+
+  it('leaves an expired checkout unconfirmed', async () => {
+    mocks.session = {
+      ...mocks.session,
+      status: 'expired',
+      payment_status: 'unpaid',
+    };
+    const { GET } = await import('@/app/api/billing/checkout-session/route');
+    const body = await (await GET(request())).json();
+    expect(body).toEqual({ status: 'unconfirmed', plan: null, priceId: null });
     expect(mocks.recordedStages).toEqual([]);
   });
 
   it('matches legacy clerkId session metadata for migrated Better Auth users', async () => {
     mocks.userId = 'ba-uuid-1';
+    mocks.entitlement = { ...mocks.entitlement, userId: 'ba-uuid-1' };
     mocks.profileRows = [
       {
         clerkId: 'user_legacy_clerk_1',
@@ -232,6 +358,7 @@ describe('GET /api/billing/checkout-session', () => {
     const { GET } = await import('@/app/api/billing/checkout-session/route');
     const body = await (await GET(request())).json();
     expect(body).toEqual({
+      status: 'unconfirmed',
       plan: null,
       priceId: null,
       sessionStatus: 'open',

@@ -33,9 +33,9 @@ export function MetaPill({
         'inline-flex items-center gap-1.5 h-6 px-2 rounded-md text-2xs border whitespace-nowrap',
         'border-transparent bg-transparent transition-[background-color,border-color] duration-subtle ease-subtle cursor-default',
         tone === 'amber'
-          ? 'text-amber-300/85 hover:border-amber-500/30 hover:bg-amber-500/10'
+          ? 'text-warning-text/85 hover:border-warning/30 hover:bg-warning/10'
           : tone === 'cyan'
-            ? 'text-cyan-300/85 hover:border-cyan-500/30 hover:bg-cyan-500/10'
+            ? 'text-accent-text/85 hover:border-accent/30 hover:bg-accent/10'
             : 'text-secondary-token hover:border-(--app-shell-border) hover:bg-surface-1/40',
         className
       )}

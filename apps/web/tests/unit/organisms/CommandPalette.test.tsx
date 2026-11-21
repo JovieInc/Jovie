@@ -64,26 +64,7 @@ vi.mock('next/image', () => ({
   ),
 }));
 
-vi.mock('@jovie/ui', () => ({
-  Dialog: ({ children, open }: { children: ReactNode; open: boolean }) =>
-    open ? <div role='dialog'>{children}</div> : null,
-  DialogContent: ({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  Button: ({
-    children,
-    onClick,
-    disabled,
-  }: {
-    children: ReactNode;
-    onClick?: () => void;
-    disabled?: boolean;
-  }) => (
-    <button type='button' onClick={onClick} disabled={disabled}>
-      {children}
-    </button>
-  ),
-}));
+vi.mock('@jovie/ui', () => import('./command-palette-ui-mock'));
 
 vi.mock('@radix-ui/react-dialog', () => ({
   Title: ({ children }: { children: ReactNode }) => <div>{children}</div>,
