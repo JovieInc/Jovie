@@ -411,6 +411,9 @@ export type ArtistProfileCaptureVisualCopy = Omit<
   >;
 };
 
+const _d = TIM_WHITE_PROFILE.publicProfileDisplay;
+const TIM_WHITE_SHARE_DEEP_LINKS = [_d, `${_d}/pay`, `${_d}/listen`, `${_d}/contact`] as const;
+
 export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   seo: {
     title: 'Artist Profiles',
@@ -1151,9 +1154,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       displayValue: TIM_WHITE_PROFILE.publicProfileDisplay,
       qrLabel: 'QR code',
       deepLinksLabel: 'Deep links',
-      deepLinks: (['', '/pay', '/listen', '/contact'] as const).map(
-        suffix => `${TIM_WHITE_PROFILE.publicProfileDisplay}${suffix}`
-      ) as unknown as readonly [string, string, string, string],
+      deepLinks: TIM_WHITE_SHARE_DEEP_LINKS,
     },
   },
   socialProof: {

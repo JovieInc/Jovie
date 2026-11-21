@@ -42,7 +42,10 @@ function textAndToolStream({
   ]);
 }
 
-async function sendComposerMessage(page: import('@playwright/test').Page, text: string) {
+async function sendComposerMessage(
+  page: import('@playwright/test').Page,
+  text: string
+) {
   await page.locator(COMPOSER_TEXTAREA).fill(text);
   const sendButton = page.getByRole('button', { name: 'Send message' });
   await expect(sendButton).toBeEnabled();
