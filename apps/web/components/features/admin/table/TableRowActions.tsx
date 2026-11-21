@@ -86,7 +86,9 @@ export function TableRowActions({
           className={cn(
             'h-3.5 w-3.5',
             isVerificationLoading && 'animate-pulse',
-            isVerified && 'fill-info text-info'
+            // Pre-migration AppIconButton used fill-info + stroke-white so the
+            // checkmark stays visible against the filled badge.
+            isVerified && 'fill-info text-info stroke-white'
           )}
         />
       </IconButton>

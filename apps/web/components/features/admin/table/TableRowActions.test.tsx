@@ -23,4 +23,20 @@ describe('TableRowActions', () => {
     );
     expect(onRefreshIngest).toHaveBeenCalledOnce();
   });
+
+  it('keeps a contrasting stroke on the verified BadgeCheck fill', () => {
+    const { container } = render(
+      <TableRowActions
+        isVerified
+        isClaimed={false}
+        verificationStatus='idle'
+        refreshIngestStatus='idle'
+        onToggleVerification={vi.fn().mockResolvedValue(undefined)}
+        onRefreshIngest={vi.fn()}
+      />
+    );
+    const badge = container.querySelector('svg.lucide-badge-check');
+    expect(badge?.getAttribute('class') ?? '').toMatch(/\bfill-info\b/);
+    expect(badge?.getAttribute('class') ?? '').toMatch(/\bstroke-white\b/);
+  });
 });
