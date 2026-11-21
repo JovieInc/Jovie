@@ -30,6 +30,7 @@ import {
   getNavContainerVariantClass,
   getNavGroupVariantClass,
   getNavLinkVariantClass,
+  shouldOpenFlyoutOnKey,
 } from './header-nav-variants';
 
 // Linear header structure: full-width header with centered ~1000px content
@@ -273,11 +274,7 @@ function supportsNativePopover(): boolean {
   );
 }
 
-/**
- * Marketing glass nav flyout: native `popover` + CSS anchor/`position-area`
- * and `@starting-style` entry when supported (JOV-14244). Unsupported
- * browsers keep the class-toggled fixed panel.
- */
+/** Native popover + anchor flyout; class toggle fallback when unsupported. */
 function MarketingGlassFlyout({
   menu,
   open,
@@ -295,8 +292,6 @@ function MarketingGlassFlyout({
       return;
     }
 
-    // Guard with :popover-open so we never call show/hide when already
-    // in the requested state (avoids InvalidStateError).
     if (open && !panel.matches(':popover-open')) {
       panel.showPopover();
     } else if (!open && panel.matches(':popover-open')) {
@@ -308,8 +303,7 @@ function MarketingGlassFlyout({
     <div
       ref={panelRef}
       id={`marketing-header-flyout-${menu.id}`}
-      // Closed panels stay mounted for popover/@starting-style, but must not
-      // steal Tab order on marketing routes (Capture changed UI focus-visible).
+      // Closed panels stay mounted but must not steal Tab into main.
       inert={!open ? true : undefined}
       aria-hidden={!open}
       {...(nativePopover ? { popover: 'manual' as const } : {})}
@@ -578,7 +572,13 @@ export function HeaderNav({
                   aria-controls={`marketing-header-flyout-${menu.id}`}
                   onMouseEnter={() => openFlyout(menu.id)}
                   onPointerEnter={() => openFlyout(menu.id)}
-                  onFocus={() => openFlyout(menu.id)}
+                  onKeyDown={event => {
+                    if (!shouldOpenFlyoutOnKey(event.key)) {
+                      return;
+                    }
+                    event.preventDefault();
+                    openFlyout(menu.id);
+                  }}
                 >
                   {menu.label}
                   <ChevronDown aria-hidden='true' size={13} strokeWidth={1.8} />

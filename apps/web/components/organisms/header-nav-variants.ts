@@ -59,3 +59,8 @@ export function getNavContainerVariantClass({
 
   return 'max-w-public-content';
 }
+
+/** Enter / Space / ArrowDown open a marketing flyout; bare Focus must not. */
+export function shouldOpenFlyoutOnKey(key: string): boolean {
+  return key === 'Enter' || key === ' ' || key === 'ArrowDown';
+}

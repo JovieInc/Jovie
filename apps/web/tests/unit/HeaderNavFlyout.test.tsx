@@ -115,8 +115,11 @@ describe('HeaderNav flyout interactions', () => {
     );
 
     const trigger = screen.getByRole('button', { name: /Features/ });
+    // Bare Focus must not open (Capture changed UI Tab-into-main).
     fireEvent.focus(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
 
+    fireEvent.keyDown(trigger, { key: 'Enter' });
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
 
     fireEvent.keyDown(document, { key: 'Escape' });
