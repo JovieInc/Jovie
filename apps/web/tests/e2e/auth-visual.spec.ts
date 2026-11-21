@@ -19,6 +19,7 @@
  */
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import { expectCaptureReady } from './utils/visual-capture-ready';
 
 // Visual tests use no stored auth state
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -155,6 +156,7 @@ test.describe('Auth modal visual regression', () => {
         }
 
         await neutralizeAuthScreenshotPointer(page);
+        await expectCaptureReady(page.locator('body'));
         await expect(page).toHaveScreenshot(`modal-signin-${bp.name}.png`, {
           fullPage: false,
           maxDiffPixels: 200,
@@ -191,6 +193,7 @@ test.describe('Auth modal visual regression', () => {
         }
 
         await neutralizeAuthScreenshotPointer(page);
+        await expectCaptureReady(page.locator('body'));
         await expect(page).toHaveScreenshot(`modal-signup-${bp.name}.png`, {
           fullPage: false,
           maxDiffPixels: 200,
@@ -238,6 +241,7 @@ test.describe('/signin page visual regression', () => {
       await expect(page).toHaveTitle('Log in to Jovie');
 
       await neutralizeAuthScreenshotPointer(page);
+      await expectCaptureReady(page.locator('body'));
       await expect(page).toHaveScreenshot(`signin-page-${bp.name}.png`, {
         fullPage: false,
         maxDiffPixels: 200,
@@ -282,6 +286,7 @@ test.describe('/signup page visual regression', () => {
       await expect(page).toHaveTitle('Continue to Jovie');
 
       await neutralizeAuthScreenshotPointer(page);
+      await expectCaptureReady(page.locator('body'));
       await expect(page).toHaveScreenshot(`signup-page-${bp.name}.png`, {
         fullPage: false,
         maxDiffPixels: 200,
