@@ -12,12 +12,14 @@
 export const SIDEBAR_WIDTH = 360; // px
 
 /**
- * Fallback table row height (px) for tables that name no `rowMode`. It equals
- * `TABLE_ROW_MODES.compact.rowHeight`; the row-mode custom property is the
- * single source of truth when a mode is set.
+ * Fallback table row height (px) for tables that name no `rowMode`.
+ * Equals dense 32 (DRI-21 / taste #7); prefer `rowMode='dense'` /
+ * `TABLE_CANONICAL_ROW_MODE` over raw pixels. The row-mode custom property is
+ * the single source of truth when a mode is set.
  */
 export const TABLE_ROW_HEIGHTS = {
-  STANDARD: 40,
+  COMPACT: 32,
+  STANDARD: 32,
 } as const;
 
 /**

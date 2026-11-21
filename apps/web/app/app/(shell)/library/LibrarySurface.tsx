@@ -1903,9 +1903,9 @@ function LibraryReleaseTable({
       containerClassName='h-full'
       skeletonRows={SKELETON_ROW_COUNT.TABLE}
       skeletonColumnConfig={
-        rowMode === LIBRARY_CATALOG_ROW_MODE
-          ? LIBRARY_CATALOG_SKELETON_CONFIG
-          : LIBRARY_TABLE_SKELETON_CONFIG
+        hideHeader
+          ? LIBRARY_TABLE_SKELETON_CONFIG
+          : LIBRARY_CATALOG_SKELETON_CONFIG
       }
     />
   );

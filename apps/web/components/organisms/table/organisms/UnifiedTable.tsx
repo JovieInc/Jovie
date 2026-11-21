@@ -11,7 +11,7 @@ import React, {
   useState,
 } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { TABLE_MIN_WIDTHS, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
+import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import {
   type ColumnDef,
   type ColumnPinningState,
@@ -45,6 +45,7 @@ import {
 import {
   cn,
   iconColors,
+  TABLE_CANONICAL_ROW_MODE,
   TABLE_ROW_MODES,
   type TableRowMode,
   tableRowModeStyle,
@@ -109,11 +110,14 @@ export interface UnifiedTableProps<TData extends RowData> {
   readonly enableVirtualization?: boolean;
 
   /**
-   * Estimated row height for virtualization
-   * @default 40
+   * Legacy pixel override for virtualization when `rowMode` is omitted.
+   * Prefer `rowMode='dense'` (canonical). Ignored when `rowMode` is set.
    */
   readonly rowHeight?: number;
-  /** Fixed geometry for content, loading rows, and virtualization. */
+  /**
+   * Fixed geometry for content, loading rows, and virtualization.
+   * @default dense (32px) — sole customer/dashboard height (DRI-21).
+   */
   readonly rowMode?: TableRowMode;
 
   /**
@@ -461,8 +465,8 @@ function UnifiedTableContent<TData extends RowData>({
   sorting,
   onSortingChange,
   enableVirtualization,
-  rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
-  rowMode,
+  rowHeight,
+  rowMode = TABLE_CANONICAL_ROW_MODE,
   overscan = 5,
   renderRow,
   getRowId,
@@ -511,7 +515,7 @@ function UnifiedTableContent<TData extends RowData>({
   const snapColumns = columnSnap;
   const resolvedRowHeight = rowMode
     ? TABLE_ROW_MODES[rowMode].rowHeight
-    : rowHeight;
+    : (rowHeight ?? TABLE_ROW_MODES[TABLE_CANONICAL_ROW_MODE].rowHeight);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [rowRefs] = useState(() => new Map<number, HTMLTableRowElement>());
   const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);

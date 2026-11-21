@@ -20,7 +20,7 @@ export const alignment = {
   workspaceSeamX: 'px-3',
   checkboxCell: 'flex items-center justify-center', // Center checkbox
   numberCell: 'flex items-center justify-end tabular-nums', // Right-align numbers
-  rowHeight: 'system-b-table-row-height', // Comfortable density with room for two-line cells
+  rowHeight: 'system-b-table-row-height', // Dense 32px — sole table row height
   cellPadding: 'px-3', // Shared page seam; vertical space comes from the row mode content height
   headerPadding: 'px-3', // Shared page seam; header row height is fixed (h-8)
   checkboxSize: 'h-3.5 w-3.5', // 14px checkbox
@@ -87,13 +87,14 @@ export const columnWidths = {
 } as const;
 
 // Layout Stability - Fixed Heights to Prevent Layout Shift
+// Row + header share the dense 32px band (DRI-21 / taste #7).
 export const layoutStability = {
-  rowHeight: '40px',
+  rowHeight: '32px',
   headerHeight: '32px',
   toolbarHeight: '56px',
   footerHeight: '52px',
   emptyStateMinHeight: '400px',
-  skeletonRowHeight: '40px', // Must match rowHeight
+  skeletonRowHeight: '32px', // Must match rowHeight
 } as const;
 
 export const tableAlignment = {
@@ -180,16 +181,16 @@ export const presets = {
   ),
 } as const;
 
+/**
+ * Canonical table row geometry (DRI-21 / taste #7).
+ * One row height for every customer/dashboard (and admin) table — no density forks.
+ */
+export const TABLE_CANONICAL_ROW_MODE = 'dense' as const;
+
 /** Fixed content budgets shared by real rows, loading rows, and virtualization. */
 export const TABLE_ROW_MODES = {
-  /** 32px. Admin/debug/dev-only surfaces. Not Linear-scale: Linear's list is 40-44px, so user-facing tables use `compact` or `list`. */
+  /** Sole mode: 32px row / 24px stable cell content; matches header `h-8`. */
   dense: { rowHeight: 32, contentHeight: 24 },
-  compact: { rowHeight: 40, contentHeight: 32 },
-  /** Measured Linear issue list: 88 backing pixels at Retina 2x. */
-  list: { rowHeight: 44, contentHeight: 36 },
-  'two-line': { rowHeight: 56, contentHeight: 48 },
-  description: { rowHeight: 72, contentHeight: 64 },
-  controls: { rowHeight: 96, contentHeight: 88 },
 } as const;
 
 export type TableRowMode = keyof typeof TABLE_ROW_MODES;

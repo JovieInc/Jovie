@@ -26,11 +26,10 @@ import type { LibraryReleaseAsset } from './library-data';
  */
 
 /**
- * List rows carry two lines (title + artist), so they use the canonical
- * two-line row mode. A bare `rowHeight` sizes virtualization only; the 40px
- * row class and 32px cell clamp still apply, which clipped the artist line.
+ * Library list + catalog share dense 32px rows (DRI-21). Truncate secondary
+ * lines in cells; do not fork row height for two-line content.
  */
-export const LIBRARY_LIST_ROW_MODE = 'two-line' satisfies TableRowMode;
+export const LIBRARY_LIST_ROW_MODE = 'dense' satisfies TableRowMode;
 export const LIBRARY_CATALOG_ROW_MODE = 'dense' satisfies TableRowMode;
 export const LIBRARY_TABLE_MIN_WIDTH = '0';
 

@@ -46,7 +46,7 @@ export const LoadingPeoplePage: Story = {
   args: {
     rows: 6,
     columns: 4,
-    rowHeight: '40px',
+    rowHeight: '32px',
     columnConfig: [
       { width: '180px', variant: 'person' },
       { width: '96px', variant: 'badge' },

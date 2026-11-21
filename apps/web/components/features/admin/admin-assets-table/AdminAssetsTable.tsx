@@ -413,7 +413,7 @@ export function AdminAssetsTable({
     >
       {() => (
         <AdminDataTable
-          rowMode='two-line'
+          rowMode='dense'
           data={allAssets}
           columns={columns}
           getRowId={(row: AdminAssetRow) => `${row.assetType}:${row.id}`}

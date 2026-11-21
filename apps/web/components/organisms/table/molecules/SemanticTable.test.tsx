@@ -5,9 +5,9 @@ import { TableCell } from '../atoms/TableCell';
 import { TableBody, TableHead, TableRoot, TableRow } from './SemanticTable';
 
 describe('SemanticTable row geometry', () => {
-  it('forwards the selected row mode to the semantic table containing investor cells', () => {
+  it('forwards the canonical dense row mode to the semantic table', () => {
     render(
-      <TableRoot rowMode='two-line'>
+      <TableRoot rowMode='dense'>
         <TableBody>
           <TableRow>
             <TableCell multiline>
@@ -19,17 +19,18 @@ describe('SemanticTable row geometry', () => {
       </TableRoot>
     );
     const table = screen.getByRole('table');
-    expect(table).toHaveAttribute('data-table-row-mode', 'two-line');
-    expect(table.style.getPropertyValue('--table-row-height')).toBe('56px');
+    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+    expect(table.style.getPropertyValue('--table-row-height')).toBe('32px');
     expect(table.style.getPropertyValue('--table-cell-content-height')).toBe(
-      '48px'
+      '24px'
     );
+    expect(screen.getByRole('row')).toHaveClass('system-b-table-row-height');
     expect(screen.getByRole('cell')).toContainElement(
       screen.getByRole('button', { name: 'Copy token' })
     );
   });
 
-  it('leaves legacy table geometry unchanged when no mode is selected', () => {
+  it('defaults to dense geometry when no mode is selected', () => {
     render(
       <TableRoot>
         <TableBody>
@@ -39,17 +40,14 @@ describe('SemanticTable row geometry', () => {
         </TableBody>
       </TableRoot>
     );
-    expect(screen.getByRole('table')).not.toHaveAttribute(
-      'data-table-row-mode'
-    );
-    expect(
-      screen.getByRole('table').style.getPropertyValue('--table-row-height')
-    ).toBe('');
+    const table = screen.getByRole('table');
+    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+    expect(table.style.getPropertyValue('--table-row-height')).toBe('32px');
   });
 
   it('composes an axe-clean table with a header row', async () => {
     const { container } = render(
-      <TableRoot className='w-96' rowMode='two-line'>
+      <TableRoot className='w-96' rowMode='dense'>
         <TableHead className='text-secondary-token'>
           <TableRow>
             <th>Name</th>
