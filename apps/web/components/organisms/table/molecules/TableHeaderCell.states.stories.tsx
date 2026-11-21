@@ -1,22 +1,23 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import type { Header } from '@/lib/tanstack-table';
+import {
+  getCoreRowModel,
+  type Header,
+  useReactTable,
+} from '@/lib/tanstack-table';
 import { TableHeaderCell } from './TableHeaderCell';
 
 type Row = { title: string };
 
-function mockHeader(label: string, placeholder = false): Header<Row, unknown> {
-  return {
-    id: label,
-    isPlaceholder: placeholder,
-    getSize: () => 160,
-    column: {
-      columnDef: { header: label, meta: undefined },
-      getCanSort: () => true,
-      getIsSorted: () => false,
-      getToggleSortingHandler: () => () => undefined,
-    },
-    getContext: () => ({}),
-  } as unknown as Header<Row, unknown>;
+/** A real header from a one-column table, so the story needs no type casts. */
+function useHeader(label: string, placeholder: boolean): Header<Row, unknown> {
+  const table = useReactTable<Row>({
+    data: [],
+    columns: [{ id: 'col', header: label, accessorFn: row => row.title }],
+    getCoreRowModel: getCoreRowModel(),
+  });
+  const header = table.getFlatHeaders()[0];
+  if (!header) throw new Error('the story table has one column');
+  return placeholder ? { ...header, isPlaceholder: true } : header;
 }
 
 const meta: Meta<typeof TableHeaderCell<Row>> = {
@@ -29,14 +30,17 @@ export default meta;
 type Story = StoryObj<typeof TableHeaderCell<Row>>;
 
 function HeaderFrame({
-  header,
+  label,
+  placeholder = false,
   canSort,
   dir,
 }: {
-  readonly header: Header<Row, unknown>;
+  readonly label: string;
+  readonly placeholder?: boolean;
   readonly canSort: boolean;
   readonly dir?: 'rtl';
 }) {
+  const header = useHeader(label, placeholder);
   return (
     <table dir={dir} className='w-48 table-fixed'>
       <thead>
@@ -57,21 +61,19 @@ function HeaderFrame({
 
 /** Empty: a placeholder header renders its cell with no content. */
 export const Empty: Story = {
-  render: () => (
-    <HeaderFrame header={mockHeader('Group', true)} canSort={false} />
-  ),
+  render: () => <HeaderFrame label='Group' placeholder canSort={false} />,
 };
 
 /** Partial: a plain header that cannot be sorted. */
 export const Partial: Story = {
-  render: () => <HeaderFrame header={mockHeader('Actions')} canSort={false} />,
+  render: () => <HeaderFrame label='Actions' canSort={false} />,
 };
 
 /** LongContent: a long label truncates beside the sort indicator. */
 export const LongContent: Story = {
   render: () => (
     <HeaderFrame
-      header={mockHeader('Monthly listeners across every connected platform')}
+      label='Monthly listeners across every connected platform'
       canSort
     />
   ),
@@ -79,7 +81,5 @@ export const LongContent: Story = {
 
 /** Rtl: the sort indicator mirrors to the end edge. */
 export const Rtl: Story = {
-  render: () => (
-    <HeaderFrame header={mockHeader('العنوان')} canSort dir='rtl' />
-  ),
+  render: () => <HeaderFrame label='العنوان' canSort dir='rtl' />,
 };
