@@ -100,8 +100,14 @@ export async function collectArtifactFreshness(input = {}) {
     const stamp = await fetchDesktopPublishInFlight({
       fetchImpl,
       token: input.token,
+      // Match queued/in_progress desktop-release after stamp merge.
+      headSha:
+        certified?.status === 'known' &&
+        typeof certified.sourceRevision === 'string'
+          ? certified.sourceRevision
+          : null,
     });
-    // true / false / null (null = stamp observation incomplete).
+    // true / false / null (null = stamp/release observation incomplete).
     publishInFlight = stamp.inFlight;
   }
 

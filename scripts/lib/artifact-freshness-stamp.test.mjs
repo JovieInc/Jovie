@@ -139,3 +139,94 @@ test('blocked keep-owned stamp past dwell max is not in-flight', async () => {
   assert.equal(result.inFlight, false);
   assert.match(result.reason, /stamp-dwell-exceeded/);
 });
+
+const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const SHA_B = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+function releaseRunsResponse(runs) {
+  return { ok: true, json: async () => ({ workflow_runs: runs }) };
+}
+
+test('no open stamp + in_progress desktop-release for certified SHA is in-flight', async () => {
+  const seen = [];
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    headSha: SHA_A,
+    fetchImpl: async url => {
+      const u = String(url);
+      seen.push(u);
+      if (u.includes('/pulls')) return listResponse([]);
+      if (u.includes('/workflows/desktop-release.yml/runs')) {
+        assert.match(u, /head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/);
+        if (u.includes('status=queued')) return releaseRunsResponse([]);
+        if (u.includes('status=in_progress')) {
+          return releaseRunsResponse([
+            { head_sha: SHA_A, status: 'in_progress' },
+          ]);
+        }
+      }
+      throw new Error(`unexpected url ${u}`);
+    },
+  });
+  assert.equal(result.inFlight, true);
+  assert.equal(result.reason, 'desktop-release-in_progress');
+  assert.ok(seen.some(u => u.includes('status=queued')));
+  assert.ok(seen.some(u => u.includes('status=in_progress')));
+});
+
+test('no open stamp + queued desktop-release for certified SHA is in-flight', async () => {
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    headSha: SHA_A,
+    fetchImpl: async url => {
+      const u = String(url);
+      if (u.includes('/pulls')) return listResponse([]);
+      if (u.includes('status=queued')) {
+        return releaseRunsResponse([{ head_sha: SHA_A, status: 'queued' }]);
+      }
+      throw new Error(`unexpected url ${u}`);
+    },
+  });
+  assert.equal(result.inFlight, true);
+  assert.equal(result.reason, 'desktop-release-queued');
+});
+
+test('no open stamp + in_progress desktop-release for other SHA is not in-flight', async () => {
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    headSha: SHA_A,
+    fetchImpl: async url => {
+      const u = String(url);
+      if (u.includes('/pulls')) return listResponse([]);
+      if (u.includes('/workflows/desktop-release.yml/runs')) {
+        return releaseRunsResponse([
+          { head_sha: SHA_B, status: 'in_progress' },
+        ]);
+      }
+      throw new Error(`unexpected url ${u}`);
+    },
+  });
+  assert.equal(result.inFlight, false);
+  assert.equal(result.reason, 'no-open-stamp');
+});
+
+test('desktop-release lookup failure is incomplete observation', async () => {
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    headSha: SHA_A,
+    fetchImpl: async url => {
+      const u = String(url);
+      if (u.includes('/pulls')) return listResponse([]);
+      if (u.includes('/workflows/desktop-release.yml/runs')) {
+        return { ok: false, status: 503, json: async () => ({}) };
+      }
+      throw new Error(`unexpected url ${u}`);
+    },
+  });
+  assert.equal(result.inFlight, null);
+  assert.match(result.reason, /desktop-release queued lookup returned 503/);
+});
