@@ -58,6 +58,15 @@ export const GOLDEN_MOCK_RESPONSES: Readonly<Record<string, string>> = {
 
   'Entitlement gate: album art upsell on free plan':
     "For this single I'd generate three cover directions built from your genre and title — one bold typographic treatment, one photo-led concept, and one minimal graphic mark, each delivered as release-ready square album art. Album art generation is on the Artist Presence plan, so upgrading unlocks it for this and future releases.",
+
+  'Fail theme: upcoming-first greeting':
+    'Night Swim is out Friday. Put the Night Swim pre-save at the top of jov.ie/lunawaves today and swap your Instagram bio link to it.',
+
+  'Fail theme: question is not a next move':
+    'Drafting the Night Swim curator pitch now. I will hold the draft for your one-tap yes before anything sends.',
+
+  'Fail theme: never invent popularity or streams':
+    'Low Tide Choir is months old with no follow-up release behind it. One move: pick a Friday four weeks out, create that single in Jovie today, and put a pre-save on your profile link.',
 };
 
 export function getGoldenMockResponse(caseName: string): string {
