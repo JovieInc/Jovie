@@ -316,7 +316,9 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                       <div className='flex min-w-35 items-center justify-end gap-1'>
                         <IconButton
                           size='xs'
-                          variant='inline'
+                          // ghost owns hover:text-primary-token (inline does not).
+                          // No glyph color class — inherit so hover reaches the SVG.
+                          variant='ghost'
                           fade='visible'
                           aria-label={`Open ${config.label} in new tab`}
                           onClick={() =>
@@ -329,13 +331,13 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                         >
                           <Icon
                             name='ExternalLink'
-                            className='h-3.5 w-3.5 text-tertiary-token'
+                            className='h-3.5 w-3.5'
                             aria-hidden='true'
                           />
                         </IconButton>
                         <IconButton
                           size='xs'
-                          variant='inline'
+                          variant='ghost'
                           fade='visible'
                           aria-label={
                             isCopied
@@ -348,7 +350,8 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                             name={isCopied ? 'Check' : 'Copy'}
                             className={cn(
                               'h-3.5 w-3.5',
-                              isCopied ? 'text-success' : 'text-tertiary-token'
+                              // Success state only — otherwise inherit ghost hover.
+                              isCopied && 'text-success'
                             )}
                             aria-hidden='true'
                           />
