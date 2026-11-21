@@ -117,10 +117,13 @@ jobs:
       # toolchain or dependency change cannot restore an incompatible cache.
       # Persistent Mac runners already retain these packages locally; uploading
       # their multi-GB cache can exhaust the job budget after tests pass.
+      # Use restore + explicit save (not actions/cache post) so a later step
+      # failure still warms the primary key for the next hosted Fast Unit
+      # (JOV-14016 wall-clock proof needs a real cache-hit=true run).
       - name: Restore Swift package cache
         id: swiftpm-cache
         if: ${{ runner.environment == 'github-hosted' }}
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             .build/ios-ci/SourcePackages
@@ -140,9 +143,53 @@ jobs:
       # so resolve still runs. Self-hosted skips the cache step (empty output)
       # and therefore always resolves.
       - name: Resolve Swift package dependencies
+        id: swiftpm-resolve
         if: ${{ steps.swiftpm-cache.outputs.cache-hit != 'true' }}
         timeout-minutes: 5
-        run: bash apps/ios/scripts/run-xcodebuild.sh -resolvePackageDependencies -derivedDataPath .build/ios-ci
+        run: |
+          set -euo pipefail
+          start_seconds=$(date +%s)
+          bash apps/ios/scripts/run-xcodebuild.sh -resolvePackageDependencies -derivedDataPath .build/ios-ci
+          end_seconds=$(date +%s)
+          printf 'duration_seconds=%s\n' "$((end_seconds - start_seconds))" >> "$GITHUB_OUTPUT"
+
+      # Save as soon as resolve succeeds so a later JovieMac/unit failure still
+      # leaves a primary-key hit for the next hosted Fast Unit measurement.
+      - name: Save Swift package cache
+        if: >-
+          runner.environment == 'github-hosted' &&
+          steps.swiftpm-cache.outputs.cache-hit != 'true' &&
+          steps.swiftpm-resolve.outcome == 'success'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .build/ios-ci/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ steps.swiftpm-cache.outputs.cache-primary-key }}
+
+      - name: Record SwiftPM cache receipt
+        if: ${{ always() && !cancelled() }}
+        env:
+          SWIFTPM_CACHE_HIT: ${{ steps.swiftpm-cache.outputs.cache-hit }}
+          SWIFTPM_RESOLVE_OUTCOME: ${{ steps.swiftpm-resolve.outcome }}
+          SWIFTPM_RESOLVE_DURATION_SECONDS: ${{ steps.swiftpm-resolve.outputs.duration_seconds }}
+          SWIFTPM_CACHE_PRIMARY_KEY: ${{ steps.swiftpm-cache.outputs.cache-primary-key }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: node scripts/ios-ci-swiftpm-cache-receipt.mjs
+
+      - name: Upload SwiftPM cache receipt
+        if: ${{ always() && !cancelled() && hashFiles('artifacts/ios-ci/swiftpm-cache-receipt.json') != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: swiftpm-cache-receipt-${{ inputs.checkout-ref || github.sha }}-${{ github.run_attempt }}
+          path: artifacts/ios-ci/swiftpm-cache-receipt.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Test shared JovieKit package
         run: swift test --package-path apps/ios/Packages/JovieKit --enable-code-coverage

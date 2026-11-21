@@ -12,15 +12,11 @@
  * flashing a loading banner on every page visit.
  */
 
-import { CardContent } from '@jovie/ui';
+import { CardContent, IconButton } from '@jovie/ui';
 import { useEffect, useMemo } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
-import {
-  DrawerButton,
-  DrawerInlineIconButton,
-  DrawerSurfaceCard,
-} from '@/components/molecules/drawer';
+import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { DspProviderIcon } from '@/features/dashboard/atoms/DspProviderIcon';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import {
@@ -226,7 +222,9 @@ export function AppleMusicSyncBanner({
                 {match.externalArtistName}
               </span>
               {externalArtistUrl && (
-                <DrawerInlineIconButton
+                <IconButton
+                  size='lg'
+                  variant='inline'
                   type='button'
                   aria-label='View On Apple Music'
                   onClick={() =>
@@ -238,7 +236,7 @@ export function AppleMusicSyncBanner({
                   }
                 >
                   <Icon name='ExternalLink' className='h-3 w-3' />
-                </DrawerInlineIconButton>
+                </IconButton>
               )}
             </div>
             <p className='mt-0.5 text-2xs text-secondary-token'>

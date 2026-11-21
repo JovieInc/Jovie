@@ -187,7 +187,7 @@ function generatedFixture() {
         steps: [
           {
             id: 'source_guard_merge',
-            if: "matrix.shard == '4/4'",
+            if: "matrix.shard == '4/4' && steps.reuse.outputs.reuse != 'true'",
             run: 'echo dependency_changed=true',
           },
           ...selected,

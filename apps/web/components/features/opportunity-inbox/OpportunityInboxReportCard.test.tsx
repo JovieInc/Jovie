@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { OpportunityInboxReportCard } from './OpportunityInboxReportCard';
@@ -107,5 +108,34 @@ describe('OpportunityInboxReportCard', () => {
     );
 
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('renders the PlainButton actions as type=button that fire on a real click', async () => {
+    const user = userEvent.setup();
+    const onNextStep = vi.fn();
+    const onDismiss = vi.fn();
+
+    render(
+      <OpportunityInboxReportCard
+        card={REPORT_CARD}
+        onNextStep={onNextStep}
+        onDismiss={onDismiss}
+      />
+    );
+
+    const nextStep = screen.getByTestId('opportunity-inbox-report-next-step');
+    const dismiss = screen.getByRole('button', { name: 'Dismiss' });
+    const expand = screen.getByRole('button', { name: /Show Breakdown/ });
+    for (const button of [nextStep, dismiss, expand]) {
+      expect(button).toHaveAttribute('type', 'button');
+    }
+
+    await user.click(nextStep);
+    await user.click(dismiss);
+    await user.click(expand);
+
+    expect(onNextStep).toHaveBeenCalledWith('report-1');
+    expect(onDismiss).toHaveBeenCalledWith('report-1');
+    expect(expand).toHaveAttribute('aria-expanded', 'true');
   });
 });
