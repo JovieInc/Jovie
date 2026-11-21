@@ -1,0 +1,152 @@
+{
+  "gates": {
+    "apps/web/components/features/dashboard/organisms/InlineChatArea.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/ProfileEditorSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dsp-matches/ConfirmMatchDialog.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dsp-presence/CatalogHealthSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/links/ChatStyleLinkItem.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/links/IngestedSuggestions.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/links/SortableLinkItem.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/MobileReleaseList.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleasePlanWizard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/socials-form/SocialLinkSuggestionRows.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/tour-dates/TourDatesTable.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskCompactRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/dashboard/organisms/InlineChatArea.tsx": {
+      "loading": "Transcript, loading and error state come from the server-backed useJovieChat hook, which a story cannot inject; covered with a mocked hook in InlineChatArea.test.tsx",
+      "empty": "Transcript, loading and error state come from the server-backed useJovieChat hook, which a story cannot inject; covered with a mocked hook in InlineChatArea.test.tsx",
+      "error": "Transcript, loading and error state come from the server-backed useJovieChat hook, which a story cannot inject; covered with a mocked hook in InlineChatArea.test.tsx",
+      "partial": "Transcript, loading and error state come from the server-backed useJovieChat hook, which a story cannot inject; covered with a mocked hook in InlineChatArea.test.tsx",
+      "long-content": "Transcript, loading and error state come from the server-backed useJovieChat hook, which a story cannot inject; covered with a mocked hook in InlineChatArea.test.tsx",
+      "offline": "Transcript, loading and error state come from the server-backed useJovieChat hook, which a story cannot inject; covered with a mocked hook in InlineChatArea.test.tsx",
+      "permission-denied": "Transcript, loading and error state come from the server-backed useJovieChat hook, which a story cannot inject; covered with a mocked hook in InlineChatArea.test.tsx",
+      "rtl-overflow": "Transcript, loading and error state come from the server-backed useJovieChat hook, which a story cannot inject; covered with a mocked hook in InlineChatArea.test.tsx"
+    },
+    "apps/web/components/features/dashboard/organisms/ProfileEditorSection.tsx": {
+      "error": "Inline editors have no validation or error state; save failures are owned by the parent hook"
+    },
+    "apps/web/components/features/dashboard/organisms/links/ChatStyleLinkItem.tsx": {
+      "empty": "A row always renders one link; the empty list is rendered by ChatStyleLinkList",
+      "error": "Invalid links are reported by the parent list; the row has no error state",
+      "permission-denied": "No permission-gated behaviour in this row"
+    },
+    "apps/web/components/features/dashboard/organisms/links/IngestedSuggestions.tsx": {
+      "loading": "Receives already-fetched suggestions as props; the parent owns the loading state",
+      "offline": "Pure presentational list with no network access; accept and dismiss are parent callbacks"
+    },
+    "apps/web/components/features/dashboard/organisms/links/SortableLinkItem.tsx": {
+      "loading": "Presentational row; the parent list owns loading",
+      "empty": "A row always renders one link; the empty list is rendered by the parent",
+      "offline": "No network access in this row"
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/MobileReleaseList.tsx": {
+      "permission-denied": "A locked smart link is a plan gate shown as a disabled Link action, covered by the existing SmartLinkLocked story and the locked-copy unit test; there is no separate denied screen"
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleasePlanWizard.tsx": {
+      "empty": "The wizard is a fixed multiple-choice flow with no empty, error or network state of its own; submit failures are handled by the parent",
+      "error": "The wizard is a fixed multiple-choice flow with no empty, error or network state of its own; submit failures are handled by the parent",
+      "offline": "The wizard is a fixed multiple-choice flow with no empty, error or network state of its own; submit failures are handled by the parent"
+    },
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskCompactRow.tsx": {
+      "empty": "A row always renders exactly one task; an empty list is rendered by the parent checklist"
+    }
+  }
+}

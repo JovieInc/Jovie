@@ -131,6 +131,7 @@ export function ConfirmMatchDialog({
                     href={externalArtistUrl}
                     target='_blank'
                     rel='noopener noreferrer'
+                    aria-label={`Open ${externalArtistName} on ${PROVIDER_LABELS[providerId]}`}
                     className='flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-transparent text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
                   >
                     <Icon name='ExternalLink' className='h-4 w-4' />
@@ -166,12 +167,9 @@ export function ConfirmMatchDialog({
         )}
 
         {/* Info note */}
-        <ContentSurfaceCard className='flex items-start gap-2 border-sky-500/15 bg-sky-500/5 p-3'>
-          <Icon
-            name='Info'
-            className='mt-0.5 h-4 w-4 shrink-0 text-sky-600 dark:text-sky-300'
-          />
-          <p className='text-xs text-sky-700 dark:text-sky-300'>
+        <ContentSurfaceCard className='flex items-start gap-2 border-info/15 bg-info/5 p-3'>
+          <Icon name='Info' className='mt-0.5 h-4 w-4 shrink-0 text-info' />
+          <p className='text-xs text-info'>
             Once confirmed, we&apos;ll automatically sync your releases and
             tracks from {PROVIDER_LABELS[providerId]}. You can unlink this
             connection anytime from your settings.

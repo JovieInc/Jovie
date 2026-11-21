@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { Plus, X } from 'lucide-react';
 import React, { useCallback, useEffect, useRef } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
@@ -236,7 +237,7 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
 
           return (
             <div key={key} className='relative'>
-              <button
+              <PlainButton
                 type='button'
                 aria-label={`Accept ${suggestion.platform.name} suggestion`}
                 className='rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
@@ -252,7 +253,7 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
                   className='pr-10'
                   testId='ingested-suggestion-pill'
                 />
-              </button>
+              </PlainButton>
 
               <AppIconButton
                 ariaLabel={`Dismiss ${suggestion.platform.name} suggestion`}

@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import React from 'react';
 import { ShellListRowFrame } from '@/components/organisms/table/atoms/ShellListRowFrame';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
@@ -44,7 +45,7 @@ export const ReleaseTaskCompactRow = React.memo(function ReleaseTaskCompactRow({
         onToggle={onToggle}
         className='h-3 w-3'
       />
-      <button
+      <PlainButton
         type='button'
         onClick={() => onNavigate(task.id)}
         className={cn(
@@ -55,12 +56,12 @@ export const ReleaseTaskCompactRow = React.memo(function ReleaseTaskCompactRow({
         <ReleaseTaskTitleText className='block' isDone={isDone}>
           {task.title}
           {isAi && (
-            <ReleaseTaskAutoBadge className='ml-1 text-purple-500'>
+            <ReleaseTaskAutoBadge className='ml-1 text-accent-purple'>
               AI
             </ReleaseTaskAutoBadge>
           )}
         </ReleaseTaskTitleText>
-      </button>
+      </PlainButton>
       <ReleaseTaskDueBadge
         dueDate={task.dueDate}
         dueDaysOffset={task.dueDaysOffset}
