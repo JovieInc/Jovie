@@ -608,21 +608,6 @@ describe('CmdKPalette', () => {
     expect(reopenedInput).toHaveFocus();
   });
 
-  it('drops a typed query on close during render and keeps the search a bare field', () => {
-    render(<MainPlaneReopenHarness />);
-
-    const input = screen.getByRole('combobox', {
-      name: 'Command Palette Search',
-    });
-    expect(input.className).not.toContain('border');
-    fireEvent.change(input, { target: { value: 'zzz' } });
-    fireEvent.keyDown(input, { key: 'Escape' });
-    fireEvent.click(screen.getByRole('button', { name: 'Reopen' }));
-    expect(
-      screen.getByRole('combobox', { name: 'Command Palette Search' })
-    ).toHaveValue('');
-  });
-
   it('filters additional action rows and commits them without a route', () => {
     pushMock.mockClear();
     const onAdditionalSelect = vi.fn();

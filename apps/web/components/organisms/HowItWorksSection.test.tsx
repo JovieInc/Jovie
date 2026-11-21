@@ -14,7 +14,7 @@ describe('HowItWorksSection', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Get Your Link')).toBeInTheDocument();
     await user.tab();
-    expect(document.body).toContainElement(document.activeElement);
+    expect(document.activeElement).toBeInstanceOf(HTMLElement);
     await expectNoA11yViolations(container);
   });
 

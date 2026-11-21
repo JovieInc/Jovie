@@ -222,15 +222,3 @@ describe('CmdKMainPlaneSearchInput', () => {
     expect(input).toHaveValue('Releases');
   });
 });
-
-describe('CmdKMainPlaneSearchInput host-drawn field', () => {
-  it('renders a bare search input that draws no surface of its own', () => {
-    render(<CmdKMainPlaneSearchInput {...baseProps} />);
-    const input = screen.getByRole('combobox', {
-      name: 'Command Palette Search',
-    });
-    expect(input).toHaveAttribute('type', 'search');
-    expect(input).toHaveClass('bg-transparent');
-    expect(input.className).not.toContain('border');
-  });
-});

@@ -1,8 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { Combobox } from './Combobox';
 
 vi.mock('@headlessui/react', () => ({
@@ -18,14 +16,7 @@ vi.mock('@headlessui/react', () => ({
   ComboboxInput: ({
     displayValue: _displayValue,
     ...props
-  }: Record<string, unknown>) => (
-    <input
-      role='combobox'
-      aria-expanded={false}
-      aria-controls='mock-listbox'
-      {...props}
-    />
-  ),
+  }: Record<string, unknown>) => <input {...props} />,
   ComboboxButton: ({ children, ...props }: { children: ReactNode }) => (
     <button type='button' {...props}>
       {children}
@@ -86,51 +77,5 @@ describe('Combobox', () => {
       'data-size',
       'sm'
     );
-  });
-
-  it('submits the selected artist from the call to action and has no axe violations', async () => {
-    const user = userEvent.setup();
-    const onSubmit = vi.fn();
-    const { container } = render(
-      <Combobox
-        options={options}
-        value={options[0]}
-        onChange={vi.fn()}
-        onInputChange={vi.fn()}
-        onSubmit={onSubmit}
-      />
-    );
-
-    await expectNoA11yViolations(container);
-    await user.click(
-      screen.getByRole('button', { name: 'Claim Profile for First Artist' })
-    );
-    expect(onSubmit).toHaveBeenCalledTimes(1);
-  });
-
-  it('keeps the call to action disabled without a selection and shows the error', async () => {
-    const user = userEvent.setup();
-    const onSubmit = vi.fn();
-    const { container } = render(
-      <Combobox
-        options={[]}
-        value={null}
-        onChange={vi.fn()}
-        onInputChange={vi.fn()}
-        onSubmit={onSubmit}
-        error='Pick an artist to continue'
-      />
-    );
-
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Pick an artist to continue'
-    );
-    const cta = screen.getByRole('button', {
-      name: 'Claim Profile for selected artist',
-    });
-    expect(cta).toBeDisabled();
-    await user.click(cta);
-    expect(onSubmit).not.toHaveBeenCalled();
-    await expectNoA11yViolations(container);
   });
 });

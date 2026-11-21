@@ -182,7 +182,7 @@ export function DesktopUpdateModalView({
             </div>
           ) : notes && (notes.summary || notes.items.length) ? (
             <div className='space-y-2'>
-              <h3 className='text-2xs font-medium tracking-wide text-tertiary-token'>
+              <h3 className='text-balance text-2xs font-medium tracking-wide text-tertiary-token'>
                 {COPY.notesHeading}
               </h3>
               {notes.summary ? (

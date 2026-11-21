@@ -48,7 +48,7 @@ describe('DesktopUpdateModalView certificate', () => {
 
   it('has no axe violations while downloading and hides via the focused action', async () => {
     const user = userEvent.setup();
-    const props = renderView(downloadingUpdate(), { version: '26.9.16' });
+    const props = renderView(downloadingUpdate(40), { version: '26.9.16' });
     const hide = screen.getAllByRole('button')[0];
     expect(hide).toHaveFocus();
     await expectNoA11yViolations(document.body);

@@ -5,7 +5,7 @@ import {
   ComboboxInput,
   Combobox as HeadlessCombobox,
 } from '@headlessui/react';
-import { Spinner as LoadingSpinner, PlainButton } from '@jovie/ui';
+import { Spinner as LoadingSpinner } from '@jovie/ui';
 import { clsx } from 'clsx';
 import { ChevronDown, Search } from 'lucide-react';
 import {
@@ -233,7 +233,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                   )}
 
                   {showCta && (
-                    <PlainButton
+                    <button
                       type='button'
                       onClick={handleSubmit}
                       disabled={disabled || !isValidSelection}
@@ -250,7 +250,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                     >
                       <Search className='h-4 w-4' aria-hidden='true' />
                       {ctaText}
-                    </PlainButton>
+                    </button>
                   )}
                 </div>
 
