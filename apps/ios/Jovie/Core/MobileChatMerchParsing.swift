@@ -9,7 +9,7 @@ extension MobileChatContentParser {
   ]
 
   static func extractJsonPayload(from block: String) -> Data? {
-    if let tagged = firstCapture(in: block, pattern: "<json>\\s*([\\s\\S]*?)\\s*</json>") {
+    if let tagged = firstCapture(in: block, pattern: #"<json>\s*([\s\S]*?)\s*</json>"#) {
       return tagged.data(using: .utf8)
     }
 
@@ -146,21 +146,30 @@ extension MobileChatContentParser {
     }
   }
 
+  private static let merchBoldNumberRegex = try? NSRegularExpression(
+    pattern: #"\*\*\d+\."#,
+    options: [.caseInsensitive]
+  )
+  private static let merchNumberedBoldRegex = try? NSRegularExpression(
+    pattern: #"^\d+\.\s+\*\*"#,
+    options: [.caseInsensitive]
+  )
+  private static let merchOptionLabelRegex = try? NSRegularExpression(
+    pattern: #"(?i)\boption\s+[123]\b"#,
+    options: [.caseInsensitive]
+  )
+
   static func sanitizeMerchEnumerationProse(_ text: String) -> String {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty else { return "" }
 
-    let enumerationPatterns = [
-      #"\*\*\d+\."#,
-      #"^\d+\.\s+\*\*"#,
-      #"(?i)\boption\s+[123]\b"#,
-    ]
-
-    for pattern in enumerationPatterns {
-      guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
-        continue
-      }
-      let range = NSRange(trimmed.startIndex..., in: trimmed)
+    let range = NSRange(trimmed.startIndex..., in: trimmed)
+    let regexes = [
+      merchBoldNumberRegex,
+      merchNumberedBoldRegex,
+      merchOptionLabelRegex,
+    ].compactMap { $0 }
+    for regex in regexes {
       if regex.firstMatch(in: trimmed, range: range) != nil {
         return ""
       }
