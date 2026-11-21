@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { TocEntry } from '@/types/docs';
@@ -101,7 +102,7 @@ export function PublicTableOfContents({
           const isActive = activeId === entry.id;
 
           return (
-            <button
+            <PlainButton
               key={entry.id}
               type='button'
               onClick={() => handleJump(entry.id)}
@@ -114,7 +115,7 @@ export function PublicTableOfContents({
               )}
             >
               {entry.title}
-            </button>
+            </PlainButton>
           );
         })}
       </div>

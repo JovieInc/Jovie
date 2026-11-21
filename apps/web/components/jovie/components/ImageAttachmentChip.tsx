@@ -1,6 +1,11 @@
 'use client';
 
-import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
+import {
+  PlainButton,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@jovie/ui';
 import { ImageIcon } from 'lucide-react';
 import Image from 'next/image';
 import {
@@ -98,7 +103,7 @@ export function ImageAttachmentChip({
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
-        <button
+        <PlainButton
           type='button'
           aria-haspopup='dialog'
           aria-expanded={open}
@@ -120,7 +125,7 @@ export function ImageAttachmentChip({
             />
             <span className='system-b-image-attachment-label'>{label}</span>
           </span>
-        </button>
+        </PlainButton>
       </PopoverTrigger>
       <PopoverContent
         className='system-b-image-attachment-popover'

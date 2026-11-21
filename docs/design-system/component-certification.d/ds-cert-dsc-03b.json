@@ -18,6 +18,15 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/jovie/components/ChatOpsDataCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/jovie/components/ChatPinnedOpportunityHeader.tsx": [
       "ds-owner",
       "tokens",
@@ -27,7 +36,25 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/jovie/components/ChatPitchCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/jovie/components/EntityChip.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/jovie/components/ImageAttachmentChip.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -62,6 +89,65 @@
       "a11y",
       "frontend-rules",
       "forced-caps"
+    ],
+    "apps/web/components/marketing/ClientFaqAccordion.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/FeatureAccordion.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/PublicTableOfContents.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/TimeRangeSelector.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/drawer/DrawerLinkSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/inspector/InspectorTabs.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ]
+  },
+  "waivers": {
+    "apps/web/components/jovie/components/ChatPitchCard.tsx": {
+      "offline": "No offline UI exists: the card never fetches, and its only async call is navigator.clipboard.writeText, whose rejection takes the toast.error('Failed to copy') path covered by ChatPitchCard.test.tsx."
+    }
   }
 }
