@@ -87,6 +87,8 @@ export {
   filterMergedWithBasePoolEntries,
   MERGED_WITH_BASE_POOL_CONCURRENCY,
   MERGED_WITH_BASE_POOL_LONG_POLES,
+  SCREEN_CERTIFICATION_TEST_MARKER,
+  SCREEN_CERTIFICATION_TEST_PATHS,
 } from './lib/merged-with-base-pool-config.mjs';
 
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';

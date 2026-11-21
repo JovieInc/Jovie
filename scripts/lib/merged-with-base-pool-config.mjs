@@ -43,6 +43,37 @@ export const DESIGN_CI_JUDGE_VITEST_PATHS =
   /^(?:apps\/web\/(?:scripts\/design-ci-judge|lib\/agent-os\/design-ci-judge|app\/api\/internal\/ovie\/(?:design-ci-judge-evidence|certification-evidence)|data\/(?:appScreens\/|marketing\/)|package\.json$|vitest\.config\.mts$)|scripts\/invariants\/(?:design-ci-judge|registry\.mjs$|screen-certification|screen-registry)|canon\/invariants\.jsonl$|scripts\/lib\/merged-with-base-pool-config\.mjs$|scripts\/lib\/ci-source-guard-pool\.mjs$|scripts\/ci-fast-lanes\.mjs$|package\.json$)/u;
 
 /**
+ * Unique substring of the ~61s screen-certification node --test segment
+ * (split from latency-sensitive so the path-gate cannot drop that suite).
+ */
+export const SCREEN_CERTIFICATION_TEST_MARKER =
+  'scripts/invariants/screen-certification.test.mjs';
+
+/**
+ * Paths that require screen-certification.test.mjs on the PR merged-with-base
+ * pool. Covers the certification module, its screen-* / browser-owned-input /
+ * product-reference helpers, registry data, and pool-control modules.
+ * Latency-sensitive stays a separate always-on segment after the package.json
+ * split. Merge-group structural still runs full `invariants:check`.
+ */
+export const SCREEN_CERTIFICATION_TEST_PATHS =
+  /^(?:scripts\/invariants\/(?:screen-certification|screen-registry|screen-decision-routing|screen-proof-resolver|browser-owned-input|product-reference-coherence|registry\.mjs$)|canon\/invariants\.jsonl$|scripts\/lib\/merged-with-base-pool-config\.mjs$|scripts\/lib\/ci-source-guard-pool\.mjs$|scripts\/ci-fast-lanes\.mjs$|package\.json$)/u;
+
+/** @type {readonly {marker: string, paths: RegExp, reason: string}[]} */
+const MERGED_WITH_BASE_PATH_GATES = Object.freeze([
+  {
+    marker: DESIGN_CI_JUDGE_VITEST_MARKER,
+    paths: DESIGN_CI_JUDGE_VITEST_PATHS,
+    reason: 'design-ci-judge vitest; no related paths in PR diff',
+  },
+  {
+    marker: SCREEN_CERTIFICATION_TEST_MARKER,
+    paths: SCREEN_CERTIFICATION_TEST_PATHS,
+    reason: 'screen-certification tests; no related paths in PR diff',
+  },
+]);
+
+/**
  * Filter expanded merged-with-base pool entries for PR path-gates.
  * @param {readonly {id: string, command: string}[]} entries
  * @param {readonly string[] | null | undefined} changedFiles
@@ -59,17 +90,20 @@ export function filterMergedWithBasePoolEntries(entries, changedFiles) {
   /** @type {{id: string, command: string, reason: string}[]} */
   const skipped = [];
   for (const entry of entries) {
-    if (
-      !failClosed &&
-      entry.command.includes(DESIGN_CI_JUDGE_VITEST_MARKER) &&
-      !changedFiles.some(file => DESIGN_CI_JUDGE_VITEST_PATHS.test(file))
-    ) {
-      skipped.push({
-        id: entry.id,
-        command: entry.command,
-        reason: 'design-ci-judge vitest; no related paths in PR diff',
-      });
-      continue;
+    if (!failClosed) {
+      const gate = MERGED_WITH_BASE_PATH_GATES.find(
+        g =>
+          entry.command.includes(g.marker) &&
+          !changedFiles.some(file => g.paths.test(file))
+      );
+      if (gate) {
+        skipped.push({
+          id: entry.id,
+          command: entry.command,
+          reason: gate.reason,
+        });
+        continue;
+      }
     }
     kept.push(entry);
   }
