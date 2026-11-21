@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LinkActions } from '@/features/dashboard/atoms/link-actions';
 
 vi.mock('@jovie/ui', () => ({
+  PlainButton: ({
+    type = 'button',
+    ...props
+  }: React.ComponentProps<'button'>) => <button type={type} {...props} />,
   Button: ({
     children,
     className,

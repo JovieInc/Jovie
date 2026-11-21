@@ -167,4 +167,12 @@ describe('SharedCommandPalette InlinePalette', () => {
     );
     await expectNoA11yViolations(container);
   });
+
+  it('draws inline section labels in the quiet token without forced uppercase', () => {
+    renderPalette([navSection]);
+
+    const label = screen.getByText('Go To');
+    expect(label).toHaveClass('text-tertiary-token');
+    expect(label.className).not.toMatch(/uppercase|tracking-\[/);
+  });
 });
