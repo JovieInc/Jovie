@@ -44,15 +44,6 @@
       "a11y",
       "frontend-rules",
       "forced-caps"
-    ],
-    "apps/web/components/features/profile/ProfilePrimaryActionCard.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
     ]
   },
   "waivers": {

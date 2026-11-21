@@ -1,6 +1,5 @@
 'use client';
 
-import { PlainButton } from '@jovie/ui';
 import { Play } from 'lucide-react';
 import Link from 'next/link';
 import { type ReactNode, useMemo } from 'react';
@@ -17,7 +16,8 @@ import {
 } from '@/features/profile/profile-surface-state';
 import { useReleaseAwareNow } from '@/hooks/useReleaseAwareNow';
 import { useTourDateProximity } from '@/hooks/useTourDateProximity';
-import { type UserLocation, useUserLocation } from '@/hooks/useUserLocation';
+import type { UserLocation } from '@/hooks/useUserLocation';
+import { useUserLocation } from '@/hooks/useUserLocation';
 import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
@@ -115,19 +115,19 @@ function buildCardStyles(
   return {
     isShowcase,
     shellClassName: cn(
-      'group w-full rounded-(--profile-action-radius) border border-on-media/[0.08] bg-on-media/[0.05] text-left backdrop-blur-2xl transition-[background-color,box-shadow,opacity] duration-subtle hover:bg-on-media/[0.08] active:opacity-90',
+      'group w-full rounded-(--profile-action-radius) border border-white/[0.08] bg-white/[0.05] text-left backdrop-blur-2xl transition-[background-color,box-shadow,opacity] duration-subtle hover:bg-white/[0.08] active:opacity-90',
       isShowcase
-        ? 'relative block min-h-50 overflow-hidden shadow-[0_18px_46px_color-mix(in_srgb,var(--color-ink-on-media)_34%,transparent)] [@media(max-height:880px)]:min-h-43 [@media(max-height:760px)]:min-h-39'
+        ? 'relative block min-h-50 overflow-hidden shadow-[0_18px_46px_rgba(0,0,0,0.34)] [@media(max-height:880px)]:min-h-43 [@media(max-height:760px)]:min-h-39'
         : 'flex min-h-16 items-center gap-3 px-3 py-2.5',
       className
     ),
     artClassName: isShowcase ? 'h-12 w-12 rounded-xl' : 'h-11 w-11 rounded-xl',
     titleClassName: isShowcase
-      ? 'text-sm font-semibold leading-[1.12] text-on-media'
-      : 'text-app font-semibold leading-[1.1] text-on-media/92',
+      ? 'text-sm font-semibold leading-[1.12] text-white dark:text-white'
+      : 'text-app font-semibold leading-[1.1] text-white/92',
     metaClassName: isShowcase
-      ? 'text-2xs text-on-media/56'
-      : 'text-3xs text-on-media/52',
+      ? 'text-2xs text-white/56'
+      : 'text-3xs text-white/52',
   };
 }
 
@@ -172,37 +172,37 @@ function ReleaseCard({
             fallbackVariant='release'
           />
         ) : (
-          <div className='absolute inset-0 flex items-center justify-center bg-on-media/[0.055] text-on-media/42'>
+          <div className='absolute inset-0 flex items-center justify-center bg-white/[0.055] text-white/42'>
             <Play className='h-12 w-12 fill-current' />
           </div>
         )}
         <span
           aria-hidden='true'
-          className='absolute inset-0 bg-linear-to-b from-ink-on-media/4 from-0% via-ink-on-media/24 via-46% to-ink-on-media/74 to-100%'
+          className='absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.04)_0%,rgba(0,0,0,0.24)_46%,rgba(0,0,0,0.74)_100%)]'
         />
         <span
           aria-hidden='true'
-          className='absolute inset-x-0 bottom-0 h-24 bg-[radial-gradient(circle_at_24%_100%,color-mix(in_srgb,var(--color-on-media)_18%,transparent),transparent_46%)]'
+          className='absolute inset-x-0 bottom-0 h-24 bg-[radial-gradient(circle_at_24%_100%,rgba(255,255,255,0.18),transparent_46%)]'
         />
         <div className='relative z-10 flex min-h-50 flex-col justify-end p-4 [@media(max-height:880px)]:min-h-43 [@media(max-height:880px)]:p-3.5 [@media(max-height:760px)]:min-h-39 [@media(max-height:760px)]:p-3'>
           <div className='flex min-w-0 items-end justify-between gap-3'>
             <div className='min-w-0 flex-1'>
-              <p className='line-clamp-2 text-base font-semibold leading-[1.08] text-on-media [overflow-wrap:anywhere] [@media(max-height:880px)]:text-base [@media(max-height:760px)]:text-mid'>
+              <p className='line-clamp-2 text-base font-semibold leading-[1.08] text-white dark:text-white [overflow-wrap:anywhere] [@media(max-height:880px)]:text-base [@media(max-height:760px)]:text-mid'>
                 {state.release.title}
               </p>
               <div className='mt-1 space-y-0.5'>
-                <p className='truncate text-xs font-semibold leading-4 text-on-media/72'>
+                <p className='truncate text-xs font-semibold leading-4 text-white/72'>
                   {artist.name}
                 </p>
                 {state.collaboratorLine ? (
-                  <p className='truncate font-caption text-2xs leading-4 text-on-media/58'>
+                  <p className='truncate font-caption text-2xs leading-4 text-white/58'>
                     {state.collaboratorLine}
                   </p>
                 ) : null}
               </div>
             </div>
             {state.kind === 'release_countdown' && releaseDate ? (
-              <div className='shrink-0 rounded-2xl border border-on-media/12 bg-ink-on-media/24 px-3 py-2 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--color-on-media)_5%,transparent)] backdrop-blur-xl'>
+              <div className='shrink-0 rounded-2xl border border-white/12 bg-black/24 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-xl'>
                 <ReleaseCountdown releaseDate={releaseDate} compact />
               </div>
             ) : (
@@ -222,7 +222,7 @@ function ReleaseCard({
       dataTestId={dataTestId}
     >
       {state.release.artworkUrl ? (
-        <ArtworkFrame size={44} className='h-11 w-11 bg-on-media/[0.05]'>
+        <ArtworkFrame size={44} className='h-11 w-11 bg-white/[0.05]'>
           <ImageWithFallback
             src={state.release.artworkUrl}
             alt={`${state.release.title} artwork`}
@@ -235,7 +235,7 @@ function ReleaseCard({
       ) : (
         <div
           className={cn(
-            'flex shrink-0 items-center justify-center bg-on-media/[0.05] text-on-media/62',
+            'flex shrink-0 items-center justify-center bg-white/[0.05] text-white/62',
             styles.artClassName
           )}
         >
@@ -258,7 +258,7 @@ function ReleaseCard({
         </div>
       </div>
       {state.kind === 'release_countdown' && releaseDate ? (
-        <div className='shrink-0 rounded-2xl border border-on-media/10 bg-ink-on-media/16 px-3 py-2 shadow-[inset_0_1px_0_color-mix(in_srgb,var(--color-on-media)_4%,transparent)]'>
+        <div className='shrink-0 rounded-2xl border border-white/10 bg-black/16 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
           <ReleaseCountdown releaseDate={releaseDate} compact />
         </div>
       ) : (
@@ -293,11 +293,11 @@ function TourCard({
     >
       <div
         className={cn(
-          'flex shrink-0 flex-col items-center justify-center bg-on-media/[0.04] leading-none text-on-media',
+          'flex shrink-0 flex-col items-center justify-center bg-white/[0.04] leading-none text-white dark:text-white',
           styles.artClassName
         )}
       >
-        <span className='text-3xs font-semibold tracking-[0.14em] text-on-media/48'>
+        <span className='text-3xs font-semibold uppercase tracking-[0.14em] text-white/48'>
           {getMonthLabel(state.tourDate.startDate)}
         </span>
         <span className='mt-1 text-xl font-bold tracking-[-0.06em]'>
@@ -359,7 +359,7 @@ function PlaylistCard({
       ) : (
         <div
           className={cn(
-            'flex shrink-0 items-center justify-center bg-on-media/[0.05] text-on-media/62',
+            'flex shrink-0 items-center justify-center bg-white/[0.05] text-white/62',
             styles.artClassName
           )}
         >
@@ -425,7 +425,7 @@ function ListenCard({
       ) : (
         <div
           className={cn(
-            'flex shrink-0 items-center justify-center bg-on-media/[0.05] text-on-media/62',
+            'flex shrink-0 items-center justify-center bg-white/[0.05] text-white/62',
             styles.artClassName
           )}
         >
@@ -441,8 +441,8 @@ function ListenCard({
 }
 
 const CTA_PILL_CLASS_NAME = cn(
-  'inline-flex h-7 items-center justify-center rounded-full border border-on-media/14 bg-on-media dark:bg-surface-1 px-5 text-2xs font-semibold text-ink-on-media dark:text-on-media shadow-[0_10px_24px_color-mix(in_srgb,var(--color-on-media)_16%,transparent)]',
-  'group-hover:bg-on-media dark:group-hover:bg-surface-1 group-hover:text-ink-on-media dark:group-hover:text-on-media'
+  'inline-flex h-7 items-center justify-center rounded-full border border-white/14 bg-white dark:bg-surface-1 px-5 text-2xs font-semibold text-black dark:text-white shadow-[0_10px_24px_rgba(255,255,255,0.16)]',
+  'group-hover:bg-white dark:group-hover:bg-surface-1 group-hover:text-black dark:group-hover:text-white'
 );
 
 function getReleaseArtistNames(
@@ -555,9 +555,9 @@ function ActionCardShell({
 
   if (onClick) {
     return (
-      <PlainButton onClick={onClick} {...sharedProps}>
+      <button type='button' onClick={onClick} {...sharedProps}>
         {children || 'Submit'}
-      </PlainButton>
+      </button>
     );
   }
 
@@ -576,7 +576,7 @@ function ActionPill({
       className={cn(
         CTA_PILL_CLASS_NAME,
         emphasis === 'dark' &&
-          'border-on-media/14 bg-on-media/[0.08] text-on-media shadow-none hover:bg-on-media/[0.1] hover:text-on-media dark:text-on-media'
+          'border-white/14 bg-white/[0.08] text-white dark:text-white shadow-none hover:bg-white/[0.1] hover:text-white dark:text-white'
       )}
     >
       {label}
