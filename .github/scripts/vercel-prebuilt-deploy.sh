@@ -63,20 +63,9 @@ count_prebuilt_files() {
   find .vercel/output -type f | wc -l | tr -d ' '
 }
 
-# Vercel CLI >= 59 applies the repo .vercelignore to prebuilt functions'
-# `.vc-config.json` filePathMap entries and drops every match from the upload
-# (PREBUILT_FILEPATHMAP_IGNORED, "excludes at least 20 files the prebuilt
-# functions need"). CLI 56.x uploaded the full traced closure. (Restoring
-# that closure did not fix the 59.x "Extracting deployment files ...
-# Unexpected error" failures; the CLI is pinned to 56.3.2 for that, see
-# .github/dependabot.yml.) The prebuilt file walk ignores everything outside .vercel/output regardless
-# of .vercelignore, so that file only shapes source uploads. For prebuilt
-# uploads it only removes files `vercel build` traced (CHANGELOG.md,
-# docs/FEATURE_REGISTRY.md, tests/quarantine.json, ...). The dropped set
-# depends on the trace and the CLI truncates it at 20, so no fixed re-include
-# list can cover it. Hide the file for the prebuilt CLI call only; source
-# deploys keep it. assert_prebuilt_upload_has_no_secrets bounds what the
-# upload set may contain.
+# CLI >=59 drops .vercelignore matches from prebuilt filePathMap uploads
+# (PREBUILT_FILEPATHMAP_IGNORED). Pin is 56.3.2 (.github/dependabot.yml).
+# Hide .vercelignore for prebuilt only; source keeps it.
 HIDDEN_VERCELIGNORE=""
 
 restore_vercelignore() {
@@ -223,7 +212,7 @@ run_deploy() {
   "${deploy_cmd[@]}" "${VERCEL_CMD[@]}" deploy --no-wait "$@" "${VERCEL_SCOPE_ARGS[@]}"
 }
 
-# Exit 75 trips the staging breaker so the next run skips `vercel build`.
+# Settle after --no-wait: BLOCKED→75, ERROR/CANCELED→1 (fallback), else 0.
 assert_deployment_not_blocked() {
   VERCEL_CLI_JSON="$(node -e 'process.stdout.write(JSON.stringify(process.argv.slice(1)))' -- "${VERCEL_CMD[@]}")" \
     node "$SCRIPT_DIR/vercel-blocked-breaker.mjs" poll "$1"
@@ -359,27 +348,27 @@ try_mode() {
     fi
   fi
   rm -f "$deploy_output_file"
+  local settle_seconds="${VERCEL_DEPLOY_ARCHIVE_TIMEOUT_SECONDS:-480}"
+  [ "$mode" = "source" ] && settle_seconds="${VERCEL_DEPLOY_SOURCE_TIMEOUT_SECONDS:-30}"
+  settle_seconds="${VERCEL_DEPLOY_SETTLE_SECONDS:-$settle_seconds}"
   if [ "$deploy_status" -eq 0 ]; then
     if [ -z "$deployment_url" ]; then
       echo "Deploy succeeded but no preview URL was found in Vercel output" >&2
       return 1
     fi
-    assert_deployment_not_blocked "$deployment_url" || return $?
+    VERCEL_DEPLOY_SETTLE_SECONDS="$settle_seconds" \
+      assert_deployment_not_blocked "$deployment_url" || return $?
     write_deployment_url "$deployment_url"
     echo "Deploy succeeded on attempt $attempt with ${mode} upload"
     return 0
   fi
-
   if [ "$deploy_status" -eq 124 ] || [ "$deploy_status" -eq 137 ]; then
     echo "Deploy attempt $attempt with ${mode} upload exceeded its time budget" >&2
-    local accepted_deployment_url=""
-    accepted_deployment_url="$deployment_url"
-    if [ -n "$accepted_deployment_url" ]; then
-      # A timed-out CLI may still have handed us a BLOCKED deployment; refuse
-      # to treat that as a successful handoff to the readiness wait.
-      assert_deployment_not_blocked "$accepted_deployment_url" || return $?
-      write_deployment_url "$accepted_deployment_url"
-      echo "Vercel accepted ${accepted_deployment_url}; downstream health gates will verify readiness"
+    if [ -n "$deployment_url" ]; then
+      VERCEL_DEPLOY_SETTLE_SECONDS="$settle_seconds" \
+        assert_deployment_not_blocked "$deployment_url" || return $?
+      write_deployment_url "$deployment_url"
+      echo "Vercel accepted ${deployment_url}; downstream health gates will verify readiness"
       return 0
     fi
   fi

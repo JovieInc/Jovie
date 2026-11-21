@@ -11,6 +11,7 @@ import {
   isBlockedState,
   isBreakerOpen,
   isTerminalFailureState,
+  pollDeployment,
   readBreaker,
   SCHEMA,
   tripBreaker,
@@ -137,4 +138,42 @@ test('CLI inspect-json exits 75 on BLOCKED so deploy can fail fast', t => {
     encoding: 'utf8',
   });
   assert.equal(ready.status, 0, ready.stderr);
+});
+
+test('poll settles BUILDING then ERROR so fallback can run', t => {
+  const dir = tempDir(t);
+  const path = join(dir, 'breaker.json');
+  let calls = 0;
+  const sleeps = [];
+  const status = pollDeployment({
+    deploymentUrl: 'https://jovie-async-error.vercel.app',
+    env: {
+      VERCEL_CLI: 'vercel',
+      VERCEL_BLOCKED_BREAKER_PATH: path,
+      VERCEL_DEPLOY_SETTLE_SECONDS: '5',
+      VERCEL_DEPLOY_SETTLE_INTERVAL_MS: '1',
+      VERCEL_BLOCKED_POLL_TIMEOUT_SECONDS: '5',
+    },
+    now: 1_000,
+    sleep: ms => {
+      sleeps.push(ms);
+    },
+    spawn: () => {
+      calls += 1;
+      const readyState = calls === 1 ? 'BUILDING' : 'ERROR';
+      const errorMessage =
+        calls === 1 ? undefined : 'Extracting deployment files failed';
+      return {
+        status: 0,
+        stdout: JSON.stringify({
+          readyState,
+          errorMessage,
+          id: `dpl_${calls}`,
+        }),
+      };
+    },
+  });
+  assert.equal(status, 1);
+  assert.equal(calls, 2);
+  assert.deepEqual(sleeps, [1]);
 });

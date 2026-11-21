@@ -80,6 +80,88 @@ exit 99
     )
 
 
+def test_async_remote_error_after_nowait_falls_back_to_source(
+    tmp_path: Path,
+) -> None:
+    """--no-wait + BUILDING then ERROR must still fall back to source."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    fake_vercel = bin_dir / "vercel"
+    fake_vercel.write_text(
+        """#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\\n' "$*" >> "${VERCEL_CALL_LOG}"
+if [[ " $* " == *" inspect "* && " $* " == *" --format=json "* ]]; then
+  if [[ -f "${RUNNER_TEMP}/source-deployed" ]]; then
+    printf '%s\\n' '{"readyState":"READY","id":"dpl_source"}'
+    exit 0
+  fi
+  count_file="${RUNNER_TEMP}/inspect-count"
+  n=0
+  if [[ -f "$count_file" ]]; then n=$(cat "$count_file"); fi
+  n=$((n + 1))
+  printf '%s' "$n" > "$count_file"
+  if [[ "$n" -eq 1 ]]; then
+    printf '%s\\n' '{"readyState":"BUILDING","id":"dpl_building"}'
+  else
+    printf '%s\\n' '{"readyState":"ERROR","errorMessage":"Extracting deployment files failed","id":"dpl_err"}'
+  fi
+  exit 0
+fi
+if [[ " $* " == *" --prebuilt "* ]]; then
+  echo "https://jovie-async-error.vercel.app"
+  exit 0
+fi
+: > "${RUNNER_TEMP}/source-deployed"
+echo "https://jovie-source-after-error.vercel.app"
+exit 0
+"""
+    )
+    fake_vercel.chmod(0o755)
+
+    prebuilt_output = tmp_path / ".vercel/output"
+    prebuilt_output.mkdir(parents=True)
+    (prebuilt_output / "config.json").write_text("{}")
+    output_file = tmp_path / "github-output"
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "VERCEL_TOKEN": "test-token",
+        "VERCEL_ORG_ID": "test-org",
+        "GITHUB_OUTPUT": str(output_file),
+        "VERCEL_ENABLE_SOURCE_FALLBACK": "true",
+        "VERCEL_ENABLE_PLAIN_PREBUILT_FALLBACK": "false",
+        "VERCEL_CALL_LOG": str(tmp_path / "vercel-calls"),
+        "VERCEL_BLOCKED_BREAKER_PATH": str(tmp_path / ".vercel-blocked-breaker.json"),
+        "VERCEL_DEPLOY_SETTLE_SECONDS": "5",
+        "VERCEL_DEPLOY_SETTLE_INTERVAL_MS": "1",
+        "RUNNER_TEMP": str(tmp_path),
+    }
+
+    result = subprocess.run(
+        ["bash", str(DEPLOY_SCRIPT), "deploy_url", "--yes"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Extracting deployment files failed" in result.stderr
+    assert "Deploy succeeded on attempt 2 with source upload" in result.stdout
+    assert output_file.read_text().strip() == (
+        "deploy_url=https://jovie-source-after-error.vercel.app"
+    )
+    calls = (tmp_path / "vercel-calls").read_text().splitlines()
+    deploy_calls = [line for line in calls if "deploy " in line]
+    assert len(deploy_calls) == 2
+    assert "--prebuilt --archive=tgz --no-wait" in deploy_calls[0]
+    assert "--prebuilt" not in deploy_calls[1]
+    assert sum(1 for line in calls if "inspect " in line) >= 2
+
+
 def test_staging_skips_vercel_build_while_blocked_breaker_is_open() -> None:
     """Staging reads the breaker before `vercel build` and persists it after."""
     workflow = PRODUCTION_RELEASE_WORKFLOW.read_text()

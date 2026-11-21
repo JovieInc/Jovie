@@ -138,16 +138,47 @@ function scopeArgs(env = process.env) {
   return env.VERCEL_ORG_ID ? ['--scope', env.VERCEL_ORG_ID] : [];
 }
 
+function settleBudgetSeconds(env = process.env) {
+  const raw =
+    env.VERCEL_DEPLOY_SETTLE_SECONDS ?? env.VERCEL_BLOCKED_POLL_TIMEOUT_SECONDS;
+  if (raw === undefined || raw === '') return 120;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(
+      'VERCEL_DEPLOY_SETTLE_SECONDS must be a non-negative number'
+    );
+  }
+  return Math.floor(parsed);
+}
+
+function settleIntervalMs(env = process.env) {
+  const raw = env.VERCEL_DEPLOY_SETTLE_INTERVAL_MS;
+  if (raw === undefined || raw === '') return 2_000;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(
+      'VERCEL_DEPLOY_SETTLE_INTERVAL_MS must be a non-negative number'
+    );
+  }
+  return Math.floor(parsed);
+}
+
+function defaultSleep(ms) {
+  if (!(ms > 0)) return;
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
 /**
- * Inspect a deployment URL once. BLOCKED trips the breaker and returns 75;
- * other terminal failures return 1; inspect/parse noise returns 0 so readiness
- * still owns non-BLOCKED wait semantics.
+ * After `--no-wait`, settle via inspect until READY / terminal failure /
+ * settle budget. BLOCKED trips the breaker (75). ERROR/CANCELED return 1 so
+ * try_mode can fall back to plain/source. Inspect noise hands off (0).
  */
 export function pollDeployment({
   deploymentUrl,
   env = process.env,
   spawn = spawnSync,
   now = Date.now(),
+  sleep = defaultSleep,
 }) {
   if (!deploymentUrl) {
     process.stderr.write(
@@ -155,11 +186,16 @@ export function pollDeployment({
     );
     return 2;
   }
-  const timeoutSeconds = Number(env.VERCEL_BLOCKED_POLL_TIMEOUT_SECONDS || 20);
-  const timeoutMs =
-    Number.isFinite(timeoutSeconds) && timeoutSeconds > 0
-      ? Math.floor(timeoutSeconds * 1000)
+  const inspectTimeoutSeconds = Number(
+    env.VERCEL_BLOCKED_POLL_TIMEOUT_SECONDS || 20
+  );
+  const inspectTimeoutMs =
+    Number.isFinite(inspectTimeoutSeconds) && inspectTimeoutSeconds > 0
+      ? Math.floor(inspectTimeoutSeconds * 1000)
       : 20_000;
+  const deadline = now + settleBudgetSeconds(env) * 1000;
+  const intervalMs = settleIntervalMs(env);
+  let clock = now;
   const tempRoot = mkdtempSync(join(tmpdir(), 'jovie-vercel-blocked-'));
   try {
     const argv = [
@@ -169,60 +205,71 @@ export function pollDeployment({
       '--format=json',
       ...scopeArgs(env),
     ];
-    const inspect = spawn(argv[0], argv.slice(1), {
-      encoding: 'utf8',
-      timeout: timeoutMs,
-      env,
-    });
-    if (inspect.status !== 0) {
-      process.stderr.write(
-        `Vercel inspect for early BLOCKED poll exited ${inspect.status ?? 'null'}; continuing\n`
-      );
-      return 0;
-    }
-    let payload;
-    try {
-      payload = JSON.parse(inspect.stdout || '');
-    } catch {
-      process.stderr.write(
-        'vercel-blocked-breaker: inspect JSON was malformed; continuing\n'
-      );
-      return 0;
-    }
-    const { state, reason, id, url } = deploymentState(payload);
-    if (isBlockedState(state)) {
-      const blockedReason = reason || 'Vercel deployment BLOCKED';
-      const normalizedUrl = url
-        ? url.includes('://')
-          ? url
-          : `https://${url}`
-        : deploymentUrl;
-      const breaker = tripBreaker({
-        reason: blockedReason,
-        deploymentUrl: normalizedUrl,
-        deploymentId: id,
-        now,
-        ttlSeconds: defaultTtlSeconds(env),
+    for (;;) {
+      const inspect = spawn(argv[0], argv.slice(1), {
+        encoding: 'utf8',
+        timeout: inspectTimeoutMs,
+        env,
       });
-      writeBreaker(
-        breaker,
-        env.VERCEL_BLOCKED_BREAKER_PATH || DEFAULT_BREAKER_PATH
-      );
-      process.stdout.write(
-        `::error title=Vercel deployment BLOCKED::${blockedReason}\n`
-      );
-      process.stderr.write(
-        `Deploy failed: Vercel reported BLOCKED immediately after upload (${blockedReason})\n`
-      );
-      return 75;
+      if (inspect.status !== 0) {
+        process.stderr.write(
+          `Vercel inspect for post-upload settle exited ${inspect.status ?? 'null'}; continuing\n`
+        );
+        return 0;
+      }
+      let payload;
+      try {
+        payload = JSON.parse(inspect.stdout || '');
+      } catch {
+        process.stderr.write(
+          'vercel-blocked-breaker: inspect JSON was malformed; continuing\n'
+        );
+        return 0;
+      }
+      const { state, reason, id, url } = deploymentState(payload);
+      if (isBlockedState(state)) {
+        const blockedReason = reason || 'Vercel deployment BLOCKED';
+        const normalizedUrl = url
+          ? url.includes('://')
+            ? url
+            : `https://${url}`
+          : deploymentUrl;
+        const breaker = tripBreaker({
+          reason: blockedReason,
+          deploymentUrl: normalizedUrl,
+          deploymentId: id,
+          now: clock,
+          ttlSeconds: defaultTtlSeconds(env),
+        });
+        writeBreaker(
+          breaker,
+          env.VERCEL_BLOCKED_BREAKER_PATH || DEFAULT_BREAKER_PATH
+        );
+        process.stdout.write(
+          `::error title=Vercel deployment BLOCKED::${blockedReason}\n`
+        );
+        process.stderr.write(
+          `Deploy failed: Vercel reported BLOCKED immediately after upload (${blockedReason})\n`
+        );
+        return 75;
+      }
+      if (isTerminalFailureState(state)) {
+        process.stderr.write(
+          `Deploy failed: Vercel deployment entered terminal state ${state}${reason ? `: ${reason}` : ''}\n`
+        );
+        return 1;
+      }
+      if (state === 'READY') return 0;
+      if (clock >= deadline) {
+        process.stderr.write(
+          `Vercel deployment still ${state} after settle budget; handing off to readiness\n`
+        );
+        return 0;
+      }
+      const waitMs = Math.min(intervalMs, Math.max(0, deadline - clock));
+      sleep(waitMs);
+      clock += waitMs > 0 ? waitMs : intervalMs || 1;
     }
-    if (isTerminalFailureState(state)) {
-      process.stderr.write(
-        `Deploy failed: Vercel deployment entered terminal state ${state}${reason ? `: ${reason}` : ''}\n`
-      );
-      return 1;
-    }
-    return 0;
   } finally {
     rmSync(tempRoot, { recursive: true, force: true });
   }
