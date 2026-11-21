@@ -3,6 +3,7 @@ import { mkdtempSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { capturePathMatchesExpected } from './clef-screenshot-capture.mjs';
 import {
   DEFAULT_PEN_CAPTURE_EMAIL,
   extractFreshOtp,
@@ -144,6 +145,19 @@ test('storageState is isolated to auth: required frames and never leaks to anony
   assert.equal('storageState' in pageCalls[1], false);
 });
 
+test('capturePathMatchesExpected treats /app/chat/{id} as the chat surface', () => {
+  assert.equal(capturePathMatchesExpected('/app/chat', '/app/chat'), true);
+  assert.equal(
+    capturePathMatchesExpected('/app/chat/thread-abc', '/app/chat'),
+    true
+  );
+  assert.equal(capturePathMatchesExpected('/app/chat/', '/app/chat'), true);
+  assert.equal(capturePathMatchesExpected('/start', '/app/chat'), false);
+  assert.equal(capturePathMatchesExpected('/signin', '/app/chat'), false);
+  assert.equal(capturePathMatchesExpected('/signin', '/signin'), true);
+  assert.equal(capturePathMatchesExpected('/waitlist', '/signin'), false);
+});
+
 test('off-route redirect fails strict qualification and records capture-redirected-off-route', async t => {
   const { root, pngBytes } = makeStillFixture(t);
   const manifest = {
@@ -182,6 +196,74 @@ test('off-route redirect fails strict qualification and records capture-redirect
   assert.match(
     formatComment(receipt),
     /waiting \(capture-redirected-off-route\)/u
+  );
+});
+
+test('chat thread navigation /app/chat/{id} is comparable, not capture-redirected-off-route', async t => {
+  const { root, pngBytes } = makeStillFixture(t);
+  const statePath = join(root, 'state.json');
+  writeFileSync(
+    statePath,
+    JSON.stringify({
+      cookies: [
+        {
+          name: 'better-auth.session_token',
+          value: 'fixture',
+          domain: 'fixture.invalid',
+          path: '/',
+        },
+      ],
+      origins: [],
+    })
+  );
+  const manifest = {
+    schema: MANIFEST_SCHEMA,
+    frames: [
+      {
+        sectionId: 'chat/app-chat',
+        penNodeId: 'hkkdJ',
+        stillPath: 'auth.png',
+        viewport: 1440,
+        mode: 'dark',
+        route: '/app/chat',
+        auth: 'required',
+        status: 'active',
+      },
+    ],
+  };
+  const receipt = await evaluateManifestWithBrowser(manifest, {
+    root,
+    baseUrl: 'http://fixture.invalid',
+    strict: true,
+    storageState: statePath,
+    launchBrowser: async () => ({
+      isConnected: () => true,
+      close: async () => {},
+      newPage: async () => ({
+        goto: async () => {},
+        url: () => 'http://fixture.invalid/app/chat/thread-fixture',
+        waitForTimeout: async () => {},
+        screenshot: async () => pngBytes,
+        locator: () => ({
+          first: () => ({ screenshot: async () => pngBytes }),
+          evaluate: async () => null,
+        }),
+        close: async () => {},
+      }),
+    }),
+  });
+  assert.equal(receipt.frames[0].reason, undefined);
+  assert.notEqual(receipt.frames[0].verdict, 'waiting');
+  assert.ok(
+    receipt.frames[0].verdict === 'pass' || receipt.frames[0].verdict === 'fail'
+  );
+});
+
+test('DEFAULT_PEN_CAPTURE_EMAIL is the chat-health canary', () => {
+  assert.equal(DEFAULT_PEN_CAPTURE_EMAIL, 'browse-ready+chat-health@jov.ie');
+  assert.equal(
+    isAllowedPenCaptureEmail('browse-ready+canary-admitted@jov.ie'),
+    true
   );
 });
 

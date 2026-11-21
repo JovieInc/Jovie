@@ -12,10 +12,17 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const DEFAULT_PEN_CAPTURE_EMAIL = 'browse-ready+canary-admitted@jov.ie';
+/**
+ * Default to the chat-health canary so `/app/chat` stays reachable for Pen
+ * capture. The admitted canary is still allowlisted for billing-success and
+ * other auth-required frames when explicitly passed via `--email`.
+ * Unpublished or unfinished profiles redirect `/app/chat` → `/start`, which
+ * the comparator correctly records as `capture-redirected-off-route`.
+ */
+export const DEFAULT_PEN_CAPTURE_EMAIL = 'browse-ready+chat-health@jov.ie';
 export const ALLOWED_PEN_CAPTURE_EMAILS = Object.freeze([
   DEFAULT_PEN_CAPTURE_EMAIL,
-  'browse-ready+chat-health@jov.ie',
+  'browse-ready+canary-admitted@jov.ie',
 ]);
 
 const OTP_PATTERN = /^\d{6}$/u;
