@@ -45,6 +45,15 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/admin/outreach/DmQueuePanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/admin/outreach/OutreachKpis.tsx": [
       "ds-owner",
       "tokens",
@@ -54,7 +63,43 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/admin/outreach/OutreachOverviewPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/admin/outreach/OutreachStatusBadge.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/system-map/AdminSystemMap.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/system-map/AdminSystemMapSkillsTab.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/system-map/SkillDocCard.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -108,5 +153,15 @@
       "frontend-rules",
       "forced-caps"
     ]
+  },
+  "waivers": {
+    "apps/web/components/features/admin/system-map/AdminSystemMap.tsx": {
+      "empty": "The connectors and memory tabs list static registries and entity types that are never empty. The tools tab empty branch is reachable only by an empty registry, which a story cannot set up; AdminSystemMap.test.tsx covers it with a mocked registry.",
+      "long-content": "Every row shows registry strings authored in source (short labels and one-line descriptions); no user or runtime text reaches it."
+    },
+    "apps/web/components/features/admin/system-map/AdminSystemMapSkillsTab.tsx": {
+      "empty": "The tab lists the static SKILL_REGISTRY, which ships non-empty; there is no runtime path that empties it. The detector matched the identifier items in a doc comment.",
+      "long-content": "Every card shows registry strings authored in source (short names and one-line descriptions); no user or runtime text reaches it, and SkillDocCard owns the wrapping (SkillDocCard.states.stories.tsx LongContentHeader)."
+    }
   }
 }
