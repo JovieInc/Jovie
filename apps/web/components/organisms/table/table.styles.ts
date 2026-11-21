@@ -202,3 +202,12 @@ export function tableRowModeStyle(mode?: TableRowMode): CSSProperties {
     '--table-cell-content-height': `${TABLE_ROW_MODES[mode].contentHeight}px`,
   } as CSSProperties;
 }
+
+/** Resolve virtualization/layout px from mode (preferred) or legacy rowHeight. */
+export function resolveTableRowHeightPx(
+  rowMode?: TableRowMode,
+  rowHeight?: number
+): number {
+  if (rowMode) return TABLE_ROW_MODES[rowMode].rowHeight;
+  return rowHeight ?? TABLE_ROW_MODES[TABLE_CANONICAL_ROW_MODE].rowHeight;
+}

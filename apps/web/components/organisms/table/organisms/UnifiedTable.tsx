@@ -46,8 +46,8 @@ import {
   cn,
   iconColors,
   TABLE_CANONICAL_ROW_MODE,
-  TABLE_ROW_MODES,
   type TableRowMode,
+  resolveTableRowHeightPx,
   tableRowModeStyle,
   zIndex,
 } from '../table.styles';
@@ -109,15 +109,9 @@ export interface UnifiedTableProps<TData extends RowData> {
    */
   readonly enableVirtualization?: boolean;
 
-  /**
-   * Legacy pixel override for virtualization when `rowMode` is omitted.
-   * Prefer `rowMode='dense'` (canonical). Ignored when `rowMode` is set.
-   */
+  /** Legacy px when `rowMode` omitted; prefer dense mode. */
   readonly rowHeight?: number;
-  /**
-   * Fixed geometry for content, loading rows, and virtualization.
-   * @default dense (32px) — sole customer/dashboard height (DRI-21).
-   */
+  /** Fixed geometry; defaults to dense 32px (DRI-21). */
   readonly rowMode?: TableRowMode;
 
   /**
@@ -513,9 +507,7 @@ function UnifiedTableContent<TData extends RowData>({
   // Cell identity follows the table option. The provider disables layout
   // animation for reduced motion without remounting cells after hydration.
   const snapColumns = columnSnap;
-  const resolvedRowHeight = rowMode
-    ? TABLE_ROW_MODES[rowMode].rowHeight
-    : (rowHeight ?? TABLE_ROW_MODES[TABLE_CANONICAL_ROW_MODE].rowHeight);
+  const resolvedRowHeight = resolveTableRowHeightPx(rowMode, rowHeight);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [rowRefs] = useState(() => new Map<number, HTMLTableRowElement>());
   const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);

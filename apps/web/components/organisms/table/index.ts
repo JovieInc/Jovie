@@ -306,5 +306,6 @@ export {
   TABLE_CANONICAL_ROW_MODE,
   TABLE_ROW_MODES,
   type TableRowMode,
+  resolveTableRowHeightPx,
   tableRowModeStyle,
 } from './table.styles';
