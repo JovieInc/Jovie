@@ -1057,7 +1057,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/layout-guard-pen-contracts.test.mjs',
   'scripts/invariants/shell-ia.test.mjs', // JOV-INV-047 shell+IA registry.
   'scripts/ci-rounds-report.test.mjs',
-  'scripts/preflight-changed.test.mjs',
+  'scripts/preflight-changed.test.mjs scripts/preflight-coverage.test.mjs',
   'scripts/preflight-process-timeout.test.mjs',
   'scripts/lib/preflight-failure-summary.test.mjs',
   'scripts/preflight-source-size.test.mjs',

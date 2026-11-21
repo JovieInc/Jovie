@@ -14,7 +14,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import {
+  SCRIPT_CONTRACT_NODE_TESTS,
+  scriptContractNodeArgs,
+} from './ci-fast-lanes.mjs';
 import { runPreflightCoverage } from './lib/preflight-coverage.mjs';
+import { selectScriptContracts } from './lib/script-contract-affected.mjs';
 import { sh } from './preflight-changed.mjs';
 
 const repo = fileURLToPath(new URL('..', import.meta.url));
@@ -24,6 +29,24 @@ const env = Object.fromEntries(
     ([key]) => !key.startsWith('GIT_') && key !== 'NODE_TEST_CONTEXT'
   )
 );
+
+test('the existing affected CI selector runs both preflight and coverage contracts', () => {
+  const selected = selectScriptContracts(
+    ['scripts/lib/preflight-coverage.mjs'],
+    {
+      root: repo,
+      derivedOnly: true,
+    }
+  );
+  const args = scriptContractNodeArgs(selected.node).flat();
+  assert.ok(args.includes('scripts/preflight-changed.test.mjs'));
+  assert.ok(args.includes('scripts/preflight-coverage.test.mjs'));
+  assert.ok(
+    SCRIPT_CONTRACT_NODE_TESTS.some(entry =>
+      entry.split(' ').includes('scripts/preflight-coverage.test.mjs')
+    )
+  );
+});
 
 function fixture({ answer = 42, uncovered = false } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), 'preflight-coverage-'));
