@@ -280,7 +280,14 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
         <time
           aria-hidden='true'
           dateTime={thread.updatedAt}
-          className='shrink-0 text-(length:--text-2xs) text-tertiary-token'
+          className={cn(
+            'shrink-0 text-(length:--text-2xs) text-tertiary-token',
+            // The chat actions button reveals in this same trailing track on
+            // hover or keyboard focus, so the date steps aside only then. A
+            // link that keeps click focus must not blank the track.
+            onThreadContextMenu &&
+              'transition-opacity duration-subtle ease-subtle group-hover/thread:opacity-0 group-has-focus-visible/thread:opacity-0'
+          )}
         >
           {formatSidebarThreadTime(thread.updatedAt)}
         </time>
@@ -334,7 +341,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
             className={cn(
               // The reserved trailing track keeps this action off the title.
               'absolute right-(--app-shell-sidebar-inset) top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-subtle hover:bg-surface-0 active:bg-surface-0 hover:text-primary-token focus-visible:bg-transparent focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55',
-              '[@media(hover:hover)_and_(pointer:fine)]:opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
+              '[@media(hover:hover)_and_(pointer:fine)]:opacity-0 group-hover/thread:opacity-100 group-has-focus-visible/thread:opacity-100'
             )}
           >
             <Icon

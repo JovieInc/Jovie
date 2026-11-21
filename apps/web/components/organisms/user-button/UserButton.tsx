@@ -473,11 +473,15 @@ function buildDropdownItems({
       id: 'version',
       render: () => (
         <div
-          className={cn(INSET_PANEL_SECTION_LABEL, 'select-none font-normal')}
+          className={cn(
+            INSET_PANEL_SECTION_LABEL,
+            // Diagnostics, not navigation: smaller and quieter than the rows.
+            'h-6 select-none text-3xs font-normal text-quaternary-token'
+          )}
           data-testid='app-build-diagnostics'
         >
           {isElectronRuntime ? (
-            <DesktopReleaseIdentity />
+            <DesktopReleaseIdentity className='text-3xs font-normal text-quaternary-token' />
           ) : (
             <span className='truncate'>
               Version {process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}

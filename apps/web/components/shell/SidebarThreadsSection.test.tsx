@@ -543,8 +543,7 @@ describe('founder-locked calm sidebar history', () => {
   });
 
   it('retains retry and context actions and hides history when collapsed', () => {
-    const retry = vi.fn();
-    const context = vi.fn();
+    const [retry, context] = [vi.fn(), vi.fn()];
     const { rerender } = render(
       <SidebarThreadsSection
         calm
@@ -566,10 +565,11 @@ describe('founder-locked calm sidebar history', () => {
         onThreadContextMenu={context}
       />
     );
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Chat Actions for Release rollout' })
-    );
+    const actions = { name: 'Chat Actions for Release rollout' };
+    fireEvent.click(screen.getByRole('button', actions));
     expect(context).toHaveBeenCalledOnce();
+    const hidesOnHover = 'group-hover/thread:opacity-0';
+    expect(document.querySelector('time')).toHaveClass(hidesOnHover);
     rerender(
       <SidebarThreadsSection
         calm

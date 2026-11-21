@@ -367,9 +367,9 @@ describe('UserButton billing actions', () => {
     const diagnostics = await screen.findByTestId('app-build-diagnostics');
     expect(diagnostics).toHaveTextContent('Version 26.9.1 (abc1234)');
     expect(diagnostics).toHaveClass(
-      'h-8',
-      'text-2xs',
-      'text-tertiary-token',
+      'h-6',
+      'text-3xs',
+      'text-quaternary-token',
       'select-none'
     );
     expect(
