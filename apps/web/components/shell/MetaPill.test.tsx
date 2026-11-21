@@ -12,12 +12,12 @@ describe('MetaPill', () => {
 
   it('applies amber tone classes', () => {
     render(<MetaPill tone='amber'>Soon</MetaPill>);
-    expect(screen.getByText('Soon').className).toContain('amber-300');
+    expect(screen.getByText('Soon').className).toContain('text-warning-text');
   });
 
   it('applies cyan tone classes', () => {
     render(<MetaPill tone='cyan'>Auto</MetaPill>);
-    expect(screen.getByText('Auto').className).toContain('cyan-300');
+    expect(screen.getByText('Auto').className).toContain('text-accent-text');
   });
 });
 

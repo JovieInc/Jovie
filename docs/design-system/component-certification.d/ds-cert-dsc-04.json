@@ -18,6 +18,21 @@
     },
     "apps/web/components/organisms/table/atoms/AudienceTypeBadge.tsx": {
       "empty": "The badge takes one value from a closed five-member union and always renders its label; there is no collection to be empty. The detector matched the word items in the items-center class."
+    },
+    "apps/web/components/shell/ArtworkPlayOverlay.tsx": {
+      "empty": "The overlay renders one play or pause button; there is no collection. The detector matched the word items in the place-items-center class.",
+      "long-content": "The overlay holds only an icon, with fixed aria-labels Play and Pause, so no caller text can overflow. The detector matched text in the text-on-media class.",
+      "rtl-overflow": "The overlay is a single icon centered by a grid with no inline text or direction-dependent layout. The detector matched text in the text-on-media class."
+    },
+    "apps/web/components/shell/IconBtn.tsx": {
+      "empty": "The button renders one icon child with no collection. The detector matched the word items in the place-items-center class."
+    },
+    "apps/web/components/shell/MetaPill.tsx": {
+      "empty": "children is a required node and the pill is only rendered around content; there is no collection. The detector matched the word items in the items-center class."
+    },
+    "apps/web/components/shell/PriorityGlyph.tsx": {
+      "long-content": "The glyph renders a fixed bang or three bars and takes no caller text, so nothing can overflow. The detector matched the word text in text-3xs and text-error-text.",
+      "rtl-overflow": "The glyph holds no inline text beyond a bang; its bars are fixed-size flex items. The detector matched text in text-3xs; the Rtl story still demonstrates the mirrored row."
     }
   },
   "gates": {
@@ -130,6 +145,60 @@
       "forced-caps"
     ],
     "apps/web/components/organisms/table/atoms/AvatarCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/ArtworkPlayOverlay.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/AssigneeChip.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/DropDateChip.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/EntityThreadGlyph.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/IconBtn.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/MetaPill.tsx": [
       "ds-owner",
       "tokens",
       "states",
