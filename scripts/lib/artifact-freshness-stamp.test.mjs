@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { GITHUB_API } from '../../packages/api-client/github.ts';
 import {
   fetchDesktopPublishInFlight,
   nextLinkUrl,
@@ -7,6 +8,7 @@ import {
 
 const REPO = 'JovieInc/Jovie';
 const STAMP_REF = 'cursor/stable-desktop-publish-abc1234';
+const PULLS_PAGE_2 = `${GITHUB_API}/repos/${REPO}/pulls?page=2`;
 
 function stampListRow(overrides = {}) {
   return {
@@ -29,12 +31,7 @@ function listResponse(body, link = null) {
 }
 
 test('nextLinkUrl reads rel=next from Link header', () => {
-  assert.equal(
-    nextLinkUrl(
-      '<https://api.github.com/repos/JovieInc/Jovie/pulls?page=2>; rel="next"'
-    ),
-    'https://api.github.com/repos/JovieInc/Jovie/pulls?page=2'
-  );
+  assert.equal(nextLinkUrl(`<${PULLS_PAGE_2}>; rel="next"`), PULLS_PAGE_2);
   assert.equal(nextLinkUrl(null), null);
 });
 
@@ -144,8 +141,7 @@ test('blocked keep-owned stamp past dwell max is not in-flight', async () => {
 });
 
 test('paginates open PRs so stamp past first page is found', async () => {
-  const page2 =
-    'https://api.github.com/repos/JovieInc/Jovie/pulls?state=open&base=main&per_page=100&page=2';
+  const page2 = `${GITHUB_API}/repos/${REPO}/pulls?state=open&base=main&per_page=100&page=2`;
   const result = await fetchDesktopPublishInFlight({
     repo: REPO,
     token: 't',
