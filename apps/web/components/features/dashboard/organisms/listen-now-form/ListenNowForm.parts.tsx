@@ -52,7 +52,7 @@ export function ConnectedArtistBadge({
         {info.artistName}
       </span>
       <CheckCircle2
-        className='h-3.5 w-3.5 shrink-0 text-secondary-token'
+        className='h-3.5 w-3.5 shrink-0 text-success-text'
         aria-hidden='true'
       />
       {info.externalUrl ? (

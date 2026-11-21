@@ -138,9 +138,9 @@ test.describe('Self-serve artist profile checkout', () => {
         .toBe(true);
       expect((await getBillingStatus(page)).plan).toBe('pro');
 
-      // Open Stripe session (`status === 'open'`) lands on honest recovery
-      // (never a stubbed false-green celebration), then unstubbed /billing/success
-      // renders the live Pro unlock screen from real entitlement + profile state.
+      // An open Stripe session and a direct visit without that session both
+      // stay on recovery. Paid success requires the session receipt and the
+      // current entitlement together.
       await page.goto(`/billing/success?session_id=${sessionId}`, {
         waitUntil: 'domcontentloaded',
       });
@@ -151,12 +151,11 @@ test.describe('Self-serve artist profile checkout', () => {
       await page.goto('/billing/success', {
         waitUntil: 'domcontentloaded',
       });
-      await expect(page.getByTestId('checkout-success-paid')).toBeVisible({
+      await expect(page.getByTestId('checkout-success-recovery')).toBeVisible({
         timeout: 30_000,
       });
-      await expect(page.getByText(/You're on .+: unlocked/)).toBeVisible({
-        timeout: 30_000,
-      });
+      await expect(page.getByTestId('checkout-success-paid')).toHaveCount(0);
+      await expect(page.getByText(/You're on .+: unlocked/)).toHaveCount(0);
 
       // An existing subscriber is never charged twice.
       const again = await page.request.get('/claim/start?new=1', {
@@ -374,17 +373,18 @@ test.describe('Claim checkout dogfood', () => {
       expect(pending.record?.paidAt).toBeTruthy();
       expect((await getBillingStatus(page)).isPro).toBe(true);
 
-      // Proof-pending paid buyer: /billing/success?source=onboarding keeps the
-      // page private (`shareUrl: null`) and never claims the profile is live.
+      // Direct return without a checkout session must not celebrate, and must
+      // not claim the unproven profile is live.
       await page.goto('/billing/success?source=onboarding', {
         waitUntil: 'domcontentloaded',
       });
-      await expect(page.getByTestId('checkout-success-paid')).toBeVisible({
+      await expect(page.getByTestId('checkout-success-recovery')).toBeVisible({
         timeout: 30_000,
       });
+      await expect(page.getByTestId('checkout-success-paid')).toHaveCount(0);
       await expect(
         page.getByRole('heading', { name: 'Your plan is active' })
-      ).toBeVisible();
+      ).toHaveCount(0);
       await expect(page.getByTestId('paid-share-prompt')).toHaveCount(0);
       await expect(page.getByRole('heading', { name: /live/i })).toHaveCount(0);
 

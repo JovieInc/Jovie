@@ -2145,7 +2145,8 @@ body {
      type and colour on a plain element around the field, the control
      inherits them, and the container draws the surface and the focus ring.
      Zero specificity, so a host stylesheet still wins where it draws more. */
-  :where(.composite-field) :where(:is(input, textarea, select)[data-host-drawn]) {
+  :where(.composite-field)
+    :where(:is(input, textarea, select)[data-host-drawn]) {
     min-width: 0;
     margin: 0;
     padding: 0;
@@ -2155,7 +2156,8 @@ body {
     letter-spacing: inherit;
     color: inherit;
   }
-  :where(.composite-field) :where(:is(input, textarea)[data-host-drawn])::placeholder {
+  :where(.composite-field)
+    :where(:is(input, textarea)[data-host-drawn])::placeholder {
     color: var(--color-text-tertiary-token);
     opacity: 1;
   }

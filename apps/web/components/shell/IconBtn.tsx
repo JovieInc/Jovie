@@ -1,3 +1,4 @@
+import { PlainButton } from '@jovie/ui';
 import type { ShortcutHint } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
 import { Tooltip } from './Tooltip';
@@ -37,7 +38,7 @@ export function IconBtn({
   const isGhost = tone === 'ghost';
   return (
     <Tooltip label={label} shortcut={shortcut} side={tooltipSide}>
-      <button
+      <PlainButton
         type='button'
         onClick={onClick}
         onPointerEnter={onPointerEnter}
@@ -58,7 +59,7 @@ export function IconBtn({
         aria-label={label}
       >
         {children}
-      </button>
+      </PlainButton>
     </Tooltip>
   );
 }
