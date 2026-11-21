@@ -2916,7 +2916,26 @@ ${selectedGateScript}`,
       'group: production-mutation'
     );
     expect(POSTDEPLOY_PROBES_WORKFLOW).not.toContain('secrets: inherit');
-    expect(POSTDEPLOY_PROBES_WORKFLOW).not.toContain('environment:');
+    // JOV-9826: auth-smoke alone binds Preview – jovie so Stripe TEST keys
+    // resolve (repo-level secrets are empty). Every other probe job stays
+    // environment-free so read-only evidence never waits on env protection.
+    const authSmoke = getJobBlock(POSTDEPLOY_PROBES_WORKFLOW, 'auth-smoke');
+    expect(authSmoke).toMatch(/^\s+environment:\s+Preview – jovie\s*$/m);
+    for (const jobId of [
+      'resolve-target',
+      'smoke',
+      'lighthouse',
+      'golden-path-cert',
+      'golden-path-cert-reused',
+      'product-crawl',
+      'product-crawl-merge',
+      'remediation',
+      'notify-failure',
+    ]) {
+      const job = getJobBlock(POSTDEPLOY_PROBES_WORKFLOW, jobId);
+      if (!job) continue;
+      expect(job, jobId).not.toMatch(/^\s+environment:/m);
+    }
 
     const resolve = getJobBlock(POSTDEPLOY_PROBES_WORKFLOW, 'resolve-target');
     expect(resolve).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);

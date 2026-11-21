@@ -247,9 +247,7 @@ test.describe('Artist Profiles Landing', () => {
     await adaptiveSection.scrollIntoViewIfNeeded();
 
     await expect(
-      adaptiveSection.getByRole('heading', {
-        name: 'One profile. Right action.',
-      })
+      adaptiveSection.getByRole('tablist', { name: 'Profile Modes' })
     ).toBeVisible();
     await expect(adaptiveSection.getByRole('tab')).toHaveCount(4);
     await expect(
@@ -389,21 +387,35 @@ test.describe('Artist Profiles Landing', () => {
   }) => {
     const sectionIds = [
       'artist-profile-section-hero',
-      'artist-profile-section-adaptive',
       'artist-profile-section-outcomes',
       'artist-profile-section-capture',
-      'artist-profile-section-opinionated',
-      'artist-profile-section-spec-wall',
-      'artist-profile-section-showcase',
-      'artist-profile-section-spec-bento',
       'artist-profile-section-how-it-works',
-      'artist-profile-section-release-cycle',
-      'artist-profile-section-faq',
+      'artist-profile-section-showcase',
       'artist-profile-section-final-cta',
     ];
 
     for (const sectionId of sectionIds) {
       await expect(page.getByTestId(sectionId)).toHaveCount(1);
+    }
+
+    // Mode switcher stays inside the hero (one morphing mock).
+    await expect(
+      page.getByTestId('artist-profile-section-adaptive')
+    ).toHaveCount(1);
+    await expect(
+      page
+        .getByTestId('artist-profile-section-hero')
+        .getByTestId('artist-profile-section-adaptive')
+    ).toHaveCount(1);
+
+    for (const cutId of [
+      'artist-profile-section-opinionated',
+      'artist-profile-section-spec-wall',
+      'artist-profile-section-spec-bento',
+      'artist-profile-section-release-cycle',
+      'artist-profile-section-faq',
+    ]) {
+      await expect(page.getByTestId(cutId)).toHaveCount(0);
     }
 
     const documentOrder = await page.evaluate(ids => {
@@ -487,7 +499,7 @@ test.describe('Artist Profiles Landing', () => {
     await expectNoHorizontalOverflow(page);
   });
 
-  test('capture, opinionated decisions, product truth, steps, and FAQ match the plan', async ({
+  test('capture, how-it-works, and shipped sites match the six-section plan', async ({
     page,
   }, testInfo) => {
     const captureSection = page.getByTestId('artist-profile-section-capture');
@@ -501,47 +513,6 @@ test.describe('Artist Profiles Landing', () => {
     );
     await expect(capturePreview).toBeVisible();
     await expect(capturePreview.locator('input, button')).toHaveCount(0);
-
-    const opinionatedSection = page.getByTestId(
-      'artist-profile-section-opinionated'
-    );
-    await expect(
-      opinionatedSection.getByRole('heading', {
-        name: 'Stop designing your link-in-bio.',
-      })
-    ).toBeVisible();
-    await expect(
-      opinionatedSection.getByTestId('artist-profile-opinionated-profile')
-    ).toBeVisible();
-
-    const specWallSection = page.getByTestId(
-      'artist-profile-section-spec-wall'
-    );
-    await specWallSection.scrollIntoViewIfNeeded();
-
-    await expect(
-      specWallSection.getByRole('heading', {
-        name: 'Your music stays together. The right action leads.',
-      })
-    ).toBeVisible();
-    await expect(
-      specWallSection.getByTestId('artist-profile-truth-tile')
-    ).toHaveCount(4);
-    await expect(
-      specWallSection.getByText('They know it is you')
-    ).toBeVisible();
-    await expect(
-      specWallSection.getByText('The Right Next Move')
-    ).toBeVisible();
-    await expect(
-      specWallSection.getByTestId('artist-profile-related-feature')
-    ).toHaveCount(4);
-    await expect(
-      specWallSection.getByRole('link', { name: /See audience notifications/i })
-    ).toHaveAttribute('href', '/artist-notifications');
-    await expect(
-      specWallSection.getByRole('link', { name: /See Instant Merch/i })
-    ).toHaveAttribute('href', '/instant-merch');
 
     const howSection = page.getByTestId('artist-profile-section-how-it-works');
     await expect(
@@ -559,44 +530,21 @@ test.describe('Artist Profiles Landing', () => {
       howSection.getByRole('heading', { name: 'Share one link everywhere.' })
     ).toBeVisible();
 
-    const faqSection = page.getByTestId('artist-profile-section-faq');
-    await expect(
-      faqSection.getByRole('heading', { name: 'Questions' })
-    ).toBeVisible();
-    await expect(faqSection.getByRole('button')).toHaveCount(4);
-    const firstQuestion = faqSection.getByRole('button', {
-      name: 'Is an Artist Profile free?',
-    });
-    await expect(firstQuestion).toHaveAttribute('aria-expanded', 'false');
-    await firstQuestion.click();
-    await expect(firstQuestion).toHaveAttribute('aria-expanded', 'true');
-    await expect(faqSection.getByText(/free to claim and edit/i)).toBeVisible();
+    const showcase = page.getByTestId('artist-profile-section-showcase');
+    await showcase.scrollIntoViewIfNeeded();
+    await expect(showcase).toBeVisible();
 
     for (const viewport of [
       { name: 'desktop', width: 1440, height: 900 },
       { name: 'mobile', width: 390, height: 844 },
     ] as const) {
       await page.setViewportSize(viewport);
-      for (const item of ARTIST_PROFILE_COPY.faq.items) {
-        const question = faqSection.getByRole('button', {
-          name: item.question,
-          exact: true,
-        });
-        await question.scrollIntoViewIfNeeded();
-        await question.focus();
-        await expect(question).toBeFocused();
-        if ((await question.getAttribute('aria-expanded')) === 'false') {
-          await question.press('Enter');
-        }
-        await expect(question).toHaveAttribute('aria-expanded', 'true');
-        await expect(
-          faqSection.getByText(item.answer, { exact: true })
-        ).toBeVisible();
-      }
+      await showcase.scrollIntoViewIfNeeded();
       await expectNoHorizontalOverflow(page);
-      await faqSection.scrollIntoViewIfNeeded();
       await page.screenshot({
-        path: testInfo.outputPath(`artist-profiles-${viewport.name}-faq.png`),
+        path: testInfo.outputPath(
+          `artist-profiles-${viewport.name}-six-section.png`
+        ),
         caret: 'initial',
       });
     }
