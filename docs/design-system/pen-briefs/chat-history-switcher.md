@@ -2,6 +2,7 @@
 frame: chat-history-switcher
 route: /app/chat
 context: chat, dropdown, app shell
+model: claude-opus-5-5
 ---
 Design the chat title switcher in the signed-in app header, desktop 1440 wide and mobile 390 wide, dark mode first.
 

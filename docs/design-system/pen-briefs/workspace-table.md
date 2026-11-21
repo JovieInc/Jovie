@@ -2,6 +2,7 @@
 frame: workspace-table
 route: /app/links
 context: links, table, workspace
+model: claude-opus-5-5
 ---
 Design the one table every signed-in Jovie workspace uses, shown on the Links page, desktop 1440 wide and mobile 390 wide, dark mode first.
 

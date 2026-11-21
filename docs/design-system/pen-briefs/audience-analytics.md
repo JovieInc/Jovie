@@ -2,6 +2,7 @@
 frame: audience-analytics
 route: /app/contacts?tab=audience
 context: audience, contacts, analytics
+model: claude-opus-5-5
 ---
 Design the Analytics rail that opens beside an artist's Audience table, desktop 1440 wide and mobile 390 wide, dark mode first.
 

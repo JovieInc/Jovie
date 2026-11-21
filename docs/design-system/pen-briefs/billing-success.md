@@ -2,6 +2,7 @@
 frame: billing-success
 route: /billing/success
 context: billing, checkout, pricing
+model: claude-opus-5-5
 ---
 Design the screen a buyer sees right after paying for Jovie Pro, desktop 1440 wide and mobile 390 wide, dark mode first.
 

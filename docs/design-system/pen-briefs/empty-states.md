@@ -2,6 +2,7 @@
 frame: empty-states
 route: /app/dashboard
 context: dashboard, empty state
+model: claude-opus-5-5
 ---
 Design the one empty state every signed-in Jovie page uses when an account has no data yet, desktop 1440 wide and mobile 390 wide, dark mode first.
 
