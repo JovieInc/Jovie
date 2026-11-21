@@ -9,7 +9,10 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { buildClaimRedirectUrl } from './redirect-origin';
 
-function requestOf(url: string, host: string | null): {
+function requestOf(
+  url: string,
+  host: string | null
+): {
   readonly url: string;
   readonly headers: Headers;
 } {
@@ -61,7 +64,10 @@ describe('buildClaimRedirectUrl properties', () => {
     fc.assert(
       fc.property(
         fc.constantFrom(...LOOPBACK_HOSTS),
-        fc.constantFrom('http://localhost/claim/t', 'https://localhost/claim/t'),
+        fc.constantFrom(
+          'http://localhost/claim/t',
+          'https://localhost/claim/t'
+        ),
         fc.constantFrom('/e2eclaimartist?claim=1', '/signin', '/'),
         (host, requestUrl, pathname) => {
           const result = buildClaimRedirectUrl(
