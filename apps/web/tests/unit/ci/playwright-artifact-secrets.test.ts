@@ -92,12 +92,10 @@ type PolicyWorkflow = {
   readonly jobs?: Record<string, PolicyJob>;
 };
 const safeUploadUses = './.github/actions/upload-safe-playwright-artifact';
-// Commands that make Playwright (or its telemetry normalizers) write the
-// browser-derived files the guard scans before any upload can read them.
+// Playwright/telemetry commands that write browser-derived files the guard scans.
 const playwrightProducer =
   /(?:playwright test|run qa:routes| e2e:|run test:e2e|test:nightly-agent:(?:normalize|publish-status))/;
-// Reviewed producers that run without guard-playwright-artifacts.mjs, keyed
-// `file:job` to one step name or '*' for the whole job.
+// Unguarded producers: `file:job` → step name or '*' for the whole job.
 const unguardedProducerSteps = new Map([
   // Captures publish through the catalog integrity/budget verifier instead.
   ['screenshots.yml:generate', '*'],
@@ -1576,7 +1574,9 @@ ${fixtureCheckout}
               step =>
                 step.includes(
                   'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs"'
-                ) && (step.includes('tests/e2e/smoke-prod-auth.spec.ts') || step.includes('tests/e2e/canary-claim-checkout.spec.ts'))
+                ) &&
+                (step.includes('tests/e2e/smoke-prod-auth.spec.ts') ||
+                  step.includes('tests/e2e/canary-claim-checkout.spec.ts'))
             )
             .map(step => ({
               file,
