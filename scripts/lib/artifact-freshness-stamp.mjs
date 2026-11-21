@@ -4,7 +4,7 @@
  * After stamp merge, queued/in_progress desktop-release for the certified SHA
  * still counts as in-flight (closes the post-merge false-page window).
  * api-budget: github-actions-token 60/hr - open PR pages + stamp detail + up to
- * two desktop-release run pages (queued/in_progress) per reconcile
+ * two desktop-release run pages (queued/in_progress by display_title) per reconcile
  */
 import { GITHUB_API } from '../../packages/api-client/github.ts';
 import {
@@ -45,7 +45,20 @@ export function nextLinkUrl(link) {
 }
 
 /**
+ * Generation SHA from desktop-release run-name (`Desktop release <sha>`).
+ * workflow_run tips at main tip; the certified SHA lives in display_title.
+ * @param {unknown} run
+ * @returns {string | null}
+ */
+export function desktopReleaseGenerationSha(run) {
+  const title = typeof run?.display_title === 'string' ? run.display_title : '';
+  const match = /^Desktop release ([0-9a-f]{40})$/i.exec(title);
+  return match ? match[1].toLowerCase() : null;
+}
+
+/**
  * True when a desktop-release run is queued/in_progress for headSha on main.
+ * Matches display_title (not head_sha): see desktop-release.yml run-name.
  * @param {{
  *   readonly repo?: string;
  *   readonly headSha?: string | null;
@@ -69,7 +82,8 @@ export async function fetchDesktopReleaseInFlight(input) {
   };
   try {
     for (const status of RELEASE_IN_FLIGHT_STATUSES) {
-      const url = `${GITHUB_API}/repos/${repo}/actions/workflows/${DESKTOP_RELEASE_WORKFLOW}/runs?branch=main&status=${status}&head_sha=${headSha}&per_page=5`;
+      // No head_sha filter: tip SHA ≠ generation SHA after main advances.
+      const url = `${GITHUB_API}/repos/${repo}/actions/workflows/${DESKTOP_RELEASE_WORKFLOW}/runs?branch=main&status=${status}&per_page=20`;
       const response = await fetchImpl(url, {
         headers,
         signal: AbortSignal.timeout(30_000),
@@ -82,13 +96,7 @@ export async function fetchDesktopReleaseInFlight(input) {
       }
       const body = await response.json();
       const runs = Array.isArray(body?.workflow_runs) ? body.workflow_runs : [];
-      if (
-        runs.some(
-          run =>
-            typeof run?.head_sha === 'string' &&
-            run.head_sha.toLowerCase() === headSha
-        )
-      ) {
+      if (runs.some(run => desktopReleaseGenerationSha(run) === headSha)) {
         return { inFlight: true, reason: `desktop-release-${status}` };
       }
     }

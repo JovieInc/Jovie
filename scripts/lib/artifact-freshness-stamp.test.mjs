@@ -158,11 +158,16 @@ test('no open stamp + in_progress desktop-release for certified SHA is in-flight
       seen.push(u);
       if (u.includes('/pulls')) return listResponse([]);
       if (u.includes('/workflows/desktop-release.yml/runs')) {
-        assert.match(u, /head_sha=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/);
+        assert.doesNotMatch(u, /head_sha=/);
         if (u.includes('status=queued')) return releaseRunsResponse([]);
         if (u.includes('status=in_progress')) {
+          // Tip SHA advanced; generation SHA is only in display_title.
           return releaseRunsResponse([
-            { head_sha: SHA_A, status: 'in_progress' },
+            {
+              head_sha: SHA_B,
+              status: 'in_progress',
+              display_title: `Desktop release ${SHA_A}`,
+            },
           ]);
         }
       }
@@ -184,7 +189,13 @@ test('no open stamp + queued desktop-release for certified SHA is in-flight', as
       const u = String(url);
       if (u.includes('/pulls')) return listResponse([]);
       if (u.includes('status=queued')) {
-        return releaseRunsResponse([{ head_sha: SHA_A, status: 'queued' }]);
+        return releaseRunsResponse([
+          {
+            head_sha: SHA_B,
+            status: 'queued',
+            display_title: `Desktop release ${SHA_A}`,
+          },
+        ]);
       }
       throw new Error(`unexpected url ${u}`);
     },
@@ -193,7 +204,7 @@ test('no open stamp + queued desktop-release for certified SHA is in-flight', as
   assert.equal(result.reason, 'desktop-release-queued');
 });
 
-test('no open stamp + in_progress desktop-release for other SHA is not in-flight', async () => {
+test('no open stamp + in_progress desktop-release for other generation is not in-flight', async () => {
   const result = await fetchDesktopPublishInFlight({
     repo: REPO,
     token: 't',
@@ -203,7 +214,35 @@ test('no open stamp + in_progress desktop-release for other SHA is not in-flight
       if (u.includes('/pulls')) return listResponse([]);
       if (u.includes('/workflows/desktop-release.yml/runs')) {
         return releaseRunsResponse([
-          { head_sha: SHA_B, status: 'in_progress' },
+          {
+            head_sha: SHA_A,
+            status: 'in_progress',
+            display_title: `Desktop release ${SHA_B}`,
+          },
+        ]);
+      }
+      throw new Error(`unexpected url ${u}`);
+    },
+  });
+  assert.equal(result.inFlight, false);
+  assert.equal(result.reason, 'no-open-stamp');
+});
+
+test('head_sha-only match without display_title is not in-flight', async () => {
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    headSha: SHA_A,
+    fetchImpl: async url => {
+      const u = String(url);
+      if (u.includes('/pulls')) return listResponse([]);
+      if (u.includes('/workflows/desktop-release.yml/runs')) {
+        return releaseRunsResponse([
+          {
+            head_sha: SHA_A,
+            status: 'in_progress',
+            display_title: 'Desktop release',
+          },
         ]);
       }
       throw new Error(`unexpected url ${u}`);
