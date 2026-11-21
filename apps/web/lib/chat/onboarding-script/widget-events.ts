@@ -160,4 +160,6 @@ export function widgetEventDisplayText(
 export const WIDGET_COMPLETION_ACTIONS = {
   HANDLE_CONFIRMED: 'handle_confirmed',
   SOCIAL_ATTACHED: 'social_attached',
+  /** Visitor skipped Spotify match (None of These). Advances past artist search. */
+  SPOTIFY_SKIPPED: 'spotify_skipped',
 } as const;
