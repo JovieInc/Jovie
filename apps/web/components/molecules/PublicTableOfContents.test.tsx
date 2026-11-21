@@ -65,4 +65,14 @@ describe('PublicTableOfContents', () => {
     await user.keyboard('{ArrowUp}');
     expect(first).toHaveFocus();
   });
+
+  it('keeps the nav item focus ring instead of adding a second one', () => {
+    render(<PublicTableOfContents toc={toc} />);
+
+    for (const button of screen.getAllByRole('button')) {
+      expect(button).toHaveAttribute('type', 'button');
+      expect(button).toHaveClass('public-doc-nav-item');
+      expect(button.className).not.toContain('focus-visible:ring-2');
+    }
+  });
 });
