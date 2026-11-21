@@ -1,9 +1,11 @@
+import path from 'node:path';
 import {
   defineConfig,
   devices,
   type ReporterDescription,
 } from '@playwright/test';
 import { worktreeMetadata } from './scripts/playwright-worktree';
+import { resolveE2eDefaultRetries } from './tests/e2e/utils/e2e-retry-budget';
 import {
   E2E_DEFAULT_GEO_HEADERS,
   vercelAutomationHeaders,
@@ -57,9 +59,13 @@ const webServerCommand = process.env.DATABASE_URL
   ? stableLocalServerCommand
   : `doppler run --project jovie-web --config dev -- ${stableLocalServerCommand}`;
 
+// CI retries come from the quarantine ledger's retryBudget.e2eDefaultRetries
+// (apps/web/tests/quarantine.json); smoke and full runs share one budget.
 function getRetries(): number {
-  if (!isCI) return 0;
-  return isSmokeOnly ? 2 : 2;
+  return resolveE2eDefaultRetries({
+    isCI,
+    ledgerPath: path.join(__dirname, 'tests', 'quarantine.json'),
+  });
 }
 
 function getWorkers(): number | undefined {
@@ -116,7 +122,6 @@ export default defineConfig({
   testIgnore: ['**/nightly/**', '**/storybook-*.spec.ts'],
   fullyParallel: !shouldSerializeLocalBypassRuns,
   forbidOnly: isCI,
-  // Smoke tests: fewer retries for faster feedback; full suite: more resilience
   retries: getRetries(),
   // Smoke tests: more parallelism since tests are faster
   // Increased from 6 to 8 for smoke - tests are I/O-bound, not CPU-bound

@@ -3,7 +3,7 @@
   "retryBudget": {
     "unitDefaultRetries": 1,
     "quarantineUnitRetries": 2,
-    "e2eDefaultRetries": 0,
+    "e2eDefaultRetries": 2,
     "quarantineE2eRetries": 2,
     "maxRetryAttemptsPerCiRun": 160,
     "unitShardCount": 14
