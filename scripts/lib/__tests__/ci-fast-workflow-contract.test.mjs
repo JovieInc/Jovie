@@ -378,6 +378,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/tests/test_noabandon_invariant.py',
       'scripts/tests/test_noabandon_adapters.py',
       'scripts/tests/test_vercel_prebuilt_deploy.py',
+      'scripts/tests/test_vercel_blocked_breaker.py',
       'scripts/tests/test_brand_scrub.py',
       'scripts/tests/test_agent_workflow_hygiene.py',
       'scripts/tests/test_fleet_audit.py',
