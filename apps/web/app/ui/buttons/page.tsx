@@ -1,7 +1,8 @@
 'use client';
 
-import { Button, IconButton, SimpleTooltip } from '@jovie/ui';
+import { Button } from '@jovie/ui';
 import { Archive, ChevronDown, Plus, Settings, Trash2 } from 'lucide-react';
+import { TableIconButton } from '@/components/organisms/table';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 
 function Section({
@@ -169,28 +170,20 @@ export default function ButtonsPage() {
             icon={<Archive />}
           />
         </Stack>
-        <Stack title='IconButton (table row)'>
-          <SimpleTooltip content='Settings'>
-            <IconButton
-              variant='secondary'
-              size='lg'
-              ariaLabel='Settings'
-              onClick={() => {}}
-            >
-              <Settings className='h-4 w-4' />
-            </IconButton>
-          </SimpleTooltip>
-          <SimpleTooltip content='Delete'>
-            <IconButton
-              variant='secondary'
-              size='lg'
-              destructive
-              ariaLabel='Delete'
-              onClick={() => {}}
-            >
-              <Trash2 className='h-4 w-4' />
-            </IconButton>
-          </SimpleTooltip>
+        <Stack title='TableIconButton'>
+          <TableIconButton
+            icon={<Settings className='h-4 w-4' />}
+            onClick={() => {}}
+            ariaLabel='Settings'
+            tooltip='Settings'
+          />
+          <TableIconButton
+            icon={<Trash2 className='h-4 w-4' />}
+            onClick={() => {}}
+            ariaLabel='Delete'
+            variant='danger'
+            tooltip='Delete'
+          />
         </Stack>
       </Section>
 
