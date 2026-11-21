@@ -17,11 +17,41 @@
       "a11y",
       "frontend-rules",
       "forced-caps"
+    ],
+    "apps/web/components/organisms/ErrorSummary.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/SharedCommandPalette.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/PriorityGlyph.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ]
   },
   "waivers": {
     "apps/web/components/organisms/BillingDashboard.tsx": {
       "permission-denied": "Billing is per-account and the route is already behind sign-in; the component has no permission gate, so a denied state is unreachable."
+    },
+    "apps/web/components/shell/PriorityGlyph.tsx": {
+      "error": "A pure presentational glyph with no data, request or failure path; the urgent level already shows the alarm styling."
     }
   }
 }
