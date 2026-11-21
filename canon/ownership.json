@@ -124,6 +124,7 @@
     {"id": "workflow:safe-pr-remediation", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/safe-pr-remediation.yml"},
     {"id": "workflow:pr-remediation-swarm", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/pr-remediation-swarm.yml"},
     {"id": "workflow:screenshots", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/screenshots.yml"},
+    {"id": "workflow:screenshots-r2-upload", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/screenshots-r2-upload.yml", "note": "workflow_dispatch only; uploads screenshot binaries to the private R2 store with the WRITE key pair."},
     {"id": "workflow:security-suppression-audit", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/security-suppression-audit.yml"},
     {"id": "workflow:spend-guard", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/spend-guard.yml", "note": "Hourly Vercel spend guard (scripts/spend-guard.mjs); registry entry in canon/automation-registry.jsonl."},
     {"id": "workflow:security", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/security.yml"},
