@@ -3290,7 +3290,15 @@ describe('CI E2E smoke workflow', () => {
       'Golden path requires the dedicated real-auth lane'
     );
     expect(goldenPathSpec).toContain('prepareBetterAuthEmailOtp(page, {');
-    expect(goldenPathSpec).toContain('beforeResponseFulfill: ensureDbUser,');
+    // Keep → auth (JOV-14011): approve the app user and record operator
+    // proof before the claim response so the mount claim can publish.
+    expect(goldenPathSpec).toContain(
+      'beforeResponseFulfill: async betterAuthUserId => {'
+    );
+    expect(goldenPathSpec).toContain('await ensureDbUser(betterAuthUserId);');
+    expect(goldenPathSpec).toContain(
+      'await recordOperatorApproval(sql, betterAuthUserId, email);'
+    );
     expect(authHelper).toContain(
       "const signInRoute = '**/api/auth/sign-in/email-otp'"
     );
