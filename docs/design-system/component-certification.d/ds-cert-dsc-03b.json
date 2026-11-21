@@ -72,15 +72,6 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/jovie/components/ImageAttachmentChip.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
     "apps/web/components/jovie/components/ImagePreviewStrip.tsx": [
       "ds-owner",
       "tokens",
@@ -118,15 +109,6 @@
       "forced-caps"
     ],
     "apps/web/components/jovie/components/picker-rows.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
-    "apps/web/components/jovie/release-calendar/ReleaseMomentDrawer.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -240,9 +222,6 @@
     "apps/web/components/jovie/components/picker-rows.tsx": {
       "empty": "PickerRow renders exactly one row for one item and no collection; the empty list state belongs to the palette that maps over items.",
       "permission-denied": "No permission-gated UI exists: a row only renders the item and callbacks it is given."
-    },
-    "apps/web/components/jovie/release-calendar/ReleaseMomentDrawer.tsx": {
-      "permission-denied": "No permission-gated UI exists: the drawer only reads a demo moment passed in as a prop and has no role or entitlement check."
     },
     "apps/web/components/molecules/OptimizedImage.tsx": {
       "offline": "No offline UI exists: the component never fetches itself, and an image that cannot load takes the onError fallback covered by OptimizedImage.test.tsx."
