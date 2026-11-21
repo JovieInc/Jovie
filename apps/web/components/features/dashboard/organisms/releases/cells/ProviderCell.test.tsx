@@ -1,3 +1,4 @@
+// Drift T2.1: IconButton alias retirement — callsite migration coverage.
 import { TooltipProvider } from '@jovie/ui';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -101,9 +102,11 @@ describe('ProviderCell certificate', () => {
       'Midnight Signal – Spotify',
       'provider-copy-release-1-spotify'
     );
-    expect(
-      await screen.findByRole('button', { name: 'Copied' })
-    ).toBeInTheDocument();
+    const copied = await screen.findByRole('button', { name: 'Copied' });
+    expect(copied).toBeInTheDocument();
+    // size=sm → icon-sm (h-7) matches the h-7 pill; Check glyph wears success.
+    expect(copied.className).toContain('h-7');
+    expect(copied.querySelector('.text-success')).not.toBeNull();
     await expectNoA11yViolations(container);
 
     act(() => {
