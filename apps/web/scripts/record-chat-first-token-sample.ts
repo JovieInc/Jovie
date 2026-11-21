@@ -62,7 +62,7 @@ export function parseInjectedSamples(
 
 export function main(
   argv: readonly string[] = process.argv.slice(2),
-  env: NodeJS.ProcessEnv = process.env
+  env: Readonly<Record<string, string | undefined>> = process.env
 ): number {
   const { outPath, mode } = parseArgs(argv);
   const token = env.WORKERS_AI_TOKEN?.trim() ?? '';
