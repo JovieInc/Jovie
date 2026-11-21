@@ -117,6 +117,25 @@ describe('correction pyramid guards', () => {
     ).toBe(liveGrandfather);
   });
 
+  it('bans invented traction counts and artists-already-on-jovie claims', () => {
+    const planted = findBannedPhrases(
+      [
+        "const a = '500+ artists already on Jovie';",
+        "const b = 'Join 47+ artists';",
+        "const c = 'Trusted by 10,000 artists';",
+        '// 500+ artists in a comment',
+      ].join('\n'),
+      'apps/web/data/sample.ts'
+    );
+    expect(planted.map(hit => hit.rule).sort()).toEqual([
+      'artists-already-on-jovie',
+      'invented-artist-count',
+      'invented-artist-count',
+      'invented-artist-count',
+    ]);
+    expectWarnRatchet(scanBannedPhrases(repoRoot), phraseBaselinePath);
+  });
+
   it('bans fan, white-label, remove-branding, revolutionary and all-in-one', () => {
     const planted = findBannedPhrases(
       [

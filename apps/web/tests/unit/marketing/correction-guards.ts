@@ -87,6 +87,17 @@ const PHRASE_RULES = [
     pattern:
       /\b(?:niche[-\s]music|for musicians|musician-first|music creators|music-only|only for music)\b/giu,
   },
+  // Invented traction/adoption counts (LESSONS: Marketing traction copy must be factual).
+  {
+    id: 'invented-artist-count',
+    pattern: /\b\d{2,}(?:,\d{3})*\+?\s+artists?\b/giu,
+    skipPath: NEW_RULE_SKIP_PATH,
+  },
+  {
+    id: 'artists-already-on-jovie',
+    pattern: /\bartists?\s+already\s+on\s+jovie\b/giu,
+    skipPath: NEW_RULE_SKIP_PATH,
+  },
 ] as const;
 
 export interface CorrectionHit {
