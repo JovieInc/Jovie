@@ -3,14 +3,20 @@
 import { Bell } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { MouseEvent, PointerEvent } from 'react';
+import { type MouseEvent, type PointerEvent, useContext } from 'react';
 import { INBOX_NAVIGATION_ITEM_ID } from '@/components/features/dashboard/dashboard-nav/navigation-state';
 import { usePendingNavigation } from '@/components/features/dashboard/dashboard-nav/use-pending-navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import {
   formatInboxPendingWorkLabel,
   type InboxNavigationAvailability,
 } from '@/lib/inbox/navigation-availability';
+import {
+  navigationInputMethodFromClick,
+  startNavigationTelemetry,
+} from '@/lib/tracking/navigation-telemetry';
+import { SidebarContext } from './SidebarContext';
 import {
   SIDEBAR_HEADER_ICON_BUTTON_CLASS,
   SIDEBAR_HEADER_ICON_CLASS,
@@ -38,7 +44,9 @@ function isPlainPrimaryClick(
 
 /**
  * Pending work is server-derived; opening the Inbox never resolves it. App
- * updates are announced by the shell's update pill, not on the bell.
+ * updates are announced by the shell's update pill, not on the bell. The bell
+ * is the main way into the Inbox, so it reports the same navigation telemetry
+ * the rail's Inbox row did.
  */
 export function SidebarInboxLink({
   availability,
@@ -65,10 +73,24 @@ export function SidebarInboxLink({
     beginPendingNavigation(INBOX_NAVIGATION_ITEM_ID);
   };
 
+  const isMobile = useContext(SidebarContext)?.isMobile ?? false;
+  const isElectron = useIsElectronRuntime();
   const handleClick = (event: MouseEvent<HTMLAnchorElement>) => {
     if (!isPlainPrimaryClick(event)) {
       cancelPendingNavigation(INBOX_NAVIGATION_ITEM_ID);
+      return;
     }
+    startNavigationTelemetry({
+      itemId: INBOX_NAVIGATION_ITEM_ID,
+      sourcePathname: `${pathname}${globalThis.location?.search ?? ''}`,
+      destinationHref: APP_ROUTES.DASHBOARD,
+      inputMethod: navigationInputMethodFromClick(event.detail),
+      context: {
+        isElectron,
+        isMobile,
+        navVariant: 'canonical_identity_work_v1',
+      },
+    });
   };
 
   return (
