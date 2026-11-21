@@ -72,10 +72,10 @@ const ASSET_TYPE_LABELS: Record<AdminAssetType, string> = {
 };
 
 const ASSET_TYPE_VARIANTS: Record<AdminAssetType, string> = {
-  release: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-  track: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
-  link: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-  photo: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+  release: 'bg-secondary-token/10 text-secondary-token',
+  track: 'bg-secondary-token/10 text-secondary-token',
+  link: 'bg-secondary-token/10 text-secondary-token',
+  photo: 'bg-secondary-token/10 text-secondary-token',
 };
 
 const ASSET_TYPE_ICONS: Record<AdminAssetType, typeof Music> = {
@@ -127,6 +127,8 @@ function createColumns(): ColumnDef<AdminAssetRow, unknown>[] {
                 <img
                   src={asset.thumbnailUrl}
                   alt=''
+                  width={36}
+                  height={36}
                   className='block h-9 w-9 max-h-9 max-w-9 object-cover'
                   loading='lazy'
                 />
@@ -197,7 +199,7 @@ function createColumns(): ColumnDef<AdminAssetRow, unknown>[] {
                   @{asset.ownerUsername}
                 </p>
                 {asset.ownerIsVerified ? (
-                  <BadgeCheck className='size-3 shrink-0 text-blue-500' />
+                  <BadgeCheck className='size-3 shrink-0 text-secondary-token' />
                 ) : null}
               </div>
               {asset.ownerDisplayName ? (

@@ -19,7 +19,7 @@ import { planGateReceipt } from './plan-gate.mjs';
 import { researchGateReceipt } from './research-gate.mjs';
 import {
   assessPreventionLeverage,
-  rankQueueCandidates,
+  rankAdmissionQueue,
   scoreIssue,
 } from './scorer.mjs';
 import { verifyRoutingReceipt } from './symphony-routing.mjs';
@@ -1123,18 +1123,18 @@ export async function selectNextToAdmit(
       admissionDecisions,
     };
   }
-  const queueRanking = rankQueueCandidates(candidates, {
-    selectedAt: state.now,
-  });
+  const queueRanking = rankAdmissionQueue(
+    candidates,
+    classifications,
+    state.now
+  );
   const selected = {
     ...queueRanking.ranked[0],
     queueRankingReceipt: queueRanking.receipt,
   };
   return {
     admit: [selected],
-    reason:
-      `selected: ${selected.identifier} (score ${selected.score}; ` +
-      `${queueRanking.receipt.mode})`,
+    reason: queueRanking.reason,
     fleetGate,
     admissionDecisions,
     queueRankingReceipt: queueRanking.receipt,

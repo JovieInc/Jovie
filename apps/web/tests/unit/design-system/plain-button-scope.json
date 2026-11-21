@@ -1,6 +1,6 @@
 {
   "approved": "2026-11-12",
-  "maxFiles": 254,
+  "maxFiles": 253,
   "note": "Files allowed to use PlainButton: the components that rendered raw <button> elements when Tim approved the plain button (Nov 12, 2026), plus the 171 raw-button files he approved on Nov 14, 2026 (\"certify now then ratchet down\"), so they could use the design system without a visual change. New code uses Button. maxFiles only goes down: each file moved to Button leaves the list and lowers it. Adding a file or raising maxFiles needs his approval.",
   "files": [
     "app/(marketing)/smart-links/SmartLinksDemo.tsx",
@@ -35,7 +35,6 @@
     "components/atoms/AmountSelector.tsx",
     "components/atoms/CopyToggleIcon.tsx",
     "components/atoms/CopyableMonospaceCell.tsx",
-    "components/atoms/UpdateAvailablePill.tsx",
     "components/auth/AuthModalShell.tsx",
     "components/features/admin/FounderReviewRegistry.tsx",
     "components/features/admin/customer-recovery/CustomerRecoveryPanel.tsx",
