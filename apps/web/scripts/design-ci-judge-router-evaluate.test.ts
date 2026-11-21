@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -183,10 +183,10 @@ describe('runConsumerExecution: real process execution', () => {
 
 describe('evaluateDeterministicRow', () => {
   const cache = new Map<string, ConsumerCheckOutcome>();
-  let hangWorkDir: string;
+  let fixtureDir: string;
 
   afterEach(() => {
-    if (hangWorkDir) rmSync(hangWorkDir, { recursive: true, force: true });
+    if (fixtureDir) rmSync(fixtureDir, { recursive: true, force: true });
   });
 
   function row(
@@ -230,8 +230,8 @@ describe('evaluateDeterministicRow', () => {
   });
 
   it('deliberate red: a hung consumer becomes a real fail with a timeout reason, not a stall', () => {
-    hangWorkDir = mkdtempSync(join(tmpdir(), 'design-ci-eval-row-hang-'));
-    const fixturePath = join(hangWorkDir, 'hangs.sh');
+    fixtureDir = mkdtempSync(join(tmpdir(), 'design-ci-eval-row-hang-'));
+    const fixturePath = join(fixtureDir, 'hangs.sh');
     writeFileSync(fixturePath, '#!/usr/bin/env bash\nsleep 5\n');
     const result = evaluateDeterministicRow(
       row({ routeEvidence: [fixturePath] }),
@@ -245,6 +245,19 @@ describe('evaluateDeterministicRow', () => {
   });
 
   it('dedupes two evidence entries that resolve to the same underlying file', () => {
+    fixtureDir = mkdtempSync(join(tmpdir(), 'design-ci-eval-dedupe-'));
+    const consumer = join(fixtureDir, 'consumer.mjs');
+    const executions = join(fixtureDir, 'executions.txt');
+    writeFileSync(
+      consumer,
+      [
+        "import { appendFileSync } from 'node:fs';",
+        "import { fileURLToPath } from 'node:url';",
+        'if (process.argv[1] === fileURLToPath(import.meta.url)) {',
+        `  appendFileSync(${JSON.stringify(executions)}, 'ran\\n');`,
+        '}',
+      ].join('\n')
+    );
     const sharedCache = new Map<string, ConsumerCheckOutcome>();
     let callCount = 0;
     const originalGet = sharedCache.get.bind(sharedCache);
@@ -253,12 +266,9 @@ describe('evaluateDeterministicRow', () => {
       if (value === undefined) callCount += 1;
       return value;
     };
-    evaluateDeterministicRow(
+    const result = evaluateDeterministicRow(
       row({
-        routeEvidence: [
-          'scripts/invariants/design-surfaces.mjs#scanBlockingUiWiring',
-          'scripts/invariants/design-surfaces.mjs#scanRouteIntent',
-        ],
+        routeEvidence: [`${consumer}#first`, `${consumer}#second`],
       }),
       REPO_ROOT,
       sharedCache
@@ -266,6 +276,9 @@ describe('evaluateDeterministicRow', () => {
     // Both fragments resolve to the same file/kind, so only one cache miss
     // (one real execution) should occur despite two evidence entries.
     expect(callCount).toBe(1);
+    expect(result).toMatchObject({ state: 'pass', insufficientReason: null });
+    expect(result.evidence).toHaveLength(1);
+    expect(readFileSync(executions, 'utf8')).toBe('ran\n');
   });
 });
 

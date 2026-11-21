@@ -16,6 +16,25 @@ return CAPTURE_VIEWPORTS.desktop; }
 /** Light is the derived variant. Anything else, including omission, is dark. */
 export function resolveCaptureColorScheme(mode) {
 return mode === 'light' ? 'light' : CAPTURE_COLOR_SCHEME_DEFAULT; }
+/**
+* True when the capture stayed on the intended surface. Exact path match is
+* required, except `/app/chat` may land on `/app/chat/{threadId}` after the
+* chat shell selects a thread (JOV-11623 / JOV-10150) — that is still chat,
+* not an auth or onboarding redirect.
+* @param {string | null | undefined} landedPath
+* @param {string | null | undefined} expectedPath
+*/
+export function capturePathMatchesExpected(landedPath, expectedPath) {
+if (!landedPath || !expectedPath) return false;
+const norm = path => {
+const trimmed = String(path).replace(/\/+$/u, '');
+return trimmed.length === 0 ? '/' : trimmed;
+};
+const landed = norm(landedPath);
+const expected = norm(expectedPath);
+if (landed === expected) return true;
+return expected === '/app/chat' && landed.startsWith('/app/chat/');
+}
 /** @param {(browser: import('playwright').Browser) => Promise<unknown>} run */
 export async function withCaptureBrowser(run) { const { chromium } = await import('playwright');
 const browser = await chromium.launch(); try { return await run(browser); } finally { await browser.close(); } }
@@ -34,7 +53,7 @@ await page.goto(url, { waitUntil: 'networkidle', timeout: 60_000 });
 // handoff) is not this frame's surface: report it instead of screenshotting
 // whatever page answered (JOV-11623).
 const finalUrl = page.url();
-if (expectedPath && new URL(finalUrl).pathname !== expectedPath) {
+if (expectedPath && !capturePathMatchesExpected(new URL(finalUrl).pathname, expectedPath)) {
 return { png: null, geometry: null, viewport: target.width,
 mode: resolveCaptureColorScheme(mode), finalUrl, redirected: true }; }
 if (click) await page.click(click, { timeout: 5_000 }).catch(() => {}); await page.waitForTimeout(wait);
