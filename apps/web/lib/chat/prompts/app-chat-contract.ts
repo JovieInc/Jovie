@@ -1,10 +1,4 @@
-/**
- * Deterministic instruction-contract checks for the production `/app/chat`
- * system prompt (ASS-9 + ASS-16). Offline unit tests lock these strings so
- * one-rec, no-invented-stats, draft-hold, revenue-first voice, UPCOMING-first
- * openers, dated-move closers, and visible-catalog grounding cannot silently
- * drift.
- */
+/** Deterministic `/app/chat` prompt contract checks (ASS-9 + ASS-16). */
 
 export function checkAppChatPromptContract(prompt: string) {
   const normalized = prompt.toLowerCase();
