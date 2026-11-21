@@ -14,10 +14,13 @@
         "lib/chat/tools/onboarding-access-eval.test.ts",
         "lib/connectors/eval/precision.test.ts",
         "lib/eval/calibration.test.ts",
+        "lib/eval/chat-ux-contract.test.ts",
         "lib/eval/leak-guard.test.ts",
         "lib/eval/promote-trace.test.ts",
         "lib/eval/scorers/scorers.test.ts",
-        "tests/unit/chat/onboarding-transcript-quality.eval.test.ts"
+        "tests/unit/chat/jank-monitor.test.ts",
+        "tests/unit/chat/onboarding-transcript-quality.eval.test.ts",
+        "tests/unit/chat/useChatJankMonitor.test.tsx"
       ]
     ],
     "files": [
@@ -26,6 +29,7 @@
       "lib/chat/tools/onboarding-access-eval.test.ts",
       "lib/connectors/eval/precision.test.ts",
       "lib/eval/calibration.test.ts",
+      "lib/eval/chat-ux-contract.test.ts",
       "lib/eval/leak-guard.test.ts",
       "lib/eval/promote-trace.test.ts",
       "lib/eval/scorers/scorers.test.ts",

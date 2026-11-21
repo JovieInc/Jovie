@@ -8,6 +8,8 @@ import {
   buildStoryFirstBottleneck,
   buildStoryFirstGlance,
   buildStoryFirstStages,
+  issueLabel,
+  stripIssueId,
 } from './story-first';
 
 function count(value: number) {
@@ -334,5 +336,18 @@ describe('buildStoryFirstStages', () => {
     expect(
       buckets.find(b => b.stage === 'merging')?.highlight?.identifier
     ).toBe('JOV-9');
+  });
+});
+
+describe('issue id de-duplication', () => {
+  it('strips a trailing (ID) that repeats the identifier', () => {
+    expect(
+      issueLabel('JOV-10172', 'feat(lanes): split lanes (JOV-10172)')
+    ).toBe('JOV-10172 · feat(lanes): split lanes');
+  });
+
+  it('strips a leading "ID: " and leaves other titles alone', () => {
+    expect(stripIssueId('JOV-1', 'JOV-1: fix it')).toBe('fix it');
+    expect(stripIssueId('JOV-1', 'fix it (JOV-2)')).toBe('fix it (JOV-2)');
   });
 });

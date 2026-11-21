@@ -10,12 +10,28 @@ struct MobileSummerCard: Codable, Equatable, Sendable {
   let amountUsd: Double?
   let evidence: [String]
 
-  var amountLabel: String? {
-    guard let amountUsd else { return nil }
+  private static let currencyWholeFormatter: NumberFormatter = {
     let formatter = NumberFormatter()
     formatter.numberStyle = .currency
     formatter.currencyCode = "USD"
-    formatter.maximumFractionDigits = amountUsd.truncatingRemainder(dividingBy: 1) == 0 ? 0 : 2
+    formatter.maximumFractionDigits = 0
+    return formatter
+  }()
+
+  private static let currencyFractionalFormatter: NumberFormatter = {
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .currency
+    formatter.currencyCode = "USD"
+    formatter.maximumFractionDigits = 2
+    return formatter
+  }()
+
+  var amountLabel: String? {
+    guard let amountUsd else { return nil }
+    let formatter =
+      amountUsd.truncatingRemainder(dividingBy: 1) == 0
+      ? Self.currencyWholeFormatter
+      : Self.currencyFractionalFormatter
     return formatter.string(from: NSNumber(value: amountUsd))
   }
 

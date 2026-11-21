@@ -52,6 +52,7 @@
     "fleet-rules-evidence.yml": {"runsPerMergedPr":13.6,"triggers":["pull_request_target:edited","pull_request_target:labeled","pull_request_target:opened","pull_request_target:reopened","pull_request_target:synchronize","pull_request_target:unlabeled","workflow_run:Source Validation"]},
     "fleet-rules-ready-rerun.yml": {"runsPerMergedPr":14.1,"triggers":["workflow_run:Fleet Rules Evidence"]},
     "fork-pr-gate.yml": {"runsPerMergedPr":8.1,"triggers":["pull_request:opened","pull_request:reopened","pull_request:synchronize","pull_request_review:dismissed","pull_request_review:submitted","pull_request_target:opened","pull_request_target:reopened","pull_request_target:synchronize"]},
+    "gbrain-compounding.yml": {"runsPerMergedPr":0,"triggers":["workflow_dispatch"]},
     "golden-path-nightly.yml": {"runsPerMergedPr":0,"triggers":["schedule","workflow_dispatch"]},
     "golden-path-prod-autofix.yml": {"runsPerMergedPr":0,"triggers":["workflow_dispatch"]},
     "help-center-recertification.yml": {"runsPerMergedPr":0.6,"triggers":["push"]},

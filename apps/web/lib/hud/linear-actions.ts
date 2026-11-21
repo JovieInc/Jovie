@@ -61,7 +61,15 @@ interface LinearGraphQLResponse {
   errors?: Array<{ message: string }>;
 }
 
-const ACTIVE_STATE_TYPES = new Set(['triage', 'unstarted', 'started']);
+// Backlog counts: agents file tim-action-required asks (Pen drafts for
+// approval, setup steps) into Backlog, and dropping them hid every one from
+// Ovie's Inbox.
+const ACTIVE_STATE_TYPES = new Set([
+  'backlog',
+  'triage',
+  'unstarted',
+  'started',
+]);
 
 function computeDaysOld(createdAt: string): number {
   const created = new Date(createdAt).getTime();
@@ -71,7 +79,7 @@ function computeDaysOld(createdAt: string): number {
 
 /**
  * Fetches all Linear issues labeled `tim-action-required` that are in an
- * active state (triage, unstarted, started). Sorted by priority desc then
+ * open state (backlog, triage, unstarted, started). Sorted by priority desc then
  * createdAt desc (oldest last since priority is most important).
  *
  * Returns an empty list if LINEAR_API_KEY is not configured.
@@ -96,7 +104,9 @@ export async function fetchTimActionIssues(): Promise<TimActionsResponse> {
       issues(
         filter: {
           labels: { id: { eq: $labelId } }
-          state: { type: { in: ["triage", "unstarted", "started"] } }
+          state: {
+            type: { in: ["backlog", "triage", "unstarted", "started"] }
+          }
         }
         first: 50
         orderBy: createdAt
