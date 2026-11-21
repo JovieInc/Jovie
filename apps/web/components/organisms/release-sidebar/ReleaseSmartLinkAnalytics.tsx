@@ -196,10 +196,8 @@ function ReleaseSmartLinkControl({
               fade='visible'
               title='Share smart link'
               aria-label='Share Smart Link'
-              // Pre-migration: h-7 w-7 + text-tertiary + DrawerInline visible fade.
-              className='rounded-full text-tertiary-token'
             >
-              <Share2 className='h-3 w-3' />
+              <Share2 className='h-3 w-3 text-tertiary-token' />
             </IconButton>
           }
         />

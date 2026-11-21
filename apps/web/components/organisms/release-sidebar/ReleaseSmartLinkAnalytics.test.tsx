@@ -109,11 +109,13 @@ describe('ReleaseSmartLinkAnalytics', () => {
     // Deliberate-red: the trigger had only a title, so it announced as "button".
     const share = screen.getByRole('button', { name: 'Share Smart Link' });
     expect(share).toHaveAttribute('aria-label', 'Share Smart Link');
-    // Drift T2.1: sm (28px) + fade=visible, not bare lg (40px).
+    // Drift T2.1: sm (28px) + fade=visible — tertiary lives on the glyph.
     expect(share.className).toMatch(/\bh-7\b/);
     expect(share.className).toMatch(/\bw-7\b/);
     expect(share.className).toMatch(/\bopacity-60\b/);
-    expect(share.className).toMatch(/\btext-tertiary-token\b/);
+    expect(share.querySelector('svg')?.getAttribute('class') ?? '').toMatch(
+      /\btext-tertiary-token\b/
+    );
   });
 });
 
