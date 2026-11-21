@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  getAvatarShapeClassName,
-  getAvatarSizePx,
-  HostDrawnInput,
-  PlainButton,
-} from '@jovie/ui';
+import { getAvatarShapeClassName, getAvatarSizePx } from '@jovie/ui';
 import React, {
   forwardRef,
   useCallback,
@@ -185,8 +180,9 @@ export const AvatarUploadable = React.memo(
 
       return (
         <>
-          <PlainButton
+          <button
             ref={mergedRef}
+            type='button'
             className={cn(
               'relative group/avatar outline-none',
               isInteractive ? 'cursor-pointer focus-ring' : 'cursor-default',
@@ -245,14 +241,14 @@ export const AvatarUploadable = React.memo(
               progress={computedProgress}
               status={uploadStatus}
             />
-          </PlainButton>
+          </button>
           {canUpload && (
-            <HostDrawnInput
+            <input
               ref={fileInputRef}
               type='file'
               accept={acceptedTypeList}
               onChange={handleFileSelect}
-              visuallyHidden
+              className='sr-only'
               aria-label={fileInputLabel}
             />
           )}
