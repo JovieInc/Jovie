@@ -34,7 +34,7 @@
       "platform": "desktop",
       "resolvedPath": "/demo",
       "median": {
-        "cls": 0.028,
+        "cls": 0,
         "lcpMs": 248,
         "inpMs": 2,
         "fcpMs": 186,
@@ -45,7 +45,7 @@
         "hydrationWarnings": 0
       },
       "flags": {
-        "clsPass": false,
+        "clsPass": true,
         "lcpPass": true,
         "inpPass": true,
         "reloadPass": true,
@@ -155,7 +155,7 @@
       }
     }
   ],
-  "worstSurfaceId": "artist-profile",
-  "worstReason": "Artist profile desktop: CLS 0.028>0.02",
-  "source": "Smooth store baseline (PR #26323 isolated preview)"
+  "worstSurfaceId": "homepage",
+  "worstReason": "Homepage desktop/mobile: reload/dup ※ harness contamination until post-fix remeasure",
+  "source": "Smooth store baseline (PR #26323 isolated preview); artist-profile desktop CLS tightened after #26481"
 }

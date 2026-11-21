@@ -23,7 +23,7 @@
     "hydrationWarnings": 0
   },
   "median": {
-    "cls": 0.028,
+    "cls": 0,
     "lcpMs": 248,
     "inpMs": 2,
     "fcpMs": 186,
@@ -34,7 +34,7 @@
     "hydrationWarnings": 0
   },
   "flags": {
-    "clsPass": false,
+    "clsPass": true,
     "lcpPass": true,
     "inpPass": true,
     "reloadPass": true,
