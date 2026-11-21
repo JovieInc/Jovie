@@ -103,7 +103,7 @@ describe('ShellReleaseRow', () => {
     };
   });
 
-  it('keeps the actions trigger from selecting the row', async () => {
+  it('keeps the shared overflow trigger from selecting the row', async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
     const { container } = render(
@@ -117,10 +117,15 @@ describe('ShellReleaseRow', () => {
       </ul>
     );
 
+    // TableRowOverflowTrigger (DRI-22) — same ⋯ chrome as other entity tables.
     const trigger = screen.getByRole('button', {
       name: 'Release actions for Lost in the Light',
     });
+    expect(trigger.querySelector('svg')).not.toBeNull();
     await user.click(trigger);
+    expect(
+      await screen.findByRole('menuitem', { name: /Copy link/ })
+    ).toBeInTheDocument();
 
     expect(onSelect).not.toHaveBeenCalled();
     await expectNoA11yViolations(container);

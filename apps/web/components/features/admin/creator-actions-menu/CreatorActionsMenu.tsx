@@ -65,7 +65,14 @@ function buildCreatorActionMenuItems({
   items.push({
     id: 'toggle-featured',
     label: profile.isFeatured ? 'Unfeature' : 'Feature',
-    icon: Star,
+    icon: (
+      <Star
+        className={cn(
+          'h-4 w-4',
+          profile.isFeatured && 'fill-warning text-warning'
+        )}
+      />
+    ),
     onClick: () => {
       void onToggleFeatured();
     },
@@ -167,6 +174,7 @@ export function CreatorActionsMenu({
         <TableRowOverflowTrigger
           ariaLabel='Open Creator Actions'
           disabled={isLoading}
+          inert={open || undefined}
         />
       </TableActionMenu>
     );
@@ -187,6 +195,7 @@ export function CreatorActionsMenu({
         className={stateClass}
         disabled={isLoading}
         aria-label='Open Creator Actions'
+        inert={open || undefined}
       >
         Actions
         <MoreVertical className='ml-1 h-3.5 w-3.5' />

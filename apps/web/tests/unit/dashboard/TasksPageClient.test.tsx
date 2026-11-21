@@ -661,6 +661,48 @@ vi.mock('@/components/organisms/table', () => ({
       />
     );
   },
+  TableRowOverflowTrigger: ({
+    ariaLabel = 'More actions',
+    disabled,
+    onClick,
+    children,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    ariaLabel?: string;
+    visibility?: string;
+  }) => (
+    <button
+      type='button'
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={onClick}
+      {...props}
+    >
+      {children}
+    </button>
+  ),
+  TableRowActionBar: ({
+    actions,
+    overflowAriaLabel = 'More actions',
+  }: {
+    actions?: readonly {
+      id: string;
+      label: string;
+      onClick?: () => void;
+    }[];
+    overflowAriaLabel?: string;
+  }) => (
+    <div data-testid='table-row-action-bar'>
+      {(actions ?? []).map(action => (
+        <button key={action.id} type='button' onClick={action.onClick}>
+          {action.label}
+        </button>
+      ))}
+      <button type='button' aria-label={overflowAriaLabel}>
+        More
+      </button>
+    </div>
+  ),
   convertContextMenuItems: vi.fn(() => []),
 }));
 

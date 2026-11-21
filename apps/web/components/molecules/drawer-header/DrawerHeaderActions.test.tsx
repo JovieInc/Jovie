@@ -1,3 +1,4 @@
+import { ACTION_OVERFLOW_MAX_PRIMARY } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Check, Copy, ExternalLink } from 'lucide-react';
@@ -42,7 +43,8 @@ describe('DrawerHeaderActions states', () => {
       />
     );
 
-    // At most two primary actions render inline.
+    // Shared DRI-22 capacity: drawer headers and table rows collapse alike.
+    expect(ACTION_OVERFLOW_MAX_PRIMARY).toBe(2);
     expect(screen.queryByRole('button', { name: 'Hidden third' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Copy link' })).toHaveAttribute(
       'data-active',
