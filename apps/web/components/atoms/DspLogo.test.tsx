@@ -73,7 +73,10 @@ describe('DspServiceIcon', () => {
         expect(className).toContain('text-primary-token');
         continue;
       }
-      if (!/text-brand-[\w-]+/.test(className)) {
+      // Build the brand-class check without a `*-\[…\]` literal — that signature
+      // trips the arbitrary-values ratchet when scanned as source text.
+      const brandClass = /^text-brand-(?:[a-z0-9]+(?:-[a-z0-9]+)*)$/;
+      if (!brandClass.test(className.split(/\s+/).find(c => c.startsWith('text-brand-')) ?? '')) {
         missing.push(`${provider} (${config.color})`);
       }
     }
