@@ -13,7 +13,12 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import { type ReactNode, useCallback, useState } from 'react';
+import {
+  type ButtonHTMLAttributes,
+  type ReactNode,
+  useCallback,
+  useState,
+} from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -80,6 +85,14 @@ vi.mock('@jovie/ui', () => ({
     disabled?: boolean;
   }) => (
     <button type='button' onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
+  ),
+  PlainButton: ({
+    children,
+    ...props
+  }: { children?: ReactNode } & ButtonHTMLAttributes<HTMLButtonElement>) => (
+    <button type='button' {...props}>
       {children}
     </button>
   ),
