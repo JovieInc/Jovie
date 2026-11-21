@@ -2,7 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/release-tasks/release-plan-wizard.test.tsx
 
-import { Button } from '@jovie/ui';
+import { Button, PlainButton } from '@jovie/ui';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Dialog,
@@ -312,7 +312,7 @@ export function ReleasePlanWizard({
             {choices.map(choice => {
               const selected = currentValue === choice.value;
               return (
-                <button
+                <PlainButton
                   key={choice.value}
                   type='button'
                   onClick={() =>
@@ -327,7 +327,7 @@ export function ReleasePlanWizard({
                   }`}
                 >
                   {choice.label}
-                </button>
+                </PlainButton>
               );
             })}
           </fieldset>

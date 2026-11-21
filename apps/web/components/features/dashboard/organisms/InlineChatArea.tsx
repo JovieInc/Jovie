@@ -11,6 +11,7 @@
  * and race-condition-safe message saving.
  */
 
+import { PlainButton } from '@jovie/ui';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import {
@@ -134,14 +135,15 @@ export const InlineChatArea = forwardRef<
   }, [expanded, onExpandedChange]);
 
   // Don't render anything if no messages and not loading
-  if (!hasMessages && !isLoading && !chatError) {
+  const hasContent = hasMessages || isLoading || Boolean(chatError);
+  if (!hasContent) {
     return null;
   }
 
   return (
     <ContentSurfaceCard className='mb-4 overflow-hidden'>
       {/* Header - always visible when there are messages */}
-      <button
+      <PlainButton
         type='button'
         onClick={handleToggle}
         className='flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-surface-2'
@@ -163,7 +165,7 @@ export const InlineChatArea = forwardRef<
         ) : (
           <ChevronDown className='h-4 w-4 text-secondary-token' />
         )}
-      </button>
+      </PlainButton>
 
       {/* Messages area - collapsible */}
       {expanded && (

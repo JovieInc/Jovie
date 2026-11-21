@@ -2,6 +2,7 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { PlainButton } from '@jovie/ui';
 import React from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { SwipeToReveal } from '@/components/atoms/SwipeToReveal';
@@ -18,7 +19,7 @@ const SWIPE_ACTION_CLASS =
   'flex h-full flex-col items-center justify-center gap-1 px-4 text-xs font-caption transition-colors active:opacity-80';
 const NEUTRAL_SWIPE_ACTION_CLASS =
   'bg-surface-2 text-primary-token hover:bg-surface-3';
-const DESTRUCTIVE_SWIPE_ACTION_CLASS = 'bg-error text-white dark:text-white';
+const DESTRUCTIVE_SWIPE_ACTION_CLASS = 'bg-error text-error-foreground';
 
 /**
  * Determine the pill state based on visibility and validity.
@@ -164,7 +165,7 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
 
   const swipeActions = (
     <>
-      <button
+      <PlainButton
         type='button'
         onClick={() => onEdit(index)}
         className={cn(SWIPE_ACTION_CLASS, NEUTRAL_SWIPE_ACTION_CLASS)}
@@ -172,8 +173,8 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
       >
         <Icon name='Pencil' className='h-4 w-4' />
         <span>Edit</span>
-      </button>
-      <button
+      </PlainButton>
+      <PlainButton
         type='button'
         onClick={() => onToggle(index)}
         className={cn(SWIPE_ACTION_CLASS, NEUTRAL_SWIPE_ACTION_CLASS)}
@@ -181,8 +182,8 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
       >
         <Icon name={visible ? 'EyeOff' : 'Eye'} className='h-4 w-4' />
         <span>{visible ? 'Hide' : 'Show'}</span>
-      </button>
-      <button
+      </PlainButton>
+      <PlainButton
         type='button'
         onClick={() => onRemove(index)}
         className={cn(SWIPE_ACTION_CLASS, DESTRUCTIVE_SWIPE_ACTION_CLASS)}
@@ -190,7 +191,7 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
       >
         <Icon name='Trash' className='h-4 w-4' />
         <span>Delete</span>
-      </button>
+      </PlainButton>
     </>
   );
 
@@ -230,7 +231,7 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
       {/* Screen reader accessible URL display */}
       <div className='sr-only'>{urlDisplay}</div>
       {draggable && (
-        <button
+        <PlainButton
           type='button'
           ref={setActivatorNodeRef}
           {...attributes}
@@ -242,7 +243,7 @@ export const SortableLinkItem = React.memo(function SortableLinkItem<
           className='sr-only focus:not-sr-only focus:absolute focus:top-0 focus:z-10 focus:rounded-md focus:bg-surface-1 focus:p-2'
         >
           Drag to reorder {primaryLabel}
-        </button>
+        </PlainButton>
       )}
     </div>
   );
