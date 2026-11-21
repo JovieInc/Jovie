@@ -7,8 +7,10 @@ import test from 'node:test';
 import { stripVTControlCharacters } from 'node:util';
 import { BRAND_NAME_COVERAGE_COMMAND } from './brand-name.mjs';
 import {
+  checkDashboardColor,
   checkDrift,
   checkTitleCaseHeadings,
+  DASHBOARD_COLOR_RULES,
   LEGACY_PATH,
   loadRegistry,
   REGISTRY_PATH,
@@ -192,6 +194,51 @@ test('label ratchet permits legacy only, rejects new and duplicate hits, and req
   assert.match(checkTitleCaseHeadings(root)[0], /stale baseline/u);
   put(root, LEGACY_PATH, JSON.stringify({ files: [], titleCaseHeadings: [] }));
   assert.deepEqual(checkTitleCaseHeadings(root), []);
+});
+
+test('dashboard color rules catch each misuse and pass the sanctioned forms', () => {
+  const hit = (id, line) =>
+    DASHBOARD_COLOR_RULES.find(rule => rule.id === id).pattern.test(line);
+  assert.ok(hit('direction-colored', "  up: 'text-success',"));
+  assert.ok(hit('direction-colored', "  down: 'var(--color-error-text)',"));
+  assert.ok(!hit('direction-colored', "  positive: 'text-success-text',"));
+  assert.ok(hit('direction-selector', ':where(.x[data-direction="up"]) {'));
+  assert.ok(
+    !hit('direction-selector', ':where(.x[data-sentiment="positive"]) {')
+  );
+  assert.ok(hit('invalid-color-fn', "stroke='hsl(var(--color-accent))'"));
+  assert.ok(hit('accent-on-data', "stroke='var(--color-accent)'"));
+  assert.ok(!hit('accent-on-data', "stroke='var(--color-accent-text)'"));
+  assert.ok(hit('decorative-color', "iconClassName='text-accent'"));
+  assert.ok(hit('decorative-color', "valueClassName='text-success'"));
+  assert.ok(!hit('decorative-color', "iconClassName='text-tertiary-token'"));
+  assert.ok(!hit('decorative-color', "valueClassName='text-success-text'"));
+  assert.ok(hit('raw-status-palette', "className='text-emerald-300'"));
+  assert.ok(hit('neon-status-text', '  color: var(--color-accent-green);'));
+});
+
+test('dashboard color ratchet permits legacy only and requires shrinking', () => {
+  const root = repo();
+  const file = 'apps/web/components/organisms/home-loop/Pulse.tsx';
+  const line = "  up: 'text-success',";
+  put(root, file, line);
+  execFileSync('git', ['init', '-q', root]);
+  execFileSync('git', ['add', '.'], { cwd: root });
+  put(root, LEGACY_PATH, JSON.stringify({ files: [] }));
+  assert.match(checkDashboardColor(root)[0], /ASR-041: color a delta/u);
+  const baseline = `direction-colored ${file}: ${line.trim()}`;
+  put(
+    root,
+    LEGACY_PATH,
+    JSON.stringify({ files: [], dashboardColor: [baseline] })
+  );
+  assert.deepEqual(checkDashboardColor(root), []);
+  put(root, file, "  positive: 'text-success-text',");
+  assert.match(checkDashboardColor(root)[0], /stale baseline/u);
+  put(root, 'apps/web/components/marketing/Hero.tsx', line);
+  execFileSync('git', ['add', '.'], { cwd: root });
+  put(root, LEGACY_PATH, JSON.stringify({ files: [] }));
+  assert.deepEqual(checkDashboardColor(root), []);
 });
 
 test('settings and shell changes select the existing anti-slop CI lane', async () => {
