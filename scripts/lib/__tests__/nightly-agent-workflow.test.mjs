@@ -214,7 +214,29 @@ describe('Nightly Testing Agent evidence flow', () => {
       'apps/web/test-results/nightly-agent/skill-delta.json',
       'docs/NIGHTLY_TESTING_AGENT_REPORT.md',
       'apps/web/reports/nightly-agent/last-run.json',
+      'apps/web/reports/nightly-agent/skill-delta.json',
     ]);
+  });
+
+  it('restores prior skill-delta before select so ranking consumes memory', () => {
+    const context = workflow.jobs.context;
+    const restoreIndex = context.steps.findIndex(
+      candidate => candidate.name === 'Restore prior skill delta'
+    );
+    const selectIndex = context.steps.findIndex(
+      candidate => candidate.name === 'Select risk-ranked targets'
+    );
+    expect(restoreIndex).toBeGreaterThanOrEqual(0);
+    expect(selectIndex).toBeGreaterThan(restoreIndex);
+    expect(context.steps[selectIndex].run).toContain(
+      '--skill-delta apps/web/test-results/nightly-agent/prior/skill-delta.json'
+    );
+    expect(context.steps[restoreIndex].run).toContain('skill-delta.json');
+    expect(context.steps[restoreIndex].run).toContain(
+      'packages/api-client/cli.ts gh --priority default --'
+    );
+    expect(context.steps[restoreIndex].run).toContain('run download');
+    expect(context.steps[restoreIndex].run).toContain('run list');
   });
 
   it('binds the compact report to the resolved workflow conclusion', () => {

@@ -72,6 +72,10 @@ describe('reliability entropy projection', () => {
       resolve('scripts/nightly-test-agent-root.ts'),
       join(web, 'scripts/nightly-test-agent-root.ts')
     );
+    copyFileSync(
+      resolve('scripts/nightly-test-agent-skill-delta.ts'),
+      join(web, 'scripts/nightly-test-agent-skill-delta.ts')
+    );
     symlinkSync(resolve('node_modules'), join(web, 'node_modules'), 'dir');
     const quarantine = join(web, 'tests/quarantine.json');
     writeFileSync(quarantine, JSON.stringify(ledger().ledger));
