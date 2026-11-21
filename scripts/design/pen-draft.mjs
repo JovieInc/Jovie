@@ -14,7 +14,8 @@
  *   node scripts/design/pen-draft.mjs --out DIR [--only claim,homepage]
  *   node scripts/design/pen-draft.mjs --plan [--changed FILE] [--only ...]
  *
- * The Pen agent runs on Fable 5.2; PEN_DRAFT_MODEL names another model.
+ * The Pen agent runs on Fable 5.2, or on a brief's own `model:`;
+ * PEN_DRAFT_MODEL names another model for every brief.
  *
  * With PEN_DRAFT_TRIM=1 a draft starts from a cut-down copy of the canonical
  * file (components, related screens, variables) and the new frame is spliced
@@ -72,7 +73,19 @@ export function parseBrief(source, file = 'brief') {
     .split(',')
     .map(t => t.trim())
     .filter(Boolean);
-  return { frame: meta.frame, route: meta.route ?? null, context, prompt };
+  // model: a brief that needs only a component or layout pass drafts on the
+  // default orchestration model; taste-heavy briefs keep Fable (Tim,
+  // 2026-11-14: "only use fable for realy important shit").
+  const model = meta.model || null;
+  if (model && !/^claude-[a-z0-9-]+$/.test(model))
+    throw new Error(`${file}: model must be a claude-* model id`);
+  return {
+    frame: meta.frame,
+    route: meta.route ?? null,
+    context,
+    prompt,
+    model,
+  };
 }
 
 export function loadBriefs(dir = BRIEFS_DIR, only = null) {
@@ -114,17 +127,23 @@ export function attemptTimeout(elapsedMs, budgetMs = BUDGET_MS) {
   return left < MIN_ATTEMPT_MS ? 0 : left;
 }
 
-/** Files whose change means every frame has to be drafted again. */
+/** Files whose change is proven by drafting one canary brief. */
 export const DRAFTER_FILES = [
   'scripts/design/pen-draft.mjs',
   'scripts/design/pen-trim.mjs',
   '.github/workflows/pen-draft.yml',
 ];
 
+/** The brief a drafter-only change draws: the smallest, not all of them. */
+export const CANARY_FRAME = 'billing-success';
+
 /**
- * The frames a run drafts. A push drafts only the briefs it changed, so
- * editing one brief doesn't redraw (and pay for) all of them; a change to
- * the drafter itself, or no list of changed files, drafts every brief.
+ * The frames a run drafts: the briefs a push or PR changed, so editing one
+ * brief doesn't redraw (and pay for) all of them. A change to the drafter
+ * draws one canary brief: every brief once took 15 Fable jobs on the shared
+ * Claude plan per PR push, five times on Nov 19 alone (Tim, 2026-11-20:
+ * "shut off all waste"). No list of changed files, as in a manual run,
+ * drafts every brief.
  */
 export function planFrames({ briefs, changed = null, only = null }) {
   if (only?.length) {
@@ -133,14 +152,17 @@ export function planFrames({ briefs, changed = null, only = null }) {
       throw new Error(`no brief for --only ${unknown.join(', ')}`);
     return briefs.filter(b => only.includes(b.frame)).map(b => b.frame);
   }
-  if (!changed || changed.some(p => DRAFTER_FILES.includes(p)))
-    return briefs.map(b => b.frame);
+  if (!changed) return briefs.map(b => b.frame);
   const edited = new Set(
     changed
       .filter(p => dirname(p) === BRIEFS_DIR && p.endsWith('.md'))
       .map(p => basename(p))
   );
-  return briefs.filter(b => edited.has(b.file)).map(b => b.frame);
+  const frames = briefs.filter(b => edited.has(b.file)).map(b => b.frame);
+  if (frames.length || !changed.some(p => DRAFTER_FILES.includes(p)))
+    return frames;
+  const canary = briefs.find(b => b.frame === CANARY_FRAME) ?? briefs[0];
+  return canary ? [canary.frame] : [];
 }
 
 /** The pen arguments for one brief, drafting into its own output file. */
@@ -376,7 +398,14 @@ async function main() {
       try {
         execFileSync(
           'npx',
-          penArgs(brief, { input: from, outDir, trim, model }),
+          penArgs(brief, {
+            input: from,
+            outDir,
+            trim,
+            model: process.env.PEN_DRAFT_MODEL?.trim()
+              ? model
+              : (brief.model ?? model),
+          }),
           {
             stdio: ['ignore', 'inherit', 'inherit'],
             timeout,
