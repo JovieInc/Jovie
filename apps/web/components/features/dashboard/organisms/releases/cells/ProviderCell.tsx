@@ -10,9 +10,8 @@ import {
   useRef,
   useState,
 } from 'react';
-
-import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { Icon } from '@/components/atoms/Icon';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/molecules/page-toolbar-classes';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';

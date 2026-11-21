@@ -52,7 +52,9 @@ describe('support route header contract', () => {
       label: getClaimProfileIntent().label,
       href: getClaimProfileIntent().href,
     });
-    expect(headerSource).toContain("treatment: 'wordmark'");
+    // JOV-14240: logo is the home link; no separate "Jovie" wordmark nav item.
+    expect(headerSource).not.toContain("label: 'Jovie'");
+    expect(headerSource).not.toContain("treatment: 'wordmark'");
     expect(headerSource).toContain('MARKETING_NAV_LINKS.map');
     // Canonical Pen header: the Customers flyout is the only glass flyout.
     expect(headerSource).toContain(

@@ -203,7 +203,7 @@ describe('merge-group admission evidence', () => {
           )
         ).toBe(true);
         await expect(readFile(outputPath, 'utf8')).resolves.toContain(
-          `admitted=true\nobsolete=false\npr_number=123\nsynthetic_head_sha=${HEAD}`
+          `admitted=true\nobsolete=false\npr_number=123\nsynthetic_head_sha=${HEAD}\nsource_head_sha=${SOURCE_HEAD}`
         );
         await expect(
           runAdmissionFromEnv(env, {

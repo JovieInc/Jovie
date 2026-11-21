@@ -9,6 +9,10 @@ import {
   tierOf,
 } from '../../../scripts/invariants/native-spacing-scale.mjs';
 import {
+  projectedActionButton,
+  replaceActionButtonProjection,
+} from './native-design-system-action-button.mjs';
+import {
   contrastRatio,
   projectedMotion,
   replaceMotionProjection,
@@ -427,9 +431,16 @@ export function checkNativeDesign(root = ROOT, { write = false } = {}) {
   const css = readFileSync(resolve(root, manifest.semantics), 'utf8');
   const themePath = resolve(root, manifest.theme);
   const theme = readFileSync(themePath, 'utf8');
-  const expected = replaceMotionProjection(
-    replaceProjection(theme, projectedColors(manifest, palette, css)),
-    projectedMotion(manifest.motionBindings, css)
+  const contract = readFileSync(
+    resolve(root, manifest.actionButtonContract),
+    'utf8'
+  );
+  const expected = replaceActionButtonProjection(
+    replaceMotionProjection(
+      replaceProjection(theme, projectedColors(manifest, palette, css)),
+      projectedMotion(manifest.motionBindings, css)
+    ),
+    projectedActionButton(manifest.actionButtonBindings, contract)
   );
   if (write) writeFileSync(themePath, expected);
   const issues = [];

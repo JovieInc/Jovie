@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { TIM_WHITE_SHARE_DEEP_LINKS } from '@/data/artistProfileTimWhiteShare';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
@@ -143,6 +144,7 @@ export interface ArtistProfileLandingCopy {
     readonly headline: string;
     readonly subhead: string;
     readonly ctaLabel: string;
+    readonly secondaryCtaLabel: string; // sentence case (JOV-14240)
     readonly signature: string;
     readonly proofWhisper: string;
     readonly phoneCaption: string;
@@ -431,6 +433,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     subhead:
       'Your music, artist bio, and social links in one free profile. Review the details, then share your Jovie link.',
     ctaLabel: 'Claim your profile',
+    secondaryCtaLabel: 'See how it adapts',
     signature: 'jov.ie/you',
     proofWhisper: 'Used by artists on',
     phoneCaption: 'One profile.',
@@ -1046,7 +1049,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     callouts: [
       {
         id: 'identity',
-        title: 'They Know It Is You',
+        title: 'They know it is you',
         body: 'Your name, image, and verified destinations make the profile unmistakably yours.',
       },
       {
@@ -1145,16 +1148,11 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
       ],
     },
     share: {
-      url: 'https://jov.ie/tim',
+      url: TIM_WHITE_PROFILE.publicProfileUrl,
       displayValue: TIM_WHITE_PROFILE.publicProfileDisplay,
       qrLabel: 'QR code',
       deepLinksLabel: 'Deep links',
-      deepLinks: [
-        'jov.ie/tim',
-        'jov.ie/tim/pay',
-        'jov.ie/tim/listen',
-        'jov.ie/tim/contact',
-      ],
+      deepLinks: TIM_WHITE_SHARE_DEEP_LINKS,
     },
   },
   socialProof: {

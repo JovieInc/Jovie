@@ -17,6 +17,7 @@ const SETUP_MERGED_BROWSERS = 'Setup merged source browsers';
 const MQ_PARITY_TOOLS = 'Resolve MQ parity tools for older source heads';
 const MQ_PARITY_SCOPE = 'Select MQ parity scope';
 const TYPECHECK_TWIN = 'Run typecheck lane parity';
+const REMAINING_TWIN = 'Run remaining lane parity';
 const UNIT_FLAKY_UPLOAD = 'Preserve retried-then-passed unit tests';
 const REUSE_STEP = 'Reuse exact-head proof for a metadata-only edit';
 
@@ -110,10 +111,10 @@ function ensureMergedReuseGate(ifExpr) {
 }
 
 /**
- * Owned typecheck twin may also provision Node. Strip that clause so deepEqual
- * still pins the rest of the Setup Node step against origin/main.
+ * Owned MQ parity twins may also provision Node. Strip those clauses so
+ * deepEqual still pins the rest of the Setup Node step against origin/main.
  * @param {Step} step
- * @param {{ requireTypecheck?: boolean, requireCi28?: boolean }} [opts]
+ * @param {{ requireTypecheck?: boolean, requireRemaining?: boolean, requireCi28?: boolean }} [opts]
  */
 function normalizeSetupNodeStep(step, opts = {}) {
   if (step?.name !== SETUP_NODE && step?.name !== SETUP_PLAYWRIGHT) return step;
@@ -126,9 +127,14 @@ function normalizeSetupNodeStep(step, opts = {}) {
     if (opts.requireTypecheck) {
       assert.match(ifExpr, /steps\.mq-parity\.outputs\.typecheck == 'true'/);
     }
+    if (opts.requireRemaining) {
+      assert.match(ifExpr, /steps\.mq-parity\.outputs\.remaining == 'true'/);
+    }
     ifExpr = ifExpr
       .replace(/\s*\|\|\s*steps\.mq-parity\.outputs\.typecheck == 'true'/, '')
-      .replace(/steps\.mq-parity\.outputs\.typecheck == 'true'\s*\|\|\s*/, '');
+      .replace(/steps\.mq-parity\.outputs\.typecheck == 'true'\s*\|\|\s*/, '')
+      .replace(/\s*\|\|\s*steps\.mq-parity\.outputs\.remaining == 'true'/, '')
+      .replace(/steps\.mq-parity\.outputs\.remaining == 'true'\s*\|\|\s*/, '');
   }
   return { ...step, if: ifExpr };
 }
@@ -171,7 +177,7 @@ function normalizeUnit4x4ReuseGate(step, opts = {}) {
   return step;
 }
 
-/** @param {Job} job @param {{ requireTypecheck?: boolean, requireCi28?: boolean }} [opts] */
+/** @param {Job} job @param {{ requireTypecheck?: boolean, requireRemaining?: boolean, requireCi28?: boolean }} [opts] */
 function normalizeUnitJob(job, opts = {}) {
   return {
     ...job,
@@ -215,6 +221,7 @@ export function assertOriginalJobsRetained(current, baseline) {
     MQ_PARITY_TOOLS,
     MQ_PARITY_SCOPE,
     TYPECHECK_TWIN,
+    REMAINING_TWIN,
     UNIT_FLAKY_UPLOAD,
   ]);
   const strip = job => ({
@@ -232,6 +239,7 @@ export function assertOriginalJobsRetained(current, baseline) {
       id === 'unit'
         ? normalizeUnitJob(actual, {
             requireTypecheck: true,
+            requireRemaining: true,
             requireCi28: true,
           })
         : normalizeSourceJob(actual, { requireCi28: true });
@@ -247,11 +255,23 @@ export function assertOriginalJobsRetained(current, baseline) {
             (name === MQ_PARITY_TOOLS ||
               name === MQ_PARITY_SCOPE ||
               name === TYPECHECK_TWIN ||
+              name === REMAINING_TWIN ||
               name === UNIT_FLAKY_UPLOAD))) &&
         !kept.length &&
         added.length === 1;
       assert.ok(kept.length === added.length || firstLanding, `${id}: ${name}`);
-      if (kept.length) assert.deepEqual(added, kept, `${id}: ${name}`);
+      if (!kept.length) continue;
+      // Tools stub may grow twin keys without rewriting the rest of the step.
+      if (name === MQ_PARITY_TOOLS && id === 'unit') {
+        assert.equal(added[0]?.id, 'mq-parity-tools');
+        assert.equal(added[0]?.if, kept[0]?.if);
+        assert.deepEqual(added[0]?.env, kept[0]?.env);
+        assert.match(String(added[0]?.run), /mq-parity-scope\.mjs/);
+        assert.match(String(added[0]?.run), /typecheck=false/);
+        assert.match(String(added[0]?.run), /remaining=false/);
+        continue;
+      }
+      assert.deepEqual(added, kept, `${id}: ${name}`);
     }
   }
 
@@ -272,6 +292,15 @@ export function assertOriginalJobsRetained(current, baseline) {
     /steps\.mq-parity\.outputs\.typecheck == 'true'/
   );
   assert.match(String(twin?.if), /matrix\.shard == '2\/4'/);
+  const remaining = unitSteps.find(step => step.name === REMAINING_TWIN);
+  assert.equal(remaining?.run, 'node scripts/ci-fast-lanes.mjs');
+  assert.equal(remaining?.env?.CI_FAST_LANE_GROUP, 'remaining');
+  assert.equal(remaining?.env?.CI_FAST_SKIP_STRUCTURAL, 'true');
+  assert.match(
+    String(remaining?.if),
+    /steps\.mq-parity\.outputs\.remaining == 'true'/
+  );
+  assert.match(String(remaining?.if), /matrix\.shard == '1\/4'/);
   // Observability-only artifact upload (JOV-12621): never blocks, never
   // uploads more than the retry sidecar, never fails on a missing file.
   const flaky = unitSteps.find(step => step.name === UNIT_FLAKY_UPLOAD);

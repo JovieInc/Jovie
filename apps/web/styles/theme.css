@@ -94,7 +94,8 @@
 }
 
 .auth-form-stack-offset {
-  /* Pen oaz9c: the column's heading sits 206px down a 900px frame. */
+  /* Pen oaz9c: heading at 206px on a 900px frame. 11.375rem (182px) plus the
+     shell's top chrome (~24px) lands the h1 there; do not vertical-center. */
   padding-top: min(20vh, 11.375rem);
 }
 

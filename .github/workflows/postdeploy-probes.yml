@@ -678,6 +678,41 @@ jobs:
           PRODUCTION_BASE_URL_B64: ${{ needs.resolve-target.outputs.deployment_url_b64 }}
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
 
+      # JOV-9826: canary claim→checkout→activation (Stripe TEST only). Soft-skip if spec missing.
+      - name: Run canary claim checkout walk (JOV-9826)
+        id: canary-checkout
+        if: steps.check-creds.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          if [ ! -f apps/web/tests/e2e/canary-claim-checkout.spec.ts ]; then
+            echo "::notice::Landed build predates canary-claim-checkout.spec.ts; JOV-9826 walk skipped for it."
+            exit 0
+          fi
+          PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
+          cd apps/web
+          # Stripe TEST fixtures match claim-checkout-dogfood.yml (not Doppler):
+          # price + test account are public fixtures; keys come from GH secrets.
+          # Doppler holds CRON_SECRET + DATABASE_URL for canary reset only.
+          doppler run --project jovie-web --config prd \
+            --only-secrets=CRON_SECRET,DATABASE_URL \
+            --no-fallback -- env -u DOPPLER_TOKEN \
+              CI=true BASE_URL="$PRODUCTION_BASE_URL" PLAYWRIGHT_TEST_BASE_URL="$PRODUCTION_BASE_URL" E2E_SKIP_WEB_SERVER=1 \
+              STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
+              STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \
+              STRIPE_TEST_ACCOUNT_ID=acct_1T1DV0ASl9B9udHv \
+              STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY=price_1USkjzASl9B9udHvEYkZLYZp \
+              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+                pnpm exec playwright test tests/e2e/canary-claim-checkout.spec.ts --project=chromium --reporter=line --workers=1
+        env:
+          EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
+          PROD_CERT_STEPS_FILE: ${{ runner.temp }}/prod-cert-steps.jsonl
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+          PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          PRODUCTION_BASE_URL_B64: ${{ needs.resolve-target.outputs.deployment_url_b64 }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+
       # Step names, timestamps and one-line summaries only; no cookies, codes
       # or addresses (the step helper never records them).
       - name: Check golden-path certification steps
@@ -1069,6 +1104,21 @@ jobs:
           fi
           if [ -s "$auth_state" ]; then state_args=(--storage-state "$auth_state"); fi
           node scripts/invariants/pen-golden-path.mjs --record --out "${RUNNER_TEMP}/pen-golden-path" --base-url https://jov.ie --github-output "$GITHUB_OUTPUT" "${state_args[@]}"
+
+      # JOV-6038 / JOV-11623: keep Pen|render|diff triptychs + receipt inspectable after
+      # the job ends. Same out dir the comparator already writes; not a second cert path.
+      # Lola asked for retained expected/actual pairs on real disagreements (2026-11-17).
+      - name: Upload Golden Path Pen pair evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pen-golden-path-pairs-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/pen-golden-path/receipt.json
+            ${{ runner.temp }}/pen-golden-path/comment.md
+            ${{ runner.temp }}/pen-golden-path/triptych*.png
+          retention-days: 30
+          if-no-files-found: ignore
 
       - name: Certify the golden path on production
         id: certify

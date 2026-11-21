@@ -1,13 +1,9 @@
-/**
- * Deterministic CI lane for the Jovie helpfulness eval. No model, DB or
- * network calls: it proves the case set, hard checks and judge parsing
- * stay sound, and that a deliberately dumb reply fails while a grounded one
- * passes.
- */
+/** Deterministic helpfulness CI: case set, hard checks, judge parsing. No model/DB/network. */
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
+import calibration from './calibration.json';
 import { HELPFULNESS_CASES } from './cases';
 import { buildFixture, nextFriday } from './fixtures';
 import {
@@ -22,12 +18,18 @@ import { HELPFULNESS_BEHAVIORS, HELPFULNESS_EVAL_VERSION } from './spec';
 const NOW = new Date('2026-10-28T15:00:00Z'); // Wednesday
 const songOutFriday = HELPFULNESS_CASES.find(c => c.id === 'song-out-friday');
 
+function calibrationReply(id: string): string {
+  const example = calibration.examples.find(e => e.id === id);
+  if (!example) throw new Error(`missing calibration example: ${id}`);
+  return example.reply.text;
+}
+
 describe('helpfulness case set', () => {
   it('is versioned, unique and within the per-run cap', () => {
     expect(HELPFULNESS_EVAL_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/);
     const ids = HELPFULNESS_CASES.map(c => c.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.length).toBeLessThanOrEqual(55);
+    expect(ids.length).toBeLessThanOrEqual(120);
     expect(HELPFULNESS_CASES.filter(c => c.ciSubset).length).toBeGreaterThan(4);
   });
 
@@ -84,7 +86,9 @@ describe('hard checks', () => {
       text: 'Night Swim is out Friday, in 2 days. Editorial pitching needs weeks, so skip it. Today: put the Night Swim pre-save at the top of jov.ie/lunawaves and swap your Instagram bio link to it, since Instagram sends most of your visits.',
       toolCalls: [],
     };
-    const checks = runHardChecks(songOutFriday, good);
+    const checks = runHardChecks(songOutFriday, good, {
+      facts: buildFixture('established', NOW).facts,
+    });
     expect(checks.every(c => c.ok)).toBe(true);
     expect(scoreCase(songOutFriday.id, checks, null).score).toBe(100);
   });
@@ -104,6 +108,47 @@ describe('hard checks', () => {
         toolCalls: [],
       }).every(c => c.ok)
     ).toBe(true);
+  });
+
+  it('hard-fails inventing-stats on the lapsed-flopped deliberate red', () => {
+    const lapsed = HELPFULNESS_CASES.find(c => c.id === 'lapsed-flopped');
+    if (!lapsed) throw new Error('missing case');
+    const checks = runHardChecks(lapsed, {
+      text: calibrationReply('lapsed-flopped'),
+      toolCalls: [],
+    });
+    expect(checks.find(c => c.id === 'inventing_stats')?.ok).toBe(false);
+    expect(scoreCase(lapsed.id, checks, null).passed).toBe(false);
+  });
+
+  it('hard-fails question-not-a-move (one-rec) on clarifying closers', () => {
+    if (!songOutFriday) throw new Error('missing case');
+    for (const id of ['greeting', 'followup-do-it', 'collab'] as const) {
+      const checks = runHardChecks(songOutFriday, {
+        text: calibrationReply(id),
+        toolCalls: [],
+      });
+      expect(checks.find(c => c.id === 'question_not_a_move')?.ok, id).toBe(
+        false
+      );
+      expect(scoreCase(songOutFriday.id, checks, null).passed, id).toBe(false);
+    }
+  });
+
+  it('flags upcoming-first miss when case context has UPCOMING', () => {
+    if (!songOutFriday) throw new Error('missing case');
+    const facts = buildFixture('established', NOW).facts;
+    expect(facts.some(f => f.includes('UPCOMING:'))).toBe(true);
+    const checks = runHardChecks(
+      songOutFriday,
+      {
+        text: calibrationReply('greeting'),
+        toolCalls: [],
+      },
+      { facts }
+    );
+    expect(checks.find(c => c.id === 'upcoming_first')?.ok).toBe(false);
+    expect(scoreCase(songOutFriday.id, checks, null).passed).toBe(false);
   });
 });
 
@@ -140,5 +185,21 @@ describe('judge contract', () => {
     const result = scoreCase('x', [{ id: 'copy_floor', ok: false }], verdict);
     expect(result.score).toBe(40);
     expect(result.passed).toBe(false);
+  });
+});
+
+describe('ASS-36 empty-profile setup', () => {
+  it('requires today setup step', () => {
+    const c = HELPFULNESS_CASES.find(x => x.id === 'new-where-start')!;
+    const bad = runHardChecks(c, {
+      text: 'Finish a song first.',
+      toolCalls: [],
+    });
+    const good = runHardChecks(c, {
+      text: 'Add a bio on jov.ie/maraquill today.',
+      toolCalls: [],
+    });
+    expect(bad.find(x => x.id === 'grounding_0')?.ok).toBe(false);
+    expect(good.find(x => x.id === 'grounding_0')?.ok).toBe(true);
   });
 });
