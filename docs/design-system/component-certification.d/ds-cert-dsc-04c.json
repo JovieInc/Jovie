@@ -31,6 +31,26 @@
       "offline": "The nav makes no request of its own; the query hook owns connectivity and an offline read renders the same block as LoadingNoData.",
       "rtl-overflow": "Rows use the shared sidebar row classes with min-w-0 truncation; direction handling belongs to the shell sidebar."
     },
+    "apps/web/components/organisms/PaySection.tsx": {
+      "offline": "The section starts a payment only on an explicit Pay press and shows the same failure toast as ErrorStripeRejects when the request cannot complete; it makes no request while rendering.",
+      "rtl-overflow": "The card is a centered column with a three-column amount grid and logical text alignment; it sets no physical offsets."
+    },
+    "apps/web/components/organisms/PersistentAudioBar.tsx": {
+      "loading": "Playback state comes from useTrackAudioPlayer, which a story cannot drive without a real audio element; the loading branch only swaps the play label and disables the seek bar. PersistentAudioBar.test.tsx and the shell tests cover the dock.",
+      "empty": "With no active track the component renders an empty dock by design (zero reserved space); the empty case is asserted in PersistentAudioBar.test.tsx and the dock itself owns the 0-height state.",
+      "error": "A preview failure raises a toast through onError from useTrackAudioPlayer; the bar draws no inline error UI, and the toast is owned by the feedback layer.",
+      "long-content": "Titles use TruncatedText with one-line clamps inside min-w-0 columns; truncation is owned by TruncatedText.",
+      "offline": "The bar never fetches; playback state and errors come from the audio hook, and an unavailable preview shows the same toast as the error case.",
+      "permission-denied": "The bar has no role or gated branch; any signed-in user with an active track sees it. The detector matched the role semantics on the Audio Player landmark.",
+      "rtl-overflow": "The dock is a flex row of fixed-width controls and truncating text with no physical offsets except the visibility toggle's centered hit area."
+    },
+    "apps/web/components/organisms/ProfileSwitcher.tsx": {
+      "loading": "The switching spinner shows only for the instant between choosing an identity and the response, after a pointer interaction a static story cannot script; ProfileSwitcher.test.tsx covers the switch.",
+      "error": "A failed switch is a toast through the feedback layer with the server's message and no inline UI; ProfileSwitcher.test.tsx asserts the toast and that the route does not refresh.",
+      "offline": "The switcher fetches only on an explicit selection and reports a network failure through the same toast as the error case.",
+      "permission-denied": "The switcher lists the user's own identities and has no role or gated branch; with fewer than two it renders nothing (EmptySingleIdentity).",
+      "rtl-overflow": "The trigger and rows are flex with min-w-0 truncation; the menu is a Radix dropdown that mirrors under dir=rtl, and text-left on the name follows the sidebar's direction."
+    },
     "apps/web/components/organisms/combobox/Combobox.tsx": {
       "offline": "The combobox never fetches: options, loading and error arrive as props from the parent, so it renders identically offline.",
       "permission-denied": "The combobox has no role or gated branch; every visitor can search and pick. The detector matched the role attribute on the headless input wiring.",
@@ -62,6 +82,12 @@
     "apps/web/components/organisms/opportunity-card/OpportunityRow.tsx": {
       "permission-denied": "The row is a presentational list item driven by state and callbacks; it has no role or gated branch. The detector matched the accepted and rejected row states.",
       "rtl-overflow": "Title and metadata truncate inside a flex row with min-w-0 and the actions are shrink-0; the row sets no physical offsets, and the swipe handlers read raw clientX by design."
+    },
+    "apps/web/components/organisms/profile-notifications-menu/ProfileNotificationsMenu.tsx": {
+      "error": "Subscription failures are reported by the controller and the mutation hooks as toasts; the menu takes no error prop and draws no inline error UI.",
+      "offline": "The menu makes no request while rendering; channel actions are callbacks owned by the profile controller, so offline behaves as the LoadingChannelBusy and error cases do.",
+      "permission-denied": "Notification preferences are the viewer's own and have no role or gated branch. The detector matched the role='menu' wiring.",
+      "rtl-overflow": "The menu is a Radix dropdown whose collision handling mirrors under dir=rtl; its rows are flex with gap and no physical offsets."
     }
   },
   "gates": {
@@ -102,6 +128,33 @@
       "forced-caps"
     ],
     "apps/web/components/organisms/OperatorListsNav.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/PaySection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/PersistentAudioBar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/ProfileSwitcher.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -174,6 +227,15 @@
       "forced-caps"
     ],
     "apps/web/components/organisms/opportunity-card/OpportunityRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/profile-notifications-menu/ProfileNotificationsMenu.tsx": [
       "ds-owner",
       "tokens",
       "states",

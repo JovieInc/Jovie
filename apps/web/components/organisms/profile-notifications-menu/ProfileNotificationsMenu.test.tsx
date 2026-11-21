@@ -1,10 +1,16 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ProfileNotificationsMenu } from './ProfileNotificationsMenu';
 
-function renderMenu() {
+function renderMenu(
+  dsps: readonly { key: string; label: string }[] = [
+    { key: 'spotify', label: 'Spotify' },
+  ]
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -16,7 +22,7 @@ function renderMenu() {
   return render(
     <ProfileNotificationsMenu
       artistId='artist-1'
-      availableDspPreferences={[{ key: 'spotify', label: 'Spotify' }]}
+      availableDspPreferences={dsps}
       channelBusy={{}}
       hasActiveSubscriptions={false}
       notificationsState='idle'
@@ -48,5 +54,31 @@ describe('ProfileNotificationsMenu', () => {
     expect(screen.getByText('What You Hear About')).toBeInTheDocument();
     expect(screen.queryByText('Instagram DMs')).not.toBeInTheDocument();
     expect(screen.queryByText('Coming soon')).not.toBeInTheDocument();
+  });
+
+  it('lets the listener choose a platform and has no axe violations', async () => {
+    const user = userEvent.setup();
+    renderMenu([
+      { key: 'spotify', label: 'Spotify' },
+      { key: 'apple_music', label: 'Apple Music' },
+    ]);
+
+    const platform = screen.getByRole('combobox', {
+      name: 'Preferred streaming platform',
+    });
+    await user.selectOptions(platform, 'apple_music');
+    expect(platform).toHaveValue('apple_music');
+    await expectNoA11yViolations(document.body);
+  });
+
+  it('offers only the placeholder when no platform is available', async () => {
+    renderMenu([]);
+
+    const platform = screen.getByRole('combobox', {
+      name: 'Preferred streaming platform',
+    });
+    expect(platform).toHaveValue('');
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    await expectNoA11yViolations(document.body);
   });
 });

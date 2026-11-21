@@ -1,7 +1,7 @@
 'use client';
 // @coverage-via apps/web/tests/unit/organisms/TipSection.test.tsx
 
-import { Button } from '@jovie/ui';
+import { Button, HostDrawnInput } from '@jovie/ui';
 import { useEffect, useRef, useState } from 'react';
 import { AmountSelector } from '@/components/atoms/AmountSelector';
 import { toast } from '@/components/feedback';
@@ -216,7 +216,7 @@ export function PaySection({
             Choose an amount and a payment method
           </p>
           {customMode ? (
-            <input
+            <HostDrawnInput
               ref={customInputRef}
               type='text'
               inputMode='decimal'

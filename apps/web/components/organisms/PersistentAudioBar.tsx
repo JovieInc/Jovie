@@ -1,6 +1,7 @@
 'use client';
 
 // @coverage-via apps/web/tests/components/organisms/PersistentAudioBar.test.tsx
+import { PlainButton } from '@jovie/ui';
 import {
   ChevronDown,
   ChevronUp,
@@ -62,7 +63,7 @@ function PlayerVisibilityToggle({
   readonly onClick: () => void;
 }) {
   return (
-    <button
+    <PlainButton
       type='button'
       onClick={onClick}
       aria-label={open ? 'Hide Player' : 'Show Player'}
@@ -81,7 +82,7 @@ function PlayerVisibilityToggle({
       ) : (
         <ChevronUp className='h-3.5 w-3.5' strokeWidth={2.25} />
       )}
-    </button>
+    </PlainButton>
   );
 }
 
