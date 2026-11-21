@@ -3,6 +3,7 @@ import { KpiItem } from '@/components/features/admin/KpiItem';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { getLeadFunnelReport } from '@/lib/leads/reporting';
+import type { LeadFunnelReport } from '@/lib/leads/reporting-types';
 import { formatClampedPercent } from './percentages';
 
 function BreakdownList({
@@ -19,9 +20,7 @@ function BreakdownList({
 }>) {
   return (
     <div className='rounded-lg border border-subtle bg-surface-0 p-3'>
-      <p className='mb-2 text-xs font-medium uppercase tracking-[0.08em] text-tertiary-token'>
-        {title}
-      </p>
+      <p className='mb-2 text-xs font-medium text-tertiary-token'>{title}</p>
       <div className='space-y-2'>
         {rows.length === 0 ? (
           <p className='text-xs text-secondary-token'>
@@ -46,8 +45,23 @@ function BreakdownList({
   );
 }
 
+const RAMP_ACTION_LABELS: Record<
+  LeadFunnelReport['rampRecommendation']['recommendedAction'],
+  string
+> = {
+  increase: 'Increase',
+  hold: 'Hold',
+  pause: 'Pause',
+};
+
 export async function LeadGtmInsights() {
   const report = await getLeadFunnelReport();
+  return <LeadGtmInsightsView report={report} />;
+}
+
+export function LeadGtmInsightsView({
+  report,
+}: Readonly<{ report: LeadFunnelReport }>) {
   const claimRate =
     report.summary.contacted > 0
       ? report.summary.claimClicks / report.summary.contacted
@@ -104,12 +118,16 @@ export async function LeadGtmInsights() {
           </div>
 
           <div className='rounded-lg border border-subtle bg-surface-0 p-3'>
-            <p className='text-xs font-medium uppercase tracking-[0.08em] text-tertiary-token'>
+            <p className='text-xs font-medium text-tertiary-token'>
               Ramp recommendation
             </p>
             <div className='mt-2 flex flex-wrap items-center gap-3'>
               <span className='text-lg font-semibold text-primary-token'>
-                {report.rampRecommendation.recommendedAction.toUpperCase()}
+                {
+                  RAMP_ACTION_LABELS[
+                    report.rampRecommendation.recommendedAction
+                  ]
+                }
               </span>
               <span className='text-sm text-secondary-token'>
                 Next daily cap:{' '}

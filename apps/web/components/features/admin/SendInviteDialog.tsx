@@ -154,7 +154,6 @@ export function SendInviteDialog({
                 setEmail(e.target.value)
               }
               disabled={isLoading || success}
-              autoFocus
               className='w-full'
             />
           </DrawerFormField>
