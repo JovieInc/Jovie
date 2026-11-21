@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ArtworkPlayOverlay } from './ArtworkPlayOverlay';
 
@@ -31,5 +32,24 @@ describe('ArtworkPlayOverlay', () => {
     render(<ArtworkPlayOverlay isPlaying={false} onPlay={onPlay} visible />);
     fireEvent.click(screen.getByLabelText('Play'));
     expect(onPlay).toHaveBeenCalledOnce();
+  });
+});
+
+describe('ArtworkPlayOverlay PlainButton and media tokens', () => {
+  it('is a type=button that still fires onPlay on userEvent.click', async () => {
+    const user = userEvent.setup();
+    const onPlay = vi.fn();
+    render(<ArtworkPlayOverlay isPlaying={false} onPlay={onPlay} visible />);
+    const button = screen.getByLabelText('Play');
+    expect(button).toHaveAttribute('type', 'button');
+    await user.click(button);
+    expect(onPlay).toHaveBeenCalledOnce();
+  });
+
+  it('renders the on-media tokens and no black/white palette classes', () => {
+    render(<ArtworkPlayOverlay isPlaying={false} onPlay={() => {}} visible />);
+    const button = screen.getByLabelText('Play');
+    expect(button).toHaveClass('bg-ink-on-media/50', 'text-on-media');
+    expect(button.className).not.toMatch(/bg-black|text-white/);
   });
 });
