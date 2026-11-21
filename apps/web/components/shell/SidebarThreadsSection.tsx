@@ -280,7 +280,14 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
         <time
           aria-hidden='true'
           dateTime={thread.updatedAt}
-          className='shrink-0 text-(length:--text-2xs) text-tertiary-token'
+          className={cn(
+            'shrink-0 text-(length:--text-2xs) text-tertiary-token',
+            // The chat actions button reveals in this same trailing track on
+            // hover or focus, so the date steps aside instead of sitting
+            // under it.
+            onThreadContextMenu &&
+              'transition-opacity duration-subtle ease-subtle group-hover/thread:opacity-0 group-focus-within/thread:opacity-0'
+          )}
         >
           {formatSidebarThreadTime(thread.updatedAt)}
         </time>

@@ -178,6 +178,37 @@ describe('SidebarThreadsSection certificate', () => {
   });
 });
 
+describe('SidebarThreadsSection trailing date', () => {
+  it('steps the date aside while the chat actions button shows', () => {
+    const { container } = render(
+      <SidebarThreadsSection
+        threads={threads}
+        activeThreadId={null}
+        calm
+        onThreadContextMenu={vi.fn()}
+        collapsed={false}
+      />
+    );
+    const date = container.querySelector('time');
+    expect(date).toHaveClass('group-hover/thread:opacity-0');
+    expect(date).toHaveClass('group-focus-within/thread:opacity-0');
+  });
+
+  it('keeps the date steady when the row has no actions', () => {
+    const { container } = render(
+      <SidebarThreadsSection
+        threads={threads}
+        activeThreadId={null}
+        calm
+        collapsed={false}
+      />
+    );
+    expect(container.querySelector('time')).not.toHaveClass(
+      'group-hover/thread:opacity-0'
+    );
+  });
+});
+
 describe('SidebarThreadsSection status dot tokens', () => {
   it('paints running, errored and read dots with semantic tokens', () => {
     const { container } = render(
