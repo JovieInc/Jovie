@@ -9,15 +9,6 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/atoms/SwipeToReveal.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
     "apps/web/components/features/admin/lists/StarRating.tsx": [
       "ds-owner",
       "tokens",

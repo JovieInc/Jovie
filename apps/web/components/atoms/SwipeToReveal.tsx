@@ -142,9 +142,8 @@ export const SwipeToReveal = memo(function SwipeToReveal({
       onClose: handleClose,
     });
 
-  const shouldShowActions = isOpen || isDragging || offsetX !== 0;
-
   useEffect(() => {
+    const shouldShowActions = isOpen || isDragging || offsetX !== 0;
     if (shouldShowActions) {
       setActionsVisible(true);
       return;
@@ -157,7 +156,7 @@ export const SwipeToReveal = memo(function SwipeToReveal({
     return () => {
       globalThis.clearTimeout(timeout);
     };
-  }, [shouldShowActions]);
+  }, [isDragging, isOpen, offsetX]);
 
   // Close when another item in the group opens
   useEffect(() => {
