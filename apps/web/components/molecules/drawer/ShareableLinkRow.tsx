@@ -27,33 +27,32 @@ export interface ShareableLinkRowProps {
 }
 
 /**
- * Density → IconButton size (visible container). Hit target stays 44px via
- * Button's pseudo-element. Compact/rail/table rows are 24–32px tall; `lg`
- * (40px) overflows those rows (regression after DrawerInlineIconButton
- * retirement — that alias applied density `h-5`/`h-6` via className).
+ * Density → IconButton size (visible container + [&_svg] glyph). Hit target
+ * stays 44px via Button's pseudo-element. Compact/rail/table rows are
+ * 24–32px tall; `lg` (40px) overflows those rows. Glyph size classes on
+ * children are redundant — `[&_svg]` on xs/sm/md wins on specificity.
  */
 const DENSITY_CLASSES = {
   compact: {
     container: 'h-6 gap-1 rounded-full px-2',
     icon: 'h-3 w-3',
     value: 'text-3xs',
+    // Was h-6 chrome + h-3 glyph; xs is 24/12.
     iconButtonSize: 'xs' as const satisfies IconButtonSize,
-    glyph: 'h-3 w-3',
   },
   rail: {
     container: 'h-8 gap-1.5 rounded-full px-2.5',
     icon: 'h-3 w-3',
     value: 'text-2xs',
-    // Closest approved size to the prior 20px (`h-5`) chrome inside a 32px row.
+    // Prior 20px (`h-5`) chrome → closest xs (24); glyph was already h-3.
     iconButtonSize: 'xs' as const satisfies IconButtonSize,
-    glyph: 'h-3 w-3',
   },
   table: {
     container: 'h-8 gap-1.5 rounded-full px-3',
     icon: 'h-3.5 w-3.5',
     value: 'text-2xs',
-    iconButtonSize: 'xs' as const satisfies IconButtonSize,
-    glyph: 'h-3.5 w-3.5',
+    // Prior 24px chrome + 14px glyph (lg had no [&_svg]). sm keeps 14px glyph.
+    iconButtonSize: 'sm' as const satisfies IconButtonSize,
   },
 } as const;
 
@@ -176,7 +175,7 @@ export function ShareableLinkRow({
           aria-label={isCopied ? 'Copied' : copyButtonTitle}
           className='shrink-0'
         >
-          <Copy className={cn(styles.glyph, isCopied && 'text-success')} />
+          <Copy className={cn(isCopied && 'text-success')} />
           <span className='sr-only'>{isCopied ? 'Copied' : 'Copy'}</span>
         </IconButton>
         {showOpen ? (
@@ -188,7 +187,7 @@ export function ShareableLinkRow({
             aria-label={openButtonTitle}
             className='shrink-0'
           >
-            <ExternalLink className={styles.glyph} />
+            <ExternalLink />
             <span className='sr-only'>Open</span>
           </IconButton>
         ) : null}

@@ -83,7 +83,8 @@ function ConnectedArtistBadge({
           aria-label='Open Profile'
         >
           <a href={info.externalUrl} target='_blank' rel='noopener noreferrer'>
-            <ExternalLink className='h-3 w-3 text-tertiary-token' />
+            {/* xs owns 12px [&_svg]; color inherits inline hover. */}
+            <ExternalLink />
           </a>
         </IconButton>
       ) : null}
@@ -453,7 +454,8 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
                     />
 
                     <IconButton
-                      size='sm'
+                      // Pre-migration Trash2 was h-4 (16px); md owns [&_svg] 16px.
+                      size='md'
                       variant='inline'
                       fade='visible'
                       destructive
@@ -461,7 +463,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
                       className='shrink-0'
                       aria-label={`Remove ${meta?.name || link.platform}`}
                     >
-                      <Trash2 className='h-4 w-4' />
+                      <Trash2 />
                     </IconButton>
                   </div>
                 );

@@ -51,7 +51,8 @@ export const AudienceActionCell = memo(function AudienceActionCell({
           ariaLabel={`Message ${displayName}`}
           onClick={handleClick}
         >
-          <Icon name='Send' className='h-3.5 w-3.5' aria-hidden />
+          {/* size=xs owns [&_svg] 12px — dense TableIconButton already did. */}
+          <Icon name='Send' aria-hidden />
         </IconButton>
       </SimpleTooltip>
     </div>

@@ -109,10 +109,11 @@ export const ReleaseCell = memo(function ReleaseCell({
             }
             aria-pressed={isPlaying}
           >
+            {/* xs owns 12px [&_svg]; prior 10px (h-2.5) is non-contract — no new size. */}
             {isPlaying ? (
-              <Pause className='h-2.5 w-2.5 text-(--color-accent-purple-text)' />
+              <Pause className='text-(--color-accent-purple-text)' />
             ) : (
-              <Play className='h-2.5 w-2.5 text-quaternary-token' />
+              <Play className='text-quaternary-token' />
             )}
           </IconButton>
         )}
