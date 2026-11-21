@@ -82,6 +82,7 @@ jobs:
           sparse-checkout: |
             docs/design-system/pen-briefs
             scripts/design/pen-draft.mjs
+            scripts/design/pen-draft-annotation.mjs
             scripts/design/pen-trim.mjs
             .github/workflows/pen-draft.yml
           sparse-checkout-cone-mode: false
