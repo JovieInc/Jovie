@@ -83,8 +83,7 @@ function CatalogStatusIcon({
   if (isScanning)
     return <Loader2 className='h-3.5 w-3.5 animate-spin text-primary' />;
   if (scanFailed) return <XCircle className='h-3.5 w-3.5 text-destructive' />;
-  if (allClear)
-    return <CheckCircle2 className='h-3.5 w-3.5 text-success-text' />;
+  if (allClear) return <CheckCircle2 className='size-3.5 text-success-text' />;
   if (hasResults)
     return <AlertTriangle className='h-3.5 w-3.5 text-warning-text' />;
   return <ScanSearch className='h-3.5 w-3.5 text-muted-foreground' />;
