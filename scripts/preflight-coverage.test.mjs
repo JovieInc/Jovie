@@ -140,7 +140,6 @@ function fixture({ answer = 42, uncovered = false } = {}) {
 
 test('JOV-9722: a live shared coverage owner cannot block or lose evidence to another preflight', {
   skip: process.platform === 'win32',
-  timeout: 45000,
 }, async () => {
   const f = fixture();
   const holder = spawn(
