@@ -253,8 +253,11 @@ describe('Golden Path UI & UX closed-loop invariants', () => {
       /type=['"]hidden['"][\s\S]{0,120}?name=['"]starter_prompt['"][\s\S]{0,120}?value=\{CLAIM_PROFILE_STARTER_PROMPT\}/
     );
     // JOV-10127: reject display-name handle= on the native close form.
+    // Hyphen must be escaped (`\\-`) so unicodeSets(v) HTML pattern compiles.
+    // Pattern must be a JS expression (`pattern={...}`) — JSX string attrs
+    // keep `\\` as two literal backslashes and still fail under `v`.
     expect(editorialSource).toMatch(
-      /pattern=['"]\[A-Za-z0-9\._-\]\{3,30\}['"]/
+      /pattern=\{\s*['"]\[A-Za-z0-9\._\\\\-\]\{3,30\}['"]\s*\}/
     );
   });
 

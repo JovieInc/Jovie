@@ -138,13 +138,22 @@ describe('HomepageEditorial chapters', () => {
       'action',
       claim.href
     );
-    // JOV-10127: native pattern rejects display-name handle= (Taylor Swift).
-    expect(
-      within(section).getByRole('textbox', { name: 'Your handle' })
-    ).toHaveAttribute('pattern', '[A-Za-z0-9._-]{3,30}');
-    expect(
-      within(section).getByRole('textbox', { name: 'Your handle' })
-    ).toHaveAttribute('placeholder', COPY.claim.handlePlaceholder);
+    // JOV-10127: native pattern rejects display-name handle= (Taylor Swift)
+    // and must compile under unicodeSets(v) (Seer: unescaped `-` fails).
+    const handleInput = within(section).getByRole('textbox', {
+      name: 'Your handle',
+    });
+    const pattern = handleInput.getAttribute('pattern');
+    expect(pattern).toBe('[A-Za-z0-9._\\-]{3,30}');
+    expect(() => new RegExp(`^(?:${pattern})$`, 'v')).not.toThrow();
+    const handlePattern = new RegExp(`^(?:${pattern})$`, 'v');
+    expect(handlePattern.test('lunaharbor')).toBe(true);
+    expect(handlePattern.test('a-b')).toBe(true);
+    expect(handlePattern.test('Taylor Swift')).toBe(false);
+    expect(handleInput).toHaveAttribute(
+      'placeholder',
+      COPY.claim.handlePlaceholder
+    );
     expect(
       within(section).queryByTestId('waitlist-role-form')
     ).not.toBeInTheDocument();

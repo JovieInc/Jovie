@@ -362,7 +362,11 @@ function ClaimCloseBody() {
               maxLength={30}
               placeholder={claim.handlePlaceholder}
               aria-label={claim.handleLabel}
-              pattern='[A-Za-z0-9._-]{3,30}'
+              // Escape hyphen for HTML pattern unicodeSets(v) mode — unescaped
+              // `-` fails compilation and browsers drop the constraint (Seer).
+              // Use a JS expression: JSX string attributes keep `\\` as two
+              // literal backslashes, which then fails under `v` as well.
+              pattern={'[A-Za-z0-9._\\-]{3,30}'}
             />
             <Button type='submit' data-testid='homepage-close-cta'>
               {intent.label}
