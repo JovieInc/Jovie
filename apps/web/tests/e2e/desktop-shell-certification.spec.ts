@@ -111,13 +111,14 @@ test('OV shell expanded at 1512 certifies rail, nav rows, and screenshot', async
   ).toBeLessThanOrEqual(1);
   expect(railBox?.width ?? 0).toBeLessThanOrEqual(EXPANDED_SIDEBAR_MAX);
 
-  const links = nav.locator('a');
+  // Collapsible groups (e.g. Company) stay closed by default; only certify
+  // links that are actually painted in the expanded rail.
+  const links = nav.locator('a:visible');
   const linkCount = await links.count();
   expect(linkCount).toBeGreaterThan(0);
 
   for (let i = 0; i < linkCount; i += 1) {
     const link = links.nth(i);
-    await expect(link).toBeVisible();
     const box = await link.boundingBox();
     expect(box).not.toBeNull();
     expect(
@@ -129,7 +130,7 @@ test('OV shell expanded at 1512 certifies rail, nav rows, and screenshot', async
 
   await expect(nav.getByText('Company', { exact: true })).toBeVisible();
   await expect(nav.getByText('Tools', { exact: true })).toBeVisible();
-  await expect(nav.locator('[aria-current="page"]')).toHaveCount(1);
+  await expect(nav.locator('[aria-current="page"]:visible')).toHaveCount(1);
 
   const table = page.locator('table[data-table-row-mode]').first();
   await expect(table).toBeVisible({ timeout: 30_000 });
