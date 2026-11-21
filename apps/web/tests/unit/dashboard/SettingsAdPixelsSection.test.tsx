@@ -1,14 +1,14 @@
-import { fireEvent, waitFor, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SettingsAdPixelsSection } from "@/features/dashboard/organisms/SettingsAdPixelsSection";
-import { fastRender } from "@/tests/utils/fast-render";
+import { fireEvent, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { SettingsAdPixelsSection } from '@/features/dashboard/organisms/SettingsAdPixelsSection';
+import { fastRender } from '@/tests/utils/fast-render';
 
 // Mock @jovie/ui with lightweight stubs instead of vi.importActual (which OOMs)
-vi.mock("@jovie/ui", () => ({
+vi.mock('@jovie/ui', () => ({
   Switch: ({ checked }: { checked: boolean }) => (
-    <button type="button" aria-label="Enable pixel tracking">
-      {checked ? "on" : "off"}
+    <button type='button' aria-label='Enable pixel tracking'>
+      {checked ? 'on' : 'off'}
     </button>
   ),
   Card: ({
@@ -18,7 +18,7 @@ vi.mock("@jovie/ui", () => ({
     children: React.ReactNode;
     className?: string;
   }) => (
-    <div data-testid="card" className={className}>
+    <div data-testid='card' className={className}>
       {children}
     </div>
   ),
@@ -45,7 +45,7 @@ vi.mock("@jovie/ui", () => ({
     children: React.ReactNode;
     loading?: boolean;
   }) => (
-    <button type="button" {...props}>
+    <button type='button' {...props}>
       {children}
     </button>
   ),
@@ -54,8 +54,8 @@ vi.mock("@jovie/ui", () => ({
     // biome-ignore lint/a11y/noLabelWithoutControl: test mock
     <label>{children}</label>
   ),
-  Skeleton: () => <div data-testid="skeleton" />,
-  cn: (...args: unknown[]) => args.filter(Boolean).join(" "),
+  Skeleton: () => <div data-testid='skeleton' />,
+  cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 
 const {
@@ -67,8 +67,8 @@ const {
 } = vi.hoisted(() => {
   const mockPixelSettings = {
     pixels: {
-      facebookPixelId: "1234567890123456",
-      googleMeasurementId: "G-ABCD1234EF",
+      facebookPixelId: '1234567890123456',
+      googleMeasurementId: 'G-ABCD1234EF',
       tiktokPixelId: null,
       enabled: true,
       facebookEnabled: true,
@@ -96,7 +96,7 @@ const {
         platforms: Record<
           string,
           {
-            status: "healthy" | "degraded" | "unhealthy" | "inactive";
+            status: 'healthy' | 'degraded' | 'unhealthy' | 'inactive';
             totalSent: number;
             totalFailed: number;
             lastSuccessAt: string | null;
@@ -124,8 +124,8 @@ const { SettingsToggleRowMock } = vi.hoisted(() => ({
     onCheckedChange?: (checked: boolean) => void;
   }) => (
     <button
-      type="button"
-      data-testid="shared-settings-toggle"
+      type='button'
+      data-testid='shared-settings-toggle'
       aria-label={title}
       onClick={() => onCheckedChange?.(!checked)}
     >
@@ -134,11 +134,11 @@ const { SettingsToggleRowMock } = vi.hoisted(() => ({
   ),
 }));
 
-vi.mock("@/features/dashboard/molecules/SettingsToggleRow", () => ({
+vi.mock('@/features/dashboard/molecules/SettingsToggleRow', () => ({
   SettingsToggleRow: SettingsToggleRowMock,
 }));
 
-vi.mock("@/lib/queries", () => ({
+vi.mock('@/lib/queries', () => ({
   usePixelSettingsMutation: () => ({
     mutateAsync: savePixels,
     isPending: false,
@@ -155,12 +155,12 @@ vi.mock("@/lib/queries", () => ({
   }),
 }));
 
-describe("SettingsAdPixelsSection", () => {
+describe('SettingsAdPixelsSection', () => {
   beforeEach(() => {
     pixelQueryState.data = {
       pixels: {
-        facebookPixelId: "1234567890123456",
-        googleMeasurementId: "G-ABCD1234EF",
+        facebookPixelId: '1234567890123456',
+        googleMeasurementId: 'G-ABCD1234EF',
         tiktokPixelId: null,
         enabled: true,
         facebookEnabled: true,
@@ -181,133 +181,133 @@ describe("SettingsAdPixelsSection", () => {
     vi.unstubAllGlobals();
   });
 
-  it("groups each provider and its status within the shared settings surface", () => {
+  it('groups each provider and its status within the shared settings surface', () => {
     const { getByRole, getByText, getAllByText } = fastRender(
-      <SettingsAdPixelsSection isPro />,
+      <SettingsAdPixelsSection isPro />
     );
 
     expect(
-      getByText("Configure each retargeting destination independently."),
+      getByText('Configure each retargeting destination independently.')
     ).toBeDefined();
 
-    expect(getByText("Facebook Conversions API")).toBeDefined();
+    expect(getByText('Facebook Conversions API')).toBeDefined();
     expect(
-      getByText("Google Analytics 4 (Measurement Protocol)"),
+      getByText('Google Analytics 4 (Measurement Protocol)')
     ).toBeDefined();
-    expect(getByText("TikTok Events API")).toBeDefined();
+    expect(getByText('TikTok Events API')).toBeDefined();
 
-    expect(getAllByText("Configured")).toHaveLength(2);
-    expect(getAllByText("Not configured")).toHaveLength(1);
+    expect(getAllByText('Configured')).toHaveLength(2);
+    expect(getAllByText('Not configured')).toHaveLength(1);
 
     for (const name of [
-      "Facebook Conversions API",
-      "Google Analytics 4 (Measurement Protocol)",
-      "TikTok Events API",
+      'Facebook Conversions API',
+      'Google Analytics 4 (Measurement Protocol)',
+      'TikTok Events API',
     ]) {
-      const group = getByRole("group", { name });
-      expect(within(group).getByRole("heading", { name })).toBeVisible();
+      const group = getByRole('group', { name });
+      expect(within(group).getByRole('heading', { name })).toBeVisible();
       expect(
-        within(group).getByRole("link", { name: "Get credentials" }),
+        within(group).getByRole('link', { name: 'Get credentials' })
       ).toBeVisible();
     }
-    const facebook = getByRole("group", { name: "Facebook Conversions API" });
-    expect(within(facebook).getByLabelText("Pixel ID")).toHaveValue(
-      "1234567890123456",
+    const facebook = getByRole('group', { name: 'Facebook Conversions API' });
+    expect(within(facebook).getByLabelText('Pixel ID')).toHaveValue(
+      '1234567890123456'
     );
-    expect(within(facebook).getByText("Configured")).toBeVisible();
+    expect(within(facebook).getByText('Configured')).toBeVisible();
     expect(
-      within(facebook).getByRole("button", { name: "Test" }),
+      within(facebook).getByRole('button', { name: 'Test' })
     ).toBeEnabled();
-    const tiktok = getByRole("group", { name: "TikTok Events API" });
-    expect(within(tiktok).getByText("Not configured")).toBeVisible();
+    const tiktok = getByRole('group', { name: 'TikTok Events API' });
+    expect(within(tiktok).getByText('Not configured')).toBeVisible();
     expect(
-      within(tiktok).queryByRole("button", { name: "Test" }),
+      within(tiktok).queryByRole('button', { name: 'Test' })
     ).not.toBeInTheDocument();
   });
 
-  it("names token visibility by provider and preserves input and focus when toggled", async () => {
+  it('names token visibility by provider and preserves input and focus when toggled', async () => {
     const user = userEvent.setup();
     const view = fastRender(<SettingsAdPixelsSection isPro />);
     const facebook = within(
-      view.getByRole("group", { name: "Facebook Conversions API" }),
+      view.getByRole('group', { name: 'Facebook Conversions API' })
     );
-    const token = facebook.getByLabelText("Access Token");
+    const token = facebook.getByLabelText('Access Token');
     await user.clear(token);
-    await user.type(token, "test-only-token");
-    const show = facebook.getByRole("button", {
-      name: "Show Facebook Conversions API access token",
+    await user.type(token, 'test-only-token');
+    const show = facebook.getByRole('button', {
+      name: 'Show Facebook Conversions API access token',
     });
     await user.click(show);
-    expect(token).toHaveAttribute("type", "text");
-    expect(token).toHaveValue("test-only-token");
-    const hide = facebook.getByRole("button", {
-      name: "Hide Facebook Conversions API access token",
+    expect(token).toHaveAttribute('type', 'text');
+    expect(token).toHaveValue('test-only-token');
+    const hide = facebook.getByRole('button', {
+      name: 'Hide Facebook Conversions API access token',
     });
     expect(hide).toHaveFocus();
-    expect(hide).toHaveAttribute("aria-pressed", "true");
-    await user.keyboard("{Enter}");
-    expect(token).toHaveAttribute("type", "password");
-    expect(token).toHaveValue("test-only-token");
+    expect(hide).toHaveAttribute('aria-pressed', 'true');
+    await user.keyboard('{Enter}');
+    expect(token).toHaveAttribute('type', 'password');
+    expect(token).toHaveValue('test-only-token');
     expect(
-      facebook.getByRole("button", {
-        name: "Show Facebook Conversions API access token",
-      }),
+      facebook.getByRole('button', {
+        name: 'Show Facebook Conversions API access token',
+      })
     ).toHaveFocus();
     expect(savePixels).not.toHaveBeenCalled();
   });
 
-  it("calls usePixelSettingsQuery hook on render", () => {
+  it('calls usePixelSettingsQuery hook on render', () => {
     fastRender(<SettingsAdPixelsSection isPro />);
 
     expect(usePixelSettingsQueryMock).toHaveBeenCalled();
   });
 
-  it("uses the shared settings toggle row for the pixel enable control", () => {
+  it('uses the shared settings toggle row for the pixel enable control', () => {
     const { getByTestId } = fastRender(<SettingsAdPixelsSection isPro />);
 
-    expect(getByTestId("shared-settings-toggle")).toHaveTextContent(
-      "Enable pixel tracking",
+    expect(getByTestId('shared-settings-toggle')).toHaveTextContent(
+      'Enable pixel tracking'
     );
   });
 
-  it("saves edited pixels without resending token placeholders, then resets from refreshed data", async () => {
+  it('saves edited pixels without resending token placeholders, then resets from refreshed data', async () => {
     let resolveSave!: () => void;
     savePixels.mockReturnValue(
-      new Promise<void>((resolve) => {
+      new Promise<void>(resolve => {
         resolveSave = resolve;
-      }),
+      })
     );
     const view = fastRender(<SettingsAdPixelsSection isPro />);
 
-    fireEvent.change(view.getByLabelText("Pixel ID"), {
-      target: { value: "9999999999999999" },
+    fireEvent.change(view.getByLabelText('Pixel ID'), {
+      target: { value: '9999999999999999' },
     });
     fireEvent.click(
-      view.getByRole("button", { name: "Enable pixel tracking" }),
+      view.getByRole('button', { name: 'Enable pixel tracking' })
     );
-    fireEvent.click(view.getByRole("button", { name: "Save Pixel Settings" }));
+    fireEvent.click(view.getByRole('button', { name: 'Save Pixel Settings' }));
 
     expect(savePixels).toHaveBeenCalledWith({
-      facebookPixelId: "9999999999999999",
-      facebookAccessToken: "",
-      googleMeasurementId: "G-ABCD1234EF",
-      googleApiSecret: "",
-      tiktokPixelId: "",
-      tiktokAccessToken: "",
+      facebookPixelId: '9999999999999999',
+      facebookAccessToken: '',
+      googleMeasurementId: 'G-ABCD1234EF',
+      googleApiSecret: '',
+      tiktokPixelId: '',
+      tiktokAccessToken: '',
       enabled: false,
     });
-    expect(view.getByText("Saving…")).toHaveAttribute("data-state", "saving");
+    expect(view.getByText('Saving…')).toHaveAttribute('data-state', 'saving');
 
     resolveSave();
     await waitFor(() => {
-      expect(view.getByText("Saved")).toHaveAttribute("data-state", "saved");
+      expect(view.getByText('Saved')).toHaveAttribute('data-state', 'saved');
     });
 
     pixelQueryState.data = {
       ...pixelQueryState.data,
       pixels: {
         ...pixelQueryState.data.pixels,
-        facebookPixelId: "9999999999999999",
+        facebookPixelId: '9999999999999999',
         enabled: false,
       },
     };
@@ -315,110 +315,110 @@ describe("SettingsAdPixelsSection", () => {
 
     await waitFor(() => {
       expect(
-        view.getByRole("button", { name: "Save Pixel Settings" }),
+        view.getByRole('button', { name: 'Save Pixel Settings' })
       ).toBeDisabled();
     });
   });
 
-  it("keeps edited pixel state retryable after save rejection", async () => {
-    savePixels.mockRejectedValueOnce(new Error("network down"));
+  it('keeps edited pixel state retryable after save rejection', async () => {
+    savePixels.mockRejectedValueOnce(new Error('network down'));
     const view = fastRender(<SettingsAdPixelsSection isPro />);
 
-    fireEvent.change(view.getByLabelText("Measurement ID"), {
-      target: { value: "G-RETRY1234" },
+    fireEvent.change(view.getByLabelText('Measurement ID'), {
+      target: { value: 'G-RETRY1234' },
     });
-    fireEvent.click(view.getByRole("button", { name: "Save Pixel Settings" }));
+    fireEvent.click(view.getByRole('button', { name: 'Save Pixel Settings' }));
 
     await waitFor(() => {
-      expect(view.getByText("Failed to save. Try again.")).toHaveAttribute(
-        "data-state",
-        "error",
+      expect(view.getByText('Failed to save. Try again.')).toHaveAttribute(
+        'data-state',
+        'error'
       );
     });
     expect(savePixels).toHaveBeenCalledWith(
       expect.objectContaining({
-        googleMeasurementId: "G-RETRY1234",
-        googleApiSecret: "",
-      }),
+        googleMeasurementId: 'G-RETRY1234',
+        googleApiSecret: '',
+      })
     );
     expect(
-      view.getByRole("button", { name: "Save Pixel Settings" }),
+      view.getByRole('button', { name: 'Save Pixel Settings' })
     ).toBeEnabled();
   });
 
-  it("keeps the pixel loading state in the same settings panel anatomy", () => {
+  it('keeps the pixel loading state in the same settings panel anatomy', () => {
     pixelQueryState.isLoading = true;
     const { getByRole } = fastRender(<SettingsAdPixelsSection isPro />);
 
-    const panelRoot = getByRole("heading", {
-      name: "Pixel tracking",
-    }).closest(".space-y-2");
+    const panelRoot = getByRole('heading', {
+      name: 'Pixel tracking',
+    }).closest('.space-y-2');
     expect(panelRoot).not.toBeNull();
 
     const bodyWrapper = panelRoot?.querySelector(
-      ':scope > [data-testid="card"] > div > .px-4.py-4',
+      ':scope > [data-testid="card"] > div > .px-4.py-4'
     );
-    expect(bodyWrapper).toHaveClass("px-4", "py-4", "sm:px-5");
+    expect(bodyWrapper).toHaveClass('px-4', 'py-4', 'sm:px-5');
   });
 
-  it("keeps pixel load failures recoverable", () => {
+  it('keeps pixel load failures recoverable', () => {
     pixelQueryState.isError = true;
     const { getByRole, getByText } = fastRender(
-      <SettingsAdPixelsSection isPro />,
+      <SettingsAdPixelsSection isPro />
     );
 
-    expect(getByText("Failed to load pixel settings.")).toBeDefined();
-    getByRole("button", { name: "Try Again" }).click();
+    expect(getByText('Failed to load pixel settings.')).toBeDefined();
+    getByRole('button', { name: 'Try Again' }).click();
     expect(refetch).toHaveBeenCalledOnce();
   });
 
-  it("announces successful test events as a live status", async () => {
+  it('announces successful test events as a live status', async () => {
     vi.stubGlobal(
-      "fetch",
+      'fetch',
       vi.fn().mockResolvedValue({
         json: vi.fn().mockResolvedValue({ success: true }),
-      }),
+      })
     );
     const { findByRole, getAllByRole } = fastRender(
-      <SettingsAdPixelsSection isPro />,
+      <SettingsAdPixelsSection isPro />
     );
 
-    getAllByRole("button", { name: "Test" })[0]?.click();
+    getAllByRole('button', { name: 'Test' })[0]?.click();
 
-    const status = await findByRole("status");
-    expect(status).toHaveTextContent("Event received");
-    expect(status.className).toContain("text-success-text");
+    const status = await findByRole('status');
+    expect(status).toHaveTextContent('Event received');
+    expect(status.className).toContain('text-success-text');
   });
 
-  it("announces failed test events as alerts", async () => {
+  it('announces failed test events as alerts', async () => {
     vi.stubGlobal(
-      "fetch",
+      'fetch',
       vi.fn().mockResolvedValue({
         json: vi.fn().mockResolvedValue({
           success: false,
-          error: "Pixel credentials rejected",
+          error: 'Pixel credentials rejected',
         }),
-      }),
+      })
     );
     const { findByRole, getAllByRole } = fastRender(
-      <SettingsAdPixelsSection isPro />,
+      <SettingsAdPixelsSection isPro />
     );
 
-    getAllByRole("button", { name: "Test" })[0]?.click();
+    getAllByRole('button', { name: 'Test' })[0]?.click();
 
-    const alert = await findByRole("alert");
-    expect(alert).toHaveTextContent("Pixel credentials rejected");
+    const alert = await findByRole('alert');
+    expect(alert).toHaveTextContent('Pixel credentials rejected');
 
     // JOV-6773: the test-event failure renders on the error token, not raw red-*.
-    expect(alert.className).toContain("text-error");
+    expect(alert.className).toContain('text-error');
     expect(alert.className).not.toMatch(/\bred-\d/);
   });
 
-  it("renders an unhealthy platform indicator with the error token, not raw red-* (JOV-6773)", () => {
+  it('renders an unhealthy platform indicator with the error token, not raw red-* (JOV-6773)', () => {
     pixelHealthState.data = {
       platforms: {
         facebook: {
-          status: "unhealthy",
+          status: 'unhealthy',
           totalSent: 12,
           totalFailed: 9,
           lastSuccessAt: null,
@@ -429,13 +429,13 @@ describe("SettingsAdPixelsSection", () => {
 
     const { getByText } = fastRender(<SettingsAdPixelsSection isPro />);
 
-    const indicator = getByText("Check Credentials");
-    expect(indicator.className).toContain("text-error");
+    const indicator = getByText('Check Credentials');
+    expect(indicator.className).toContain('text-error');
     expect(indicator.className).not.toMatch(/\bred-\d/);
   });
 
-  it("colors healthy and degraded platform indicators with status text tokens", () => {
-    const platform = (status: "healthy" | "degraded") => ({
+  it('colors healthy and degraded platform indicators with status text tokens', () => {
+    const platform = (status: 'healthy' | 'degraded') => ({
       status,
       totalSent: 10,
       totalFailed: 0,
@@ -443,15 +443,15 @@ describe("SettingsAdPixelsSection", () => {
     });
     pixelHealthState.data = {
       platforms: {
-        facebook: platform("healthy"),
-        google: platform("degraded"),
+        facebook: platform('healthy'),
+        google: platform('degraded'),
       },
       aggregate: { totalEventsThisWeek: 0, overallSuccessRate: 1 },
     };
 
     const { getByText } = fastRender(<SettingsAdPixelsSection isPro />);
 
-    expect(getByText("Healthy").className).toContain("text-success-text");
-    expect(getByText("Degraded").className).toContain("text-warning-text");
+    expect(getByText('Healthy').className).toContain('text-success-text');
+    expect(getByText('Degraded').className).toContain('text-warning-text');
   });
 });

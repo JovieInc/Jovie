@@ -1,13 +1,13 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CatalogHealthSection } from "@/features/dashboard/organisms/dsp-presence/CatalogHealthSection";
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CatalogHealthSection } from '@/features/dashboard/organisms/dsp-presence/CatalogHealthSection';
 
 const { mockRefresh } = vi.hoisted(() => ({
   mockRefresh: vi.fn(),
 }));
 
-vi.mock("next/navigation", () => ({
+vi.mock('next/navigation', () => ({
   useRouter: () => ({
     refresh: mockRefresh,
   }),
@@ -16,66 +16,66 @@ vi.mock("next/navigation", () => ({
 let mockFetch: ReturnType<typeof vi.fn>;
 
 const baseScan = {
-  id: "scan-1",
-  creatorProfileId: "profile-1",
-  providerId: "spotify",
-  externalArtistId: "spotify-artist-1",
-  status: "completed",
+  id: 'scan-1',
+  creatorProfileId: 'profile-1',
+  providerId: 'spotify',
+  externalArtistId: 'spotify-artist-1',
+  status: 'completed',
   catalogIsrcCount: 50,
   dspIsrcCount: 55,
   matchedCount: 47,
   unmatchedCount: 5,
   missingCount: 3,
-  coveragePct: "94.00",
+  coveragePct: '94.00',
   albumsScanned: 10,
   tracksScanned: 55,
   error: null,
-  startedAt: "2026-04-04T10:00:00Z",
-  completedAt: "2026-04-04T10:00:30Z",
-  createdAt: "2026-04-04T10:00:00Z",
+  startedAt: '2026-04-04T10:00:00Z',
+  completedAt: '2026-04-04T10:00:30Z',
+  createdAt: '2026-04-04T10:00:00Z',
 };
 
 const baseMismatch = {
-  id: "mismatch-1",
-  scanId: "scan-1",
-  creatorProfileId: "profile-1",
-  isrc: "USRC12345678",
-  mismatchType: "not_in_catalog" as const,
-  externalTrackId: "track-1",
-  externalTrackName: "Bad Love",
-  externalAlbumName: "Country Roads",
-  externalAlbumId: "album-1",
+  id: 'mismatch-1',
+  scanId: 'scan-1',
+  creatorProfileId: 'profile-1',
+  isrc: 'USRC12345678',
+  mismatchType: 'not_in_catalog' as const,
+  externalTrackId: 'track-1',
+  externalTrackName: 'Bad Love',
+  externalAlbumName: 'Country Roads',
+  externalAlbumId: 'album-1',
   externalArtworkUrl: null,
-  externalArtistNames: "Some Artist",
-  status: "flagged" as const,
+  externalArtistNames: 'Some Artist',
+  status: 'flagged' as const,
   dismissedAt: null,
   dismissedReason: null,
-  dedupKey: "profile-1:USRC12345678:spotify",
-  createdAt: "2026-04-04T10:00:00Z",
-  updatedAt: "2026-04-04T10:00:00Z",
+  dedupKey: 'profile-1:USRC12345678:spotify',
+  createdAt: '2026-04-04T10:00:00Z',
+  updatedAt: '2026-04-04T10:00:00Z',
 };
 
-describe("CatalogHealthSection", () => {
-  it("keeps legacy inventory misses visible as unverified and does not claim all clear", async () => {
+describe('CatalogHealthSection', () => {
+  it('keeps legacy inventory misses visible as unverified and does not claim all clear', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         scan: baseScan,
-        mismatches: [{ ...baseMismatch, mismatchType: "missing_from_dsp" }],
+        mismatches: [{ ...baseMismatch, mismatchType: 'missing_from_dsp' }],
       }),
     });
     render(
       <CatalogHealthSection
-        profileId="profile-1"
-        spotifyId="spotify-1"
+        profileId='profile-1'
+        spotifyId='spotify-1'
         hasUnresolvedMismatches={true}
-      />,
+      />
     );
     expect(
-      await screen.findByText(/Spotify availability is unverified/),
+      await screen.findByText(/Spotify availability is unverified/)
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Catalog Health — 1 to review"),
+      screen.getByText('Catalog Health — 1 to review')
     ).toBeInTheDocument();
     expect(screen.queryByText(/All clear/)).not.toBeInTheDocument();
     expect(screen.queryByText(/on Spotify yet/)).not.toBeInTheDocument();
@@ -83,20 +83,20 @@ describe("CatalogHealthSection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch = vi.fn();
-    vi.spyOn(globalThis, "fetch").mockImplementation(mockFetch);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(mockFetch);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("returns null when no spotifyId", () => {
+  it('returns null when no spotifyId', () => {
     const { container } = render(
       <CatalogHealthSection
-        profileId="profile-1"
+        profileId='profile-1'
         spotifyId={null}
         hasUnresolvedMismatches={false}
-      />,
+      />
     );
     expect(container.firstChild).toBeNull();
   });
@@ -109,16 +109,16 @@ describe("CatalogHealthSection", () => {
 
     render(
       <CatalogHealthSection
-        profileId="profile-1"
-        spotifyId="spotify-1"
+        profileId='profile-1'
+        spotifyId='spotify-1'
         hasUnresolvedMismatches={false}
-      />,
+      />
     );
 
-    expect(screen.getByText("Catalog Health")).toBeInTheDocument();
+    expect(screen.getByText('Catalog Health')).toBeInTheDocument();
   });
 
-  it("auto-expands when hasUnresolvedMismatches is true", async () => {
+  it('auto-expands when hasUnresolvedMismatches is true', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () =>
@@ -130,15 +130,15 @@ describe("CatalogHealthSection", () => {
 
     render(
       <CatalogHealthSection
-        profileId="profile-1"
-        spotifyId="spotify-1"
+        profileId='profile-1'
+        spotifyId='spotify-1'
         hasUnresolvedMismatches={true}
-      />,
+      />
     );
 
     // Section should auto-expand and show loading, then cards
     await waitFor(() => {
-      expect(screen.getByText("Bad Love")).toBeInTheDocument();
+      expect(screen.getByText('Bad Love')).toBeInTheDocument();
     });
   });
 
@@ -151,17 +151,17 @@ describe("CatalogHealthSection", () => {
     const user = userEvent.setup();
     render(
       <CatalogHealthSection
-        profileId="profile-1"
-        spotifyId="spotify-1"
+        profileId='profile-1'
+        spotifyId='spotify-1'
         hasUnresolvedMismatches={false}
-      />,
+      />
     );
 
     // Click to open
-    await user.click(screen.getByText("Catalog Health"));
+    await user.click(screen.getByText('Catalog Health'));
 
     await waitFor(() => {
-      expect(screen.getByText("Scan Catalog")).toBeInTheDocument();
+      expect(screen.getByText('Scan Catalog')).toBeInTheDocument();
     });
   });
 
@@ -178,30 +178,30 @@ describe("CatalogHealthSection", () => {
     const user = userEvent.setup();
     render(
       <CatalogHealthSection
-        profileId="profile-1"
-        spotifyId="spotify-1"
+        profileId='profile-1'
+        spotifyId='spotify-1'
         hasUnresolvedMismatches={false}
-      />,
+      />
     );
 
     // Header should show "All clear" after load
     // Need to open section first
-    await user.click(screen.getByRole("button", { expanded: false }));
+    await user.click(screen.getByRole('button', { expanded: false }));
 
     await waitFor(() => {
       expect(screen.getByText(/94\.00% coverage/)).toBeInTheDocument();
     });
   });
 
-  it("shows mismatch cards for not_in_catalog items", async () => {
+  it('shows mismatch cards for not_in_catalog items', async () => {
     const mismatches = [
       baseMismatch,
       {
         ...baseMismatch,
-        id: "mismatch-2",
-        externalTrackName: "Another Song",
-        dedupKey: "profile-1:USRC99999999:spotify",
-        isrc: "USRC99999999",
+        id: 'mismatch-2',
+        externalTrackName: 'Another Song',
+        dedupKey: 'profile-1:USRC99999999:spotify',
+        isrc: 'USRC99999999',
       },
     ];
 
@@ -216,28 +216,28 @@ describe("CatalogHealthSection", () => {
 
     render(
       <CatalogHealthSection
-        profileId="profile-1"
-        spotifyId="spotify-1"
+        profileId='profile-1'
+        spotifyId='spotify-1'
         hasUnresolvedMismatches={true}
-      />,
+      />
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Bad Love")).toBeInTheDocument();
-      expect(screen.getByText("Another Song")).toBeInTheDocument();
+      expect(screen.getByText('Bad Love')).toBeInTheDocument();
+      expect(screen.getByText('Another Song')).toBeInTheDocument();
     });
   });
 
-  it("shows info row for missing_from_dsp items separately", async () => {
+  it('shows info row for missing_from_dsp items separately', async () => {
     const mismatches = [
       baseMismatch,
       {
         ...baseMismatch,
-        id: "mismatch-missing",
-        mismatchType: "missing_from_dsp" as const,
-        externalTrackName: "My Missing Track",
-        dedupKey: "profile-1:USRC11111111:spotify",
-        isrc: "USRC11111111",
+        id: 'mismatch-missing',
+        mismatchType: 'missing_from_dsp' as const,
+        externalTrackName: 'My Missing Track',
+        dedupKey: 'profile-1:USRC11111111:spotify',
+        isrc: 'USRC11111111',
       },
     ];
 
@@ -252,23 +252,23 @@ describe("CatalogHealthSection", () => {
 
     render(
       <CatalogHealthSection
-        profileId="profile-1"
-        spotifyId="spotify-1"
+        profileId='profile-1'
+        spotifyId='spotify-1'
         hasUnresolvedMismatches={true}
-      />,
+      />
     );
 
     await waitFor(() => {
       // The not_in_catalog one shows as a card
-      expect(screen.getByText("Bad Love")).toBeInTheDocument();
+      expect(screen.getByText('Bad Love')).toBeInTheDocument();
       // The missing_from_dsp one shows as info text, not a card
       expect(
-        screen.getByText(/1 track in your catalog was not observed/),
+        screen.getByText(/1 track in your catalog was not observed/)
       ).toBeInTheDocument();
     });
   });
 
-  it("shows post-triage summary with Spotify link after resolving all cards", async () => {
+  it('shows post-triage summary with Spotify link after resolving all cards', async () => {
     mockFetch
       // Initial load
       .mockResolvedValueOnce({
@@ -287,19 +287,19 @@ describe("CatalogHealthSection", () => {
 
     render(
       <CatalogHealthSection
-        profileId="profile-1"
-        spotifyId="spotify-1"
+        profileId='profile-1'
+        spotifyId='spotify-1'
         hasUnresolvedMismatches={true}
-      />,
+      />
     );
 
     // Wait for card to load
     await waitFor(() => {
-      expect(screen.getByText("Bad Love")).toBeInTheDocument();
+      expect(screen.getByText('Bad Love')).toBeInTheDocument();
     });
 
     // Click "Not Mine"
-    await user.click(screen.getByText("Not Mine"));
+    await user.click(screen.getByText('Not Mine'));
 
     // Advance past undo delay
     vi.advanceTimersByTime(3000);
@@ -307,8 +307,8 @@ describe("CatalogHealthSection", () => {
     // Wait for PATCH and removal
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
-        "/api/dsp/catalog-scan/mismatches/mismatch-1",
-        expect.objectContaining({ method: "PATCH" }),
+        '/api/dsp/catalog-scan/mismatches/mismatch-1',
+        expect.objectContaining({ method: 'PATCH' })
       );
     });
 
@@ -318,17 +318,17 @@ describe("CatalogHealthSection", () => {
     // Post-triage summary should appear
     await waitFor(() => {
       const note = screen.getByText(/You flagged 1 track as not yours/);
-      expect(note).toHaveClass("text-warning-text");
-      expect(note.parentElement).toHaveClass("bg-warning-subtle");
+      expect(note).toHaveClass('text-warning-text');
+      expect(note.parentElement).toHaveClass('bg-warning-subtle');
       expect(
-        screen.getByText("Report to Spotify for Artists →"),
+        screen.getByText('Report to Spotify for Artists →')
       ).toBeInTheDocument();
     });
 
     vi.useRealTimers();
   });
 
-  it("triggers scan when Scan Catalog button is clicked", async () => {
+  it('triggers scan when Scan Catalog button is clicked', async () => {
     // Initial load — no scan
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -338,16 +338,16 @@ describe("CatalogHealthSection", () => {
     const user = userEvent.setup();
     render(
       <CatalogHealthSection
-        profileId="profile-1"
-        spotifyId="spotify-1"
+        profileId='profile-1'
+        spotifyId='spotify-1'
         hasUnresolvedMismatches={false}
-      />,
+      />
     );
 
-    await user.click(screen.getByText("Catalog Health"));
+    await user.click(screen.getByText('Catalog Health'));
 
     await waitFor(() => {
-      expect(screen.getByText("Scan Catalog")).toBeInTheDocument();
+      expect(screen.getByText('Scan Catalog')).toBeInTheDocument();
     });
 
     // Mock the scan trigger response
@@ -356,53 +356,53 @@ describe("CatalogHealthSection", () => {
       json: () =>
         Promise.resolve({
           success: true,
-          scanId: "new-scan",
-          status: "pending",
+          scanId: 'new-scan',
+          status: 'pending',
         }),
     });
 
-    await user.click(screen.getByText("Scan Catalog"));
+    await user.click(screen.getByText('Scan Catalog'));
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
-        "/api/dsp/catalog-scan",
-        expect.objectContaining({ method: "POST" }),
+        '/api/dsp/catalog-scan',
+        expect.objectContaining({ method: 'POST' })
       );
     });
   });
 
-  it("backs off catalog scan polling after the initial fast window", async () => {
+  it('backs off catalog scan polling after the initial fast window', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
     mockFetch.mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
 
-      if (url.includes("/api/dsp/catalog-scan/results")) {
+      if (url.includes('/api/dsp/catalog-scan/results')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({ scan: null, mismatches: [] }),
         });
       }
 
-      if (url === "/api/dsp/catalog-scan") {
+      if (url === '/api/dsp/catalog-scan') {
         return Promise.resolve({
           ok: true,
           json: () =>
             Promise.resolve({
               success: true,
-              scanId: "new-scan",
-              status: "pending",
+              scanId: 'new-scan',
+              status: 'pending',
             }),
         });
       }
 
-      if (url.includes("/api/dsp/catalog-scan/status?scanId=new-scan")) {
+      if (url.includes('/api/dsp/catalog-scan/status?scanId=new-scan')) {
         return Promise.resolve({
           ok: true,
           json: () =>
             Promise.resolve({
-              scan: { status: "pending" },
+              scan: { status: 'pending' },
             }),
         });
       }
@@ -412,29 +412,29 @@ describe("CatalogHealthSection", () => {
 
     render(
       <CatalogHealthSection
-        profileId="profile-1"
-        spotifyId="spotify-1"
+        profileId='profile-1'
+        spotifyId='spotify-1'
         hasUnresolvedMismatches={false}
-      />,
+      />
     );
 
-    await user.click(screen.getByText("Catalog Health"));
+    await user.click(screen.getByText('Catalog Health'));
 
     await waitFor(() => {
-      expect(screen.getByText("Scan Catalog")).toBeInTheDocument();
+      expect(screen.getByText('Scan Catalog')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText("Scan Catalog"));
+    await user.click(screen.getByText('Scan Catalog'));
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
-        "/api/dsp/catalog-scan/status?scanId=new-scan",
+        '/api/dsp/catalog-scan/status?scanId=new-scan'
       );
     });
 
     const getStatusCallCount = () =>
       mockFetch.mock.calls.filter(([input]) =>
-        String(input).includes("/api/dsp/catalog-scan/status?scanId=new-scan"),
+        String(input).includes('/api/dsp/catalog-scan/status?scanId=new-scan')
       ).length;
 
     expect(getStatusCallCount()).toBe(1);
@@ -468,14 +468,14 @@ describe("CatalogHealthSection", () => {
   });
 });
 
-it("shows persisted unknown scan failure after reload and never revives all clear", async () => {
-  vi.spyOn(globalThis, "fetch").mockResolvedValue({
+it('shows persisted unknown scan failure after reload and never revives all clear', async () => {
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue({
     ok: true,
     json: async () => ({
       scan: {
         ...baseScan,
-        status: "failed",
-        error: "Spotify availability remains unknown",
+        status: 'failed',
+        error: 'Spotify availability remains unknown',
       },
       mismatches: [],
     }),
@@ -483,23 +483,23 @@ it("shows persisted unknown scan failure after reload and never revives all clea
   try {
     render(
       <CatalogHealthSection
-        profileId="profile-1"
-        spotifyId="spotify-1"
+        profileId='profile-1'
+        spotifyId='spotify-1'
         hasUnresolvedMismatches={true}
-      />,
+      />
     );
     expect(
-      await screen.findByText("Spotify availability remains unknown"),
+      await screen.findByText('Spotify availability remains unknown')
     ).toBeInTheDocument();
-    expect(screen.getByText("Scan failed")).toBeInTheDocument();
+    expect(screen.getByText('Scan failed')).toBeInTheDocument();
     expect(screen.queryByText(/All clear/)).not.toBeInTheDocument();
   } finally {
     vi.restoreAllMocks();
   }
 });
 
-it("drops a cached all-clear and reloads when the artist connection changes", async () => {
-  const fetcher = vi.spyOn(globalThis, "fetch");
+it('drops a cached all-clear and reloads when the artist connection changes', async () => {
+  const fetcher = vi.spyOn(globalThis, 'fetch');
   fetcher.mockResolvedValueOnce({
     ok: true,
     json: async () => ({ scan: baseScan, mismatches: [] }),
@@ -511,21 +511,21 @@ it("drops a cached all-clear and reloads when the artist connection changes", as
   try {
     const view = render(
       <CatalogHealthSection
-        profileId="profile-1"
-        spotifyId="artist-A"
+        profileId='profile-1'
+        spotifyId='artist-A'
         hasUnresolvedMismatches={true}
-      />,
+      />
     );
     expect(await screen.findByText(/All clear/)).toBeInTheDocument();
     view.rerender(
       <CatalogHealthSection
-        profileId="profile-1"
-        spotifyId="artist-B"
+        profileId='profile-1'
+        spotifyId='artist-B'
         hasUnresolvedMismatches={true}
-      />,
+      />
     );
     expect(
-      await screen.findByRole("button", { name: "Scan Catalog" }),
+      await screen.findByRole('button', { name: 'Scan Catalog' })
     ).toBeInTheDocument();
     expect(screen.queryByText(/All clear/)).not.toBeInTheDocument();
     expect(fetcher).toHaveBeenCalledTimes(2);
