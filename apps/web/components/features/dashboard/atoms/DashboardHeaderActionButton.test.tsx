@@ -1,3 +1,4 @@
+// Drift T2.1: IconButton alias retirement — callsite migration coverage.
 import {
   ACTION_BUTTON_FACE_CLASSNAME,
   ACTION_BUTTON_PRESET,

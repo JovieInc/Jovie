@@ -356,6 +356,8 @@ describe('merged-with-base-invariants pool', () => {
         ],
       },
       {
+        // Force every entry to run (path-gate fail-closed).
+        changedFileList: null,
         execute: async command => {
           started.push(command);
           await new Promise(resolveDone => setTimeout(resolveDone, 5));
@@ -376,7 +378,9 @@ describe('merged-with-base-invariants pool', () => {
         { id: 'also-ok', command: 'node -e "process.exit(0)"' },
       ],
     };
-    const { code, output } = await runSourceGuardPool(spec);
+    const { code, output } = await runSourceGuardPool(spec, {
+      changedFileList: null,
+    });
     expect(code).toBe(4);
     // Run-all: the command after the failure still ran.
     expect(output).toContain('[merged-with-base] ok: exit 0;');

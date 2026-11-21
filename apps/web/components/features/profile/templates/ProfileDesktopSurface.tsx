@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Switch } from '@jovie/ui';
+import { Button, IconButton, Switch } from '@jovie/ui';
 import {
   BadgeCheck,
   CalendarDays,
@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
@@ -1033,9 +1032,9 @@ export function ProfileDesktopSurface({
                  pill nav never shifts between modes (the mode-history
                  contract); it is visibility-hidden, not unmounted, at the
                  profile root where there is nothing to go back to. */
-              <CircleIconButton
+              <IconButton
                 onClick={showBackChevron ? onBack : undefined}
-                size='lg'
+                size='xl'
                 variant='pearlQuiet'
                 aria-hidden={!showBackChevron}
                 className={cn(
@@ -1045,7 +1044,7 @@ export function ProfileDesktopSurface({
                 ariaLabel='Back'
               >
                 <ChevronLeft className='h-5 w-5' />
-              </CircleIconButton>
+              </IconButton>
             ) : null}
             <nav
               className='flex min-w-0 items-center gap-1 rounded-full bg-black/24 p-1 backdrop-blur-xl'

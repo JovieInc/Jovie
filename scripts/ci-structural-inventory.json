@@ -112,7 +112,7 @@
       "kind": "pr-cheap-scan"
     },
     {
-      "key": "node --test scripts/ci-release-trigger-contract.test.mjs .github/scripts/analyze-test-flakiness.test.js",
+      "key": "node --test scripts/ci-release-trigger-contract.test.mjs .github/scripts/analyze-test-flakiness.test.js .github/scripts/",
       "part": "operationsParts",
       "seconds": 0.8,
       "kind": "suite"

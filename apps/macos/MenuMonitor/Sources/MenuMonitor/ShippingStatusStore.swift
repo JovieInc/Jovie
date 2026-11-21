@@ -19,11 +19,15 @@ final class ShippingStatusStore: ObservableObject {
   private let dashboardURL = URL(string: "https://linear.app/jovie")!
   private let pollIntervalNanoseconds: UInt64 = 30 * 1_000_000_000
 
-  var lastRefreshDescription: String? {
-    guard let lastRefresh else { return nil }
+  private static let relativeDateFormatter: RelativeDateTimeFormatter = {
     let formatter = RelativeDateTimeFormatter()
     formatter.unitsStyle = .abbreviated
-    return formatter.localizedString(for: lastRefresh, relativeTo: Date())
+    return formatter
+  }()
+
+  var lastRefreshDescription: String? {
+    guard let lastRefresh else { return nil }
+    return Self.relativeDateFormatter.localizedString(for: lastRefresh, relativeTo: Date())
   }
 
   func start() async {

@@ -85,8 +85,13 @@ export {
   sourceGuardLocks,
 } from './lib/ci-source-guard-pool.mjs';
 export {
+  DESIGN_CI_JUDGE_VITEST_MARKER,
+  DESIGN_CI_JUDGE_VITEST_PATHS,
+  filterMergedWithBasePoolEntries,
   MERGED_WITH_BASE_POOL_CONCURRENCY,
   MERGED_WITH_BASE_POOL_LONG_POLES,
+  SCREEN_CERTIFICATION_TEST_MARKER,
+  SCREEN_CERTIFICATION_TEST_PATHS,
 } from './lib/merged-with-base-pool-config.mjs';
 
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
@@ -912,7 +917,7 @@ export function webCiContractTestsCommand(
   return `pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci${excludes}`;
 }
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-source-guard-pool.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs lib/__tests__/ci-fast-merge-queue-compatibility.test.mjs lib/__tests__/ci-fast-shard-fanin-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-source-guard-pool.test.mjs lib/__tests__/ci-source-guard-pool.path-gates.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs lib/__tests__/ci-fast-merge-queue-compatibility.test.mjs lib/__tests__/ci-fast-shard-fanin-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 
 /**
  * Script contracts that no other CI command ran (orphan sweep). The
@@ -1034,7 +1039,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/spend-guard.test.mjs',
   'scripts/lib/__tests__/wins-ledger.test.mjs',
   'scripts/lib/__tests__/wins-measure.test.mjs',
-  'scripts/lib/__tests__/wins-store.test.mjs',
+  'scripts/lib/__tests__/wins-store.test.mjs scripts/lib/__tests__/wins-summer-loop.test.mjs',
   'scripts/pr-open.test.mjs',
   'scripts/pr-open-priority.test.mjs',
   'scripts/pr-open-win.test.mjs',
@@ -1167,6 +1172,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/virtual-models.test.mjs',
   'scripts/invariants/writing-surfaces.test.mjs',
   'scripts/ios-ci-cache-contract.test.mjs',
+  'scripts/ios-ci-swiftpm-cache-receipt.test.mjs',
   '.github/scripts/testflight-release-lease.test.mjs',
   '.github/scripts/mutation-next-target.test.mjs',
   '.github/scripts/mutation-next-target-cli.test.mjs',
@@ -1240,6 +1246,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/vision/art-evaluator.test.mjs',
   'scripts/screenshot-publish-cadence.test.mjs',
   'scripts/visual-baseline-adopt.test.mjs',
+  'scripts/gbrain-compounding/gbrain-compounding.test.mjs',
   'scripts/voc/voc-mine.test.mjs',
   'scripts/web-ai-health-intake.test.mjs',
   'scripts/weekly-agent-readiness.test.mjs',
@@ -1471,6 +1478,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/typecheck-performance.test.mjs scripts/lib/__tests__/ci-typecheck-overlap.test.mjs',
   'scripts/lib/__tests__/ui-story-coverage-policy.test.mjs',
   'scripts/lib/__tests__/ci-fast-pr-structural-guards.test.mjs',
+  'scripts/lib/__tests__/ci-fast-trusted-base.test.mjs',
   'scripts/lib/__tests__/ci-structural-inventory.test.mjs',
   'scripts/lib/__tests__/ci-fixture-annotations.test.mjs',
   'scripts/lib/__tests__/fleet-rules-lookup-token.test.mjs',
@@ -1504,7 +1512,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/api-budget.test.mjs',
   'scripts/lib/__tests__/domain-write-guard.test.mjs',
   'scripts/lib/__tests__/screen-audit-receipts.test.mjs',
-  'scripts/lib/__tests__/component-certificate.test.mjs scripts/lib/__tests__/component-certificate-discovery.test.mjs scripts/lib/__tests__/component-story-workers.test.mjs scripts/lib/__tests__/component-story-inventory.test.mjs scripts/lib/__tests__/screen-cert-repair.test.mjs scripts/lib/__tests__/component-render-inputs.test.mjs scripts/lib/__tests__/component-render-receipts.test.mjs',
+  'scripts/lib/__tests__/component-certificate.test.mjs scripts/lib/__tests__/component-certificate-discovery.test.mjs scripts/lib/__tests__/component-story-workers.test.mjs scripts/lib/__tests__/component-story-inventory.test.mjs scripts/lib/__tests__/screen-cert-repair.test.mjs scripts/lib/__tests__/component-render-inputs.test.mjs scripts/lib/__tests__/component-render-receipts.test.mjs scripts/lib/__tests__/ds-cert-loop.test.mjs',
   'scripts/lib/__tests__/verify-patched-dependencies.test.mjs',
   'scripts/lib/__tests__/incident-dedupe.test.mjs',
   'scripts/lib/__tests__/ci-capacity.test.mjs',
@@ -2960,7 +2968,7 @@ export async function runStructural(opts = {}) {
     "node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --test-coverage-exclude='scripts/verification/*.test.mjs' --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=98 scripts/verification/*.test.mjs",
     'pnpm ci:harness:check',
     'pnpm ci:incident-contract:validate',
-    'node --test scripts/ci-release-trigger-contract.test.mjs .github/scripts/analyze-test-flakiness.test.js',
+    'node --test scripts/ci-release-trigger-contract.test.mjs .github/scripts/analyze-test-flakiness.test.js .github/scripts/flakiness-retry-evidence.test.js',
     'node --test .github/scripts/collect-quarantine-evidence.test.mjs',
     'node --test scripts/file-quarantine-clusters.test.mjs scripts/propose-quarantine-ledger.test.mjs',
     'node --test .github/scripts/marketing-dom-workflow.test.mjs',

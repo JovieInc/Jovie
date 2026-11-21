@@ -1,9 +1,8 @@
 'use client';
 
-import { SimpleTooltip } from '@jovie/ui';
+import { IconButton, SimpleTooltip } from '@jovie/ui';
 import { Bell } from 'lucide-react';
 import React from 'react';
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import type { NotificationSubscriptionState } from '@/types/notifications';
 import type { ProfileNotificationsState } from './hooks/useProfileNotificationsController';
 
@@ -38,15 +37,10 @@ export function ProfileNotificationsButton({
   const isActive = hasActiveSubscriptions;
 
   const button = (
-    <CircleIconButton
+    <IconButton
       ref={buttonRef}
-      size='md'
-      variant='pearlQuiet'
-      className={
-        isActive
-          ? 'relative bg-(--profile-pearl-bg-active) text-primary-token'
-          : 'relative text-primary-token/76'
-      }
+      size='lg'
+      variant={isActive ? 'pearl' : 'pearlQuiet'}
       aria-expanded={ariaExpanded}
       ariaLabel={
         hasActiveSubscriptions
@@ -55,6 +49,7 @@ export function ProfileNotificationsButton({
       }
       aria-pressed={isEditing}
       onClick={onClick}
+      className='relative'
     >
       <Bell
         className={
@@ -64,7 +59,7 @@ export function ProfileNotificationsButton({
         }
         aria-hidden='true'
       />
-    </CircleIconButton>
+    </IconButton>
   );
 
   if (hasActiveSubscriptions) {

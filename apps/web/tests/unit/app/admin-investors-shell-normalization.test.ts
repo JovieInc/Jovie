@@ -28,6 +28,17 @@ const INVESTOR_LINKS_MANAGER = findSourceFile(
   )
 );
 
+const INVESTOR_LINK_ROW_ACTIONS = findSourceFile(
+  resolve(
+    process.cwd(),
+    'app/app/(shell)/admin/investors/links/InvestorLinkRowActions.tsx'
+  ),
+  resolve(
+    process.cwd(),
+    'apps/web/app/app/(shell)/admin/investors/links/InvestorLinkRowActions.tsx'
+  )
+);
+
 const INVESTOR_TABLE_PRIMITIVES = findSourceFile(
   resolve(
     process.cwd(),
@@ -87,8 +98,11 @@ describe('admin investor shell normalization', () => {
 
   it('uses the canonical table action menu instead of a bespoke row dropdown', () => {
     const managerSource = readFileSync(INVESTOR_LINKS_MANAGER, 'utf8');
+    const rowActionsSource = readFileSync(INVESTOR_LINK_ROW_ACTIONS, 'utf8');
 
-    expect(managerSource).toContain('TableActionMenu');
+    // Shell migrate landed on main: row chrome in InvestorLinkRowActions.
+    expect(managerSource).toContain('InvestorLinkRowActions');
+    expect(rowActionsSource).toContain('TableActionMenu');
     expect(managerSource).not.toContain('absolute right-0 top-full');
     expect(managerSource).not.toContain('document.addEventListener');
   });

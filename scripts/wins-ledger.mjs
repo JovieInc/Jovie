@@ -7,6 +7,7 @@
 //   rollup [--write]         weekly investor rollup (docs/metrics/wins-weekly.json)
 //   due                      merged wins still waiting on their after-value
 //   measure-due [--store]    auto-measure queryable dues; skip needs-probe
+//   summer-verify [--runs PATH] [--store]  promote Summer loop verifies → receipts
 //   notify                   one-line messages for verified, meaningful wins
 //   receipt --id --metric --value --evidence [--sha] [--store]  post-deploy re-measure
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -27,7 +28,12 @@ import {
   winFromPr,
   winStatus,
 } from './lib/wins-ledger.mjs';
-import { dueMeasurePlan, measureDueWins } from './lib/wins-measure/index.mjs';
+import {
+  applySummerVerifyReceipts,
+  dueMeasurePlan,
+  measureDueWins,
+  parseSummerRuns,
+} from './lib/wins-measure/index.mjs';
 import {
   listWinsFromStore,
   mergeWins,
@@ -62,6 +68,23 @@ async function loadWins(argv) {
   return mergeWins(ledger, storeWins);
 }
 
+async function persistReceiptedWins(wins, touchedIds, io) {
+  for (const id of touchedIds) {
+    const win = wins.find(w => w.id === id);
+    if (!win) continue;
+    const problems = validateWin(win);
+    if (problems.length) throw new Error(`${id}: ${problems.join('; ')}`);
+    io.log(`${id}: ${await overwriteWinInStore(win)} (${winStatus(win)})`);
+  }
+  const metrics = {
+    schema: 'jovie.wins-metrics/v1',
+    at: new Date().toISOString(),
+    ...weeklyMetrics(wins),
+    clusters: clusters(wins).map(({ wins: _w, ...c }) => c),
+  };
+  io.log(await putWinsMetricsToStore(metrics));
+}
+
 function writeSummary(wins, argv, io) {
   const out = {
     ...weeklyMetrics(wins),
@@ -83,10 +106,13 @@ function writeSummary(wins, argv, io) {
 
 export async function main(argv, io = console) {
   const [cmd] = argv;
-  // receipt --store must merge runtime-store overlays first: measure-due
-  // receipts live only in the store, and a ledger-only overwrite would erase them.
+  // receipt/summer-verify --store must merge runtime-store overlays first:
+  // measure-due receipts live only in the store, and a ledger-only overwrite
+  // would erase them.
   const wins =
-    cmd === 'measure-due' || (cmd === 'receipt' && argv.includes('--store'))
+    cmd === 'measure-due' ||
+    cmd === 'summer-verify' ||
+    (cmd === 'receipt' && argv.includes('--store'))
       ? await loadWins(argv)
       : readLedger();
   if (cmd === 'validate') {
@@ -163,22 +189,37 @@ export async function main(argv, io = console) {
       sha: arg(argv, 'sha') ?? process.env.GITHUB_SHA ?? null,
       apiKey: process.env.AI_GATEWAY_API_KEY,
     });
+    // Optional Summer verify hop on the same measure path (host/CI with runs).
+    const summerRunsPath = arg(argv, 'summer-runs');
+    let summerReport = null;
+    if (summerRunsPath) {
+      const runs = parseSummerRuns(readFileSync(summerRunsPath, 'utf8'));
+      summerReport = applySummerVerifyReceipts(wins, runs, {
+        dryRun,
+        sha: arg(argv, 'sha') ?? process.env.GITHUB_SHA ?? null,
+      });
+      report.summer = summerReport;
+      report.measured.push(
+        ...summerReport.measured.map(m => ({
+          id: m.id,
+          metric: m.metric,
+          adapter: 'summer-loop',
+          value: m.value,
+          evidence: m.evidence,
+        }))
+      );
+      report.errors.push(
+        ...summerReport.errors.map(e => ({
+          id: e.run_at ?? 'summer-loop',
+          metric: 'summer-verify',
+          adapter: 'summer-loop',
+          reason: e.reason,
+        }))
+      );
+    }
     if (!dryRun && toStore) {
       const touched = new Set(report.measured.map(m => m.id));
-      for (const id of touched) {
-        const win = wins.find(w => w.id === id);
-        if (!win) continue;
-        const problems = validateWin(win);
-        if (problems.length) throw new Error(`${id}: ${problems.join('; ')}`);
-        io.log(`${id}: ${await overwriteWinInStore(win)}`);
-      }
-      const metrics = {
-        schema: 'jovie.wins-metrics/v1',
-        at: report.at,
-        ...weeklyMetrics(wins),
-        clusters: clusters(wins).map(({ wins: _w, ...c }) => c),
-      };
-      io.log(await putWinsMetricsToStore(metrics));
+      await persistReceiptedWins(wins, touched, io);
       io.log(
         await putMeasureReportToStore({
           schema: 'jovie.wins-measure/v1',
@@ -192,6 +233,43 @@ export async function main(argv, io = console) {
     }
     io.log(JSON.stringify(report, null, argv.includes('--json') ? 0 : 2));
     if (argv.includes('--write')) writeSummary(wins, argv, io);
+    return report.errors.length ? 1 : 0;
+  }
+  if (cmd === 'summer-verify') {
+    const toStore = argv.includes('--store');
+    const dryRun = argv.includes('--dry-run') || !toStore;
+    const runsPath =
+      arg(argv, 'runs') ??
+      process.env.SUMMER_LOOP_RUNS ??
+      'ops/agents/summer-improvement-loop/runs.jsonl';
+    let text;
+    try {
+      text = readFileSync(runsPath, 'utf8');
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      io.error(`summer-verify: cannot read runs at ${runsPath}: ${reason}`);
+      return 1;
+    }
+    const report = applySummerVerifyReceipts(wins, parseSummerRuns(text), {
+      dryRun,
+      sha: arg(argv, 'sha') ?? process.env.GITHUB_SHA ?? null,
+    });
+    if (!dryRun && toStore) {
+      const touched = new Set(report.measured.map(m => m.id));
+      await persistReceiptedWins(wins, touched, io);
+      io.log(
+        await putMeasureReportToStore({
+          schema: 'jovie.wins-measure/v1',
+          source: 'summer-verify',
+          ...report,
+        })
+      );
+    } else if (!toStore) {
+      io.log(
+        'summer-verify: dry-run (pass --store to persist receipts in the runtime store)'
+      );
+    }
+    io.log(JSON.stringify(report, null, argv.includes('--json') ? 0 : 2));
     return report.errors.length ? 1 : 0;
   }
   if (cmd === 'notify') {
@@ -270,7 +348,7 @@ export async function main(argv, io = console) {
     return 0;
   }
   io.error(
-    'usage: wins-ledger.mjs validate|summary|ingest|sync|rollup|due|measure-due|notify|receipt'
+    'usage: wins-ledger.mjs validate|summary|ingest|sync|rollup|due|measure-due|summer-verify|notify|receipt'
   );
   return 2;
 }

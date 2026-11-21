@@ -5,9 +5,18 @@ import { describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
-const { pathname, runtimeUpdate } = vi.hoisted(() => ({
-  pathname: { current: '/app/chat' },
-  runtimeUpdate: { available: false },
+const { pathname, runtimeUpdate, startNavigationTelemetry } = vi.hoisted(
+  () => ({
+    pathname: { current: '/app/chat' },
+    runtimeUpdate: { available: false },
+    startNavigationTelemetry: vi.fn(),
+  })
+);
+vi.mock('@/lib/tracking/navigation-telemetry', async importOriginal => ({
+  ...(await importOriginal<
+    typeof import('@/lib/tracking/navigation-telemetry')
+  >()),
+  startNavigationTelemetry,
 }));
 // Expose the Next Link contract without starting a router in jsdom.
 vi.mock('next/link', () => ({
@@ -233,5 +242,31 @@ describe('central Inbox bell', () => {
     expect(link.querySelector('svg')).toHaveClass(
       'size-(--app-shell-sidebar-icon-size)'
     );
+  });
+
+  it('reports Inbox navigation telemetry like the rail row did', () => {
+    startNavigationTelemetry.mockClear();
+    pathname.current = '/app/audience';
+    render(
+      <SidebarInboxLink availability={{ state: 'empty', pendingCount: 0 }} />
+    );
+    const link = screen.getByRole('link', { name: 'Inbox — all caught up' });
+    fireEvent.click(link, { metaKey: true });
+    expect(startNavigationTelemetry).not.toHaveBeenCalled();
+    fireEvent.click(link, { detail: 1 });
+    expect(startNavigationTelemetry).toHaveBeenCalledTimes(1);
+    expect(startNavigationTelemetry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        itemId: 'home',
+        sourcePathname: '/app/audience',
+        destinationHref: APP_ROUTES.DASHBOARD,
+        inputMethod: 'pointer',
+        context: expect.objectContaining({
+          isMobile: false,
+          navVariant: 'canonical_identity_work_v1',
+        }),
+      })
+    );
+    pathname.current = '/app/chat';
   });
 });

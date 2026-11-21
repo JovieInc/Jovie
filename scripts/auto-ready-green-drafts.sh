@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
 # Auto-Ready green-source drafts
 #
-# Event-driven undraft for open main drafts whose required source checks are
-# SUCCESS and mergeability is CLEAN (or UNSTABLE with only advisory noise). This restores the July wake that died
-# when auto-ready-agent-drafts.yml became workflow_dispatch-only.
-#
-# This controller never enables native auto-merge and never enrolls the merge
-# queue. Auto-Enroll / jovie-bot own admission after ready_for_review.
+# Undraft open main drafts after source qualification. Native queue admission
+# remains with Merge Queue Green Enroll after ready_for_review.
 # All wakes require the author's ship intent: trusted writers ship on green
 # unless parked; any other author needs exact-head, author-owned proof.
 #
@@ -49,12 +45,12 @@ upsert_status_comment() {  # upsert_status_comment <num> <body>
 }
 
 read_state() {  # read_state <num>
-  local n="$1"
+  local n="$1" state_json head suites
   local owner="${REPO%%/*}"
   local name="${REPO#*/}"
   [[ -n "$owner" && -n "$name" && "$owner" != "$name" ]]
-  gh_retry api graphql \
-    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){isDraft headRefOid headRefName baseRefName body title author{__typename login} state mergeable mergeStateStatus reviewDecision labels(first:100){nodes{name}} timelineItems(last:50,itemTypes:[CONVERT_TO_DRAFT_EVENT,PULL_REQUEST_COMMIT,HEAD_REF_FORCE_PUSHED_EVENT]){nodes{__typename ... on ConvertToDraftEvent{createdAt} ... on PullRequestCommit{commit{committedDate}} ... on HeadRefForcePushedEvent{createdAt}}}}}}' \
+  state_json="$(gh_retry api graphql \
+    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){isDraft headRefOid headRefName baseRefName body title author{__typename login} state mergeable mergeStateStatus reviewDecision labels(first:100){nodes{name}} timelineItems(last:50,itemTypes:[CONVERT_TO_DRAFT_EVENT,HEAD_REF_FORCE_PUSHED_EVENT]){nodes{__typename ... on ConvertToDraftEvent{createdAt} ... on HeadRefForcePushedEvent{createdAt}}}}}}' \
     -f owner="$owner" \
     -f name="$name" \
     -F number="$n" \
@@ -77,13 +73,29 @@ read_state() {  # read_state <num>
       mergeable: .mergeable,
       mergeStateStatus: .mergeStateStatus,
       reviewDecision: (.reviewDecision // ""),
-      # Converted to draft after the last push: a deliberate park.
+      parkedAt: ([.timelineItems.nodes[]? | select(.__typename == "ConvertToDraftEvent") | .createdAt] | max),
+      # Commit dates do not describe when source reached this branch.
       parkedDraft: (
         ([.timelineItems.nodes[]? | select(.__typename == "ConvertToDraftEvent") | .createdAt] | max) as $parked
-        | ([.timelineItems.nodes[]? | (.commit.committedDate // (select(.__typename == "HeadRefForcePushedEvent") | .createdAt))] | max) as $pushed
+        | ([.timelineItems.nodes[]? | select(.__typename == "HeadRefForcePushedEvent") | .createdAt] | max) as $pushed
         | ($parked != null and ($pushed == null or $parked > $pushed))
       )
-    }'
+    }')" || return 1
+  if jq -e '.draft == true and .parkedDraft == true' <<<"$state_json" >/dev/null; then
+    head="$(jq -r '.head // empty' <<<"$state_json")"
+    if [[ "$head" =~ ^[0-9a-f]{40}$ ]]; then
+      # One extra read only for a converted draft. Partial/failed reads retain
+      # its park; neither an old rerun nor a future commit clock releases it.
+      suites="$(node "$SCRIPT_DIR/../packages/api-client/cli.ts" gh --priority merge -- api "repos/$REPO/commits/$head/check-suites?per_page=100" 2>/dev/null)" || suites=null
+      jq -e 'type == "object"' <<<"$suites" >/dev/null 2>&1 || suites=null
+      node "$CLASSIFY_LIB" push-evidence <<<"$(jq -nc \
+        --argjson state "$state_json" --argjson suites "$suites" \
+        --arg repository "$REPO" --argjson prNumber "$n" \
+        '{state:$state,suites:$suites,repository:$repository,prNumber:$prNumber}')"
+      return
+    fi
+  fi
+  printf '%s\n' "$state_json"
 }
 
 read_checks() {  # read_checks <num>

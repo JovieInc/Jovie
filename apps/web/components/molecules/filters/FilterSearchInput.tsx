@@ -1,8 +1,8 @@
 'use client';
 
+import { IconButton } from '@jovie/ui';
 import { useCallback } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
 
 interface FilterSearchInputProps {
@@ -73,13 +73,15 @@ export function FilterSearchInput({
           aria-label={placeholder}
         />
         {value && (
-          <DrawerInlineIconButton
+          <IconButton
+            size='xs'
+            variant='inline'
             onClick={onClear}
-            className='absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-tertiary-token'
             aria-label='Clear Search'
+            className='absolute right-1.5 top-1/2 -translate-y-1/2'
           >
             <Icon name='X' className='h-3 w-3' />
-          </DrawerInlineIconButton>
+          </IconButton>
         )}
       </div>
     </div>
