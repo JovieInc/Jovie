@@ -32,6 +32,7 @@ One skill for design-system work across Pen and code. Read this page, pick the r
 | Make code match Pen, or Pen match code; drift ledger; conformance gate; Storybook evidence | [guides/code-parity.md](guides/code-parity.md) |
 | Component certificate, benchmark judgment, alignment and a11y rules, what "done" means | [guides/certification.md](guides/certification.md) |
 | Landing page, hero or feature imagery on any marketing page; "make it look designed" | Landing imagery section below, spec in [docs/marketing/IMAGERY.md](../../../docs/marketing/IMAGERY.md) |
+| Image / video / shader / gen path ownership (which pipeline to use; no parallel owners) | [docs/design-system/MEDIA_GENERATION.md](../../../docs/design-system/MEDIA_GENERATION.md) |
 | Marketing motion and shaders: matte field, hero zoom, shell parallax, chat takeover; motion budgets; registering an effect (ASR-039) | [guides/motion.md](guides/motion.md) |
 
 Surface-specific rules that stay where they are: `docs/marketing/AGENT_GUIDE.md` (marketing), `.claude/rules/ui.md`, `docs/design-system/state-matrix.md`, `docs/design-system/component-ownership.json`.

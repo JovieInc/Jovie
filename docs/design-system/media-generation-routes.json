@@ -1,0 +1,107 @@
+{
+  "schema": "jovie-media-generation-routes/v1",
+  "owner": "design-system-consolidation",
+  "linear": "JOV-13852",
+  "doc": "docs/design-system/MEDIA_GENERATION.md",
+  "lanes": [
+    {
+      "id": "marketing-media",
+      "kind": "image-gen",
+      "status": "canonical",
+      "entry": "apps/web/scripts/marketing-media/generate-image.ts",
+      "surfaces": [
+        "apps/web/scripts/marketing-media/image-adapter.ts",
+        "apps/web/scripts/marketing-media/fal-image-adapter.ts",
+        "apps/web/scripts/marketing-media/codex-image-adapter.ts",
+        "apps/web/scripts/marketing-media/capture-adapter.ts",
+        "apps/web/scripts/marketing-media/media-export-seam.ts",
+        "apps/web/scripts/marketing-media/provenance.ts",
+        "apps/web/data/marketing/mediaRecipes.ts",
+        "apps/web/data/marketing/modelRoles.ts",
+        "scripts/vision/art-evaluator.mjs"
+      ]
+    },
+    {
+      "id": "marketing-factory",
+      "kind": "orchestrator",
+      "status": "consumer",
+      "entry": "apps/web/scripts/marketing-factory/providers.ts",
+      "routesVia": "marketing-media",
+      "surfaces": [
+        "apps/web/scripts/marketing-factory/generated-media.ts",
+        "apps/web/data/marketing/factory/mediaDecision.ts"
+      ]
+    },
+    {
+      "id": "merch-graphic",
+      "kind": "image-gen",
+      "status": "canonical",
+      "entry": "apps/web/lib/merch/graphic-engine.ts",
+      "surfaces": [
+        "apps/web/lib/merch/design-generation.ts",
+        "apps/web/lib/constants/ai-models.ts"
+      ]
+    },
+    {
+      "id": "album-art",
+      "kind": "image-gen",
+      "status": "canonical",
+      "entry": "apps/web/lib/services/album-art/provider-xai.ts",
+      "surfaces": [
+        "apps/web/lib/services/album-art/render.ts",
+        "apps/web/lib/services/album-art/storage.ts",
+        "apps/web/lib/services/album-art/styles.ts",
+        "docs/album-art-generation.md"
+      ],
+      "storage": "vercel-blob",
+      "storagePreference": "cloudflare-r2"
+    },
+    {
+      "id": "youtube-thumbnail",
+      "kind": "image-gen",
+      "status": "canonical",
+      "entry": ".claude/skills/youtube-thumbnail-growth/SKILL.md",
+      "surfaces": [
+        ".claude/skills/youtube-thumbnail-growth/references/xai-grok-imagine-adapter.md"
+      ]
+    },
+    {
+      "id": "gstack-design",
+      "kind": "agent-tooling",
+      "status": "tooling-only",
+      "entry": ".agents/skills/gstack/design/src/generate.ts",
+      "surfaces": [
+        ".agents/skills/gstack/design/src/cli.ts",
+        ".agents/skills/gstack/design/src/commands.ts"
+      ]
+    },
+    {
+      "id": "hero-light-shader",
+      "kind": "runtime-shader",
+      "status": "runtime-exception",
+      "entry": "apps/web/components/homepage/hero-light/hero-light-gl.ts",
+      "surfaces": [
+        "apps/web/components/homepage/hero-light/hero-light-gate.ts",
+        "docs/design/night-dj-harmony-v1.md"
+      ]
+    },
+    {
+      "id": "figma-bridge",
+      "kind": "bridge",
+      "status": "scratch-only",
+      "entry": null,
+      "note": "Figma MCP create_shader / generative plugins — never publishable SoT; Pen owns design."
+    },
+    {
+      "id": "merch-spike",
+      "kind": "image-gen",
+      "status": "aliased",
+      "routesVia": "merch-graphic",
+      "entry": "apps/web/scripts/merch-image-spike.ts",
+      "surfaces": [
+        "apps/web/scripts/merch-alpha-spike.ts",
+        "apps/web/scripts/merch-knockout-spike.ts"
+      ]
+    }
+  ]
+}
