@@ -15,11 +15,11 @@ import {
 } from '@floating-ui/react';
 import {
   dropdownMenuContentClasses,
+  IconButton,
   MENU_ITEM_BASE,
   MENU_ITEM_DESTRUCTIVE,
 } from '@jovie/ui';
 import { useCallback, useRef, useState } from 'react';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { Icon } from '@/components/atoms/Icon';
 import { PlatformPill } from '@/features/dashboard/atoms/PlatformPill';
 import { cn } from '@/lib/utils';
@@ -107,14 +107,21 @@ export function LinkPill({
     menuItems.length > 0 ? firstItemRef : floatingRefs.floating;
 
   const trailing = (
-    <AppIconButton
+    <IconButton
+      variant='ghost'
       ariaLabel={menuButtonAria}
       ref={setReferenceRef}
-      className='-mr-2 h-10 w-10 rounded-lg border-transparent bg-surface-0 text-quaternary-token hover:bg-surface-1 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-ring/25 [&_svg]:h-5 [&_svg]:w-5'
       {...getReferenceProps()}
+      // lg = 40px face (matches prior h-10); leaves glyph size to the child
+      // so h-5/w-5 is not overridden by sm's [&_svg]:h-3.5 rule.
+      size='lg'
+      className='-mr-2'
     >
-      <Icon name='MoreHorizontal' className='h-5 w-5 opacity-90' />
-    </AppIconButton>
+      <Icon
+        name='MoreHorizontal'
+        className='h-5 w-5 text-quaternary-token opacity-90'
+      />
+    </IconButton>
   );
 
   return (

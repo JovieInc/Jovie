@@ -4,10 +4,11 @@ import { Button } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { Sparkline } from '@/components/shell/Sparkline';
-import type {
-  StoryFirstBottleneck,
-  StoryFirstGlancePulse,
-  StoryFirstStageBucket,
+import {
+  type StoryFirstBottleneck,
+  type StoryFirstGlancePulse,
+  type StoryFirstStageBucket,
+  stripIssueId,
 } from '@/lib/ovie/home/story-first';
 import { cn } from '@/lib/utils';
 import type { HomeLoopSectionStatus } from './HomeLoopSection';
@@ -26,6 +27,18 @@ const DELTA_TONE: Record<string, string> = {
   bad: 'text-error',
   neutral: 'text-tertiary-token',
 };
+
+/** Color the delta by its own direction, not by target attainment. */
+export function deltaToneKey(
+  delta: string,
+  fallback: StoryFirstGlancePulse['tone']
+): string {
+  const trimmed = delta.trim();
+  if (/^[-−]\d/.test(trimmed)) return 'bad';
+  if (/^\+\d/.test(trimmed)) return 'good';
+  if (/^[-−+]?0+(\.0+)?$/.test(trimmed) || trimmed === 'flat') return 'neutral';
+  return fallback;
+}
 
 export interface StoryFirstCanvasProps {
   readonly bottleneck: StoryFirstBottleneck;
@@ -74,7 +87,8 @@ function GlancePulse({
             <span
               className={cn(
                 'text-xs font-medium tabular-nums',
-                DELTA_TONE[pulse.tone] ?? DELTA_TONE.neutral
+                DELTA_TONE[deltaToneKey(pulse.delta, pulse.tone)] ??
+                  DELTA_TONE.neutral
               )}
             >
               {pulse.delta}
@@ -82,7 +96,7 @@ function GlancePulse({
           ) : null}
         </div>
       )}
-      {pulse.points.length >= 2 ? (
+      {pulse.points.length >= 3 ? (
         <Sparkline
           points={pulse.points}
           trend={pulse.trend}
@@ -269,7 +283,11 @@ function StageBuckets({
               </span>
               {bucket.highlight ? (
                 <span className='truncate text-2xs text-accent'>
-                  {bucket.highlight.identifier} {bucket.highlight.title}
+                  {bucket.highlight.identifier}{' '}
+                  {stripIssueId(
+                    bucket.highlight.identifier,
+                    bucket.highlight.title
+                  )}
                 </span>
               ) : (
                 <span className='h-4' aria-hidden='true' />

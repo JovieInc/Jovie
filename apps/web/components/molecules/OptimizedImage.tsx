@@ -222,8 +222,6 @@ export const OptimizedImage = React.memo(function OptimizedImage({
   const [hasError, setHasError] = useState(false);
   const renderCount = useRef(0);
 
-  renderCount.current += 1;
-
   // Memoize the image source to prevent unnecessary re-renders
   const imageSrc = useOptimizedImageSource({
     src,
@@ -318,6 +316,11 @@ export const OptimizedImage = React.memo(function OptimizedImage({
     [loadingImageProps, stableImageProps]
   );
 
+  // Count commits after paint; refs must not be written during render.
+  useEffect(() => {
+    renderCount.current += 1;
+  });
+
   useEffect(() => {
     if (
       process.env.NODE_ENV !== 'production' &&
@@ -355,7 +358,7 @@ export const OptimizedImage = React.memo(function OptimizedImage({
 
       {/* Enhanced loading skeleton with shimmer */}
       {isLoading && (
-        <div className='absolute inset-0 bg-linear-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700 animate-pulse motion-reduce:animate-none' />
+        <div className='absolute inset-0 bg-linear-to-r from-surface-1 via-surface-2 to-surface-1 animate-pulse motion-reduce:animate-none' />
       )}
     </div>
   );

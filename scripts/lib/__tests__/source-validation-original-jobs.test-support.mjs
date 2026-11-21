@@ -6,10 +6,19 @@ import assert from 'node:assert/strict';
 
 const DISK_READ_GUARD = 'Validate disk-read source contracts from trusted base';
 const SETUP_NODE = 'Setup Node.js and pnpm';
+const SETUP_PLAYWRIGHT = 'Setup Playwright warm path';
+const CHECKOUT_UNIT =
+  'Checkout exact source head for unit and merged guard proofs';
+const FETCH_HEAD = 'Fetch head and base history only';
+const PREPARE_MERGED = 'Prepare merged source guard generation';
+const PRESERVE_MERGED = 'Preserve merged action generation';
+const SETUP_MERGED_DEPS = 'Setup merged source dependencies';
+const SETUP_MERGED_BROWSERS = 'Setup merged source browsers';
 const MQ_PARITY_TOOLS = 'Resolve MQ parity tools for older source heads';
 const MQ_PARITY_SCOPE = 'Select MQ parity scope';
 const TYPECHECK_TWIN = 'Run typecheck lane parity';
 const UNIT_FLAKY_UPLOAD = 'Preserve retried-then-passed unit tests';
+const REUSE_STEP = 'Reuse exact-head proof for a metadata-only edit';
 
 /** Serial → pooled disk-read step is an owned migration (same guards, first
  * failure wins). Normalize both sides so the deepEqual still pins everything
@@ -40,35 +49,156 @@ function normalizeDiskReadStep(step) {
 }
 
 /**
+ * CI-28: metadata reuse also requires a successful unit 4/4 job on the proof
+ * run (fail closed). Normalize the owned script delta against origin/main.
+ * @param {Step} step
+ * @param {{ requireCi28?: boolean }} [opts]
+ */
+function normalizeReuseStep(step, opts = {}) {
+  if (step?.id !== 'reuse' && step?.name !== REUSE_STEP) return step;
+  const run = String(step.run ?? '');
+  assert.match(run, /head_sha=\$HEAD_SHA&event=pull_request&status=completed/);
+  assert.match(run, /\.conclusion == "success"/);
+  if (opts.requireCi28 || /Affected Unit Tests \(4\/4\)/.test(run)) {
+    assert.match(run, /Affected Unit Tests \(4\/4\)/);
+    assert.match(run, /guard_job=/);
+    assert.match(run, /\[\[\s*"\$guard_job"\s*==\s*success\s*\]\]/);
+    assert.match(run, /api-client\/cli\.ts/);
+  } else {
+    assert.match(run, /reuse=true/);
+  }
+  return { ...step, run: 'PROOF_REUSE_NORMALIZED' };
+}
+
+/**
+ * Rewrite the pre-CI-28 setup form so deepEqual can pin the rest of the step.
+ * Old: `matrix.shard == '4/4' || (reuse != true && (…))`
+ * New: `reuse != true && (matrix.shard == '4/4' || …)`
+ * @param {string} ifExpr
+ */
+function rewriteUnitSetupReuseGate(ifExpr) {
+  const playwright =
+    /^matrix\.shard == '4\/4' \|\| \(steps\.reuse\.outputs\.reuse != 'true' && steps\.scope\.outputs\.web == 'true'\)$/;
+  if (playwright.test(ifExpr)) {
+    return "steps.reuse.outputs.reuse != 'true' && (matrix.shard == '4/4' || steps.scope.outputs.web == 'true')";
+  }
+  const node =
+    /^matrix\.shard == '4\/4' \|\| \(steps\.reuse\.outputs\.reuse != 'true' && \((.+)\)\)$/;
+  const match = ifExpr.match(node);
+  if (match) {
+    return `steps.reuse.outputs.reuse != 'true' && (matrix.shard == '4/4' || ${match[1]})`;
+  }
+  return ifExpr;
+}
+
+/**
+ * Ensure merged-guard steps gate on reuse (CI-28) for comparison with main.
+ * @param {string} ifExpr
+ */
+function ensureMergedReuseGate(ifExpr) {
+  if (ifExpr.includes("steps.reuse.outputs.reuse != 'true'")) return ifExpr;
+  if (ifExpr === "matrix.shard == '4/4'") {
+    return "matrix.shard == '4/4' && steps.reuse.outputs.reuse != 'true'";
+  }
+  if (ifExpr.startsWith("matrix.shard == '4/4' && ")) {
+    return ifExpr.replace(
+      "matrix.shard == '4/4' && ",
+      "matrix.shard == '4/4' && steps.reuse.outputs.reuse != 'true' && "
+    );
+  }
+  return ifExpr;
+}
+
+/**
  * Owned typecheck twin may also provision Node. Strip that clause so deepEqual
  * still pins the rest of the Setup Node step against origin/main.
  * @param {Step} step
- * @param {{ requireTypecheck?: boolean }} [opts]
+ * @param {{ requireTypecheck?: boolean, requireCi28?: boolean }} [opts]
  */
 function normalizeSetupNodeStep(step, opts = {}) {
-  if (step?.name !== SETUP_NODE) return step;
-  const ifExpr = String(step.if ?? '');
-  assert.match(ifExpr, /steps\.scope\.outputs\.web == 'true'/);
-  if (opts.requireTypecheck) {
-    assert.match(ifExpr, /steps\.mq-parity\.outputs\.typecheck == 'true'/);
+  if (step?.name !== SETUP_NODE && step?.name !== SETUP_PLAYWRIGHT) return step;
+  let ifExpr = rewriteUnitSetupReuseGate(String(step.if ?? ''));
+  if (opts.requireCi28) {
+    assert.match(ifExpr, /^steps\.reuse\.outputs\.reuse != 'true'/);
   }
-  return {
-    ...step,
-    if: ifExpr
+  if (step.name === SETUP_NODE) {
+    assert.match(ifExpr, /steps\.scope\.outputs\.web == 'true'/);
+    if (opts.requireTypecheck) {
+      assert.match(ifExpr, /steps\.mq-parity\.outputs\.typecheck == 'true'/);
+    }
+    ifExpr = ifExpr
       .replace(/\s*\|\|\s*steps\.mq-parity\.outputs\.typecheck == 'true'/, '')
-      .replace(/steps\.mq-parity\.outputs\.typecheck == 'true'\s*\|\|\s*/, ''),
-  };
+      .replace(/steps\.mq-parity\.outputs\.typecheck == 'true'\s*\|\|\s*/, '');
+  }
+  return { ...step, if: ifExpr };
 }
 
-/** @param {Job} job @param {{ requireTypecheck?: boolean }} [opts] */
+/**
+ * CI-28: drop the unit 4/4 exception that kept checkout/fetch/guards live on
+ * metadata reuse. Transform baseline forms to the gated shape for deepEqual.
+ * @param {Step} step
+ * @param {{ requireCi28?: boolean }} [opts]
+ */
+function normalizeUnit4x4ReuseGate(step, opts = {}) {
+  const name = step?.name;
+  let ifExpr = String(step.if ?? '');
+  if (name === CHECKOUT_UNIT || name === FETCH_HEAD) {
+    if (!ifExpr.includes("matrix.shard == '4/4'") && !opts.requireCi28) {
+      return step;
+    }
+    ifExpr = ifExpr
+      .replace(/\s*\|\|\s*matrix\.shard == '4\/4'/, '')
+      .replace(/matrix\.shard == '4\/4'\s*\|\|\s*/, '');
+    if (opts.requireCi28) {
+      assert.equal(ifExpr, "steps.reuse.outputs.reuse != 'true'");
+    }
+    return { ...step, if: ifExpr };
+  }
+  if (
+    name === PREPARE_MERGED ||
+    name === PRESERVE_MERGED ||
+    name === SETUP_MERGED_DEPS ||
+    name === SETUP_MERGED_BROWSERS ||
+    name === DISK_READ_GUARD
+  ) {
+    ifExpr = ensureMergedReuseGate(ifExpr);
+    if (opts.requireCi28) {
+      assert.match(ifExpr, /matrix\.shard == '4\/4'/);
+      assert.match(ifExpr, /steps\.reuse\.outputs\.reuse != 'true'/);
+    }
+    return { ...step, if: ifExpr };
+  }
+  return step;
+}
+
+/** @param {Job} job @param {{ requireTypecheck?: boolean, requireCi28?: boolean }} [opts] */
 function normalizeUnitJob(job, opts = {}) {
   return {
     ...job,
     steps: job.steps.map(step => {
-      if (step.name === DISK_READ_GUARD) return normalizeDiskReadStep(step);
-      if (step.name === SETUP_NODE) return normalizeSetupNodeStep(step, opts);
-      return step;
+      let next = normalizeReuseStep(step, opts);
+      next = normalizeUnit4x4ReuseGate(next, opts);
+      if (next.name === DISK_READ_GUARD) {
+        const gatedIf = String(next.if ?? '');
+        next = { ...normalizeDiskReadStep(next), if: gatedIf };
+        if (opts.requireCi28) {
+          assert.match(gatedIf, /steps\.reuse\.outputs\.reuse != 'true'/);
+        }
+        return next;
+      }
+      if (next.name === SETUP_NODE || next.name === SETUP_PLAYWRIGHT) {
+        return normalizeSetupNodeStep(next, opts);
+      }
+      return next;
     }),
+  };
+}
+
+/** @param {Job} job @param {{ requireCi28?: boolean }} [opts] */
+function normalizeSourceJob(job, opts = {}) {
+  return {
+    ...job,
+    steps: job.steps.map(step => normalizeReuseStep(step, opts)),
   };
 }
 
@@ -100,9 +230,13 @@ export function assertOriginalJobsRetained(current, baseline) {
     const actual = current.jobs[id];
     const left =
       id === 'unit'
-        ? normalizeUnitJob(actual, { requireTypecheck: true })
-        : actual;
-    const right = id === 'unit' ? normalizeUnitJob(job) : job;
+        ? normalizeUnitJob(actual, {
+            requireTypecheck: true,
+            requireCi28: true,
+          })
+        : normalizeSourceJob(actual, { requireCi28: true });
+    const right =
+      id === 'unit' ? normalizeUnitJob(job) : normalizeSourceJob(job);
     assert.deepEqual(strip(left), strip(right), id);
     for (const name of owned) {
       const added = actual.steps.filter(step => step.name === name);

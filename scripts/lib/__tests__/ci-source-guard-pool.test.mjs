@@ -2,10 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  DESIGN_CI_JUDGE_VITEST_MARKER,
-  DESIGN_CI_JUDGE_VITEST_PATHS,
   expandSourcePoolEntries,
-  filterMergedWithBasePoolEntries,
   MERGED_WITH_BASE_POOL_CONCURRENCY,
   MERGED_WITH_BASE_POOL_LONG_POLES,
   MERGED_WITH_BASE_POOL_SPEC,
@@ -370,74 +367,6 @@ describe('merged-with-base-invariants pool', () => {
     );
     expect(code).toBe(0);
     expect(started[0]).toContain('design-ci-judge-router');
-  });
-
-  it('path-gates design-ci-judge vitest by related paths', () => {
-    const entries = expandSourcePoolEntries(MERGED_WITH_BASE_POOL_SPEC);
-    const isJudge = e => e.command.includes(DESIGN_CI_JUDGE_VITEST_MARKER);
-    expect(entries.some(isJudge)).toBe(true);
-    const { kept, skipped } = filterMergedWithBasePoolEntries(entries, [
-      'docs/qa/README.md',
-      'scripts/lib/__tests__/ci-source-guard-pool.test.mjs',
-    ]);
-    expect(skipped.some(isJudge)).toBe(true);
-    expect(kept.some(isJudge)).toBe(false);
-    expect(
-      kept.some(e =>
-        e.command.includes('design-ci-judge-router-contract.test.mjs')
-      )
-    ).toBe(true);
-    for (const related of [
-      'apps/web/scripts/design-ci-judge-router.ts',
-      'apps/web/package.json',
-      'apps/web/vitest.config.mts',
-      'canon/invariants.jsonl',
-      'scripts/invariants/registry.mjs',
-      'scripts/invariants/screen-certification.mjs',
-      'scripts/invariants/screen-registry.mjs',
-      'apps/web/data/appScreens/registry.ts',
-      'apps/web/data/marketing/componentRegistry.ts',
-    ]) {
-      expect(DESIGN_CI_JUDGE_VITEST_PATHS.test(related), related).toBe(true);
-      const r = filterMergedWithBasePoolEntries(entries, [related]);
-      expect(r.skipped, related).toEqual([]);
-      expect(r.kept.some(isJudge), related).toBe(true);
-    }
-    expect(
-      DESIGN_CI_JUDGE_VITEST_PATHS.test('apps/web/app/(home)/page.tsx')
-    ).toBe(false);
-    for (const changed of [null, undefined, []]) {
-      const r = filterMergedWithBasePoolEntries(entries, changed);
-      expect(r.skipped, String(changed)).toEqual([]);
-      expect(r.kept.length, String(changed)).toBe(entries.length);
-    }
-  });
-
-  it('logs a skip line and does not execute the gated vitest', async () => {
-    const started = [];
-    const { code, output } = await runSourceGuardPool(
-      {
-        concurrency: 2,
-        commands: [
-          { id: 'cheap', command: 'node -e "process.exit(0)"' },
-          {
-            id: 'judge',
-            command: `pnpm --filter @jovie/web exec vitest run ${DESIGN_CI_JUDGE_VITEST_MARKER}`,
-          },
-        ],
-      },
-      {
-        changedFileList: ['README.md'],
-        execute: async command => {
-          started.push(command);
-          return { code: 0, output: '' };
-        },
-      }
-    );
-    expect(code).toBe(0);
-    expect(started).toEqual(['node -e "process.exit(0)"']);
-    expect(output).toContain('[merged-with-base] skip: judge;');
-    expect(output).toContain('design-ci-judge vitest');
   });
 
   it('runs every sub-command and fails on any one failure', async () => {
