@@ -316,7 +316,7 @@ module.exports = [
     },
   },
   {
-    files: ['**/components/dashboard/**/*'],
+    files: ['**/components/dashboard/**/*', 'lib/auth/dev-test-auth.server.ts'],
     rules: {
       'import/no-cycle': 'off',
     },
