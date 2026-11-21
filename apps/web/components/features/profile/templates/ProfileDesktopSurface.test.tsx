@@ -10,6 +10,7 @@ import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
+import { PROFILE_STORY_ARTIST } from '../profile-story-fixture';
 import {
   PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME,
   PROFILE_LISTEN_DSP_COLUMN_CLASSNAME,
@@ -149,25 +150,9 @@ vi.mock('@/hooks/useIsAuthenticated', () => ({
 }));
 
 const artist = {
-  id: 'artist-1',
-  owner_user_id: 'user-1',
-  name: 'Tim White',
-  handle: 'timwhite',
-  spotify_id: '4u',
+  ...PROFILE_STORY_ARTIST,
   image_url: 'https://example.com/tim.jpg',
-  tagline: 'Producer, songwriter, and after-hours romantic.',
   location: null,
-  hometown: null,
-  career_highlights: null,
-  is_verified: true,
-  active_since_year: null,
-  published: true,
-  is_featured: false,
-  marketing_opt_out: false,
-  created_at: '2026-04-24T00:00:00.000Z',
-  settings: {
-    heroRoleLabel: 'DJ / PRODUCER',
-  },
 } satisfies Artist;
 
 const contacts = [] satisfies PublicContact[];

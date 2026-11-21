@@ -2,12 +2,37 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import type { PublicRelease } from '@/features/profile/releases/types';
+import { PROFILE_DESKTOP_SURFACE_ENABLED } from '@/lib/profile/desktop-surface-flag';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { PROFILE_STORY_ARTIST } from '../profile-story-fixture';
 import { PUBLIC_MUSIC_ERROR_HEADING } from '../profile-surface-state';
 import { ProfileCompactTemplate } from './ProfileCompactTemplate';
+import * as desktopSurfaceModule from './useDesktopSurfaceModule';
+
+const previousDesktopFlag = vi.hoisted(() => {
+  const previous = process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE;
+  process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE = '1';
+  return previous;
+});
+
+afterAll(() => {
+  if (previousDesktopFlag === undefined) {
+    delete process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE;
+  } else {
+    process.env.NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE =
+      previousDesktopFlag;
+  }
+});
 
 // State and axe coverage on the real compact surface. The wiring contract
 // (drawers, history, flags) lives in tests/unit/profile/profile-compact-template.test.tsx.
@@ -67,6 +92,41 @@ describe('ProfileCompactTemplate states', () => {
   afterEach(() => {
     phoneSheet?.remove();
     vi.unstubAllGlobals();
+  });
+
+  it('keeps embedded previews compact without enabling the hidden desktop loader', async () => {
+    expect(PROFILE_DESKTOP_SURFACE_ENABLED).toBe(true);
+    const loader = vi.spyOn(desktopSurfaceModule, 'useDesktopSurfaceModule');
+    const previousMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches:
+        query === '(min-width: 768px)' || query === '(min-width: 1180px)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    try {
+      renderTemplate({ embeddedPreview: true });
+      const shell = screen.getByTestId('public-profile-layout-shell');
+      await waitFor(() =>
+        expect(shell).toHaveAttribute('data-layout', 'compact')
+      );
+      expect(shell).toHaveAttribute('data-profile-preview', 'true');
+      expect(screen.getByTestId('profile-compact-surface')).toBeVisible();
+      expect(screen.getByTestId('profile-preview-exit')).toHaveAttribute(
+        'href',
+        '/timwhite'
+      );
+      expect(loader).toHaveBeenCalledWith(false);
+      expect(loader).not.toHaveBeenCalledWith(true);
+    } finally {
+      window.matchMedia = previousMatchMedia;
+      loader.mockRestore();
+    }
   });
 
   it('shares the profile from the surface', async () => {

@@ -66,8 +66,11 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
-import { ProfileDesktopSurface } from './ProfileDesktopSurface';
 import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
+import {
+  DesktopSurfaceSlot,
+  useDesktopSurfaceModule,
+} from './useDesktopSurfaceModule';
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
@@ -204,18 +207,6 @@ function getInitialModeFromLocation(
   return modeParam === null ? fallbackMode : getProfileMode(modeParam);
 }
 
-function getInitialDrawerPresentation(): ProfileSurfacePresentation {
-  // Keep the first client render identical to the server render. The responsive
-  // presentation is synced in an effect immediately after hydration.
-  return 'standalone';
-}
-
-function getInitialIsDesktopLayout(): boolean {
-  // Keep the first client render identical to the server render. The responsive
-  // layout is synced in an effect immediately after hydration.
-  return false;
-}
-
 function getModeFromUrl(): ProfileMode {
   if (globalThis.window === undefined) {
     return 'profile';
@@ -345,13 +336,17 @@ export function ProfileCompactTemplate({
   const [drawerView, setDrawerView] = useState<DrawerView>(
     initialDrawerView ?? 'menu'
   );
+  // Match the server render until hydration resolves the responsive layout.
   const [drawerPresentation, setDrawerPresentation] =
-    useState<ProfileSurfacePresentation>(getInitialDrawerPresentation);
-  const [isDesktopLayout, setIsDesktopLayout] = useState(
-    getInitialIsDesktopLayout
-  );
+    useState<ProfileSurfacePresentation>('standalone');
+  const [isDesktopLayout, setIsDesktopLayout] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const [desktopSurfaceReady, setDesktopSurfaceReady] = useState(false);
+  // Embedded previews always render the compact surface. Only a desktop
+  // viewport can present this graph (JOV-12207/JOV-12208).
+  const { Surface } = useDesktopSurfaceModule(
+    PROFILE_DESKTOP_SURFACE_ENABLED && isDesktopLayout
+  );
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
     getInitialModeFromLocation(mode, false)
   );
@@ -1249,9 +1244,9 @@ export function ProfileCompactTemplate({
           </div>
         }
         desktopBanner={
-          embeddedPreview || !PROFILE_DESKTOP_SURFACE_ENABLED
-            ? null
-            : profileBanner
+          PROFILE_DESKTOP_SURFACE_ENABLED && isDesktopLayout
+            ? profileBanner
+            : null
         }
         desktopSurface={
           PROFILE_DESKTOP_SURFACE_ENABLED ? (
@@ -1259,7 +1254,8 @@ export function ProfileCompactTemplate({
               className='relative flex min-h-0 w-full flex-1 flex-col'
               data-sheet-container
             >
-              <ProfileDesktopSurface
+              <DesktopSurfaceSlot
+                surface={Surface}
                 presentation='embedded'
                 overlaysEnabled={isDesktopLayout}
                 onReady={handleDesktopSurfaceReady}

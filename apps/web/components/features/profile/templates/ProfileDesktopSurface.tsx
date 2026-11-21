@@ -89,7 +89,7 @@ const DESTINATION_ICONS: Readonly<Record<BottomTabKey, LucideIcon>> = {
   about: UserRound,
 };
 
-interface ProfileDesktopSurfaceProps {
+export interface ProfileDesktopSurfaceProps {
   readonly presentation?: ProfileSurfacePresentation;
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];

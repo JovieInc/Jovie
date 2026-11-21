@@ -13,11 +13,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PublicClaimBanner } from '@/app/[username]/_components/PublicClaimBanner';
 import { AboutSection } from '@/components/features/profile/AboutSection';
 import { ProfileDrawerShell } from '@/components/features/profile/ProfileDrawerShell';
-import type { PublicRelease } from '@/components/features/profile/releases/types';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 import { ProfileCompactSurface } from '../../../components/features/profile/templates/ProfileCompactSurface';
 import { ProfileCompactTemplate } from '../../../components/features/profile/templates/ProfileCompactTemplate';
+import {
+  mockContacts,
+  mockReleases,
+  mockViewport,
+} from './profile-compact-template.fixtures';
 
 // The desktop surface ships behind a build-time flag (default off). Most of
 // this suite pins it ON to keep covering the flagged desktop surface; the
@@ -252,64 +256,6 @@ const mockArtist: Artist = {
   published: true,
   is_verified_flag: false,
 };
-
-const mockContacts = [
-  {
-    id: 'contact-1',
-    role: 'bookings',
-    roleLabel: 'Booking',
-    territorySummary: 'Worldwide',
-    territoryCount: 1,
-    secondaryLabel: 'book@example.com',
-    channels: [
-      {
-        type: 'email' as const,
-        encoded: 'book@example.com',
-      },
-    ],
-  },
-] satisfies PublicContact[];
-
-const mockReleases = [
-  {
-    id: 'release-1',
-    title: "Don't Look Down",
-    slug: 'dont-look-down',
-    releaseType: 'single',
-    releaseDate: '2024-11-01T00:00:00.000Z',
-    artworkUrl: 'https://example.com/release-1.jpg',
-    artistNames: ['Test Artist'],
-  },
-  {
-    id: 'release-2',
-    title: 'Holding On',
-    slug: 'holding-on',
-    releaseType: 'single',
-    releaseDate: '2023-10-01T00:00:00.000Z',
-    artworkUrl: 'https://example.com/release-2.jpg',
-    artistNames: ['Test Artist'],
-  },
-] satisfies readonly PublicRelease[];
-
-function mockViewport(width: 'mobile' | 'desktop') {
-  const previousMatchMedia = window.matchMedia;
-  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-    matches:
-      width === 'desktop' &&
-      (query === '(min-width: 768px)' || query === '(min-width: 1180px)'),
-    media: query,
-    onchange: null,
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })) as typeof window.matchMedia;
-
-  return () => {
-    window.matchMedia = previousMatchMedia;
-  };
-}
 
 describe('ProfileCompactTemplate', () => {
   let originalMatchMedia: typeof window.matchMedia;
@@ -831,15 +777,49 @@ describe('ProfileCompactTemplate', () => {
     expect(within(drawer).getByText('Main artist')).toBeInTheDocument();
     expect(within(drawer).queryByText('Producer')).toBeNull();
 
-    // The desktop surface slot owns a sheet container that anchors modal
-    // drawers to the desktop shell (route DOM certification, JOV-6915).
+    // The desktop sheet container stays empty at mobile widths — the desktop
+    // module is not fetched where the compact surface owns the page
+    // (JOV-12207/JOV-12208). The desktop anchor is certified below.
+    await act(async () => {});
+    expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
     const sheetContainer = document.querySelector('[data-sheet-container]');
     expect(sheetContainer).not.toBeNull();
     expect(
       sheetContainer?.querySelector(
         '[data-testid="mock-profile-desktop-surface"]'
       )
-    ).not.toBeNull();
+    ).toBeNull();
+  });
+
+  it('anchors the desktop credits drawer to the desktop sheet container', async () => {
+    // Route DOM certification, JOV-6915: the desktop surface slot owns a
+    // sheet container that anchors modal drawers to the desktop shell; the
+    // desktop module mounts client-side on activation.
+    const restoreViewport = mockViewport('desktop');
+    try {
+      render(
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockProfileDesktopSurface).toHaveBeenCalled();
+      });
+
+      const sheetContainer = document.querySelector('[data-sheet-container]');
+      expect(sheetContainer).not.toBeNull();
+      expect(
+        sheetContainer?.querySelector(
+          '[data-testid="mock-profile-desktop-surface"]'
+        )
+      ).not.toBeNull();
+    } finally {
+      restoreViewport();
+    }
   });
 
   it('hides the release credits menu entry when every credit group is empty', () => {
@@ -3128,7 +3108,7 @@ describe('ProfileCompactTemplate', () => {
     });
   });
 
-  it('does not expose a loading status on the compact public profile', () => {
+  it('does not expose a loading status on the compact public profile', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -3140,11 +3120,11 @@ describe('ProfileCompactTemplate', () => {
 
     expect(screen.getByTestId('profile-compact-shell')).toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    // The desktop surface is SSR'd alongside the compact surface; CSS picks
-    // the visible one per breakpoint so no loading interstitial exists.
-    expect(
-      screen.getByTestId('mock-profile-desktop-surface')
-    ).toBeInTheDocument();
+    // At mobile widths (jsdom's matchMedia matches nothing) the desktop
+    // module is never fetched, so no interstitial exists and the compact
+    // surface is the whole page (JOV-12207/JOV-12208).
+    await act(async () => {});
+    expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
     expect(screen.queryByTestId('profile-desktop-loading')).toBeNull();
   });
 
@@ -3235,14 +3215,22 @@ describe('ProfileCompactTemplate', () => {
       />
     );
     expect(html).not.toContain('data-interactive-ready="true"');
-    // JOV-6452: cold desktop loads must paint the real desktop surface straight
-    // from server markup — no "Loading profile…" interstitial between skeleton
-    // and usable profile, and no mobile-shell-only first paint.
-    expect(html).toContain('data-testid="mock-profile-desktop-surface"');
+    // JOV-6452 no-JS paint: server HTML includes the desktop surface test id
+    // so a desktop visitor without JavaScript still sees the surface. The
+    // interactive module stays a client import, so phones never parse,
+    // hydrate, or preload that graph (JOV-12207/JOV-12208). The paint carries
+    // no readiness flag and no loading interstitial. The real module still
+    // owns interaction readiness after it replaces this paint.
+    expect(html).toContain('data-testid="profile-desktop-surface"');
+    expect(html).not.toContain('mock-profile-desktop-surface');
     expect(html).not.toContain('data-testid="profile-desktop-loading"');
     expect(html).not.toContain('Loading profile');
     expect(html).not.toContain('aria-busy="true"');
     expect(html).toContain('data-testid="profile-compact-shell"');
+    // The desktop shell wraps that paint so >=1180px CSS clips the compact
+    // slot and shows the reserved stage. The client module replaces the paint
+    // after it loads, and only that module publishes interaction readiness.
+    expect(html).toContain('data-testid="profile-desktop-shell"');
     const view = render(
       <ProfileCompactTemplate
         mode='profile'
