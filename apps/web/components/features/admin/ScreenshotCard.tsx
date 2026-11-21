@@ -3,7 +3,6 @@ import Image from 'next/image';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
 import type { ScreenshotInfo } from '@/lib/admin/types';
-import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import {
   formatCaptureDate,
   formatConsumerLabel,
@@ -23,11 +22,12 @@ export function ScreenshotCard({
 }: Readonly<ScreenshotCardProps>) {
   return (
     <ContentSurfaceCard surface='nested' className='group overflow-hidden'>
-      <div
-        role='button'
-        tabIndex={0}
-        onClick={onOpen}
-        onKeyDown={event => handleActivationKeyDown(event, onOpen)}
+      <a
+        href={screenshot.url}
+        onClick={event => {
+          event.preventDefault();
+          onOpen();
+        }}
         className='block w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
         aria-label={`View ${screenshot.title}`}
       >
@@ -42,7 +42,7 @@ export function ScreenshotCard({
             className='h-full w-full object-cover object-top'
           />
         </div>
-      </div>
+      </a>
 
       <div className='flex items-center justify-between gap-3 p-3'>
         <div className='min-w-0'>

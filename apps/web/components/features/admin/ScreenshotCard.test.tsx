@@ -14,7 +14,7 @@ describe('ScreenshotCard', () => {
     );
 
     await user.click(
-      screen.getByRole('button', { name: 'View Homepage Desktop' })
+      screen.getByRole('link', { name: 'View Homepage Desktop' })
     );
 
     expect(onOpen).toHaveBeenCalledTimes(1);

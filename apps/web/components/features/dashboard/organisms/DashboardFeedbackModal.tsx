@@ -79,12 +79,7 @@ export function DashboardFeedbackModal({
   );
 
   return (
-    <Dialog
-      open={isOpen}
-      onClose={handleClose}
-      size='sm'
-      hideClose
-    >
+    <Dialog open={isOpen} onClose={handleClose} size='sm' hideClose>
       {isSubmitted ? (
         <div className='px-6 py-8 text-center bg-surface-1'>
           <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success-subtle text-success'>

@@ -1897,7 +1897,7 @@
       "offline": "It never fetches: the items stream in from the server page, and its isLoading flag only drives the static ActivityTableSkeleton (the Loading story)."
     },
     "apps/web/components/features/admin/AdminReadUnavailable.tsx": {
-      "loading": "The 'Reading current data…' copy shows only while the Retry transition's router.refresh() is in flight; it has no prop, so no static story can hold it. Retry is driven in AdminReadUnavailable.test.tsx and AdminReadUnavailable.certificate.test.tsx.",
+      "loading": "The 'Reading current data\u2026' copy shows only while the Retry transition's router.refresh() is in flight; it has no prop, so no static story can hold it. Retry is driven in AdminReadUnavailable.test.tsx and AdminReadUnavailable.certificate.test.tsx.",
       "offline": "It never fetches: Retry only calls router.refresh(), and a read that failed for lack of connectivity reaches it as the caller's message, which ErrorReadFailed shows.",
       "permission-denied": "It has no gated action or permission input; the detector matched role='status'. A read blocked by a missing admin step-up renders AdminVerificationRequired instead (its PermissionDeniedStepUpRequired story)."
     },
@@ -2740,7 +2740,7 @@
       "empty": "The banner renders one card from scalar props (title, description, CTA) and owns no collection that could be empty; omitted copy falls back to defaults (PartialCustomTitle story). The detector matched the items-center class."
     },
     "apps/web/components/shell/LoopBtn.tsx": {
-      "long-content": "The button renders an icon and a one-glyph badge; its accessible name is derived from the three-value mode ('Loop: off', 'Loop: track 1', 'Loop: section ⤴'), so no caller text can grow. Every mode has a story."
+      "long-content": "The button renders an icon and a one-glyph badge; its accessible name is derived from the three-value mode ('Loop: off', 'Loop: track 1', 'Loop: section \u2934'), so no caller text can grow. Every mode has a story."
     },
     "apps/web/components/shell/LyricsRouteSkeleton.tsx": {
       "empty": "The skeleton takes no props: it maps a fixed constant list of six placeholder lines, so there is no collection that can be empty. The detector matched that .map call.",

@@ -68,53 +68,55 @@ export function ScreenshotFilterBar({
   return (
     <ContentSurfaceCard>
       <div className='space-y-4 p-4'>
-      <div className='flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
-        <div>
-          <p className='text-xs font-semibold text-primary-token'>
-            Screenshot Set
-          </p>
-          <p className='text-xs text-secondary-token'>
-            Showing {shown} of {total} captures. Canonical: {canonical}. Other:{' '}
-            {other}.
-          </p>
-        </div>
-        <FilterPills
-          filters={SURFACE_FILTERS}
-          value={surfaceFilter}
-          onChange={onSurfaceChange}
-        />
-      </div>
-      <details className='group rounded-md border border-subtle bg-surface-0'>
-        <summary className='flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-medium text-primary-token'>
-          <span className='inline-flex items-center gap-2'>
-            <SlidersHorizontal className='size-3.5' aria-hidden />
-            More Filters
-          </span>
-          <span className='text-2xs font-normal text-tertiary-token'>
-            Group and use case
-          </span>
-        </summary>
-        <div className='space-y-3 px-3 pb-3 pt-1'>
-          <div className='space-y-2'>
+        <div className='flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between'>
+          <div>
             <p className='text-xs font-semibold text-primary-token'>
-              Capture Group
+              Screenshot Set
             </p>
-            <FilterPills
-              filters={GROUP_FILTERS}
-              value={groupFilter}
-              onChange={onGroupChange}
-            />
+            <p className='text-xs text-secondary-token'>
+              Showing {shown} of {total} captures. Canonical: {canonical}.
+              Other: {other}.
+            </p>
           </div>
-          <div className='space-y-2'>
-            <p className='text-xs font-semibold text-primary-token'>Use Case</p>
-            <FilterPills
-              filters={CONSUMER_FILTERS}
-              value={consumerFilter}
-              onChange={onConsumerChange}
-            />
-          </div>
+          <FilterPills
+            filters={SURFACE_FILTERS}
+            value={surfaceFilter}
+            onChange={onSurfaceChange}
+          />
         </div>
-      </details>
+        <details className='group rounded-md border border-subtle bg-surface-0'>
+          <summary className='flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-medium text-primary-token'>
+            <span className='inline-flex items-center gap-2'>
+              <SlidersHorizontal className='size-3.5' aria-hidden />
+              More Filters
+            </span>
+            <span className='text-2xs font-normal text-tertiary-token'>
+              Group and use case
+            </span>
+          </summary>
+          <div className='space-y-3 px-3 pb-3 pt-1'>
+            <div className='space-y-2'>
+              <p className='text-xs font-semibold text-primary-token'>
+                Capture Group
+              </p>
+              <FilterPills
+                filters={GROUP_FILTERS}
+                value={groupFilter}
+                onChange={onGroupChange}
+              />
+            </div>
+            <div className='space-y-2'>
+              <p className='text-xs font-semibold text-primary-token'>
+                Use Case
+              </p>
+              <FilterPills
+                filters={CONSUMER_FILTERS}
+                value={consumerFilter}
+                onChange={onConsumerChange}
+              />
+            </div>
+          </div>
+        </details>
       </div>
     </ContentSurfaceCard>
   );

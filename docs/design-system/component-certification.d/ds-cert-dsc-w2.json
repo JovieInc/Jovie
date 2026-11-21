@@ -54,15 +54,6 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/features/dashboard/atoms/CopyLinkInput.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
     "apps/web/components/features/dashboard/atoms/PlatformPill.tsx": [
       "ds-owner",
       "tokens",

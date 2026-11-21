@@ -15,7 +15,7 @@ describe('ScreenshotGallery', () => {
       screen.getByText(/Showing 3 of 3 captures. Canonical: 2. Other: 1./)
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'View Homepage Mobile' })
+      screen.getByRole('link', { name: 'View Homepage Mobile' })
     ).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
@@ -27,7 +27,7 @@ describe('ScreenshotGallery', () => {
     await user.click(screen.getByRole('button', { name: 'Other Captures' }));
     expect(screen.getByText(/Showing 1 of 3 captures/)).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'View Settings Desktop' })
+      screen.getByRole('link', { name: 'View Settings Desktop' })
     ).toBeInTheDocument();
 
     await user.click(screen.getByText('More Filters'));
@@ -51,7 +51,7 @@ describe('ScreenshotGallery', () => {
     render(<ScreenshotGallery screenshots={SCREENSHOT_SET} />);
 
     await user.click(
-      screen.getByRole('button', { name: 'View Homepage Desktop' })
+      screen.getByRole('link', { name: 'View Homepage Desktop' })
     );
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText('1/3')).toBeInTheDocument();
@@ -62,12 +62,12 @@ describe('ScreenshotGallery', () => {
     expect(within(dialog).getByText('1/3')).toBeInTheDocument();
   });
 
-  it('draws the selected filter with the accent token, not a linear variable', async () => {
+  it('draws the selected filter with a design-system variant, not a linear variable', async () => {
     render(<ScreenshotGallery screenshots={SCREENSHOT_SET} />);
 
     const pill = screen.getByRole('button', { name: 'All Captures' });
     expect(pill).toHaveAttribute('aria-pressed', 'true');
-    expect(pill.className).toContain('bg-accent/10');
+    expect(pill.className).not.toContain('bg-accent/10');
     expect(pill.className).not.toContain('--linear');
   });
 });
