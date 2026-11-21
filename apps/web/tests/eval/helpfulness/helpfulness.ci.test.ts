@@ -1,9 +1,4 @@
-/**
- * Deterministic CI lane for the Jovie helpfulness eval. No model, DB or
- * network calls: it proves the case set, hard checks and judge parsing
- * stay sound, and that a deliberately dumb reply fails while a grounded one
- * passes.
- */
+/** Deterministic helpfulness CI: case set, hard checks, judge parsing. No model/DB/network. */
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
@@ -27,7 +22,7 @@ describe('helpfulness case set', () => {
     expect(HELPFULNESS_EVAL_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/);
     const ids = HELPFULNESS_CASES.map(c => c.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.length).toBeLessThanOrEqual(55);
+    expect(ids.length).toBeLessThanOrEqual(120);
     expect(HELPFULNESS_CASES.filter(c => c.ciSubset).length).toBeGreaterThan(4);
   });
 
@@ -140,5 +135,21 @@ describe('judge contract', () => {
     const result = scoreCase('x', [{ id: 'copy_floor', ok: false }], verdict);
     expect(result.score).toBe(40);
     expect(result.passed).toBe(false);
+  });
+});
+
+describe('ASS-36 empty-profile setup', () => {
+  it('requires today setup step', () => {
+    const c = HELPFULNESS_CASES.find(x => x.id === 'new-where-start')!;
+    const bad = runHardChecks(c, {
+      text: 'Finish a song first.',
+      toolCalls: [],
+    });
+    const good = runHardChecks(c, {
+      text: 'Add a bio on jov.ie/maraquill today.',
+      toolCalls: [],
+    });
+    expect(bad.find(x => x.id === 'grounding_0')?.ok).toBe(false);
+    expect(good.find(x => x.id === 'grounding_0')?.ok).toBe(true);
   });
 });

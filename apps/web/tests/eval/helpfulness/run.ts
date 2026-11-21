@@ -78,7 +78,7 @@ import {
 export { assertNoGatewaySpend, resolveWorkersAiConfig } from './resolve-config';
 
 /** Hard cap on cases per run so a loop can never fan out unbounded spend. */
-export const MAX_CASES_PER_RUN = 55;
+export const MAX_CASES_PER_RUN = 120;
 
 interface Args {
   judge: string;
