@@ -134,6 +134,30 @@ describe('buildStoryFirstBottleneck', () => {
     });
   });
 
+  it('keeps funnel title distinct from the measured body', () => {
+    const funnel: CompanyBlocker = {
+      schema: 'jovie.company-blocker/v1',
+      id: 'funnel:claim_attempted',
+      kind: 'funnel',
+      step: 'claim_attempted',
+      tone: 'bad',
+      text: '12 claim prompts shown this week, but no claim attempts',
+      detailsHref: APP_ROUTES.ADMIN_GROWTH,
+      since: null,
+      nextAction: null,
+      observedAt: '2026-11-21T00:00:00.000Z',
+    };
+    const story = buildStoryFirstBottleneck({
+      revenue: funnel,
+      revenueRead: true,
+      constraint: { tone: 'bad', text: funnel.text },
+      highlight: null,
+    });
+    expect(story.title).toBe('Claim Attempted is blocking revenue');
+    expect(story.body).toBe(funnel.text);
+    expect(story.title).not.toBe(story.body);
+  });
+
   it('reads clear when revenue and shipping are quiet', () => {
     const story = buildStoryFirstBottleneck({
       revenue: null,

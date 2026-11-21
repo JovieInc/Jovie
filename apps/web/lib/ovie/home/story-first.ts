@@ -249,7 +249,8 @@ function shortTitle(blocker: CompanyBlocker): string {
                 : stepLabel(blocker.step);
     return `${name} is blocking revenue`;
   }
-  return blocker.text;
+  // Funnel body already carries the measured detail — headline must differ.
+  return `${stepLabel(blocker.step)} is blocking revenue`;
 }
 
 /**
