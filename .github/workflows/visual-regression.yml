@@ -169,6 +169,8 @@ jobs:
           - { suite: chat-visual, spec: chat-visual.spec.ts, server: app, update: 'true', persona: creator }
           # Electron titlebar/shell geometry (JOV-7713) over seeded personas
           - { suite: electron-titlebar-geometry, spec: electron-titlebar-geometry.spec.ts, server: app, update: 'false', persona: admin }
+          # Rendered OV shell guard at 1512 expanded/collapsed (JOV-12642)
+          - { suite: desktop-shell-certification, spec: desktop-shell-certification.spec.ts, server: app, update: 'true', persona: admin }
           # Admin surfaces (JOV-4062)
           - { suite: admin-visual-regression, spec: admin-visual-regression.spec.ts, server: app, update: 'true', persona: admin }
           # Surface elevation matrix (JOV-2156) and chat history switcher,
