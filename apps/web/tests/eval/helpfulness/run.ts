@@ -8,7 +8,13 @@
  * All model calls go to Cloudflare Workers AI (startup credits). The AI
  * Gateway is never used: Gateway cash is reserved for production traffic.
  *
- *   CLOUDFLARE_ACCOUNT_ID=... pnpm --filter @jovie/web eval:helpfulness -- \
+ * Preferred (Cursor agent VM / CI — no Cloudflare account id):
+ *   WORKERS_AI_TOKEN=... pnpm --filter @jovie/web eval:helpfulness -- \
+ *     --judge cheap --subset ci --out .eval-results/jovie-helpfulness/ci.json
+ *
+ * Direct Workers AI API (local Doppler / wrangler):
+ *   CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... \
+ *     pnpm --filter @jovie/web eval:helpfulness -- \
  *     --judge strong --out .eval-results/jovie-helpfulness/latest.json
  *
  * Flags:
@@ -47,6 +53,7 @@ import {
   parseHistory,
   renderMetricPage,
 } from './publish';
+import { assertNoGatewaySpend, resolveWorkersAiConfig } from './resolve-config';
 import {
   buildJudgePrompt,
   type CaseResult,
@@ -65,12 +72,13 @@ import {
   WORKERS_AI_CHEAP_JUDGE,
   WORKERS_AI_STRONG_JUDGE,
   WORKERS_AI_SUBJECT_MODEL,
-  type WorkersAiConfig,
   workersAiChat,
 } from './workers-ai';
 
+export { assertNoGatewaySpend, resolveWorkersAiConfig } from './resolve-config';
+
 /** Hard cap on cases per run so a loop can never fan out unbounded spend. */
-export const MAX_CASES_PER_RUN = 45;
+export const MAX_CASES_PER_RUN = 55;
 
 interface Args {
   judge: string;
@@ -110,60 +118,6 @@ function parseArgs(argv: string[]): Args {
     i += 1;
   }
   return args;
-}
-
-/**
- * Gateway guard: this runner has no Gateway path. A Gateway key in the
- * environment is refused unless the operator explicitly opted in, so a
- * future edit cannot silently start spending Gateway cash.
- */
-export function assertNoGatewaySpend(
-  env: NodeJS.ProcessEnv,
-  allowGatewaySpend: boolean
-): void {
-  if (allowGatewaySpend) return;
-  const gatewayVars = Object.keys(env).filter(
-    key => /GATEWAY.*(KEY|TOKEN)/i.test(key) && Boolean(env[key])
-  );
-  if (gatewayVars.length > 0) {
-    throw new Error(
-      `Refusing to run with AI Gateway credentials present (${gatewayVars.join(', ')}). Unset them or pass --allow-gateway-spend.`
-    );
-  }
-}
-
-/** wrangler OAuth tokens live about an hour; refresh well before that. */
-const WRANGLER_TOKEN_TTL_MS = 20 * 60_000;
-
-function resolveWorkersAiConfig(): WorkersAiConfig {
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-  if (!accountId) throw new Error('CLOUDFLARE_ACCOUNT_ID is required.');
-  const fixed = process.env.CLOUDFLARE_API_TOKEN ?? '';
-  if (fixed) return { accountId, token: () => fixed };
-  let cached = '';
-  let fetchedAt = 0;
-  const token = () => {
-    if (!cached || Date.now() - fetchedAt > WRANGLER_TOKEN_TTL_MS) {
-      cached =
-        execFileSync('npx', ['-y', 'wrangler@4', 'auth', 'token'], {
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'ignore'],
-        })
-          .trim()
-          .split('\n')
-          .at(-1)
-          ?.trim() ?? '';
-      fetchedAt = Date.now();
-    }
-    if (!cached) {
-      throw new Error(
-        'CLOUDFLARE_API_TOKEN is required (or run `wrangler login` on this host).'
-      );
-    }
-    return cached;
-  };
-  token();
-  return { accountId, token };
 }
 
 const PRO_ACCOUNT = {
