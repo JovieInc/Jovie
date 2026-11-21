@@ -172,3 +172,20 @@ describe('StoryFirstCanvas', () => {
     await expectNoA11yViolations(melt.container);
   });
 });
+
+describe('StoryFirstCanvas shipping delta', () => {
+  it('colors a negative delta as an error even when the pulse tone is good', () => {
+    render(
+      <StoryFirstCanvas
+        bottleneck={bottleneck}
+        glance={[
+          { ...glance[0], delta: '-16', tone: 'good', points: [30, 14] },
+        ]}
+        stages={[]}
+      />
+    );
+    expect(screen.getByText('-16')).toHaveClass('text-error');
+    expect(screen.getByText('-16')).not.toHaveClass('text-success');
+    expect(screen.queryByLabelText('Shipping · 7d trend')).toBeNull();
+  });
+});
