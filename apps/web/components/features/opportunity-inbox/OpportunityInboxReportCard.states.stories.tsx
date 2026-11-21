@@ -3,6 +3,22 @@ import type { Decorator, Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { OpportunityInboxReportCard } from './OpportunityInboxReportCard';
 
+type Report = NonNullable<OpportunityInboxCardViewModel['report']>;
+
+const baseReport: Report = {
+  metricLabel: 'Saves per visitor',
+  deltaPercent: 18,
+  deltaDisplay: '+18%',
+  direction: 'up',
+  series: [4, 5, 5, 6, 7, 8, 9],
+  items: [
+    { label: 'Mobile', deltaPercent: 22, detail: '1,204 visitors' },
+    { label: 'Desktop', deltaPercent: 9, detail: '318 visitors' },
+  ],
+  experimentId: 'exp-cta-swap-1',
+  nextStep: { label: 'Roll out to all releases', kind: 'apply_experiment' },
+};
+
 const baseCard: OpportunityInboxCardViewModel = {
   id: 'report-states-1',
   signalType: 'other',
@@ -13,28 +29,16 @@ const baseCard: OpportunityInboxCardViewModel = {
   primaryActionLabel: 'Review',
   status: 'pending',
   category: 'report',
-  report: {
-    metricLabel: 'Saves per visitor',
-    deltaPercent: 18,
-    deltaDisplay: '+18%',
-    direction: 'up',
-    series: [4, 5, 5, 6, 7, 8, 9],
-    items: [
-      { label: 'Mobile', deltaPercent: 22, detail: '1,204 visitors' },
-      { label: 'Desktop', deltaPercent: 9, detail: '318 visitors' },
-    ],
-    experimentId: 'exp-cta-swap-1',
-    nextStep: { label: 'Roll out to all releases', kind: 'apply_experiment' },
-  },
+  report: baseReport,
 };
 
 const withReport = (
-  patch: Partial<NonNullable<OpportunityInboxCardViewModel['report']>>,
+  patch: Partial<Report>,
   card: Partial<OpportunityInboxCardViewModel> = {}
 ): OpportunityInboxCardViewModel => ({
   ...baseCard,
   ...card,
-  report: { ...baseCard.report!, ...patch },
+  report: { ...baseReport, ...patch },
 });
 
 /** Rendered states of the experiment report card. */
