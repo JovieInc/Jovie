@@ -80,6 +80,11 @@ function issueDescription(finding, report) {
   ].join('\n');
 }
 
+/**
+ * @param {{ upserts: Array<{ key: string, title: string, detail: string, evidence?: unknown }>, resolves: string[] }} plan
+ * @param {{ creatorUsername?: string | null, checkedAt?: string }} report
+ * @param {{ runId?: string, fetchImpl?: typeof fetch }} [options]
+ */
 export async function applyDogfoodTruthPlan(
   plan,
   report,
@@ -141,6 +146,9 @@ export function summarize(report, plan) {
   return lines.join('\n');
 }
 
+/**
+ * @param {{ env?: Record<string, string | undefined>, fetchImpl?: typeof fetch }} [options]
+ */
 export async function runDogfoodTruthIntake({
   env = process.env,
   fetchImpl,
