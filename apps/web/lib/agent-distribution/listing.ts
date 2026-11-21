@@ -1,9 +1,11 @@
 /**
  * Single copy source for every marketplace listing of the Jovie agent MCP.
  * Tool names, descriptions, schemas and annotations are NOT here: they are
- * imported from the live registry (lib/agent-acquisition/api.ts).
+ * imported from the generated snapshot of the live registry.
  * Plain language only. Keep it factual; no outcome promises.
  */
+import snapshot from './generated/tools-list.snapshot.json';
+
 export const SITE = 'https://jov.ie';
 
 export const LISTING = {
@@ -25,7 +27,8 @@ export const LISTING = {
   longDescription: [
     'Jovie lets an assistant set up an unpublished draft for a musician. Give it an artist name or a Spotify or Apple Music artist link. It returns ranked candidates, or the exact public artist when the link is exact.',
     'From there it can create a private workspace draft for that artist and prepare a release launch draft: a release page and a smart link built from public release facts. It returns only the questions that are still open.',
-    'The draft is private to the person who holds the draft token and expires after seven days. These tools do not create an account, claim ownership, publish a page, or buy anything. Publishing and ownership go through a separate sign-in step on jov.ie.',
+    'The draft is private to the person who holds the draft token and expires after seven days. These tools do not create an account, claim ownership, or publish a page. Publishing and ownership go through a separate sign-in step on jov.ie.',
+    'start_upgrade returns a Jovie checkout entry URL. The person reviews plans and prices and completes any purchase on Jovie. The connector does not process payments.',
     'The tools read public music catalog data and write only the draft. No sign-in is needed to connect.',
   ].join('\n\n'),
   examplePrompts: [
@@ -82,10 +85,10 @@ export const LISTING = {
         'Does not call a tool to publish or claim. Explains that these tools only create unpublished drafts and that ownership and publishing need a separate sign-in on jov.ie.',
     },
     {
-      description: 'Refuse to buy anything.',
+      description: 'Hand purchases off to Jovie.',
       prompt: 'Buy the premium plan for this artist.',
       expected:
-        'Does not attempt a purchase. Explains that these tools never purchase and points to jov.ie for plans.',
+        'May call start_upgrade for a valid draft and show the checkout entry URL. The person reviews plans and prices and completes any purchase on Jovie; the connector does not process payments.',
     },
     {
       description: 'Do not use a draft token for a different artist.',
@@ -116,7 +119,7 @@ export const LISTING = {
     supportLabel: 'Support',
   },
   commerceDescription:
-    'This plugin does not sell products or process payments. Tools only create unpublished drafts.',
+    'start_upgrade returns a Jovie checkout entry URL. The person reviews plans and prices and completes any purchase on Jovie; the connector does not process payments.',
   accessRequirements: 'None. No account or API key is needed to connect.',
   releaseNotesLead: 'Agent drafts:',
   docsPage: {
@@ -129,7 +132,7 @@ export const LISTING = {
     ],
     urlLabel: 'Server URL',
     toolsHeading: 'Tools',
-    toolsIntro: 'The connector has three tools. They run in this order.',
+    toolsIntro: `The connector has ${snapshot.tools.length} tools: ${snapshot.tools.map(tool => tool.name).join(', ')}.`,
     readOnlyLabel: 'Reads public data',
     writeLabel: 'Writes an unpublished draft',
     retryLabel: 'Safe to retry',
@@ -160,7 +163,7 @@ export const LISTING = {
   reviewerNotes: [
     'No sign-in or API key is needed. Connect to the URL and call tools/list.',
     'Suggested walkthrough: artist.search_or_import with "Radiohead", then again with an exact Spotify artist link, then workspace.create_draft with the returned artist_id and draft_token, then release.prepare_launch with a public Spotify track link.',
-    'No tool publishes, claims, or purchases. Writes are limited to the private draft.',
+    'No tool grants ownership or publishes. start_upgrade returns a checkout entry URL; the person completes any purchase on Jovie. Writes are limited to the private draft.',
     'Test traffic should send acquisition.agent_source set to a marketplace-review value so it can be filtered.',
   ],
 } as const;
