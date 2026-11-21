@@ -5,6 +5,7 @@ import {
   assessPreventionLeverage,
   leverageFirstViolations,
   orderLeverageFirst,
+  rankAdmissionQueue,
   rankQueueCandidates,
   scoreIssue,
 } from '../scorer.mjs';
@@ -311,6 +312,38 @@ describe('JOV-7423 leverage-first ordering', () => {
     assert.deepEqual(ids(ranked), ['JOV-4601', 'JOV-6038']);
     assert.deepEqual(ranked.receipt.leverageFirst.clusters, []);
     assert.equal(ranked.receipt.leverageFirst.duplicationAvoided, 0);
+  });
+
+  it('records the cluster on the admission reason while a guard is in progress', () => {
+    const guard = issue('JOV-6038', {
+      title: 'Guardrail: canonical pen production round-trip',
+      labels: ['invariant'],
+      effort: 'medium',
+      state: 'In Progress',
+    });
+    const proof = issue('JOV-4601', {
+      title: 'Repair auth profile design drift',
+      createdAt: '2026-08-01T00:00:00.000Z',
+      priority: 2,
+    });
+    const duplicate = issue('JOV-4602', {
+      title: 'Repair dashboard profile design drift',
+      createdAt: '2026-09-01T00:00:00.000Z',
+      priority: 2,
+    });
+    const candidates = withPrevention([proof, duplicate]);
+    guard.state = 'In Progress';
+    guard.prevention = null;
+    const ranked = rankAdmissionQueue(
+      candidates,
+      [guard, ...candidates],
+      '2026-10-03T00:00:00.000Z'
+    );
+    assert.equal(ranked.ranked[0].identifier, 'JOV-4601');
+    assert.match(
+      ranked.reason,
+      /leverage-first proof-while-guard-ships JOV-6038 avoids 1 duplicate leaf repair/
+    );
   });
 
   it('orders an already assessed cluster without a second score', () => {

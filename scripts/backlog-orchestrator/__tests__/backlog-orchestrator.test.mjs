@@ -4937,49 +4937,6 @@ describe('deterministic Symphony admission boundary', () => {
     );
   });
 
-  it('records the leaf cluster when a shared guard is admitted ahead of it', async () => {
-    const guardrail = admissionIssue({
-      identifier: 'JOV-6038',
-      title: 'Guardrail: canonical pen production round-trip',
-      labels: ['invariant'],
-    });
-    const proof = admissionIssue({
-      identifier: 'JOV-4601',
-      title: 'Repair auth profile design drift',
-    });
-    const duplicate = admissionIssue({
-      identifier: 'JOV-4602',
-      title: 'Repair onboarding profile design drift',
-    });
-    const cls = (item, overrides = {}) => ({
-      ...classification(item),
-      mrrCategory: 'reliability',
-      mrrConfidence: 'high',
-      effort: 'small',
-      area: 'design',
-      ...overrides,
-    });
-    const result = await admitter.selectNextToAdmit(
-      [
-        cls(proof, { effort: 'trivial', mrrCategory: 'paid' }),
-        cls(duplicate, { effort: 'trivial', mrrCategory: 'paid' }),
-        cls(guardrail, { effort: 'medium', mrrConfidence: 'low' }),
-      ],
-      [],
-      { fleetGate: greenFleetGate(), now: '2026-10-03T00:00:00.000Z' }
-    );
-    assert.equal(result.admit[0].identifier, 'JOV-6038');
-    assert.match(result.reason, /leverage-first guard-before-leaves JOV-6038/);
-    assert.equal(
-      result.queueRankingReceipt.leverageFirst.clusters[0].duplicationAvoided,
-      1
-    );
-    assert.deepEqual(
-      result.queueRankingReceipt.leverageFirst.clusters[0].heldLeaves,
-      ['JOV-4602']
-    );
-  });
-
   it('admits founder-assigned work without a human ownership hold', async () => {
     const protectedIssue = admissionIssue({
       identifier: 'JOV-4513',
