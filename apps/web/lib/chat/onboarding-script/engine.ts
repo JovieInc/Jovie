@@ -340,6 +340,19 @@ export function resolveGuardedStep(input: {
   }
 
   if (!state.spotifyArtistId && !selectedArtistId) {
+    // None of These skips Spotify and advances to handle (JOV-14240).
+    if (
+      findLatestToolOutput(
+        uiMessages,
+        WIDGET_COMPLETION_ACTIONS.SPOTIFY_SKIPPED
+      ) ||
+      findWidgetEventInHistory(
+        uiMessages,
+        ONBOARDING_WIDGET_EVENTS.ARTIST_NONE_OF_THESE
+      )
+    ) {
+      return hasHandleConfirmed(uiMessages) ? 'contact' : 'handle';
+    }
     if (
       findLatestToolOutput(uiMessages, 'open_artist_picker') ||
       state.turnCount > 1
@@ -692,28 +705,43 @@ export async function decideFallbackTurn(
     ? parseWidgetEventFromMetadata(latest.metadata)
     : null;
 
-  // "None of these" — re-open artist search without treating as selection.
+  // "None of these" — skip Spotify and advance to handle (JOV-14240).
+  // Re-opening the picker looped dogfood accounts back to the same step.
   if (
     latestEvent?.onboardingEvent ===
     ONBOARDING_WIDGET_EVENTS.ARTIST_NONE_OF_THESE
   ) {
-    const query = '';
-    const line = pick('get_artist');
+    const priorPicker = findLatestToolOutput(uiMessages, 'open_artist_picker');
+    const queryHint =
+      typeof priorPicker?.query === 'string' ? priorPicker.query : '';
+    const handle =
+      requestedHandleFrom(uiMessages, latest, true) ??
+      handleFromArtistName(queryHint);
+    const line = pick('handle');
     return {
       line,
-      text: renderLine(line, {}),
+      text: renderLine(line, { handle }),
       toolEvents: [
         {
           toolName: 'searchSpotifyArtist',
-          input: { query },
+          input: { query: queryHint || null },
           output: {
-            action: 'open_artist_picker',
-            query: null,
-            summary: 'Pick the matching Spotify artist.',
+            action: WIDGET_COMPLETION_ACTIONS.SPOTIFY_SKIPPED,
+            query: queryHint || null,
+            summary: 'Skipped Spotify match.',
+          },
+        },
+        {
+          toolName: 'checkHandle',
+          input: { handle },
+          output: {
+            action: 'check_handle',
+            handle,
+            summary: `Checking @${handle}.`,
           },
         },
       ],
-      guardedStep: 'artist_search',
+      guardedStep: 'handle',
     };
   }
 
@@ -749,37 +777,50 @@ export async function decideFallbackTurn(
   }
 
   // No artist yet: greet on the very first turn, otherwise open the picker.
+  // After an explicit Spotify skip, stay on the handle path (JOV-14240).
   if (!state.spotifyArtistId) {
-    if (state.turnCount <= 1 && input.openPickerQuery === undefined) {
-      const line = pick('greet');
+    const skippedSpotify =
+      findLatestToolOutput(
+        uiMessages,
+        WIDGET_COMPLETION_ACTIONS.SPOTIFY_SKIPPED
+      ) ||
+      findWidgetEventInHistory(
+        uiMessages,
+        ONBOARDING_WIDGET_EVENTS.ARTIST_NONE_OF_THESE
+      );
+    if (!skippedSpotify) {
+      if (state.turnCount <= 1 && input.openPickerQuery === undefined) {
+        const line = pick('greet');
+        return {
+          line,
+          text: renderLine(line, {}),
+          toolEvents: [],
+          guardedStep: 'role',
+        };
+      }
+      // Prefill from prior user message; skip incomplete acks.
+      const rawQuery =
+        input.openPickerQuery ??
+        (latest ? messageText(latest).slice(0, 50) : '');
+      const query = isIncompleteAdvanceMessage(rawQuery) ? '' : rawQuery;
+      const line = pick('get_artist');
       return {
         line,
         text: renderLine(line, {}),
-        toolEvents: [],
-        guardedStep: 'role',
+        toolEvents: [
+          {
+            toolName: 'searchSpotifyArtist',
+            input: { query },
+            output: {
+              action: 'open_artist_picker',
+              query: query || null,
+              summary: 'Pick the matching Spotify artist.',
+            },
+          },
+        ],
+        guardedStep: 'artist_search',
       };
     }
-    // Prefill from prior user message; skip incomplete acks.
-    const rawQuery =
-      input.openPickerQuery ?? (latest ? messageText(latest).slice(0, 50) : '');
-    const query = isIncompleteAdvanceMessage(rawQuery) ? '' : rawQuery;
-    const line = pick('get_artist');
-    return {
-      line,
-      text: renderLine(line, {}),
-      toolEvents: [
-        {
-          toolName: 'searchSpotifyArtist',
-          input: { query },
-          output: {
-            action: 'open_artist_picker',
-            query: query || null,
-            summary: 'Pick the matching Spotify artist.',
-          },
-        },
-      ],
-      guardedStep: 'artist_search',
-    };
   }
 
   // Artist confirmed but handle widget not shown yet (neither check nor confirm).

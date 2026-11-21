@@ -87,7 +87,9 @@ describe('artist-profiles heading order (JOV-2246)', () => {
       undefined
     );
 
-    fireEvent.click(screen.getByRole('link', { name: 'See How It Adapts' }));
+    fireEvent.click(
+      screen.getByRole('link', { name: ARTIST_PROFILE_COPY.hero.secondaryCtaLabel })
+    );
 
     expect(trackHomepageEvent).toHaveBeenLastCalledWith(
       'artist_profiles_adaptive_cta_clicked',
