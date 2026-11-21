@@ -10,6 +10,10 @@ import {
 } from './performance-smooth-baseline';
 import { SMOOTH_SURFACES } from './performance-smooth-manifest';
 import {
+  classifySameRouteJank,
+  smoothRouteIdentity,
+} from './performance-smooth-measure';
+import {
   isHydrationConsoleText,
   medianNumber,
 } from './performance-smooth-probes';
@@ -188,6 +192,37 @@ describe('performance-smooth-baseline helpers', () => {
     );
     expect(isHydrationConsoleText('fetch failed')).toBe(false);
     expect(medianNumber([3, 1, 2])).toBe(2);
+  });
+
+  it('does not count intentional leave as same-route reload/dup jank', () => {
+    const measured = smoothRouteIdentity('https://preview.example/');
+    expect(measured).toBe('https://preview.example/');
+    const left = classifySameRouteJank({
+      measuredRoute: measured,
+      finalUrl: 'https://preview.example/start',
+      documentUrls: [
+        'https://preview.example/',
+        'https://preview.example/start',
+      ],
+      probeReloads: 0,
+      probeDuplicateFetches: 4,
+      settleDuplicateFetches: 0,
+      settleProbeReloads: 0,
+    });
+    expect(left.fullPageReloads).toBe(0);
+    expect(left.duplicateFetches).toBe(0);
+
+    const stayed = classifySameRouteJank({
+      measuredRoute: measured,
+      finalUrl: 'https://preview.example/',
+      documentUrls: ['https://preview.example/', 'https://preview.example/'],
+      probeReloads: 1,
+      probeDuplicateFetches: 2,
+      settleDuplicateFetches: 0,
+      settleProbeReloads: 0,
+    });
+    expect(stayed.fullPageReloads).toBe(1);
+    expect(stayed.duplicateFetches).toBe(2);
   });
 });
 

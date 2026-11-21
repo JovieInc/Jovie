@@ -105,9 +105,11 @@ export function pickWorstSurface(
     }))
     .sort((left, right) => right.score - left.score);
   const worst = ranked[0];
+  const first = baselines[0];
   if (!worst || worst.score <= 0) {
+    if (!first) return null;
     return {
-      surfaceId: baselines[0]!.surfaceId,
+      surfaceId: first.surfaceId,
       reason: 'all surfaces meet Smooth targets; start with homepage',
     };
   }

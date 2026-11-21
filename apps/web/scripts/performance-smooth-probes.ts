@@ -207,7 +207,8 @@ export function isHydrationConsoleText(text: string) {
 export function medianNumber(values: readonly number[]) {
   if (values.length === 0) return 0;
   const ordered = [...values].sort((left, right) => left - right);
-  return ordered[Math.floor(ordered.length / 2)]!;
+  const mid = ordered[Math.floor(ordered.length / 2)];
+  return mid === undefined ? 0 : mid;
 }
 
 export function medianNullable(values: readonly (number | null)[]) {

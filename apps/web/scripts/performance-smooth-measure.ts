@@ -40,6 +40,49 @@ function resolveRouteUrl(baseUrl: string, path: string) {
   return new URL(path, `${baseUrl.replace(/\/$/, '')}/`).toString();
 }
 
+/** Origin + pathname without trailing slash — used to detect intentional leave. */
+export function smoothRouteIdentity(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/\/+$/, '') || '/';
+    return `${parsed.origin}${path}`;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Reload/dup counts for the measured surface only.
+ * Extra document requests after leaving the measured route (e.g. homepage CTA)
+ * are classified as expected navigation, not jank.
+ */
+export function classifySameRouteJank(options: {
+  readonly measuredRoute: string;
+  readonly finalUrl: string;
+  readonly documentUrls: readonly string[];
+  readonly probeReloads: number;
+  readonly probeDuplicateFetches: number;
+  readonly settleDuplicateFetches: number;
+  readonly settleProbeReloads: number;
+}): { readonly fullPageReloads: number; readonly duplicateFetches: number } {
+  const stayedOnRoute =
+    smoothRouteIdentity(options.finalUrl) === options.measuredRoute;
+  if (!stayedOnRoute) {
+    return {
+      fullPageReloads: options.settleProbeReloads,
+      duplicateFetches: options.settleDuplicateFetches,
+    };
+  }
+  const sameRouteDocs = options.documentUrls.filter(
+    url => smoothRouteIdentity(url) === options.measuredRoute
+  );
+  const documentReloads = Math.max(0, sameRouteDocs.length - 1);
+  return {
+    fullPageReloads: Math.max(documentReloads, options.probeReloads),
+    duplicateFetches: options.probeDuplicateFetches,
+  };
+}
+
 export async function resolvePathForRoute(
   route: PerfRouteDefinition,
   baseUrl: string,
@@ -147,6 +190,21 @@ async function triggerMainInteraction(
   const locator = page.locator(first).first();
   if ((await locator.count()) === 0) return;
   if (!(await locator.isVisible().catch(() => false))) return;
+  // Keep CWV/reload/dup attribution on the measured route: INP needs a click,
+  // but navigations from primary CTAs must not count as surface jank.
+  await page.evaluate(() => {
+    window.addEventListener(
+      'click',
+      event => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (target.closest('a[href], form button[type="submit"], form')) {
+          event.preventDefault();
+        }
+      },
+      { capture: true, once: true }
+    );
+  });
   await locator.click({ timeout: 5_000 }).catch(() => undefined);
   await page.waitForTimeout(250);
 }
@@ -193,6 +251,7 @@ export async function measureSmoothSample(options: {
     await applyCpuThrottle(page, cpuThrottleRate);
 
     const url = resolveRouteUrl(baseUrl, resolvedPath);
+    const measuredRoute = smoothRouteIdentity(url);
     await page.goto(url, {
       timeout: NAVIGATION_TIMEOUT_MS,
       waitUntil: 'domcontentloaded',
@@ -203,6 +262,7 @@ export async function measureSmoothSample(options: {
     }
 
     await page.waitForTimeout(SETTLE_MS);
+    const settleProbe = await readSmoothProbe(page);
     await triggerMainInteraction(page, surface);
     await page.waitForTimeout(400);
 
@@ -215,7 +275,15 @@ export async function measureSmoothSample(options: {
       requiredMetrics
     );
     const probe = await readSmoothProbe(page);
-    const documentReloads = Math.max(0, requestTracker.documentUrls.length - 1);
+    const jank = classifySameRouteJank({
+      measuredRoute,
+      finalUrl: browserMetrics.finalUrl || page.url(),
+      documentUrls: requestTracker.documentUrls,
+      probeReloads: probe.fullPageReloads,
+      probeDuplicateFetches: probe.duplicateFetches,
+      settleDuplicateFetches: settleProbe.duplicateFetches,
+      settleProbeReloads: settleProbe.fullPageReloads,
+    });
 
     return {
       attempt,
@@ -224,8 +292,8 @@ export async function measureSmoothSample(options: {
       inpMs: probe.inpMs ?? browserMetrics.timingValues['first-input-delay'],
       fcpMs: browserMetrics.timingValues['first-contentful-paint'],
       ttfbMs: browserMetrics.timingValues['time-to-first-byte'],
-      fullPageReloads: Math.max(documentReloads, probe.fullPageReloads),
-      duplicateFetches: probe.duplicateFetches,
+      fullPageReloads: jank.fullPageReloads,
+      duplicateFetches: jank.duplicateFetches,
       flickerEvents: probe.flickerEvents,
       hydrationWarnings: consoleTracker.hydrationMessages.length,
       flickerReasons: probe.flickerReasons,
