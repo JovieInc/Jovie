@@ -1,9 +1,8 @@
 'use client';
 
-import { PlainButton } from '@jovie/ui';
+import { IconButton } from '@jovie/ui';
 import { Plus, X } from 'lucide-react';
 import React, { useCallback, useEffect, useRef } from 'react';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { PlatformPill } from '@/features/dashboard/atoms/PlatformPill';
 import { track } from '@/lib/analytics';
 import type { SuggestedLink } from './hooks/useSuggestions';
@@ -237,7 +236,7 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
 
           return (
             <div key={key} className='relative'>
-              <PlainButton
+              <button
                 type='button'
                 aria-label={`Accept ${suggestion.platform.name} suggestion`}
                 className='rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
@@ -253,15 +252,17 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
                   className='pr-10'
                   testId='ingested-suggestion-pill'
                 />
-              </PlainButton>
+              </button>
 
-              <AppIconButton
+              <IconButton
+                size='sm'
+                variant='control'
                 ariaLabel={`Dismiss ${suggestion.platform.name} suggestion`}
-                className='absolute top-1/2 right-2 z-10 -translate-y-1/2'
                 onClick={event => handleDismiss(suggestion, event)}
+                className='absolute top-1/2 right-2 z-10 -translate-y-1/2'
               >
                 <X className='h-3.5 w-3.5' aria-hidden />
-              </AppIconButton>
+              </IconButton>
             </div>
           );
         })}

@@ -45,15 +45,6 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/features/dashboard/organisms/links/IngestedSuggestions.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
     "apps/web/components/features/dashboard/organisms/links/SortableLinkItem.tsx": [
       "ds-owner",
       "tokens",
@@ -82,15 +73,6 @@
       "forced-caps"
     ],
     "apps/web/components/features/dashboard/organisms/release-provider-matrix/components/TrackRow.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
-    "apps/web/components/features/dashboard/organisms/socials-form/SocialLinkSuggestionRows.tsx": [
       "ds-owner",
       "tokens",
       "states",
