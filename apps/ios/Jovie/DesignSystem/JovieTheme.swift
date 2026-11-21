@@ -172,7 +172,10 @@ enum JovieFont {
 }
 
 enum JovieActionButtonMetrics {
-  static let height: CGFloat = 32
+  // BEGIN GENERATED NATIVE ACTION BUTTON
+  static let height: CGFloat = 28
+  static let hitTarget: CGFloat = 44
+  // END GENERATED NATIVE ACTION BUTTON
   static let labelWeight = JovieFont.actionLabelWeight
   static let radius = JovieRadius.pill
 }
@@ -289,9 +292,9 @@ extension View {
 }
 
 struct JoviePillButtonStyle: ButtonStyle {
-  static let visibleHeight: CGFloat = 28
-  /// 44pt hit target on the padded control. The frame is applied after the pill is painted, so it adds no paint.
-  static let minimumHitHeight: CGFloat = 44
+  static let visibleHeight = JovieActionButtonMetrics.height // KEEP 28
+  /// Hit frame applied after paint (KEEP 44).
+  static let minimumHitHeight = JovieActionButtonMetrics.hitTarget
   static let hitInset = JovieSpacing.small
   static let pressedOpacity: Double = 0.8
 
