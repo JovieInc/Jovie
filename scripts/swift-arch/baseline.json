@@ -52,7 +52,6 @@
       "apps/ios/Jovie/Core/MobileActionLoopInboxResponse.swift": 1,
       "apps/ios/Jovie/Core/MobileChatContentParser.swift": 6,
       "apps/ios/Jovie/Core/MobileChatMerchParsing.swift": 1,
-      "apps/ios/Jovie/Core/Observability/ObservabilityReportBuilder.swift": 1,
       "apps/macos/MenuMonitor/Sources/MenuMonitor/ShippingStatusStore.swift": 1
     },
     "polling-timer": {

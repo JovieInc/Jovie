@@ -37,6 +37,8 @@ struct ObservabilityIngestReport: Equatable {
 }
 
 enum ObservabilityReportBuilder {
+  private static let iso8601Formatter = ISO8601DateFormatter()
+
   static func buildReport(
     kind: ObservabilityReportKind,
     title: String,
@@ -55,7 +57,7 @@ enum ObservabilityReportBuilder {
       release: sanitizedLine(release),
       environment: sanitizedLine(environment),
       stacktrace: sanitizedStacktrace(stacktrace),
-      occurredAt: ISO8601DateFormatter().string(from: occurredAt),
+      occurredAt: iso8601Formatter.string(from: occurredAt),
       sampled: sampled
     )
   }
