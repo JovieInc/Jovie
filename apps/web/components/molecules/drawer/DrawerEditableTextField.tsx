@@ -282,17 +282,17 @@ export const DrawerEditableTextField = React.memo(
               <IconButton
                 size='xs'
                 variant='inline'
+                fade='visible'
                 onClick={event => {
                   event.stopPropagation();
                   handleCopyClick();
                 }}
                 aria-label={copyLabel ?? `Copy ${label}`}
-                className='text-tertiary-token'
               >
                 {isSuccess ? (
                   <Check className='h-3.5 w-3.5 text-success' />
                 ) : (
-                  <Copy className='h-3.5 w-3.5' />
+                  <Copy className='h-3.5 w-3.5 text-tertiary-token' />
                 )}
               </IconButton>
             ) : null}
@@ -319,15 +319,17 @@ export const DrawerEditableTextField = React.memo(
                     <IconButton
                       size='xs'
                       variant='inline'
+                      fade='visible'
                       key={action.id}
                       onClick={event => {
                         event.stopPropagation();
                         action.onClick?.();
                       }}
                       aria-label={action.ariaLabel}
-                      className='text-tertiary-token'
                     >
-                      {action.icon ?? <ExternalLink className='h-3.5 w-3.5' />}
+                      {action.icon ?? (
+                        <ExternalLink className='h-3.5 w-3.5 text-tertiary-token' />
+                      )}
                     </IconButton>
                   )
                 )}

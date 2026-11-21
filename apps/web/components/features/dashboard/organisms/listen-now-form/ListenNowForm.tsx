@@ -79,11 +79,11 @@ function ConnectedArtistBadge({
           asChild
           size='xs'
           variant='inline'
-          className='rounded-full text-tertiary-token'
+          fade='visible'
           aria-label='Open Profile'
         >
           <a href={info.externalUrl} target='_blank' rel='noopener noreferrer'>
-            <ExternalLink className='h-3 w-3' />
+            <ExternalLink className='h-3 w-3 text-tertiary-token' />
           </a>
         </IconButton>
       ) : null}
@@ -455,8 +455,10 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
                     <IconButton
                       size='sm'
                       variant='inline'
+                      fade='visible'
+                      destructive
                       onClick={() => removeAdditionalLink(index)}
-                      className='shrink-0 rounded-full text-tertiary-token hover:text-error'
+                      className='shrink-0'
                       aria-label={`Remove ${meta?.name || link.platform}`}
                     >
                       <Trash2 className='h-4 w-4' />
