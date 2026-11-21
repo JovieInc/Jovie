@@ -1,7 +1,7 @@
 'use client';
 
 // @coverage-via apps/web/tests/unit/dashboard/TaskListRow.test.tsx
-import { UserAvatar } from '@jovie/ui';
+import { PlainButton, UserAvatar } from '@jovie/ui';
 import { Layers, Sparkles, Tag } from 'lucide-react';
 import { memo, type ReactNode } from 'react';
 import { TaskProjectionListRow } from '@/components/organisms/table';
@@ -219,7 +219,7 @@ export const TaskListRow = memo(function TaskListRow({
             </div>
           ) : null}
           {task.releaseTitle ? (
-            <button
+            <PlainButton
               type='button'
               onClick={event => {
                 event.stopPropagation();
@@ -230,7 +230,7 @@ export const TaskListRow = memo(function TaskListRow({
             >
               <Layers className='h-3 w-3 shrink-0 text-tertiary-token' />
               <span className='min-w-0 truncate'>{task.releaseTitle}</span>
-            </button>
+            </PlainButton>
           ) : null}
         </div>
       }

@@ -1,6 +1,7 @@
 'use client';
 
 // @coverage-via apps/web/tests/components/releases/ReleaseCell.test.tsx
+import { PlainButton } from '@jovie/ui';
 import { Pause, Play, VolumeX } from 'lucide-react';
 import { memo, useCallback } from 'react';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
@@ -133,7 +134,7 @@ export const ReleaseCell = memo(function ReleaseCell({
 
       {/* Title + artist */}
       {onSelect ? (
-        <button
+        <PlainButton
           type='button'
           onClick={handleSelect}
           className='min-w-0 flex-1 text-left focus-visible:outline-none'
@@ -188,7 +189,7 @@ export const ReleaseCell = memo(function ReleaseCell({
               {artistLine}
             </TruncatedText>
           ) : null}
-        </button>
+        </PlainButton>
       ) : (
         <div className='min-w-0 flex-1'>
           <div className='flex min-w-0 items-center gap-1.5 leading-none'>

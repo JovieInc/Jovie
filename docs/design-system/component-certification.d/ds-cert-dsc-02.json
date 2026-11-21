@@ -119,8 +119,14 @@
     ]
   },
   "waivers": {
+    "apps/web/components/features/dashboard/organisms/dashboard-theme-toggle/DashboardThemeToggle.tsx": {
+      "empty": "The theme options come from the fixed THEME_OPTIONS constant, so the list is never empty."
+    },
     "apps/web/components/features/dashboard/organisms/release-provider-matrix/FilterSubmenu.tsx": {
       "permission-denied": "The submenu has no role or plan gating; the parent menu decides whether it renders through isVisible."
+    },
+    "apps/web/components/features/dashboard/organisms/releases/cells/ReleaseCell.tsx": {
+      "error": "A failed preview raises a toast from the player hook; the cell renders no inline error UI."
     },
     "apps/web/components/features/dashboard/youtube/YouTubeChannelPilotPanel.tsx": {
       "offline": "The panel renders server-provided workspace data and never fetches; sync freshness shows through the last-sync copy."
