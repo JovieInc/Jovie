@@ -36,6 +36,14 @@ const TITLE_GAP_MIN = 16;
 const TITLE_GAP_MAX = 28;
 
 test.use({ storageState: { cookies: [], origins: [] } });
+// Visual Regression always sets the bypass. Fail closed outside that lane
+// instead of test.skip (JOV-INV-045 gate-weakening).
+test.beforeAll(() => {
+  expect(
+    process.env.E2E_USE_TEST_AUTH_BYPASS,
+    'desktop-shell-certification needs E2E_USE_TEST_AUTH_BYPASS=1'
+  ).toBe('1');
+});
 
 function shellMasks(page: Page) {
   return [
@@ -60,10 +68,6 @@ async function openOvPresenceShell(
   page: Page,
   options?: { readonly collapsed?: boolean }
 ): Promise<void> {
-  test.skip(
-    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
-    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
-  );
   test.setTimeout(180_000);
 
   await page.setViewportSize(VIEWPORT);
