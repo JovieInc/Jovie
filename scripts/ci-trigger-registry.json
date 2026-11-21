@@ -16,6 +16,7 @@
     "actions-cache-gc.yml": {"runsPerMergedPr":0.9,"triggers":["push","workflow_dispatch"]},
     "agent-harness-health-report.yml": {"runsPerMergedPr":0,"triggers":["workflow_dispatch"]},
     "artifact-freshness.yml": {"runsPerMergedPr":0,"triggers":["workflow_dispatch","workflow_run:desktop-release"]},
+    "assistants-scheduled-check.yml": {"runsPerMergedPr":0,"triggers":["workflow_dispatch"]},
     "auto-merge-base-guard.yml": {"runsPerMergedPr":0,"triggers":["pull_request_target:auto_merge_enabled"]},
     "auto-ready-agent-drafts.yml": {"runsPerMergedPr":6.9,"triggers":["workflow_dispatch","workflow_run:Source Validation"]},
     "automation-liveness.yml": {"runsPerMergedPr":2.3,"triggers":["workflow_dispatch","workflow_run:Production Continuity Guard"]},
