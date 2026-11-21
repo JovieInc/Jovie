@@ -161,10 +161,8 @@ private struct ContinueInBrowserButton: View {
   let hasRecoveryMessage: Bool
   let action: () -> Void
 
-  private static let minimumHitTargetHeight: CGFloat = 44
-
   private static var minimumHitTargetPadding: CGFloat {
-    max((minimumHitTargetHeight - JovieActionButtonMetrics.height) / 2, 0)
+    max((JovieActionButtonMetrics.hitTarget - JovieActionButtonMetrics.height) / 2, 0)
   }
 
   var body: some View {
