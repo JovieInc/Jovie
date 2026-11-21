@@ -62,6 +62,33 @@
       "a11y",
       "frontend-rules",
       "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/atoms/CopyLinkInput.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/dashboard-analytics/DashboardAnalytics.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/dashboard-pay/DashboardPay.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ]
   },
   "waivers": {
@@ -79,6 +106,9 @@
     },
     "apps/web/components/features/ask-jovie/AskJovieWidget.tsx": {
       "permission-denied": "The widget is a public profile surface open to every visitor and checks no role or entitlement. The detector matched the role field on chat messages (visitor or jovie)."
+    },
+    "apps/web/components/features/dashboard/dashboard-analytics/DashboardAnalytics.tsx": {
+      "permission-denied": "The page denies nothing: usePlanGate only passes maxRetentionDays to TimeRangeSelector, which owns how longer ranges are offered. The detector matched the word plan in usePlanGate."
     }
   }
 }
