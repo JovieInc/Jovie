@@ -55,7 +55,7 @@ describe('TaskRowActionMenu', () => {
       )
     );
 
-    await user.click(screen.getByRole('button', { name: 'Open task actions' }));
+    await user.click(screen.getByRole('button', { name: 'Open Task Actions' }));
 
     expect(onParentClick).not.toHaveBeenCalled();
     expect(
@@ -74,7 +74,7 @@ describe('TaskRowActionMenu', () => {
         />
       );
 
-      screen.getByRole('button', { name: 'Open task actions' }).focus();
+      screen.getByRole('button', { name: 'Open Task Actions' }).focus();
       await user.keyboard(key);
 
       expect(
@@ -82,4 +82,16 @@ describe('TaskRowActionMenu', () => {
       ).toBeInTheDocument();
     }
   );
+
+  it('renders the trigger as a type=button PlainButton with a popup menu', () => {
+    render(
+      <TaskRowActionMenu
+        items={[{ id: 'archive', label: 'Archive', onClick: vi.fn() }]}
+      />
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Open Task Actions' });
+    expect(trigger).toHaveAttribute('type', 'button');
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+  });
 });
