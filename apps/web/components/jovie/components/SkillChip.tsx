@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { X } from 'lucide-react';
 
 /**
@@ -27,7 +28,7 @@ export function SkillChip({ label, onRemove, removeLabel }: SkillChipProps) {
       <span aria-hidden className='system-b-skill-chip-dot' />
       <span className='min-w-0 truncate'>{label}</span>
       {onRemove ? (
-        <button
+        <PlainButton
           type='button'
           aria-label={removeLabel ?? `Remove ${label} skill`}
           onMouseDown={event => {
@@ -39,7 +40,7 @@ export function SkillChip({ label, onRemove, removeLabel }: SkillChipProps) {
           className='system-b-skill-chip-remove'
         >
           <X className='h-3 w-3' />
-        </button>
+        </PlainButton>
       ) : null}
     </span>
   );

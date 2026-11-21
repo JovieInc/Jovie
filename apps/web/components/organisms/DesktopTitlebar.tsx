@@ -2,6 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/components/organisms/DesktopTitlebar.test.tsx
 
+import { PlainButton } from '@jovie/ui';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { useContext, useEffect } from 'react';
@@ -228,7 +229,7 @@ export function DesktopTitlebar() {
             className='flex shrink-0 items-center gap-0.5'
             style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
           >
-            <button
+            <PlainButton
               type='button'
               onClick={goBack}
               disabled={!canGoBack}
@@ -243,8 +244,8 @@ export function DesktopTitlebar() {
               )}
             >
               <ChevronLeft className='h-3.5 w-3.5' strokeWidth={2} />
-            </button>
-            <button
+            </PlainButton>
+            <PlainButton
               type='button'
               onClick={goForward}
               disabled={!canGoForward}
@@ -259,7 +260,7 @@ export function DesktopTitlebar() {
               )}
             >
               <ChevronRight className='h-3.5 w-3.5' strokeWidth={2} />
-            </button>
+            </PlainButton>
           </div>
           <div
             data-testid='electron-titlebar-drag-strip'

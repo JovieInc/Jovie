@@ -109,7 +109,13 @@ export function HudDrilldownSearch({
             data-testid='hud-drilldown-form'
           >
             {Object.entries(target.hiddenParams).map(([name, value]) => (
-              <input key={name} type='hidden' name={name} value={value} />
+              <Input
+                key={name}
+                type='hidden'
+                name={name}
+                value={value}
+                readOnly
+              />
             ))}
             <Input
               type='search'

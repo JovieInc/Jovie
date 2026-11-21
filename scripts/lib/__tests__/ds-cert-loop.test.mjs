@@ -93,6 +93,22 @@ describe('ds-cert-loop', () => {
     assert.equal(skipped.skipped, 1);
   });
 
+  it('flags a skipped component that a gate still holds while it fails', () => {
+    const r = report(cert('a/A.tsx', { tokens: 'fail' }), cert('b/B.tsx'));
+    const result = verifyOrder(
+      ['a/A.tsx', 'b/B.tsx'],
+      r,
+      { 'a/A.tsx': ALL, 'b/B.tsx': ALL },
+      { 'a/A.tsx': 'reverted', 'b/B.tsx': 'not needed' }
+    );
+    assert.equal(result.ok, false);
+    assert.deepEqual(result.problems, [
+      'a/A.tsx: skipped but still gated while it fails tokens; remove its gate entry',
+    ]);
+    const clean = verifyOrder(['a/A.tsx'], r, {}, { 'a/A.tsx': 'reverted' });
+    assert.equal(clean.ok, true);
+  });
+
   it('new gates cover only passing, ungated components', () => {
     const r = report(
       cert('b/B.tsx'),

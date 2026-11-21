@@ -258,6 +258,20 @@ jobs:
           --only-secrets=BETTER_AUTH_URL,NEXT_PUBLIC_BETTER_AUTH_URL,BETTER_AUTH_SECRET,DATABASE_URL,SESSION_SECRET,AI_GATEWAY_API_KEY,NEXT_PUBLIC_TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,NEXT_PUBLIC_APP_URL,NEXT_PUBLIC_PROFILE_URL,NEXT_PUBLIC_PROFILE_HOSTNAME
           --no-fallback -- env -u DOPPLER_TOKEN pnpm --filter=@jovie/web exec
           tsx scripts/check-signup-readiness.ts --target=stg --source=env
+      # JOV-12620: when a prior staging generation hit readyState=BLOCKED, skip
+      # the expensive vercel build until the breaker TTL expires. The deploy
+      # script trips .vercel-blocked-breaker.json; Actions cache carries it.
+      - name: Restore Vercel blocked breaker
+        id: vercel-blocked-breaker-restore
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .vercel-blocked-breaker.json
+          key: vercel-blocked-breaker-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            vercel-blocked-breaker-
+          fail-on-cache-miss: false
+      - name: Skip vercel build while Vercel blocked breaker is open
+        run: node .github/scripts/vercel-blocked-breaker.mjs check
       - name: Build (preview target for staging verification)
         timeout-minutes: 10
         run: |
@@ -426,6 +440,13 @@ jobs:
           # The in-job prebuilt artifact is the thing canary verifies. A source
           # fallback would silently discard it and repeat the slow server build.
           VERCEL_ENABLE_SOURCE_FALLBACK: 'false'
+
+      - name: Persist Vercel blocked breaker
+        if: ${{ always() && hashFiles('.vercel-blocked-breaker.json') != '' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .vercel-blocked-breaker.json
+          key: vercel-blocked-breaker-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Wait for staging deployment readiness
         id: inspect-deployment
