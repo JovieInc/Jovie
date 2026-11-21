@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import {
   Popover,
   PopoverContent,
@@ -22,20 +23,15 @@ export function ReleaseTaskExplainerPopover({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
+        <PlainButton
           type='button'
           className='flex-shrink-0 rounded p-0.5 text-tertiary-token opacity-60 hover:opacity-100 hover:bg-surface-1 transition-opacity'
           aria-label='Task Info'
         >
           <Info className='h-3.5 w-3.5' />
-        </button>
+        </PlainButton>
       </PopoverTrigger>
-      <PopoverContent
-        align='end'
-        side='top'
-        sideOffset={4}
-        className='w-72 rounded-lg border border-subtle bg-surface-1 p-3 shadow-lg'
-      >
+      <PopoverContent align='end' side='top' sideOffset={4} className='w-72'>
         <p className='text-2xs leading-relaxed text-secondary-token'>
           {explainerText}
         </p>

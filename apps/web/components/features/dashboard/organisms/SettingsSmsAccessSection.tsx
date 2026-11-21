@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { MessageSquare } from 'lucide-react';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
@@ -65,14 +66,14 @@ export function SettingsSmsAccessSection({
                   soon.
                 </p>
               ) : (
-                <button
+                <PlainButton
                   type='button'
                   onClick={() => mutate()}
                   disabled={isPending}
                   className='inline-flex items-center gap-1.5 rounded-lg border border-(--linear-btn-primary-border) bg-btn-primary px-3 py-1.5 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:opacity-50'
                 >
                   {isPending ? 'Requesting...' : 'Request SMS Access'}
-                </button>
+                </PlainButton>
               )}
               {isError && (
                 <p className='mt-1.5 text-xs text-error'>
