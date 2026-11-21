@@ -19,6 +19,8 @@ const MQ_PARITY_SCOPE = 'Select MQ parity scope';
 const TYPECHECK_TWIN = 'Run typecheck lane parity';
 const REMAINING_TWIN = 'Run remaining lane parity';
 const UNIT_FLAKY_UPLOAD = 'Preserve retried-then-passed unit tests';
+/** SMO-3: hermetic Smooth baseline inventory + planted regression tests. */
+const SMOOTH_SURFACE_RATCHET = 'Smooth surface regression ratchet';
 const REUSE_STEP = 'Reuse exact-head proof for a metadata-only edit';
 
 /** Serial → pooled disk-read step is an owned migration (same guards, first
@@ -223,6 +225,7 @@ export function assertOriginalJobsRetained(current, baseline) {
     TYPECHECK_TWIN,
     REMAINING_TWIN,
     UNIT_FLAKY_UPLOAD,
+    SMOOTH_SURFACE_RATCHET,
   ]);
   const strip = job => ({
     ...job,
@@ -256,7 +259,8 @@ export function assertOriginalJobsRetained(current, baseline) {
               name === MQ_PARITY_SCOPE ||
               name === TYPECHECK_TWIN ||
               name === REMAINING_TWIN ||
-              name === UNIT_FLAKY_UPLOAD))) &&
+              name === UNIT_FLAKY_UPLOAD)) ||
+          (id === 'coverage' && name === SMOOTH_SURFACE_RATCHET)) &&
         !kept.length &&
         added.length === 1;
       assert.ok(kept.length === added.length || firstLanding, `${id}: ${name}`);
@@ -312,6 +316,18 @@ export function assertOriginalJobsRetained(current, baseline) {
     assert.equal(flaky['continue-on-error'], undefined);
     assert.match(String(flaky.if), /steps\.reuse\.outputs\.reuse != 'true'/);
   }
+
+  const smooth = current.jobs.coverage.steps.find(
+    step => step.name === SMOOTH_SURFACE_RATCHET
+  );
+  assert.ok(smooth, 'coverage must land Smooth surface regression ratchet');
+  assert.equal(smooth.if, "steps.reuse.outputs.reuse != 'true'");
+  assert.equal(smooth['continue-on-error'], undefined);
+  assert.match(String(smooth.run), /performance-smooth-ratchet\.ts --check/);
+  assert.match(
+    String(smooth.run),
+    /vitest run scripts\/performance-smooth-ratchet\.test\.ts/
+  );
 
   const steps = current.jobs.deterministic.steps;
   const linearStep = steps.find(step => step.name === linear);
