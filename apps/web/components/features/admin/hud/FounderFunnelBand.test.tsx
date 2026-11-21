@@ -10,6 +10,7 @@ import type {
   FounderFunnelStageRows,
   FounderFunnelTimeRange,
 } from '@/lib/admin/types';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   FounderFunnelBand,
   founderFunnelScopeLabel,
@@ -142,7 +143,7 @@ describe('FounderFunnelBand', () => {
 
     expect(
       screen.getByRole('link', {
-        name: '40 Accounts created; inspect underlying entities',
+        name: /^Accounts created 40 .*; inspect underlying entities$/,
       })
     ).toHaveAttribute(
       'href',
@@ -205,7 +206,7 @@ describe('FounderFunnelBand', () => {
     expect(screen.getByText('7d customer')).toBeInTheDocument();
     expect(screen.getByText('Updating funnel range…')).toBeInTheDocument();
     const oldLink = screen.getByRole('link', {
-      name: '7 Accounts created; inspect underlying entities',
+      name: /^Accounts created 7 .*; inspect underlying entities$/,
     });
     expect(
       new URL(oldLink.getAttribute('href')!, 'https://jov.ie').searchParams.get(
@@ -226,7 +227,7 @@ describe('FounderFunnelBand', () => {
     expect(screen.getByText('30d customer')).toBeInTheDocument();
     expect(screen.queryByText('7d customer')).not.toBeInTheDocument();
     const stage = screen.getByRole('link', {
-      name: '30 Accounts created; inspect underlying entities',
+      name: /^Accounts created 30 .*; inspect underlying entities$/,
     });
     const href = new URL(stage.getAttribute('href')!, 'https://jov.ie')
       .searchParams;
@@ -244,6 +245,47 @@ describe('FounderFunnelBand', () => {
     expect(back.get('q')).toBe('Ada');
     expect(back.getAll('tag')).toEqual(['a', 'b']);
     client.clear();
+  });
+});
+
+describe('FounderFunnelBand accessibility', () => {
+  it('has no accessibility violations with linked and anonymous stages', async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const { container } = render(
+      <QueryClientProvider client={client}>
+        <FounderFunnelBand initialFunnel={funnel} />
+      </QueryClientProvider>
+    );
+
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no accessibility violations for an empty funnel and a failed one', async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const empty = {
+      ...funnel,
+      stages: funnel.stages.map(item => ({ ...item, count: 0 })),
+    };
+    const first = render(
+      <QueryClientProvider client={client}>
+        <FounderFunnelBand initialFunnel={empty} />
+      </QueryClientProvider>
+    );
+    await expectNoA11yViolations(first.container);
+    first.unmount();
+
+    const second = render(
+      <QueryClientProvider client={client}>
+        <FounderFunnelBand
+          initialFunnel={{ ...funnel, errors: ['Timed out'] }}
+        />
+      </QueryClientProvider>
+    );
+    await expectNoA11yViolations(second.container);
   });
 });
 

@@ -91,7 +91,7 @@ describe('EntityHoverLink', () => {
     advanceTimers(200);
 
     expect(screen.getByRole('tooltip').textContent).toContain('Sober');
-
+    expect(trigger).toHaveAttribute('type', 'button');
     fireEvent.mouseLeave(trigger);
     advanceTimers(120);
 
