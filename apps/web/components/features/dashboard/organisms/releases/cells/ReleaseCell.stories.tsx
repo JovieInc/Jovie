@@ -58,7 +58,7 @@ export const PartialRequiredOnly: Story = {
   args: {
     artistName: undefined,
     onSelect: () => undefined,
-    release: { ...release, releaseType: undefined, releaseDate: undefined },
+    release: { ...release, releaseDate: undefined },
   },
 };
 

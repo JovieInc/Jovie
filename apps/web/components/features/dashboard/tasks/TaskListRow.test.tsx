@@ -40,15 +40,14 @@ describe('TaskListRow', () => {
     const user = userEvent.setup();
     const onOpenRelease = vi.fn();
     const onRowClick = vi.fn();
+    // A click that bubbles past the row would reach the document body.
+    document.body.addEventListener('click', onRowClick);
     const { container } = render(
-      // biome-ignore lint/a11y/noStaticElementInteractions: row click bubbling probe
-      // biome-ignore lint/a11y/useKeyWithClickEvents: row click bubbling probe
-      <div onClick={onRowClick}>
-        <TaskListRow task={task} onOpenRelease={onOpenRelease} />
-      </div>
+      <TaskListRow task={task} onOpenRelease={onOpenRelease} />
     );
 
     await user.click(screen.getByRole('button', { name: /QA Release/ }));
+    document.body.removeEventListener('click', onRowClick);
     expect(onOpenRelease).toHaveBeenCalledWith(task);
     expect(onRowClick).not.toHaveBeenCalled();
     await expectNoA11yViolations(container);
