@@ -112,7 +112,7 @@ jobs:
             # What this push changed: the PR head (the merge commit's second
             # parent) against the previous head, file by file.
             { git ls-tree -r --name-only HEAD^2 -- docs/design-system/pen-briefs
-              ls .pen-before/docs/design-system/pen-briefs 2>/dev/null | sed 's|^|docs/design-system/pen-briefs/|'
+              find .pen-before/docs/design-system/pen-briefs -maxdepth 1 -type f -printf 'docs/design-system/pen-briefs/%f\n' 2>/dev/null || true
               printf '%s\n' scripts/design/pen-draft.mjs scripts/design/pen-trim.mjs .github/workflows/pen-draft.yml
             } | sort -u | while IFS= read -r f; do
               git show "HEAD^2:$f" 2>/dev/null | cmp -s - ".pen-before/$f" || echo "$f"
