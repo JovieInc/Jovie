@@ -538,8 +538,16 @@ export function JovieChat({
     draft,
     !showThreadView && !showHomeCanvas
   );
+  // Living Home (Ovie Story First): subscribe while the board is up so typing
+  // can melt it without opening the transcript.
+  const livingBoardIntent = useComposerDraftIntent(
+    draft,
+    livingCanvas && showHomeCanvas
+  );
   const composerHasIntent =
     composerPickerOpen || hasDraftIntent || chipTray.chips.length > 0;
+  const homeComposerHasIntent =
+    livingBoardIntent || composerPickerOpen || chipTray.chips.length > 0;
   // The empty state is the greeting above the composer. Only a result Jovie
   // has already finished may sit under it (ChatEmptyStateResult); a chore
   // like "Review your tip flow" never does. No cards, no
@@ -869,6 +877,7 @@ export function JovieChat({
                             isStreaming:
                               status === 'submitted' || status === 'streaming',
                             onOpenTranscript: () => setTranscriptOpen(true),
+                            composerHasIntent: homeComposerHasIntent,
                           })
                         : homeCanvas
                     }
