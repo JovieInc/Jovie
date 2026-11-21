@@ -2823,12 +2823,14 @@ it('parseSkipLaneIds and selectLanes drop listed typecheck/lint ids (JOV-12618)'
     ]);
 
     process.env.CI_FAST_SKIP_LANE_IDS =
-      'typecheck,web-tests-typecheck,web-stories-typecheck,biome,eslint-server-boundaries,shadcn-lint-contracts,scripts-typecheck';
+      'typecheck,web-tests-typecheck,web-stories-typecheck,biome,shadcn-lint-contracts,scripts-typecheck';
     expect(selectLanes('typecheck').map(lane => lane.id)).toEqual([]);
 
     const remaining = selectLanes('remaining').map(lane => lane.id);
     expect(remaining).not.toContain('biome');
     expect(remaining).not.toContain('scripts-typecheck');
+    // eslint-server-boundaries is proof-inequivalent to SV; never skipped.
+    expect(remaining).toContain('eslint-server-boundaries');
     expect(remaining).toContain('structural');
     expect(remaining).toContain('guardrails');
   } finally {

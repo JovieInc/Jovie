@@ -88,14 +88,15 @@ lanes only when every condition holds (JOV-13081):
 3. Decision fails open on any lookup error (full typecheck/lint runs).
 
 Reusable (skippable) lanes: `typecheck`, `web-tests-typecheck`,
-`web-stories-typecheck`, `biome`, `eslint-server-boundaries`,
-`shadcn-lint-contracts`, `scripts-typecheck`.
+`web-stories-typecheck`, `biome`, `shadcn-lint-contracts`, `scripts-typecheck`.
 
-Always keep running in the merge group (base-sensitive or combined-head):
+Always keep running in the merge group (base-sensitive, combined-head, or
+proof-inequivalent to Source Validation):
 
 | Check | Why it stays |
 | --- | --- |
 | CI/release incident prevention contract | Every-head receipt; dependency-free |
+| `eslint-server-boundaries` | Lane uses `--no-inline-config`; SV `lint:eslint:changed` honors inline disables |
 | `guardrails` (proxy) | Path + product-lane sensitive |
 | `design-exception-registry` and other design ratchets | Compare against the group's base / trusted tip |
 | `source-guards`, `copy-gate`, `node-runtime-contracts` | Read disk / base-bound contracts |

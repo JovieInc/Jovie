@@ -70,24 +70,36 @@ describe('merge-group typecheck/lint same-tree reuse (JOV-12618 / JOV-13081)', (
       expect.arrayContaining([
         'typecheck',
         'biome',
-        'eslint-server-boundaries',
         'shadcn-lint-contracts',
         'scripts-typecheck',
       ])
     );
+    expect(decision.skipLaneIds).not.toContain('eslint-server-boundaries');
   });
 
-  it('keeps base-sensitive ratchets out of the reusable skip set', () => {
+  it('keeps base-sensitive / proof-inequivalent lanes out of the reusable skip set', () => {
     for (const laneId of MERGE_GROUP_BASE_SENSITIVE_CI_FAST_LANES) {
       expect(REUSABLE_TYPECHECK_LINT_LANE_IDS).not.toContain(laneId);
     }
     expect(MERGE_GROUP_BASE_SENSITIVE_CI_FAST_LANES).toEqual(
       expect.arrayContaining([
+        'eslint-server-boundaries',
         'design-exception-registry',
         'guardrails',
         'structural',
         'source-guards',
       ])
+    );
+  });
+
+  it('does not treat eslint-server-boundaries as SV-equivalent (Sentry 20814816)', () => {
+    // SV lint:eslint:changed honors inline disables; the MG lane passes
+    // --no-inline-config on eslint-server-boundaries.config.js.
+    expect(REUSABLE_TYPECHECK_LINT_LANE_IDS).not.toContain(
+      'eslint-server-boundaries'
+    );
+    expect(MERGE_GROUP_BASE_SENSITIVE_CI_FAST_LANES).toContain(
+      'eslint-server-boundaries'
     );
   });
 

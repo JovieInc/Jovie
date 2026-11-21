@@ -20,16 +20,22 @@ export const REUSABLE_TYPECHECK_LINT_LANE_IDS = Object.freeze([
   'web-tests-typecheck',
   'web-stories-typecheck',
   'biome',
-  'eslint-server-boundaries',
   'shadcn-lint-contracts',
   'scripts-typecheck',
 ]);
 
 /**
- * Base-sensitive / combined-head work that must keep running in merge_group
- * even when typecheck/lint reuse fires. Documented in MERGE_QUEUE.md.
+ * Base-sensitive / combined-head / proof-inequivalent work that must keep
+ * running in merge_group even when typecheck/lint reuse fires. Documented in
+ * MERGE_QUEUE.md.
+ *
+ * `eslint-server-boundaries` is not tree-reuse-safe: its lane runs
+ * `--no-inline-config` on the boundaries profile, while Source Validation's
+ * `lint:eslint:changed` honors inline disable comments. Skipping it on an SV
+ * green proof would let boundary suppressions reach main.
  */
 export const MERGE_GROUP_BASE_SENSITIVE_CI_FAST_LANES = Object.freeze([
+  'eslint-server-boundaries',
   'guardrails',
   'design-system-source-ratchet',
   'design-exception-registry',
