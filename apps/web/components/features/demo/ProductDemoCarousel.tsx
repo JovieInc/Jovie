@@ -1,6 +1,5 @@
 'use client';
 
-import { PlainButton } from '@jovie/ui';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -68,14 +67,15 @@ export function ProductDemoCarousel() {
     <div className='relative w-full select-none'>
       <BrowserFrame>
         {/* clickable overlay for advancing */}
-        <PlainButton
+        <button
+          type='button'
           className='relative block w-full text-left focus:outline-none'
           onClick={handleAdvance}
           onMouseEnter={() => setPaused(true)}
           onMouseLeave={() => setPaused(false)}
           aria-label='Next Slide'
         >
-          <div className='relative aspect-[1440/900] w-full overflow-hidden bg-ink-on-media'>
+          <div className='relative aspect-[1440/900] w-full overflow-hidden bg-black dark:bg-black'>
             <AnimatePresence mode='wait'>
               <motion.div
                 key={slide.id}
@@ -106,22 +106,22 @@ export function ProductDemoCarousel() {
             <AnimatePresence mode='wait'>
               <motion.div
                 key={`caption-${slide.id}`}
-                className='absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink-on-media/80 via-ink-on-media/40 to-transparent px-6 pb-6 pt-16'
+                className='absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-6 pb-6 pt-16'
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.4, delay: 0.3 }}
               >
-                <p className='text-lg font-semibold tracking-tight text-on-media sm:text-xl md:text-2xl'>
+                <p className='text-lg font-semibold tracking-tight text-white dark:text-white sm:text-xl md:text-2xl'>
                   {slide.caption}
                 </p>
               </motion.div>
             </AnimatePresence>
           </div>
-        </PlainButton>
+        </button>
 
         {/* Progress bar */}
-        <div className='flex h-1 gap-px bg-on-media/5'>
+        <div className='flex h-1 gap-px bg-white/5'>
           {SLIDES.map((s, i) => (
             <div key={s.id} className='relative flex-1 overflow-hidden'>
               {i === current && (
@@ -144,10 +144,11 @@ export function ProductDemoCarousel() {
       {/* Dot indicators */}
       <div className='mt-4 flex justify-center gap-2'>
         {SLIDES.map((s, i) => (
-          <PlainButton
+          <button
             key={s.id}
+            type='button'
             className={`size-2 rounded-full transition-colors ${
-              i === current ? 'bg-on-media' : 'bg-on-media/30'
+              i === current ? 'bg-white' : 'bg-white/30'
             }`}
             onClick={() => setCurrent(i)}
             aria-label={`Go to slide ${i + 1}`}

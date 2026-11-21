@@ -1,23 +1,5 @@
 {
   "gates": {
-    "apps/web/components/features/demo/DemoVideoPlayer.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
-    "apps/web/components/features/demo/ProductDemoCarousel.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
     "apps/web/components/features/library/LibraryFirstArrivalAdapter.tsx": [
       "ds-owner",
       "tokens",
