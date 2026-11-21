@@ -1778,7 +1778,6 @@ export function validateLaneGroups(groups, laneIds = LANE_IDS) {
 }
 
 validateLaneGroups(LANE_GROUPS);
-
 export function selectLanes(groupId) {
   // Local callers historically ran the complete cluster with no selector.
   if (groupId === undefined) return LANES;
@@ -1794,7 +1793,6 @@ export function selectLanes(groupId) {
   }
   return selectedLaneIds.map(laneId => LANES.find(lane => lane.id === laneId));
 }
-
 function shell(command, opts = {}) {
   const result = spawnSync(command, {
     shell: true,
@@ -3270,7 +3268,6 @@ export async function runStructural(opts = {}) {
   const combined = results.map(result => result.output).join('');
   return { code: 0, output: combined, timings, wallMs, commandReceipt };
 }
-
 function annotateFailure(lane, logExcerpt) {
   // GitHub Actions annotation — visible on the PR Checks UI.
   const msg = `${lane.name} failed. Fix: ${lane.nextLocalCommand}`;
@@ -3362,7 +3359,6 @@ export const FAIL_FAST_SKIPPABLE_LANES = Object.freeze(new Set(['structural']));
 function failFastEnabled() {
   return process.env.CI_FAST_FAIL_FAST !== 'false';
 }
-
 async function main() {
   const laneGroup = process.env.CI_FAST_LANE_GROUP;
   /** @type {LaneResult[]} */
@@ -3374,11 +3370,9 @@ async function main() {
   const failFast = failFastEnabled();
 
   try {
-    let selectedLanes = selectLanes(laneGroup);
-    const skipLaneIds = parseSkipLaneIds(process.env.CI_FAST_SKIP_LANE_IDS);
-    if (skipLaneIds.size > 0) {
-      selectedLanes = selectedLanes.filter(lane => !skipLaneIds.has(lane.id));
-    }
+    let selectedLanes = selectLanes(laneGroup).filter(
+      lane => !parseSkipLaneIds(process.env.CI_FAST_SKIP_LANE_IDS).has(lane.id)
+    );
     if (process.env.CI_FAST_ONLY_STRUCTURAL === 'true') {
       selectedLanes = selectedLanes.filter(lane => lane.id === 'structural');
     }
