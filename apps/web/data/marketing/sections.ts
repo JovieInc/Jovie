@@ -442,16 +442,6 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         status: 'active',
       },
       {
-        id: 'centered-handle-claim',
-        layout: 'centered',
-        media: 'phone',
-        alignment: 'centered',
-        chooseWhen:
-          'audience=artist AND conversion=claim-handle AND recipe=artist-lp (Linktree-style claim bar) — checked FIRST (more specific than centered-phone)',
-        exemplar: { route: '/artist-profiles', section: 'hero' },
-        status: 'active',
-      },
-      {
         id: 'centered-phone',
         layout: 'centered',
         media: 'phone',
