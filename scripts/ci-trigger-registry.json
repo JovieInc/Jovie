@@ -65,6 +65,7 @@
     "lane-fix-relay.yml": {"runsPerMergedPr":48.5,"triggers":["deployment_status","pull_request_review:submitted","pull_request_review_comment:created","pull_request_target:dequeued","push","repository_dispatch:sentry-issue","workflow_dispatch","workflow_run:CI","workflow_run:Changed-Evidence Test Suites","workflow_run:Fork PR Gate","workflow_run:Golden Path Nightly","workflow_run:Golden Path Prod Autofix","workflow_run:PR Fleet Rules","workflow_run:PR Size Guard","workflow_run:Production Controller","workflow_run:Source Validation"]},
     "legacy-human-hold-scrub.yml": {"runsPerMergedPr":0,"triggers":["label:created","label:edited","push","workflow_dispatch"]},
     "linear-sync-on-merge.yml": {"runsPerMergedPr":2.3,"triggers":["pull_request:closed","repository_dispatch:linear_validation_receipt","workflow_dispatch","workflow_run:Production Controller","workflow_run:Sentry Autofix Recurrence"]},
+    "linear-team-drift.yml": {"runsPerMergedPr":0.1,"triggers":["push","workflow_dispatch"]},
     "m2-revenue-path-canary.yml": {"runsPerMergedPr":0,"triggers":["schedule","workflow_call","workflow_dispatch"]},
     "mac-lane-route.yml": {"runsPerMergedPr":0,"triggers":["workflow_call"]},
     "mac-lane.yml": {"runsPerMergedPr":0.1,"triggers":["workflow_dispatch"]},

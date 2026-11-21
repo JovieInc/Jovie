@@ -1,0 +1,83 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Summer
+# capability-gap: Linear team configuration drift requires a read-only Linear query and report; GitHub has no native report of this policy.
+# removal-trigger: Remove this workflow when the existing Linear event consumer produces the same team-drift receipt from configuration changes.
+# github-token-budget: 0 calls/run - no GitHub API; one read-only Linear GraphQL query; Node is primed from the toolcache.
+name: Linear Team Drift
+
+# JOV-13101 workflow half. The check lives in scripts/linear-team-drift.mjs
+# (Jovie #26049, da8b21bb). This hop only runs that entrypoint and publishes
+# the jovie.linear-team-drift/v1 receipt. It never patches Linear settings,
+# never moves LYB or SYM issues, and is not a pull_request or merge_group
+# check (not a merge gate, not a required check).
+#
+# Triggers are event-driven only (no cron). #26049 offered a daily schedule;
+# that backstop is LATER because a new scheduled trigger needs a
+# canon/automation-schedule-allowlist.json entry and a live
+# canon/automation-registry.jsonl id (scripts/schedule-trigger-guard.mjs).
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/lib/linear-team-policy.mjs'
+      - 'scripts/linear-team-drift.mjs'
+      - '.github/workflows/linear-team-drift.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linear-team-drift
+  cancel-in-progress: true
+
+jobs:
+  report:
+    name: Report Linear team drift
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Run report-only team drift check
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: |
+          set -u
+          set +e
+          node scripts/linear-team-drift.mjs --json > "${RUNNER_TEMP}/linear-team-drift.json"
+          status=$?
+          set -e
+          mkdir -p "${GITHUB_WORKSPACE}/.linear-team-drift"
+          cp "${RUNNER_TEMP}/linear-team-drift.json" "${GITHUB_WORKSPACE}/.linear-team-drift/receipt.json"
+          {
+            echo "### Linear team drift receipt"
+            echo
+            echo '```json'
+            cat "${RUNNER_TEMP}/linear-team-drift.json"
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY}"
+          exit "${status}"
+
+      - name: Upload drift receipt
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linear-team-drift-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .linear-team-drift/receipt.json
+          if-no-files-found: ignore
+          retention-days: 14

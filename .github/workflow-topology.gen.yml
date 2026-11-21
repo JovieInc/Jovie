@@ -725,6 +725,18 @@ nodes:
       - workflow_run
     terminalReceipt: job:sync_done
     jobCount: 1
+  - name: Linear Team Drift
+    path: .github/workflows/linear-team-drift.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:report
+    jobCount: 1
   - name: M2 Revenue-Path Canary
     path: .github/workflows/m2-revenue-path-canary.yml
     active: true
