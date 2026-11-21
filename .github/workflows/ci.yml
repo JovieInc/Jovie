@@ -8413,6 +8413,9 @@ jobs:
           E2E_TEST_MODE: '1'
           CHAT_LLM_FAILURE_INJECTION: '1'
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+          # Distinct from the full-suite results.json so this second invocation
+          # cannot overwrite primary flaky status (JOV-12621 / Sentry 20814746).
+          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/results-quarantined.json
         run: |
           RETRIES=$(jq -r '.retryBudget.quarantineE2eRetries // 2' apps/web/tests/quarantine.json)
           cd apps/web && node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm playwright test --retries="$RETRIES" ${{ steps.quarantine.outputs.quarantined_specs }}
@@ -8428,13 +8431,15 @@ jobs:
           done
 
       - name: Upload Playwright flaky JSON status
-        # Green-run retries live only in results.json. Always upload so the
+        # Green-run retries live in results*.json. Always upload so the
         # flakiness report can count Playwright status "flaky" (JOV-12621).
-        if: ${{ always() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') && hashFiles('apps/web/test-results/results.json') != '' }}
+        # Glob keeps both the full-suite and quarantined reports when shard 1
+        # ran both invocations.
+        if: ${{ always() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') && hashFiles('apps/web/test-results/results*.json') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: playwright-e2e-flaky-json-ci-shard-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: apps/web/test-results/results.json
+          path: apps/web/test-results/results*.json
           retention-days: 7
 
       - name: Upload Playwright Test Results on Failure

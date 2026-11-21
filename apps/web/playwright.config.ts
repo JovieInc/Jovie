@@ -89,7 +89,16 @@ const ciReporters: ReporterDescription[] = [
   ...(vercelAutomation.active
     ? []
     : ([
-        ['json', { outputFile: 'test-results/results.json' }],
+        [
+          'json',
+          {
+            // Quarantine (and other second invocations) must set a distinct
+            // path or they overwrite the primary suite's flaky status.
+            outputFile:
+              process.env.PLAYWRIGHT_JSON_OUTPUT_FILE ||
+              'test-results/results.json',
+          },
+        ],
       ] as ReporterDescription[])),
 ];
 
