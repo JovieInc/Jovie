@@ -47,9 +47,9 @@ export function shardPaths(root, rel) {
 }
 
 /**
- * The registry with every shard's gates and waivers merged in, and the
- * errors the gate reports: a key named by two files, or a file out of path
- * order.
+ * The registry with every shard's gates and waivers merged in, the errors
+ * the gate reports (a key named by two files, or a file out of path order),
+ * and `owner`: which file names each gate and waiver key.
  * @param {string} root
  * @param {string} rel
  * @param {Record<string, any>} [fallback]
@@ -90,7 +90,7 @@ export function readCertificationRegistry(root, rel, fallback = {}) {
   }
   registry.gates = sortByPath(registry.gates);
   registry.waivers = sortByPath(registry.waivers);
-  return { registry, errors };
+  return { registry, errors, owner };
 }
 
 /** Sorts gates and waivers in the registry and each shard, in place. */
