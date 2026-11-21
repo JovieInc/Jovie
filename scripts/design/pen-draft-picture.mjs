@@ -35,6 +35,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
+import { decodePng } from '../invariants/pen-still-diff-lib.mjs';
 import {
   MANIFEST,
   missingSecrets,
@@ -92,6 +93,33 @@ const scale = seen ? pictureScale(seen.w, seen.h) : 1;
 Print(${JSON.stringify(PICTURE_PREFIX)} + JSON.stringify({ ...seen, scale }));
 Export([id], 'png', dir, { scale });
 }`;
+}
+
+/** The see-through share a frame may have: its rounded outer corners. */
+export const MAX_CLEAR_SHARE = 0.02;
+
+/**
+ * Why a picture must not go to review, or null. A frame or section with no
+ * background fill exports see-through, and the viewer draws a checkerboard
+ * where the surface or gradient should be (Tim, 2026-11-15: "gradient bgs
+ * dont render"; the canonical "Section / What's new" has no fill at all).
+ * @param {Buffer} png
+ */
+export function pictureProblem(png) {
+  let img;
+  try {
+    img = decodePng(png);
+  } catch (error) {
+    return `pen exported a picture that is not a readable PNG (${firstLine(error)})`;
+  }
+  const pixels = img.width * img.height;
+  if (!pixels) return 'pen exported an empty picture';
+  let clear = 0;
+  for (let i = 3; i < img.data.length; i += 4) if (img.data[i] < 250) clear++;
+  const share = clear / pixels;
+  return share > MAX_CLEAR_SHARE
+    ? `the frame has no background: ${Math.round(share * 100)}% of the picture is see-through`
+    : null;
 }
 
 /** The node Pen says it drew, from the session's stdout; null when unsaid. */
@@ -195,6 +223,8 @@ function renderFrame({ frame, folder, canonical, work, env, run }) {
       name => name.endsWith('.png') && name.includes(node.id)
     );
     if (!png) throw new Error(`pen exported no picture of ${frame}`);
+    const problem = pictureProblem(readFileSync(join(pngDir, png)));
+    if (problem) throw new Error(problem);
     copyFileSync(join(pngDir, png), join(folder, `${frame}.frame.png`));
     return {
       nodes: [{ id: node.id, name: frame, width: drawn.w, height: drawn.h }],
