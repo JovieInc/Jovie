@@ -40,7 +40,7 @@ function resolveRouteUrl(baseUrl: string, path: string) {
   return new URL(path, `${baseUrl.replace(/\/$/, '')}/`).toString();
 }
 
-/** Origin + pathname without trailing slash — used to detect intentional leave. */
+/** Origin+pathname identity so intentional leaves are not counted as reloads. */
 export function smoothRouteIdentity(url: string): string {
   try {
     const parsed = new URL(url);
@@ -51,11 +51,7 @@ export function smoothRouteIdentity(url: string): string {
   }
 }
 
-/**
- * Reload/dup counts for the measured surface only.
- * Extra document requests after leaving the measured route (e.g. homepage CTA)
- * are classified as expected navigation, not jank.
- */
+/** Same-route reload/dup only; destination docs after leave are expected navigation. */
 export function classifySameRouteJank(options: {
   readonly measuredRoute: string;
   readonly finalUrl: string;
@@ -190,8 +186,7 @@ async function triggerMainInteraction(
   const locator = page.locator(first).first();
   if ((await locator.count()) === 0) return;
   if (!(await locator.isVisible().catch(() => false))) return;
-  // Keep CWV/reload/dup attribution on the measured route: INP needs a click,
-  // but navigations from primary CTAs must not count as surface jank.
+  // INP click without leaving the measured route (CTA navigations ≠ jank).
   await page.evaluate(() => {
     window.addEventListener(
       'click',

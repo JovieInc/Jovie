@@ -1,15 +1,5 @@
 #!/usr/bin/env tsx
-/**
- * Smooth phase-1 baseline runner.
- *
- * Extends the existing performance-budgets-guard controller: same auth bootstrap,
- * route resolvers, CWV init script, and ready-selector waits. Adds Smooth
- * viewports (1512×944 / 390×844), mobile 4× CPU throttle, INP, reload /
- * duplicate-fetch / flicker / hydration probes, and checked-in baseline JSON.
- *
- *   pnpm --filter @jovie/web run perf:smooth:baseline
- *   pnpm --filter @jovie/web exec tsx scripts/performance-smooth-baseline.ts --write
- */
+/** Smooth baseline runner — extends performance-budgets-guard (not a second controller). */
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';

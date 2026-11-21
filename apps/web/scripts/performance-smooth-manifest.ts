@@ -1,11 +1,4 @@
-/**
- * Smooth phase-1 surface catalog.
- *
- * Maps Tim's Smooth surfaces onto existing end-user perf route ids so the
- * budgets guard remains the measurement controller. Viewports and Smooth
- * targets live here; route paths, auth, and ready selectors stay owned by
- * `performance-route-manifest.ts`.
- */
+/** Smooth surface catalog → end-user perf route ids (budgets-guard stays controller). */
 import { APP_ROUTES } from '../constants/routes';
 import {
   getEndUserPerfRouteById,

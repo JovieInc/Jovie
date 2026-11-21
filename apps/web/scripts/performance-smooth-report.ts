@@ -148,7 +148,7 @@ export function pickWorstSurface(
   };
 }
 
-/** Checked-in baselines keep medians/flags only — raw samples stay out of PR size. */
+/** Checked-in baselines: medians/flags only (drop samples for PR size). */
 export function toCheckedInBaseline(baseline: SmoothSurfaceBaseline) {
   const { samples: _samples, ...rest } = baseline;
   return rest;
