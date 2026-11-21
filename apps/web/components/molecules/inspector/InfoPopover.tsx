@@ -35,10 +35,7 @@ export function InfoPopover({
           aria-label={label}
           data-testid={testId}
           data-disclosure-level='l2'
-          className={cn(
-            'text-tertiary-token hover:text-secondary-token',
-            className
-          )}
+          className={className}
         >
           <Info className='h-3.5 w-3.5' aria-hidden='true' />
         </IconButton>
@@ -47,10 +44,7 @@ export function InfoPopover({
         side={side}
         align={align}
         aria-label={label}
-        className={cn(
-          'max-w-64 text-2xs leading-4 text-secondary-token',
-          contentClassName
-        )}
+        className={cn('max-w-64', contentClassName)}
         testId={testId ? `${testId}-content` : 'inspector-info-popover'}
       >
         {children}
