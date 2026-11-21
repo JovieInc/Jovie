@@ -266,7 +266,9 @@ describe('evaluateDeterministicRow', () => {
     // Both fragments resolve to the same file/kind, so only one cache miss
     // (one real execution) should occur despite two evidence entries.
     expect(callCount).toBe(1);
-  });
+    // That one execution is a real full-repo design-surfaces scan: 3-5 s
+    // locally, 12-15 s on the shared PR runner, past the 12 s default.
+  }, 60_000);
 });
 
 describe('evaluateDesignCiJudgeMatrix', () => {
