@@ -12,6 +12,7 @@ LANES = Path(__file__).resolve().parents[1] / "lanes"
 sys.path.insert(0, str(LANES))
 import binding_refill as br  # noqa: E402
 import linear_sync as ls  # noqa: E402
+import execution_attempt as execution  # noqa: E402
 
 BODY = ("## Problem\n" + "The sitemap omits public routes and stamps every URL as changed on each request. " * 3 +
         "\n\n## Acceptance criteria\n- [ ] sitemap == public route list\n")
@@ -29,6 +30,28 @@ class FakeClient:
 
 
 class SelectTests(unittest.TestCase):
+    def test_execution_observations_match_source_generation_and_never_authorize_dispatch(self):
+        candidate = row(1)
+        ident = execution.identity('linear-work', {'issue': 'LYB-1', 'outcome': 'draft-pr'},
+                                   {key: candidate[key] for key in ('title', 'description')})
+        with tempfile.TemporaryDirectory() as d:
+            state = Path(d); path = state / 'runs' / 'execution-attempts.jsonl'
+            path.parent.mkdir()
+            terminal = {**ident, 'schema': execution.SCHEMA, 'event': 'decision', 'terminalState': 'budget_exhausted'}
+            path.write_text(json.dumps(terminal) + '\n')
+            self.assertEqual(br.execution_skips(state, [candidate]), {'LYB-1': 'execution-generation-terminal'})
+            self.assertEqual(br.execution_skips(state, [dict(candidate, priority=1, updatedAt='2026-11-20T00:00:00Z')]),
+                             {'LYB-1': 'execution-generation-terminal'})
+            self.assertEqual(br.execution_skips(state, [dict(candidate, description=BODY + '\nNew source proof')]), {})
+            path.write_text(json.dumps({**terminal, 'terminalState': None, 'event': 'completion_fenced'}) + '\n')
+            self.assertEqual(br.execution_skips(state, [candidate]), {'LYB-1': 'execution-generation-terminal'})
+            path.write_text(json.dumps({**terminal, 'terminalState': None, 'event': 'attempt_finished', 'result': 'failed_known'}) + '\n')
+            self.assertEqual(br.execution_skips(state, [candidate]), {}, 'retryable outcomes keep the existing execution gate')
+            for broken in ('broken\n', '[]\n', 'null\n'):
+                path.write_text(broken)
+                self.assertEqual(br.execution_skips(state, [candidate]), {'LYB-1': 'execution-mirror-unreadable'})
+                self.assertEqual(path.read_text(), broken, 'corrupt evidence is not cleared')
+
     def test_orders_by_priority_then_age_and_respects_need(self):
         rows = [row(1, priority=3), row(2, priority=1), row(3, priority=2, created="2026-09-01T00:00:00.000Z"),
                 row(4, priority=0), row(5, priority=2)]
@@ -104,6 +127,26 @@ class RefillTests(unittest.TestCase):
         self.assertEqual({e["target"] for e in moves}, {"Todo"})
         self.assertEqual(len(moves), 4)
         self.assertEqual(receipt["deficitSince"], 1010.0)
+
+    def test_refill_keeps_terminal_work_out_and_uses_room_for_other_ready_issues(self):
+        candidates = [row(n, priority=2) for n in range(1, 7)]
+        candidates[1]['description'] += '\nBlocked by LYB-1.\n'
+        self.mirror(candidates)
+        ident = execution.identity('linear-work', {'issue': 'LYB-1', 'outcome': 'draft-pr'},
+                                   {key: candidates[0][key] for key in ('title', 'description')})
+        path = self.state / 'runs' / 'execution-attempts.jsonl'
+        local = {'kind': 'local-test'}
+        policy = dict(attempts=1, concurrency=1, wallSeconds=60, spend=0, mutations=0, leaseSeconds=30)
+        claimed = execution.claim(path, ident, {}, policy, {}, 1001, coordination=local)
+        execution.finish(path, ident, claimed['fencingToken'], 'failed_unknown', {}, 1002, coordination=local)
+        before = path.read_bytes()
+        receipt = br.refill(self.lane, self.host, self.binding, FakeClient(), now=1010.0)
+        self.assertEqual(receipt['promoted'], ['LYB-3', 'LYB-4', 'LYB-5', 'LYB-6'])
+        self.assertEqual(receipt['skipped']['LYB-1'], 'execution-generation-terminal')
+        self.assertEqual(receipt['skipped']['LYB-2'], 'blocked-by:LYB-1', 'a stopped issue remains an open blocker')
+        self.assertEqual(receipt['ready'], 4, 'terminal work is not counted as runnable backlog')
+        self.assertFalse(any(entry['issueId'] == 'id-1' for entry in self.outbox()))
+        self.assertEqual(path.read_bytes(), before)
 
     def test_lyb_ios_rows_wait_while_the_macos_pool_is_loaded_and_other_rows_still_promote(self):
         rows = [row(n, labels=("agent-ready", "area:iOS")) for n in range(1, 4)] + [row(n) for n in range(4, 9)]

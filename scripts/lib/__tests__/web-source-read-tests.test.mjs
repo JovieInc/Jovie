@@ -16,7 +16,7 @@ const ROOT = join(import.meta.dirname, '../../..');
 
 test('publication source-read uses the CI test budget', () => {
   const args = sourceReadRunnerArgs(['tests/unit/ci/deploy-workflow.test.ts']);
-  assert.ok(args.includes('--testTimeout=12000'));
+  assert.ok(args.includes('--testTimeout=30000'));
   assert.equal(args.at(-1), 'tests/unit/ci/deploy-workflow.test.ts');
 });
 

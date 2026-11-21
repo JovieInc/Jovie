@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 
-/** @typedef {{name?: string, shell?: string, if?: string, run?: string, env?: Record<string, string>, 'continue-on-error'?: boolean}} Step */
+/** @typedef {{name?: string, id?: string, shell?: string, if?: string, run?: string, uses?: string, env?: Record<string, string>, 'continue-on-error'?: boolean}} Step */
 /** @typedef {{steps: Step[], 'runs-on'?: string}} Job */
 /** @typedef {{jobs: Record<string, Job>, permissions: unknown, on: unknown}} Workflow */
 
 const DISK_READ_GUARD = 'Validate disk-read source contracts from trusted base';
+const SETUP_NODE = 'Setup Node.js and pnpm';
+const MQ_PARITY_TOOLS = 'Resolve MQ parity tools for older source heads';
+const MQ_PARITY_SCOPE = 'Select MQ parity scope';
+const TYPECHECK_TWIN = 'Run typecheck lane parity';
 
 /** Serial → pooled disk-read step is an owned migration (same guards, first
  * failure wins). Normalize both sides so the deepEqual still pins everything
@@ -34,13 +38,36 @@ function normalizeDiskReadStep(step) {
   };
 }
 
-/** @param {Job} job */
-function normalizeUnitJob(job) {
+/**
+ * Owned typecheck twin may also provision Node. Strip that clause so deepEqual
+ * still pins the rest of the Setup Node step against origin/main.
+ * @param {Step} step
+ * @param {{ requireTypecheck?: boolean }} [opts]
+ */
+function normalizeSetupNodeStep(step, opts = {}) {
+  if (step?.name !== SETUP_NODE) return step;
+  const ifExpr = String(step.if ?? '');
+  assert.match(ifExpr, /steps\.scope\.outputs\.web == 'true'/);
+  if (opts.requireTypecheck) {
+    assert.match(ifExpr, /steps\.mq-parity\.outputs\.typecheck == 'true'/);
+  }
+  return {
+    ...step,
+    if: ifExpr
+      .replace(/\s*\|\|\s*steps\.mq-parity\.outputs\.typecheck == 'true'/, '')
+      .replace(/steps\.mq-parity\.outputs\.typecheck == 'true'\s*\|\|\s*/, ''),
+  };
+}
+
+/** @param {Job} job @param {{ requireTypecheck?: boolean }} [opts] */
+function normalizeUnitJob(job, opts = {}) {
   return {
     ...job,
-    steps: job.steps.map(step =>
-      step.name === DISK_READ_GUARD ? normalizeDiskReadStep(step) : step
-    ),
+    steps: job.steps.map(step => {
+      if (step.name === DISK_READ_GUARD) return normalizeDiskReadStep(step);
+      if (step.name === SETUP_NODE) return normalizeSetupNodeStep(step, opts);
+      return step;
+    }),
   };
 }
 
@@ -51,7 +78,13 @@ function normalizeUnitJob(job) {
 export function assertOriginalJobsRetained(current, baseline) {
   const linear = 'Require a Linear issue reference from trusted base';
   const brand = 'Check brand spelling in PR text and commit messages';
-  const owned = new Set([linear, brand]);
+  const owned = new Set([
+    linear,
+    brand,
+    MQ_PARITY_TOOLS,
+    MQ_PARITY_SCOPE,
+    TYPECHECK_TWIN,
+  ]);
   const strip = job => ({
     ...job,
     steps: job.steps.filter(step => !owned.has(step.name)),
@@ -63,18 +96,46 @@ export function assertOriginalJobsRetained(current, baseline) {
   for (const [id, job] of Object.entries(baseline.jobs)) {
     if (id === 'cancel-superseded') continue;
     const actual = current.jobs[id];
-    const left = id === 'unit' ? normalizeUnitJob(actual) : actual;
+    const left =
+      id === 'unit'
+        ? normalizeUnitJob(actual, { requireTypecheck: true })
+        : actual;
     const right = id === 'unit' ? normalizeUnitJob(job) : job;
     assert.deepEqual(strip(left), strip(right), id);
     for (const name of owned) {
       const added = actual.steps.filter(step => step.name === name);
       const kept = job.steps.filter(step => step.name === name);
       const firstLanding =
-        id === 'deterministic' && !kept.length && added.length === 1;
+        ((id === 'deterministic' && (name === linear || name === brand)) ||
+          (id === 'unit' &&
+            (name === MQ_PARITY_TOOLS ||
+              name === MQ_PARITY_SCOPE ||
+              name === TYPECHECK_TWIN))) &&
+        !kept.length &&
+        added.length === 1;
       assert.ok(kept.length === added.length || firstLanding, `${id}: ${name}`);
       if (kept.length) assert.deepEqual(added, kept, `${id}: ${name}`);
     }
   }
+
+  const unitSteps = current.jobs.unit.steps;
+  const tools = unitSteps.find(step => step.name === MQ_PARITY_TOOLS);
+  assert.equal(tools?.id, 'mq-parity-tools');
+  assert.equal(tools?.if, "steps.reuse.outputs.reuse != 'true'");
+  assert.match(String(tools?.run), /mq-parity-scope\.mjs/);
+  const scope = unitSteps.find(step => step.name === MQ_PARITY_SCOPE);
+  assert.equal(scope?.id, 'mq-parity');
+  assert.equal(scope?.if, "steps.reuse.outputs.reuse != 'true'");
+  assert.match(String(scope?.run), /mq-parity-scope\.mjs/);
+  const twin = unitSteps.find(step => step.name === TYPECHECK_TWIN);
+  assert.equal(twin?.run, 'node scripts/ci-fast-lanes.mjs');
+  assert.equal(twin?.env?.CI_FAST_LANE_GROUP, 'typecheck');
+  assert.match(
+    String(twin?.if),
+    /steps\.mq-parity\.outputs\.typecheck == 'true'/
+  );
+  assert.match(String(twin?.if), /matrix\.shard == '2\/4'/);
+
   const steps = current.jobs.deterministic.steps;
   const linearStep = steps.find(step => step.name === linear);
   assert.equal(linearStep.shell, 'bash');

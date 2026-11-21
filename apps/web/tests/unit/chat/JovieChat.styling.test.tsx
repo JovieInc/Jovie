@@ -12,12 +12,12 @@ import {
   vi,
 } from 'vitest';
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from '@/components/jovie/chat-layout';
-import { createComposerDraft } from '@/components/jovie/hooks/useComposerDraft';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { CHAT_TRANSCRIPT_ROW_ESTIMATE_PX } from '@/lib/chat/transcript-window';
 import { getDesktopWorkState } from '@/lib/desktop/session-work-state';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 import type { InsightResponse } from '@/types/insights';
+import { createMockComposerDraft } from './mock-composer-draft';
 
 const virtualizerSpy = vi.hoisted(() => ({
   options: null as null | {
@@ -107,6 +107,9 @@ const mockChatState = vi.hoisted(() => ({
   messages: [{ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Hi' }] }],
 }));
 
+/** Shared so living Home can assert melt-to-chat via draft intent. */
+const mockComposerDraft = createMockComposerDraft();
+
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   DashboardDataContext: {
     Provider: ({ children }: { children: React.ReactNode }) => children,
@@ -144,7 +147,7 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
       isActioning: false,
     }),
     useJovieChatController: () => ({
-      draft: createComposerDraft(''),
+      draft: mockComposerDraft,
       setInput: vi.fn(),
       messages: mockChatState.messages,
       chatError: mockChatState.chatError,
@@ -260,6 +263,7 @@ afterEach(() => {
   mockChatState.messages = [
     { id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Hi' }] },
   ];
+  mockComposerDraft.set('');
   mockInsightsSummary.data = undefined;
 });
 
@@ -779,7 +783,12 @@ describe('JovieChat styling regressions', () => {
   });
 
   it('keeps a living Home canvas as the surface after messages, with the transcript on request', () => {
-    const states: { isStreaming: boolean; count: number }[] = [];
+    type Living = {
+      isStreaming: boolean;
+      count: number;
+      composerHasIntent: boolean;
+    };
+    const states: Living[] = [];
     const { container, getByRole } = renderWithQueryClient(
       <JovieChat
         profileId='profile-1'
@@ -789,6 +798,7 @@ describe('JovieChat styling regressions', () => {
           states.push({
             isStreaming: state.isStreaming,
             count: state.messages.length,
+            composerHasIntent: Boolean(state.composerHasIntent),
           });
           return (
             <button type='button' onClick={state.onOpenTranscript}>
@@ -799,29 +809,36 @@ describe('JovieChat styling regressions', () => {
       />
     );
 
-    expect(
-      container
-        .querySelector('[data-testid="chat-empty-state-viewport"]')
-        ?.getAttribute('data-empty-affordance')
-    ).toBe('home-canvas');
-    expect(states.at(-1)).toEqual({ isStreaming: true, count: 1 });
+    const viewport = () =>
+      container.querySelector('[data-testid="chat-empty-state-viewport"]');
+    expect(viewport()?.getAttribute('data-empty-affordance')).toBe(
+      'home-canvas'
+    );
+    expect(states.at(-1)).toEqual({
+      isStreaming: true,
+      count: 1,
+      composerHasIntent: false,
+    });
     // Living Home fills the space above the composer (no page scroll).
     expect(
       container.querySelector('[data-testid="chat-empty-state-above-scroll"]')
     ).toHaveClass('lg:overflow-hidden');
 
+    // Typing melts Story First without opening the transcript.
+    act(() => {
+      mockComposerDraft.set('unblock the bottleneck');
+    });
+    expect(states.at(-1)?.composerHasIntent).toBe(true);
+    expect(viewport()).toBeTruthy();
+
     act(() => {
       getByRole('button', { name: 'Open Transcript Fixture' }).click();
     });
-    expect(
-      container.querySelector('[data-testid="chat-empty-state-viewport"]')
-    ).toBeNull();
+    expect(viewport()).toBeNull();
     act(() => {
       getByRole('button', { name: 'Back To Home' }).click();
     });
-    expect(
-      container.querySelector('[data-testid="chat-empty-state-viewport"]')
-    ).toBeTruthy();
+    expect(viewport()).toBeTruthy();
   });
 
   it('keeps the bare Jovie empty state when no Home canvas is supplied', () => {

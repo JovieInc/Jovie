@@ -7,20 +7,22 @@ import * as React from 'react';
 import { Button, type ButtonProps, type ButtonVariant } from './button';
 import type { ButtonSize } from './button-contract';
 import {
+  ICON_BUTTON_FADE_CLASSNAME,
   ICON_BUTTON_SIZE_NAMES,
   ICON_BUTTON_VARIANT_NAMES,
+  ICON_BUTTON_VISIBLE_CLASSNAME,
   type IconButtonSize,
   type IconButtonVariant,
 } from './icon-button-contract';
 
 /**
- * Canonical icon-only button (JOV-4871).
+ * Canonical icon-only button (JOV-4871 / Drift T2.1).
  *
  * Single size/variant contract for every icon button in the product, built on
  * the base Button so the focus ring, disabled state, and 44px hit target are
- * identical everywhere. The legacy web atoms (CircleIconButton,
- * AppIconButton, HeaderIconButton, InlineIconButton, DrawerInlineIconButton)
- * are thin compat wrappers over this component.
+ * identical everywhere. Compose with TooltipShortcut / SimpleTooltip at the
+ * callsite. Justified patterns that wrap this atom (e.g. RailToggleButton)
+ * must stay thin and document why they are not a second primitive.
  */
 
 const ICON_BUTTON_SIZE_TO_BUTTON_SIZE: Record<IconButtonSize, ButtonSize> = {
@@ -163,6 +165,8 @@ export type IconButtonName =
       readonly 'aria-labelledby': string;
     };
 
+export type IconButtonFade = 'parent' | 'visible';
+
 export type IconButtonProps = Omit<
   ButtonProps,
   'size' | 'variant' | 'aria-label' | 'aria-labelledby'
@@ -171,6 +175,13 @@ export type IconButtonProps = Omit<
   readonly variant?: IconButtonVariant;
   /** Container size: xs 24 / sm 28 / md 32 / lg 40 / xl 44px. */
   readonly size?: IconButtonSize;
+  /**
+   * Contract fade modifiers owned by the primitive (JOV-4871). Prefer this
+   * over className — `shadcn/no-restyle` treats opacity/padding as restyles.
+   * - `parent`: reveal on parent group-hover / group-focus-within
+   * - `visible`: always faintly visible, full opacity on hover/focus
+   */
+  readonly fade?: IconButtonFade;
 } & IconButtonName;
 
 export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
@@ -181,6 +192,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       'aria-label': ariaLabelProp,
       variant = 'ghost',
       size = 'lg',
+      fade,
       className,
       destructive = false,
       ...props
@@ -197,6 +209,8 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         destructive={destructive}
         className={cn(
           iconButtonVariants({ variant, size }),
+          fade === 'parent' && ICON_BUTTON_FADE_CLASSNAME,
+          fade === 'visible' && ICON_BUTTON_VISIBLE_CLASSNAME,
           destructive && ICON_BUTTON_DESTRUCTIVE_CLASSNAME,
           className
         )}

@@ -41,16 +41,28 @@ import {
 // The CLI runs from the checkout root; Source Validation may load this file
 // from a trusted base archive elsewhere on disk.
 const REPO_ROOT = process.cwd();
-// JS/TS under scripts/ stays on the full list. A .py or other non-JS path
-// there does not: it cannot change a contract's toolchain or inputs, and
-// treating it as one is what made a four-file lane fix run every contract.
-const FULL_RUN_INPUT =
-  /^(?:\.github\/.+|package\.json|pnpm-lock\.yaml|biome\.json|scripts\/.+\.(?:mjs|cjs|js|ts|mts|tsx))$/u;
+// Non-test JS/TS under scripts/ stays on the full list (header above). A
+// .py / other non-JS path, or a test / __tests__ file, does not: those cannot
+// change every contract's toolchain or inputs, and treating *.test.mjs as a
+// full-run trigger made a two-file Mut floor PR run 240+242 contracts (~205s)
+// while the same affected selection is ~35+43 (~60s) and frees CPU for the
+// parallel merged-with-base pole.
+const FULL_RUN_TOOLCHAIN =
+  /^(?:\.github\/.+|package\.json|pnpm-lock\.yaml|biome\.json)$/u;
+const FULL_RUN_SCRIPTS_SRC = /^scripts\/.+\.(?:mjs|cjs|js|ts|mts|tsx)$/u;
+const SCRIPT_TEST_PATH = /(?:^|\/)__tests__\/|\.(?:test|spec)\./u;
+
+/** @param {string} file */
+export function forcesScriptContractFullRun(file) {
+  if (FULL_RUN_TOOLCHAIN.test(file)) return true;
+  if (!FULL_RUN_SCRIPTS_SRC.test(file)) return false;
+  return !SCRIPT_TEST_PATH.test(file);
+}
 
 // extract.mjs is at the size ceiling, so this predicate lives with the
 // selector and must stay aligned with allowed() there. A public marketing
-// source, or anything under scripts/copy-inventory/ (ids.gen.json is not a
-// FULL_RUN_INPUT), selects the inventory contract without the full lists.
+// source, or anything under scripts/copy-inventory/ (ids.gen.json does not
+// force a full run), selects the inventory contract without the full lists.
 export const COPY_INVENTORY_TEST = 'scripts/copy-inventory/extract.test.mjs';
 export const SHELL_IA_TEST = 'scripts/invariants/shell-ia.test.mjs';
 export const PEN_GOLDEN_PATH_TEST =
@@ -142,10 +154,11 @@ export function selectScriptContracts(changed, options = {}) {
   const node = options.node ?? SCRIPT_CONTRACT_NODE_TESTS;
   const vitest = options.vitest ?? SCRIPT_CONTRACT_VITEST_TESTS;
   // derivedOnly is the local pre-push scope: contracts whose files or
-  // importers changed. CI never passes it, so CI keeps the full-list rule.
+  // importers changed. CI never passes it, so CI keeps the full-list rule
+  // for toolchain / non-test scripts/ diffs (forcesScriptContractFullRun).
   if (
     !options.derivedOnly &&
-    (changed === null || changed.some(file => FULL_RUN_INPUT.test(file)))
+    (changed === null || changed.some(forcesScriptContractFullRun))
   ) {
     // Partial checkouts (fixtures, sparse archives) run what they contain.
     const present = (/** @type {string} */ test) =>

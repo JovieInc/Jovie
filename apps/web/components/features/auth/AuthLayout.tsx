@@ -5,11 +5,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  IconButton,
 } from '@jovie/ui';
 import { MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import { type ReactNode, useRef } from 'react';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -284,9 +284,9 @@ export function AuthLayout({
         <div className='absolute top-4 right-4 z-50'>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <AppIconButton ariaLabel='Open menu'>
+              <IconButton variant='control' ariaLabel='Open menu' size='sm'>
                 <MoreHorizontal />
-              </AppIconButton>
+              </IconButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align='end' sideOffset={8}>
               <DropdownMenuItem

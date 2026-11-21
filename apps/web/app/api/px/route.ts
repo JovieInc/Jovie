@@ -7,6 +7,7 @@ import { pixelEvents } from '@/lib/db/schema/pixels';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { scheduleAfter } from '@/lib/next/schedule-after';
+import { isYoungAudienceProfile } from '@/lib/profile/public-profile-access';
 import { createRateLimitHeaders, publicVisitLimiter } from '@/lib/rate-limit';
 import { ensureClaimRetargetingCreatives } from '@/lib/retargeting/claim-creatives';
 import { forwardEvent } from '@/lib/tracking/forwarding';
@@ -123,6 +124,7 @@ export async function POST(request: NextRequest) {
         id: creatorProfiles.id,
         isPublic: creatorProfiles.isPublic,
         username: creatorProfiles.username,
+        settings: creatorProfiles.settings,
       })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, profileId))
@@ -139,6 +141,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Profile is not public' },
         { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (isYoungAudienceProfile(profile.settings)) {
+      return NextResponse.json(
+        { success: true, suppressed: 'young_audience' },
+        { headers: NO_STORE_HEADERS }
       );
     }
 

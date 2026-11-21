@@ -92,6 +92,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:report
     jobCount: 1
+  - name: Artifact Freshness
+    path: .github/workflows/artifact-freshness.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:reconcile
+    jobCount: 1
   - name: Auto-Merge Base Guard
     path: .github/workflows/auto-merge-base-guard.yml
     active: true
@@ -421,7 +433,8 @@ nodes:
     category: release-orchestration
     authoritativeProducer: Production Controller
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Artifact Freshness
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
@@ -1376,7 +1389,7 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:certify
     jobCount: 3
-  - name: Security Advisory Loop (Linear devin lane)
+  - name: Security Advisory Loop (Summer owned)
     path: .github/workflows/security-advisory-loop.yml
     active: true
     category: source-validation
@@ -1728,6 +1741,9 @@ nodes:
     terminalReceipt: job:ingest
     jobCount: 1
 edges:
+  - from: desktop-release
+    to: Artifact Freshness
+    type: workflow_run
   - from: Production Continuity Guard
     to: Automation Liveness
     type: workflow_run

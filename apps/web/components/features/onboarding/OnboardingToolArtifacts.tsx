@@ -15,7 +15,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ATTACH_ACCOUNT_CTA_LABEL,
-  CONFIRM_HANDLE_CTA_LABEL,
+  HANDLE_ACCEPT_COPY,
   NONE_OF_THESE_CTA_LABEL,
 } from '@/lib/chat/onboarding-script/widget-events';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
@@ -879,7 +879,7 @@ export function OnboardingHandleCheckCard({
                   : 'cursor-not-allowed border border-subtle bg-surface-0 text-tertiary-token'
               )}
             >
-              {confirmed ? 'Handle Confirmed' : CONFIRM_HANDLE_CTA_LABEL}
+              {confirmed ? 'Kept' : HANDLE_ACCEPT_COPY}
             </Button>
           )}
           {showEditor || confirmed ? null : (

@@ -2,8 +2,14 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  DESIGN_CI_JUDGE_VITEST_MARKER,
+  DESIGN_CI_JUDGE_VITEST_PATHS,
   expandSourcePoolEntries,
+  filterMergedWithBasePoolEntries,
+  MERGED_WITH_BASE_POOL_CONCURRENCY,
+  MERGED_WITH_BASE_POOL_LONG_POLES,
   MERGED_WITH_BASE_POOL_SPEC,
+  mergedWithBasePoolConcurrency,
   PR_CHEAP_SCAN_COMMANDS,
   runSourceGuardPool,
   runSourceGuards,
@@ -240,6 +246,8 @@ describe('source guard pool', () => {
 });
 
 describe('merged-with-base-invariants pool', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
   it('still contains every PR_CHEAP_SCAN_COMMANDS entry plus the design scans', () => {
     const commands = MERGED_WITH_BASE_POOL_SPEC.commands.map(
       entry => entry.command
@@ -282,6 +290,156 @@ describe('merged-with-base-invariants pool', () => {
     ]);
   });
 
+  it('pins measured long poles so the 70s/61s work starts first', () => {
+    const entries = expandSourcePoolEntries(MERGED_WITH_BASE_POOL_SPEC);
+    const matched = entries.filter(entry =>
+      MERGED_WITH_BASE_POOL_LONG_POLES.some(pole =>
+        entry.command.includes(pole)
+      )
+    );
+    // Every pole substring must hit a real expanded command (no stale paths).
+    for (const pole of MERGED_WITH_BASE_POOL_LONG_POLES) {
+      expect(
+        entries.some(entry => entry.command.includes(pole)),
+        pole
+      ).toBe(true);
+    }
+    expect(matched.map(entry => entry.command).join('\n')).toContain(
+      'design-ci-judge-router'
+    );
+    expect(matched.map(entry => entry.command).join('\n')).toContain(
+      'screen-certification.test.mjs'
+    );
+    expect(matched.map(entry => entry.command).join('\n')).toContain(
+      'gem-priority-gate.test.py'
+    );
+    expect(matched.map(entry => entry.command).join('\n')).toContain(
+      'lint:seo'
+    );
+  });
+
+  it('does not let SOURCE_GUARD_CONCURRENCY=3 cap the nested pool at 3', () => {
+    vi.stubEnv('SOURCE_GUARD_CONCURRENCY', '3');
+    // Unset nested override so the documented pool width applies.
+    vi.stubEnv('MERGED_WITH_BASE_POOL_CONCURRENCY', undefined);
+    const nested = mergedWithBasePoolConcurrency(
+      MERGED_WITH_BASE_POOL_CONCURRENCY
+    );
+    // Old code: Math.min(4, sourceGuardConcurrency()) → 3 under the workflow
+    // default. Nested may still be capped by availableParallelism(), but must
+    // not inherit the top-level default of 3.
+    expect(MERGED_WITH_BASE_POOL_CONCURRENCY).toBe(4);
+    expect(nested).toBeGreaterThan(3);
+  });
+
+  it('honors SOURCE_GUARD_CONCURRENCY=1 as the serial Validate debug switch', () => {
+    vi.stubEnv('SOURCE_GUARD_CONCURRENCY', '1');
+    expect(mergedWithBasePoolConcurrency(4)).toBe(1);
+  });
+
+  it('honors MERGED_WITH_BASE_POOL_CONCURRENCY over the workflow default', () => {
+    vi.stubEnv('SOURCE_GUARD_CONCURRENCY', '3');
+    vi.stubEnv('MERGED_WITH_BASE_POOL_CONCURRENCY', '5');
+    expect(mergedWithBasePoolConcurrency(4)).toBe(5);
+  });
+
+  it('starts measured long-pole subcommands before short scans', async () => {
+    const started = [];
+    const { code } = await runSourceGuardPool(
+      {
+        concurrency: 2,
+        commands: [
+          { id: 'cheap', command: 'node -e "process.exit(0)" /* cheap */' },
+          {
+            id: 'pole',
+            command:
+              'node -e "process.exit(0)" /* design-ci-judge-router pole */',
+          },
+          { id: 'also-cheap', command: 'node -e "process.exit(0)" /* also */' },
+        ],
+      },
+      {
+        // Force every entry to run (path-gate fail-closed).
+        changedFileList: null,
+        execute: async command => {
+          started.push(command);
+          await new Promise(resolveDone => setTimeout(resolveDone, 5));
+          return { code: 0, output: '' };
+        },
+      }
+    );
+    expect(code).toBe(0);
+    expect(started[0]).toContain('design-ci-judge-router');
+  });
+
+  it('path-gates design-ci-judge vitest by related paths', () => {
+    const entries = expandSourcePoolEntries(MERGED_WITH_BASE_POOL_SPEC);
+    const isJudge = e => e.command.includes(DESIGN_CI_JUDGE_VITEST_MARKER);
+    expect(entries.some(isJudge)).toBe(true);
+    const { kept, skipped } = filterMergedWithBasePoolEntries(entries, [
+      'docs/qa/README.md',
+      'scripts/lib/__tests__/ci-source-guard-pool.test.mjs',
+    ]);
+    expect(skipped.some(isJudge)).toBe(true);
+    expect(kept.some(isJudge)).toBe(false);
+    expect(
+      kept.some(e =>
+        e.command.includes('design-ci-judge-router-contract.test.mjs')
+      )
+    ).toBe(true);
+    for (const related of [
+      'apps/web/scripts/design-ci-judge-router.ts',
+      'apps/web/package.json',
+      'apps/web/vitest.config.mts',
+      'canon/invariants.jsonl',
+      'scripts/invariants/registry.mjs',
+      'scripts/invariants/screen-certification.mjs',
+      'scripts/invariants/screen-registry.mjs',
+      'apps/web/data/appScreens/registry.ts',
+      'apps/web/data/marketing/componentRegistry.ts',
+    ]) {
+      expect(DESIGN_CI_JUDGE_VITEST_PATHS.test(related), related).toBe(true);
+      const r = filterMergedWithBasePoolEntries(entries, [related]);
+      expect(r.skipped, related).toEqual([]);
+      expect(r.kept.some(isJudge), related).toBe(true);
+    }
+    expect(
+      DESIGN_CI_JUDGE_VITEST_PATHS.test('apps/web/app/(home)/page.tsx')
+    ).toBe(false);
+    for (const changed of [null, undefined, []]) {
+      const r = filterMergedWithBasePoolEntries(entries, changed);
+      expect(r.skipped, String(changed)).toEqual([]);
+      expect(r.kept.length, String(changed)).toBe(entries.length);
+    }
+  });
+
+  it('logs a skip line and does not execute the gated vitest', async () => {
+    const started = [];
+    const { code, output } = await runSourceGuardPool(
+      {
+        concurrency: 2,
+        commands: [
+          { id: 'cheap', command: 'node -e "process.exit(0)"' },
+          {
+            id: 'judge',
+            command: `pnpm --filter @jovie/web exec vitest run ${DESIGN_CI_JUDGE_VITEST_MARKER}`,
+          },
+        ],
+      },
+      {
+        changedFileList: ['README.md'],
+        execute: async command => {
+          started.push(command);
+          return { code: 0, output: '' };
+        },
+      }
+    );
+    expect(code).toBe(0);
+    expect(started).toEqual(['node -e "process.exit(0)"']);
+    expect(output).toContain('[merged-with-base] skip: judge;');
+    expect(output).toContain('design-ci-judge vitest');
+  });
+
   it('runs every sub-command and fails on any one failure', async () => {
     const spec = {
       concurrency: 4,
@@ -291,7 +449,9 @@ describe('merged-with-base-invariants pool', () => {
         { id: 'also-ok', command: 'node -e "process.exit(0)"' },
       ],
     };
-    const { code, output } = await runSourceGuardPool(spec);
+    const { code, output } = await runSourceGuardPool(spec, {
+      changedFileList: null,
+    });
     expect(code).toBe(4);
     // Run-all: the command after the failure still ran.
     expect(output).toContain('[merged-with-base] ok: exit 0;');

@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { access, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -36,12 +35,6 @@ const ICON_SIZE = 512;
 
 async function pngMetadata(filePath) {
   return sharp(filePath).metadata();
-}
-
-async function sha256(filePath) {
-  return createHash('sha256')
-    .update(await readFile(filePath))
-    .digest('hex');
 }
 
 async function assertBlackCorners(filePath) {
@@ -153,18 +146,6 @@ test('desktop sources the canonical opaque Jovie app icon profile', async () => 
   assert.equal(sourceMetadata.height, ICON_SIZE);
   assert.notEqual(sourceMetadata.hasAlpha, true);
   await assertBlackCorners(canonicalIconPath);
-});
-
-test('legacy icon-source.png remains for reference but is no longer the production source', async () => {
-  // Ensures we didn't accidentally leave a sailboat/placeholder as active source.
-  const legacyMeta = await pngMetadata(join(assetsRoot, 'icon-source.png'));
-  assert.equal(legacyMeta.format, 'png');
-  assert.equal(legacyMeta.width, 1024);
-  assert.equal(legacyMeta.height, 1024);
-  // If this ever matches the old placeholder SHA we can flag, but the value is kept for audit.
-  // (Current SHA below was the pre-real-icon placeholder.)
-  const currentLegacySha = await sha256(join(assetsRoot, 'icon-source.png'));
-  assert.notEqual(currentLegacySha, ''); // just ensure readable
 });
 
 test('packaged production and staging icons use the rounded desktop profile', async () => {

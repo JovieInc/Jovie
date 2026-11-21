@@ -75,11 +75,19 @@ import {
 
 export {
   expandSourcePoolEntries,
+  mergedWithBasePoolConcurrency,
   runSourceGuardPool,
   runSourceGuards,
   sourceGuardConcurrency,
   sourceGuardLocks,
 } from './lib/ci-source-guard-pool.mjs';
+export {
+  DESIGN_CI_JUDGE_VITEST_MARKER,
+  DESIGN_CI_JUDGE_VITEST_PATHS,
+  filterMergedWithBasePoolEntries,
+  MERGED_WITH_BASE_POOL_CONCURRENCY,
+  MERGED_WITH_BASE_POOL_LONG_POLES,
+} from './lib/merged-with-base-pool-config.mjs';
 
 import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
 import { isInvariantScannedPath } from './invariants/scanned-paths.mjs';
@@ -96,6 +104,7 @@ import {
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
 import { STRUCTURAL_PYTEST_FILES } from './lib/ci-structural-pytest-files.mjs';
+import { MERGED_WITH_BASE_POOL_CONCURRENCY } from './lib/merged-with-base-pool-config.mjs';
 import { scriptContractNodeArgs } from './lib/script-contract-node-args.mjs';
 import { testsAffectedBy } from './lib/test-file-dependencies.mjs';
 import { TEST_PLANNER_CONTRACT_TESTS } from './lib/test-planner-contract-tests.mjs';
@@ -205,20 +214,6 @@ export const STRUCTURAL_STATIC_SCAN_EXEMPT = Object.freeze({
     'run on the PR merged with base by merged-with-base-invariants (~88s)',
   'pnpm ci:control:test': 'control-plane suite, ~40s; merge-group only',
 });
-
-/**
- * The merged-with-base guard runs its scans as one bounded pool instead of a
- * serial `;` chain. Same commands, same fail-closed outcome (any failure fails
- * the guard); run-all means a failure no longer hides later failures.
- */
-export const MERGED_WITH_BASE_POOL_CONCURRENCY = 4;
-
-/** Measured long poles inside the merged-with-base pool (ordering only). */
-export const MERGED_WITH_BASE_POOL_LONG_POLES = Object.freeze([
-  // The node --test invariants batch (~120s) and the web vitest run.
-  'scripts/invariants/registry.test.mjs',
-  'tests/unit/api/webhooks/linear.test.ts',
-]);
 
 /** Short, stable pool id for a scan command. */
 function mergedBasePoolId(command) {
@@ -801,7 +796,6 @@ export function selectSourceGuards(event, changed) {
     loadSourceGuardHistory()
   );
 }
-
 export const SOURCE_GUARDS_COMMAND = SOURCE_GUARDS.map(
   guard => guard.command
 ).join(' && ');
@@ -1010,7 +1004,6 @@ const LANES_COVERAGE_REPORT_COMMANDS = LANES_COVERAGE_FLOORS.map(
     '" --fail-under=' +
     floor
 );
-
 // Run the CPU-heavy coverage shards alone; keep every main-branch floor.
 export const LANES_COVERAGE_COMMAND = structuralPythonRegression(
   [LANES_COVERAGE_RUN, ...LANES_COVERAGE_REPORT_COMMANDS].join(' && ')
@@ -1032,6 +1025,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/design/pen-draft-picture.test.mjs',
   'scripts/design/pen-draft-frames.test.mjs',
   'scripts/design/pen-data-backed-ship.test.mjs',
+  'scripts/design-write-swarm/design-write-swarm.test.mjs',
   'scripts/hostops/pen-files-worker/src/index.test.mjs',
   'scripts/runner-pool-routing.test.mjs',
   'scripts/sentry-build-config.test.mjs',
@@ -1040,7 +1034,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/spend-guard.test.mjs',
   'scripts/lib/__tests__/wins-ledger.test.mjs',
   'scripts/lib/__tests__/wins-measure.test.mjs',
-  'scripts/lib/__tests__/wins-store.test.mjs',
+  'scripts/lib/__tests__/wins-store.test.mjs scripts/lib/__tests__/wins-summer-loop.test.mjs',
   'scripts/pr-open.test.mjs',
   'scripts/pr-open-priority.test.mjs',
   'scripts/pr-open-win.test.mjs',
@@ -1200,6 +1194,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/marketing-critic/marketing-critic.test.mjs',
   'scripts/lib/__tests__/admission-hold-labels.test.mjs',
   'scripts/lib/__tests__/source-validation-dedup-workflow.test.mjs',
+  'scripts/ci/mq-parity-scope.test.mjs',
   'scripts/linear-team-drift.test.mjs',
   'scripts/lib/__tests__/source-validation-lane-classification.test.mjs',
   'scripts/lib/__tests__/security-evidence-history-checkout.test.mjs',
@@ -1901,7 +1896,6 @@ export function changedFiles(patterns = [], cwd = REPO_ROOT) {
   }
   return result.output.split('\0').filter(Boolean);
 }
-
 export const BILLING_PROVENANCE_COVERAGE_PATHS = Object.freeze([
   'apps/web/lib/entitlements/**',
   'apps/web/lib/stripe/customer-sync/**',
@@ -2288,12 +2282,15 @@ function runScriptsTypecheck() {
   // resolver changes can alter its diagnostics without touching a path filter.
   return shell('pnpm run typecheck:scripts');
 }
-
-/** Operations-lane node:test files run by Guardrails (single source of truth). */
 export const GUARDRAIL_OPERATIONS_TESTS = Object.freeze([
   'scripts/cleanup-stale-dev.test.mjs',
   'scripts/desktop-release-guard.test.mjs',
   'scripts/desktop-installed-apps-audit.test.mjs',
+  'scripts/artifact-freshness-reconcile.test.mjs',
+  'scripts/lib/artifact-freshness-certified.test.mjs',
+  'scripts/lib/artifact-freshness-graph.test.mjs',
+  'scripts/lib/artifact-freshness-stamp.test.mjs',
+  'scripts/lib/publication-observation.test.mjs',
   'scripts/dev-web-fast.test.mjs',
   'scripts/ios-guardrail-rollout-audit.test.mjs',
   'scripts/swift-arch/guard.test.mjs',
@@ -3490,9 +3487,7 @@ async function main() {
 
   writeSummary(results, laneGroup, timingTables);
   writeLaneResults(results, laneGroup, setupError);
-
   if (setupError) process.exit(1);
-
   const failed = results.filter(r => r.status === 'failure');
   if (failed.length > 0) {
     console.error(

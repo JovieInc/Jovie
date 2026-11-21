@@ -7,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  IconButton,
 } from '@jovie/ui';
 import {
   Check,
@@ -21,7 +22,6 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 import type { CreatorActionsMenuProps } from './types';
 
@@ -174,14 +174,16 @@ export function CreatorActionsMenu({
       <div className='flex w-full items-center justify-end gap-1'>
         <DropdownMenu open={open} onOpenChange={onOpenChange}>
           <DropdownMenuTrigger asChild>
-            <AppIconButton
+            <IconButton
+              variant='control'
               inert={open}
               ariaLabel='Open creator actions'
               className='h-8 w-8 rounded-full bg-transparent text-quaternary-token hover:bg-surface-1 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-ring/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
               disabled={isLoading}
+              size='sm'
             >
               <MoreVertical className='h-3.5 w-3.5' />
-            </AppIconButton>
+            </IconButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align='end' sideOffset={8}>
             <MenuItems
