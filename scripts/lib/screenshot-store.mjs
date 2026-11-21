@@ -132,8 +132,36 @@ export function servedCatalogImages(root) {
     }
   };
   walk('apps/web/public');
+  // App code that imports a catalog image bundles it at build time, so it is
+  // served too (e.g. `import X from '@/screenshot-catalog/current/a.png'`).
+  const scan = dir => {
+    if (!existsSync(join(root, dir))) return;
+    for (const entry of readdirSync(join(root, dir), { withFileTypes: true })) {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) {
+        if (!SOURCE_SKIP_DIRS.has(entry.name)) scan(path);
+      } else if (entry.isFile() && SOURCE_FILE.test(entry.name)) {
+        const text = readFileSync(join(root, path), 'utf8');
+        for (const match of text.matchAll(CATALOG_IMPORT))
+          follow(`${CATALOG_BINARY_DIR}/${match[1]}`);
+      }
+    }
+  };
+  scan('apps/web');
   return served;
 }
+
+const SOURCE_SKIP_DIRS = new Set([
+  '.next',
+  '__tests__',
+  'node_modules',
+  'public',
+  'screenshot-catalog',
+  'tests',
+]);
+const SOURCE_FILE = /^(?!.*\.(?:test|spec)\.)[^.].*\.(?:[cm]?[jt]sx?)$/;
+const CATALOG_IMPORT =
+  /screenshot-catalog\/current\/([\w.-]+\.(?:png|jpe?g|webp|gif))['"`]/g;
 
 export function objectKey(hash, extension) {
   return `sha256/${hash.slice(0, 2)}/${hash}${extension.toLowerCase()}`;

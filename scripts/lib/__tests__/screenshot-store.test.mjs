@@ -328,6 +328,38 @@ test('served images (public symlink targets, through dedupe links) stay in git',
   }
 });
 
+test('catalog images imported by app code are served and stay in git', () => {
+  const root = mkdtempSync(join(tmpdir(), 'screenshot-imported-'));
+  try {
+    const catalog = join(root, 'apps/web/screenshot-catalog/current');
+    const components = join(root, 'apps/web/components');
+    const tests = join(root, 'apps/web/tests');
+    mkdirSync(catalog, { recursive: true });
+    mkdirSync(components, { recursive: true });
+    mkdirSync(tests, { recursive: true });
+    for (const name of ['used.png', 'test-only.png', 'unused.png'])
+      writeFileSync(join(catalog, name), name);
+    writeFileSync(
+      join(components, 'Hero.tsx'),
+      "import SHOT from '@/screenshot-catalog/current/used.png';\n"
+    );
+    writeFileSync(
+      join(components, 'Hero.test.tsx'),
+      "import SHOT from '@/screenshot-catalog/current/test-only.png';\n"
+    );
+    writeFileSync(
+      join(tests, 'shot.ts'),
+      "import SHOT from '@/screenshot-catalog/current/test-only.png';\n"
+    );
+    const served = servedCatalogImages(root);
+    assert.deepEqual([...served], [
+      'apps/web/screenshot-catalog/current/used.png',
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('CLI: verify --remote without credentials fails with an upload-not-verified message', () => {
   const env = { ...process.env };
   for (const name of [
