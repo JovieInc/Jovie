@@ -7,7 +7,6 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { FounderReviewRegistry } from '@/components/features/admin/FounderReviewRegistry';
 import {
   HeaderActionsProvider,
   useHeaderActions,
@@ -23,6 +22,8 @@ import type {
   OvieCertificationRow,
 } from '@/lib/ovie/certifications/types';
 import { founderReviewItemFixture } from '@/tests/fixtures/founder-review-item';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { FounderReviewRegistry } from './FounderReviewRegistry';
 
 vi.mock('@/hooks/useBreakpoint', () => ({
   useBreakpointDown: () => false,
@@ -473,5 +474,68 @@ describe('FounderReviewRegistry', () => {
     // The AA success text token is mode-aware (darker on light, full success
     // on dark), replacing the raw emerald palette classes.
     expect(mark.className).toContain('text-success-text');
+  });
+
+  it('keeps the typed founder note and focus across a rerender, with the Textarea atom surface', async () => {
+    const user = userEvent.setup();
+    mockInventory(items.map(item => registryRow(item)));
+    const { rerender } = renderRegistry();
+
+    const rail = await screen.findByTestId('founder-review-detail-rail');
+    const note = within(rail).getByPlaceholderText(
+      'What should stay true or change?'
+    );
+    await user.type(note, 'Hero crop is off');
+    mockInventory(items.map(item => registryRow(item)));
+    rerender(
+      <HeaderActionsProvider>
+        <RightPanelProvider>
+          <MountedHeaderActions />
+          <FounderReviewRegistry kind='feature' items={items} />
+          <MountedRightPanel />
+        </RightPanelProvider>
+      </HeaderActionsProvider>
+    );
+    await user.keyboard('{Escape}');
+
+    expect(note).toHaveValue('Hero crop is off');
+    expect(note).toHaveFocus();
+    expect(note.className).toContain('border-subtle');
+    expect(note.className).toContain('resize-none');
+  });
+
+  it('opens the evidence viewer from the keyboard on the media thumbnail', async () => {
+    const user = userEvent.setup();
+    mockInventory(items.map(item => registryRow(item)));
+    renderRegistry();
+    const rail = await screen.findByTestId('founder-review-detail-rail');
+    const open = within(rail).getByRole('button', {
+      name: 'Open Ready feature evidence',
+    });
+    const showModal = HTMLDialogElement.prototype.showModal;
+    HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
+      this.setAttribute('open', '');
+    };
+    open.focus();
+    await user.keyboard('{Enter}');
+    HTMLDialogElement.prototype.showModal = showModal;
+    expect(screen.getByTestId('media-canvas-viewer')).toBeInTheDocument();
+  });
+
+  it('has no accessibility violations with items and with an empty registry', async () => {
+    mockInventory(items.map(item => registryRow(item)));
+    const { container, unmount } = renderRegistry();
+    await screen.findByTestId('founder-review-detail-rail');
+    await expectNoA11yViolations(container);
+    unmount();
+    mockInventory([]);
+    const empty = render(
+      <HeaderActionsProvider>
+        <RightPanelProvider>
+          <FounderReviewRegistry kind='feature' items={[]} />
+        </RightPanelProvider>
+      </HeaderActionsProvider>
+    );
+    await expectNoA11yViolations(empty.container);
   });
 });

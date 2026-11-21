@@ -27,6 +27,15 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/admin/FounderReviewRegistry.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/admin/admin-assets-table/AdminAssetsTable.tsx": [
       "ds-owner",
       "tokens",
@@ -72,6 +81,15 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/admin/design-lab/DesignProposalReviewPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/admin/hud/OvieInbox.tsx": [
       "ds-owner",
       "tokens",
@@ -86,6 +104,9 @@
     "apps/web/components/ask-jovie/AskJovie.tsx": {
       "error": "The feedback post is best-effort and its failure is swallowed by design, so the panel has no error UI; AskJovie.test.tsx and the Offline story cover the rejected request.",
       "permission-denied": "The panel needs no permission or role and renders for every signed-in user."
+    },
+    "apps/web/components/features/admin/FounderReviewRegistry.tsx": {
+      "error": "A failed decision write keeps the draft and shows the server message in the rail (covered by the keeps the draft and surfaces the server error test); the registry has no standing error screen."
     },
     "apps/web/components/features/admin/admin-assets-table/AdminAssetsTable.tsx": {
       "loading": "The rows arrive as server-rendered initial data and the table shows rows or the empty state; the only pending state is the infinite-scroll fetch, which AdminDataTable owns and its own stories cover.",
