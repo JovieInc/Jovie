@@ -21,6 +21,11 @@ import {
   resolvePathForRoute,
 } from './performance-smooth-measure';
 import {
+  evaluateSmoothRatchet,
+  formatSmoothRatchetReport,
+  loadCommittedBaselines,
+} from './performance-smooth-ratchet';
+import {
   buildSurfaceBaseline,
   pickWorstSurface,
   renderSmoothBaselineMarkdown,
@@ -67,6 +72,10 @@ interface CliOptions {
   readonly runs: number;
   readonly surfaceIds: readonly SmoothSurfaceId[];
   readonly write: boolean;
+  /** After measure, compare to committed baselines and exit non-zero on regression. */
+  readonly compare: boolean;
+  /** Allow `--write` to raise committed medians (intentional re-baseline). */
+  readonly allowRaise: boolean;
   readonly json: boolean;
 }
 
@@ -88,6 +97,8 @@ export function parseSmoothBaselineCliArgs(
   let outDir = defaults.outDir ?? DEFAULT_BASELINE_DIR;
   let runs = defaults.runs ?? SMOOTH_RUNS;
   let write = defaults.write ?? false;
+  let compare = defaults.compare ?? process.env.CI === 'true';
+  let allowRaise = defaults.allowRaise ?? false;
   let json = defaults.json ?? false;
   const platforms = new Set<SmoothPlatform>(
     defaults.platforms ?? ['desktop', 'mobile']
@@ -100,6 +111,18 @@ export function parseSmoothBaselineCliArgs(
     const arg = args[index];
     if (arg === '--write') {
       write = true;
+      continue;
+    }
+    if (arg === '--compare') {
+      compare = true;
+      continue;
+    }
+    if (arg === '--no-compare') {
+      compare = false;
+      continue;
+    }
+    if (arg === '--allow-raise') {
+      allowRaise = true;
       continue;
     }
     if (arg === '--json') {
@@ -172,6 +195,8 @@ export function parseSmoothBaselineCliArgs(
     runs,
     surfaceIds: [...surfaceIds],
     write,
+    compare,
+    allowRaise,
     json,
   };
 }
@@ -302,13 +327,36 @@ async function main() {
   const options = parseSmoothBaselineCliArgs(process.argv.slice(2));
   const summary = await runSmoothBaseline(options);
   if (options.write) {
-    const summaryPath = writeSmoothBaselines(summary, options.outDir);
+    const previous = existsSyncBaselines(options.outDir)
+      ? loadCommittedBaselines(options.outDir)
+      : [];
+    const summaryPath = writeSmoothBaselines(summary, options.outDir, {
+      previous,
+      allowRaise: options.allowRaise,
+    });
     console.error(`[smooth] wrote baselines to ${summaryPath}`);
   }
   if (options.json) {
     process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
   } else {
     process.stdout.write(renderSmoothBaselineMarkdown(summary));
+  }
+  if (options.compare) {
+    const report = evaluateSmoothRatchet({
+      measured: summary,
+      baselineDir: options.outDir,
+    });
+    process.stderr.write(formatSmoothRatchetReport(report));
+    if (report.status === 'fail') process.exit(1);
+  }
+}
+
+function existsSyncBaselines(outDir: string) {
+  try {
+    loadCommittedBaselines(outDir);
+    return true;
+  } catch {
+    return false;
   }
 }
 

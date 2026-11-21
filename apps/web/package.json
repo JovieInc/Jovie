@@ -236,6 +236,8 @@
     "perf:interactions:measure": "tsx scripts/run-interaction-latency-audit.ts",
     "perf:smooth:baseline": "tsx scripts/performance-smooth-baseline.ts",
     "perf:smooth:baseline:write": "tsx scripts/performance-smooth-baseline.ts --write",
+    "perf:smooth:ratchet": "tsx scripts/performance-smooth-ratchet.ts",
+    "perf:smooth:ratchet:check": "tsx scripts/performance-smooth-ratchet.ts --check",
     "product-surface-counts": "tsx scripts/generate-product-surface-counts.ts",
     "product-surface-counts:check": "tsx scripts/generate-product-surface-counts.ts --check",
     "perf:queue": "doppler run --project jovie-web --config dev -- tsx scripts/performance-batch-queue.ts",
