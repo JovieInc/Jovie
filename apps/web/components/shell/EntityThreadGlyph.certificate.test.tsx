@@ -12,12 +12,7 @@ describe('EntityThreadGlyph certificate', () => {
     // Events that bubble past the component would reach the document body.
     document.body.addEventListener('click', onRow);
     const { container } = render(
-      <>
-        <EntityThreadGlyph
-          threadTitle='Generating lyric video'
-          onOpen={onOpen}
-        />
-      </>
+      <EntityThreadGlyph threadTitle='Generating lyric video' onOpen={onOpen} />
     );
 
     await user.click(screen.getByRole('button', { name: /Open Running Chat/ }));

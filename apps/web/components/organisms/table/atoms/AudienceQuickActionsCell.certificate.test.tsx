@@ -14,13 +14,11 @@ describe('AudienceQuickActionsCell certificate', () => {
     document.body.addEventListener('click', onRowClick);
     document.body.addEventListener('keydown', onRowKeyDown);
     const { container } = render(
-      <>
-        <AudienceQuickActionsCell
-          onExport={onExport}
-          onBlock={vi.fn()}
-          className='custom'
-        />
-      </>
+      <AudienceQuickActionsCell
+        onExport={onExport}
+        onBlock={vi.fn()}
+        className='custom'
+      />
     );
 
     await user.click(screen.getByRole('button', { name: 'Export Contact' }));
