@@ -45,6 +45,24 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/profile/ProfileContactDrawerContent.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/ProfilePrimaryCTA.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/marketing/MarketingCtaPendingLabel.tsx": [
       "ds-owner",
       "tokens",
@@ -89,9 +107,6 @@
     "apps/web/components/organisms/AccountDashboard.tsx": {
       "empty": "The page is static quick-action cards with no data list; the detector matched the word links in its copy.",
       "long-content": "All copy is fixed in source; no user-supplied text reaches the cards."
-    },
-    "apps/web/components/features/profile/ProfilePrimaryCTA.tsx": {
-      "offline": "The CTA never fetches; it reads the stored subscription from context and links out."
     }
   }
 }
