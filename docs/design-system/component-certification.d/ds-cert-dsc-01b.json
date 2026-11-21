@@ -72,6 +72,15 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/admin/outbound/OutboundRailReadiness.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/admin/outbound/OutboundReadinessPanel.tsx": [
       "ds-owner",
       "tokens",
@@ -90,7 +99,34 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/admin/waitlist-table/WaitlistKanbanCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/agent-room/AgentRoster.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/auth/AuthProviderButtons.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/dashboard-nav/CustomerNavMoreMenu.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -122,6 +158,10 @@
     "apps/web/components/features/admin/lists/OvieSmartViewWorkspace.tsx": {
       "offline": "The page only reads a query; a failed request is the Error state, and the component has no separate offline UI.",
       "permission-denied": "Access is enforced by the admin route before this component mounts; it renders no denied state."
+    },
+    "apps/web/components/features/admin/outbound/OutboundRailReadiness.tsx": {
+      "offline": "The rail renders props and makes no request; an action failure is the Error story.",
+      "permission-denied": "It only presents existing evidence and never grants approval; access is enforced by the admin route."
     },
     "apps/web/components/features/admin/outbound/OutboundReadinessPanel.tsx": {
       "offline": "The panel renders the readiness prop and makes no request; a failed fetch is the isError state shown by ErrorLoadFailed."
