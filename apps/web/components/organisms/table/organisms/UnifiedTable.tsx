@@ -45,9 +45,9 @@ import {
 import {
   cn,
   iconColors,
+  resolveTableRowHeightPx,
   TABLE_CANONICAL_ROW_MODE,
   type TableRowMode,
-  resolveTableRowHeightPx,
   tableRowModeStyle,
   zIndex,
 } from '../table.styles';
