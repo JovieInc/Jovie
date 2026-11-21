@@ -117,7 +117,7 @@ describe('design-write-swarm', () => {
     );
   });
 
-  it('treats string "true" claim flags as yes (fail-closed)', () => {
+  it('treats string "true" and non-object mutate/timReady as claims', () => {
     const stringy = validateWriteSwarmReceipt({
       ...live,
       inventAndRubberStamp: 'true',
@@ -128,7 +128,7 @@ describe('design-write-swarm', () => {
         selfApproved: 'true',
         judge: 'panel',
       },
-      timReady: { renamed: 'true', name: 'nope' },
+      timReady: { renamed: 'true', name: 'ready for Tim rabcdef01extra' },
       codeSync: { includesPenBlob: 'true', targets: ['packages/ui'] },
     });
     assert.equal(stringy.ok, false);
@@ -137,6 +137,17 @@ describe('design-write-swarm', () => {
     assert.ok(has(stringy, 'mutate_without_system1_pass'));
     assert.ok(has(stringy, 'tim_ready_name'));
     assert.ok(has(stringy, 'pen_blob_in_code_sync'));
+
+    const nonObj = validateWriteSwarmReceipt({
+      ...live,
+      mutate: true,
+      timReady: true,
+      system1: { ...live.system1, verdict: 'fail' },
+      codeSync: undefined,
+    });
+    assert.equal(nonObj.ok, false);
+    assert.ok(has(nonObj, 'mutate_type') && has(nonObj, 'tim_ready_type'));
+    assert.ok(has(nonObj, 'mutate_without_system1_pass'));
   });
 
   it('accepts live pass; CLI dry + validate', () => {

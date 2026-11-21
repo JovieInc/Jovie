@@ -90,12 +90,15 @@ export function validateWriteSwarmReceipt(receipt) {
 
   const lease = obj(doc.lease);
   const system1 = obj(doc.system1);
+  const mutatePresent = doc.mutate !== undefined && doc.mutate !== null;
   const mutate = obj(doc.mutate);
+  const timReadyPresent = doc.timReady !== undefined && doc.timReady !== null;
   const timReady = obj(doc.timReady);
   const codeSyncPresent = doc.codeSync !== undefined && doc.codeSync !== null;
   const codeSync = obj(doc.codeSync);
-  const mutated = yes(mutate?.performed);
-  const renamed = yes(timReady?.renamed);
+  // Truthy non-objects (mutate:true) must not bypass gates via obj()→null.
+  const mutated = yes(mutate?.performed) || (mutatePresent && !mutate);
+  const renamed = yes(timReady?.renamed) || (timReadyPresent && !timReady);
 
   if (mode === 'dry') {
     if (yes(doc.mutatesPen)) block('dry_mutates_pen', 'mutatesPen=false');
@@ -111,6 +114,8 @@ export function validateWriteSwarmReceipt(receipt) {
       if (!t(lease.token)) block('lease_token', 'token');
       if (!yes(lease.acquired)) block('lease_not_acquired', 'acquired');
     }
+    if (mutatePresent && !mutate) block('mutate_type', 'object');
+    if (timReadyPresent && !timReady) block('tim_ready_type', 'object');
     if (mutated && (!lease || !yes(lease?.acquired) || !t(lease?.token)))
       block('mutate_without_lease', 'need lease token');
     if (!system1) block('system1_missing', 'system1 required');
@@ -124,7 +129,8 @@ export function validateWriteSwarmReceipt(receipt) {
       const writer = t(mutate?.writer);
       const judge = t(system1.judge);
       if (!judge) block('system1_judge', 'judge required');
-      if (mutated && !writer) block('mutate_writer', 'writer required');
+      if (mutated && mutate && !writer)
+        block('mutate_writer', 'writer required');
       if (yes(system1.selfApproved) || (writer && judge && writer === judge))
         block('invent_and_rubber_stamp', 'writer≠judge');
     }
@@ -133,8 +139,9 @@ export function validateWriteSwarmReceipt(receipt) {
     if (needsPass && t(system1?.verdict) !== 'pass')
       block('mutate_without_system1_pass', 'need system1 pass');
     if (
-      renamed &&
-      (!t(timReady.name) || !/ready for Tim r[0-9a-f]{8}/.test(timReady.name))
+      yes(timReady?.renamed) &&
+      (!t(timReady.name) ||
+        !/ · ready for Tim r[0-9a-f]{8}$/.test(t(timReady.name)))
     )
       block('tim_ready_name', '· ready for Tim r<8hex>');
     if (yes(codeSync?.includesPenBlob))
