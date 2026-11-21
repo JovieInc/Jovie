@@ -49,6 +49,15 @@ vi.mock('@jovie/ui', () => ({
       {children}
     </button>
   ),
+  PlainButton: ({
+    children,
+    type = 'button',
+    ...props
+  }: React.ComponentProps<'button'>) => (
+    <button type={type} {...props}>
+      {children}
+    </button>
+  ),
   Input: (props: Record<string, unknown>) => <input {...props} />,
   Label: ({ children }: { children: React.ReactNode }) => (
     // biome-ignore lint/a11y/noLabelWithoutControl: test mock

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { DemoReleasesPanel } from './DemoReleasesPanel';
 import { DEMO_RELEASES } from './demo-fixtures';
 
@@ -51,5 +52,22 @@ describe('DemoReleasesPanel', () => {
     const live = screen.getByRole('listbox', { name: 'Live releases' });
     fireEvent.keyDown(live, { key: 'Escape' });
     expect(onSelect).toHaveBeenLastCalledWith('');
+  });
+
+  it('has no axe violations when populated, collapsed or empty', async () => {
+    const { container, rerender } = render(
+      <DemoReleasesPanel groups={groups} selectedId={null} onSelect={vi.fn()} />
+    );
+    await expectNoA11yViolations(container);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Toggle releases section: Live/ })
+    );
+    await expectNoA11yViolations(container);
+
+    rerender(
+      <DemoReleasesPanel groups={[]} selectedId={null} onSelect={vi.fn()} />
+    );
+    await expectNoA11yViolations(container);
   });
 });
