@@ -22,9 +22,8 @@ export const LEVERAGE_FIRST_SCHEMA = 'jovie.leverage-first-ordering/v1';
 export {
   leverageFirstViolations,
   orderLeverageFirst,
-  rankAdmissionQueue,
-  rankQueueCandidates,
 } from './leverage-first-ordering.mjs';
+export { rankAdmissionQueue, rankQueueCandidates } from './queue-ranking.mjs';
 
 const PREVENTION_LABEL_PATTERN =
   /^(?:invariant|guardrail|ratchet|ci-gate|quality-gate|prevention)$/i;

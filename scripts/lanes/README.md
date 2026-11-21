@@ -281,7 +281,7 @@ guardrail that covers two or more queued issues of one defect class is admitted
 before those duplicate leaf repairs. Explicit Urgent, revenue-protection, and
 red/unblock work stay ahead of the guard. An unbounded guard, or one already in
 progress, releases a single proof leaf and holds the rest
-(`orderLeverageFirst` in `scripts/backlog-orchestrator/scorer.mjs`).
+(`orderLeverageFirst` in `scripts/backlog-orchestrator/leverage-first-ordering.mjs`).
 
 ## Event queue (JOV-6672)
 
