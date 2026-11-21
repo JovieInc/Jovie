@@ -1,108 +1,37 @@
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# capability-gap: Live /app/chat first-token (TTFT) sampling needs WORKERS_AI_TOKEN (CI secret GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN) plus a test-account relay/browser probe; agent VMs and PR checks lack that credential and must not spend Gateway. Manual workflow_dispatch writes an unrun sample and soft-skips when the secret is missing or the live probe is not enrolled. Inject ASSISTANTS_CHAT_TTFT_SAMPLES_MS to record offline and fail closed on p50 ≥ 1000ms.
-# removal-trigger: Remove when a scheduled Assistants lane records live /app/chat TTFT for the test account and posts the JSON sample into the chat-ux gate / assistants ratchet.
-#
-# Assistants /app/chat first-token sample harness (ASS-28).
-# Manual dispatch only; soft-skips missing secret / probe-not-ready (ASS-18 pattern).
-# Auth: maps CI secret GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN → WORKERS_AI_TOKEN.
-# $0 Gateway by default. Test account only. No prod writes. No feature flags.
+# capability-gap: /app/chat TTFT needs WORKERS_AI_TOKEN (GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN); soft-skips when missing. Inject ASSISTANTS_CHAT_TTFT_SAMPLES_MS to record offline.
+# removal-trigger: Remove when a scheduled Assistants lane records live TTFT for the test account.
 name: Chat first-token sample
-
 on:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
   group: chat-first-token-sample-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   chat-first-token-sample:
     name: Chat first-token sample
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    permissions:
-      contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
-      - name: Setup Node and pnpm
-        uses: ./.github/actions/setup-node-pnpm
-
-      - name: Record or soft-skip first-token sample
-        id: run
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Record or soft-skip
         env:
           WORKERS_AI_TOKEN: ${{ secrets.GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN }}
           OUT_JSON: ${{ runner.temp }}/chat-first-token-sample.json
-          RUN_LOG: ${{ runner.temp }}/chat-first-token-sample.log
-          # Optional offline record (comma-separated ms). Leave unset for soft-skip.
           ASSISTANTS_CHAT_TTFT_SAMPLES_MS: ${{ vars.ASSISTANTS_CHAT_TTFT_SAMPLES_MS }}
         run: |
           set -uo pipefail
-          if [ -z "${WORKERS_AI_TOKEN:-}" ] && [ -z "${ASSISTANTS_CHAT_TTFT_SAMPLES_MS:-}" ]; then
-            echo "::notice::GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN missing and no ASSISTANTS_CHAT_TTFT_SAMPLES_MS; soft-skipping chat first-token sample."
-            echo "outcome=skipped_secret" >> "$GITHUB_OUTPUT"
-            pnpm --filter @jovie/web eval:chat-first-token -- --out "$OUT_JSON" >"$RUN_LOG" 2>&1 || true
-            cat "$RUN_LOG" || true
-            exit 0
-          fi
-
-          set +e
-          pnpm --filter @jovie/web eval:chat-first-token -- --out "$OUT_JSON" \
-            >"$RUN_LOG" 2>&1
-          status=$?
-          set -e
-          cat "$RUN_LOG"
-
-          if [ "$status" -eq 0 ] && [ -s "$OUT_JSON" ]; then
-            if grep -q '"status": "recorded"' "$OUT_JSON"; then
-              echo "outcome=recorded" >> "$GITHUB_OUTPUT"
-            else
-              echo "outcome=skipped_probe_not_ready" >> "$GITHUB_OUTPUT"
-              echo "::notice::Wrote unrun sample (probe not enrolled or soft-skip). No Gateway spend."
-            fi
-            exit 0
-          fi
-
-          echo "::error::Chat first-token sample failed (exit $status). See log above."
-          echo "outcome=failed" >> "$GITHUB_OUTPUT"
-          exit "$status"
-
-      - name: Summarize sample + gate
-        if: ${{ always() && hashFiles(format('{0}/chat-first-token-sample.json', runner.temp)) != '' }}
-        env:
-          OUT_JSON: ${{ runner.temp }}/chat-first-token-sample.json
-        run: |
-          set -euo pipefail
-          node --input-type=module <<'EOF'
-          import { readFileSync } from 'node:fs';
-          const sample = JSON.parse(readFileSync(process.env.OUT_JSON, 'utf8'));
-          const lines = [
-            'Chat first-token sample summary (Assistants /app/chat)',
-            `  status: ${sample.status}`,
-            `  mode: ${sample.mode}`,
-            `  account: ${sample.account}`,
-            `  p50Ms: ${sample.p50Ms ?? 'n/a'}`,
-            `  targetMs: ${sample.targetMs}`,
-            `  samples: ${Array.isArray(sample.samplesMs) ? sample.samplesMs.length : 0}`,
-            `  notes: ${sample.notes ?? ''}`,
-          ];
-          process.stdout.write(`${lines.join('\n')}\n`);
-          EOF
-
-      - name: Upload first-token sample JSON
-        if: ${{ always() && !cancelled() }}
+          pnpm --filter @jovie/web eval:chat-first-token -- --out "$OUT_JSON"
+      - if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: chat-first-token-sample-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/chat-first-token-sample.json
-            ${{ runner.temp }}/chat-first-token-sample.log
+          path: ${{ runner.temp }}/chat-first-token-sample.json
           if-no-files-found: ignore
-          retention-days: 30
+          retention-days: 14

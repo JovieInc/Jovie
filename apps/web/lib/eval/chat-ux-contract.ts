@@ -1,19 +1,11 @@
 /**
- * Assistants chat UX contract (ASS-11 / ASS-28).
+ * Assistants chat UX contract (ASS-11).
  *
  * Deterministic source of truth for:
  * - which jank unit tests must stay green for the CI ratchet
  * - the Assistants first-token target (<1s)
  *
- * Live LLM TTFT is recorded via `./chat-first-token-sample` (JSON loader +
- * workflow_dispatch soft-skip). Until a sample has status `recorded`, the
- * latency compare stays skipped. Client UX latency with a mocked stream is
- * gated by chat-performance-ratchet + these budgets. Summer production canary
- * uses a separate, looser TTFT target.
- *
- * Assistants ratchet import path:
- *   `evaluateChatFirstTokenSample` / `chatFirstTokenSampleToGateInput`
- *   from `./chat-first-token-sample` → `evaluateChatUxGate` here.
+ * Live TTFT: `./chat-first-token-sample` (ASS-28); unrun skips latency compare.
  */
 
 export const ASSISTANTS_CHAT_UX_CONTRACT_VERSION =
