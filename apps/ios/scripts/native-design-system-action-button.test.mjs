@@ -17,7 +17,7 @@ const contract = readFileSync(
   'utf8'
 );
 
-test('contractNumber reads ActionButton KEEP exports', () => {
+test('contractNumber reads KEEP 28/44 exports', () => {
   assert.equal(contractNumber(contract, 'ACTION_BUTTON_VISIBLE_HEIGHT_PX'), 28);
   assert.equal(
     contractNumber(contract, 'ACTION_BUTTON_MOBILE_HIT_TARGET_PX'),
@@ -35,14 +35,14 @@ test('contractNumber reads ActionButton KEEP exports', () => {
   );
 });
 
-test('ActionButton projection binds height/hitTarget to web KEEP', () => {
-  const output = projectedActionButton(manifest.actionButtonBindings, contract);
-  assert.ok(output.includes(ACTION_BUTTON_START));
-  assert.ok(output.includes(ACTION_BUTTON_END));
-  assert.ok(output.includes('/// Source: ACTION_BUTTON_VISIBLE_HEIGHT_PX'));
-  assert.ok(output.includes('static let height: CGFloat = 28'));
-  assert.ok(output.includes('/// Source: ACTION_BUTTON_MOBILE_HIT_TARGET_PX'));
-  assert.ok(output.includes('static let hitTarget: CGFloat = 44'));
+test('projection binds height/hitTarget to web KEEP', () => {
+  const out = projectedActionButton(manifest.actionButtonBindings, contract);
+  assert.ok(out.includes(ACTION_BUTTON_START));
+  assert.ok(out.includes(ACTION_BUTTON_END));
+  assert.ok(out.includes('/// Source: ACTION_BUTTON_VISIBLE_HEIGHT_PX'));
+  assert.ok(out.includes('static let height: CGFloat = 28'));
+  assert.ok(out.includes('/// Source: ACTION_BUTTON_MOBILE_HIT_TARGET_PX'));
+  assert.ok(out.includes('static let hitTarget: CGFloat = 44'));
   assert.throws(() => projectedActionButton([], contract), /required/);
   assert.throws(
     () => projectedActionButton([['height', 'bad-name']], contract),
@@ -65,7 +65,7 @@ test('ActionButton projection binds height/hitTarget to web KEEP', () => {
   );
 });
 
-test('ActionButton boundary replace catches stale native height 32', () => {
+test('boundary replace catches stale native height 32', () => {
   const projection = projectedActionButton(
     manifest.actionButtonBindings,
     contract
