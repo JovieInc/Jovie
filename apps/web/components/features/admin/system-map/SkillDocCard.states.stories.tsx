@@ -16,7 +16,7 @@ const meta = {
   },
   render: function SkillDocCardStatesRender(args) {
     return (
-      <div className='w-[min(42rem,calc(100vw-2rem))]'>
+      <div className='w-full max-w-2xl'>
         <SkillDocCard {...args} />
       </div>
     );
