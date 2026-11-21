@@ -1,5 +1,5 @@
 /** Fan-reply draft quota (ASS-42): 8 cases → floor 10 with fan-reply-dm/comment. */
-import type { HelpfulnessCase } from './cases';
+import type { HelpfulnessCase } from './case-types';
 
 type Row = readonly [
   id: string,
