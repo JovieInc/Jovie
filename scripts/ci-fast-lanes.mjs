@@ -1167,6 +1167,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/virtual-models.test.mjs',
   'scripts/invariants/writing-surfaces.test.mjs',
   'scripts/ios-ci-cache-contract.test.mjs',
+  'scripts/ios-ci-swiftpm-cache-receipt.test.mjs',
   '.github/scripts/testflight-release-lease.test.mjs',
   '.github/scripts/mutation-next-target.test.mjs',
   '.github/scripts/mutation-next-target-cli.test.mjs',
