@@ -1,1 +1,39 @@
-{"_comment":"Unrun 1-5 medians; no proxy floors. Record after Workers AI live CI-subset.","schemaVersion":1,"rubricVersion":"assistants-v1","scale":{"min":1,"max":5,"targetMedian":4.5},"updatedAt":null,"assistants":{"jovie":{"status":"unrun","median":null,"nCases":null,"safetyPassRate":null,"inventedFacts":null,"oneRecommendationRate":null,"notes":"unrun"},"summer":{"status":"unrun","median":null,"nCases":null,"safetyPassRate":null,"inventedFacts":null,"oneRecommendationRate":null,"notes":"unrun"}},"jank":{"status":"green","contractTests":["tests/unit/chat/jank-monitor.test.ts","tests/unit/chat/useChatJankMonitor.test.tsx","tests/e2e/chat-jank.spec.ts"]},"judgeCache":{"keyShape":["case_id","answer_hash","rubric_version"],"notes":"cache on ceiling; never soft-pass"}}
+{
+  "_comment": "Unrun 1-5 medians; no proxy floors. Record after Workers AI live CI-subset.",
+  "schemaVersion": 1,
+  "rubricVersion": "assistants-v1",
+  "scale": { "min": 1, "max": 5, "targetMedian": 4.5 },
+  "updatedAt": null,
+  "assistants": {
+    "jovie": {
+      "status": "unrun",
+      "median": null,
+      "nCases": null,
+      "safetyPassRate": null,
+      "inventedFacts": null,
+      "oneRecommendationRate": null,
+      "notes": "unrun"
+    },
+    "summer": {
+      "status": "unrun",
+      "median": null,
+      "nCases": null,
+      "safetyPassRate": null,
+      "inventedFacts": null,
+      "oneRecommendationRate": null,
+      "notes": "unrun"
+    }
+  },
+  "jank": {
+    "status": "green",
+    "contractTests": [
+      "tests/unit/chat/jank-monitor.test.ts",
+      "tests/unit/chat/useChatJankMonitor.test.tsx",
+      "tests/e2e/chat-jank.spec.ts"
+    ]
+  },
+  "judgeCache": {
+    "keyShape": ["case_id", "answer_hash", "rubric_version"],
+    "notes": "cache on ceiling; never soft-pass"
+  }
+}

@@ -62,7 +62,9 @@ describe('baseline-medians.json', () => {
         jovie: { ...baseline.assistants.jovie, status: 'unrun', median: 3.62 },
       },
     };
-    expect(() => parseBaselineMedians(poisoned)).toThrow(/null while status is unrun/);
+    expect(() => parseBaselineMedians(poisoned)).toThrow(
+      /null while status is unrun/
+    );
   });
   it('lists chat-jank contract tests as green', () => {
     expect(baseline.jank.status).toBe('green');
@@ -94,7 +96,9 @@ describe('evaluateAssistantsRatchet', () => {
       reasons(
         evaluateAssistantsRatchet(
           baseline,
-          sample({ safety: { passed: 2, failed: 1, failedIds: ['never-send-unasked'] } })
+          sample({
+            safety: { passed: 2, failed: 1, failedIds: ['never-send-unasked'] },
+          })
         )
       )
     ).toContain('safety_failed');
@@ -106,7 +110,10 @@ describe('evaluateAssistantsRatchet', () => {
         evaluateAssistantsRatchet(
           baseline,
           sample({
-            jank: { passed: false, regressions: ['tests/unit/chat/jank-monitor.test.ts'] },
+            jank: {
+              passed: false,
+              regressions: ['tests/unit/chat/jank-monitor.test.ts'],
+            },
           })
         )
       )
@@ -115,7 +122,10 @@ describe('evaluateAssistantsRatchet', () => {
   it('median drop only after recorded; unrun skips drop', () => {
     expect(
       reasons(
-        evaluateAssistantsRatchet(recorded(4.5), sample({ median: 4.0, caseScores: undefined }))
+        evaluateAssistantsRatchet(
+          recorded(4.5),
+          sample({ median: 4.0, caseScores: undefined })
+        )
       )
     ).toContain('median_drop');
     const unrun = evaluateAssistantsRatchet(
@@ -138,13 +148,21 @@ describe('evaluateAssistantsRatchet', () => {
     expect(v.notices.some(n => /Budget exhausted/i.test(n))).toBe(true);
     expect(
       reasons(
-        evaluateAssistantsRatchet(baseline, sample({ source: 'live', budgetExhausted: true }))
+        evaluateAssistantsRatchet(
+          baseline,
+          sample({ source: 'live', budgetExhausted: true })
+        )
       )
     ).toContain('invalid_sample');
   });
   it('rubric mismatch / summer unrun / beat baseline / bad caseScores', () => {
     expect(
-      reasons(evaluateAssistantsRatchet(baseline, sample({ rubricVersion: 'stale-rubric' })))
+      reasons(
+        evaluateAssistantsRatchet(
+          baseline,
+          sample({ rubricVersion: 'stale-rubric' })
+        )
+      )
     ).toContain('rubric_mismatch');
     const summer = evaluateAssistantsRatchet(
       baseline,
@@ -153,10 +171,17 @@ describe('evaluateAssistantsRatchet', () => {
     expect(summer.ok).toBe(true);
     expect(summer.assistant).toBe('summer');
     expect(
-      evaluateAssistantsRatchet(recorded(3.5), sample()).notices.some(n => /beat baseline/i.test(n))
+      evaluateAssistantsRatchet(recorded(3.5), sample()).notices.some(n =>
+        /beat baseline/i.test(n)
+      )
     ).toBe(true);
     expect(
-      reasons(evaluateAssistantsRatchet(baseline, sample({ median: 4.0, caseScores: [1, 1, 1] })))
+      reasons(
+        evaluateAssistantsRatchet(
+          baseline,
+          sample({ median: 4.0, caseScores: [1, 1, 1] })
+        )
+      )
     ).toContain('invalid_sample');
   });
 });
@@ -165,24 +190,40 @@ describe('parseEvalSample', () => {
   it('accepts well-formed and rejects malformed', () => {
     expect(parseEvalSample(sample()).assistant).toBe('jovie');
     expect(() => parseEvalSample(null)).toThrow(/root must be an object/);
-    expect(() => parseEvalSample({ ...sample(), assistant: 'other' })).toThrow(/jovie|summer/);
-    expect(() => parseEvalSample({ ...sample(), mode: 'weekly' })).toThrow(/pr|nightly/);
-    expect(() => parseEvalSample({ ...sample(), source: 'paid' })).toThrow(/fixture|live|cache/);
-    expect(() => parseEvalSample({ ...sample(), inventedFacts: 1.5 })).toThrow(/inventedFacts/);
-    expect(() => parseEvalSample({ ...sample(), jank: { passed: 'yes' } })).toThrow(/jank\.passed/);
+    expect(() => parseEvalSample({ ...sample(), assistant: 'other' })).toThrow(
+      /jovie|summer/
+    );
+    expect(() => parseEvalSample({ ...sample(), mode: 'weekly' })).toThrow(
+      /pr|nightly/
+    );
+    expect(() => parseEvalSample({ ...sample(), source: 'paid' })).toThrow(
+      /fixture|live|cache/
+    );
+    expect(() => parseEvalSample({ ...sample(), inventedFacts: 1.5 })).toThrow(
+      /inventedFacts/
+    );
+    expect(() =>
+      parseEvalSample({ ...sample(), jank: { passed: 'yes' } })
+    ).toThrow(/jank\.passed/);
   });
 });
 
 describe('parseBaselineMedians', () => {
   it('rejects malformed roots and recorded-without-median', () => {
     expect(() => parseBaselineMedians(null)).toThrow(/root must be an object/);
-    expect(() => parseBaselineMedians({ ...baseline, schemaVersion: 99 })).toThrow(/schemaVersion/);
+    expect(() =>
+      parseBaselineMedians({ ...baseline, schemaVersion: 99 })
+    ).toThrow(/schemaVersion/);
     expect(() =>
       parseBaselineMedians({
         ...baseline,
         assistants: {
           ...baseline.assistants,
-          jovie: { ...baseline.assistants.jovie, status: 'recorded', median: null },
+          jovie: {
+            ...baseline.assistants.jovie,
+            status: 'recorded',
+            median: null,
+          },
         },
       })
     ).toThrow(/median must be a finite number when recorded/);
