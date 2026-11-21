@@ -5,7 +5,7 @@ import { Button } from '@jovie/ui';
 import { ListPlus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/app-control-button-class';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { BatchIngestModal } from '@/features/admin/BatchIngestModal';
 import { IngestProfileDropdown } from '@/features/admin/ingest-profile-dropdown';

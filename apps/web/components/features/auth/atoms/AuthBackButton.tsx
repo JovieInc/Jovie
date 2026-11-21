@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/app-control-button-class';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { cn } from '@/lib/utils';
 

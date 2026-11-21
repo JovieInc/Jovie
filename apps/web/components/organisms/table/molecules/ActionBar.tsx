@@ -2,7 +2,7 @@
 
 import { Button, TooltipShortcut } from '@jovie/ui';
 import type { ReactNode } from 'react';
-import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/app-control-button-class';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 
 export const ACTION_BAR_BUTTON_CLASS = APP_CONTROL_BUTTON_CLASS;

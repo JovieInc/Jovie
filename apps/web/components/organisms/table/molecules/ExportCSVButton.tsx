@@ -20,7 +20,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/app-control-button-class';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { cn } from '@/lib/utils';
 import { type CSVColumn, toCSVBlob } from '@/lib/utils/csv';
