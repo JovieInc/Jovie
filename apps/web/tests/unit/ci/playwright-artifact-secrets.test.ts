@@ -1577,7 +1577,6 @@ ${fixtureCheckout}
                 step.includes(
                   'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs"'
                 ) &&
-                // Auth smoke + JOV-9826 canary claim-checkout (Stripe TEST).
                 (step.includes('tests/e2e/smoke-prod-auth.spec.ts') ||
                   step.includes('tests/e2e/canary-claim-checkout.spec.ts'))
             )

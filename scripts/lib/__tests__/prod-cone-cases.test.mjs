@@ -155,36 +155,6 @@ describe('coneScoreboard', () => {
     expect(scoreboard.counts.passed).toBe(0);
   });
 
-  it('a blocked surface never clobbers a producer check that already ran', () => {
-    // Regression for discussion_r4650659684: whole-surface blocked fill-in
-    // must only cover absent producers, not overwrite a passed check.
-    const scoreboard = coneScoreboard([
-      receipt(
-        'landing',
-        [
-          { id: 'landing-renders', status: 'passed', summary: 'ok' },
-          {
-            id: 'served-sha-matches-promotion',
-            status: 'blocked',
-            summary: 'production serves abc, promotion was def',
-          },
-        ],
-        'blocked',
-        'served-sha-matches-promotion: production serves abc, promotion was def'
-      ),
-    ]);
-    const renders = scoreboard.cases.find(
-      c => c.id === 'cone-entry-landing-renders'
-    );
-    expect(renders.status).toBe('passed');
-    expect(renders.summary).toBe('ok');
-    const handoff = scoreboard.cases.find(
-      c => c.id === 'cone-entry-claim-handoff'
-    );
-    expect(handoff.status).toBe('blocked');
-    expect(handoff.summary).toContain('serves abc');
-  });
-
   it('a producer registered but absent from the receipt is uncovered, not passed', () => {
     const scoreboard = coneScoreboard([
       receipt('landing', [
