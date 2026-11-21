@@ -42,7 +42,6 @@ import {
 } from '../../../../../scripts/lib/playwright-png.mjs';
 import { allowanceEnabled } from './artifact-allowance';
 import productionSmokeProducers from './fixtures/production-smoke-producers.json';
-
 const webRoot = resolve(import.meta.dirname, '../../..');
 const repoRoot = resolve(webRoot, '../..');
 const githubRoot = join(repoRoot, '.github');
@@ -1604,7 +1603,7 @@ ${fixtureCheckout}
       expect(yamlPropertyBlock(source, 'env', 0), item).not.toContain(
         'PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN'
       );
-      // JOV-9826: dogfood Stripe TEST custody (not Doppler price/account).
+      // JOV-9826: Preview – jovie GH Stripe TEST custody (not Doppler price/account).
       if (producer.includes('canary-claim-checkout.spec.ts')) {
         for (const s of [
           'STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}',
@@ -1616,6 +1615,7 @@ ${fixtureCheckout}
         expect(producer).not.toContain(
           'STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY,STRIPE_TEST_ACCOUNT_ID'
         );
+        expect(job.source).toMatch(/^\s+environment:\s+Preview – jovie\s*$/m);
       }
     }
   });

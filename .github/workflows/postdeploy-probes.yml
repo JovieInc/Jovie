@@ -569,8 +569,15 @@ jobs:
     needs: [resolve-target]
     # Probes still need it; a reused certification (JOV-12639) does not.
     if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_certify == 'true' && (needs.resolve-target.outputs.should_probe == 'true' || needs.resolve-target.outputs.cert_reused != 'true') }}
+    # JOV-9826: Stripe TEST keys live on Preview – jovie (same custody as
+    # claim-checkout-dogfood / CI golden-path). Without this environment the
+    # job sees empty STRIPE_SECRET_KEY/STRIPE_WEBHOOK_SECRET, Playwright
+    # soft-skips the canary walk, and prod-cert-steps only get capability
+    # mapping — not cone-* receipts (postdeploy 44941778256).
+    environment: Preview – jovie
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    # Auth smoke (~1m) + canary claim→TEST checkout→activation (up to 5m).
+    timeout-minutes: 20
     permissions:
       contents: read
     outputs:
