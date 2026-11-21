@@ -36,6 +36,15 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/features/admin/outbound/OutboundNameCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/admin/outreach/OutreachKpis.tsx": [
       "ds-owner",
       "tokens",
@@ -46,6 +55,51 @@
       "forced-caps"
     ],
     "apps/web/components/features/admin/outreach/OutreachStatusBadge.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/table/AdminCreatorsTableHeader.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/table/AdminTableHeader.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/table/AdminTablePagination.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/table/AdminTableShell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/wiki/WikiPageArticle.tsx": [
       "ds-owner",
       "tokens",
       "states",
