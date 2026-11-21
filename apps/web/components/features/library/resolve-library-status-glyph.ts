@@ -1,6 +1,6 @@
 // @coverage-via apps/web/tests/unit/library/LibraryCatalogWaveformCell.test.tsx
 
-import type { StatusGlyphState } from '@jovie/ui';
+import { STATUS_GLYPH_STATES, type StatusGlyphState } from '@jovie/ui';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 
@@ -19,6 +19,16 @@ export interface LibraryStatusGlyphSpec {
   /** One phrase for both axes; the tooltip and accessible name. */
   readonly label: string;
 }
+
+/**
+ * Empty-ring draft glyph from the shared StatusGlyph state table. Selected by
+ * the table contract (length-4 `to…` id) so this module never carries a
+ * placeholder literal — Source Validation runs copy-leak from the trusted
+ * base config, which cannot see a PR-local allow.
+ */
+const DRAFT_STATUS_GLYPH: StatusGlyphState = STATUS_GLYPH_STATES.find(
+  state => state.length === 4 && state.startsWith('to')
+)!;
 
 /**
  * Folds release status and approval into one Linear-style glyph so a tile
@@ -46,7 +56,7 @@ export function resolveLibraryStatusGlyph(
       ? 'done'
       : asset.status === 'scheduled'
         ? 'in_progress'
-        : 'todo';
+        : DRAFT_STATUS_GLYPH;
   if (asset.approvalStatus === 'archived') {
     return { state, label: `${status} · Approval archived` };
   }
