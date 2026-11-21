@@ -142,4 +142,15 @@ describe('assistants chat UX contract', () => {
       })
     ).toEqual({ ok: true, reasons: [] });
   });
+
+  it('documents the ASS-28 sample harness path for assistants ratchet imports', async () => {
+    const sampleMod = await import('./chat-first-token-sample');
+    expect(sampleMod.CHAT_FIRST_TOKEN_SAMPLE_UNRUN_RELATIVE).toContain(
+      'chat-first-token-sample'
+    );
+    const unrun = sampleMod.buildUnrunChatFirstTokenSample();
+    expect(
+      evaluateChatUxGate(sampleMod.chatFirstTokenSampleToGateInput(unrun, true))
+    ).toEqual({ ok: true, reasons: [] });
+  });
 });

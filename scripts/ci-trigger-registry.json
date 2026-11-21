@@ -22,6 +22,7 @@
     "automation-liveness.yml": {"runsPerMergedPr":2.3,"triggers":["workflow_dispatch","workflow_run:Production Continuity Guard"]},
     "buyer-eval-gate.yml": {"runsPerMergedPr":0,"triggers":["workflow_dispatch"]},
     "canary-health-gate.yml": {"runsPerMergedPr":0,"triggers":["workflow_call"]},
+    "chat-first-token-sample.yml": {"runsPerMergedPr":0,"triggers":["workflow_dispatch"]},
     "cheap-fixer.yml": {"runsPerMergedPr":0,"triggers":["workflow_call"]},
     "ci-duration-ratchet.yml": {"runsPerMergedPr":0.1,"triggers":["push","schedule","workflow_dispatch"]},
     "ci-shard-contract-canary.yml": {"runsPerMergedPr":0,"triggers":["pull_request"]},

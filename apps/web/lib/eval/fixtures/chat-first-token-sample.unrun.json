@@ -1,0 +1,14 @@
+{
+  "schema": "jovie.assistants-chat-first-token/v1",
+  "schemaVersion": 1,
+  "metric": "chat_first_token",
+  "status": "unrun",
+  "surface": "/app/chat",
+  "mode": "relay",
+  "account": "test",
+  "targetMs": 1000,
+  "recordedAt": null,
+  "samplesMs": [],
+  "p50Ms": null,
+  "notes": "Placeholder until a live/relay sample is recorded for the test account (ASS-28). Soft-skip workflow_dispatch when WORKERS_AI_TOKEN is missing."
+}
