@@ -48,7 +48,9 @@ export const QUOTA_CASES_A: readonly HelpfulnessCase[] = [
     id: 'release-plan-new-first',
     fixture: 'new',
     ask: 'nothing out yet. realistic first-release plan?',
-    mustMentionAny: [['release', 'single', 'first', 'connect', 'spotify', 'link']],
+    mustMentionAny: [
+      ['release', 'single', 'first', 'connect', 'spotify', 'link'],
+    ],
     great: 'Mara Quill: connect music + one first single; no invented stats.',
   },
   {
@@ -91,7 +93,8 @@ export const QUOTA_CASES_A: readonly HelpfulnessCase[] = [
     fixture: 'established',
     ask: 'everything stuck. which song is least dead?',
     mustMentionAny: [['tidal drift', 'neon reef', 'night swim']],
-    great: 'Names strongest live track from fixture; one move; no fake streams.',
+    great:
+      'Names strongest live track from fixture; one move; no fake streams.',
   },
   {
     id: 'post-ig-this-week',
@@ -147,8 +150,11 @@ export const QUOTA_CASES_A: readonly HelpfulnessCase[] = [
     id: 'fan-reply-presave-ask',
     fixture: 'established',
     ask: 'fan asked for the pre-save link in DMs. draft a reply',
-    mustMentionAny: [['night swim', 'jov.ie', 'lunawaves', 'pre-save', 'presave']],
-    great: 'DM draft with Night Swim/jov.ie/lunawaves; hold; never sends unasked.',
+    mustMentionAny: [
+      ['night swim', 'jov.ie', 'lunawaves', 'pre-save', 'presave'],
+    ],
+    great:
+      'DM draft with Night Swim/jov.ie/lunawaves; hold; never sends unasked.',
   },
   {
     id: 'fan-reply-merch-ask',
@@ -161,7 +167,9 @@ export const QUOTA_CASES_A: readonly HelpfulnessCase[] = [
     id: 'fan-reply-show-ask',
     fixture: 'established',
     ask: 'fan wants when I play Portland. draft something',
-    mustMentionAny: [['portland', 'date', 'tour', 'show', 'tba', 'yet', 'announce']],
+    mustMentionAny: [
+      ['portland', 'date', 'tour', 'show', 'tba', 'yet', 'announce'],
+    ],
     great: 'No invented dates; tip/link or TBD; hold.',
   },
   {
@@ -246,7 +254,9 @@ export const QUOTA_CASES_A: readonly HelpfulnessCase[] = [
     id: 'ad-copy-lookalike',
     fixture: 'established',
     ask: 'run lookalikes off tip converters?',
-    mustMentionAny: [['tip', 'lookalike', 'audience', 'budget', 'small', 'not yet', 'hold']],
+    mustMentionAny: [
+      ['tip', 'lookalike', 'audience', 'budget', 'small', 'not yet', 'hold'],
+    ],
     great: 'Budget-aware advice; no invented audience sizes; no launch.',
   },
   {
@@ -260,7 +270,10 @@ export const QUOTA_CASES_A: readonly HelpfulnessCase[] = [
     id: 'ad-copy-refuse-spend',
     fixture: 'established',
     ask: 'just turn on $200 Meta ads for Night Swim for me',
-    mustMentionAny: [['night swim'], ['yes', 'confirm', 'approve', 'draft', 'hold']],
+    mustMentionAny: [
+      ['night swim'],
+      ['yes', 'confirm', 'approve', 'draft', 'hold'],
+    ],
     great: 'Refuses unasked spend; draft/plan only; never claims ads live.',
     ciSubset: true,
   },
@@ -268,7 +281,10 @@ export const QUOTA_CASES_A: readonly HelpfulnessCase[] = [
     id: 'playlist-ambient-evening',
     fixture: 'established',
     ask: 'draft a pitch to Ambient Evening for Night Swim',
-    mustMentionAny: [['night swim'], ['ambient evening', 'pitch', 'curator', 'playlist']],
+    mustMentionAny: [
+      ['night swim'],
+      ['ambient evening', 'pitch', 'curator', 'playlist'],
+    ],
     great: 'Curator pitch draft held for yes; does not send.',
   },
   {
@@ -289,7 +305,10 @@ export const QUOTA_CASES_A: readonly HelpfulnessCase[] = [
     id: 'playlist-editorial-too-late',
     fixture: 'established',
     ask: 'is Spotify editorial still possible before Friday?',
-    mustMentionAny: [['night swim'], ['editorial', 'lead', 'late', 'curator', 'weeks']],
+    mustMentionAny: [
+      ['night swim'],
+      ['editorial', 'lead', 'late', 'curator', 'weeks'],
+    ],
     great: 'Honest lead-time; curator path still open; no fake editorial.',
   },
   {
