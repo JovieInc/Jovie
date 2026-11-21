@@ -470,10 +470,8 @@ function SpotifyConnectDialogContent({
 
   return (
     <Dialog open={open} onClose={() => onOpenChange(false)} size='lg'>
-      <DialogTitle className='text-base font-semibold text-primary-token'>
-        Connect Spotify
-      </DialogTitle>
-      <DialogDescription className='text-app text-secondary-token'>
+      <DialogTitle>Connect Spotify</DialogTitle>
+      <DialogDescription>
         Search your artist name or paste a Spotify artist link.
       </DialogDescription>
 

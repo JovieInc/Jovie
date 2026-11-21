@@ -354,7 +354,7 @@ describe('SpotifyConnectDialog', () => {
 });
 
 describe('SpotifyConnectDialog scale tokens', () => {
-  it('uses the 16px text-base step instead of the text-lg alias', async () => {
+  it('uses no text-lg alias and lets DialogTitle own its type scale', async () => {
     const { readFileSync } = await import('node:fs');
     const { join } = await import('node:path');
     const source = readFileSync(
@@ -363,6 +363,7 @@ describe('SpotifyConnectDialog scale tokens', () => {
     );
 
     expect(source).not.toMatch(/(?<![\w-])text-lg\b/);
-    expect(source).toContain('text-base');
+    expect(source).toContain('<DialogTitle>Connect Spotify</DialogTitle>');
+    expect(source).not.toMatch(/<DialogTitle\s+className=/);
   });
 });
