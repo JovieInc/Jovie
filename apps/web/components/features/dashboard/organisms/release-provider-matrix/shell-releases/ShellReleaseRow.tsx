@@ -498,7 +498,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
               onClick={e => e.stopPropagation()}
               onKeyDown={e => e.stopPropagation()}
               aria-label={`Release actions for ${release.title}`}
-              className='grid h-7 w-7 shrink-0 place-items-center rounded-md text-quaternary-token transition-[opacity,color,background-color] duration-subtle ease-subtle hover:bg-surface-2/70 hover:text-primary-token'
+              className='relative grid h-7 w-7 shrink-0 place-items-center rounded-md text-quaternary-token before:absolute before:left-1/2 before:top-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""] transition-[opacity,color,background-color] duration-subtle ease-subtle hover:bg-surface-2/70 hover:text-primary-token'
             >
               <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
             </PlainButton>

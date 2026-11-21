@@ -24,7 +24,7 @@ export const EmptyNoAction: Story = {
 
 /** Partial: an artist without a photo falls back to the play glyph. */
 export const PartialNoArtistImage: Story = {
-  args: { artist: { ...PROFILE_STORY_ARTIST, image_url: null } },
+  args: { artist: { ...PROFILE_STORY_ARTIST, image_url: undefined } },
 };
 
 /** Long content: an artist name that must truncate inside the card. */
