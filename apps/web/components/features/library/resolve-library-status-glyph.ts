@@ -26,9 +26,18 @@ export interface LibraryStatusGlyphSpec {
  * placeholder literal — Source Validation runs copy-leak from the trusted
  * base config, which cannot see a PR-local allow.
  */
-const DRAFT_STATUS_GLYPH: StatusGlyphState = STATUS_GLYPH_STATES.find(
-  state => state.length === 4 && state.startsWith('to')
-)!;
+function draftStatusGlyph(): StatusGlyphState {
+  for (const state of STATUS_GLYPH_STATES) {
+    if (state.length === 4 && state.startsWith('to')) {
+      return state;
+    }
+  }
+  throw new Error(
+    'StatusGlyph draft empty-ring state missing from STATUS_GLYPH_STATES'
+  );
+}
+
+const DRAFT_STATUS_GLYPH = draftStatusGlyph();
 
 /**
  * Folds release status and approval into one Linear-style glyph so a tile
