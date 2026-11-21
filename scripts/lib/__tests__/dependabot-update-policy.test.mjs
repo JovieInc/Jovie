@@ -503,19 +503,17 @@ describe('Dependabot discovery contract', () => {
     // merge group. Grouping keeps the PR count far below the 25-slot limit.
     expect(npm).toContain("interval: 'weekly'");
     expect(npm).toContain('open-pull-requests-limit: 25');
-    expect(npm).toContain('semver-patch-days: 1');
+    expect(npm).toMatch(/versioning-strategy: increase[\s\S]*patch-days: 3\n/);
     expect(npm).toContain('semver-minor-days: 3');
     expect(npm).toContain('semver-major-days: 7');
   });
 
-  it('does not create default reviewer requests for the founder', () => {
+  it('neither requests reviews from nor assigns the founder', () => {
     const ecosystems = CONFIG.split('  - package-ecosystem:').slice(1);
-    // 5 entries: root npm, eve-pilot npm (security-only), deepsec npm
-    // (security-only), github-actions, docker.
+    // 5: root npm, eve-pilot npm, deepsec npm, github-actions, docker.
     expect(ecosystems).toHaveLength(5);
     for (const ecosystem of ecosystems) {
-      expect(ecosystem).not.toMatch(/^\s+reviewers:/m);
-      expect(ecosystem).toContain("assignees:\n      - 'itstimwhite'");
+      expect(ecosystem).not.toMatch(/^\s+(reviewers|assignees):/m);
     }
   });
 
@@ -523,6 +521,7 @@ describe('Dependabot discovery contract', () => {
     [
       '/apps/eve-pilot',
       [
+        { 'dependency-name': 'eve' }, // patched: Dependabot cannot re-key it
         { 'dependency-name': '@fastify/busboy', versions: ['2.1.1'] },
         { 'dependency-name': 'sprintf-js', versions: ['1.1.3'] },
         { 'dependency-name': 'undici', versions: ['5.28.4', '5.29.0'] },
@@ -536,7 +535,7 @@ describe('Dependabot discovery contract', () => {
       ],
     ],
   ])(
-    'limits security ignores in %s to the upstream-blocked versions',
+    'limits ignores in %s to the upstream-blocked versions',
     (directory, ignores) => {
       const parsed = load(CONFIG);
       if (
@@ -552,7 +551,8 @@ describe('Dependabot discovery contract', () => {
           entry['package-ecosystem'] === 'npm' && entry.directory === directory
       );
       expect(entries).toHaveLength(1);
-      expect(entries[0]['open-pull-requests-limit']).toBe(0);
+      const limit = directory === '/apps/eve-pilot' ? 2 : 0;
+      expect(entries[0]['open-pull-requests-limit']).toBe(limit);
       expect(entries[0].ignore).toEqual(ignores);
     }
   );

@@ -19,13 +19,16 @@ updates:
     # every other one, so move-together families and low-risk dev patches
     # land as one PR each. Majors and runtime deps stay one PR per package.
     open-pull-requests-limit: 25
+    # JOV-13093: patch cooldown raised 1 -> 3 days so a compromised-maintainer
+    # patch is never resolved inside the usual 24-72h takedown window (the
+    # lockfile-majors guard also refuses resolutions younger than 3 days).
+    # `increase` + .npmrc save-exact keeps every bump an exact pin.
+    versioning-strategy: increase
     cooldown:
       default-days: 3
       semver-major-days: 7
       semver-minor-days: 3
-      semver-patch-days: 1
-    assignees:
-      - 'itstimwhite'
+      semver-patch-days: 3
     commit-message:
       prefix: 'deps'
       prefix-development: 'deps-dev'
@@ -103,13 +106,6 @@ updates:
       # two probe files locally against the new binary, then drop this ignore.
       - dependency-name: '@biomejs/biome'
         versions: ['2.5.15']
-      # Held at 0.72.x (2026-10-12): eve is pre-1.0, so a minor is a breaking
-      # release. 0.76 removed load_skill (apps/eve-pilot disables it) and changed
-      # compactMessages; the runtime group #21427 failed the isolated pilot
-      # checks on it. Ship now: patches only. Re-evaluate when JOV-8227 lands
-      # the migration. Then drop this ignore.
-      - dependency-name: 'eve'
-        update-types: ['version-update:semver-minor']
       # Held at 1.60.0 (2026-10-13): the baked runner image ships Playwright
       # 1.60.0 browsers (.github/runner-image/prerequisites.json, chromium-1223)
       # and runner-setup-action.test.ts requires devDependencies.playwright to
@@ -137,19 +133,31 @@ updates:
       - dependency-name: 'prebuild-install'
       - dependency-name: 'zod'
 
-  # Isolated Eve pilot manifest (JOV-5214). This directory entry exists so
-  # SECURITY advisories are tracked for the standalone install; version
-  # updates stay OFF (open-pull-requests-limit: 0 keeps dependabot quiet
-  # while still creating the grouped security-update job that must go green).
+  # Isolated Eve pilot manifest (JOV-5214). JOV-13093: version updates are ON
+  # (weekly, limit 2) so the pilot stops drifting silently; security updates
+  # are unaffected. eve itself is excluded below because it carries an
+  # exact-version pnpm patch (patches/eve@0.72.1.patch) that Dependabot cannot
+  # re-key; eve majors go through the migration gate in JovieInc/ci
+  # canon/dependency-migration-gates.json (JOV-9613), not a blanket hold.
   - package-ecosystem: 'npm'
     directory: '/apps/eve-pilot'
     schedule:
-      interval: 'daily'
+      interval: 'weekly'
+      day: 'monday'
       time: '09:00'
       timezone: 'Etc/UTC'
-    open-pull-requests-limit: 0
-    assignees:
-      - 'itstimwhite'
+    open-pull-requests-limit: 2
+    versioning-strategy: increase
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+      semver-minor-days: 3
+      semver-patch-days: 3
+    groups:
+      pilot-non-major:
+        update-types:
+          - 'minor'
+          - 'patch'
     commit-message:
       prefix: 'deps'
       include: 'scope'
@@ -157,6 +165,10 @@ updates:
       - 'dependencies'
       - 'automated'
     ignore:
+      # Patched by apps/eve-pilot pnpm.patchedDependencies (eve@0.72.1); a
+      # Dependabot bump would orphan the patch and fail the update job.
+      # Re-key the patch by hand under the JOV-9613 migration gate.
+      - dependency-name: 'eve'
       # Unfixable advisories: https://linear.app/jovie/issue/JOV-8060
       # busboy/undici are exact pins in the dev-only Vercel CLI.
       # sprintf-js is a runtime dependency of just-bash 3.6.0 and has no
@@ -179,8 +191,6 @@ updates:
       time: '09:00'
       timezone: 'Etc/UTC'
     open-pull-requests-limit: 0
-    assignees:
-      - 'itstimwhite'
     commit-message:
       prefix: 'deps'
       include: 'scope'
@@ -208,8 +218,6 @@ updates:
       day: 'monday'
       time: '09:00'
     open-pull-requests-limit: 5
-    assignees:
-      - 'itstimwhite'
     commit-message:
       prefix: 'ci'
       include: 'scope'
@@ -240,8 +248,6 @@ updates:
       day: 'monday'
       time: '09:00'
     open-pull-requests-limit: 5
-    assignees:
-      - 'itstimwhite'
     commit-message:
       prefix: 'ci'
       include: 'scope'
