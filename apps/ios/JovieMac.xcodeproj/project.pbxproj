@@ -30,6 +30,8 @@
 		A076610000000000000000D9 /* NativeChatRepositoryFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000D8 /* NativeChatRepositoryFactory.swift */; };
 		A076610000000000000000DB /* IntentNavigationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000DA /* IntentNavigationStore.swift */; };
 		A076610000000000000000DD /* ConversationUserActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000DC /* ConversationUserActivity.swift */; };
+		A076610000000000000000E3 /* ChatAuthFailure.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000E2 /* ChatAuthFailure.swift */; };
+		A076610000000000000000E5 /* ChatRepository+PostIdentityMeasurementMac.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000E4 /* ChatRepository+PostIdentityMeasurementMac.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -65,6 +67,8 @@
 		A076610000000000000000D8 /* NativeChatRepositoryFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeChatRepositoryFactory.swift; sourceTree = "<group>"; };
 		A076610000000000000000DA /* IntentNavigationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntentNavigationStore.swift; sourceTree = "<group>"; };
 		A076610000000000000000DC /* ConversationUserActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationUserActivity.swift; sourceTree = "<group>"; };
+		A076610000000000000000E2 /* ChatAuthFailure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAuthFailure.swift; sourceTree = "<group>"; };
+		A076610000000000000000E4 /* ChatRepository+PostIdentityMeasurementMac.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ChatRepository+PostIdentityMeasurementMac.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -183,6 +187,8 @@
 			isa = PBXGroup;
 			children = (
 				A076610000000000000000C8 /* ChatRepository.swift */,
+				A076610000000000000000E2 /* ChatAuthFailure.swift */,
+				A076610000000000000000E4 /* ChatRepository+PostIdentityMeasurementMac.swift */,
 				A076610000000000000000CA /* ChatCache.swift */,
 				A076610000000000000000CC /* NativeSessionTokenStore.swift */,
 				A076610000000000000000E0 /* NativeSessionRevoker.swift */,
@@ -323,6 +329,8 @@
 			files = (
 				1896A3883415894102BD7253 /* JovieTheme.swift in Sources */,
 				A076610000000000000000C9 /* ChatRepository.swift in Sources */,
+				A076610000000000000000E3 /* ChatAuthFailure.swift in Sources */,
+				A076610000000000000000E5 /* ChatRepository+PostIdentityMeasurementMac.swift in Sources */,
 				A076610000000000000000CB /* ChatCache.swift in Sources */,
 				A076610000000000000000CD /* NativeSessionTokenStore.swift in Sources */,
 				A076610000000000000000E1 /* NativeSessionRevoker.swift in Sources */,

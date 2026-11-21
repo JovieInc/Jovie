@@ -5,9 +5,12 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fixtureInventory } from '@/lib/ovie/certifications/fixtures';
 import type { OvieCertificationInventory } from '@/lib/ovie/certifications/types';
+import { FetchError } from '@/lib/queries/fetch';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { CertificationJudgments } from './CertificationJudgments';
 
 const mocks = vi.hoisted(() => ({
@@ -431,5 +434,37 @@ describe('CertificationJudgments', () => {
         name: 'Certify "Flow signup-golden-path"',
       })
     ).toBeNull();
+  });
+
+  it('keeps the typed note and focus across a rerender and Escape, axe-clean', async () => {
+    const user = userEvent.setup();
+    mockQuery({ data: fixtureInventory() });
+    const { container, rerender } = render(<CertificationJudgments />);
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Request changes "Flow signup-golden-path"',
+      })
+    );
+    const note = screen.getByPlaceholderText(/What should change/);
+    await user.type(note, 'tighten the hero copy');
+    rerender(<CertificationJudgments />);
+    await user.keyboard('{Escape}');
+
+    expect(screen.getByPlaceholderText(/What should change/)).toBe(note);
+    expect(note).toHaveValue('tighten the hero copy');
+    expect(note).toHaveFocus();
+    await expectNoA11yViolations(container);
+  });
+
+  it('explains a locked admin session when the read is forbidden', async () => {
+    mockQuery({
+      isError: true,
+      error: new FetchError('Forbidden', 403),
+    });
+    const { container } = render(<CertificationJudgments />);
+    expect(
+      screen.getByText(/Certification judgments are locked/)
+    ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 });

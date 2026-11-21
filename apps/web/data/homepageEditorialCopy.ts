@@ -14,7 +14,9 @@ import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
  * an editorial story whose actions all enter `/start` with the shared
  * claim-profile intent, ending in the `claim` close. While the
  * `PUBLIC_SIGNUP_CLOSED` kill switch is on, the hero action scrolls to the
- * on-page role waitlist form instead and the close is `invite`.
+ * on-page role waitlist form instead and the close is `invite`. Kill-switch
+ * copy speaks waitlist, never invitation (Tim, 2026-11-19): no "Request an
+ * invite", no invite-only language — the waitlist reserves your handle.
  *
  * These are the code defaults. The published `marketing-page/home` content
  * record fills the open slots (`lib/content-records/marketing-page.ts`); the
@@ -39,7 +41,7 @@ export const HOMEPAGE_EDITORIAL_COPY = {
     headline: 'Move your music forward.',
     subhead:
       'Your profile, every release, and a link to each place the music is streaming.',
-    primaryAction: 'Request an invite',
+    primaryAction: 'Join the waitlist',
     primaryHref: `#${HOMEPAGE_INVITE_ANCHOR}`,
     secondaryAction: 'See a live profile',
     secondaryHref: TIM_WHITE_PROFILE.publicProfilePath,
@@ -47,7 +49,7 @@ export const HOMEPAGE_EDITORIAL_COPY = {
     windowLabel: `Jovie for Mac: ${featuredArtistPossessive(HOMEPAGE_FEATURED_ARTIST)} Releases list, beside the ${HOMEPAGE_FEATURED_ARTIST.inspected.title} release page listeners open`,
   },
   /** Chapter index (mono, lowercase, as approved). */
-  chapters: ['profile', 'releases', 'specs', 'invitation'],
+  chapters: ['profile', 'releases', 'specs', 'waitlist'],
   chaptersLabel: 'On this page',
   profile: {
     headline: 'One name. Found everywhere.',
@@ -116,24 +118,25 @@ export const HOMEPAGE_EDITORIAL_COPY = {
       },
     ],
   },
-  /** 04 invitation: the close only while `PUBLIC_SIGNUP_CLOSED` is on. */
+  /** 04 close: the waitlist form, only while `PUBLIC_SIGNUP_CLOSED` is on.
+   * Waitlist copy, never invitation copy (Tim, 2026-11-19). */
   invite: {
-    headline: 'Jovie opens by invitation.',
+    headline: 'Your handle is reserved. You’re on the waitlist.',
     subhead:
       'Tell us your role and where to reach you. We’ll email you when your spot opens.',
     roleLabel: 'I’m a',
-    action: 'Request an invite',
+    action: 'Join the waitlist',
     steps: [
       {
         title: 'Tell us who you are',
         body: 'Under a minute.',
       },
       {
-        title: 'We review each request',
+        title: 'We admit from the waitlist',
         body: 'Jovie opens to a small group at a time.',
       },
       {
-        title: 'Your invite arrives',
+        title: 'Your spot opens',
         body: 'A link to claim your name and bring in your catalog.',
       },
     ],
@@ -152,6 +155,9 @@ export const HOMEPAGE_HEADLINE_BREAKS: Readonly<
     'Every release,',
     'ready on day one.',
   ],
-  [HOMEPAGE_EDITORIAL_COPY.invite.headline]: ['Jovie opens', 'by invitation.'],
+  [HOMEPAGE_EDITORIAL_COPY.invite.headline]: [
+    'Your handle is reserved.',
+    'You’re on the waitlist.',
+  ],
   [HOMEPAGE_EDITORIAL_COPY.claim.headline]: ['Claim your name', 'on Jovie.'],
 };

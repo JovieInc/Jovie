@@ -1,3 +1,4 @@
+// Drift T2.1: IconButton alias retirement — callsite migration coverage.
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -192,6 +193,9 @@ describe('AskJovieWidget', () => {
 
     fireEvent.click(
       screen.getByRole('button', { name: 'Send to Test Artist' })
+    );
+    expect(screen.getByLabelText('Name (optional)')).toHaveClass(
+      'bg-surface-1'
     );
     fireEvent.click(screen.getByRole('button', { name: 'Booking' }));
     fireEvent.change(screen.getByPlaceholderText('Name (optional)'), {
