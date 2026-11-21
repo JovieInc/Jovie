@@ -146,7 +146,7 @@ describe('hero code bindings', () => {
         "left-content": "left-none",
         "mobile-390": null,
         "npm-copy": null,
-        "split-link-claim": "split-claim-card",
+        "split-link-claim": "left-phone",
       }
     `);
     for (const binding of Object.values(HERO_CODE_BINDING_BY_VARIANT)) {
@@ -223,7 +223,7 @@ describe('route hero audit', () => {
         "/about": "ok: left-content",
         "/alternatives/*": "ok: left-content",
         "/artist-notifications": "ok: f-layout-desktop-screenshot",
-        "/artist-profiles": "unlocked-code-variant: centered-phone -> split-link-claim",
+        "/artist-profiles": "ok: split-link-claim",
         "/blog": "ok: left-content",
         "/blog/category/*": "ok: left-content",
         "/card": "ok: left-content",
@@ -232,9 +232,9 @@ describe('route hero audit', () => {
         "/download": "ok: f-layout-desktop-screenshot",
         "/instant-merch": "ok: f-layout-desktop-screenshot",
         "/launch": "ok: f-layout-desktop-screenshot",
-        "/pay": "ok: split-link-claim",
+        "/pay": "unlocked-code-variant: split-claim-card -> split-link-claim",
         "/pricing": "unlocked-code-variant: centered-none -> left-buttons",
-        "/product": "ok: split-link-claim",
+        "/product": "unlocked-code-variant: split-claim-card -> split-link-claim",
         "/product/command-palette": "ok: f-layout-desktop-screenshot",
         "/product/dsp-links": "ok: f-layout-desktop-screenshot",
         "/product/isrc": "ok: f-layout-desktop-screenshot",
@@ -243,7 +243,7 @@ describe('route hero audit', () => {
         "/product/release-scheduling": "ok: f-layout-desktop-screenshot",
         "/product/utm-links": "ok: f-layout-desktop-screenshot",
         "/smart-links": "ok: f-layout-desktop-screenshot",
-        "/solutions/*": "unlocked-code-variant: centered-phone -> split-link-claim",
+        "/solutions/*": "ok: split-link-claim",
         "/support": "ok: left-content",
         "/voice": "ok: f-layout-desktop-screenshot",
         "/youtube-thumbnails": "ok: left-content",
@@ -270,7 +270,8 @@ describe('route hero audit', () => {
     expect(rows.map(row => row.mismatch)).toEqual([
       'unbound',
       'unlocked-code-variant',
-      'wrong-variant',
+      // split-claim-card is unlocked after claim conversion locked to left-phone
+      'unlocked-code-variant',
       null,
     ]);
   });
