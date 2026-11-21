@@ -553,6 +553,17 @@ nodes:
       - pull_request_target
     terminalReceipt: job:fork-gate
     jobCount: 2
+  - name: GBrain Compounding
+    path: .github/workflows/gbrain-compounding.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:verify-needs-probe
+    jobCount: 1
   - name: Golden Path Nightly
     path: .github/workflows/golden-path-nightly.yml
     active: true

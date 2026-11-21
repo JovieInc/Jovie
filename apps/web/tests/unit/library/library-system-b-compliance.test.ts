@@ -64,6 +64,48 @@ describe('library right-rail System B structural compliance', () => {
     expect(css).not.toContain('system-b-library-icon-button');
   });
 
+  it('does not compete with ArtworkFrame for release-art border-radius', () => {
+    // Unlayered route CSS beats @layer utilities; shell must not set radius.
+    // Rendered cascade proof (old-css red / new-css green) is in
+    // storybook-library-density.spec.ts — these are source locks only.
+    expect(css).not.toMatch(
+      /:where\(\.system-b-library-artwork-shell\)[\s\S]{0,320}border-radius:/
+    );
+    expect(css).toMatch(
+      /:where\(\.system-b-library-status-pill\),\s*:where\(\.system-b-library-count-pill\)/
+    );
+    expect(css).toMatch(
+      /:where\(\.system-b-library-artwork-shell\),\s*:where\(\.system-b-library-card-artwork\),\s*:where\(\.system-b-library-drawer-artwork\)\s*\{\s*background:/
+    );
+    const artworkFrame = readSource('components/atoms/ArtworkFrame.tsx');
+    const tokens = readSource('styles/generated/design-tokens.css');
+    expect(artworkFrame).toMatch(/thumbnail:\s*2/);
+    expect(artworkFrame).toMatch(
+      /if \(scale === 'thumbnail'\) return 'rounded-xs'/
+    );
+    expect(tokens).toMatch(/--radius-xs:\s*2px;/);
+    expect(tokens).toMatch(/--radius-md:\s*10px;/);
+  });
+
+  it('keeps Type labels off the Title fluid-cell shrink recipe', () => {
+    const columns = readSource(
+      'components/features/library/library-catalog-columns.tsx'
+    );
+    const typeCell = columns.slice(
+      columns.indexOf("id: 'type'"),
+      columns.indexOf("id: 'bpm'")
+    );
+    expect(typeCell).toContain('formatLibraryItemType');
+    expect(typeCell).toContain('whitespace-nowrap');
+    // Comment may name the forbidden class; the className string must not.
+    expect(typeCell).toMatch(
+      /className='system-b-library-meta-text block truncate whitespace-nowrap text-tertiary-token'/
+    );
+    expect(typeCell).not.toMatch(
+      /className='[^']*system-b-library-fluid-cell[^']*'/
+    );
+  });
+
   it('edits approval status inline in Details without a native select', () => {
     expect(surface).toContain("label='Approval Status'");
     expect(surface).toContain('ApprovalStatusEditor');
