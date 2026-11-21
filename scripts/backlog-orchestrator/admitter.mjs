@@ -1123,18 +1123,34 @@ export async function selectNextToAdmit(
       admissionDecisions,
     };
   }
+  const inFlight = classifications.filter(classification => {
+    const issue = issueForClassification(classification);
+    return (issue.state?.name || classification.state) === 'In Progress';
+  });
+  for (const guard of inFlight) {
+    guard.prevention = assessPreventionLeverage(guard, [
+      ...eligible,
+      ...inFlight.filter(item => item !== guard),
+    ]);
+  }
   const queueRanking = rankQueueCandidates(candidates, {
     selectedAt: state.now,
+    shippingGuards: inFlight.filter(guard => guard.prevention),
+    inFlightIdentifiers: inFlight.map(guard => guard.identifier),
   });
   const selected = {
     ...queueRanking.ranked[0],
     queueRankingReceipt: queueRanking.receipt,
   };
+  const cluster = queueRanking.receipt.leverageFirst?.clusters?.[0];
+  const leverageNote = cluster
+    ? `; leverage-first ${cluster.placement} ${cluster.guard} avoids ${cluster.duplicationAvoided} duplicate leaf repair(s)`
+    : '';
   return {
     admit: [selected],
     reason:
       `selected: ${selected.identifier} (score ${selected.score}; ` +
-      `${queueRanking.receipt.mode})`,
+      `${queueRanking.receipt.mode}${leverageNote})`,
     fleetGate,
     admissionDecisions,
     queueRankingReceipt: queueRanking.receipt,
