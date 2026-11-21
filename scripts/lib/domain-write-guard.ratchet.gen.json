@@ -359,20 +359,10 @@
     }
   },
   "sideEffectGaps": {
-    "apps/web/app/api/dashboard/social-links/route.post.ts": [
-      "socialLinks"
-    ],
-    "apps/web/lib/db/batch.ts": [
-      "socialLinks"
-    ],
-    "apps/web/lib/db/social-links-sync.ts": [
-      "socialLinks"
-    ],
-    "apps/web/lib/discography/unclaimed-artist-enrichment.ts": [
-      "socialLinks"
-    ],
-    "apps/web/lib/ingestion/merge.ts": [
-      "socialLinks"
-    ]
+    "apps/web/app/api/dashboard/social-links/route.post.ts": ["socialLinks"],
+    "apps/web/lib/db/batch.ts": ["socialLinks"],
+    "apps/web/lib/db/social-links-sync.ts": ["socialLinks"],
+    "apps/web/lib/discography/unclaimed-artist-enrichment.ts": ["socialLinks"],
+    "apps/web/lib/ingestion/merge.ts": ["socialLinks"]
   }
 }
