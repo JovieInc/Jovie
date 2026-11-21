@@ -1504,7 +1504,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/api-budget.test.mjs',
   'scripts/lib/__tests__/domain-write-guard.test.mjs',
   'scripts/lib/__tests__/screen-audit-receipts.test.mjs',
-  'scripts/lib/__tests__/component-certificate.test.mjs scripts/lib/__tests__/component-certificate-discovery.test.mjs scripts/lib/__tests__/component-story-workers.test.mjs scripts/lib/__tests__/component-story-inventory.test.mjs scripts/lib/__tests__/screen-cert-repair.test.mjs scripts/lib/__tests__/component-render-inputs.test.mjs scripts/lib/__tests__/component-render-receipts.test.mjs',
+  'scripts/lib/__tests__/component-certificate.test.mjs scripts/lib/__tests__/component-certificate-discovery.test.mjs scripts/lib/__tests__/component-story-workers.test.mjs scripts/lib/__tests__/component-story-inventory.test.mjs scripts/lib/__tests__/screen-cert-repair.test.mjs scripts/lib/__tests__/component-render-inputs.test.mjs scripts/lib/__tests__/component-render-receipts.test.mjs scripts/lib/__tests__/ds-cert-loop.test.mjs',
   'scripts/lib/__tests__/verify-patched-dependencies.test.mjs',
   'scripts/lib/__tests__/incident-dedupe.test.mjs',
   'scripts/lib/__tests__/ci-capacity.test.mjs',
