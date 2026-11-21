@@ -242,7 +242,7 @@ still run their old code; runtime singleflight is proven only after those worker
 and their gate descendants have naturally drained. Never kill or reset their work
 to make an activation claim.
 
-## Workstreams and leverage-first admission (JOV-7514, JOV-7423, JOV-7330, JOV-5555)
+## Workstreams and leverage-first admission (JOV-7514, JOV-7330, JOV-5555)
 
 Every issue belongs to exactly one workstream (`workstreams.py`). An explicit
 `ws:<key>` Linear label wins; otherwise the first matching rule (labels, then title)
@@ -275,6 +275,13 @@ are identity). Only the oldest member is admissible; the others are rejected as
 `duplicate-candidate:<JOV>` in the worker and counted under `duplicate-candidate` in
 the doctor census. Near-duplicates are grouped by workstream, never auto-merged.
 Lane reads paginate the Todo pool (up to `LANE_ISSUE_PAGES` × 100).
+
+JOV-7423 orders Summer admission, not this workstream rank. A bounded shared
+guardrail that covers two or more queued issues of one defect class is admitted
+before those duplicate leaf repairs. Explicit Urgent, revenue-protection, and
+red/unblock work stay ahead of the guard. An unbounded guard, or one already in
+progress, releases a single proof leaf and holds the rest
+(`orderLeverageFirst` in `scripts/backlog-orchestrator/scorer.mjs`).
 
 ## Event queue (JOV-6672)
 
