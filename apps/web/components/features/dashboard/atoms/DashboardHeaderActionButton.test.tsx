@@ -1,5 +1,11 @@
+import {
+  ACTION_BUTTON_FACE_CLASSNAME,
+  ACTION_BUTTON_PRESET,
+  ACTION_BUTTON_VISIBLE_HEIGHT_PX,
+} from '@jovie/ui/atoms/button-contract';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { PAGE_TOOLBAR_ACTION_BUTTON_CLASS } from '@/components/molecules/page-toolbar-classes';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS,
@@ -10,9 +16,16 @@ import {
 const icon = <svg data-testid='action-icon' />;
 
 describe('DashboardHeaderActionButton', () => {
-  it('locks the text button to the 32px desktop density contract', () => {
-    expect(DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS).toContain('h-8');
-    expect(DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS).not.toContain('h-7');
+  it('locks the text button to the shared ActionButton 28px face', () => {
+    expect(ACTION_BUTTON_VISIBLE_HEIGHT_PX).toBe(28);
+    expect(ACTION_BUTTON_FACE_CLASSNAME).toBe('h-7');
+    expect(DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS).toContain(
+      ACTION_BUTTON_FACE_CLASSNAME
+    );
+    expect(DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS).not.toContain('h-8');
+    expect(PAGE_TOOLBAR_ACTION_BUTTON_CLASS).toContain(
+      ACTION_BUTTON_FACE_CLASSNAME
+    );
   });
 
   it('keeps the canonical hit target instead of restyling icon height', () => {
@@ -35,13 +48,15 @@ describe('DashboardHeaderActionButton', () => {
 
     const button = screen.getByRole('button', { name: 'Refresh' });
     expect(button).toHaveAttribute('aria-pressed', 'true');
-    expect(button.className).toContain('h-8');
+    expect(button).toHaveAttribute('data-size', ACTION_BUTTON_PRESET.size);
+    expect(button.className).toContain(ACTION_BUTTON_FACE_CLASSNAME);
+    expect(button.className).not.toContain('h-8');
     fireEvent.click(button);
     expect(onClick).toHaveBeenCalledOnce();
     await expectNoA11yViolations(container);
   });
 
-  it('renders an icon-only action at 32px', async () => {
+  it('renders an icon-only action at the ActionButton 28px face', async () => {
     const { container } = render(
       <DashboardHeaderActionButton
         ariaLabel='Copy'
@@ -53,9 +68,10 @@ describe('DashboardHeaderActionButton', () => {
 
     const button = screen.getByTestId('copy-action');
     expect(button).toHaveAttribute('aria-label', 'Copy');
-    // md IconButton size = 32px face; the 44px pseudo hit target stays.
-    expect(button.className).toContain('h-8');
-    expect(button.className).toContain('w-8');
+    // sm IconButton size = 28px face; the 44px pseudo hit target stays.
+    expect(ACTION_BUTTON_PRESET.iconButtonSize).toBe('sm');
+    expect(button.className).toContain('h-7');
+    expect(button.className).toContain('w-7');
     expect(button.className).toContain('before:h-11');
     await expectNoA11yViolations(container);
   });
@@ -75,7 +91,7 @@ describe('DashboardHeaderActionButton', () => {
       name: 'Toggle details sidebar',
     });
     expect(button).toHaveAttribute('data-testid', 'details-action');
-    expect(button.className).toContain('w-8');
+    expect(button.className).toContain('w-7');
     fireEvent.click(button);
     expect(onClick).toHaveBeenCalledOnce();
     await expectNoA11yViolations(container);

@@ -15,10 +15,14 @@ import type { ReactNode } from 'react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ATTACH_ACCOUNT_CTA_LABEL,
-  CONFIRM_HANDLE_CTA_LABEL,
+  HANDLE_ACCEPT_COPY,
   NONE_OF_THESE_CTA_LABEL,
 } from '@/lib/chat/onboarding-script/widget-events';
 import type { SpotifyArtistResult } from '@/lib/contracts/api';
+import {
+  assessArtistPickerMatch,
+  formatArtistPickerDifferentiator,
+} from '@/lib/onboarding/artist-picker-match';
 import {
   type CanonicalArtistMetrics,
   getDisplaySpotifyFollowers,
@@ -106,39 +110,21 @@ function isFailed(state: ToolState): boolean {
   return state === 'output-error' || state === 'output-denied';
 }
 
-export function formatCompactCount(
-  count: number | null | undefined
-): string | null {
-  if (typeof count !== 'number' || !Number.isFinite(count)) return null;
-  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
-  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K`;
-  return count.toLocaleString('en-US');
-}
+import {
+  formatCompactCount,
+  formatExactCount,
+  formatGenreLabel,
+  getSafeSpotifyArtistUrl,
+  hostnameFor,
+} from '@/lib/onboarding/tool-artifact-format';
 
-export function formatExactCount(
-  count: number | null | undefined
-): string | null {
-  if (typeof count !== 'number' || !Number.isFinite(count)) return null;
-  return count.toLocaleString('en-US');
-}
-
-export function formatGenreLabel(genre: string): string {
-  return genre
-    .trim()
-    .replaceAll(/\s+/g, ' ')
-    .split(' ')
-    .map(word =>
-      word
-        .split('-')
-        .map(part =>
-          part
-            ? `${part.charAt(0).toUpperCase()}${part.slice(1).toLowerCase()}`
-            : part
-        )
-        .join('-')
-    )
-    .join(' ');
-}
+export {
+  formatCompactCount,
+  formatExactCount,
+  formatGenreLabel,
+  getSafeSpotifyArtistUrl,
+  hostnameFor,
+};
 
 function selectionFromSpotifyResult(
   artist: SpotifyArtistResult
@@ -156,11 +142,6 @@ function selectionFromSpotifyResult(
     metrics,
     popularity: artist.popularity ?? undefined,
   };
-}
-
-function formatFollowers(count: number | null | undefined): string | null {
-  const compact = formatCompactCount(count);
-  return compact ? `${compact} followers` : null;
 }
 
 function getArtistSearchFailureCopy(error: string | null): {
@@ -191,30 +172,6 @@ function getArtistSearchFailureCopy(error: string | null): {
     title: 'Spotify search did not finish',
     body: 'Check the artist name and try again.',
   };
-}
-
-function hostnameFor(url: string | undefined): string | null {
-  if (!url) return null;
-  try {
-    return new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    return null;
-  }
-}
-
-export function getSafeSpotifyArtistUrl(
-  url: string | null | undefined
-): string | null {
-  if (!url) return null;
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== 'https:') return null;
-    if (parsed.hostname !== 'open.spotify.com') return null;
-    if (!parsed.pathname.startsWith('/artist/')) return null;
-    return parsed.toString();
-  } catch {
-    return null;
-  }
 }
 
 function StatusShell({
@@ -261,56 +218,6 @@ function StatusShell({
   );
 }
 
-function ArtistAvatar({
-  imageUrl,
-  name,
-  size = 'md',
-}: {
-  readonly imageUrl?: string | null;
-  readonly name: string;
-  readonly size?: 'sm' | 'md';
-}) {
-  const dimension = size === 'sm' ? 32 : 42;
-  const initials = name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map(part => part.charAt(0))
-    .join('')
-    .toUpperCase();
-
-  if (imageUrl) {
-    return (
-      <div
-        className={cn(
-          'relative shrink-0 overflow-hidden rounded-full border border-white/[0.08] bg-surface-0',
-          size === 'sm' ? 'h-8 w-8' : 'h-11 w-11'
-        )}
-      >
-        <Image
-          src={imageUrl}
-          alt=''
-          width={dimension}
-          height={dimension}
-          className='h-full w-full object-cover'
-          unoptimized
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={cn(
-        'flex shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-2xs font-semibold text-secondary-token',
-        size === 'sm' ? 'h-8 w-8' : 'h-11 w-11'
-      )}
-      aria-hidden
-    >
-      {initials || <AtSign className='h-4 w-4' />}
-    </div>
-  );
-}
-
 export function OnboardingSpotifyArtistPickerCard({
   state,
   output,
@@ -330,8 +237,12 @@ export function OnboardingSpotifyArtistPickerCard({
   const [query, setQuery] = useState(initialQuery);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Pen R6As7U: the agent proposes its top match with one confirm; the full
-  // list and search sit behind "Not Me".
+  // list and search sit behind "Not Me". Low-confidence / lookalike tops skip
+  // proposal and open the 3–5 candidate list (JOV-7823 / JOV-8051).
   const [browsing, setBrowsing] = useState(false);
+  const [rejectedIds, setRejectedIds] = useState<ReadonlySet<string>>(
+    () => new Set()
+  );
   const artistSearch = useArtistSearchQuery({
     debounceMs: 250,
     limit: 5,
@@ -389,22 +300,41 @@ export function OnboardingSpotifyArtistPickerCard({
     setSelectedId(artist.id);
     onSelectArtist(selectionFromSpotifyResult(artist));
   };
-  const proposal = results[0];
-  // Hold the proposal frame while the prefilled query resolves so the card
-  // does not swap layouts under the reader.
-  const proposing =
-    !browsing &&
+  const matchAssessment = assessArtistPickerMatch({
+    query,
+    results,
+    rejectedIds,
+  });
+  const proposal =
+    matchAssessment.decision === 'propose' ? matchAssessment.proposal : null;
+  const forceDisambiguate =
+    !isSearching &&
     hasQuery &&
     !artistSearch.error &&
-    (isSearching || proposal !== undefined);
+    results.length > 0 &&
+    matchAssessment.decision === 'disambiguate';
+  // Hold the proposal frame while the prefilled query resolves so the card
+  // does not swap layouts under the reader. Never propose a weak / lookalike
+  // top hit — that path mints a full draft too easily (live walk + Boardy).
+  const proposing =
+    !browsing &&
+    !forceDisambiguate &&
+    hasQuery &&
+    !artistSearch.error &&
+    (isSearching || proposal !== null);
 
   if (proposing) {
     return (
       <OnboardingArtistProposal
-        artist={isSearching ? null : (proposal ?? null)}
+        artist={isSearching ? null : proposal}
         disabled={disabled}
         onConfirm={selectArtist}
-        onNotMe={() => setBrowsing(true)}
+        onNotMe={() => {
+          if (proposal) {
+            setRejectedIds(prev => new Set([...prev, proposal.id]));
+          }
+          setBrowsing(true);
+        }}
       />
     );
   }
@@ -413,11 +343,19 @@ export function OnboardingSpotifyArtistPickerCard({
     <div
       className='min-h-42 w-full max-w-110 px-1 py-1'
       data-testid='onboarding-artist-picker'
+      data-mode='disambiguate'
+      data-match-reason={forceDisambiguate ? matchAssessment.reason : undefined}
     >
       <div className='min-w-0 px-0.5'>
         <p className='text-sm font-semibold leading-5 tracking-[-0.01em] text-primary-token'>
           Pick the exact Spotify artist
         </p>
+        {forceDisambiguate ? (
+          <p className='mt-1 text-xs leading-5 text-secondary-token'>
+            Several close matches — use followers to tell them apart, or None of
+            These.
+          </p>
+        ) : null}
       </div>
 
       <OnboardingToolField density='picker' htmlFor={fieldId}>
@@ -487,6 +425,7 @@ export function OnboardingSpotifyArtistPickerCard({
           <ArtistResultRow
             key={artist.id}
             artist={artist}
+            query={query}
             disabled={disabled || selectedId !== null}
             selected={selectedId === artist.id}
             onSelect={() => selectArtist(artist)}
@@ -509,6 +448,61 @@ export function OnboardingSpotifyArtistPickerCard({
           </Button>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function formatFollowers(count: number | null | undefined): string | null {
+  const compact = formatCompactCount(count);
+  return compact ? `${compact} followers` : null;
+}
+
+function ArtistAvatar({
+  imageUrl,
+  name,
+  size = 'md',
+}: {
+  readonly imageUrl?: string | null;
+  readonly name: string;
+  readonly size?: 'sm' | 'md';
+}) {
+  const dimension = size === 'sm' ? 32 : 42;
+  const initials = name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(part => part.charAt(0))
+    .join('')
+    .toUpperCase();
+
+  if (imageUrl) {
+    return (
+      <div
+        className={cn(
+          'relative shrink-0 overflow-hidden rounded-full border border-white/[0.08] bg-surface-0',
+          size === 'sm' ? 'h-8 w-8' : 'h-11 w-11'
+        )}
+      >
+        <Image
+          src={imageUrl}
+          alt=''
+          width={dimension}
+          height={dimension}
+          className='h-full w-full object-cover'
+          unoptimized
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        'flex shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-2xs font-semibold text-secondary-token',
+        size === 'sm' ? 'h-8 w-8' : 'h-11 w-11'
+      )}
+      aria-hidden
+    >
+      {initials || <AtSign className='h-4 w-4' />}
     </div>
   );
 }
@@ -598,23 +592,20 @@ function OnboardingArtistProposal({
 
 function ArtistResultRow({
   artist,
+  query,
   disabled,
   selected,
   onSelect,
 }: {
   readonly artist: SpotifyArtistResult;
+  readonly query: string;
   readonly disabled: boolean;
   readonly selected: boolean;
   readonly onSelect: () => void;
 }) {
-  const metrics = normalizeArtistMetrics(
-    { followers: artist.followers },
-    { source: 'spotify_search' }
-  );
-  const followers = formatFollowers(getDisplaySpotifyFollowers(metrics));
-  // Followers only: Spotify's internal "popularity" score ("Pop 60") means
-  // nothing to an artist (2026-10-31 golden-path walk).
-  const meta = followers;
+  // Followers + exact-name cue; never Spotify's opaque "popularity" score
+  // (2026-10-31 golden-path walk + JOV-7823 wrong-match guard).
+  const meta = formatArtistPickerDifferentiator(artist, query);
 
   return (
     <button
@@ -888,7 +879,7 @@ export function OnboardingHandleCheckCard({
                   : 'cursor-not-allowed border border-subtle bg-surface-0 text-tertiary-token'
               )}
             >
-              {confirmed ? 'Handle Confirmed' : CONFIRM_HANDLE_CTA_LABEL}
+              {confirmed ? 'Kept' : HANDLE_ACCEPT_COPY}
             </Button>
           )}
           {showEditor || confirmed ? null : (

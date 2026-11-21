@@ -119,7 +119,7 @@ describe('Better Auth base URL', () => {
     expect(getOptions().secondaryStorage).toBeUndefined();
     expect(getOptions().session).toMatchObject({
       storeSessionInDatabase: true,
-      cookieCache: { enabled: true, maxAge: 300 },
+      cookieCache: { enabled: true, maxAge: 120 },
     });
     expect(getOptions().rateLimit?.customStorage).toBeDefined();
     expect(getOptions().rateLimit?.storage).toBeUndefined();

@@ -95,7 +95,9 @@ describe('Noir Ion — approved dark anchors', () => {
     expect(dsDark).toContain('--color-bg-surface-2: var(--noir-ion-elevated);');
     expect(dsDark).toContain('--color-bg-surface-3: var(--noir-ion-floating);');
     expect(dsDark).toContain('--color-bg-elevated: var(--noir-ion-elevated);');
-    expect(dsDark).toContain('--app-shell-content-surface: #131417;');
+    expect(dsDark).toContain(
+      '--app-shell-content-surface: var(--noir-ion-card);'
+    );
   });
 
   it('locks the light five-step ladder', () => {
@@ -127,6 +129,20 @@ describe('Noir Ion — approved dark anchors', () => {
     expect(dsDark.toLowerCase()).not.toContain('#2563ff');
     expect(dsLight.toLowerCase()).not.toContain('#2563ff');
     expect(dsLight.toLowerCase()).not.toContain('#7170ff');
+    // Drift T1.2 unify-ion: marketing accent hexes retired; bare accent
+    // aliases System B ion. Rainbow / info / btn / pricing defs deleted.
+    expect(linearTokens.toLowerCase()).not.toContain('#2563ff');
+    expect(linearTokens).toMatch(/--linear-accent:\s*var\(--color-accent\)/);
+    expect(linearTokens).not.toMatch(/--linear-accent-(?!gray)[a-z]+\s*:/);
+    expect(linearTokens).toMatch(/--linear-info:\s*var\(--color-info\)/);
+    expect(linearTokens).toMatch(
+      /--linear-info-subtle:\s*var\(--color-info-subtle\)/
+    );
+    expect(linearTokens).toMatch(
+      /--linear-accent-gray:\s*var\(--color-accent-gray\)/
+    );
+    expect(linearTokens).not.toMatch(/--linear-btn-accent-[a-z]+\s*:/);
+    expect(linearTokens).not.toMatch(/--linear-pricing-accent(?:-[a-z]+)?\s*:/);
     expect(linearDark).toContain(
       '--linear-border-focus: rgba(17, 175, 255, 0.72);'
     );

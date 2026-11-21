@@ -255,13 +255,10 @@ merch, composer, and filled/icon geometry variants retain distinct semantics.
    “opacity-only (no offset)” at `AppShellLeftDrawer.swift:L150-L153` but applies
    `.offset(x: ... -8)` at `L159-L163`. `StatTileRevealModifier` repeats the
    same comment/code mismatch at `AudienceHighlightsView.swift:L250-L263`.
-2. **Press token mismatch and stale inventory.** iOS names
-   `JovieMotion.pressScale` the canonical `--scale-press` at
-   `JovieTheme.swift:L120-L122` and sets it to `0.96`. The current web CSS token
-   is `0.98` at `apps/web/styles/design-system.css:L2021-L2024`, while the
-   historical state matrix still documents `active:scale-[0.96]` at
-   `docs/design-system/state-matrix.md:L42`. Keep the token under one owner
-   when a migration is authorized; do not silently alter locked Chat/Calendar.
+2. **Press token (resolved).** `JovieMotion.pressScale` projects web
+   `--scale-press` (`0.98`) via `native-design-system` `motionBindings`;
+   `state-matrix.md` documents `active:scale-press`. Do not silently alter
+   locked Chat/Calendar press behavior.
 3. **Local token ownership.** iOS hard-codes its `Color(hex:)` values in
    `JovieTheme.swift:L4-L24`; web resolves CSS variables in `tokens.ts:L17-L30`.
    The semantic names overlap, but no cross-platform generated token contract

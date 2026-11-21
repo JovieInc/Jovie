@@ -73,4 +73,16 @@ describe('resolveStartEntryHandoff', () => {
       prompt: 'I want to claim my profile.',
     });
   });
+
+  it('rewrites display-name handle= into a Spotify search prior (JOV-10127)', () => {
+    expect(
+      resolveStartEntryHandoff({
+        starter_prompt: 'I want to claim my profile.',
+        handle: 'Taylor Swift',
+      })
+    ).toEqual({
+      kind: 'prompt',
+      prompt: 'I want to claim my profile. Find Taylor Swift on Spotify.',
+    });
+  });
 });

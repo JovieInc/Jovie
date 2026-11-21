@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  anonymousChecks,
   EXPECTED_BROWSER_CHECKS,
   runCheck,
   SURFACE_IDS,
@@ -24,33 +23,7 @@ import {
   coneScoreboard,
   formatConeScoreboardLine,
 } from '../prod-cone-cases.mjs';
-
-/** All check ids the anonymous HTTP probes produce, per surface. */
-async function anonymousCheckIds() {
-  const fakeResponse = {
-    status: 200,
-    ok: true,
-    text: async () => '<html><title>x</title></html>',
-    headers: new Map(),
-    url: 'https://jov.ie/',
-  };
-  /** @type {typeof fetch} */
-  const fakeFetch = async () => /** @type {any} */ (fakeResponse);
-  const probes = anonymousChecks({
-    origin: 'https://jov.ie',
-    fetchImpl: fakeFetch,
-    coneCases: true,
-  });
-  const ids = {};
-  for (const [surface, fns] of Object.entries(probes)) {
-    ids[surface] = [];
-    for (const pending of fns()) {
-      // runCheck never throws: a failing probe still carries its id.
-      ids[surface].push((await pending).id);
-    }
-  }
-  return ids;
-}
+import { anonymousCheckIds } from './prod-cone-anonymous-ids.mjs';
 
 describe('JOV-6920 cone case registry', () => {
   it('freezes the 31-case full-cone denominator', () => {
@@ -465,5 +438,45 @@ describe('design first: every Golden Path screen needs a Pen frame', () => {
     });
     expect(run('checkout', { receipt: receipt('pass') })[1][1]).toBe('passed');
     expect(run('checkout', { receipt: receipt('fail') })[1][1]).toBe('failed');
+  });
+
+  it('binds comparisons to exact Pen node/route (JOV-11623)', () => {
+    const priced = { ...frame('checkout/pricing', 'hLRZB'), route: '/pricing' };
+    const runExact = extra =>
+      penDesignChecks('checkout', {
+        manifest: { frames: [priced] },
+        exists: () => true,
+        ...extra,
+      }).map(c => [c.id, c.status, c.summary]);
+    const row = (penNodeId, verdict) => ({
+      sectionId: 'checkout/pricing',
+      mode: 'dark',
+      viewport: 1440,
+      penNodeId,
+      route: '/pricing',
+      verdict,
+    });
+    expect(
+      runExact({
+        receipt: { frames: [row('WRONG', 'pass'), row('hLRZB', 'fail')] },
+      })[1][1]
+    ).toBe('failed');
+    const incomplete = runExact({
+      receipt: {
+        frames: [
+          {
+            sectionId: 'checkout/pricing',
+            mode: 'dark',
+            viewport: 1440,
+            verdict: 'pass',
+          },
+        ],
+      },
+    })[1];
+    expect(incomplete[1]).toBe('blocked');
+    expect(incomplete[2]).toContain('incomplete-identity');
+    const wrong = runExact({ receipt: { frames: [row('WRONG', 'pass')] } })[1];
+    expect(wrong[1]).toBe('blocked');
+    expect(wrong[2]).toContain('identity-mismatch');
   });
 });

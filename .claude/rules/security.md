@@ -11,8 +11,21 @@ CSP, webhooks, secrets, email, fail-closed persistence, biome-ignore, environmen
 - **NEVER** rely on in-memory rate-limit, dedupe, or coordination state for public endpoints, webhooks, or automation triggers.
 - Public traffic controls and webhook dedupe MUST use durable storage (Redis, database, or another cross-instance store).
 - Cold starts, deploys, and horizontal scale must not reset critical protections or duplicate suppression.
+- Public abuse writers (feedback, report, claim entry/start/agent claim, and similar anonymous durable writers) MUST fail closed when the rate-limit backend is unavailable: return 429 on exhaustion and 503 on `unavailable`. Do **not** wrap those call sites with `allowIfRateLimitBackendDegraded`.
+- `allowIfRateLimitBackendDegraded` is reserved for documented UX-critical authenticated paths only (native auth exchange/handback, AI chat hourly burst). Auth storage fail-closed policy is owned separately (SEC-02 / `rate-limit-storage.ts`).
 
 For webhook signature verification: verify before parsing business logic.
+
+## Better Auth Path Rate Limits Fail Closed On Sensitive Routes
+
+Better Auth path counters live in Redis (`apps/web/lib/auth/rate-limit-storage.ts`), not in session storage. Sessions and OTP verification values stay in Postgres.
+
+Distinguish **intentional no-Redis** from **Redis expected but down**:
+
+- Non-production selects the in-memory store via `selectRedisStore` (`kind: 'memory'`). That is not an outage — use the process-local fixed-window counter (same split as `RateLimiter`, which only fail-closes when `storeKind === 'upstash'`). Do not 429 OTP/sign-in solely because preview/local/CI/E2E chose memory.
+- When the selected store is Upstash or local Redis and the client is missing, times out, or the consume script cannot set a TTL: **fail closed** for abuse-critical auth paths (email OTP send/sign-in, phone OTP, one-time tokens, `/sign-in/*`, `/sign-up/*`, password reset / change-email / change-password). Return deny with `retryAfter` = rule window so Better Auth responds 429 + `X-Retry-After`. Classifier: `isSensitiveAuthRateLimitPath` in `rate-limit-rules.ts`.
+- **Fail open** only for non-abuse Better Auth paths that still hit this storage during a durable-backend outage. Do not broaden fail-open to OTP or passwordless endpoints to “keep sign-in available” during an outage — that unbounded spray is worse than a temporary deny.
+- Inventory: `REDIS_DATA_CONSUMERS['auth/rate-limit']` in `lib/rate-limit/outage-policy.ts` (mandatory).
 
 ## No Unlimited Anything
 

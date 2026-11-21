@@ -21,6 +21,7 @@
 		A076610000000000000000C9 /* ChatRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000C8 /* ChatRepository.swift */; };
 		A076610000000000000000CB /* ChatCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000CA /* ChatCache.swift */; };
 		A076610000000000000000CD /* NativeSessionTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000CC /* NativeSessionTokenStore.swift */; };
+		A076610000000000000000E1 /* NativeSessionRevoker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000E0 /* NativeSessionRevoker.swift */; };
 		A076610000000000000000CF /* MobileChatClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000CE /* MobileChatClient.swift */; };
 		A076610000000000000000D1 /* NativeAPIContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000D0 /* NativeAPIContracts.swift */; };
 		A076610000000000000000D3 /* ChatStateModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A076610000000000000000D2 /* ChatStateModels.swift */; };
@@ -55,6 +56,7 @@
 		A076610000000000000000C8 /* ChatRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatRepository.swift; sourceTree = "<group>"; };
 		A076610000000000000000CA /* ChatCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatCache.swift; sourceTree = "<group>"; };
 		A076610000000000000000CC /* NativeSessionTokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSessionTokenStore.swift; sourceTree = "<group>"; };
+		A076610000000000000000E0 /* NativeSessionRevoker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSessionRevoker.swift; sourceTree = "<group>"; };
 		A076610000000000000000CE /* MobileChatClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileChatClient.swift; sourceTree = "<group>"; };
 		A076610000000000000000D0 /* NativeAPIContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeAPIContracts.swift; sourceTree = "<group>"; };
 		A076610000000000000000D2 /* ChatStateModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStateModels.swift; sourceTree = "<group>"; };
@@ -183,6 +185,7 @@
 				A076610000000000000000C8 /* ChatRepository.swift */,
 				A076610000000000000000CA /* ChatCache.swift */,
 				A076610000000000000000CC /* NativeSessionTokenStore.swift */,
+				A076610000000000000000E0 /* NativeSessionRevoker.swift */,
 				A076610000000000000000CE /* MobileChatClient.swift */,
 				A076610000000000000000D0 /* NativeAPIContracts.swift */,
 				A076610000000000000000D2 /* ChatStateModels.swift */,
@@ -322,6 +325,7 @@
 				A076610000000000000000C9 /* ChatRepository.swift in Sources */,
 				A076610000000000000000CB /* ChatCache.swift in Sources */,
 				A076610000000000000000CD /* NativeSessionTokenStore.swift in Sources */,
+				A076610000000000000000E1 /* NativeSessionRevoker.swift in Sources */,
 				A076610000000000000000CF /* MobileChatClient.swift in Sources */,
 				A076610000000000000000D1 /* NativeAPIContracts.swift in Sources */,
 				A076610000000000000000D3 /* ChatStateModels.swift in Sources */,

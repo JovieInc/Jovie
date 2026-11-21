@@ -23,13 +23,15 @@ export const WEB_ROOT = 'apps/web';
 
 /** apps/web-relative prefixes where a weak test costs money, access, or trust. */
 export const HIGH_RISK_PREFIXES = Object.freeze([
+  'app/[username]/',
   'app/api/billing/',
+  'app/api/onboarding/',
   'app/api/stripe/',
   'app/api/webhooks/',
   'components/features/dashboard/dashboard-nav/',
-  'lib/acquisition/eligibility-cache.ts',
-  'lib/acquisition/eligibility.server.ts',
-  'lib/acquisition/eligibility.ts',
+  'data/product-truth/',
+  'lib/acquisition/',
+  'lib/agent-acquisition/',
   'lib/app-shell/',
   'lib/auth/',
   'lib/billing/',
@@ -39,6 +41,7 @@ export const HIGH_RISK_PREFIXES = Object.freeze([
   'lib/idempotency.ts',
   'lib/ovie/certifications/',
   'lib/stripe/',
+  'lib/waitlist/',
   'proxy.ts',
 ]);
 
@@ -72,14 +75,7 @@ const ALIASES = Object.freeze([
   ['@/', ''],
 ]);
 
-/**
- * Pick the changed files this lane mutates.
- * @param {string[]} changedPaths repo-relative paths
- * @param {(path: string) => string | null} [readModule] apps/web-relative reader
- * @param {{ prefixes?: readonly string[] | null, root?: string }} [options] `prefixes: null`
- *   widens selection to every source under `root` (default apps/web; scripts/mutation-sweep.mjs).
- * @returns {string[]} root-relative source paths
- */
+/** Pick changed high-risk source files under `root` (default `apps/web`). */
 export function selectHighRiskSources(
   changedPaths,
   readModule,

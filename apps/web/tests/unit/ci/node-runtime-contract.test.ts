@@ -98,7 +98,7 @@ describe('Node runtime contract', () => {
       '- name: Detect path changes for all job types'
     );
     const ciFastTypecheck = getJobBlock(workflow, 'ci-fast-typecheck');
-    const ciFastRemaining = getJobBlock(workflow, 'ci-fast-remaining');
+    const ciFastRemaining = getJobBlock(workflow, 'ci-fast-remaining-shards');
 
     expect(pathDetection).toBeGreaterThanOrEqual(0);
     expect(workflow.indexOf('  ci-fast-typecheck:')).toBeGreaterThan(
@@ -107,7 +107,7 @@ describe('Node runtime contract', () => {
 
     for (const [jobId, job] of [
       ['ci-fast-typecheck', ciFastTypecheck],
-      ['ci-fast-remaining', ciFastRemaining],
+      ['ci-fast-remaining-shards', ciFastRemaining],
     ] as const) {
       const canonicalSetup = job.indexOf(
         '- uses: ./.github/actions/setup-node-pnpm'

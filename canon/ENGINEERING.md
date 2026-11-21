@@ -139,6 +139,53 @@ does not create a parallel app, repository, native rewrite or second shell
 - Plans that add a repo or app must name the shell they extend in the IA
   preflight below; "new repo" is not an answer to "where does this live".
 
+### Native / web / Electron boundary
+
+<!-- Project Swift; projects capability sourcing + product-surfaces + Mac ADR -->
+
+Choose the **thinnest client that still delivers the user job**. Stack fashion
+is not a reason. This section is the single client-boundary authority; Mac ADR,
+iOS/macOS rules, and decision records project it. Applied receipts:
+[`docs/architecture/native-web-electron-decisions.md`](../docs/architecture/native-web-electron-decisions.md).
+
+**Favor native** when it materially improves latency, platform UX, credentials
+(Keychain/Secure Enclave/biometrics), notifications, files, media capture,
+HealthKit/background work, or accessibility/input conventions the platform
+owns. Core daily loops (sign-in, home/shell, chat type/send/stream, onboarding
+profile completion) belong native on installed clients unless a dated receipt
+proves otherwise.
+
+**Retain web (or Electron wrapping hosted web)** when total ownership cost is
+better: content/admin/infrequent surfaces, Stripe Customer Portal and legal
+docs, dense long-tail workspaces without a native IA, or a single hosted engine
+that must not fork (example: public-profile playback). Electron on Mac remains
+the shipped product shell until the accepted native cutover in
+[`docs/macos/ADR-swift-native-mac.md`](../docs/macos/ADR-swift-native-mac.md);
+new Mac product surfaces default to SwiftUI, not new Electron chrome.
+
+**Shared layer stays server-authoritative.** Entitlements, billing state, action
+policy, auth verification, and health/safety dispositions are owned by shared
+server contracts. Clients present and collect; they do not invent a second
+business-rule implementation. One Ovie remains web on the shared shell
+(`canon/PRODUCT.md`); do not grow a native Ovie.
+
+**Evidence before migration.** Inspect the current experience and code first.
+A rewrite needs a measured user problem, a named owner/runtime, rollback, and
+what the old path retires. Source checks are not installed-app proof. Broad
+native or web migrations stay blocked until a decision record exists.
+
+**Decision record (required for each meaningful boundary change):** user problem
++ evidence; why chosen impl; API/auth/nav/state boundary; compatibility/fallback;
+migration/rollback; what can be retired; what would justify revisiting. Ship the
+record with the PR that changes the boundary; extend the decisions file rather
+than inventing a parallel doctrine.
+
+**Ship now:** this policy and applied receipts for existing surfaces.
+**Re-evaluate when:** a measured journey shows native/web mismatch costing
+activation, trust, or ownership (hangs, auth failures, stranded deep links, or
+duplicated business rules). **Then:** update the matching decision record and
+cut over only with rollback.
+
 ### IA preflight for UI-bearing plans
 
 **Integrate > consolidate > replace > extend > add.** Before implementation,

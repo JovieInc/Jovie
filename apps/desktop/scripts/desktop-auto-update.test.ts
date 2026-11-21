@@ -201,18 +201,12 @@ const idleOvernight = {
   workStateSafe: true,
 };
 
-test('a running app restarts into a downloaded update only overnight and idle', () => {
+test('a running app restarts into a downloaded update when idle any hour', () => {
   expect(shouldInstallDownloadedUpdateWhileRunning(idleOvernight)).toBe(true);
-  expect(
-    shouldInstallDownloadedUpdateWhileRunning({
-      ...idleOvernight,
-      localHour: 1,
-    })
-  ).toBe(true);
-  for (const localHour of [0, 6, 12, 23]) {
+  for (const localHour of [0, 1, 6, 12, 15, 23]) {
     expect(
       shouldInstallDownloadedUpdateWhileRunning({ ...idleOvernight, localHour })
-    ).toBe(false);
+    ).toBe(true);
   }
   expect(
     shouldInstallDownloadedUpdateWhileRunning({

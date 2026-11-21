@@ -84,7 +84,7 @@ export const DELIGHT_METRICS: readonly DelightMetricDefinition[] = [
     id: 'turns_before_wow',
     unit: 'turns',
     definition:
-      'Per onboarding session: assistant turns (max turn_index + 1). Anything inferable is never asked; the floor is the handle plus one confirm.',
+      'Per onboarding session: assistant turns (max 1-based turn_index). Anything inferable is never asked; the floor is the handle plus one confirm.',
     producer: 'server_analytics_events onboarding_reply',
     target: {
       direction: 'at_most',

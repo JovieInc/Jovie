@@ -2,7 +2,7 @@ name: Shipping SLO Ratchet
 # clock-class: upstream-advisory
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Devin
-# necessary-trust-boundary: A hosted clock measures repo-local GitHub signals (workflow runs, PR timelines, deployments) and writes only committed metric snapshots and baseline ratchet PRs under the Jovie Bot app token, plus deduped Linear findings under JOV-6783; it never merges, deploys, or records founder decisions.
+# necessary-trust-boundary: A hosted clock measures repo-local GitHub signals (workflow runs, PR timelines, deployments) and writes only committed metric snapshots and baseline ratchet PRs under the Jovie Bot app token, plus deduped Linear findings under JOV-6783; the same run then auto-measures due wins with v1 adapters (committed metrics JSON + Gateway report) and writes receipts to the runtime store only. It never merges, deploys, scrapes HTML, or records founder decisions.
 # removal-trigger: Remove the schedule when the Symphony control plane emits these SLO measurements natively and the daily GitHub-Actions sweep becomes redundant.
 
 # JOV-6783: deterministic, zero-token shipping-SLO ratchet.
@@ -11,8 +11,9 @@ name: Shipping SLO Ratchet
 # production lag) plus merges/day throughput with the +8% WoW growth line and
 # its second-order trend. Compares against docs/metrics/shipping-slo-baseline.json:
 #   >10% p95 improvement held 3 days → bot PR tightens the baseline
-#   >20% regression / >20% throughput drop / flat growth → one deduped
-#     Linear `slo-regression` issue per metric (top offenders + measurement diff)
+#   >20% regression / >20% throughput drop / flat growth → exactly one ranked
+#     Linear `slo-regression` issue for the top regression (required ## Win;
+#     sticky while open; re-rank after verified / not-reproduced)
 # Also publishes docs/metrics/shipping-slo-latest.json through a bot PR so the
 # Symphony lanes status gist (scripts/lanes/doctor.py) can embed the `slo` block
 # for Summer without bypassing protected-main admission.
@@ -146,6 +147,23 @@ jobs:
             echo "samples=$SAMPLES"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Measure due wins into the runtime store
+        # Immediately after --write-latest so JSON field-path adapters see the
+        # fresh snapshot. Must run before snapshot/ratchet steps that switch
+        # git branches (those reset the working tree to origin/main).
+        # Advisory (`|| true`): never fail the SLO job or suppress snapshot /
+        # intake / Slack. Receipts stay in the runtime store (data vs behaviour).
+        id: wins-measure
+        if: ${{ !cancelled() }}
+        env:
+          SUMMER_STORE_URL: ${{ vars.SUMMER_STORE_URL }}
+          SUMMER_STORE_TOKEN: ${{ secrets.SUMMER_STORE_TOKEN }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+          node scripts/wins-ledger.mjs measure-due --store --json | tee -a "$GITHUB_STEP_SUMMARY" || true
+
       # Merge to live per production promotion (alias move), last 10: p50/p95
       # and the slowest stage. REST only, so a GraphQL shed cannot blank it.
       - name: Measure merge-to-live lead time
@@ -201,7 +219,8 @@ jobs:
             --pr "$(gh pr view "$BRANCH" --json number --jq .number)" \
             --head-sha "$(git rev-parse HEAD)" --linear-issue JOV-6783
 
-      - name: File deduped slo-regression issues
+      - name: File ranked slo-regression issue
+        # Exactly one owned intake for the top (or sticky open) regression.
         # Only file when the run actually collected data — an empty sample
         # (API outage, auth failure) is a collection bug, not a regression.
         if: ${{ (steps.slo.outputs.regressions != '0' || steps.slo.outputs.flat_stall == 'true') && steps.slo.outputs.samples != '0' }}
@@ -279,7 +298,8 @@ jobs:
           retention-days: 30
 
       - name: Slack alert on regressions
-        if: ${{ steps.slo.outputs.regressions != '0' && env.SLACK_WEBHOOK_URL != '' }}
+        # always(): do not suppress alerts when an earlier advisory step fails.
+        if: ${{ always() && !cancelled() && steps.slo.outputs.regressions != '0' && env.SLACK_WEBHOOK_URL != '' }}
         env:
           COUNT: ${{ steps.slo.outputs.regressions }}
         run: |

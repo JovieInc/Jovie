@@ -710,23 +710,24 @@
 
 .dark [data-app-shell-frame="true"],
 [data-app-shell-frame="true"].dark {
-  /* Surfaces — neutral graphite elevation; Ion stays reserved for intent. */
-  --app-shell-content-surface: #101114; /* panel canvas */
+  /* Surfaces — ZiaWI / Noir Ion 5-step only; no parallel carbon ladder.
+     Ion stays reserved for intent (focus / accent). */
+  --app-shell-content-surface: var(--noir-ion-card);
   --app-shell-frame-seam: rgba(255, 255, 255, 0.07);
   --app-shell-border: rgba(255, 255, 255, 0.12);
   --system-b-app-content-surface: var(--app-shell-content-surface);
   --system-b-app-frame-seam: var(--app-shell-frame-seam);
   --system-b-app-shell-border: var(--app-shell-border);
 
-  --color-bg-surface-0: #0b0c0f; /* recessed wells */
-  --color-bg-surface-1: #14161a; /* card */
-  --color-bg-surface-2: #1b1d22; /* elevated */
-  --color-bg-surface-3: #24272d; /* floating */
-  --color-bg-elevated: #1b1d22;
-  --color-bg-tooltip: #24272d;
+  --color-bg-surface-0: var(--noir-ion-shell); /* recessed wells */
+  --color-bg-surface-1: var(--noir-ion-card);
+  --color-bg-surface-2: var(--noir-ion-elevated);
+  --color-bg-surface-3: var(--noir-ion-floating);
+  --color-bg-elevated: var(--noir-ion-elevated);
+  --color-bg-tooltip: var(--noir-ion-floating);
   --color-bg-hover: rgba(255, 255, 255, 0.055);
   --color-bg-active: rgba(255, 255, 255, 0.085);
-  --color-bg-input: #14161a;
+  --color-bg-input: var(--noir-ion-card);
   --color-row-hover: rgba(255, 255, 255, 0.055);
   --color-row-selected: rgba(255, 255, 255, 0.085);
   --system-b-bg-surface-0: var(--color-bg-surface-0);
@@ -754,24 +755,8 @@
     0 0 0 1px rgba(255, 255, 255, 0.12), 0 12px 32px rgba(0, 0, 0, 0.52);
 
   /* Skeleton / loading — reserved geometry; color only */
-  --color-skeleton-base: #1b1d22;
-  --color-skeleton-shimmer: rgba(255, 255, 255, 0.11);
-}
-
-/* Ovie consumes the canonical Noir Ion ramp instead of a second near-identical
-   graphite palette. Home, dashboards, shell chrome, and composer share one
-   content tone; cards retain their existing borders and geometry. */
-.dark [data-app-shell-workspace="ov"],
-[data-app-shell-workspace="ov"].dark {
-  --app-shell-content-surface: var(--noir-ion-card);
-  --color-bg-surface-0: var(--noir-ion-shell);
-  --color-bg-surface-1: var(--noir-ion-card);
-  --color-bg-surface-2: var(--noir-ion-elevated);
-  --color-bg-surface-3: var(--noir-ion-floating);
-  --color-bg-elevated: var(--noir-ion-elevated);
-  --color-bg-tooltip: var(--noir-ion-floating);
-  --color-bg-input: var(--noir-ion-card);
   --color-skeleton-base: var(--noir-ion-elevated);
+  --color-skeleton-shimmer: rgba(255, 255, 255, 0.11);
 }
 
 /* A selected row mode owns the same geometry during loading and after data arrives. */
@@ -1130,8 +1115,11 @@
   min-width: 154px;
 }
 
-/* System B Library route primitives */
-:where(.system-b-library-artwork-shell),
+/* System B Library route primitives.
+   ArtworkFrame owns release-art shape (thumbnail → 2px / rounded-xs).
+   Do not assign border-radius on `.system-b-library-artwork-shell` —
+   unlayered route CSS beats layered Tailwind utilities and was rounding
+   24px table thumbs to --radius-md (JOV-7752 / JOV-5455). */
 :where(.system-b-library-status-pill),
 :where(.system-b-library-count-pill),
 :where(.system-b-library-filter-row),

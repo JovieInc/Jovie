@@ -85,7 +85,9 @@ Press feedback is opt-in, not a default. Do not compress controls when the
 action already supplies immediate state feedback: play/pause, toggles,
 accordions, menus, navigation, and submitting controls remain static. When a
 standalone action has no other immediate cue and tactile compression materially
-helps, use the shared **`var(--scale-press)` (0.98)** token.
+helps, use the shared **`var(--scale-press)` (0.98)** token. That value is the
+cross-platform SoT (Drift W1 / T0.5): web owns it in `design-system.css`; native
+clients project `0.98` — never `0.96` or a hardcoded fork.
 
 ```css
 .button {

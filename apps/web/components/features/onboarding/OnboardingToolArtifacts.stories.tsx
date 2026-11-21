@@ -36,7 +36,7 @@ export const SearchFailed: Story = {
 
 /**
  * Proposed handle (Pen R6As7U): one "jov.ie/<handle> is available" line and
- * one Confirm Handle action; Change Handle opens the field.
+ * one Keep action; Change Handle opens the field.
  */
 export const HandleAvailable: Story = {
   render: () => {

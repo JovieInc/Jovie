@@ -14,6 +14,11 @@ import { evaluateShrinkOnlyCount } from '@/lib/design/shrink-only-count-ratchet'
  * `scripts/build-design-tokens.mjs`), and consumers migrate to the semantic
  * namespace wave by wave.
  *
+ * Drift W1 / T0.1 write-path freeze: ban NEW `--linear-*` definitions and
+ * references. Growth fails this ratchet. Removals must lower
+ * `linear-namespace.baseline.json` in the same PR. Do not open feature token
+ * packs or carbon shell overrides as a bypass — see docs/DESIGN_TOKENS.md.
+ *
  * This ratchet counts every `--linear-` occurrence across live web source
  * (app/, components/, styles/, tailwind.config.js). The count may only go
  * DOWN. When you migrate consumers, lower `count` in

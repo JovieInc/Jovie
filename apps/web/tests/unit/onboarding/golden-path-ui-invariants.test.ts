@@ -252,6 +252,13 @@ describe('Golden Path UI & UX closed-loop invariants', () => {
     expect(editorialSource).toMatch(
       /type=['"]hidden['"][\s\S]{0,120}?name=['"]starter_prompt['"][\s\S]{0,120}?value=\{CLAIM_PROFILE_STARTER_PROMPT\}/
     );
+    // JOV-10127: reject display-name handle= on the native close form.
+    // Hyphen must be escaped (`\\-`) so unicodeSets(v) HTML pattern compiles.
+    // Pattern must be a JS expression (`pattern={...}`) — JSX string attrs
+    // keep `\\` as two literal backslashes and still fail under `v`.
+    expect(editorialSource).toMatch(
+      /pattern=\{\s*['"]\[A-Za-z0-9\._\\\\-\]\{3,30\}['"]\s*\}/
+    );
   });
 
   it('forbids golden-path E2E from bypassing / with a bare page.goto("/start")', () => {
@@ -259,6 +266,21 @@ describe('Golden Path UI & UX closed-loop invariants', () => {
     expect(goldenPathSpec).not.toMatch(/page\.goto\(\s*['"`]\/start['"`]/);
     expect(goldenPathSpec).toContain(
       "page.getByTestId('homepage-primary-cta').click()"
+    );
+  });
+
+  it('Keep → auth: golden-path E2E must not wait for social-link after handle confirm', () => {
+    const goldenPathSpec = readWebSource('tests/e2e/golden-path.spec.ts');
+    // JOV-14011 / #26243: after Keep the journey asserts auth handoff, not
+    // the deferred social enrichment card.
+    expect(goldenPathSpec).not.toMatch(
+      /onboarding-confirm-handle[\s\S]{0,1200}?getByTestId\(['"]onboarding-social-link['"]\)\)\.toBeVisible/
+    );
+    expect(goldenPathSpec).toContain(
+      "getByTestId('onboarding-social-link')).toHaveCount(0)"
+    );
+    expect(goldenPathSpec).toMatch(
+      /x-onboarding-fallback[\s\S]{0,200}instant_access\|golden_path_admitted\|waitlist/
     );
   });
 

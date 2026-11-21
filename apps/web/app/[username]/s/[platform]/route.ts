@@ -179,31 +179,32 @@ export async function GET(
 
     if (botDetection.isBot) {
       recordAnonymousBotMetric(botDetection, 'redirect');
-    }
-    const rateLimitResult = botDetection.isBot
-      ? null
-      : await publicClickLimiter.limit(clientIP);
-    if (rateLimitResult?.success) {
-      scheduleAfter(() =>
-        recordShortcutAnalytics({
-          creatorProfileId: profile.id,
-          socialLinkId: link.id,
-          platform: link.platform,
-          slug: platformKey.toLowerCase(),
-          destinationUrl: link.url,
-          isBot: botDetection.isBot,
-          clientIP,
-          userAgent,
-          referrer,
-        }).catch(error =>
-          captureError('Social shortcut analytics failed', error, {
+    } else {
+      // Rate limit + click accounting after Location — never tax hop latency.
+      scheduleAfter(async () => {
+        try {
+          const rateLimitResult = await publicClickLimiter.limit(clientIP);
+          if (!rateLimitResult.success) return;
+          await recordShortcutAnalytics({
+            creatorProfileId: profile.id,
+            socialLinkId: link.id,
+            platform: link.platform,
+            slug: platformKey.toLowerCase(),
+            destinationUrl: link.url,
+            isBot: false,
+            clientIP,
+            userAgent,
+            referrer,
+          });
+        } catch (error) {
+          await captureError('Social shortcut analytics failed', error, {
             route: '/[username]/s/[platform]',
             username: profile.usernameNormalized,
             platform: platformKey,
             socialLinkId: link.id,
-          })
-        )
-      );
+          });
+        }
+      });
     }
 
     return NextResponse.redirect(link.url, {

@@ -215,13 +215,25 @@ describe('Rate Limit Config', () => {
         expect(capture.prefix).toBe('public:profile:capture-dismissal');
         expect(capture.trafficClass).toBe('anonymous');
         expect(capture.algorithm).toBe('fixed-window');
+        expect(capture.requireRedis).toBe(true);
         expect(pac.limit).toBe(40);
         expect(pac.window).toBe(RATE_LIMITERS.general.window);
         expect(pac.prefix).toBe('public:profile:pac-event');
         expect(pac.trafficClass).toBe('anonymous');
         expect(pac.algorithm).toBe('fixed-window');
+        expect(pac.requireRedis).toBe(true);
         expect(capture.prefix).not.toBe(pac.prefix);
         expect(capture.limit + pac.limit).toBe(RATE_LIMITERS.general.limit);
+      });
+
+      it('fail-closes handle enumeration on Redis outage', () => {
+        expect(RATE_LIMITERS.handleCheck).toMatchObject({
+          limit: 30,
+          window: '1 m',
+          prefix: 'handle_check',
+          trafficClass: 'anonymous',
+          requireRedis: true,
+        });
       });
 
       it('isolates the public artist API from profile-view telemetry', () => {

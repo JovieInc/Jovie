@@ -291,7 +291,7 @@ const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
   ['tests/unit/ci/deploy-workflow.test.ts']
 );
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-source-guard-pool.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-source-guard-pool.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs lib/__tests__/ci-fast-merge-queue-compatibility.test.mjs lib/__tests__/ci-fast-shard-fanin-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 const SUMMER_BRIDGE_COVERAGE_COMMAND =
   'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts';
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -1001,21 +1001,20 @@ describe('invariant-scanned structural selection', () => {
     expect(plan.runJovieProduct).toBe(false);
   });
 
-  it('routes every feedback inventory and linked guard edit through invariants', async () => {
-    const paths = new Set([
+  it.each([
+    ...new Set([
       'LESSONS.md',
       'LESSONS.guards.json',
       ...readFeedbackGuardPaths(),
-    ]);
-    for (const path of paths) {
-      expect(isInvariantScannedPath(path), path).toBe(true);
-      const { execute } = await runFor(
-        'pull_request',
-        [path],
-        classifyProductLanes([path]).selectedLanes
-      );
-      expect(invariantRuns(execute), path).toBe(1);
-    }
+    ]),
+  ])('routes feedback input %s through invariants', async path => {
+    expect(isInvariantScannedPath(path), path).toBe(true);
+    const { execute } = await runFor(
+      'pull_request',
+      [path],
+      classifyProductLanes([path]).selectedLanes
+    );
+    expect(invariantRuns(execute), path).toBe(1);
   });
 
   it('classifies every scanned path into a lane that reaches structural', () => {

@@ -90,9 +90,9 @@ const HOSTED_GROUP_JOBS = [
     jobName: 'ci-fast (typecheck)',
   },
   {
-    jobId: 'ci-fast-remaining',
+    jobId: 'ci-fast-remaining-shards',
     nextJobId: 'ci-profile-admission-browser',
-    jobName: 'ci-fast (remaining)',
+    jobName: 'ci-fast (remaining shard ${{ matrix.shard }}/3)',
   },
   {
     jobId: 'ci-fast-structural-web',
@@ -360,7 +360,7 @@ describe('ci-fast bounded parallel workflow', () => {
       );
     }
     expect(
-      jobBlock('ci-fast-remaining', 'ci-profile-admission-browser')
+      jobBlock('ci-fast-remaining-shards', 'ci-profile-admission-browser')
     ).toContain(
       'python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt'
     );
@@ -371,6 +371,7 @@ describe('ci-fast bounded parallel workflow', () => {
     // select the identical files with complementary -k expressions so every
     // collected test runs in exactly one shard (never zero, never twice).
     expect(STRUCTURAL_PYTEST_FILES).toEqual([
+      'scripts/prod-errors/test_claim_parking.py',
       'scripts/prod-errors/test_prod_errors.py',
       'scripts/tests/test_noabandon_route.py',
       'scripts/tests/test_gh_retry.py',
@@ -639,7 +640,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
 
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const pattern = remaining.match(
@@ -691,7 +692,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('selects the overlay collision proof when overlay primitives change', () => {
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const pattern = remaining.match(/OVERLAY_STORYBOOK_PATTERN='([^']+)'/)?.[1];
@@ -748,7 +749,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('selects the desktop updater geometry proofs for modal and control changes', () => {
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const pattern = remaining.match(
@@ -801,7 +802,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('selects the account surface captures for the menu, banner and footer', () => {
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const pattern = remaining.match(
@@ -853,7 +854,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('selects DSP details only for its real consumers and runs the maintained browser proof', () => {
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const pattern = remaining.match(/DSP_STORYBOOK_PATTERN='([^']+)'/)?.[1];
@@ -968,7 +969,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('selects real Ovie privacy browser proof for its boundary and keeps combined coverage', () => {
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const pattern = remaining.match(/PRIVACY_STORYBOOK_PATTERN='([^']+)'/)?.[1];
@@ -1101,7 +1102,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('runs existing Kbd and Spotify Storybook specs through the scanned evidence path', () => {
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const runner = remaining
@@ -1158,7 +1159,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(webParts).toContain('CERTIFICATION_KERNEL_COMMAND');
     expect(LANE_COMMANDS.structural).toContain(CERTIFICATION_KERNEL_COMMAND);
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const pattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
@@ -1908,7 +1909,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('keeps the iOS design gate independent from Ubuntu operations', () => {
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const structuralDecision = remaining.slice(
@@ -2127,7 +2128,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('fails closed onto structural UI gates for every web UI source and guard', () => {
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const structuralDecision = remaining.slice(
@@ -2339,7 +2340,7 @@ describe('ci-fast bounded parallel workflow', () => {
       });
       expect(selected.status, path).toBe(0);
     }
-    for (const path of ['README.md', 'docs/native-queue-eval.mjs']) {
+    for (const path of ['docs/REVIEW_BAR.md', 'docs/native-queue-eval.mjs']) {
       const selected = spawnSync('grep', ['-qE', pattern], {
         input: `${path}\n`,
       });
@@ -2438,7 +2439,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('overlaps structural setup and the structural lane with cheap lanes', () => {
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const at = marker => remaining.indexOf(marker);
@@ -2692,7 +2693,7 @@ describe('ci-fast bounded parallel workflow', () => {
     }
     expect(callers.sort()).toEqual([
       'actionlint.yml:actionlint',
-      'ci.yml:ci-fast-remaining',
+      'ci.yml:ci-fast-remaining-shards',
       'source-validation.yml:deterministic',
       // Fills the main-scoped download cache the three callers above restore.
       'tsc-cache-warm.yml:warm',
@@ -2708,7 +2709,9 @@ describe('ci-fast bounded parallel workflow', () => {
     'different condition',
   ])('rejects an actionlint compiler prerequisite with %s', fault => {
     const workflow = /** @type {ActionlintWorkflow} */ (loadYaml(WORKFLOW));
-    const steps = structuredClone(workflow.jobs['ci-fast-remaining'].steps);
+    const steps = structuredClone(
+      workflow.jobs['ci-fast-remaining-shards'].steps
+    );
     const setupIndex = steps.findIndex(step =>
       step.uses?.startsWith('actions/setup-go@')
     );
@@ -2729,7 +2732,7 @@ describe('ci-fast bounded parallel workflow', () => {
   it('keeps structural setup out of typecheck and fails closed in the aggregate', () => {
     const typecheck = jobBlock('ci-fast-typecheck', 'ci-fast-remaining');
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const aggregate = jobBlock('ci-fast', 'ci-promptfoo-evals');
@@ -2740,7 +2743,7 @@ describe('ci-fast bounded parallel workflow', () => {
     // actionlint reads only checked-out workflows, so it runs unconditionally
     // in the idle wait for the background base-branch fetch.
     expect(remaining).toMatch(
-      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Set up Go for source-pinned actionlint\n\s+uses: actions\/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\.0\.0\n\s+with:\n\s+go-version: '1\.26\.10'\n\s+cache: false\n\s+- name: Run actionlint\n\s+env:\n(?:\s+#.*\n)+\s+RELEASE_DOWNLOAD_TOKEN: \$\{\{ github\.token \}\}\n\s+PINNED_DOWNLOAD_CACHE_DIR: \/tmp\/jovie-pinned-downloads\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
+      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Set up Go for source-pinned actionlint\n\s+if: \$\{\{ success\(\) && matrix.shard == 1 \}\}\n\s+uses: actions\/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\.0\.0\n\s+with:\n\s+go-version: '1\.26\.10'\n\s+cache: false\n\s+- name: Run actionlint\n\s+if: \$\{\{ success\(\) && matrix.shard == 1 \}\}\n\s+env:\n(?:\s+#.*\n)+\s+RELEASE_DOWNLOAD_TOKEN: \$\{\{ github\.token \}\}\n\s+PINNED_DOWNLOAD_CACHE_DIR: \/tmp\/jovie-pinned-downloads\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
     );
     expect(
       remaining.match(/bash \.github\/scripts\/run-actionlint\.sh/g)
@@ -2781,7 +2784,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('runs the structural pytest shards in an aliased ci-fast job', () => {
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const python = jobBlock(
@@ -2798,12 +2801,12 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('runs the lanes coverage pytest alone in an aliased ci-fast job', () => {
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
-    const lanes = jobBlock('ci-fast-structural-lanes', 'ci-knip');
+    const lanes = jobBlock('ci-fast-structural-lanes-shards', 'ci-knip');
     expect(lanes).toMatch(
-      /^ {2}ci-fast-structural-lanes:\n {4}name: ci-fast \(structural lanes\)$/m
+      /^ {2}ci-fast-structural-lanes-shards:\n {4}name: ci-fast \(structural lanes shard \$\{\{ matrix.group \}\}\)$/m
     );
     const aliases = lanes.match(/(?<= \*)[\w-]+/g);
     expect(aliases).toHaveLength(10);
@@ -2817,7 +2820,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('runs the structural web commands in an aliased ci-fast job', () => {
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const web = jobBlock('ci-fast-structural-web', 'ci-fast-structural-lanes');
@@ -2840,7 +2843,7 @@ describe('ci-fast bounded parallel workflow', () => {
   it('moves the slowest cheap lanes into a background web group without dropping any', () => {
     const web = jobBlock('ci-fast-structural-web', 'ci-fast-structural-lanes');
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const at = marker => web.indexOf(marker);
@@ -3000,7 +3003,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('path-selects both workflow contracts and excludes unrelated tests', () => {
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const controlPattern = structuralControlPattern();
@@ -3157,12 +3160,15 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(selectsStructural.test(nonUiPath)).toBe(false);
     }
     expect(selectsStructural.test('.claude/skills/qa/SKILL.md')).toBe(false);
-    expect(selectsStructural.test('.claude/rules/auth.md')).toBe(false);
+    // Hygiene asserts rule markdown; the whole .claude/rules tree selects
+    // structural so docs-only MQ cannot skip (JOV-12618 / swarm.md).
+    expect(selectsStructural.test('.claude/rules/auth.md')).toBe(true);
+    expect(selectsStructural.test('.claude/rules/swarm.md')).toBe(true);
   });
 
   it('runs hosted structural CI for Storybook and token-guard inputs', () => {
     const remaining = jobBlock(
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const structuralDecision = remaining.slice(
@@ -3176,9 +3182,14 @@ describe('ci-fast bounded parallel workflow', () => {
     const selectsStructural = new RegExp(`${controlPattern}|${uiPattern}`);
     const uiRe = new RegExp(uiPattern);
 
-    // Source PRs path-gate the remaining structural lane; merge groups never skip.
+    // Source PRs path-gate the remaining structural lane; merge groups skip
+    // only on the trusted docs-only verdict (JOV-12618), and every other
+    // event runs it.
     expect(structuralDecision).toContain(
-      'github.event_name }}" != "pull_request"'
+      'github.event_name }}" == "pull_request"'
+    );
+    expect(structuralDecision).toContain(
+      '"${{ github.event_name }}" == "merge_group" && "${STRUCTURAL_DOCS_ONLY:-}" == "true"'
     );
     expect(structuralDecision).toContain('echo "skip=false"');
     expect(remaining).toMatch(/github\.event_name != 'merge_group'/);
@@ -3340,10 +3351,22 @@ it('runs web CI contracts on PRs changing the files they read (#18718)', () => {
     '.github/actions/setup-playwright/action.yml',
     'scripts/lib/playwright-png.mjs',
     'apps/web/playwright.config.ts',
+    // Structural suites assert these docs; docs_only must not skip (JOV-12618).
+    'README.md',
+    'CONTRIBUTING.md',
+    '.claude/rules/swarm.md',
+    'docs/REPO-POLICY.md',
+    'docs/SYNTHETIC_MONITORING.md',
+    'docs/COST_MONITORING.md',
+    'docs/AUTOMATION_AUDIT.md',
+    'docs/design/design-brief-template.md',
+    'docs/design/app-ui-brief-template.md',
   ]) {
     expect(selects(path), path).toBe(true);
   }
-  expect(selects('README.md')).toBe(false);
+  expect(selects('docs/REVIEW_BAR.md')).toBe(false);
+  // Orphan pytest (not wired into structural CI) — keep out of the selector.
+  expect(selects('docs/ops/openai-symphony-burrito.md')).toBe(false);
 });
 
 describe('invariant-scanned PR structural selection', () => {
@@ -3357,8 +3380,9 @@ describe('invariant-scanned PR structural selection', () => {
       WORKFLOW.indexOf('- name: Select Storybook browser proof')
     );
     expect(decision).toContain(addition);
+    expect(decision.indexOf(addition)).toBeGreaterThanOrEqual(0);
     expect(decision.indexOf(addition)).toBeLessThan(
-      decision.indexOf('|| git diff --name-only')
+      decision.indexOf('STRUCTURAL_CHANGED_FILES=$(git diff')
     );
 
     const ere = execFileSync(
@@ -3396,7 +3420,11 @@ describe('new scripts test PR structural selection', () => {
     const line = decision
       .split('\n')
       .find(l => l.includes('NEW_SCRIPT_TESTS=$('));
-    expect(line).toContain('git diff --diff-filter=AR --name-only');
+    expect(line).toContain(
+      'git diff --diff-filter=AR "${DIFF_ARGS[@]}" "$DIFF_BASE" HEAD'
+    );
+    expect(decision).toContain('DIFF_ARGS=(--name-only)');
+    expect(decision).toContain('DIFF_ARGS=(--no-renames --name-only)');
     expect(decision).toContain('if [ -n "$NEW_SCRIPT_TESTS" ] ||');
     const ere = line.match(/grep -E '([^']+)'/)[1];
     const selects = path =>
@@ -3707,7 +3735,7 @@ it('selects hosted structural coverage for doctor census fixture-only edits', ()
     'scripts/tests/test_design_gate.py'
   );
   const unrelated = spawnSync('grep', ['-qE', pattern], {
-    input: 'README.md\n',
+    input: 'docs/REVIEW_BAR.md\n',
   });
   expect(unrelated.status).toBe(1);
 });
@@ -3737,5 +3765,11 @@ it('reads structural control paths from data, one alternative per line (JOV-6837
     .split('\n')
     .filter(path => new RegExp(structuralControlPattern()).test(path));
   expect(selected).toContain('.github/workflows/ci.yml');
-  expect(selected).not.toContain('README.md');
+  expect(selected).toContain('README.md');
+  expect(selected).toContain('docs/SYNTHETIC_MONITORING.md');
+  expect(selected).toContain('docs/COST_MONITORING.md');
+  expect(selected).toContain('docs/AUTOMATION_AUDIT.md');
+  expect(selected).toContain('docs/design/design-brief-template.md');
+  expect(selected).not.toContain('docs/REVIEW_BAR.md');
+  expect(selected).not.toContain('docs/ops/openai-symphony-burrito.md');
 });

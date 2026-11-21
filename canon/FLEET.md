@@ -58,6 +58,22 @@ Everyone else is burst or personal:
 
 Summer owns the company bottleneck. Gem owns the engineering bottleneck. If Symphony is down, Gem fixes it. If Gem is down, Symphony fixes it. Tim is not Gem.
 
+### Cursor Projects (optional accelerator)
+
+Cursor Projects are not a second factory and not a second CoS. Symphony → Gem
+remains the default drain. Summer may open or recommend a Project only when it
+clearly accelerates wall-clock **or** raises quality for multi-PR / durable /
+parallel work — never as a tax on either, never to bypass admission, review, or
+merge authority. Gate and fixtures:
+[`docs/operations/SUMMER_CURSOR_PROJECTS.md`](../docs/operations/SUMMER_CURSOR_PROJECTS.md).
+Gem-dark Cursor Cloud recovery stays the isolated diagnostics lane; it is not a
+Project.
+
+Summer also owns **open-PR no-stall** for Jovie: inventory orphans, reclaim
+admission deadlocks (ready + `lane-fix-red` + idle owner) via the existing
+breaker/enroll path, and never use a Cursor Project as the stall watchdog.
+Canonical: [`docs/operations/SUMMER_NO_STALL.md`](../docs/operations/SUMMER_NO_STALL.md).
+
 ---
 
 ## Admission, not filing

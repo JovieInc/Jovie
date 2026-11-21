@@ -24,6 +24,47 @@ describe('Icon', () => {
     expect(icon).toHaveAttribute('height', '32');
   });
 
+  it('defaults to optical chrome stroke and scales feature stroke with size (JOV-14004)', () => {
+    render(<Icon name='Search' data-testid='chrome' size={16} />);
+    expect(screen.getByTestId('chrome')).toHaveAttribute('stroke-width', '1.5');
+
+    render(<Icon name='Search' data-testid='feature' size={24} />);
+    expect(screen.getByTestId('feature')).toHaveAttribute(
+      'stroke-width',
+      '1.75'
+    );
+  });
+
+  it('lets explicit strokeWidth win over the optical default', () => {
+    render(
+      <Icon name='Search' data-testid='override' size={16} strokeWidth={2} />
+    );
+    expect(screen.getByTestId('override')).toHaveAttribute('stroke-width', '2');
+  });
+
+  it('infers optical stroke from Tailwind className when size is omitted', () => {
+    render(
+      <Icon name='AlertTriangle' data-testid='tall' className='h-6 w-6' />
+    );
+    expect(screen.getByTestId('tall')).toHaveAttribute('stroke-width', '1.75');
+
+    render(<Icon name='User' data-testid='mid' className='size-5' />);
+    expect(screen.getByTestId('mid')).toHaveAttribute('stroke-width', '1.65');
+
+    render(<Icon name='Rocket' data-testid='xl' className='size-14' />);
+    expect(screen.getByTestId('xl')).toHaveAttribute('stroke-width', '1.75');
+  });
+
+  it('honors raw aria-label when the dedicated ariaLabel prop is omitted', () => {
+    render(
+      <Icon name='Settings' data-testid='labeled' aria-label='Settings' />
+    );
+    const icon = screen.getByTestId('labeled');
+    expect(icon).toHaveAttribute('aria-label', 'Settings');
+    expect(icon).toHaveAttribute('aria-hidden', 'false');
+    expect(icon).toHaveAttribute('role', 'img');
+  });
+
   it('normalizes various icon name formats', () => {
     render(<Icon name='alarm-clock' data-testid='kebab' />);
     expect(screen.getByTestId('kebab')).toBeInTheDocument();

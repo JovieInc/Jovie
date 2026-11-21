@@ -118,7 +118,7 @@ const producerStageExempt = new Set([
 ]);
 // Jobs that must keep the receipt even if their uploads move elsewhere.
 const producerStageRequired = [
-  ...'ci-fast-remaining ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-lighthouse-dashboard-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'
+  ...'ci-fast-remaining-shards ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-lighthouse-dashboard-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'
     .split(' ')
     .map(job => `ci.yml:${job}`),
   'e2e-full-matrix.yml:e2e-full-matrix',
@@ -133,7 +133,7 @@ const producerStageRequired = [
   'visual-regression.yml:visual-regression',
 ];
 const imageAllowedJobs = new Set([
-  'ci.yml:ci-fast-remaining',
+  'ci.yml:ci-fast-remaining-shards',
   'ci.yml:ci-golden-path',
   'ci.yml:ci-lighthouse-pr',
   'ci.yml:ci-storybook-surfaces',
@@ -153,7 +153,7 @@ const markdownAllowedJobs = new Set([
   'ci.yml:ci-build-layout',
   'ci.yml:ci-e2e-smoke',
   'ci.yml:ci-e2e-tests',
-  'ci.yml:ci-fast-remaining',
+  'ci.yml:ci-fast-remaining-shards',
   'ci.yml:ci-golden-path',
   'ci.yml:ci-smoke-required',
   'ci.yml:ci-storybook-surfaces',
@@ -945,7 +945,7 @@ describe('Playwright artifact secret boundary', () => {
     'keeps Storybook base-fetch auth scoped and propagates exit %i',
     fetchExit => {
       const workflow = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
-      const job = jobBlock(workflow, 'ci-fast-remaining');
+      const job = jobBlock(workflow, 'ci-fast-remaining-shards');
       const step = stepBlock(job, 'Decide structural lane');
       expect(step).toContain('GH_TOKEN: ${{ github.token }}');
       const command = step
@@ -2929,6 +2929,7 @@ ${fixtureCheckout}
       'apps/web/test-results/nightly-agent/skill-delta.json',
       'docs/NIGHTLY_TESTING_AGENT_REPORT.md',
       'apps/web/reports/nightly-agent/last-run.json',
+      'apps/web/reports/nightly-agent/skill-delta.json',
     ];
     const reportContents = Object.fromEntries(
       reportPaths.map((path, index) => [

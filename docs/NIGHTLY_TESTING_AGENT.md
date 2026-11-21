@@ -27,7 +27,7 @@ This automation is intentionally **LLM-free**:
 
 | Lane | Cost | Notes |
 |------|------|-------|
-| Context + target selection | $0 | Reads manifests + local failure memory |
+| Context + target selection | $0 | Reads manifests, local failure memory, and prior `skill-delta.json` (consume-before-select) |
 | Unit telemetry | $0 | Reuses existing Vitest JUnit output |
 | Report generation | $0 | Markdown + JSON from normalized telemetry |
 | Redis publish | ~$0 | One `SET` per run via existing Upstash REST |
@@ -44,6 +44,7 @@ GitHub Actions runner time is incurred only for changed evidence or manual diagn
 |----------|----------|----------|
 | Daily markdown report | `docs/NIGHTLY_TESTING_AGENT_REPORT.md` | Humans, PR diff history |
 | Machine-readable status | `apps/web/reports/nightly-agent/last-run.json` | Scripts, baselines |
+| Skill delta (next select) | `apps/web/reports/nightly-agent/skill-delta.json` + prior-run artifact | Consume-before-select ranking |
 | Ops HUD snapshot | Redis key `nightly-agent:jovie:last_run` | `/app/admin/ops` |
 | CI artifacts | `nightly-agent-report-<run_id>` | Debugging, 90-day retention |
 

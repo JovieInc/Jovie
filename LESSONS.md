@@ -14,34 +14,38 @@ A passing linkage receipt proves those references exist; it does not prove all l
 runtime behavior. Scoped rules are policy guards, not automated regression tests.
 No lesson is declared unable to recur in this inventory. H-EX-06 stays partial
 until shadow-qualification and promotion receipts meet `canon/ENGINEERING.md`;
-policy-only fingerprints are listed explicitly and do not prove executable prevention.
+remaining policy-only fingerprints are listed in the linkage receipt and do not
+prove executable prevention.
 
-## Linkage audit — 2026-10-21 (JOV-7355)
+## Linkage audit — 2026-11-21 (RSI win #5)
 
 Reviewed every level-three lesson heading and its guard rationale against the
-current source, including the three marketing fingerprints added after the
-original 36-lesson audit. The companion inventory has no exclusions, duplicate
-fingerprints, orphan entries, changed lesson digests or missing guard anchors.
+current source. Promoted eight high-leverage policy-only fingerprints to named
+executable tests (CTA routes, traction copy, Calvin identity, hover motion,
+eyebrow caps, Doppler pin, migration journal allow, zero-test CI rejection) and
+repaired the stale homepage H1 guard anchor. The companion inventory has no
+exclusions, duplicate fingerprints, orphan entries, changed-unreviewed lesson
+digests or missing guard anchors.
 
 | Existing linkage receipt | Result |
 | --- | --- |
-| Fingerprints linked / total | 39 / 39 |
-| Fingerprints with named test links | 21 |
-| Fingerprints with scoped rules only | 18 |
-| Test links / scoped-rule links | 33 / 20 |
+| Fingerprints linked / total | 43 / 43 |
+| Fingerprints with named test links | 33 |
+| Fingerprints with scoped rules only | 10 |
+| Test links / scoped-rule links | 48 / 22 |
 | Cannot-recur dispositions / unlinked fingerprints | 0 / 0 |
 | `ok` / findings | `true` / `[]` |
+
+Counts are total guard links from `auditFeedbackLinkage()` (`testLinks` / `ruleLinks`), not unique `path#anchor` identities (the Self-Improvement Loop rule is linked from two fingerprints).
 
 The existing `jovie.feedback-linkage-qualification/v1` receipt includes every
 fingerprint, reviewed lesson digest, guard path, exact anchor, rationale and
 guard-source digest. SHA-256 of `JSON.stringify(receipt.lessons)` for this review:
-`48f29f68ece99b109131a78f8d24e340ea98fcc547afb650d8a7ef83cbe11bac`.
-Source base: `5d32064364b29dd67f6c9ff09aa4fbf83e9b1d16`.
+`4dde29f2c026136f52246d41eec3f1b578e36cc8a70221ff555e96e26938aae7`.
 
-The initial audit failed on the removed deployment-test anchor. Commit
-`76e7e0e871368266bb0859cde86c89f8d74c1cf2` replaced that test with the executed
-canary-shell suite; its exact-deployment, cookie-only, no-redirect test now owns
-the link. Lesson digests remain unchanged after review.
+Prior audit (2026-10-21 / JOV-7355) recorded 39 / 39 linked with 18 policy-only.
+This pass keeps that receipt historical and refreshes counts after the RSI
+promotion batch.
 
 Reproduce the full receipt and its digest from the repository root with the
 pinned Node version:
@@ -59,11 +63,10 @@ JS
 ```
 
 This records source linkage; linked-test execution is separate evidence. The
-18 policy-only fingerprints remain identified in the full receipt. The existing
-audit remains nonblocking, and this receipt does not renew H-EX-06 or promote it.
-Ship now: repair the stale reference and record the exhaustive audit.
-Re-evaluate when a lesson or linked guard changes; then review that linkage and
-regenerate the receipt before reusing this dated evidence.
+10 remaining policy-only fingerprints stay listed in the full receipt. The
+existing audit remains nonblocking, and this receipt does not renew H-EX-06.
+Ship now: executable guards for the promoted batch. Re-evaluate when a lesson
+or linked guard changes; then review that linkage and regenerate the receipt.
 
 ---
 
