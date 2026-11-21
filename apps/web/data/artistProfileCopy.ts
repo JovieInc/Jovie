@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { TIM_WHITE_SHARE_DEEP_LINKS } from '@/data/artistProfileTimWhiteShare';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
@@ -410,9 +411,6 @@ export type ArtistProfileCaptureVisualCopy = Omit<
     'inputPlaceholder'
   >;
 };
-
-const _d = TIM_WHITE_PROFILE.publicProfileDisplay;
-const TIM_WHITE_SHARE_DEEP_LINKS = [_d, `${_d}/pay`, `${_d}/listen`, `${_d}/contact`] as const;
 
 export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   seo: {
