@@ -58,7 +58,5 @@ export const ErrorValidation: Story = {
 
 /** Long content: a selected artist name longer than the field. */
 export const LongContentSelectedName: Story = {
-  render: () => (
-    <StateHarness options={longOptions} initial={longOptions[0]} />
-  ),
+  render: () => <StateHarness options={longOptions} initial={longOptions[0]} />,
 };

@@ -100,6 +100,14 @@ describe('OperatorListsNav', () => {
     ).toBeInTheDocument();
   });
 
+  it('focuses the new list input once the New List button opens it', () => {
+    renderNav();
+    fireEvent.click(screen.getByRole('button', { name: 'New List' }));
+    expect(
+      screen.getByRole('textbox', { name: 'New List Name' })
+    ).toHaveFocus();
+  });
+
   it('expands a collapsed rail before entering a new list name', () => {
     const onOpenChange = vi.fn();
     render(

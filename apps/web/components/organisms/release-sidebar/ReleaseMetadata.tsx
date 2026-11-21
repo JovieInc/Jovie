@@ -30,11 +30,11 @@ const CANVAS_STATUS_CONFIG: Record<
 > = {
   uploaded: {
     label: 'Has Video',
-    className: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+    className: 'bg-success-subtle text-success-text',
   },
   generated: {
     label: 'Ready To Upload',
-    className: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
+    className: 'bg-info-subtle text-info',
   },
   not_set: {
     label: 'No Video',
@@ -80,7 +80,7 @@ function ReleaseTypeBadges({ release }: { readonly release: Release }) {
       {release.isExplicit && (
         <Badge
           size='sm'
-          className='h-5 rounded-full border border-transparent bg-red-500/10 px-2 text-3xs font-caption tracking-normal text-red-600 shadow-none dark:text-red-300'
+          className='h-5 rounded-full border border-transparent bg-error-subtle px-2 text-3xs font-caption tracking-normal text-error-text shadow-none'
         >
           E
         </Badge>
@@ -171,6 +171,75 @@ export function ReleaseMetadata({
       label: release.label ?? null,
     };
   }, [release.label, release.upc]);
+
+  const canvasValue = onCanvasStatusChange ? (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <DrawerButton
+          tone='secondary'
+          size='sm'
+          className='-mx-0.5 h-5.5 gap-1 rounded-full border-subtle bg-surface-0 px-2 text-3xs font-caption leading-none text-secondary-token shadow-none hover:bg-surface-0'
+        >
+          <span>{canvasStatusDisplayLabel}</span>
+          <ChevronDown
+            size={12}
+            className='text-tertiary-token'
+            aria-hidden='true'
+          />
+        </DrawerButton>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align='start' className='w-44'>
+        {CANVAS_STATUS_OPTIONS.map(status => {
+          const config = CANVAS_STATUS_CONFIG[status];
+          const isActive = status === selectionStatus;
+          return (
+            <DropdownMenuItem
+              key={status}
+              onClick={() => onCanvasStatusChange(status)}
+              className={cn(isActive && 'font-medium')}
+            >
+              <span className='flex w-full items-center gap-2'>
+                <Badge
+                  variant='secondary'
+                  className={`${METADATA_BADGE_CLASSNAME} ${config.className}`}
+                >
+                  {config.label}
+                </Badge>
+                {isActive && (
+                  <Check
+                    size={14}
+                    className='ml-auto text-primary-token'
+                    aria-hidden='true'
+                  />
+                )}
+              </span>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  ) : (
+    <Badge
+      variant='secondary'
+      className={`${METADATA_BADGE_CLASSNAME} ${canvasStatusConfig.className}`}
+    >
+      {canvasStatusDisplayLabel}
+    </Badge>
+  );
+
+  const genresValue = (
+    <div className='flex flex-wrap gap-1'>
+      {(release.genres ?? []).slice(0, 3).map(genre => (
+        <Badge
+          key={genre}
+          variant='secondary'
+          className='rounded-full border border-subtle bg-surface-0 px-2 py-0 text-3xs font-caption tracking-normal text-secondary-token shadow-none'
+        >
+          {genre}
+        </Badge>
+      ))}
+    </div>
+  );
 
   return (
     <DrawerSurfaceCard
@@ -375,62 +444,7 @@ export function ReleaseMetadata({
             className={METADATA_ROW_CLASSNAME}
             labelClassName={METADATA_LABEL_CLASSNAME}
             label='Canvas'
-            value={
-              onCanvasStatusChange ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <DrawerButton
-                      tone='secondary'
-                      size='sm'
-                      className='-mx-0.5 h-5.5 gap-1 rounded-full border-subtle bg-surface-0 px-2 text-3xs font-caption leading-none text-secondary-token shadow-none hover:bg-surface-0'
-                    >
-                      <span>{canvasStatusDisplayLabel}</span>
-                      <ChevronDown
-                        size={12}
-                        className='text-tertiary-token'
-                        aria-hidden='true'
-                      />
-                    </DrawerButton>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align='start' className='w-44'>
-                    {CANVAS_STATUS_OPTIONS.map(status => {
-                      const config = CANVAS_STATUS_CONFIG[status];
-                      const isActive = status === selectionStatus;
-                      return (
-                        <DropdownMenuItem
-                          key={status}
-                          onClick={() => onCanvasStatusChange(status)}
-                          className={cn(isActive && 'font-medium')}
-                        >
-                          <span className='flex w-full items-center gap-2'>
-                            <Badge
-                              variant='secondary'
-                              className={`${METADATA_BADGE_CLASSNAME} ${config.className}`}
-                            >
-                              {config.label}
-                            </Badge>
-                            {isActive && (
-                              <Check
-                                size={14}
-                                className='ml-auto text-primary-token'
-                                aria-hidden='true'
-                              />
-                            )}
-                          </span>
-                        </DropdownMenuItem>
-                      );
-                    })}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : (
-                <Badge
-                  variant='secondary'
-                  className={`${METADATA_BADGE_CLASSNAME} ${canvasStatusConfig.className}`}
-                >
-                  {canvasStatusDisplayLabel}
-                </Badge>
-              )
-            }
+            value={canvasValue}
           />
 
           {release.spotifyPopularity != null && (
@@ -482,19 +496,7 @@ export function ReleaseMetadata({
               className={METADATA_ROW_CLASSNAME}
               labelClassName={METADATA_LABEL_CLASSNAME}
               label='Genres'
-              value={
-                <div className='flex flex-wrap gap-1'>
-                  {release.genres.slice(0, 3).map(genre => (
-                    <Badge
-                      key={genre}
-                      variant='secondary'
-                      className='rounded-full border border-subtle bg-surface-0 px-2 py-0 text-3xs font-caption tracking-normal text-secondary-token shadow-none'
-                    >
-                      {genre}
-                    </Badge>
-                  ))}
-                </div>
-              }
+              value={genresValue}
               align='start'
             />
           )}

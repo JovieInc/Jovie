@@ -33,7 +33,9 @@ describe('OpportunityRow certificate', () => {
     await expectNoA11yViolations(container);
     await user.click(screen.getByRole('button', { name: 'Approve buyer' }));
     expect(onPrimaryAction).toHaveBeenCalledWith('row-1');
-    await user.click(screen.getByRole('button', { name: 'Dismiss Opportunity' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Dismiss Opportunity' })
+    );
     expect(onDismiss).toHaveBeenCalledWith('row-1');
   });
 
@@ -44,7 +46,9 @@ describe('OpportunityRow certificate', () => {
     });
 
     await user.click(screen.getByRole('button', { name: 'Plan Opportunity' }));
-    await user.click(screen.getByRole('button', { name: 'Dismiss Opportunity' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Dismiss Opportunity' })
+    );
     expect(onPrimaryAction).not.toHaveBeenCalled();
     expect(onDismiss).not.toHaveBeenCalled();
     await expectNoA11yViolations(container);

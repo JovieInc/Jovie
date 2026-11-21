@@ -31,10 +31,6 @@
       "offline": "The nav makes no request of its own; the query hook owns connectivity and an offline read renders the same block as LoadingNoData.",
       "rtl-overflow": "Rows use the shared sidebar row classes with min-w-0 truncation; direction handling belongs to the shell sidebar."
     },
-    "apps/web/components/organisms/PaySection.tsx": {
-      "offline": "The section starts a payment only on an explicit Pay press and shows the same failure toast as ErrorStripeRejects when the request cannot complete; it makes no request while rendering.",
-      "rtl-overflow": "The card is a centered column with a three-column amount grid and logical text alignment; it sets no physical offsets."
-    },
     "apps/web/components/organisms/PersistentAudioBar.tsx": {
       "loading": "Playback state comes from useTrackAudioPlayer, which a story cannot drive without a real audio element; the loading branch only swaps the play label and disables the seek bar. PersistentAudioBar.test.tsx and the shell tests cover the dock.",
       "empty": "With no active track the component renders an empty dock by design (zero reserved space); the empty case is asserted in PersistentAudioBar.test.tsx and the dock itself owns the 0-height state.",
@@ -83,11 +79,17 @@
       "permission-denied": "The row is a presentational list item driven by state and callbacks; it has no role or gated branch. The detector matched the accepted and rejected row states.",
       "rtl-overflow": "Title and metadata truncate inside a flex row with min-w-0 and the actions are shrink-0; the row sets no physical offsets, and the swipe handlers read raw clientX by design."
     },
-    "apps/web/components/organisms/profile-notifications-menu/ProfileNotificationsMenu.tsx": {
-      "error": "Subscription failures are reported by the controller and the mutation hooks as toasts; the menu takes no error prop and draws no inline error UI.",
-      "offline": "The menu makes no request while rendering; channel actions are callbacks owned by the profile controller, so offline behaves as the LoadingChannelBusy and error cases do.",
-      "permission-denied": "Notification preferences are the viewer's own and have no role or gated branch. The detector matched the role='menu' wiring.",
-      "rtl-overflow": "The menu is a Radix dropdown whose collision handling mirrors under dir=rtl; its rows are flex with gap and no physical offsets."
+    "apps/web/components/organisms/release-sidebar/ReleaseDspLinks.tsx": {
+      "rtl-overflow": "Rows are flex with min-w-0 and the shared drawer link rows, with no physical offsets; direction is owned by the drawer."
+    },
+    "apps/web/components/organisms/release-sidebar/ReleaseLyricsSection.tsx": {
+      "error": "A failed save shows the shared ReleaseSaveStatusRow error with retry, which has its own states and tests; reaching it needs a typed edit and the 1.5s autosave, which a static story cannot script.",
+      "offline": "The section never fetches while rendering; save and format are callbacks owned by the sidebar, and a failed save resolves to the same error row as above.",
+      "rtl-overflow": "The textarea and toolbar are flex and block layouts with no physical offsets; direction is owned by the drawer."
+    },
+    "apps/web/components/organisms/release-sidebar/ReleaseMetadata.tsx": {
+      "rtl-overflow": "The metadata grid is the shared drawer property rows, with badge wrapping and no physical offsets; direction is owned by the drawer.",
+      "error": "The card renders the release it is given and has no error prop or inline error UI; a failed metadata save is reported by the sidebar's save-status row and toasts, not here."
     }
   },
   "gates": {
@@ -128,15 +130,6 @@
       "forced-caps"
     ],
     "apps/web/components/organisms/OperatorListsNav.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
-    "apps/web/components/organisms/PaySection.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -235,7 +228,25 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/organisms/profile-notifications-menu/ProfileNotificationsMenu.tsx": [
+    "apps/web/components/organisms/release-sidebar/ReleaseDspLinks.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/release-sidebar/ReleaseLyricsSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/release-sidebar/ReleaseMetadata.tsx": [
       "ds-owner",
       "tokens",
       "states",

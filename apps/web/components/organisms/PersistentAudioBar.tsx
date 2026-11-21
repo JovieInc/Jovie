@@ -118,7 +118,6 @@ export function PersistentAudioBar() {
   const wasLyricsRouteRef = useRef(isLyricsRoutePath(pathname));
   const currentPathWithSearch = useMemo(() => {
     if (!pathname) return APP_ROUTES.LIBRARY;
-
     const query = searchParams.toString();
     return query ? `${pathname}?${query}` : pathname;
   }, [pathname, searchParams]);

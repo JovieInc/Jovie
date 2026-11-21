@@ -5,7 +5,7 @@ import {
   ComboboxInput,
   Combobox as HeadlessCombobox,
 } from '@headlessui/react';
-import { PlainButton, Spinner as LoadingSpinner } from '@jovie/ui';
+import { Spinner as LoadingSpinner, PlainButton } from '@jovie/ui';
 import { clsx } from 'clsx';
 import { ChevronDown, Search } from 'lucide-react';
 import {

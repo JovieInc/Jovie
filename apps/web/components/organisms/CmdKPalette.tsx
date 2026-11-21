@@ -206,15 +206,12 @@ export function CmdKPalette({
   const generatedListId = useId();
   const paletteDescriptionId = `${generatedListId}-description`;
 
-  // Reset when closing so the next open starts clean. Adjusting state while
-  // rendering (rather than in an effect) avoids a stale-query frame on reopen.
+  // Reset on close during render, so reopening never shows a stale query.
   const [wasOpen, setWasOpen] = useState(open);
   if (wasOpen !== open) {
     setWasOpen(open);
-    if (!open) {
-      setQuery('');
-      setSelectedIndex(0);
-    }
+    if (!open) setQuery('');
+    if (!open) setSelectedIndex(0);
   }
 
   useLayoutEffect(() => {

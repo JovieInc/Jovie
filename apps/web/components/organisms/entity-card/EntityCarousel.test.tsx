@@ -72,3 +72,14 @@ describe('EntityCarousel focus ring', () => {
     }
   });
 });
+
+describe('EntityCarousel controls', () => {
+  it('disables Previous on the first card and enables Next', () => {
+    render(<EntityCarousel items={items} layout='profile-landscape' />);
+
+    expect(
+      screen.getByRole('button', { name: 'Previous Card' })
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next Card' })).toBeEnabled();
+  });
+});

@@ -218,7 +218,9 @@ export function ReleaseLyricsSection({
         'overflow-hidden'
       )}
     >
-      <div className='space-y-2.5 p-3'>
+      {/* The divider lives on this block, not the toolbar, so the format
+          control is not a third nested bordered surface. */}
+      <div className='space-y-2.5 border-b border-(--app-shell-frame-seam) p-3'>
         <Textarea
           placeholder='Paste your lyrics here'
           value={draftLyrics}
@@ -239,7 +241,7 @@ export function ReleaseLyricsSection({
         </div>
       </div>
 
-      <div className='flex flex-wrap items-center gap-2 border-t border-(--app-shell-frame-seam) px-3 py-2.5'>
+      <div className='flex flex-wrap items-center gap-2 px-3 py-2.5'>
         <DrawerButton
           type='button'
           disabled={isActionsDisabled || isCopying}
@@ -260,7 +262,7 @@ export function ReleaseLyricsSection({
               type='button'
               disabled={isActionsDisabled || isFormatting}
               onClick={() => handleFormat(selectedFormat)}
-              className='h-7 rounded-r-none border-r border-r-(--linear-border-subtle) px-2 text-2xs'
+              className='h-7 rounded-r-none px-2 text-2xs'
             >
               {isFormatting ? (
                 <Loader2 className='h-3.5 w-3.5 animate-spin' />
@@ -271,6 +273,10 @@ export function ReleaseLyricsSection({
                 ? 'Formatting…'
                 : `Format: ${LYRICS_FORMAT_LABELS[selectedFormat]}`}
             </DrawerButton>
+            <span
+              aria-hidden='true'
+              className='h-7 w-px shrink-0 bg-(--linear-border-subtle)'
+            />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

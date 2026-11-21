@@ -18,7 +18,14 @@ vi.mock('@headlessui/react', () => ({
   ComboboxInput: ({
     displayValue: _displayValue,
     ...props
-  }: Record<string, unknown>) => <input role='combobox' {...props} />,
+  }: Record<string, unknown>) => (
+    <input
+      role='combobox'
+      aria-expanded={false}
+      aria-controls='mock-listbox'
+      {...props}
+    />
+  ),
   ComboboxButton: ({ children, ...props }: { children: ReactNode }) => (
     <button type='button' {...props}>
       {children}

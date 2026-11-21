@@ -132,6 +132,27 @@ describe('EntityCard', () => {
     expect(screen.getByText('Live')).toBeInTheDocument();
   });
 
+  it('shows the date pill month without forced capitals and fires a button CTA', () => {
+    const onClick = vi.fn();
+    render(
+      <EntityCard
+        model={{
+          id: 's2',
+          kind: 'show',
+          title: 'The Echo',
+          imageAlt: 'The Echo',
+          datePill: { month: 'Jul', day: '4' },
+          interactive: true,
+          cta: { label: 'Get Tickets', onClick },
+        }}
+        treatment='compact'
+      />
+    );
+    expect(screen.getByText('Jul')).not.toHaveClass('uppercase');
+    fireEvent.click(screen.getByRole('button', { name: 'Get Tickets' }));
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
   it('renders a date pill instead of an image for shows without artwork', () => {
     const show: EntityCardModel = {
       id: 's1',

@@ -15,7 +15,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  HostDrawnSelect,
   Switch,
 } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
@@ -266,7 +265,7 @@ export function ProfileNotificationsMenu({
             <label htmlFor='preferred-dsp-select' className='sr-only'>
               Preferred streaming platform
             </label>
-            <HostDrawnSelect
+            <select
               id='preferred-dsp-select'
               value={selectedDspPreference}
               onChange={event => handleDspPreferenceChange(event.target.value)}
@@ -278,7 +277,7 @@ export function ProfileNotificationsMenu({
                   {preference.label}
                 </option>
               ))}
-            </HostDrawnSelect>
+            </select>
             <p className='pt-1 text-xs text-tertiary-token'>
               We&apos;ll open this platform first on future smart links.
             </p>

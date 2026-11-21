@@ -43,7 +43,9 @@ describe('OperatorListsNav certificate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.data = {
-      lists: [{ id: 'l1', name: 'Collab list', count: 12, pendingSuggestions: 3 }],
+      lists: [
+        { id: 'l1', name: 'Collab list', count: 12, pendingSuggestions: 3 },
+      ],
       smartViews: [],
     };
   });

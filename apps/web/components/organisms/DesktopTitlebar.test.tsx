@@ -83,7 +83,9 @@ describe('DesktopTitlebar', () => {
 
     const identity = screen.getByRole('status');
     expect(identity).toHaveAttribute('data-provenance', 'unverified');
-    expect(identity).toHaveTextContent('Desktop · Version Unknown · Unverified');
+    expect(identity).toHaveTextContent(
+      'Desktop · Version Unknown · Unverified'
+    );
     await expectNoA11yViolations(container);
   });
 
