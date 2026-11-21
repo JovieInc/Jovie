@@ -2445,11 +2445,11 @@ ${selectedGateScript}`,
     const fastGate = getStepBlock(iosGate, 'Run fast unit and coverage gate');
     const fullGate = getStepBlock(iosGate, 'Run full simulator regression');
 
-    // actions/cache saves in its post step too. Gating the action itself keeps
-    // both remote restore and upload off persistent runners, while hosted VMs
-    // still receive the lockfile- and toolchain-scoped package cache.
+    // Restore + explicit save (not actions/cache post) keeps remote I/O off
+    // persistent runners while still warming hosted primary keys after a
+    // successful resolve even when a later step fails (JOV-14016).
     expect(cache).toContain("if: ${{ runner.environment == 'github-hosted' }}");
-    expect(cache).toContain('uses: actions/cache@');
+    expect(cache).toContain('uses: actions/cache/restore@');
     expect(cache).toContain('.build/ios-ci/SourcePackages');
     expect(cache).toContain('~/Library/Caches/org.swift.swiftpm');
     expect(cache).toContain('steps.xcode-version.outputs.cache_key');
@@ -2463,6 +2463,15 @@ ${selectedGateScript}`,
     expect(resolvePackages).toContain(
       "if: ${{ steps.swiftpm-cache.outputs.cache-hit != 'true' }}"
     );
+    expect(resolvePackages).toContain('id: swiftpm-resolve');
+    const savePackages = getStepBlock(iosGate, 'Save Swift package cache');
+    expect(savePackages).toContain('uses: actions/cache/save@');
+    expect(savePackages).toContain(
+      "steps.swiftpm-resolve.outcome == 'success'"
+    );
+    const receipt = getStepBlock(iosGate, 'Record SwiftPM cache receipt');
+    expect(receipt).toContain('ios-ci-swiftpm-cache-receipt.mjs');
+    expect(receipt).toContain('SWIFTPM_CACHE_HIT');
     expect(fastGate).toContain('if: ${{ !inputs.full-regression }}');
     expect(fastGate).toContain('bash apps/ios/scripts/run-unit-tests.sh');
     expect(fastGate).toContain('bash apps/ios/scripts/check_coverage.sh');
