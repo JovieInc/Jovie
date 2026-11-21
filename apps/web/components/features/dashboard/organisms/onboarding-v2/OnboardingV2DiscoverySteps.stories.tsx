@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { OnboardingV2DiscoveryStep } from './OnboardingV2DiscoverySteps';
 import {
   createStepContext,
   SPARSE_SNAPSHOT,
 } from './fixtures/onboardingV2StepContext';
+import { OnboardingV2DiscoveryStep } from './OnboardingV2DiscoverySteps';
 
 const meta = {
   title: 'Features/Dashboard/Onboarding/OnboardingV2DiscoverySteps',

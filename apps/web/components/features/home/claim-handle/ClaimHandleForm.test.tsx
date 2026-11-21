@@ -79,7 +79,10 @@ describe('ClaimHandleForm', () => {
     const user = userEvent.setup();
     render(
       <ClaimHandleForm
-        submitTracking={{ eventName: 'landing_cta_claim_handle', section: 'final_cta' }}
+        submitTracking={{
+          eventName: 'landing_cta_claim_handle',
+          section: 'final_cta',
+        }}
       />
     );
 
