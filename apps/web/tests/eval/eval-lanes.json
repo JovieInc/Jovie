@@ -2,9 +2,20 @@
   "schemaVersion": 1,
   "deterministic": {
     "commands": [
-      ["bash", "scripts/run-deterministic-promptfoo-evals.sh", "validate"],
-      ["bash", "scripts/run-deterministic-promptfoo-evals.sh", "eval"],
-      ["bash", "scripts/run-golden-eval-set-ci.sh"],
+      [
+        "bash",
+        "scripts/run-deterministic-promptfoo-evals.sh",
+        "validate"
+      ],
+      [
+        "bash",
+        "scripts/run-deterministic-promptfoo-evals.sh",
+        "eval"
+      ],
+      [
+        "bash",
+        "scripts/run-golden-eval-set-ci.sh"
+      ],
       [
         "pnpm",
         "exec",
@@ -13,6 +24,7 @@
         "--config=vitest.config.mts",
         "lib/chat/tools/onboarding-access-eval.test.ts",
         "lib/connectors/eval/precision.test.ts",
+        "lib/eval/assistants-ratchet/gate.test.ts",
         "lib/eval/calibration.test.ts",
         "lib/eval/chat-ux-contract.test.ts",
         "lib/eval/leak-guard.test.ts",
@@ -28,6 +40,7 @@
       "scripts/run-golden-eval-set-ci.sh",
       "lib/chat/tools/onboarding-access-eval.test.ts",
       "lib/connectors/eval/precision.test.ts",
+      "lib/eval/assistants-ratchet/gate.test.ts",
       "lib/eval/calibration.test.ts",
       "lib/eval/chat-ux-contract.test.ts",
       "lib/eval/leak-guard.test.ts",
@@ -50,12 +63,21 @@
     "commands": [
       {
         "family": "promptfoo-all",
-        "command": ["bash", "scripts/run-live-promptfoo-evals.sh", "all"],
-        "requiredEnvironment": ["AI_GATEWAY_API_KEY"]
+        "command": [
+          "bash",
+          "scripts/run-live-promptfoo-evals.sh",
+          "all"
+        ],
+        "requiredEnvironment": [
+          "AI_GATEWAY_API_KEY"
+        ]
       },
       {
         "family": "http-routes",
-        "command": ["bash", "scripts/run-live-promptfoo-http-evals.sh"],
+        "command": [
+          "bash",
+          "scripts/run-live-promptfoo-http-evals.sh"
+        ],
         "requiredEnvironment": [
           "JOVIE_PROMPTFOO_BASE_URL",
           "JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED"
@@ -93,7 +115,10 @@
           "run",
           "--config=lib/eval/adversarial/vitest.config.real-eval.mts"
         ],
-        "requiredEnvironment": ["AI_GATEWAY_API_KEY", "HELICONE_API_KEY"]
+        "requiredEnvironment": [
+          "AI_GATEWAY_API_KEY",
+          "HELICONE_API_KEY"
+        ]
       },
       {
         "family": "knowledge-accuracy",
@@ -104,7 +129,9 @@
           "run",
           "--config=tests/eval/vitest.config.knowledge-live.mts"
         ],
-        "requiredEnvironment": ["AI_GATEWAY_API_KEY"]
+        "requiredEnvironment": [
+          "AI_GATEWAY_API_KEY"
+        ]
       }
     ],
     "files": [

@@ -1,0 +1,44 @@
+{
+  "_comment": "Assistants eval CI ratchet. Live 1–5 medians are unrun (see Assistants Project docs/baseline-scores.md, 2026-11-21). Do NOT lock the Jovie calibration proxy 3.62/5 or Summer task-success 91.8% as floors — those are different rubrics / offline proxies. Record a real median only after Workers AI live CI-subset (eval:helpfulness --subset ci) under the verification-plan protocol, then raise this file when the median rises. Never lower. Until status is recorded, the gate skips median-drop but still fails closed on safety, invented-facts, and jank.",
+  "schemaVersion": 1,
+  "rubricVersion": "assistants-v1",
+  "scale": {
+    "min": 1,
+    "max": 5,
+    "targetMedian": 4.5
+  },
+  "updatedAt": null,
+  "sourceReport": "docs/baseline-scores.md",
+  "assistants": {
+    "jovie": {
+      "status": "unrun",
+      "median": null,
+      "nCases": null,
+      "safetyPassRate": null,
+      "inventedFacts": null,
+      "oneRecommendationRate": null,
+      "notes": "Live 1–5 median unrun. Offline calibration proxy 3.62/5 is NOT ratchet-grade — do not record it here. Raise after Workers AI live CI-subset."
+    },
+    "summer": {
+      "status": "unrun",
+      "median": null,
+      "nCases": null,
+      "safetyPassRate": null,
+      "inventedFacts": null,
+      "oneRecommendationRate": null,
+      "notes": "Live 1–5 median unrun. Cached task-success 91.8% is a different rubric — do not record it here."
+    }
+  },
+  "jank": {
+    "status": "green",
+    "contractTests": [
+      "tests/unit/chat/jank-monitor.test.ts",
+      "tests/unit/chat/useChatJankMonitor.test.tsx",
+      "tests/e2e/chat-jank.spec.ts"
+    ]
+  },
+  "judgeCache": {
+    "keyShape": ["case_id", "answer_hash", "rubric_version"],
+    "notes": "When the $5/day Gateway ceiling is exhausted, consume the last good cached sample; never soft-pass safety or invented-facts."
+  }
+}
