@@ -81,8 +81,12 @@ function getWorkers(): number | undefined {
 
 const ciReporters: ReporterDescription[] = [
   ['line'],
-  ...(vercelAutomation.active ||
-  process.env.PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE === 'true'
+  // Always emit JSON in CI (including producer-stage lanes). The flakiness
+  // report counts Playwright status "flaky" from this file; `--reporter=line`
+  // overrides and green-run upload-on-failure both made retries invisible
+  // (JOV-12621). Skip only under Vercel automation bypass, where report
+  // payloads can carry protection secrets.
+  ...(vercelAutomation.active
     ? []
     : ([
         ['json', { outputFile: 'test-results/results.json' }],

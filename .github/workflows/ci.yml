@@ -8427,6 +8427,16 @@ jobs:
             echo "::notice title=Quarantined E2E spec (non-blocking)::This lane runs quarantined specs fail-open — failures are tracked by ${url}"
           done
 
+      - name: Upload Playwright flaky JSON status
+        # Green-run retries live only in results.json. Always upload so the
+        # flakiness report can count Playwright status "flaky" (JOV-12621).
+        if: ${{ always() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') && hashFiles('apps/web/test-results/results.json') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: playwright-e2e-flaky-json-ci-shard-${{ matrix.shard }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-results/results.json
+          retention-days: 7
+
       - name: Upload Playwright Test Results on Failure
         if: ${{ failure() && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') && hashFiles('apps/web/test-results/**') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact

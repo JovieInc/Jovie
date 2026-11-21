@@ -734,7 +734,7 @@ afterEach(() => {
 });
 
 describe('Playwright artifact secret boundary', () => {
-  it('keeps configs reporter-safe and suppresses default JSON only for producer jobs', async () => {
+  it('keeps configs reporter-safe and always emits JSON flaky status in CI', async () => {
     const actual = readdirSync(webRoot)
       .filter(name =>
         /^playwright(?:\.[\w-]+)*\.config(?:\.[\w-]+)*\.[cm]?[jt]s$/.test(name)
@@ -840,11 +840,13 @@ describe('Playwright artifact secret boundary', () => {
     expect(reporterNames(ci['playwright.config.ts'].reporter)).toContain(
       'json'
     );
+    // Producer-stage lanes still need JSON flaky status for the flakiness
+    // report on green runs (JOV-12621). Only Vercel automation bypass skips it.
     expect(
       reporterNames(
         (await configs(true, true))['playwright.config.ts'].reporter
       )
-    ).not.toContain('json');
+    ).toContain('json');
     await expect(configs(true, false, 'sentinel')).rejects.toThrow(
       'Global Vercel bypass headers are forbidden'
     );
