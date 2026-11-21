@@ -80,6 +80,8 @@
     "evals": "bash scripts/run-deterministic-promptfoo-evals.sh eval",
     "evals:golden": "bash scripts/run-golden-eval-set-ci.sh",
     "eval:helpfulness": "tsx --import ./tests/eval/promptfoo/server-only-preload.mjs tests/eval/helpfulness/run.ts",
+    "eval:helpfulness:delta": "tsx --import ./tests/eval/promptfoo/server-only-preload.mjs tests/eval/helpfulness/failure-delta.ts",
+    "eval:helpfulness:targets": "tsx --import ./tests/eval/promptfoo/server-only-preload.mjs tests/eval/helpfulness/targets.ts",
     "eval:chat-first-token": "tsx scripts/record-chat-first-token-sample.ts",
     "evals:validate": "bash scripts/run-deterministic-promptfoo-evals.sh validate",
     "promptfoo": "promptfoo",
