@@ -98,4 +98,12 @@ describe('TourDatesTable', () => {
     const past = screen.getByText('Past');
     expect(past.closest('.invisible')).toBeNull();
   });
+
+  it('colors the Admin Import source with the warning text token', () => {
+    renderTable([{ ...baseTourDate, provider: 'admin_import' }]);
+
+    const source = screen.getByText('Admin Import');
+    expect(source).toHaveClass('text-warning-text');
+    expect(source.className).not.toMatch(/amber-\d/);
+  });
 });
