@@ -44,7 +44,7 @@ export const FooterLink = React.forwardRef<HTMLAnchorElement, FooterLinkProps>(
     const palette =
       tone === 'light'
         ? 'text-secondary-token hover:text-primary-token hover:bg-surface-1'
-        : 'text-white/70 hover:text-white hover:bg-white/5';
+        : 'text-secondary-token hover:text-primary-token hover:bg-interactive-hover';
 
     // Renders through the canonical Link primitive (asChild + variant={null}).
     // The primitive base supplies inline-flex, transition-colors, and the
