@@ -291,9 +291,7 @@ export async function bindDogfoodSubjectDeploy(input: {
   });
 }
 
-export function dogfoodFeedStatus(
-  ledger: DogfoodReceiptLedger | null
-): {
+export function dogfoodFeedStatus(ledger: DogfoodReceiptLedger | null): {
   readonly status: 'disconnected' | 'fixture' | 'production';
   readonly receiptCount: number;
   readonly subjectsWithDeploy: number;
@@ -310,11 +308,15 @@ export function dogfoodFeedStatus(
   const sources = Object.values(ledger.subjectDeploys).map(
     binding => binding.source
   );
-  const status = sources.includes('production')
-    ? 'production'
-    : sources.length > 0 || Object.keys(ledger.receipts).length > 0
-      ? 'fixture'
-      : 'disconnected';
+  let status: 'disconnected' | 'fixture' | 'production' = 'disconnected';
+  if (sources.includes('production')) {
+    status = 'production';
+  } else if (
+    sources.length > 0 ||
+    Object.keys(ledger.receipts).length > 0
+  ) {
+    status = 'fixture';
+  }
   return {
     status,
     receiptCount: Object.keys(ledger.receipts).length,

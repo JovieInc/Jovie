@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
-  dogfoodReceiptProvesOutcome,
   type DogfoodReceipt,
+  dogfoodReceiptProvesOutcome,
 } from '@/lib/agent-os/dogfood-receipt';
 import { getCanonicalSurface } from '@/lib/canonical-surfaces';
-import { memoryCertificationBackend } from './fixtures';
 import {
   bindDogfoodSubjectDeploy,
+  DOGFOOD_RECEIPT_LEDGER_CONTRACT,
   dogfoodFeedStatus,
   dogfoodReceiptKey,
-  DOGFOOD_RECEIPT_LEDGER_CONTRACT,
   parseDogfoodReceiptLedger,
   readDogfoodReceiptLedger,
   recordDogfoodReceipt,
 } from './dogfood-receipt-ledger';
+import { memoryCertificationBackend } from './fixtures';
 import {
   buildPublicProfileCapabilityReceipt,
   buildPublicProfileScriptedFalseSuccess,
@@ -42,10 +42,12 @@ describe('dogfood receipt ledger', () => {
     expect(receipt?.missionId).toBe(
       getCanonicalSurface('public-profile').outcomeMission.id
     );
-    expect(dogfoodReceiptProvesOutcome(receipt!, {
-      id: receipt!.missionId,
-      outcome: getCanonicalSurface('public-profile').outcomeMission.outcome,
-    })).toBe(true);
+    expect(
+      dogfoodReceiptProvesOutcome(receipt!, {
+        id: receipt!.missionId,
+        outcome: getCanonicalSurface('public-profile').outcomeMission.outcome,
+      })
+    ).toBe(true);
 
     const ledger = await readDogfoodReceiptLedger(backend);
     expect(ledger?.contract).toBe(DOGFOOD_RECEIPT_LEDGER_CONTRACT);

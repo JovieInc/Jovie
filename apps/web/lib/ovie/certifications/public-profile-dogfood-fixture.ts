@@ -1,7 +1,7 @@
 import type { CertificationRecordBackend } from '@/lib/agent-os/certification-cas';
 import {
-  dogfoodReceiptFromOutcomeMission,
   type DogfoodReceipt,
+  dogfoodReceiptFromOutcomeMission,
 } from '@/lib/agent-os/dogfood-receipt';
 import { getCanonicalSurface } from '@/lib/canonical-surfaces';
 import {
@@ -73,8 +73,7 @@ export function buildPublicProfileCapabilityReceipt(input: {
       })),
       friction: { assessment: 'acceptable', details: [] },
       recovery: { retries: 0, details: [] },
-      durationMs:
-        Date.parse(input.completedAt) - Date.parse(input.startedAt),
+      durationMs: Date.parse(input.completedAt) - Date.parse(input.startedAt),
       resources: {
         status: 'not_applicable',
         reason: 'No metered provider call in this read mission.',
@@ -120,8 +119,7 @@ export function buildPublicProfileScriptedFalseSuccess(input: {
       ],
       friction: { assessment: 'acceptable', details: [] },
       recovery: { retries: 0, details: [] },
-      durationMs:
-        Date.parse(input.completedAt) - Date.parse(input.startedAt),
+      durationMs: Date.parse(input.completedAt) - Date.parse(input.startedAt),
       resources: {
         status: 'not_applicable',
         reason: 'No metered provider call in this scripted run.',

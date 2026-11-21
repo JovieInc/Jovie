@@ -24,12 +24,26 @@ import {
   computeFleetHardeningMetrics,
   type FleetHardeningMetrics,
 } from '@/lib/agent-os/fleet-hardening';
-import { computeRatePercent } from '@/lib/analytics/metrics';
+import {
+  type DogfoodFeedProjection,
+  projectDogfoodFeed,
+} from './dogfood-feed';
+import {
+  metric,
+  type MetricValue,
+  minutesBetween,
+  per100,
+  percentile,
+  rate,
+} from './metrics-math';
 import {
   projectQualityScoreboard,
   type QualityOutcomeReceipt,
   type QualityScoreboardProjection,
 } from './quality-scoreboard';
+
+export type { DogfoodFeedProjection } from './dogfood-feed';
+export type { MetricValue } from './metrics-math';
 
 export const CERTIFICATION_METRICS_CONTRACT =
   'jovie.certification-metrics/v1' as const;
@@ -176,23 +190,8 @@ export interface CertificationMetricsInput {
   readonly knownGoodDeploymentIds: readonly string[];
   /** Immutable Ovie quality ledger; null means the source is disconnected. */
   readonly qualityReceipts: readonly QualityOutcomeReceipt[] | null;
-  /**
-   * Dogfood receipt ledger feed status. Absent/`disconnected` means the
-   * adapter has no authoritative store yet; never invent coverage from silence.
-   */
-  readonly dogfoodFeed?: {
-    readonly status: 'disconnected' | 'fixture' | 'production';
-    readonly receiptCount: number;
-    readonly subjectsWithRequiredMissions: number;
-    readonly subjectsWithDeploy: number;
-    readonly knownGoodDeploymentCount: number;
-  };
-}
-
-export interface MetricValue {
-  /** Null when the denominator is empty — never a fake zero. */
-  readonly value: number | null;
-  readonly sampleSize: number;
+  /** Adapter-supplied feed status; omitted means disconnected / empty. */
+  readonly dogfoodFeed?: DogfoodFeedProjection;
 }
 
 export interface JudgeRungCalibration {
@@ -264,14 +263,6 @@ export interface CertificationLaneMetrics extends CertificationScopeMetrics {
   >;
 }
 
-export interface DogfoodFeedProjection {
-  readonly status: 'disconnected' | 'fixture' | 'production';
-  readonly receiptCount: number;
-  readonly subjectsWithRequiredMissions: number;
-  readonly subjectsWithDeploy: number;
-  readonly knownGoodDeploymentCount: number;
-}
-
 export interface CertificationMetricsProjection {
   readonly contract: typeof CERTIFICATION_METRICS_CONTRACT;
   readonly generatedAt: string;
@@ -279,42 +270,8 @@ export interface CertificationMetricsProjection {
   readonly lanes: Readonly<Record<DogfoodProduct, CertificationLaneMetrics>>;
   /** Product outcomes are top-line; engineering throughput is diagnostic only. */
   readonly qualityScoreboard: QualityScoreboardProjection;
-  /**
-   * Explicit dogfood receipt / mission coverage feed (JOV-7200). Disconnected
-   * until the existing ledger is present; fixture bindings may graduate to
-   * production without a new queue.
-   */
+  /** Explicit dogfood receipt / mission coverage feed (JOV-7200). */
   readonly dogfoodFeed: DogfoodFeedProjection;
-}
-
-const MINUTES_PER_MS = 1 / 60_000;
-
-function minutesBetween(start: string, end: string): number {
-  return Math.max(0, (Date.parse(end) - Date.parse(start)) * MINUTES_PER_MS);
-}
-
-function metric(value: number | null, sampleSize: number): MetricValue {
-  return { value, sampleSize };
-}
-
-function rate(numerator: number, denominator: number): MetricValue {
-  if (denominator === 0) return metric(null, 0);
-  return metric(numerator / denominator, denominator);
-}
-
-function per100(numerator: number, denominator: number): MetricValue {
-  if (denominator === 0) return metric(null, 0);
-  // Canonical per-100 rate derivation (analytics-metrics-layer guard).
-  return metric(computeRatePercent(numerator, denominator), denominator);
-}
-
-function percentile(sorted: readonly number[], p: number): number | null {
-  if (sorted.length === 0) return null;
-  const index = Math.min(
-    sorted.length - 1,
-    Math.max(0, Math.ceil((p / 100) * sorted.length) - 1)
-  );
-  return sorted[index];
 }
 
 interface ScopeFacts {
@@ -701,20 +658,6 @@ export function computeCertificationMetrics(
     })
   ) as Record<DogfoodProduct, CertificationLaneMetrics>;
 
-  const subjectsWithRequiredMissions = input.subjects.filter(
-    subject => subject.requiredMissions.length > 0
-  ).length;
-  const subjectsWithDeploy = input.subjects.filter(
-    subject => subject.deploy !== null
-  ).length;
-  const dogfoodFeed: DogfoodFeedProjection = input.dogfoodFeed ?? {
-    status: 'disconnected',
-    receiptCount: input.receipts.length,
-    subjectsWithRequiredMissions,
-    subjectsWithDeploy,
-    knownGoodDeploymentCount: input.knownGoodDeploymentIds.length,
-  };
-
   return {
     contract: CERTIFICATION_METRICS_CONTRACT,
     generatedAt: input.generatedAt,
@@ -725,6 +668,6 @@ export function computeCertificationMetrics(
       generatedAt: input.generatedAt,
       windowStart: input.windowStart,
     }),
-    dogfoodFeed,
+    dogfoodFeed: projectDogfoodFeed(input),
   };
 }

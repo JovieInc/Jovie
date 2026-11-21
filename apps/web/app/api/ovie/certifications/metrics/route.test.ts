@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { dogfoodReceiptProvesOutcome } from '@/lib/agent-os/dogfood-receipt';
 import { getCanonicalSurface } from '@/lib/canonical-surfaces';
+import { recordDogfoodReceipt } from '@/lib/ovie/certifications/dogfood-receipt-ledger';
 import {
   fixturePacket,
   memoryCertificationBackend,
@@ -14,7 +15,6 @@ import {
 } from '@/lib/ovie/certifications/public-profile-dogfood-fixture';
 import { QUALITY_OUTCOME_RECEIPT_SCHEMA } from '@/lib/ovie/certifications/quality-scoreboard';
 import { recordQualityOutcomeReceipt } from '@/lib/ovie/certifications/quality-scoreboard-ledger';
-import { recordDogfoodReceipt } from '@/lib/ovie/certifications/dogfood-receipt-ledger';
 import { GET } from './route';
 
 const mocks = vi.hoisted(() => ({
@@ -158,7 +158,7 @@ describe('GET /api/ovie/certifications/metrics', () => {
     const backend = memoryCertificationBackend();
     await seedPublicProfileDogfoodFixture({
       backend,
-      recordedAt: new Date().toISOString(),
+      recordedAt: '2026-11-21T12:00:00.000Z',
     });
     mocks.backend.mockReturnValue(backend);
 
@@ -183,8 +183,8 @@ describe('GET /api/ovie/certifications/metrics', () => {
 
   it('rejects a deliberate scripted false-success from dogfood kind coverage', async () => {
     const backend = memoryCertificationBackend();
-    const now = new Date().toISOString();
-    const startedAt = new Date(Date.parse(now) - 60_000).toISOString();
+    const now = '2026-11-21T12:00:00.000Z';
+    const startedAt = '2026-11-21T11:59:00.000Z';
     await seedPublicProfileDogfoodFixture({
       backend,
       recordedAt: now,
@@ -225,31 +225,35 @@ describe('GET /api/ovie/certifications/metrics', () => {
   });
 
   it('counts founder-facing Summer cards toward cards per day', async () => {
-    // One day before the clock this test actually runs, so the card stays
-    // inside the 30-day metrics window after the wall clock moves.
-    const createdAt = new Date(Date.now() - 86_400_000).toISOString();
-    mocks.cards.mockResolvedValue([
-      {
-        id: 'sc_1',
-        kind: 'taste',
-        product: 'jov',
-        createdAt,
-      },
-      {
-        id: 'sc_2',
-        kind: 'spend', // not founder-facing: excluded
-        product: 'jov',
-        createdAt,
-      },
-    ]);
-    const body = await (await GET(request())).json();
-    expect(body.lanes.jov.founderCardsPerDay.sampleSize).toBe(1);
-    expect(body.lanes.jov.founderCardsPerDay.value).toBeGreaterThan(0);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-11-21T12:00:00.000Z'));
+    try {
+      const createdAt = '2026-11-20T12:00:00.000Z';
+      mocks.cards.mockResolvedValue([
+        {
+          id: 'sc_1',
+          kind: 'taste',
+          product: 'jov',
+          createdAt,
+        },
+        {
+          id: 'sc_2',
+          kind: 'spend', // not founder-facing: excluded
+          product: 'jov',
+          createdAt,
+        },
+      ]);
+      const body = await (await GET(request())).json();
+      expect(body.lanes.jov.founderCardsPerDay.sampleSize).toBe(1);
+      expect(body.lanes.jov.founderCardsPerDay.value).toBeGreaterThan(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('projects exact before, after, deploy, and retest evidence from the durable ledger', async () => {
     const backend = memoryCertificationBackend();
-    const now = new Date().toISOString();
+    const now = '2026-11-21T12:00:00.000Z';
     const link = (ref: string) => ({ ref, observedAt: now });
     await recordQualityOutcomeReceipt({
       backend,
