@@ -59,9 +59,9 @@ describe('ActionDial preferred state', () => {
       'data-preferred',
       'true'
     );
-    expect(screen.getByTestId('action-dial-selection')).toHaveTextContent(
-      'Remembered'
-    );
+    const selection = screen.getByTestId('action-dial-selection');
+    expect(selection).toHaveTextContent('Remembered');
+    expect(selection).toHaveClass('font-normal', 'tracking-widest');
     expect(status()).toBe('Apple Music selected, remembered');
     fireEvent.keyDown(screen.getByRole('listbox'), { key: 'ArrowDown' });
     await waitFor(() =>
@@ -120,9 +120,15 @@ describe('ActionDial preferred state', () => {
       'h-7',
       'w-7'
     );
-    expect(screen.getByText('Stream Now')).toHaveClass('text-sm');
-    expect(screen.getByTestId('action-dial-selection')).toHaveTextContent(
-      'Remembered'
+    expect(screen.getByText('Stream Now')).toHaveClass(
+      'text-sm',
+      'font-semibold'
     );
+    const selection = screen.getByTestId('action-dial-selection');
+    expect(selection).toHaveTextContent('Remembered');
+    expect(selection).toHaveClass('tracking-widest', 'text-tertiary-token');
+    expect(
+      screen.getByRole('option', { name: 'Apple Music' }).className
+    ).toMatch(/\bh-12\b/);
   });
 });

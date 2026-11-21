@@ -17,6 +17,7 @@ import {
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { DialEngine, type DialState } from '@/lib/dial/dial-engine';
 import {
+  DIAL_ICON_OPTICAL_CLASS,
   ROW_STEP_PX,
   rowIsTappable,
   rowLayout,
@@ -181,10 +182,10 @@ export function ActionDial({
     lastPulseRef.current = now;
     action.animate(
       [
-        { transform: 'scale(0.968)', opacity: 0.88 },
+        { transform: 'scale(0.978)', opacity: 0.92 },
         { transform: 'scale(1)', opacity: 1 },
       ],
-      { duration: 120, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+      { duration: 160, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
     );
   }, []);
 
@@ -410,14 +411,14 @@ export function ActionDial({
                 if (node) iconRefs.current.set(index, node);
                 else iconRefs.current.delete(index);
               }}
-              className='absolute inset-0 will-change-transform'
+              className='absolute inset-0 flex items-center justify-center will-change-transform'
               style={{
                 transform: `translate3d(0, ${(index - position) * 100}%, 0)`,
                 opacity: Math.max(0, 1 - Math.abs(index - position)),
               }}
               data-testid={`action-dial-icon-${option.id}`}
             >
-              {option.icon}
+              <span className={DIAL_ICON_OPTICAL_CLASS}>{option.icon}</span>
             </span>
           ) : null
         )}
@@ -485,7 +486,7 @@ export function ActionDial({
                   aria-setsize={count}
                   data-dial-offset={index - activeIndex}
                   data-preferred={preferredRow ? 'true' : undefined}
-                  className='absolute inset-x-3 top-21 flex h-12 min-h-12 items-center justify-center gap-2.5 rounded-full text-sm font-medium tracking-tight text-foreground will-change-transform'
+                  className='absolute inset-x-3 top-21 flex h-12 min-h-12 items-center justify-center gap-2.5 rounded-full text-sm font-normal tracking-tight text-foreground will-change-transform'
                   style={{
                     transform: `translate3d(0, ${layout.y}px, 0) scale(${layout.scale})`,
                     opacity: layout.opacity,
@@ -508,13 +509,16 @@ export function ActionDial({
                 >
                   {option.icon ? (
                     <span
-                      className='shrink-0 [&_svg]:h-7 [&_svg]:w-7'
+                      className={cn(
+                        'shrink-0 [&_svg]:h-7 [&_svg]:w-7',
+                        DIAL_ICON_OPTICAL_CLASS
+                      )}
                       aria-hidden='true'
                     >
                       {option.icon}
                     </span>
                   ) : null}
-                  <span>{option.label}</span>
+                  <span className='min-w-0 truncate'>{option.label}</span>
                 </div>
               );
             })}
@@ -535,7 +539,7 @@ export function ActionDial({
             primary
             disabled={disabled}
             ariaLabel={`${actionLabel} with ${active.label}`}
-            className='w-full gap-3 tracking-tight [&_svg]:h-7 [&_svg]:w-7'
+            className='w-full gap-3 text-sm font-semibold tracking-tight [&_svg]:h-7 [&_svg]:w-7'
             onClick={event => {
               if (suppressClickRef.current) {
                 event.preventDefault();
@@ -552,10 +556,13 @@ export function ActionDial({
         </p>
       ) : null}
       {count > 1 ? (
-        <div className='mt-1 flex min-h-6 flex-col items-center justify-center gap-0.5'>
+        <div className='mt-1.5 flex min-h-5 flex-col items-center justify-center gap-0.5'>
           <p
             data-testid='action-dial-selection'
-            className='text-center text-2xs font-medium tracking-tight text-tertiary-token'
+            className={cn(
+              'text-center text-2xs font-normal text-tertiary-token transition-opacity duration-normal motion-reduce:transition-none',
+              isPreferred ? 'tracking-widest' : 'tracking-tight'
+            )}
             aria-hidden='true'
           >
             {isPreferred ? 'Remembered' : active.label}
@@ -597,7 +604,10 @@ export function ActionDial({
       ) : (
         <p
           data-testid='action-dial-selection'
-          className='mt-1 text-center text-2xs font-medium tracking-tight text-tertiary-token'
+          className={cn(
+            'mt-1.5 text-center text-2xs font-normal text-tertiary-token',
+            isPreferred ? 'tracking-widest' : 'tracking-tight'
+          )}
         >
           {isPreferred ? 'Remembered' : active.label}
         </p>
