@@ -62,7 +62,7 @@ export function ReleaseMomentDrawer({
           </SheetHeader>
 
           <section className='flex flex-col gap-2'>
-            <h3 className='text-xs font-semibold tracking-wide text-(--linear-text-secondary)'>
+            <h3 className='text-balance text-xs font-semibold tracking-wide text-(--linear-text-secondary)'>
               Workflow
             </h3>
             <ul className='flex flex-col gap-1.5'>
@@ -116,7 +116,7 @@ function FanNotificationPreview({ moment }: { readonly moment: DemoMoment }) {
       className='flex flex-col gap-1.5 rounded-md border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-3'
     >
       <div className='flex items-center justify-between'>
-        <h3 className='text-xs font-semibold tracking-wide text-(--linear-text-secondary)'>
+        <h3 className='text-balance text-xs font-semibold tracking-wide text-(--linear-text-secondary)'>
           Fan Notification
         </h3>
         <span className='rounded-full bg-success-subtle px-2 py-0.5 text-3xs font-semibold text-success-text'>

@@ -45,7 +45,7 @@ export function ChatPinnedOpportunityHeader({
         <PlainButton
           type='button'
           onClick={onUnpin}
-          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-colors duration-fast hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40'
+          className='relative before:absolute before:left-1/2 before:top-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[''] flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-colors duration-fast hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40'
           aria-label='Unpin Opportunity'
           data-testid='chat-pinned-opportunity-unpin'
         >
