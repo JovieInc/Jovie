@@ -398,7 +398,9 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
       getScreenshotArguments(visualRegressionSpec).filter(argument =>
         /signin|signup|route\.slice/.test(argument)
       )
-    ).toEqual(['`${route.slice(1)}-dark.png`']);
+    ).toEqual([]);
+    // The dark-mode auth block retired with Clerk: auth-visual owns both pages.
+    expect(visualRegressionSpec).not.toContain('auth pages dark-mode');
     expect(visualRegressionSpec).toContain(
       "test.describe('JOV-2081: Viewport matrix — /sign-up'"
     );
