@@ -111,9 +111,9 @@ export function SettingsProfileSection({
         </div>
         {avatarQuality?.status === 'low' ? (
           <div className='pb-2 sm:pl-[calc(var(--profile-label-column-width)+1.25rem)]'>
-            <div className='flex items-start gap-3 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-secondary-token'>
+            <div className='flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-secondary-token'>
               <AlertCircle
-                className='mt-0.5 h-4 w-4 shrink-0 text-amber-600'
+                className='mt-0.5 h-4 w-4 shrink-0 text-warning'
                 aria-hidden='true'
               />
               <p>

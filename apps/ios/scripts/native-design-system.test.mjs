@@ -35,6 +35,7 @@ import {
   swiftColor,
   trustedPaintCeiling,
 } from './native-design-system.mjs';
+import { nativeDesignFixturePaths } from './native-design-system-action-button.mjs';
 
 const manifest = JSON.parse(readFileSync(resolve(ROOT, MANIFEST), 'utf8'));
 const palette = JSON.parse(
@@ -312,12 +313,7 @@ test('the selected source gate goes red on wrong native paint/token bypass and g
   }
   try {
     copySwift('apps/ios/Jovie');
-    for (const path of [
-      MANIFEST,
-      manifest.palette,
-      manifest.semantics,
-      manifest.paintDebt,
-    ])
+    for (const path of nativeDesignFixturePaths(manifest, MANIFEST))
       copyFile(path);
     const git = args => {
       const result = spawnSync('git', args, {

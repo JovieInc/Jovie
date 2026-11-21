@@ -60,7 +60,7 @@ export function SmartLinkProviderButton({
             viewBox='0 0 24 24'
             fill='currentColor'
             className={cn(
-              'h-5 w-5 shrink-0',
+              primary ? 'h-7 w-7 shrink-0' : 'h-5 w-5 shrink-0',
               iconColor ? undefined : 'text-muted-foreground'
             )}
             style={iconColor ? { color: iconColor } : undefined}
@@ -74,6 +74,8 @@ export function SmartLinkProviderButton({
           primary
             ? 'text-btn-primary-foreground flex-none'
             : 'text-foreground flex-1',
+          // Shared primary label stays text-base — dial/marketing callers must
+          // not shrink PaySelector and other primary CTAs via this component.
           'text-base font-semibold'
         )}
       >

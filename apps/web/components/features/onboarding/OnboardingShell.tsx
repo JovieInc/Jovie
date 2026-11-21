@@ -37,11 +37,13 @@ import {
 import { cn } from '@/lib/utils';
 import { OnboardingChat } from './OnboardingChat';
 import { OnboardingProfileRail } from './OnboardingProfileRailLazy';
+import { OnboardingStartStepRail } from './OnboardingStartStepRail';
 import {
   isOnboardingTurnstilePanelVisible,
   OnboardingTurnstile,
   type OnboardingTurnstileState,
 } from './OnboardingTurnstile';
+import { ONBOARDING_FRAME_CLASS } from './onboarding-shell-frame';
 import { endsInTerminalNextStep } from './onboardingChatHelpers';
 import { buildEntryProfileBuilderState } from './onboardingEntryProfileState';
 import {
@@ -49,18 +51,16 @@ import {
   type OnboardingProfileBuilderState,
   resolvePreviewArtist,
 } from './onboardingProfileRailState';
+import { resolveOnboardingJourneyState } from './onboardingStartSteps';
 import { useOnboardingClaim } from './useOnboardingClaim';
 import { useOnboardingTurnstileFailOpen } from './useOnboardingTurnstileFailOpen';
 
+export { ONBOARDING_FRAME_CLASS } from './onboarding-shell-frame';
 export { buildEntryProfileBuilderState } from './onboardingEntryProfileState';
 
 const SIGN_IN_LABEL = 'Sign in';
 
-/**
- * App-shell frame for the anonymous onboarding chat.
- *
- * Holds the Turnstile token until the chat client wires its first request.
- */
+/** App-shell frame for the anonymous onboarding chat + Turnstile token. */
 export interface OnboardingShellProps {
   readonly initialMessages?: UIMessage[];
   readonly conversationId?: string | null;
@@ -87,9 +87,6 @@ export interface OnboardingShellProps {
   /** The real page behind `?handle=`, shown before the visitor types. */
   readonly entryProfile?: StartEntryProfile | null;
 }
-
-/** The /start frame runs dark; the restore state reuses it so nothing repaints. */
-export const ONBOARDING_FRAME_CLASS = '[color-scheme:dark]';
 
 export function OnboardingShell({
   isSignedIn = false,
@@ -251,6 +248,10 @@ export function OnboardingShell({
   const railState = resolvePreviewArtist(profileBuilderState)
     ? profileBuilderState
     : entryBuilderState;
+  const journeyState = resolveOnboardingJourneyState(
+    profileBuilderState,
+    entryBuilderState
+  );
   const sideProfileRail = resolvePreviewArtist(railState) ? (
     <OnboardingProfileRail state={railState} />
   ) : null;
@@ -283,6 +284,10 @@ export function OnboardingShell({
                   />
                 </OnboardingIdentityConflict>
               ) : null}
+              <OnboardingStartStepRail
+                state={journeyState}
+                className='shrink-0 px-4 pt-1 sm:px-6 lg:px-8'
+              />
               <OnboardingChat
                 initialMessages={initialMessages}
                 conversationId={conversationId}
@@ -292,6 +297,7 @@ export function OnboardingShell({
                 intentId={intentId}
                 onConversationActivity={handleConversationActivity}
                 onProfileBuilderChange={setProfileBuilderState}
+                profilePeekState={railState}
                 starterHandoff={starterHandoff}
                 entryProfile={entryProfile}
                 turnstileToken={failOpen.token}

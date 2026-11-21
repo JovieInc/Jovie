@@ -95,6 +95,8 @@ describe('useChatThreadContextMenu', () => {
     await expectNoA11yViolations(container);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+
+    await screen.findAllByRole('menuitem');
     expect(container).toContainElement(
       screen.getByRole('menuitem', { name: 'Archive' })
     );
@@ -111,6 +113,8 @@ describe('useChatThreadContextMenu', () => {
     expect(copySessionId).toHaveBeenCalledWith('conv-123');
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+
+    await screen.findAllByRole('menuitem');
     fireEvent.click(screen.getByRole('menuitem', { name: 'Archive' }));
 
     await waitFor(() => {
@@ -122,6 +126,8 @@ describe('useChatThreadContextMenu', () => {
     renderProbe({ activeThreadId: 'conv-123' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+
+    await screen.findAllByRole('menuitem');
     fireEvent.click(screen.getByRole('menuitem', { name: 'Archive' }));
 
     await waitFor(() =>
@@ -135,6 +141,8 @@ describe('useChatThreadContextMenu', () => {
     const { container } = renderProbe({ activeThreadId: 'conv-123' });
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+
+    await screen.findAllByRole('menuitem');
     fireEvent.click(screen.getByRole('menuitem', { name: 'Archive' }));
 
     await waitFor(() =>
@@ -161,6 +169,8 @@ describe('useChatThreadContextMenu', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+
+    await screen.findAllByRole('menuitem');
     fireEvent.click(screen.getByRole('menuitem', { name: 'Copy Session ID' }));
     expect(copySessionId).toHaveBeenCalledWith('conv-rtl');
     await expectNoA11yViolations(container);

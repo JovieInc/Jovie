@@ -30,6 +30,8 @@ node scripts/ds-cert-loop.mjs gate --shard <branch> --order <order>
    the order is done. Anything else is listed, and the worker iterates on
    that list. A component that needs a product decision goes in the order's
    `skipped` map with the reason, and is reported, never silently dropped.
+   A skipped component must not keep a gate entry: if you reverted it after
+   `gate`, remove its entry, or `verify` fails.
 6. **Ship.** One PR per order, labelled `codemod`, merges on green.
 7. **Repeat** until `status` says 0. Then the loop stands down; the gate keeps
    the result.

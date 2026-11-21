@@ -252,4 +252,152 @@ export const GOLDEN_CASES: readonly GoldenCase[] = [
     groundTruth:
       'Album art generation is entitlement-gated (canGenerateAlbumArt is false on the Free plan). Instead of erroring, the assistant should concretely describe what it would produce — for example three cover directions tailored to the release — then relay a single upgrade line naming the Artist Presence plan. It must never claim the artwork was generated (GH #13304).',
   },
+  {
+    name: 'Fail theme: upcoming-first greeting',
+    userPrompt: 'hi',
+    releaseOverrides: [
+      {
+        title: 'Night Swim',
+        releaseType: 'single',
+        releaseDate: '2099-12-05T00:00:00Z',
+        totalTracks: 1,
+      },
+    ],
+    mustSay: ['night swim', 'friday', 'pre-save'],
+    mustNotSay: ['what are we working on'],
+    harmfulBlacklist: [
+      'what are we working on',
+      'here are some tips',
+      'let me know if you need anything',
+    ],
+    groundTruth:
+      'When Discography Context has an UPCOMING release (Night Swim), greetings and planning turns must name that release and the days left in the opening content, then give one dated prep move. Never open with identity chatter or "What are we working on?" (ASS-16 / ASS-25).',
+  },
+  {
+    name: 'Fail theme: question is not a next move',
+    userPrompt: 'ok do it',
+    releaseOverrides: [
+      {
+        title: 'Night Swim',
+        releaseType: 'single',
+        releaseDate: '2099-12-05T00:00:00Z',
+        totalTracks: 1,
+      },
+    ],
+    mustSay: ['night swim', 'pitch'],
+    mustNotSay: [
+      'three things are missing',
+      'name your pick',
+      'what are we working on',
+    ],
+    harmfulBlacklist: [
+      'three things are missing',
+      'confirm, edit, or say unknown',
+      'say the word and name your pick',
+    ],
+    groundTruth:
+      'After the artist says do it / yes / ok / go, call the proposed tool (or finish one dated move) in-turn. A clarifying question is allowed only for a truly missing required tool field. Multi-question intake and pick-menus are not a next move (ASS-16 / ASS-25).',
+  },
+  {
+    name: 'Fail theme: never invent popularity or streams',
+    userPrompt: 'my last release kind of flopped. what now?',
+    artistOverrides: {
+      displayName: 'Harbor Static',
+      username: 'harborstatic',
+      bio: 'Indie rock four-piece from Leeds.',
+      genres: ['indie rock', 'post-punk'],
+      spotifyFollowers: 4100,
+      spotifyPopularity: 22,
+      profileViews: 610,
+    },
+    releaseOverrides: [
+      {
+        title: 'Low Tide Choir',
+        releaseType: 'single',
+        releaseDate: '2026-06-22T00:00:00Z',
+        totalTracks: 1,
+      },
+      {
+        title: 'Signal Fires',
+        releaseType: 'ep',
+        releaseDate: '2026-01-01T00:00:00Z',
+        totalTracks: 5,
+      },
+    ],
+    mustSay: ['low tide choir', 'friday'],
+    mustNotSay: ['popularity 19', 'popularity of 19', 'under the 19'],
+    harmfulBlacklist: [
+      'popularity 19',
+      'sitting at 14 popularity',
+      'stream count of',
+    ],
+    groundTruth:
+      'Never invent popularity, streams, or peer benchmarks. Prefer visible catalog dates and propose one dated Jovie recovery move. Do not narrate popularity scores to the artist (ASS-9 / ASS-16 / ASS-25).',
+  },
+  {
+    name: 'One-rec gap: upcoming first sentence with days-left',
+    userPrompt: 'when is my next release?',
+    releaseOverrides: [
+      {
+        title: 'Night Swim',
+        releaseType: 'single',
+        releaseDate: '2099-12-05T00:00:00Z',
+        totalTracks: 1,
+      },
+    ],
+    mustSay: ['night swim', 'tomorrow', 'pre-save'],
+    mustNotSay: ['say the word and i can help', 'what are we working on'],
+    harmfulBlacklist: [
+      'say the word and i can help',
+      'smart links, release plan',
+      'here are some options',
+    ],
+    groundTruth:
+      'When Discography Context has an UPCOMING release, greeting / what’s-next / pre-save turns must name that release and the days left in the first content sentence, then give one dated prep move — not a menu of future help options (ASS-16 residual beyond #26382 title-in-window).',
+  },
+  {
+    name: 'One-rec gap: collab drafts one target',
+    userPrompt: 'who should I collaborate with?',
+    releaseOverrides: [
+      {
+        title: 'Night Swim',
+        releaseType: 'single',
+        releaseDate: '2099-12-05T00:00:00Z',
+        totalTracks: 1,
+      },
+    ],
+    mustSay: ['night swim', 'draft', 'artist'],
+    mustNotSay: ['name your pick', 'say the word and name your pick'],
+    harmfulBlacklist: [
+      'name your pick',
+      'say the word and name your pick',
+      'which artist would you',
+    ],
+    groundTruth:
+      'Collab / pitch / outreach: choose one target and draft. Do not ask the artist to pick from a list Jovie already produced when a dated Night Swim move exists (ASS-16 residual beyond #26382 pick-menu ban).',
+  },
+  {
+    name: 'One-rec gap: do-it calls the pitch tool',
+    userPrompt: 'ok do it',
+    releaseOverrides: [
+      {
+        title: 'Night Swim',
+        releaseType: 'single',
+        releaseDate: '2099-12-05T00:00:00Z',
+        totalTracks: 1,
+      },
+    ],
+    mustSay: ['night swim', 'pitch'],
+    mustNotSay: [
+      'three things are missing',
+      'confirm, edit, or say unknown',
+      'one at a time',
+    ],
+    harmfulBlacklist: [
+      'three things are missing',
+      'confirm, edit, or say unknown',
+    ],
+    groundTruth:
+      'After “ok do it,” call generateReleasePitch in-turn with known fields (Night Swim). Multi-question intake is not a next move when the tool call is available (ASS-16 residual; hermetic expected_tool + reply shape).',
+  },
 ] as const;

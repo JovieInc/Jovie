@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -60,7 +61,7 @@ export function DemoReleasePresaveSurface() {
           showMenuButton={false}
           heroMeta={
             <div>
-              <p className='mb-2 inline-flex rounded-full border border-white/[0.1] px-2.5 py-1 text-2xs font-[520] uppercase tracking-[0.08em] text-muted-foreground'>
+              <p className='mb-2 inline-flex rounded-full border border-on-media/10 px-2.5 py-1 text-2xs font-[520] tracking-[0.08em] text-muted-foreground'>
                 Out now
               </p>
               <h1 className={SMART_LINK_HERO_TITLE_CLASS}>The Deep End</h1>
@@ -124,8 +125,7 @@ export function DemoReleasePresaveSurface() {
           title='Menu'
         >
           <div className='flex flex-col gap-0.5'>
-            <button
-              type='button'
+            <PlainButton
               className={SMART_LINK_MENU_ITEM_CLASS}
               onClick={() => {
                 setMenuOpen(false);
@@ -134,7 +134,7 @@ export function DemoReleasePresaveSurface() {
             >
               <Share2 className={SMART_LINK_MENU_ICON_CLASS} />
               Share
-            </button>
+            </PlainButton>
           </div>
         </ProfileDrawerShell>
         <ProfileDrawerShell

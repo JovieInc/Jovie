@@ -1806,12 +1806,6 @@
       "long-content": "AnimatedIconSwap wraps one icon in a box its caller sizes and lays out no text; every caller passes a lucide glyph, so there is no content to overflow (the detector matched the children prop).",
       "rtl-overflow": "AnimatedIconSwap lays out no text and has no start or end placement, only one centred icon, so writing direction changes nothing it renders."
     },
-    "apps/web/components/atoms/AppIconButton.tsx": {
-      "empty": "AppIconButton wraps one icon child and takes no collection; the detector matched the items-center class in APP_CONTROL_BUTTON_CLASS.",
-      "partial": "Its required accessible label is its only data; the optional tooltip label and shortcut are presentation, and a tooltip label without a shortcut is the existing WithTooltip story, so nothing can be partially present.",
-      "long-content": "The control is a fixed 28px or 32px icon square; its label is announced through aria-label rather than rendered, and tooltip text layout belongs to TooltipShortcut, so no content can overflow the button.",
-      "rtl-overflow": "The control is a symmetric icon square with no text or inline-direction classes and its tooltip opens below it, so it renders the same under dir='rtl'; mirroring a directional glyph is the caller's choice of child icon."
-    },
     "apps/web/components/atoms/ArtworkFallbackTile.tsx": {
       "empty": "The tile holds no collection: seed is required and draws the whole face. The detector matched the items-center class; Default and PartialNoLabel show the tile with only a seed."
     },
@@ -1838,7 +1832,7 @@
       "partial": "label and variant are required, and size, title and className are presentation options, so the badge has no data that can be partially present. LongContent and Rtl cover the label's limits; DotBadge.test.tsx covers the title."
     },
     "apps/web/components/atoms/DspLogo.tsx": {
-      "partial": "DspLogo takes one required provider key and draws that platform's fixed glyph and name together; its optional props (className, height) are styling with defaults, so nothing can be partially present, and an unmapped provider renders nothing (UnmappedProvider)."
+      "partial": "DspLogo takes one required provider key and draws that platform's fixed glyph and name together; its optional props (className, height) are styling with defaults, so nothing can be partially present, and an unmapped provider renders nothing (EmptyUnmappedProvider)."
     },
     "apps/web/components/atoms/Icon.tsx": {
       "empty": "Icon renders one named glyph and takes no collection; the detector matched the .map( over name segments in resolveIconName. An unknown name renders nothing, which Icon.test.tsx covers.",
@@ -1851,11 +1845,6 @@
       "long-content": "It lays out no text; alt is the accessible name of the image or placeholder rather than rendered copy, so there is no content to overflow.",
       "permission-denied": "It only draws an image or a placeholder glyph and has no gated action or permission input; the detector matched role='img' on the labelled placeholder.",
       "rtl-overflow": "It renders no text and uses no inline-direction classes: the placeholder glyph is centered with flex inside a full-size or inset-0 box, so dir='rtl' renders it the same."
-    },
-    "apps/web/components/atoms/InlineIconButton.tsx": {
-      "partial": "InlineIconButton draws one icon control from its required icon child and accessible name; its optional props (className, fadeOnParentHover, size, href and native button or anchor attributes) are styling, behaviour and wiring with defaults, so no data can be partially present.",
-      "long-content": "It lays out no visible text: every caller passes one icon glyph (at most with an sr-only word) and the name lives in aria-label, so there is no content to overflow; the detector matched the children and label props.",
-      "rtl-overflow": "It renders one centred icon in a fixed square with symmetric padding and no inline-direction classes, so dir='rtl' renders it the same and there is no text to overflow."
     },
     "apps/web/components/atoms/InvisibleTurnstile.tsx": {
       "loading": "While Cloudflare's script loads, InvisibleTurnstile renders only an off-screen, aria-hidden mount and reports status 'loading' to its owning form through onStateChange; Storybook bypasses the vendor script (it would need the network), so InvisibleTurnstile.test.tsx covers the load and its timeout.",
@@ -1908,7 +1897,7 @@
       "offline": "It never fetches: the items stream in from the server page, and its isLoading flag only drives the static ActivityTableSkeleton (the Loading story)."
     },
     "apps/web/components/features/admin/AdminReadUnavailable.tsx": {
-      "loading": "The 'Reading current data…' copy shows only while the Retry transition's router.refresh() is in flight; it has no prop, so no static story can hold it. Retry is driven in AdminReadUnavailable.test.tsx and AdminReadUnavailable.certificate.test.tsx.",
+      "loading": "The 'Reading current data\u2026' copy shows only while the Retry transition's router.refresh() is in flight; it has no prop, so no static story can hold it. Retry is driven in AdminReadUnavailable.test.tsx and AdminReadUnavailable.certificate.test.tsx.",
       "offline": "It never fetches: Retry only calls router.refresh(), and a read that failed for lack of connectivity reaches it as the caller's message, which ErrorReadFailed shows.",
       "permission-denied": "It has no gated action or permission input; the detector matched role='status'. A read blocked by a missing admin step-up renders AdminVerificationRequired instead (its PermissionDeniedStepUpRequired story)."
     },
@@ -2751,7 +2740,7 @@
       "empty": "The banner renders one card from scalar props (title, description, CTA) and owns no collection that could be empty; omitted copy falls back to defaults (PartialCustomTitle story). The detector matched the items-center class."
     },
     "apps/web/components/shell/LoopBtn.tsx": {
-      "long-content": "The button renders an icon and a one-glyph badge; its accessible name is derived from the three-value mode ('Loop: off', 'Loop: track 1', 'Loop: section ⤴'), so no caller text can grow. Every mode has a story."
+      "long-content": "The button renders an icon and a one-glyph badge; its accessible name is derived from the three-value mode ('Loop: off', 'Loop: track 1', 'Loop: section \u2934'), so no caller text can grow. Every mode has a story."
     },
     "apps/web/components/shell/LyricsRouteSkeleton.tsx": {
       "empty": "The skeleton takes no props: it maps a fixed constant list of six placeholder lines, so there is no collection that can be empty. The detector matched that .map call.",

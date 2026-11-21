@@ -702,19 +702,14 @@ describe('marketing route manifest integrity', () => {
     expect(pricingReport.matches).toBe(false);
 
     const artistReport = getRouteRecipeParity(artistProfiles!);
-    // logo-cloud waits for a brand permission (JOV-7795).
+    // logo-cloud waits for a brand permission (JOV-7795). Shared product-updates
+    // capture appends after the six homepage-system sections (JOV-14242).
     expect(artistReport.actualSectionIds).toEqual([
       'hero',
-      'feature-split',
       'feature-grid',
       'capture',
-      'feature-split',
-      'feature-split',
-      'product-gallery',
-      'spec-wall',
       'how-it-works',
       'product-gallery',
-      'faq',
       'cta',
       'capture',
     ]);

@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
 import { toast } from '@/components/feedback';
 import {
@@ -111,13 +112,13 @@ export class ErrorBoundary extends Component<Props, State> {
               </div>
 
               <div className='flex justify-center'>
-                <button
+                <PlainButton
                   type='button'
                   onClick={() => globalThis.location.reload()}
                   className='btn btn-md btn-primary btn-press'
                 >
                   Reload page
-                </button>
+                </PlainButton>
               </div>
             </div>
           </div>

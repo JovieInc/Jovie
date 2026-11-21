@@ -50,6 +50,7 @@
     "baselines": [
       "apps/web/composite-field.baseline.json",
       "apps/web/contrast-ratchet.baseline.json",
+      "apps/web/lib/eval/assistants-ratchet/baseline-medians.json",
       "apps/web/tests/unit/design-system/arbitrary-radius.baseline.json",
       "apps/web/tests/unit/design-system/canonical-nav-metric.baseline.json",
       "apps/web/tests/unit/design-system/destructive-red-drift.baseline/",
