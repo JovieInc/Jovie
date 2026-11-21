@@ -591,11 +591,13 @@ test.describe('central runtime notifications', () => {
     await expect(
       page.getByRole('button', { name: 'Downloading Jovie Update…' })
     ).toBeDisabled();
-    // The update is announced by the shell pill, never on the Inbox bell.
+    // The update is announced by the shell pill, never on the Home bell.
+    // Scope to the Home nav row — the rail bell also carries
+    // data-navigation-item-id="home" with a qualified accessible name.
     await expect(
-      page
-        .getByRole('link', { name: 'Inbox', exact: true })
-        .and(page.locator('[data-navigation-item-id="inbox"]'))
+      page.locator(
+        'a[data-navigation-item-id="home"]:not([data-inbox-attention])'
+      )
     ).toHaveAttribute('href', '/app');
     await expect(
       page.getByRole('link', { name: /App Update Available/ })
@@ -617,7 +619,7 @@ test.describe('sidebar attention and Settings header', () => {
     await openStory(page, 'organisms-unifiedsidebar--legacy-admin', 'light');
     await expect(
       page.locator('[data-sidebar-search-slot]').getByRole('link', {
-        name: 'Inbox',
+        name: 'Home',
         exact: true,
       })
     ).toHaveAttribute('href', '/app');
@@ -672,7 +674,7 @@ test.describe('sidebar attention and Settings header', () => {
       Math.abs(line.x - trigger.x - trigger.width - gap)
     ).toBeLessThanOrEqual(2);
     await expect(
-      slot.getByRole('link', { name: 'Inbox', exact: true })
+      slot.getByRole('link', { name: 'Home', exact: true })
     ).toBeVisible();
   });
 
@@ -746,7 +748,7 @@ test.describe('sidebar attention and Settings header', () => {
     test(`brand bell and search share one row [${theme}]`, async ({ page }) => {
       await openStory(page, 'organisms-unifiedsidebar--dashboard', theme);
       const row = page.locator('[data-sidebar-brand-row]');
-      const inbox = page.getByRole('link', { name: /Inbox —/ });
+      const inbox = page.getByRole('link', { name: /Home —/ });
       const search = page.getByRole('button', { name: /Search Jovie$/ });
       await expect(inbox).toHaveAttribute('href', '/app');
       await expect(search).toHaveCount(1);
@@ -772,7 +774,7 @@ test.describe('sidebar attention and Settings header', () => {
       expect(Math.abs(firstGap - secondGap)).toBeLessThanOrEqual(0.5);
       // The bell is the only `/app` entry: the rail's Inbox row is gone.
       await expect(
-        page.getByRole('link', { name: 'Inbox', exact: true })
+        page.getByRole('link', { name: 'Home', exact: true })
       ).toHaveCount(0);
       // Current navigation groups Calendar within Work. Preserve every
       // canonical destination exposed by this default-flags story.

@@ -290,12 +290,12 @@ describe('UnifiedSidebar library route', () => {
       expect.objectContaining({ collapsed: false })
     );
     const row = screen
-      .getByRole('link', { name: 'Inbox' })
+      .getByRole('link', { name: 'Home' })
       .closest('[data-sidebar-brand-row]');
     expect(row).toContainElement(
       screen.getByRole('button', { name: 'Search Sidebar' })
     );
-    expect(screen.getByRole('link', { name: 'Inbox' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute(
       'href',
       '/app'
     );
@@ -564,7 +564,7 @@ describe('UnifiedSidebar library route', () => {
     expect(toggleSlot).not.toBeNull();
     expect(brandRow?.contains(toggleSlot ?? null)).toBe(true);
 
-    const bell = screen.getByRole('link', { name: /^Inbox/ });
+    const bell = screen.getByRole('link', { name: /^Home/ });
     expect(bell.closest('[data-sidebar-header-actions]')?.contains(bell)).toBe(
       true
     );
@@ -817,13 +817,15 @@ describe('UnifiedSidebar library route', () => {
     );
   });
 
-  it('exposes Inbox while Tools is collapsed and selects only Inbox', () => {
+  it('exposes Operator Inbox while Tools is collapsed and selects only it', () => {
     globalThis.localStorage?.removeItem('ovie.nav.tools-open.v1');
     renderUnifiedSidebar({ pathname: APP_ROUTES.ADMIN_INBOX, section: 'ov' });
     const navigation = screen.getByRole('navigation', {
       name: 'OV Navigation',
     });
-    const inbox = within(navigation).getByRole('link', { name: 'Inbox' });
+    const inbox = within(navigation).getByRole('link', {
+      name: 'Operator Inbox',
+    });
     expect(inbox).toBeVisible();
     expect(inbox).toHaveAttribute('href', APP_ROUTES.ADMIN_INBOX);
     expect(inbox).toHaveAttribute('aria-current', 'page');

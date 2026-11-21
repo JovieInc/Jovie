@@ -101,7 +101,7 @@ describe('exclusive customer vs OV navigation', () => {
       ADMIN_NAV_REGISTRY.filter(item => item.section === 'workspaces').map(
         item => item.label
       )
-    ).toEqual(['Home', 'Inbox', 'Shipping', 'Fleet', 'Capacity']);
+    ).toEqual(['Home', 'Operator Inbox', 'Shipping', 'Fleet', 'Capacity']);
     expect(ADMIN_NAV_REGISTRY.map(item => item.id)).not.toContain('needs_you');
     expect(
       ADMIN_NAV_REGISTRY.filter(item => item.section === 'business').map(

@@ -66,7 +66,7 @@ describe('KeyboardShortcutsSheet', () => {
 
     renderSheet(true, '/app/ov/ops');
     expect(screen.getByText('Go to home')).toBeInTheDocument();
-    expect(screen.getByText('Go to inbox')).toBeInTheDocument();
+    expect(screen.getByText('Go to operator inbox')).toBeInTheDocument();
     expect(screen.getByText('Go to shipping')).toBeInTheDocument();
     expect(screen.getByText('Go to fleet')).toBeInTheDocument();
     expect(screen.getByText('Go to capacity')).toBeInTheDocument();

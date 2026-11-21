@@ -26,7 +26,7 @@ test('collapsed demo keeps its command allocation and stages secondary controls'
   const secondary = page.locator('[data-sidebar-search-slot] > [inert]');
   await expect(secondary).toHaveAttribute('aria-hidden', 'true');
   await expect(
-    nav.getByRole('link', { name: 'Inbox', exact: true })
+    nav.getByRole('link', { name: 'Home', exact: true })
   ).toHaveCount(1);
 });
 
