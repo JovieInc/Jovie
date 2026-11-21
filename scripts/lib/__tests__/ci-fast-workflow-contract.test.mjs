@@ -1258,17 +1258,21 @@ describe('ci-fast bounded parallel workflow', () => {
     const typecheck = jobBlock('ci-fast-typecheck', 'ci-fast-remaining');
 
     expect(typecheck).toContain('filter: blob:none');
+    // JOV-12618: same-tree reuse can skip hydration on merge_group; otherwise
+    // the path receipt still controls PR hydration.
     expect(typecheck).toMatch(
-      /uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+if: >-\n\s+github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'/
+      /uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+if: >-\n\s+\(github\.event_name != 'merge_group' \|\| steps\.reuse\.outputs\.reuse != 'true'\) &&\n\s+\(github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'\)/
     );
     expect(typecheck).toContain(
       'CI_FAST_RUN_JOVIE_TYPECHECK: ${{ needs.ci-path-changes.outputs.run_jovie_typecheck }}'
     );
-    // The lane runner remains unconditional so the required job still emits a
-    // lane receipt; it consumes the same path receipt that controls hydration.
+    // Lane runner skips when same-tree reuse fires; otherwise it still emits a
+    // lane receipt from the path-gated typecheck group.
     expect(typecheck).toMatch(
-      /- name: Run ci-fast lanes\n\s+id: lanes\n(?!\s+if:)/
+      /- name: Run ci-fast lanes\n\s+id: lanes\n\s+if: >-\n\s+github\.event_name != 'merge_group' \|\| steps\.reuse\.outputs\.reuse != 'true'/
     );
+    expect(typecheck).toContain('Decide typecheck/lint reuse');
+    expect(typecheck).toContain('Record reused typecheck lanes');
     expect(typecheck).not.toContain('CI_FAST_PRESELECTED_SKIP');
     expect(typecheck).toMatch(
       /name: Validate CI\/release incident prevention contract[\s\S]*?run: node scripts\/ci-release-incident-contract\.mjs/
@@ -1609,7 +1613,7 @@ describe('ci-fast bounded parallel workflow', () => {
     // fallback (tsc re-verifies every input hash, so older state is safe).
     expect(restore).toContain('id: web-tsbuildinfo');
     expect(restore).toMatch(
-      /if: >-\n\s+github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'/
+      /if: >-\n\s+\(github\.event_name != 'merge_group' \|\| steps\.reuse\.outputs\.reuse != 'true'\) &&\n\s+\(github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'\)/
     );
     expect(restore).toContain(`uses: actions/cache/restore@${cacheSha}`);
     expect(restore).toContain('path: apps/web/.cache/tsbuildinfo*\n');

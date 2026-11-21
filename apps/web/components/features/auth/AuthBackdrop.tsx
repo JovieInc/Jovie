@@ -1,6 +1,6 @@
 import './AuthBackdrop.css';
 
-/** Pen odZZY page backdrop behind the stack auth column. Decorative only. */
+/** Pen odZZY page backdrop behind the stack auth column (oaz9c cert geometry). */
 export function AuthBackdrop() {
   return (
     <div

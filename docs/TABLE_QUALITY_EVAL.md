@@ -17,7 +17,7 @@ A table surface **PASSES** when every Hard Gate is green, every budget is met, a
 | --- | --- | --- |
 | Organisms | `UnifiedTable.tsx`, `UnifiedTableHeader.tsx`, `UnifiedTableSkeleton.tsx`, `VirtualizedTableBody.tsx`, `VirtualizedTableRow.tsx` | TanStack Table + TanStack Virtual wrapper; the ONE table organism |
 | Molecules | `TableHeaderCell`, `TableHeaderRow`, `GroupedTableBody`, `LoadingTableBody`, `SemanticTable`, `TableContextMenu`, `HeaderBulkActions`, `PageToolbar`, `TableBulkActionsToolbar`, `TableSearchBar`, `DisplayMenuDropdown`, `ActionBar`, `ExportCSVButton`, `SocialLinksCell` | composable table parts |
-| Atoms | `TableCell`, `TableBadge`, `TableEmptyState`, `TableCheckboxCell`, `TableIconButton`, `TableCountBadge`, `GroupHeader`, `SkeletonRow/Cell`, `ShellListRowFrame/Button`, `AvatarCell`, `DateCell`, `ActionsCell`, Audience* cells | primitives |
+| Atoms | `TableCell`, `TableBadge`, `TableEmptyState`, `TableCheckboxCell`, `TableCountBadge`, `GroupHeader`, `SkeletonRow/Cell`, `ShellListRowFrame/Button`, `AvatarCell`, `DateCell`, `ActionsCell`, Audience* cells; row icon actions use `@jovie/ui` `IconButton` | primitives |
 | Hooks | `useTableVirtualization`, `useTableKeyboardNav`, `useTableGrouping`, `useTableState`, `useRowSelection`, `useRowKeyboard`, `useAmbientListSelection`, `useStableSelectionRefs` | behavior |
 | Utils | `tableKeyMap` (single source of key bindings), `createMultiFieldFilterFn`, `createSelectionColumnFactory`, `useViewMode` | support |
 | Styles | `table.styles.ts` presets + `system-b-table-*` CSS in `styles/system-b-app.css` | tokens only |

@@ -278,6 +278,7 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       onForward={history.forward}
       onHome={history.home}
       onOpenTranscript={() => chat?.onOpenTranscript()}
+      surface='flat'
     >
       {generated?.answer.length
         ? generated.answer.map((card, index) => (

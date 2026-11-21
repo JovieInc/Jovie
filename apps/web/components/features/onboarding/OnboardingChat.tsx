@@ -59,7 +59,7 @@ import {
   type OnboardingEntryMode,
 } from './OnboardingChatEmptyIntro';
 import { OnboardingMessageRecoveryRow } from './OnboardingMessageRecoveryRow';
-import { OnboardingProfileRail } from './OnboardingProfileRailLazy';
+import { OnboardingProfilePeekStrip } from './OnboardingProfilePeekStrip';
 import { OnboardingSecurityCheckRecovery } from './OnboardingSecurityCheckRecovery';
 import {
   OnboardingArtistConfirmedCard,
@@ -176,6 +176,11 @@ interface OnboardingChatProps {
   readonly onProfileBuilderChange?: (
     state: OnboardingProfileBuilderState
   ) => void;
+  /**
+   * Shell-resolved preview state (entry handle fallback included) for the
+   * mobile peek strip. lg+ keeps the side rail; 390 must not push inputs.
+   */
+  readonly profilePeekState?: OnboardingProfileBuilderState | null;
   /** Validated URL-provided context for an automatic first message. */
   readonly starterHandoff?: StartEntryHandoff | null;
   /** The real page behind `?handle=`; drafts (never sends) the claim message. */
@@ -704,7 +709,7 @@ interface OnboardingMessageRegionProps {
   readonly onAttachAccount: (url: string) => void;
   readonly onNoneOfTheseArtists: () => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
-  readonly profileBuilderState: OnboardingProfileBuilderState;
+  readonly selectedArtistId: string | null;
   readonly shouldDockComposer: boolean;
   /** Starter handoff paints the thread slot at the top, where the first message lands. */
   readonly pinThreadToTop: boolean;
@@ -732,7 +737,7 @@ function OnboardingMessageRegion({
   onAttachAccount,
   onNoneOfTheseArtists,
   onSelectArtist,
-  profileBuilderState,
+  selectedArtistId,
   shouldDockComposer,
   pinThreadToTop,
   onSuggestionSelect,
@@ -750,9 +755,8 @@ function OnboardingMessageRegion({
           onAttachAccount={onAttachAccount}
           onNoneOfTheseArtists={onNoneOfTheseArtists}
           onSelectArtist={onSelectArtist}
-          selectedArtistId={profileBuilderState.artist?.id ?? null}
+          selectedArtistId={selectedArtistId}
         />
-        <OnboardingProfileRail placement='inline' state={profileBuilderState} />
       </div>
     );
   }
@@ -802,9 +806,8 @@ function OnboardingMessageRegion({
         onAttachAccount={onAttachAccount}
         onNoneOfTheseArtists={onNoneOfTheseArtists}
         onSelectArtist={onSelectArtist}
-        selectedArtistId={profileBuilderState.artist?.id ?? null}
+        selectedArtistId={selectedArtistId}
       />
-      <OnboardingProfileRail placement='inline' state={profileBuilderState} />
     </div>
   );
 
@@ -825,6 +828,7 @@ export function OnboardingChat({
   intentId,
   onConversationActivity,
   onProfileBuilderChange,
+  profilePeekState = null,
   onTurnstileRejected,
   onTurnstileRequired,
   starterHandoff,
@@ -1370,8 +1374,13 @@ export function OnboardingChat({
     onAddEntity: chipTray.addEntity,
   } as const;
   const sendLocalError = chatError;
+  const peekState = profilePeekState ?? profileBuilderState;
   const onboardingComposerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
+      <OnboardingProfilePeekStrip
+        state={peekState}
+        className='mb-2 lg:hidden'
+      />
       {isSecurityCheckRecovery || !flowStatus ? null : (
         <div ref={starterBannerWrapRef}>{flowStatus}</div>
       )}
@@ -1462,7 +1471,7 @@ export function OnboardingChat({
             onAttachAccount={handleAttachAccount}
             onNoneOfTheseArtists={handleNoneOfTheseArtists}
             onSelectArtist={handleArtistSelect}
-            profileBuilderState={profileBuilderState}
+            selectedArtistId={profileBuilderState.artist?.id ?? null}
             shouldDockComposer={shouldDockComposer}
             pinThreadToTop={hasInitialStarterPrompt}
             onSuggestionSelect={submitText}

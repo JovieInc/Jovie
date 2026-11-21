@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ACTION_HIT_PX,
+  ACTION_TOP_PX,
+  DIAL_ICON_OPTICAL_CLASS,
   OUTER_STEP_PX,
+  ROW_HIT_PX,
+  ROW_ORIGIN_TOP_PX,
   ROW_STEP_PX,
   rowIsTappable,
   rowLayout,
@@ -12,14 +17,18 @@ describe('rowLayout', () => {
     expect(rowLayout(0)).toEqual({ y: 0, scale: 1, opacity: 0 });
   });
   it('places adjacent rows one step away at the resting opacity', () => {
-    expect(rowLayout(1)).toEqual({ y: ROW_STEP_PX, scale: 1, opacity: 0.8 });
-    expect(rowLayout(-1)).toEqual({ y: -ROW_STEP_PX, scale: 1, opacity: 0.8 });
+    expect(rowLayout(1)).toEqual({ y: ROW_STEP_PX, scale: 1, opacity: 0.78 });
+    expect(rowLayout(-1)).toEqual({
+      y: -ROW_STEP_PX,
+      scale: 1,
+      opacity: 0.78,
+    });
   });
   it('compresses and dims the outer rows', () => {
     const outer = rowLayout(2);
     expect(outer.y).toBe(ROW_STEP_PX + OUTER_STEP_PX);
-    expect(outer.opacity).toBeCloseTo(0.5, 12);
-    expect(outer.scale).toBeCloseTo(0.86, 12);
+    expect(outer.opacity).toBeCloseTo(0.48, 12);
+    expect(outer.scale).toBeCloseTo(0.88, 12);
     expect(rowLayout(-2).y).toBe(-outer.y);
   });
   it('fades rows out by the third step and stops moving them', () => {
@@ -40,20 +49,29 @@ describe('rowLayout', () => {
   it('interpolates between the center and the first step', () => {
     const half = rowLayout(0.5);
     expect(half.y).toBe(ROW_STEP_PX / 2);
-    expect(half.opacity).toBeCloseTo(0.4, 12);
-    expect(rowLayout(1.5).opacity).toBeCloseTo(0.65, 12);
-    expect(rowLayout(2.5).opacity).toBeCloseTo(0.25, 12);
+    expect(half.opacity).toBeCloseTo(0.39, 12);
+    expect(rowLayout(1.5).opacity).toBeCloseTo(0.63, 12);
+    expect(rowLayout(2.5).opacity).toBeCloseTo(0.24, 12);
+  });
+  it('aligns reel midlines to Stream Now with on-scale hits', () => {
+    expect(ROW_HIT_PX).toBe(48);
+    expect(DIAL_ICON_OPTICAL_CLASS).toBe('translate-y-px');
+    const mid = ROW_ORIGIN_TOP_PX + ROW_HIT_PX / 2;
+    expect(mid).toBe(ACTION_TOP_PX + ACTION_HIT_PX / 2);
+    expect(ACTION_TOP_PX - (mid - ROW_STEP_PX + ROW_HIT_PX / 2)).toBe(
+      mid + ROW_STEP_PX - ROW_HIT_PX / 2 - (ACTION_TOP_PX + ACTION_HIT_PX)
+    );
   });
 });
 
 describe('rowIsTappable', () => {
   it('excludes the docked row and the compressed outer rows', () => {
     expect(rowIsTappable(0)).toBe(false);
-    expect(rowIsTappable(0.59)).toBe(false);
-    expect(rowIsTappable(0.6)).toBe(true);
+    expect(rowIsTappable(0.49)).toBe(false);
+    expect(rowIsTappable(0.5)).toBe(true);
     expect(rowIsTappable(-1)).toBe(true);
-    expect(rowIsTappable(1.5)).toBe(true);
-    expect(rowIsTappable(1.51)).toBe(false);
+    expect(rowIsTappable(1.6)).toBe(true);
+    expect(rowIsTappable(1.61)).toBe(false);
     expect(rowIsTappable(-2)).toBe(false);
   });
 });

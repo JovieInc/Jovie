@@ -1,17 +1,28 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { fn } from 'storybook/test';
-import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
+import { DspServiceIcon } from '@/components/atoms/DspLogo';
 import { ActionDial, type ActionDialOption } from './ActionDial';
 
 const services: ActionDialOption[] = [
-  { id: 'spotify', label: 'Spotify', href: 'https://open.spotify.com' },
+  {
+    id: 'spotify',
+    label: 'Spotify',
+    href: 'https://open.spotify.com',
+    icon: <DspServiceIcon provider='spotify' />,
+  },
   {
     id: 'apple_music',
     label: 'Apple Music',
     href: 'https://music.apple.com',
+    icon: <DspServiceIcon provider='apple_music' />,
   },
-  { id: 'deezer', label: 'Deezer', href: 'https://www.deezer.com' },
+  {
+    id: 'deezer',
+    label: 'Deezer',
+    href: 'https://www.deezer.com',
+    icon: <DspServiceIcon provider='deezer' />,
+  },
 ];
 
 function InteractiveDial(args: React.ComponentProps<typeof ActionDial>) {
@@ -68,23 +79,6 @@ export const EmptyNoServices: Story = {
   args: { options: [], selectedId: '' },
 };
 
-function DspGlyph({
-  provider,
-}: {
-  readonly provider: keyof typeof DSP_LOGO_CONFIG;
-}) {
-  return (
-    <svg
-      viewBox='0 0 24 24'
-      fill='currentColor'
-      className='h-5 w-5 shrink-0'
-      aria-hidden='true'
-    >
-      <path d={DSP_LOGO_CONFIG[provider]?.iconPath} />
-    </svg>
-  );
-}
-
 /** Some providers have no logo in the registry, so their rows show the name alone. */
 export const PartialMissingIcons: Story = {
   args: {
@@ -93,14 +87,14 @@ export const PartialMissingIcons: Story = {
         id: 'spotify',
         label: 'Spotify',
         href: 'https://open.spotify.com',
-        icon: <DspGlyph provider='spotify' />,
+        icon: <DspServiceIcon provider='spotify' />,
       },
       { id: 'kkbox', label: 'KKBOX', href: 'https://www.kkbox.com' },
       {
         id: 'tidal',
         label: 'TIDAL',
         href: 'https://tidal.com',
-        icon: <DspGlyph provider='tidal' />,
+        icon: <DspServiceIcon provider='tidal' />,
       },
       { id: 'jiosaavn', label: 'JioSaavn', href: 'https://www.jiosaavn.com' },
     ],
@@ -141,25 +135,25 @@ const arabicServices: ActionDialOption[] = [
     id: 'anghami',
     label: 'أنغامي',
     href: 'https://www.anghami.com',
-    icon: <DspGlyph provider='anghami' />,
+    icon: <DspServiceIcon provider='anghami' />,
   },
   {
     id: 'spotify',
     label: 'سبوتيفاي',
     href: 'https://open.spotify.com',
-    icon: <DspGlyph provider='spotify' />,
+    icon: <DspServiceIcon provider='spotify' />,
   },
   {
     id: 'apple_music',
     label: 'آبل ميوزك',
     href: 'https://music.apple.com',
-    icon: <DspGlyph provider='apple_music' />,
+    icon: <DspServiceIcon provider='apple_music' />,
   },
   {
     id: 'deezer',
     label: 'ديزر',
     href: 'https://www.deezer.com',
-    icon: <DspGlyph provider='deezer' />,
+    icon: <DspServiceIcon provider='deezer' />,
   },
 ];
 
