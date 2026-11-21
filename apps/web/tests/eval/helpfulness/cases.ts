@@ -6,15 +6,13 @@
  * New cases from real conversations must be anonymized: rewrite the ask in
  * your own words, map the artist onto a fixture, never paste user text.
  *
- * ASS-12 quota-fill cases live in cohesive modules under 500 lines (company
- * size budget). This file keeps the core + ASS-7 seed bank and composes them.
+ * ASS-12 quota fills live in cases-quota-a/b.ts (compact, company size-500).
+ * This file keeps the core + ASS-7 seed bank and composes them.
  */
 
 import type { HelpfulnessCase } from './case-types';
-import { QUOTA_FAN_LINK_AD_PLAYLIST_CASES } from './cases-quota-fan-link-ad-playlist';
-import { QUOTA_OPS_CASES } from './cases-quota-ops';
-import { QUOTA_RELEASE_POST_CASES } from './cases-quota-release-post';
-import { QUOTA_SAFETY_LANES_CASES } from './cases-quota-safety-lanes';
+import { QUOTA_CASES_A } from './cases-quota-a';
+import { QUOTA_CASES_B } from './cases-quota-b';
 
 export type { HelpfulnessCase } from './case-types';
 export { DEFAULT_MAX_WORDS } from './case-types';
@@ -445,8 +443,6 @@ export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = ([] = [
       'Picks one: a short nudge draft held for yes, or drop and move on - with a reason tied to Night Swim timing. Never sends the nudge unasked; does not invent that River Lantern replied.',
   },
 
-  ...QUOTA_RELEASE_POST_CASES,
-  ...QUOTA_FAN_LINK_AD_PLAYLIST_CASES,
-  ...QUOTA_OPS_CASES,
-  ...QUOTA_SAFETY_LANES_CASES,
+  ...QUOTA_CASES_A,
+  ...QUOTA_CASES_B,
 ]);
