@@ -6,6 +6,7 @@
  *   node scripts/ds-cert-loop.mjs verify --order dir/dsc-01.json
  *   node scripts/ds-cert-loop.mjs verify --component a.tsx --component b.tsx
  *   node scripts/ds-cert-loop.mjs gate --shard my-branch [--order f]
+ * Add --root <checkout> to run against another checkout.
  * `verify` exits 1 and lists what is left until the order is done.
  */
 import { execFileSync } from 'node:child_process';
@@ -42,10 +43,12 @@ const { values, positionals } = parseArgs({
     },
     json: { type: 'boolean', default: false },
     shard: { type: 'string' },
+    root: { type: 'string' },
   },
 });
 const command = positionals[0];
-const root = REPO_ROOT;
+// --root runs this copy of the loop against another checkout.
+const root = values.root ? resolve(values.root) : REPO_ROOT;
 
 function certify(components) {
   const out = join(mkdtempSync(join(tmpdir(), 'ds-cert-loop-')), 'report.json');
