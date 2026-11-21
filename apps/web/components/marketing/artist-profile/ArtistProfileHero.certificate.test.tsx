@@ -49,7 +49,9 @@ describe('ArtistProfileHero states', () => {
     const user = userEvent.setup();
     const intent = getClaimProfileIntent();
     const { hero } = ARTIST_PROFILE_COPY;
-    const { container } = render(<ArtistProfileHero hero={hero} />);
+    const { container } = render(
+      <ArtistProfileHero hero={hero} adaptive={ARTIST_PROFILE_COPY.adaptive} />
+    );
     const claim = screen.getByRole('link', { name: hero.ctaLabel });
     const adapt = screen.getByRole('link', { name: hero.secondaryCtaLabel });
     expect(claim).toHaveAttribute('href', intent.href);
