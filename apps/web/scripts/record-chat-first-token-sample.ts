@@ -1,5 +1,5 @@
 #!/usr/bin/env tsx
-/** Record or soft-skip Assistants `/app/chat` TTFT sample (ASS-28). */
+/** ASS-28 TTFT record/soft-skip CLI. */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,7 +11,7 @@ import {
   serializeChatFirstTokenSample,
 } from '../lib/eval/chat-first-token-sample';
 
-function parseArgs(argv: readonly string[]): {
+export function parseArgs(argv: readonly string[]): {
   outPath: string;
   mode: 'relay' | 'injected' | 'live';
 } {
@@ -22,7 +22,7 @@ function parseArgs(argv: readonly string[]): {
   let mode: 'relay' | 'injected' | 'live' = 'relay';
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--') continue;
+    if (arg === '--' || arg === undefined) continue;
     if (arg === '--out') {
       const next = argv[i + 1];
       if (typeof next === 'string' && next.length > 0) {
@@ -46,10 +46,12 @@ function parseArgs(argv: readonly string[]): {
   return { outPath, mode };
 }
 
-function parseInjectedSamples(): number[] | null {
-  const raw = process.env.ASSISTANTS_CHAT_TTFT_SAMPLES_MS?.trim();
-  if (!raw) return null;
-  const parts = raw.split(',').map(part => Number(part.trim()));
+export function parseInjectedSamples(
+  raw = process.env.ASSISTANTS_CHAT_TTFT_SAMPLES_MS
+): number[] | null {
+  const text = raw?.trim();
+  if (!text) return null;
+  const parts = text.split(',').map(part => Number(part.trim()));
   if (parts.length === 0 || parts.some(n => !Number.isFinite(n) || n < 0)) {
     throw new Error(
       'ASSISTANTS_CHAT_TTFT_SAMPLES_MS must be non-negative numbers'
@@ -58,12 +60,14 @@ function parseInjectedSamples(): number[] | null {
   return parts;
 }
 
-function main(): number {
-  const { outPath, mode } = parseArgs(process.argv.slice(2));
-  const token = process.env.WORKERS_AI_TOKEN?.trim() ?? '';
-  const injected = parseInjectedSamples();
+export function main(
+  argv: readonly string[] = process.argv.slice(2),
+  env: NodeJS.ProcessEnv = process.env
+): number {
+  const { outPath, mode } = parseArgs(argv);
+  const token = env.WORKERS_AI_TOKEN?.trim() ?? '';
+  const injected = parseInjectedSamples(env.ASSISTANTS_CHAT_TTFT_SAMPLES_MS);
   let sample: ChatFirstTokenSample;
-
   if (injected) {
     sample = buildRecordedChatFirstTokenSample({
       samplesMs: injected,
@@ -81,13 +85,11 @@ function main(): number {
     );
     process.stdout.write('::notice::TTFT probe not ready; soft-skipped.\n');
   }
-
   mkdirSync(path.dirname(outPath), { recursive: true });
   writeFileSync(outPath, serializeChatFirstTokenSample(sample), 'utf8');
   process.stdout.write(
     `chat-first-token sample written: ${outPath} (status=${sample.status})\n`
   );
-
   if (sample.status === 'recorded') {
     const gate = evaluateChatFirstTokenSample(sample, true);
     if (!gate.ok) {
@@ -100,4 +102,6 @@ function main(): number {
   return 0;
 }
 
-process.exitCode = main();
+if (process.argv[1]?.endsWith('record-chat-first-token-sample.ts')) {
+  process.exitCode = main();
+}

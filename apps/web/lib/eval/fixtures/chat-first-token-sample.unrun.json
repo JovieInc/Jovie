@@ -9,6 +9,5 @@
   "targetMs": 1000,
   "recordedAt": null,
   "samplesMs": [],
-  "p50Ms": null,
-  "notes": "Unrun ASS-28 soft-skip."
+  "p50Ms": null
 }

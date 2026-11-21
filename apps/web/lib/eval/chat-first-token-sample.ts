@@ -1,4 +1,4 @@
-/** Assistants /app/chat TTFT sample helpers (ASS-28). CLI owns I/O. */
+/** ASS-28 /app/chat TTFT sample helpers. */
 import {
   ASSISTANTS_FIRST_TOKEN_METRIC,
   ASSISTANTS_FIRST_TOKEN_TARGET_MS,
@@ -42,7 +42,7 @@ export function firstTokenP50Ms(samplesMs: readonly number[]): number | null {
   return s[Math.max(0, Math.ceil(s.length * 0.5) - 1)] ?? null;
 }
 
-function baseFields(
+function base(
   status: ChatFirstTokenSampleStatus,
   mode: ChatFirstTokenSampleMode
 ) {
@@ -93,9 +93,8 @@ export function parseChatFirstTokenSample(
   if (value.status === 'unrun') {
     if (samplesMs.length) throw new Error('unrun samplesMs must be empty');
     if (value.p50Ms !== null) throw new Error('unrun p50Ms must be null');
-    if (value.recordedAt !== null) {
+    if (value.recordedAt !== null)
       throw new Error('unrun recordedAt must be null');
-    }
   } else {
     if (!samplesMs.length) throw new Error('recorded needs samples');
     if (value.p50Ms !== p50) {
@@ -112,7 +111,7 @@ export function parseChatFirstTokenSample(
     notes = value.notes;
   }
   return {
-    ...baseFields(value.status, value.mode as ChatFirstTokenSampleMode),
+    ...base(value.status, value.mode as ChatFirstTokenSampleMode),
     recordedAt: value.recordedAt as string | null,
     samplesMs,
     p50Ms: value.status === 'recorded' ? p50 : null,
@@ -144,7 +143,7 @@ export function buildUnrunChatFirstTokenSample(
   notes?: string
 ): ChatFirstTokenSample {
   return {
-    ...baseFields('unrun', 'relay'),
+    ...base('unrun', 'relay'),
     recordedAt: null,
     samplesMs: [],
     p50Ms: null,
@@ -165,7 +164,7 @@ export function buildRecordedChatFirstTokenSample(input: {
   const p50Ms = firstTokenP50Ms(samplesMs);
   if (p50Ms === null) throw new Error('p50Ms compute failed');
   return {
-    ...baseFields('recorded', input.mode ?? 'injected'),
+    ...base('recorded', input.mode ?? 'injected'),
     recordedAt: input.recordedAt ?? new Date().toISOString(),
     samplesMs,
     p50Ms,

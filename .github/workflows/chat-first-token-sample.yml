@@ -1,7 +1,7 @@
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# capability-gap: /app/chat TTFT needs WORKERS_AI_TOKEN (GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN); soft-skips when missing. Inject ASSISTANTS_CHAT_TTFT_SAMPLES_MS to record offline.
-# removal-trigger: Remove when a scheduled Assistants lane records live TTFT for the test account.
+# capability-gap: soft-skips without WORKERS_AI_TOKEN; inject ASSISTANTS_CHAT_TTFT_SAMPLES_MS.
+# removal-trigger: Remove when Assistants lane records live TTFT for test account.
 name: Chat first-token sample
 on:
   workflow_dispatch:
