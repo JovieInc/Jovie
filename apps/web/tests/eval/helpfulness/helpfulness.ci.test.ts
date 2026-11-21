@@ -1,9 +1,4 @@
-/**
- * Deterministic CI lane for the Jovie helpfulness eval. No model, DB or
- * network calls: it proves the case set, hard checks and judge parsing
- * stay sound, and that a deliberately dumb reply fails while a grounded one
- * passes.
- */
+/** Deterministic helpfulness CI: case set, hard checks, judge parsing. No model/DB/network. */
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
@@ -140,5 +135,13 @@ describe('judge contract', () => {
     const result = scoreCase('x', [{ id: 'copy_floor', ok: false }], verdict);
     expect(result.score).toBe(40);
     expect(result.passed).toBe(false);
+  });
+});
+
+describe('ASS-36 empty-profile setup grounding', () => {
+  it('requires a today setup step', () => {
+    const c = HELPFULNESS_CASES.find(x => x.id === 'new-where-start')!;
+    expect(runHardChecks(c, { text: 'Finish a song first then launch.', toolCalls: [] }).find(x => x.id === 'grounding_0')?.ok).toBe(false);
+    expect(runHardChecks(c, { text: 'Add a bio on jov.ie/maraquill today.', toolCalls: [] }).find(x => x.id === 'grounding_0')?.ok).toBe(true);
   });
 });
