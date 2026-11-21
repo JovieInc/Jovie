@@ -27,10 +27,10 @@ function brandHexFor(icon: string): string {
   return `#${meta?.hex || NEUTRAL_BRAND_FALLBACK_HEX}`;
 }
 
+type PlatformOption = (typeof PLATFORM_OPTIONS)[number];
+
 interface PlatformSelectorProps {
-  readonly onPlatformSelect: (
-    platform: (typeof PLATFORM_OPTIONS)[number]
-  ) => void;
+  readonly onPlatformSelect: (option: PlatformOption) => void;
   readonly onArtistSearchSelect: (provider: ArtistSearchProvider) => void;
   readonly onRestoreFocus: (cursor?: CursorPosition) => void;
   readonly disabled?: boolean;

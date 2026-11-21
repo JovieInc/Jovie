@@ -8,6 +8,7 @@ import {
 } from '@jovie/ui';
 import { X } from 'lucide-react';
 import Image from 'next/image';
+import { useEffect, useRef } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
@@ -79,6 +80,17 @@ export function UniversalLinkInputArtistSearchModeView({
   setActiveResultIndex,
   setShowResults,
 }: Readonly<UniversalLinkInputArtistSearchModeViewProps>) {
+  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+    },
+    []
+  );
+  const hideResultsAfterBlur = () => {
+    if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+    blurTimerRef.current = setTimeout(() => setShowResults(false), 150);
+  };
   return (
     <div className='relative w-full'>
       <div
@@ -115,7 +127,7 @@ export function UniversalLinkInputArtistSearchModeView({
           onChange={handleSearchInputChange}
           onKeyDown={handleSearchKeyDown}
           onFocus={() => searchQuery.length >= 2 && setShowResults(true)}
-          onBlur={() => setTimeout(() => setShowResults(false), 150)}
+          onBlur={hideResultsAfterBlur}
           disabled={disabled}
           autoCapitalize='none'
           autoCorrect='off'
