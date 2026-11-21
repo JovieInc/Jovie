@@ -37,7 +37,6 @@ import {
   selectStructuralShard,
 } from './lib/ci-structural-shards.mjs';
 import { shouldOverlapTypecheckLanes } from './lib/ci-typecheck-overlap.mjs';
-
 export {
   LANES_COVERAGE_FLOORS,
   LANES_COVERAGE_GROUP_SHARDS,
@@ -48,9 +47,6 @@ export {
   lanesReceiptRanSuite,
   selectStructuralShard,
 } from './lib/ci-structural-shards.mjs';
-// Re-export kept for scripts that import overlap policy from this module.
-export { shouldOverlapTypecheckLanes };
-
 import {
   escapeAnnotationMessage,
   escapeAnnotationProperty,
@@ -3381,7 +3377,6 @@ async function main() {
       selectedLanes = selectedLanes.filter(lane => lane.id === 'structural');
     }
 
-    // Overlap tsc lanes only when shouldOverlapTypecheckLanes() says so (#26276).
     const started = new Map();
     if (shouldOverlapTypecheckLanes()) {
       for (const lane of selectedLanes.filter(l =>
@@ -3392,12 +3387,10 @@ async function main() {
         started.set(lane.id, [Date.now(), run]);
       }
     }
-
     let failedFast = false;
     for (const lane of selectedLanes) {
       console.log(`\n======== lane: ${lane.id} ========`);
       const [laneStartedAt, run] = started.get(lane.id) ?? [Date.now()];
-
       if (failedFast && FAIL_FAST_SKIPPABLE_LANES.has(lane.id)) {
         const logExcerpt = 'skipped: earlier lane failed (fail-fast)';
         const durationMs = Math.max(0, Date.now() - laneStartedAt);
