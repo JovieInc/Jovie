@@ -112,10 +112,7 @@ describe('Icon', () => {
     render(
       <Icon name='Bell' size={16} strokeWidth={2} data-testid='override' />
     );
-    expect(screen.getByTestId('override')).toHaveAttribute(
-      'stroke-width',
-      '2'
-    );
+    expect(screen.getByTestId('override')).toHaveAttribute('stroke-width', '2');
   });
 
   it('honors raw aria-label when ariaLabel is omitted', () => {

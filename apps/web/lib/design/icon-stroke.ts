@@ -47,8 +47,7 @@ const TAILWIND_SPACING_OVERRIDES: Readonly<Record<string, number>> = {
   '3.5': 14,
 };
 
-const CLASS_SIZE_RE =
-  /(?:^|\s)(?:!)?(?:size|h|w)-(\d+(?:\.\d+)?)(?=\s|$)/g;
+const CLASS_SIZE_RE = /(?:^|\s)(?:!)?(?:size|h|w)-(\d+(?:\.\d+)?)(?=\s|$)/g;
 
 const CLASS_ARBITRARY_SIZE_RE =
   /(?:^|\s)(?:!)?(?:size|h|w)-\[(\d+(?:\.\d+)?)(px|rem)\](?=\s|$)/g;
