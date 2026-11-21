@@ -36,10 +36,12 @@ digests or missing guard anchors.
 | Cannot-recur dispositions / unlinked fingerprints | 0 / 0 |
 | `ok` / findings | `true` / `[]` |
 
+Counts are total guard links from `auditFeedbackLinkage()` (`testLinks` / `ruleLinks`), not unique `path#anchor` identities (the Self-Improvement Loop rule is linked from two fingerprints).
+
 The existing `jovie.feedback-linkage-qualification/v1` receipt includes every
 fingerprint, reviewed lesson digest, guard path, exact anchor, rationale and
 guard-source digest. SHA-256 of `JSON.stringify(receipt.lessons)` for this review:
-`c4ebb63f38637bb3e86cccb91b60359ebc414fcedc6afcbb8c4df2910d502ff5`.
+`4dde29f2c026136f52246d41eec3f1b578e36cc8a70221ff555e96e26938aae7`.
 
 Prior audit (2026-10-21 / JOV-7355) recorded 39 / 39 linked with 18 policy-only.
 This pass keeps that receipt historical and refreshes counts after the RSI
