@@ -297,7 +297,8 @@ describe('Ion-token feedback on availability surfaces', () => {
       });
       // Success color lives on the glyph (IconButton no-restyle: no color on the control).
       // SVGElement.className is SVGAnimatedString — read the attribute.
-      const glyphClass = copied.querySelector('svg')?.getAttribute('class') ?? '';
+      const glyphClass =
+        copied.querySelector('svg')?.getAttribute('class') ?? '';
       expect(glyphClass).toContain('text-success');
       expect(glyphClass).not.toMatch(/emerald|amber/);
     });
