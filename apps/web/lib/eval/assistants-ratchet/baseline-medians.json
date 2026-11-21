@@ -1,5 +1,5 @@
 {
-  "_comment": "Assistants CI ratchet. Medians unrun \u2014 do not lock proxy 3.62 or Summer 91.8%. Record after Workers AI live CI-subset; never lower.",
+  "_comment": "Unrun 1-5 medians; no proxy floors. Record after Workers AI live CI-subset.",
   "schemaVersion": 1,
   "rubricVersion": "assistants-v1",
   "scale": {
@@ -8,7 +8,6 @@
     "targetMedian": 4.5
   },
   "updatedAt": null,
-  "sourceReport": "docs/baseline-scores.md",
   "assistants": {
     "jovie": {
       "status": "unrun",
@@ -17,7 +16,7 @@
       "safetyPassRate": null,
       "inventedFacts": null,
       "oneRecommendationRate": null,
-      "notes": "Live 1\u20135 median unrun; do not record offline proxies."
+      "notes": "unrun"
     },
     "summer": {
       "status": "unrun",
@@ -26,7 +25,7 @@
       "safetyPassRate": null,
       "inventedFacts": null,
       "oneRecommendationRate": null,
-      "notes": "Live 1\u20135 median unrun; do not record offline proxies."
+      "notes": "unrun"
     }
   },
   "jank": {
@@ -43,6 +42,6 @@
       "answer_hash",
       "rubric_version"
     ],
-    "notes": "On $5/day ceiling, use last good cache; never soft-pass safety/invented-facts."
+    "notes": "cache on ceiling; never soft-pass"
   }
 }

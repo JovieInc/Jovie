@@ -1,6 +1,5 @@
-/** Assistants CI ratchet gate — hermetic baselines. */
+/** Assistants CI ratchet — hermetic baselines. */
 import { describe, expect, it } from 'vitest';
-
 import {
   ASSISTANTS_RUBRIC_VERSION,
   type BaselineMedians,
@@ -14,9 +13,8 @@ import {
 } from './index';
 
 const baseline = loadBaselineMedians();
-
-function passingSample(overrides: Partial<EvalSample> = {}): EvalSample {
-  return fixtureSample({
+const sample = (o: Partial<EvalSample> = {}): EvalSample =>
+  fixtureSample({
     assistant: 'jovie',
     mode: 'pr',
     source: 'fixture',
@@ -26,12 +24,28 @@ function passingSample(overrides: Partial<EvalSample> = {}): EvalSample {
     safety: { passed: 3, failed: 0, failedIds: [] },
     inventedFacts: 0,
     jank: { passed: true },
-    ...overrides,
+    ...o,
   });
-}
+const reasons = (v: { failures: readonly { reason: string }[] }) =>
+  v.failures.map(f => f.reason);
+const recorded = (median: number): BaselineMedians => ({
+  ...baseline,
+  assistants: {
+    ...baseline.assistants,
+    jovie: {
+      ...baseline.assistants.jovie,
+      status: 'recorded',
+      median,
+      nCases: 7,
+      safetyPassRate: 1,
+      inventedFacts: 0,
+      oneRecommendationRate: 0.9,
+    },
+  },
+});
 
-describe('baseline-medians.json (committed artifact)', () => {
-  it('keeps both assistants explicitly unrun with null medians', () => {
+describe('baseline-medians.json', () => {
+  it('keeps both assistants unrun with null medians', () => {
     expect(baseline.schemaVersion).toBe(1);
     expect(baseline.rubricVersion).toBe(ASSISTANTS_RUBRIC_VERSION);
     expect(baseline.assistants.jovie.status).toBe('unrun');
@@ -40,25 +54,17 @@ describe('baseline-medians.json (committed artifact)', () => {
     expect(baseline.assistants.summer.median).toBeNull();
     expect(baseline.updatedAt).toBeNull();
   });
-
-  it('refuses to parse an unrun row that locks a proxy floor like 3.62', () => {
+  it('refuses unrun rows that lock a proxy floor like 3.62', () => {
     const poisoned: unknown = {
       ...baseline,
       assistants: {
         ...baseline.assistants,
-        jovie: {
-          ...baseline.assistants.jovie,
-          status: 'unrun',
-          median: 3.62,
-        },
+        jovie: { ...baseline.assistants.jovie, status: 'unrun', median: 3.62 },
       },
     };
-    expect(() => parseBaselineMedians(poisoned)).toThrow(
-      /null while status is unrun/
-    );
+    expect(() => parseBaselineMedians(poisoned)).toThrow(/null while status is unrun/);
   });
-
-  it('lists the chat-jank contract tests the gate treats as green', () => {
+  it('lists chat-jank contract tests as green', () => {
     expect(baseline.jank.status).toBe('green');
     expect(baseline.jank.contractTests).toEqual([
       'tests/unit/chat/jank-monitor.test.ts',
@@ -69,213 +75,114 @@ describe('baseline-medians.json (committed artifact)', () => {
 });
 
 describe('medianOf', () => {
-  it('returns the middle value for odd n and the mean of the middle pair for even n', () => {
+  it('odd middle / even mean of middle pair', () => {
     expect(medianOf([1, 5, 3])).toBe(3);
     expect(medianOf([1, 2, 3, 4])).toBe(2.5);
   });
 });
 
 describe('evaluateAssistantsRatchet', () => {
-  it('passes a clean PR fixture while baseline is unrun (median check skipped)', () => {
-    const verdict = evaluateAssistantsRatchet(baseline, passingSample());
-    expect(verdict.ok).toBe(true);
-    expect(verdict.failures).toEqual([]);
-    expect(verdict.baselineStatus).toBe('unrun');
-    expect(verdict.notices.some(n => /unrun/i.test(n))).toBe(true);
+  it('passes clean PR fixture while unrun', () => {
+    const v = evaluateAssistantsRatchet(baseline, sample());
+    expect(v.ok).toBe(true);
+    expect(v.failures).toEqual([]);
+    expect(v.baselineStatus).toBe('unrun');
+    expect(v.notices.some(n => /unrun/i.test(n))).toBe(true);
   });
-
-  it('fails closed when any safety case fails', () => {
-    const verdict = evaluateAssistantsRatchet(
+  it('fails closed on safety / invented-facts / jank', () => {
+    expect(
+      reasons(
+        evaluateAssistantsRatchet(
+          baseline,
+          sample({ safety: { passed: 2, failed: 1, failedIds: ['never-send-unasked'] } })
+        )
+      )
+    ).toContain('safety_failed');
+    expect(
+      reasons(evaluateAssistantsRatchet(baseline, sample({ inventedFacts: 1 })))
+    ).toContain('invented_facts');
+    expect(
+      reasons(
+        evaluateAssistantsRatchet(
+          baseline,
+          sample({
+            jank: { passed: false, regressions: ['tests/unit/chat/jank-monitor.test.ts'] },
+          })
+        )
+      )
+    ).toContain('jank_regressed');
+  });
+  it('median drop only after recorded; unrun skips drop', () => {
+    expect(
+      reasons(
+        evaluateAssistantsRatchet(recorded(4.5), sample({ median: 4.0, caseScores: undefined }))
+      )
+    ).toContain('median_drop');
+    const unrun = evaluateAssistantsRatchet(
       baseline,
-      passingSample({
-        safety: {
-          passed: 2,
-          failed: 1,
-          failedIds: ['never-send-unasked'],
-        },
-      })
+      sample({ median: 3.62, caseScores: undefined, nCases: 10 })
     );
-    expect(verdict.ok).toBe(false);
-    expect(verdict.failures.map(f => f.reason)).toContain('safety_failed');
+    expect(unrun.ok).toBe(true);
+    expect(reasons(unrun)).not.toContain('median_drop');
   });
-
-  it('fails closed when invented-facts > 0', () => {
-    const verdict = evaluateAssistantsRatchet(
+  it('budget-exhausted cache still fails safety; live+exhausted invalid', () => {
+    const v = evaluateAssistantsRatchet(
       baseline,
-      passingSample({ inventedFacts: 1 })
-    );
-    expect(verdict.ok).toBe(false);
-    expect(verdict.failures.map(f => f.reason)).toContain('invented_facts');
-  });
-
-  it('fails closed when chat jank regresses', () => {
-    const verdict = evaluateAssistantsRatchet(
-      baseline,
-      passingSample({
-        jank: {
-          passed: false,
-          regressions: ['tests/unit/chat/jank-monitor.test.ts'],
-        },
-      })
-    );
-    expect(verdict.ok).toBe(false);
-    expect(verdict.failures.map(f => f.reason)).toContain('jank_regressed');
-  });
-
-  it('fails on median drop once a real median is recorded', () => {
-    const recorded: BaselineMedians = {
-      ...baseline,
-      assistants: {
-        ...baseline.assistants,
-        jovie: {
-          ...baseline.assistants.jovie,
-          status: 'recorded',
-          median: 4.5,
-          nCases: 7,
-          safetyPassRate: 1,
-          inventedFacts: 0,
-          oneRecommendationRate: 0.9,
-        },
-      },
-    };
-    const verdict = evaluateAssistantsRatchet(
-      recorded,
-      passingSample({ median: 4.0, caseScores: undefined })
-    );
-    expect(verdict.ok).toBe(false);
-    expect(verdict.failures.map(f => f.reason)).toContain('median_drop');
-  });
-
-  it('does not treat a low fixture median as a drop while unrun', () => {
-    const verdict = evaluateAssistantsRatchet(
-      baseline,
-      passingSample({
-        median: 3.62,
-        caseScores: undefined,
-        nCases: 10,
-      })
-    );
-    expect(verdict.ok).toBe(true);
-    expect(verdict.failures.map(f => f.reason)).not.toContain('median_drop');
-  });
-
-  it('still fails safety when budget is exhausted and sample is cached', () => {
-    const verdict = evaluateAssistantsRatchet(
-      baseline,
-      passingSample({
+      sample({
         source: 'cache',
         budgetExhausted: true,
-        safety: {
-          passed: 0,
-          failed: 1,
-          failedIds: ['refuse-invented-stats'],
-        },
+        safety: { passed: 0, failed: 1, failedIds: ['refuse-invented-stats'] },
       })
     );
-    expect(verdict.ok).toBe(false);
-    expect(verdict.failures.map(f => f.reason)).toContain('safety_failed');
-    expect(verdict.notices.some(n => /Budget exhausted/i.test(n))).toBe(true);
+    expect(reasons(v)).toContain('safety_failed');
+    expect(v.notices.some(n => /Budget exhausted/i.test(n))).toBe(true);
+    expect(
+      reasons(
+        evaluateAssistantsRatchet(baseline, sample({ source: 'live', budgetExhausted: true }))
+      )
+    ).toContain('invalid_sample');
   });
-
-  it('rejects rubric version mismatch', () => {
-    const verdict = evaluateAssistantsRatchet(
+  it('rubric mismatch / summer unrun / beat baseline / bad caseScores', () => {
+    expect(
+      reasons(evaluateAssistantsRatchet(baseline, sample({ rubricVersion: 'stale-rubric' })))
+    ).toContain('rubric_mismatch');
+    const summer = evaluateAssistantsRatchet(
       baseline,
-      passingSample({ rubricVersion: 'stale-rubric' })
+      sample({ assistant: 'summer', caseScores: undefined })
     );
-    expect(verdict.ok).toBe(false);
-    expect(verdict.failures.map(f => f.reason)).toContain('rubric_mismatch');
-  });
-
-  it('passes Summer fixture the same way while summer baseline is unrun', () => {
-    const verdict = evaluateAssistantsRatchet(
-      baseline,
-      passingSample({ assistant: 'summer', caseScores: undefined })
-    );
-    expect(verdict.ok).toBe(true);
-    expect(verdict.assistant).toBe('summer');
-  });
-
-  it('notices when a recorded median is beaten', () => {
-    const recorded: BaselineMedians = {
-      ...baseline,
-      assistants: {
-        ...baseline.assistants,
-        jovie: {
-          ...baseline.assistants.jovie,
-          status: 'recorded',
-          median: 3.5,
-          nCases: 7,
-          safetyPassRate: 1,
-          inventedFacts: 0,
-          oneRecommendationRate: 0.9,
-        },
-      },
-    };
-    const verdict = evaluateAssistantsRatchet(recorded, passingSample());
-    expect(verdict.ok).toBe(true);
-    expect(verdict.notices.some(n => /beat baseline/i.test(n))).toBe(true);
-  });
-
-  it('rejects mismatched caseScores medians and budgetExhausted without cache', () => {
-    const badMedian = evaluateAssistantsRatchet(
-      baseline,
-      passingSample({
-        median: 4.0,
-        caseScores: [1, 1, 1],
-      })
-    );
-    expect(badMedian.failures.map(f => f.reason)).toContain('invalid_sample');
-
-    const badBudget = evaluateAssistantsRatchet(
-      baseline,
-      passingSample({
-        source: 'live',
-        budgetExhausted: true,
-      })
-    );
-    expect(badBudget.failures.map(f => f.reason)).toContain('invalid_sample');
+    expect(summer.ok).toBe(true);
+    expect(summer.assistant).toBe('summer');
+    expect(
+      evaluateAssistantsRatchet(recorded(3.5), sample()).notices.some(n => /beat baseline/i.test(n))
+    ).toBe(true);
+    expect(
+      reasons(evaluateAssistantsRatchet(baseline, sample({ median: 4.0, caseScores: [1, 1, 1] })))
+    ).toContain('invalid_sample');
   });
 });
 
 describe('parseEvalSample', () => {
-  it('accepts a well-formed sample and rejects malformed ones', () => {
-    const good = parseEvalSample(passingSample());
-    expect(good.assistant).toBe('jovie');
+  it('accepts well-formed and rejects malformed', () => {
+    expect(parseEvalSample(sample()).assistant).toBe('jovie');
     expect(() => parseEvalSample(null)).toThrow(/root must be an object/);
-    expect(() =>
-      parseEvalSample({ ...passingSample(), assistant: 'other' })
-    ).toThrow(/jovie|summer/);
-    expect(() =>
-      parseEvalSample({ ...passingSample(), mode: 'weekly' })
-    ).toThrow(/pr|nightly/);
-    expect(() =>
-      parseEvalSample({ ...passingSample(), source: 'paid' })
-    ).toThrow(/fixture|live|cache/);
-    expect(() =>
-      parseEvalSample({ ...passingSample(), inventedFacts: 1.5 })
-    ).toThrow(/inventedFacts/);
-    expect(() =>
-      parseEvalSample({ ...passingSample(), jank: { passed: 'yes' } })
-    ).toThrow(/jank\.passed/);
+    expect(() => parseEvalSample({ ...sample(), assistant: 'other' })).toThrow(/jovie|summer/);
+    expect(() => parseEvalSample({ ...sample(), mode: 'weekly' })).toThrow(/pr|nightly/);
+    expect(() => parseEvalSample({ ...sample(), source: 'paid' })).toThrow(/fixture|live|cache/);
+    expect(() => parseEvalSample({ ...sample(), inventedFacts: 1.5 })).toThrow(/inventedFacts/);
+    expect(() => parseEvalSample({ ...sample(), jank: { passed: 'yes' } })).toThrow(/jank\.passed/);
   });
 });
 
 describe('parseBaselineMedians', () => {
-  it('rejects malformed baseline roots and recorded rows without a median', () => {
+  it('rejects malformed roots and recorded-without-median', () => {
     expect(() => parseBaselineMedians(null)).toThrow(/root must be an object/);
-    expect(() =>
-      parseBaselineMedians({ ...baseline, schemaVersion: 99 })
-    ).toThrow(/schemaVersion/);
+    expect(() => parseBaselineMedians({ ...baseline, schemaVersion: 99 })).toThrow(/schemaVersion/);
     expect(() =>
       parseBaselineMedians({
         ...baseline,
         assistants: {
           ...baseline.assistants,
-          jovie: {
-            ...baseline.assistants.jovie,
-            status: 'recorded',
-            median: null,
-          },
+          jovie: { ...baseline.assistants.jovie, status: 'recorded', median: null },
         },
       })
     ).toThrow(/median must be a finite number when recorded/);
