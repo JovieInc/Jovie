@@ -36,6 +36,7 @@ import {
   lanesCoverageRun,
   selectStructuralShard,
 } from './lib/ci-structural-shards.mjs';
+import { shouldOverlapTypecheckLanes } from './lib/ci-typecheck-overlap.mjs';
 
 export {
   LANES_COVERAGE_FLOORS,
@@ -1472,7 +1473,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/tracker.test.mjs',
   'scripts/lib/__tests__/typecheck-singleflight-diagnostics.test.mjs',
   'scripts/lib/__tests__/typecheck-singleflight.test.mjs',
-  'scripts/lib/__tests__/typecheck-performance.test.mjs',
+  'scripts/lib/__tests__/typecheck-performance.test.mjs scripts/lib/__tests__/ci-typecheck-overlap.test.mjs',
   'scripts/lib/__tests__/ui-story-coverage-policy.test.mjs',
   'scripts/lib/__tests__/ci-fast-pr-structural-guards.test.mjs',
   'scripts/lib/__tests__/ci-fast-trusted-base.test.mjs',
@@ -1776,7 +1777,6 @@ export function validateLaneGroups(groups, laneIds = LANE_IDS) {
 }
 
 validateLaneGroups(LANE_GROUPS);
-
 export function selectLanes(groupId) {
   // Local callers historically ran the complete cluster with no selector.
   if (groupId === undefined) return LANES;
@@ -2055,7 +2055,6 @@ export function runCopyGate(cwd = REPO_ROOT) {
 export function listAllChangedFiles(cwd = REPO_ROOT) {
   return changedFiles([], cwd);
 }
-
 let cachedRepoLanes = null;
 function repoLanes() {
   if (cachedRepoLanes) return cachedRepoLanes;
@@ -3378,21 +3377,20 @@ async function main() {
       selectedLanes = selectedLanes.filter(lane => lane.id === 'structural');
     }
 
-    // Overlap the independent tsc lanes (~5.6 GB each); results keep order.
     const started = new Map();
-    for (const lane of selectedLanes.filter(l =>
-      LANE_GROUPS.typecheck.includes(l.id)
-    )) {
-      const run = Promise.resolve().then(() => lane.run());
-      run.catch(() => {});
-      started.set(lane.id, [Date.now(), run]);
+    if (shouldOverlapTypecheckLanes()) {
+      for (const lane of selectedLanes.filter(l =>
+        LANE_GROUPS.typecheck.includes(l.id)
+      )) {
+        const run = Promise.resolve().then(() => lane.run());
+        run.catch(() => {});
+        started.set(lane.id, [Date.now(), run]);
+      }
     }
-
     let failedFast = false;
     for (const lane of selectedLanes) {
       console.log(`\n======== lane: ${lane.id} ========`);
       const [laneStartedAt, run] = started.get(lane.id) ?? [Date.now()];
-
       if (failedFast && FAIL_FAST_SKIPPABLE_LANES.has(lane.id)) {
         const logExcerpt = 'skipped: earlier lane failed (fail-fast)';
         const durationMs = Math.max(0, Date.now() - laneStartedAt);

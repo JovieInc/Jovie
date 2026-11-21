@@ -177,4 +177,116 @@ describe('decideFallbackTurn free-text handle keep', () => {
       expect(turn.line.stepId).not.toBe('attach_social');
     }
   });
+
+  it('does not let adaptive draft outcome swallow short claim/keep', async () => {
+    // Production served failure: draft.awaiting=outcome + claim (len≤5) never
+    // sets draft.outcome, so adaptive-outcome replied instead of confirming.
+    for (const text of ['claim', 'keep']) {
+      const messages = [
+        ...baseThroughArtist(),
+        assistant('Claiming @testartist.', [HANDLE_CHECKED]),
+        user(text),
+      ];
+      const state = stateFor(messages);
+      state.profileDraft = {
+        version: 1,
+        roles: ['artist'],
+        activeRole: 'artist',
+        outcome: null,
+        outcomes: {},
+        sourceCandidates: [],
+        selectedSource: {
+          url: 'https://open.spotify.com/artist/artist-1',
+          status: 'available',
+          title: 'Test Artist',
+          description: null,
+          fetchedAt: new Date().toISOString(),
+        },
+        sourceSkipped: false,
+        awaiting: 'outcome',
+        lastUserMessageId: null,
+      };
+      const turn = await decideFallbackTurn({ uiMessages: messages, state });
+      expect(turn.line.key).not.toMatch(/^greet:adaptive-/);
+      expect(turn.guardedStep).toBe('waitlist_or_complete');
+      expect(turn.toolEvents.map(e => e.output.action)).toContain(
+        'handle_confirmed'
+      );
+    }
+  });
+
+  it('keeps non-artist drafts in adaptive on claim (no artist picker)', async () => {
+    // Seer 20813115: unscoped honorHandleConfirmIntent skipped adaptive for
+    // founder/expert/creator and fell into open_artist_picker.
+    const messages = [
+      user('I am a founder'),
+      assistant('What is your company site?', [
+        {
+          toolName: 'checkHandle',
+          output: { action: 'check_handle', handle: 'acme' },
+        },
+      ]),
+      user('claim'),
+    ];
+    const state = stateFor(messages);
+    state.spotifyArtistId = null;
+    state.spotifyArtistName = null;
+    state.profileDraft = {
+      version: 1,
+      roles: ['founder'],
+      activeRole: 'founder',
+      outcome: null,
+      outcomes: {},
+      sourceCandidates: [],
+      selectedSource: {
+        url: 'https://example.com',
+        status: 'available',
+        title: 'Acme',
+        description: null,
+        fetchedAt: new Date().toISOString(),
+      },
+      sourceSkipped: false,
+      awaiting: 'outcome',
+      lastUserMessageId: null,
+    };
+    const turn = await decideFallbackTurn({ uiMessages: messages, state });
+    expect(turn.line.key).toMatch(/^greet:adaptive-/);
+    expect(turn.toolEvents.map(e => e.output.action)).not.toContain(
+      'open_artist_picker'
+    );
+    expect(turn.toolEvents.map(e => e.output.action)).not.toContain(
+      'handle_confirmed'
+    );
+  });
+
+  it('keeps multi-role null activeRole in priority adaptive on claim', async () => {
+    // Seer 20814980: activeRole == null treated unset-as-artist and skipped
+    // the priority gate while a handle card was pending.
+    const messages = [
+      ...baseThroughArtist(),
+      assistant('Claiming @testartist.', [HANDLE_CHECKED]),
+      user('claim'),
+    ];
+    const state = stateFor(messages);
+    state.profileDraft = {
+      version: 1,
+      roles: ['artist', 'founder'],
+      activeRole: null,
+      outcome: null,
+      outcomes: {},
+      sourceCandidates: [],
+      selectedSource: null,
+      sourceSkipped: false,
+      awaiting: 'priority',
+      lastUserMessageId: null,
+    };
+    const turn = await decideFallbackTurn({ uiMessages: messages, state });
+    expect(turn.line.key).toMatch(/^greet:adaptive-priority/);
+    expect(turn.toolEvents.map(e => e.output.action)).not.toContain(
+      'handle_confirmed'
+    );
+    expect(turn.toolEvents.map(e => e.output.action)).not.toContain(
+      'open_artist_picker'
+    );
+  });
 });

@@ -13,6 +13,7 @@ import { test } from 'node:test';
 import {
   decodePng,
   encodePng,
+  fillRect,
   solidImage,
 } from '../invariants/pen-still-diff-lib.mjs';
 import { PEN_CLI_VERSION } from './pen-draft.mjs';
@@ -341,6 +342,33 @@ test('without the Pen secrets every draft is marked failed and Pen is never run'
     []
   );
   assert.equal(basename(dir).startsWith('pen-draft-picture-'), true);
+});
+
+test('clear gutters between variants pass; a baked checkerboard fails', () => {
+  // Desktop and mobile variants with a clear gutter between them, as the
+  // homepage draft exports (about 4% of it is that gutter).
+  const variants = solidImage(200, 60, [3, 4, 6, 255]);
+  fillRect(variants, 120, 0, 12, 60, [0, 0, 0, 0]);
+  assert.equal(pictureProblem(encodePng(variants)), null);
+
+  // A section with no fill: Pen exports a dark checkerboard of opaque
+  // 5px tiles, as the What's New card did in audience-analytics.
+  const card = solidImage(200, 60, [3, 4, 6, 255]);
+  for (let y = 10; y < 40; y++)
+    for (let x = 20; x < 120; x++) {
+      const light = (Math.floor(x / 5) + Math.floor(y / 5)) % 2;
+      fillRect(card, x, y, 1, 1, light ? [20, 20, 20, 255] : [3, 3, 3, 255]);
+    }
+  assert.match(
+    pictureProblem(encodePng(card)),
+    /^the frame shows a see-through checkerboard near x 2\d, y 10: a section there has no fill$/
+  );
+
+  // One striped line, like a dashed divider, is not a checkerboard.
+  const divider = solidImage(200, 60, [3, 4, 6, 255]);
+  for (let x = 20; x < 120; x += 10)
+    fillRect(divider, x, 30, 5, 1, [40, 40, 40, 255]);
+  assert.equal(pictureProblem(encodePng(divider)), null);
 });
 
 test('a see-through picture never goes to review: it fails its frame', async () => {

@@ -104,6 +104,17 @@ nodes:
       - workflow_run
     terminalReceipt: job:reconcile
     jobCount: 1
+  - name: Assistants scheduled check
+    path: .github/workflows/assistants-scheduled-check.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:assistants-scheduled-check
+    jobCount: 1
   - name: Auto-Merge Base Guard
     path: .github/workflows/auto-merge-base-guard.yml
     active: true
