@@ -89,6 +89,33 @@
       "a11y",
       "frontend-rules",
       "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/CelebrationCardPreview.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/DspMatchCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/ContactsManager.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ]
   },
   "waivers": {
@@ -109,6 +136,12 @@
     },
     "apps/web/components/features/dashboard/dashboard-analytics/DashboardAnalytics.tsx": {
       "permission-denied": "The page denies nothing: usePlanGate only passes maxRetentionDays to TimeRangeSelector, which owns how longer ranges are offered. The detector matched the word plan in usePlanGate."
+    },
+    "apps/web/components/features/dashboard/molecules/DspMatchCard.tsx": {
+      "offline": "The card makes no request: confirm and reject are callbacks owned by the parent list, which reports in-flight work through isConfirming and isRejecting (LoadingRejecting). The detector matched the isLoading local."
+    },
+    "apps/web/components/features/dashboard/organisms/ContactsManager.tsx": {
+      "offline": "The manager makes no request itself: saves, deletes and their offline failures belong to useContactsManager and the table. The detector matched the isLoading prop that gates navigation readiness (LoadingContacts)."
     }
   }
 }
