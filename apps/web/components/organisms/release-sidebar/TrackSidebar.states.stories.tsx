@@ -26,7 +26,7 @@ const baseTrack: TrackSidebarData = {
 
 function Frame(Story: () => ReactNode) {
   return (
-    <div className='h-[40rem] w-96'>
+    <div className='h-160 w-96'>
       <Story />
     </div>
   );
@@ -34,7 +34,7 @@ function Frame(Story: () => ReactNode) {
 
 function RtlFrame(Story: () => ReactNode) {
   return (
-    <div dir='rtl' className='h-[40rem] w-96'>
+    <div dir='rtl' className='h-160 w-96'>
       <Story />
     </div>
   );
