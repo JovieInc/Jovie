@@ -94,7 +94,10 @@ export function renderAss13TargetsReport(
     .filter(Boolean)
     .join(', ');
   const gateRows = evaluation.gates
-    .map(g => `| ${g.label} | ${g.actual} | ${g.target} | **${g.ok ? 'PASS' : 'FAIL'}** |`)
+    .map(
+      g =>
+        `| ${g.label} | ${g.actual} | ${g.target} | **${g.ok ? 'PASS' : 'FAIL'}** |`
+    )
     .join('\n');
   const themeBlock =
     evaluation.passed || evaluation.themes.length === 0
@@ -150,10 +153,14 @@ function main(): void {
     );
   }
   const report = parseHelpfulnessResults(
-    JSON.parse(readFileSync(resolve(process.cwd(), resultsPath), 'utf8')) as unknown
+    JSON.parse(
+      readFileSync(resolve(process.cwd(), resultsPath), 'utf8')
+    ) as unknown
   );
   const evaluation = evaluateAss13Targets(report, { topN });
-  process.stdout.write(`${renderAss13TargetsReport(report, evaluation).trimEnd()}\n`);
+  process.stdout.write(
+    `${renderAss13TargetsReport(report, evaluation).trimEnd()}\n`
+  );
   if (!evaluation.passed) process.exitCode = 1;
 }
 
