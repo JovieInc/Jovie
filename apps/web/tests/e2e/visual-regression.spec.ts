@@ -5,8 +5,8 @@ import { expect, test } from '@playwright/test';
  *
  * Uses Playwright's built-in screenshot comparison (toHaveScreenshot)
  * with thresholds configured in playwright.config.ts:
- *   maxDiffPixelRatio: 0.08 (8%)
- *   threshold: 0.2
+ *   maxDiffPixelRatio: 0.02 (2%)
+ *   threshold: 0.1
  *   animations: 'disabled'
  *
  * Baselines stored in tests/e2e/__snapshots__/visual-regression.spec.ts/
