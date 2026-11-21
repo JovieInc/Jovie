@@ -191,19 +191,20 @@ describe('MarketingHeader', () => {
     ).toHaveAttribute('href', '/start');
   });
 
-  it('orders Customers, Product, and Pricing after the wordmark', () => {
+  it('orders Customers, Product, and Pricing without a nav wordmark', () => {
     render(<MarketingHeader />);
 
     const navItems = Array.from(
       document.querySelector('.marketing-glass-header__nav')?.children ?? []
     ).map(item => item.textContent);
 
-    expect(navItems).toEqual(['Jovie', 'Customers', 'Product', 'Pricing']);
+    // LogoLink is the home control; do not duplicate "Jovie" in the nav (JOV-14240).
+    expect(navItems).toEqual(['Customers', 'Product', 'Pricing']);
     expect(
       document.querySelector(
         '.marketing-glass-header__nav .marketing-glass-header__brand-wordmark'
       )
-    ).toHaveTextContent('Jovie');
+    ).toBeNull();
     expect(
       screen
         .getByTestId('site-logo-link')
@@ -360,13 +361,18 @@ describe('MarketingHeader', () => {
     }
   });
 
-  it('keeps the desktop wordmark lockup by default and marks it for the reveal guard', () => {
+  it('keeps the logo reveal guard without a duplicate nav wordmark (JOV-14240)', () => {
     render(<MarketingHeader />);
 
-    expect(screen.getByTestId('header-nav')).toHaveAttribute(
-      'data-brand-lockup',
-      'desktop'
+    // Inner marketing pages use the mark as the only brand control in chrome.
+    expect(screen.getByTestId('header-nav')).not.toHaveAttribute(
+      'data-brand-lockup'
     );
+    expect(
+      document.querySelector(
+        '.marketing-glass-header__nav .marketing-glass-header__brand-wordmark'
+      )
+    ).toBeNull();
     expect(screen.getByTestId('site-logo-link')).toHaveAttribute(
       'data-logo-reveal',
       'true'

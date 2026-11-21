@@ -75,6 +75,8 @@ describe('ArtistProfileModeSwitcher', () => {
     expect(source).toContain("'line-clamp-2'");
     expect(source).toContain("layoutId='artist-profile-mode-active-tab'");
     expect(source).toContain('useReducedMotion');
+    expect(source).toContain('ViewTransition');
+    expect(source).toContain("name='artist-profile-mode-phone'");
   });
 
   it('reserves the panel slot at the tallest mode so tabs never reflow vertically', () => {
@@ -90,7 +92,8 @@ describe('ArtistProfileModeSwitcher', () => {
     expect(source).toContain("aria-hidden='true'");
     expect(source).toContain('col-start-1 row-start-1');
     expect(source).toContain('min-h-20');
-    expect(source).toContain('slideDirection');
+    expect(source).toContain('data-reduced-motion');
+    expect(source).toContain('transitionClass');
   });
 
   it('keeps the adjacent Storybook receipt bound to both mode-switcher layouts', () => {

@@ -2349,6 +2349,10 @@ describe('source-read guard selection', () => {
     ],
     ['apps/web/tests/e2e/public-profile-smoke.spec.ts', ['anti-slop']],
     ['apps/ios/Jovie/App.swift', ['native-design-system', 'anti-slop']],
+    [
+      'packages/ui/atoms/button-contract.ts',
+      ['native-design-system', 'merge-group-unit-guards', 'anti-slop'],
+    ],
     // OutboundRail.tsx text-destructive ejected group pr-21458 (10-13).
     [
       'apps/web/components/features/admin/outbound/OutboundRail.tsx',

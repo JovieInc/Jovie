@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
-import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
+import { DSP_LOGO_CONFIG, DspServiceIcon } from '@/components/atoms/DspLogo';
 import {
   ActionDial,
   type ActionDialOption,
@@ -30,6 +30,7 @@ const SERVICES = [
 export function SmartLinksDemo() {
   const [releaseIndex, setReleaseIndex] = useState(0);
   const [selectedId, setSelectedId] = useState('spotify');
+  const [preferredId, setPreferredId] = useState<string | null>(null);
   const release = RELEASES[releaseIndex]!;
   const options = useMemo<ActionDialOption[]>(
     () =>
@@ -40,15 +41,7 @@ export function SmartLinksDemo() {
           label: service.label,
           href: release.href,
           icon: logo?.iconPath ? (
-            <svg
-              viewBox='0 0 24 24'
-              fill='currentColor'
-              className='h-5 w-5'
-              style={{ color: logo.color }}
-              aria-hidden='true'
-            >
-              <path d={logo.iconPath} />
-            </svg>
+            <DspServiceIcon provider={service.id} />
           ) : undefined,
         };
       }),
@@ -79,7 +72,11 @@ export function SmartLinksDemo() {
         <ActionDial
           options={options}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          preferredId={preferredId}
+          onSelect={id => {
+            setSelectedId(id);
+            setPreferredId(id);
+          }}
           actionLabel='Open live Smart Link'
           groupLabel='Try the streaming service dial'
           hint='Pick a service. Your choice carries to the next release.'

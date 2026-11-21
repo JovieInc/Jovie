@@ -257,31 +257,13 @@ export const DESIGN_SYSTEM_COMPONENT_REGISTRY = [
     dependsOn: ['atom.button'],
     compatibilityConsumers: [
       {
-        source: 'apps/web/components/atoms/AppIconButton.tsx',
-        exportName: 'AppIconButton',
-        canonicalImportSource: '@jovie/ui',
-      },
-      {
-        source: 'apps/web/components/atoms/CircleIconButton.tsx',
-        exportName: 'CircleIconButton',
-        canonicalImportSource: '@jovie/ui',
-      },
-      {
-        source: 'apps/web/components/atoms/HeaderIconButton.tsx',
-        exportName: 'HeaderIconButton',
-        canonicalImportSource: '@jovie/ui',
-      },
-      {
-        source: 'apps/web/components/atoms/InlineIconButton.tsx',
-        exportName: 'InlineIconButton',
-        canonicalImportSource: '@jovie/ui',
-      },
-      {
         source: 'packages/ui/atoms/overflow-menu-trigger.tsx',
         exportName: 'OverflowMenuTrigger',
         canonicalImportSource: './icon-button',
       },
       {
+        // Justified shell-rail pattern: domain rail chrome over IconButton
+        // (mirrored rail icons + TooltipShortcut). Not a second icon primitive.
         source: 'apps/web/components/atoms/RailToggleButton.tsx',
         exportName: 'RailToggleButton',
         canonicalImportSource: '@jovie/ui',

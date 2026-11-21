@@ -76,6 +76,8 @@ describe('profile shell token contract', () => {
 
     expect(desktopRule).toContain('var(--ds-public-content-max)');
     expect(desktopRule).not.toContain('--profile-shell-max-width');
+    // Top-align before hydration so --compact → --desktop does not shift MAIN.
+    expect(desktopRule).toContain('align-items: flex-start');
   });
 
   it('keeps compact in the a11y tree until the desktop surface is ready', () => {
