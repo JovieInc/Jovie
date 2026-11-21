@@ -48,7 +48,8 @@ export {
   lanesReceiptRanSuite,
   selectStructuralShard,
 } from './lib/ci-structural-shards.mjs';
-export { shouldOverlapTypecheckLanes } from './lib/ci-typecheck-overlap.mjs';
+// Re-export kept for scripts that import overlap policy from this module.
+export { shouldOverlapTypecheckLanes };
 
 import {
   escapeAnnotationMessage,
@@ -3372,10 +3373,7 @@ async function main() {
       selectedLanes = selectedLanes.filter(lane => lane.id === 'structural');
     }
 
-    // Overlap independent tsc lanes (~5.6 GB each) only when the runner can
-    // hold them. merge_group / workflow_dispatch keep overlap; pull_request
-    // Source Validation twins share a ~7GB ubuntu job with unit tests — three
-    // concurrent tsc processes thrash until the 30m timeout (#26276).
+    // Overlap tsc lanes only when shouldOverlapTypecheckLanes() says so (#26276).
     const started = new Map();
     if (shouldOverlapTypecheckLanes()) {
       for (const lane of selectedLanes.filter(l =>
