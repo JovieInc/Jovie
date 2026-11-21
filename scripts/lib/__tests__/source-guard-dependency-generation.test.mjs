@@ -79,37 +79,51 @@ test('metadata reuse and no unit diff still provision the guard shard only', () 
   for (const shard of workflow.jobs.unit.strategy.matrix.shard) {
     for (const reuse of ['true', 'false']) {
       for (const web of ['true', 'false']) {
-        const context = {
-          matrix: { shard },
-          steps: {
-            reuse: { outputs: { reuse } },
-            scope: { outputs: { web, ui: 'false', ovie: 'false' } },
-          },
-        };
-        for (const name of names) {
-          const step = steps.find(item => item.name === name);
-          assert.ok(step, name);
-          const transactionStep = name === guardName || name === names[4];
-          const setup = name === names[2] || name === names[3];
-          const expected =
-            shard === '4/4' ||
-            (!transactionStep &&
-              reuse !== 'true' &&
-              (!setup || web === 'true'));
+        for (const typecheck of ['true', 'false']) {
+          const context = {
+            matrix: { shard },
+            steps: {
+              reuse: { outputs: { reuse } },
+              scope: { outputs: { web, ui: 'false', ovie: 'false' } },
+              'mq-parity': { outputs: { typecheck } },
+            },
+          };
+          for (const name of names) {
+            const step = steps.find(item => item.name === name);
+            assert.ok(step, name);
+            const transactionStep = name === guardName || name === names[4];
+            const setupNode = name === names[2];
+            const setupPlaywright = name === names[3];
+            const expected =
+              shard === '4/4' ||
+              (!transactionStep &&
+                reuse !== 'true' &&
+                ((setupNode && (web === 'true' || typecheck === 'true')) ||
+                  (setupPlaywright && web === 'true') ||
+                  (!setupNode && !setupPlaywright)));
+            assert.equal(
+              expression(step.if, context),
+              expected,
+              `${name}: ${shard}/${reuse}/${web}/${typecheck}`
+            );
+          }
+          const unit = steps.find(
+            item =>
+              item.name === 'Run web unit tests related to the exact PR diff'
+          );
           assert.equal(
-            expression(step.if, context),
-            expected,
-            `${name}: ${shard}/${reuse}/${web}`
+            expression(unit.if, context),
+            reuse !== 'true' && web === 'true'
+          );
+          const twin = steps.find(
+            item => item.name === 'Run typecheck lane parity'
+          );
+          assert.equal(
+            expression(twin.if, context),
+            reuse !== 'true' && typecheck === 'true' && shard === '2/4',
+            `typecheck twin: ${shard}/${reuse}/${typecheck}`
           );
         }
-        const unit = steps.find(
-          item =>
-            item.name === 'Run web unit tests related to the exact PR diff'
-        );
-        assert.equal(
-          expression(unit.if, context),
-          reuse !== 'true' && web === 'true'
-        );
       }
     }
   }

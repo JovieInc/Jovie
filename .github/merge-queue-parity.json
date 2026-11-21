@@ -33,6 +33,10 @@
     "ci.yml#ci-exact-head-coverage": {
       "pr": "source-validation.yml#coverage",
       "command": "node scripts/check-changed-test-coverage.mjs"
+    },
+    "ci.yml#ci-fast-typecheck": {
+      "pr": "source-validation.yml#unit",
+      "command": "node scripts/ci-fast-lanes.mjs"
     }
   },
   "exemptions": [
@@ -82,13 +86,6 @@
       "job": "ci.yml#ci-merge-group-ready",
       "kind": "combined-head",
       "reason": "Aggregates the combined-head leaves into the PR Ready context on merge_group; the PR has its own aggregate in Source Validation.",
-      "createdOn": "2026-11-11",
-      "expiresOn": "2027-02-09"
-    },
-    {
-      "job": "ci.yml#ci-fast-typecheck",
-      "kind": "gap",
-      "reason": "The queue runs the typecheck lane of scripts/ci-fast-lanes.mjs; the PR runs a hand-copied typecheck in Source Validation, so a lane-only failure first shows in the queue.",
       "createdOn": "2026-11-11",
       "expiresOn": "2027-02-09"
     },

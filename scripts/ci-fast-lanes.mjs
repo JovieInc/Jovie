@@ -1199,6 +1199,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/marketing-critic/marketing-critic.test.mjs',
   'scripts/lib/__tests__/admission-hold-labels.test.mjs',
   'scripts/lib/__tests__/source-validation-dedup-workflow.test.mjs',
+  'scripts/ci/mq-parity-scope.test.mjs',
   'scripts/linear-team-drift.test.mjs',
   'scripts/lib/__tests__/source-validation-lane-classification.test.mjs',
   'scripts/lib/__tests__/security-evidence-history-checkout.test.mjs',
@@ -3491,7 +3492,6 @@ async function main() {
 
   writeSummary(results, laneGroup, timingTables);
   writeLaneResults(results, laneGroup, setupError);
-
   if (setupError) process.exit(1);
   const failed = results.filter(r => r.status === 'failure');
   if (failed.length > 0) {
