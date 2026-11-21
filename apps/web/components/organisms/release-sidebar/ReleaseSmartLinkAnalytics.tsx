@@ -191,10 +191,13 @@ function ReleaseSmartLinkControl({
           items={shareItems}
           trigger={
             <IconButton
-              size='lg'
+              size='sm'
               variant='inline'
+              fade='visible'
               title='Share smart link'
               aria-label='Share Smart Link'
+              // Pre-migration: h-7 w-7 + text-tertiary + DrawerInline visible fade.
+              className='rounded-full text-tertiary-token'
             >
               <Share2 className='h-3 w-3' />
             </IconButton>
