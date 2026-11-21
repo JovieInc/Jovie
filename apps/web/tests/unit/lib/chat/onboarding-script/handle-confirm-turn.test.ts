@@ -177,4 +177,41 @@ describe('decideFallbackTurn free-text handle keep', () => {
       expect(turn.line.stepId).not.toBe('attach_social');
     }
   });
+
+  it('does not let adaptive draft outcome swallow short claim/keep', async () => {
+    // Production served failure: draft.awaiting=outcome + claim (len≤5) never
+    // sets draft.outcome, so adaptive-outcome replied instead of confirming.
+    for (const text of ['claim', 'keep']) {
+      const messages = [
+        ...baseThroughArtist(),
+        assistant('Claiming @testartist.', [HANDLE_CHECKED]),
+        user(text),
+      ];
+      const state = stateFor(messages);
+      state.profileDraft = {
+        version: 1,
+        roles: ['artist'],
+        activeRole: 'artist',
+        outcome: null,
+        outcomes: {},
+        sourceCandidates: [],
+        selectedSource: {
+          url: 'https://open.spotify.com/artist/artist-1',
+          status: 'available',
+          title: 'Test Artist',
+          description: null,
+          fetchedAt: new Date().toISOString(),
+        },
+        sourceSkipped: false,
+        awaiting: 'outcome',
+        lastUserMessageId: null,
+      };
+      const turn = await decideFallbackTurn({ uiMessages: messages, state });
+      expect(turn.line.key).not.toMatch(/^greet:adaptive-/);
+      expect(turn.guardedStep).toBe('waitlist_or_complete');
+      expect(turn.toolEvents.map(e => e.output.action)).toContain(
+        'handle_confirmed'
+      );
+    }
+  });
 });

@@ -28,6 +28,7 @@ import {
 import { loadScriptBank, pickFromBank } from './line-source';
 import { renderLine, type ScriptLine, type ScriptStepId } from './script';
 import {
+  isHandleConfirmIntent,
   isIncompleteAdvanceMessage,
   ONBOARDING_WIDGET_EVENTS,
   type OnboardingGuardedStep,
@@ -565,9 +566,23 @@ export async function decideFallbackTurn(
 ): Promise<FallbackTurn> {
   const { uiMessages, state } = input;
   const draft = state.profileDraft;
+  // Served verify (JOV-13027 / 2026-11-21): when Confirm Handle / Keep is
+  // showing, short claim/keep free-text must not be swallowed by the adaptive
+  // draft questionnaire (awaiting=outcome + text.length>5 gate). Fall through
+  // to resolveAwaitingHandleConfirm instead.
+  const pendingHandleConfirm =
+    Boolean(findLatestToolOutput(uiMessages, 'check_handle')) &&
+    !hasHandleConfirmed(uiMessages);
+  const latestFreeText = (() => {
+    const latest = lastUserMessage(uiMessages);
+    return latest ? messageText(latest) : '';
+  })();
+  const honorHandleConfirmIntent =
+    pendingHandleConfirm && isHandleConfirmIntent(latestFreeText);
   if (
     draft &&
     !input.openPickerQuery?.trim() &&
+    !honorHandleConfirmIntent &&
     (draft.activeRole !== 'artist' || (state.spotifyArtistId && !draft.outcome))
   ) {
     const reply = (
