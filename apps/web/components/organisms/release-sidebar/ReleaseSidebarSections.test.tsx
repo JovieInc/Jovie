@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ProviderKey } from '@/lib/discography/types';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ReleaseEntityHeader } from './ReleaseSidebarSections';
 import type { Release } from './types';
 
@@ -439,5 +440,53 @@ describe('ReleaseSidebarSections', () => {
       'data-size',
       'xl'
     );
+  });
+
+  it('toggles the artwork preview from the overlay button on media tokens', async () => {
+    const onTogglePreview = vi.fn();
+    const { container } = render(
+      <ReleaseEntityHeader
+        release={mockRelease}
+        artistName='Example Artist'
+        providerConfig={providerConfig}
+        canUploadArtwork={false}
+        canRevertArtwork={false}
+        onArtworkUpload={undefined}
+        onArtworkRevert={undefined}
+        allowDownloads={false}
+        previewUrl='https://cdn.example.com/preview.mp3'
+        isPlaying={false}
+        onTogglePreview={onTogglePreview}
+      />
+    );
+
+    const toggle = screen.getByRole('button', { name: /preview/i });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    expect(toggle.className).toContain('bg-ink-on-media/40');
+    expect(toggle.className).not.toMatch(/(^|\s|:)bg-black/);
+    await userEvent.click(toggle);
+    expect(onTogglePreview).toHaveBeenCalledTimes(1);
+    await expectNoA11yViolations(container);
+  });
+
+  it('hides the preview toggle when there is no preview and has no a11y violations', async () => {
+    const { container } = render(
+      <ReleaseEntityHeader
+        release={mockRelease}
+        artistName='Example Artist'
+        providerConfig={providerConfig}
+        canUploadArtwork={false}
+        canRevertArtwork={false}
+        onArtworkUpload={undefined}
+        onArtworkRevert={undefined}
+        allowDownloads={false}
+        previewUrl={null}
+        isPlaying={false}
+        onTogglePreview={() => undefined}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: /preview/i })).toBeDisabled();
+    await expectNoA11yViolations(container);
   });
 });
