@@ -1,0 +1,23 @@
+{
+  "waivers": {
+    "apps/web/components/organisms/PayPromo.tsx": {
+      "long-content": "The promo renders fixed copy with no props, so no content can overflow its layout; the detector matched the word text in the className text-accent and the description prop name."
+    },
+    "apps/web/components/organisms/table/atoms/AudienceDeviceCell.tsx": {
+      "permission-denied": "The cell has no permission or gated action; the detector matched role='img' on the device icon."
+    },
+    "apps/web/components/organisms/table/atoms/AudienceIntentScoreCell.tsx": {
+      "empty": "The cell takes one of three intent levels and always renders an icon; there is no collection. The detector matched the word items in the items-center class.",
+      "long-content": "The cell renders only an icon in a fixed w-8 slot; the label lives in the tooltip and comes from a three-entry map, so no caller text can overflow."
+    },
+    "apps/web/components/organisms/table/atoms/AudienceQuickActionsCell.tsx": {
+      "empty": "The cell always renders its two fixed actions; there is no collection. The detector matched the word items in the items-center class.",
+      "error": "The cell only forwards two callbacks and has no async work or failure path; failures belong to the caller that owns onExport and onBlock. The detector matched the hover:text-error and bg-error/10 token classes.",
+      "long-content": "Both actions are icon-only with fixed aria-labels, so no caller text can overflow.",
+      "permission-denied": "The cell has no permission branch; whether to render it is the table's decision. The detector matched role='toolbar'."
+    },
+    "apps/web/components/organisms/table/atoms/AudienceTypeBadge.tsx": {
+      "empty": "The badge takes one value from a closed five-member union and always renders its label; there is no collection to be empty. The detector matched the word items in the items-center class."
+    }
+  }
+}
