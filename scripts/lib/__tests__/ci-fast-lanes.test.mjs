@@ -55,6 +55,7 @@ it('selects capacity behavior and coverage on collector, fixture and registry ch
     'scripts/capacity/forecast.py',
     'scripts/tests/test_capacity_forecast.py',
     'scripts/tests/test_neon_collector.py',
+    'scripts/tests/test_gh_env_secrets_collector.py',
     'ops/registry/capacity-resources.json',
   ]) {
     const guards = selectSourceGuards('pull_request', [file]);
@@ -63,6 +64,7 @@ it('selects capacity behavior and coverage on collector, fixture and registry ch
     expect(guard.command).toContain('coverage run --branch -m unittest');
     expect(guard.command).toContain('scripts.tests.test_capacity_forecast');
     expect(guard.command).toContain('scripts.tests.test_neon_collector');
+    expect(guard.command).toContain('scripts.tests.test_gh_env_secrets_collector');
     expect(guard.command).toContain('--fail-under=60');
     expect(guard.command).toContain('python3 -m venv');
     expect(guard.command).toContain(
@@ -2501,7 +2503,7 @@ describe('source-read guard selection', () => {
         ].map(match => match[0]);
         expect(modules.join(' ')).toBe(
           'scripts.tests.test_capacity_forecast scripts.tests.test_capacity_collectors ' +
-            'scripts.tests.test_neon_collector'
+            'scripts.tests.test_neon_collector scripts.tests.test_gh_env_secrets_collector'
         );
         for (const module of modules) {
           expect(
