@@ -262,6 +262,9 @@ describe('OnboardingToolField production sources', () => {
   const productionFiles = [
     'OnboardingToolField.tsx',
     'OnboardingToolArtifacts.tsx',
+    'OnboardingSpotifyArtistPickerCard.tsx',
+    'OnboardingHandleCheckCard.tsx',
+    'OnboardingSocialLinkCard.tsx',
   ] as const;
 
   it('keeps production off the retired raw focus recipe', () => {
@@ -285,8 +288,15 @@ describe('OnboardingToolField production sources', () => {
   });
 
   it('uses one field owner for the three onboarding tool inputs', () => {
-    const source = readSource('OnboardingToolArtifacts.tsx');
-    expect(source).toContain("from './OnboardingToolField'");
+    const cards = [
+      'OnboardingSpotifyArtistPickerCard.tsx',
+      'OnboardingHandleCheckCard.tsx',
+      'OnboardingSocialLinkCard.tsx',
+    ].map(readSource);
+    const source = cards.join('\n');
+    for (const card of cards) {
+      expect(card).toContain("from './OnboardingToolField'");
+    }
     expect(source.match(/<OnboardingToolField\b/g)).toHaveLength(3);
     expect(source).toContain("density='picker'");
     expect(source.match(/density='compact'/g)).toHaveLength(2);

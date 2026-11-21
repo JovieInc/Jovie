@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, HostDrawnSelect, PlainButton } from '@jovie/ui';
+import { Button, HostDrawnSelect } from '@jovie/ui';
 import { BadgeCheck, Link2 } from 'lucide-react';
 import Image from 'next/image';
 import type { RefObject } from 'react';
@@ -154,21 +154,20 @@ export function HeroSpotifyResults({
           aria-hidden='true'
         >
           {results.map((artist, index) => (
-            <PlainButton
+            <Button
               key={artist.id}
+              type='button'
+              variant={index === activeIndex ? 'secondary' : 'ghost'}
               disabled={isLoading}
               tabIndex={0}
-              className={cn(
-                'flex items-center gap-3 p-3 cursor-pointer transition-colors border-0 bg-transparent w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-inset',
-                index === activeIndex && 'bg-surface-1'
-              )}
+              className='w-full justify-start'
               onClick={() => onSelectArtist(artist)}
               onKeyDown={event =>
                 handleActivationKeyDown(event, () => onSelectArtist(artist))
               }
               onMouseEnter={() => onActiveIndexChange(index)}
             >
-              <div className='w-10 h-10 rounded-full overflow-hidden shrink-0 relative bg-surface-1'>
+              <div className='relative mr-3 h-10 w-10 shrink-0 overflow-hidden rounded-full bg-surface-1'>
                 {artist.imageUrl ? (
                   <Image
                     src={artist.imageUrl}
@@ -187,7 +186,7 @@ export function HeroSpotifyResults({
                   </div>
                 )}
               </div>
-              <div className='flex-1 min-w-0'>
+              <div className='mr-3 min-w-0 flex-1 text-left'>
                 <div className='font-medium truncate text-sm text-primary-token'>
                   {artist.name}
                 </div>
@@ -213,34 +212,37 @@ export function HeroSpotifyResults({
                   <BadgeCheck className='h-4 w-4' aria-hidden='true' />
                 </div>
               )}
-            </PlainButton>
+            </Button>
           ))}
         </div>
       )}
 
       {/* "Paste URL" option */}
-      <PlainButton
-        tabIndex={0}
-        className={cn(
-          'flex items-center gap-3 p-3 cursor-pointer transition-colors bg-transparent mt-1 w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-inset',
-          activeIndex === pasteUrlIndex && 'bg-surface-1'
-        )}
-        onClick={onPasteUrl}
-        onKeyDown={event => handleActivationKeyDown(event, () => onPasteUrl())}
-        onMouseEnter={() => onActiveIndexChange(pasteUrlIndex)}
-      >
-        <div className='w-10 h-10 rounded-full flex items-center justify-center bg-surface-1'>
-          <Link2 className='h-5 w-5 text-tertiary-token' aria-hidden='true' />
-        </div>
-        <div className='flex-1'>
-          <div className='font-medium text-sm text-primary-token'>
-            Paste a Spotify URL instead
+      <div className='mt-1'>
+        <Button
+          type='button'
+          variant={activeIndex === pasteUrlIndex ? 'secondary' : 'ghost'}
+          tabIndex={0}
+          className='w-full justify-start'
+          onClick={onPasteUrl}
+          onKeyDown={event =>
+            handleActivationKeyDown(event, () => onPasteUrl())
+          }
+          onMouseEnter={() => onActiveIndexChange(pasteUrlIndex)}
+        >
+          <div className='mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-surface-1'>
+            <Link2 className='h-5 w-5 text-tertiary-token' aria-hidden='true' />
           </div>
-          <div className='text-xs text-tertiary-token'>
-            open.spotify.com/artist/...
+          <div className='flex-1 text-left'>
+            <div className='font-medium text-sm text-primary-token'>
+              Paste a Spotify URL instead
+            </div>
+            <div className='text-xs text-tertiary-token'>
+              open.spotify.com/artist/...
+            </div>
           </div>
-        </div>
-      </PlainButton>
+        </Button>
+      </div>
     </div>
   );
 }

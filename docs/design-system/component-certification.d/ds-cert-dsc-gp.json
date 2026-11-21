@@ -1,5 +1,14 @@
 {
   "gates": {
+    "apps/web/components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/features/dashboard/organisms/onboarding/OnboardingDspStep.tsx": [
       "ds-owner",
       "tokens",
@@ -118,6 +127,15 @@
       "forced-caps"
     ],
     "apps/web/components/features/onboarding/OnboardingStartStepRail.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/onboarding/OnboardingToolArtifacts.tsx": [
       "ds-owner",
       "tokens",
       "states",

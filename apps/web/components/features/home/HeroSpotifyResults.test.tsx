@@ -60,12 +60,12 @@ function renderResults(
 }
 
 describe('HeroSpotifyResults', () => {
-  it('lists artists and selects one with the plain button', async () => {
+  it('lists artists and selects one with a ghost button', async () => {
     const user = userEvent.setup();
     const { container, onSelectArtist, onActiveIndexChange } = renderResults();
 
     const row = screen.getByText('Taylor Swift').closest('button');
-    expect(row).toHaveAttribute('data-slot', 'plain-button');
+    expect(row).toHaveAttribute('type', 'button');
     expect(screen.getByText('120.0M followers')).toBeInTheDocument();
     expect(screen.getByTestId('verified-badge')).toBeInTheDocument();
     expect(screen.getByTestId('listing-badge')).toBeInTheDocument();

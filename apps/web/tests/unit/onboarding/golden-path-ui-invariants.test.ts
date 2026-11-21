@@ -36,6 +36,10 @@ const WEB_ROOT = resolve(__dirname, '../../..');
 const GOLDEN_PATH_UI_SOURCES = [
   'components/features/onboarding/ChatProposeCheckoutCard.tsx',
   'components/features/onboarding/OnboardingToolArtifacts.tsx',
+  'components/features/onboarding/OnboardingSpotifyArtistPickerCard.tsx',
+  'components/features/onboarding/OnboardingHandleCheckCard.tsx',
+  'components/features/onboarding/OnboardingSocialLinkCard.tsx',
+  'components/features/onboarding/OnboardingArtistPickerParts.tsx',
   'components/features/onboarding/OnboardingProfileRail.tsx',
   'app/onboarding/checkout/OnboardingCheckoutClient.tsx',
   'app/claim/ClaimArtistSearch.tsx',
