@@ -37,6 +37,7 @@ import {
   selectStructuralShard,
 } from './lib/ci-structural-shards.mjs';
 import { shouldOverlapTypecheckLanes } from './lib/ci-typecheck-overlap.mjs';
+
 export {
   LANES_COVERAGE_FLOORS,
   LANES_COVERAGE_GROUP_SHARDS,
@@ -47,6 +48,7 @@ export {
   lanesReceiptRanSuite,
   selectStructuralShard,
 } from './lib/ci-structural-shards.mjs';
+
 import {
   escapeAnnotationMessage,
   escapeAnnotationProperty,
@@ -1775,7 +1777,6 @@ export function validateLaneGroups(groups, laneIds = LANE_IDS) {
 }
 
 validateLaneGroups(LANE_GROUPS);
-
 export function selectLanes(groupId) {
   // Local callers historically ran the complete cluster with no selector.
   if (groupId === undefined) return LANES;
@@ -2054,7 +2055,6 @@ export function runCopyGate(cwd = REPO_ROOT) {
 export function listAllChangedFiles(cwd = REPO_ROOT) {
   return changedFiles([], cwd);
 }
-
 let cachedRepoLanes = null;
 function repoLanes() {
   if (cachedRepoLanes) return cachedRepoLanes;
