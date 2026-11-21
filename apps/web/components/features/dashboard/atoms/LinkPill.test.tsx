@@ -47,5 +47,4 @@ describe('LinkPill', () => {
     expect(svgClass).toMatch(/h-5/);
     expect(svgClass).toMatch(/w-5/);
   });
-
 });
