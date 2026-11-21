@@ -1156,10 +1156,6 @@ function createRunContextFromEnv(env = process.env) {
 
 async function writeAdmissionOutputs(receipt, env = process.env) {
   if (env.GITHUB_OUTPUT) {
-    const sourceHeadSha =
-      typeof receipt.liveEntry?.sourceHeadSha === 'string'
-        ? receipt.liveEntry.sourceHeadSha
-        : '';
     await appendFile(
       env.GITHUB_OUTPUT,
       [
@@ -1167,7 +1163,7 @@ async function writeAdmissionOutputs(receipt, env = process.env) {
         `obsolete=${receipt.outcome === 'obsolete' ? 'true' : 'false'}`,
         `pr_number=${receipt.pr}`,
         `synthetic_head_sha=${receipt.syntheticSha}`,
-        `source_head_sha=${sourceHeadSha}`,
+        `source_head_sha=${typeof receipt.liveEntry?.sourceHeadSha === 'string' ? receipt.liveEntry.sourceHeadSha : ''}`,
         `current_queue_state=${receipt.currentQueueState}`,
         `replacement_combined_head=${receipt.replacementCombinedHead ?? ''}`,
         '',
@@ -1189,9 +1185,7 @@ async function writeAdmissionOutputs(receipt, env = process.env) {
         `| PR | #${receipt.pr} |`,
         `| Synthetic head | \`${receipt.syntheticSha}\` |`,
         `| Current queue state | \`${receipt.currentQueueState}\` |`,
-        `| Replacement combined head | \`${
-          receipt.replacementCombinedHead ?? 'none'
-        }\` |`,
+        `| Replacement combined head | \`${receipt.replacementCombinedHead ?? 'none'}\` |`,
         `| Run id | \`${receipt.runId ?? 'unknown'}\` |`,
         '',
       ].join('\n'),

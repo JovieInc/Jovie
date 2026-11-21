@@ -31,8 +31,6 @@ import {
   LANE_GROUPS,
   LANES_COVERAGE_COMMAND,
   laneFailureExcerpt,
-  parseSkipLaneIds,
-  selectLanes,
   MARKETING_CERTIFICATION_COMMAND,
   runCommandPool,
   runDesignConformance,
@@ -2803,38 +2801,4 @@ describe('staging carryover coverage contract', () => {
       }
     }
   });
-});
-
-it('parseSkipLaneIds and selectLanes drop listed typecheck/lint ids (JOV-12618)', () => {
-  expect([...parseSkipLaneIds('')]).toEqual([]);
-  expect([...parseSkipLaneIds(' typecheck , biome ,')].sort()).toEqual([
-    'biome',
-    'typecheck',
-  ]);
-
-  const previous = process.env.CI_FAST_SKIP_LANE_IDS;
-  try {
-    delete process.env.CI_FAST_SKIP_LANE_IDS;
-    const fullTypecheck = selectLanes('typecheck').map(lane => lane.id);
-    expect(fullTypecheck).toEqual([
-      'typecheck',
-      'web-tests-typecheck',
-      'web-stories-typecheck',
-    ]);
-
-    process.env.CI_FAST_SKIP_LANE_IDS =
-      'typecheck,web-tests-typecheck,web-stories-typecheck,biome,shadcn-lint-contracts,scripts-typecheck';
-    expect(selectLanes('typecheck').map(lane => lane.id)).toEqual([]);
-
-    const remaining = selectLanes('remaining').map(lane => lane.id);
-    expect(remaining).not.toContain('biome');
-    expect(remaining).not.toContain('scripts-typecheck');
-    // eslint-server-boundaries is proof-inequivalent to SV; never skipped.
-    expect(remaining).toContain('eslint-server-boundaries');
-    expect(remaining).toContain('structural');
-    expect(remaining).toContain('guardrails');
-  } finally {
-    if (previous === undefined) delete process.env.CI_FAST_SKIP_LANE_IDS;
-    else process.env.CI_FAST_SKIP_LANE_IDS = previous;
-  }
 });

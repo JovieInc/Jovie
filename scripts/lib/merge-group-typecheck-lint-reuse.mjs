@@ -166,8 +166,22 @@ export function gitTreeSha(cwd, rev) {
 }
 
 /** Workflow file used for Source Validation proof lookup (matches SV itself). */
-export const SOURCE_VALIDATION_WORKFLOW_PATH =
-  'source-validation.yml';
+export const SOURCE_VALIDATION_WORKFLOW_PATH = 'source-validation.yml';
+
+/**
+ * Parse CI_FAST_SKIP_LANE_IDS (comma-separated). Empty/missing → skip nothing.
+ * @param {string | undefined} raw
+ * @returns {Set<string>}
+ */
+export function parseSkipLaneIds(raw) {
+  const skipped = new Set();
+  if (typeof raw !== 'string' || raw.trim() === '') return skipped;
+  for (const part of raw.split(',')) {
+    const id = part.trim();
+    if (id) skipped.add(id);
+  }
+  return skipped;
+}
 
 /**
  * True when Source Validation already concluded success on the exact source

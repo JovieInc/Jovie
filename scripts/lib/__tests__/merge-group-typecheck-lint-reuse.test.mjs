@@ -1,14 +1,15 @@
 import { createHash } from 'node:crypto';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   decideTypecheckLintReuse,
   MERGE_GROUP_BASE_SENSITIVE_CI_FAST_LANES,
+  parseSkipLaneIds,
   REUSABLE_TYPECHECK_LINT_LANE_IDS,
   reusableLaneDefinitionHash,
   SOURCE_VALIDATION_WORKFLOW_PATH,
   sourceHeadHasGreenValidationProof,
 } from '../merge-group-typecheck-lint-reuse.mjs';
-import { LANE_GROUPS } from '../../ci-fast-lanes.mjs';
+import { LANE_GROUPS, selectLanes } from '../../ci-fast-lanes.mjs';
 
 const TREE_A = 'a'.repeat(40);
 const TREE_B = 'b'.repeat(40);
@@ -108,25 +109,25 @@ describe('merge-group typecheck/lint same-tree reuse (JOV-12618 / JOV-13081)', (
   it('proof lookup scopes to source-validation.yml runs (Sentry 20814924)', async () => {
     /** @type {string[]} */
     const urls = [];
-    const fetchImpl = vi.fn(async url => {
-      urls.push(String(url));
-      return {
-        ok: true,
-        async json() {
-          return {
-            workflow_runs: [
-              { head_sha: HEAD, conclusion: 'success' },
-            ],
-          };
-        },
-      };
-    });
+    const fetchImpl =
+      /** @type {typeof fetch} */
+      (async url => {
+        urls.push(String(url));
+        return /** @type {Response} */ ({
+          ok: true,
+          async json() {
+            return {
+              workflow_runs: [{ head_sha: HEAD, conclusion: 'success' }],
+            };
+          },
+        });
+      });
     await expect(
       sourceHeadHasGreenValidationProof({
         repository: 'JovieInc/Jovie',
         sourceHeadSha: HEAD,
         token: 't',
-        fetchImpl: /** @type {typeof fetch} */ (fetchImpl),
+        fetchImpl,
       })
     ).resolves.toBe(true);
     expect(urls).toHaveLength(1);
@@ -139,20 +140,46 @@ describe('merge-group typecheck/lint same-tree reuse (JOV-12618 / JOV-13081)', (
   });
 
   it('proof lookup fails open when the workflow-scoped query is empty', async () => {
-    const fetchImpl = vi.fn(async () => ({
-      ok: true,
-      async json() {
-        return { workflow_runs: [] };
-      },
-    }));
+    const fetchImpl =
+      /** @type {typeof fetch} */
+      (async () =>
+        /** @type {Response} */ ({
+          ok: true,
+          async json() {
+            return { workflow_runs: [] };
+          },
+        }));
     await expect(
       sourceHeadHasGreenValidationProof({
         repository: 'JovieInc/Jovie',
         sourceHeadSha: HEAD,
         token: 't',
-        fetchImpl: /** @type {typeof fetch} */ (fetchImpl),
+        fetchImpl,
       })
     ).resolves.toBe(false);
+  });
+
+  it('parseSkipLaneIds filters ci-fast lanes via CI_FAST_SKIP_LANE_IDS', () => {
+    expect([...parseSkipLaneIds('')]).toEqual([]);
+    expect([...parseSkipLaneIds(' typecheck , biome ,')].sort()).toEqual([
+      'biome',
+      'typecheck',
+    ]);
+    const previous = process.env.CI_FAST_SKIP_LANE_IDS;
+    try {
+      process.env.CI_FAST_SKIP_LANE_IDS =
+        'biome,shadcn-lint-contracts,scripts-typecheck';
+      // selectLanes itself does not skip; main() filters with parseSkipLaneIds.
+      const remaining = selectLanes('remaining')
+        .filter(lane => !parseSkipLaneIds(process.env.CI_FAST_SKIP_LANE_IDS).has(lane.id))
+        .map(lane => lane.id);
+      expect(remaining).not.toContain('biome');
+      expect(remaining).toContain('eslint-server-boundaries');
+      expect(remaining).toContain('structural');
+    } finally {
+      if (previous === undefined) delete process.env.CI_FAST_SKIP_LANE_IDS;
+      else process.env.CI_FAST_SKIP_LANE_IDS = previous;
+    }
   });
 
   it('reusable lanes are a subset of the hosted ci-fast lane table', () => {

@@ -108,6 +108,7 @@ import {
 } from './lib/ci-repo-lanes.mjs';
 import { STRUCTURAL_PYTEST_FILES } from './lib/ci-structural-pytest-files.mjs';
 import { MERGED_WITH_BASE_POOL_CONCURRENCY } from './lib/merged-with-base-pool-config.mjs';
+import { parseSkipLaneIds } from './lib/merge-group-typecheck-lint-reuse.mjs';
 import { scriptContractNodeArgs } from './lib/script-contract-node-args.mjs';
 import { testsAffectedBy } from './lib/test-file-dependencies.mjs';
 import { TEST_PLANNER_CONTRACT_TESTS } from './lib/test-planner-contract-tests.mjs';
@@ -1778,33 +1779,9 @@ export function validateLaneGroups(groups, laneIds = LANE_IDS) {
 
 validateLaneGroups(LANE_GROUPS);
 
-/**
- * Parse CI_FAST_SKIP_LANE_IDS (comma-separated). Unknown ids are ignored so a
- * stale skip list cannot invent lanes; empty/missing means skip nothing.
- * @param {string | undefined} raw
- * @returns {Set<string>}
- */
-export function parseSkipLaneIds(raw) {
-  const skipped = new Set();
-  if (typeof raw !== 'string' || raw.trim() === '') return skipped;
-  for (const part of raw.split(',')) {
-    const id = part.trim();
-    if (id) skipped.add(id);
-  }
-  return skipped;
-}
-
-export function selectLanes(groupId, { skipLaneIds } = {}) {
+export function selectLanes(groupId) {
   // Local callers historically ran the complete cluster with no selector.
-  const skip =
-    skipLaneIds instanceof Set
-      ? skipLaneIds
-      : parseSkipLaneIds(process.env.CI_FAST_SKIP_LANE_IDS);
-  /** @param {typeof LANES} lanes */
-  const withoutSkipped = lanes =>
-    skip.size === 0 ? lanes : lanes.filter(lane => !skip.has(lane.id));
-
-  if (groupId === undefined) return withoutSkipped(LANES);
+  if (groupId === undefined) return LANES;
   if (typeof groupId !== 'string' || groupId.trim() === '') {
     throw new Error('CI_FAST_LANE_GROUP must be a non-empty known group');
   }
@@ -1815,9 +1792,7 @@ export function selectLanes(groupId, { skipLaneIds } = {}) {
       `Unknown CI_FAST_LANE_GROUP ${JSON.stringify(groupId)}; expected one of ${Object.keys(LANE_GROUPS).join(', ')}`
     );
   }
-  return withoutSkipped(
-    selectedLaneIds.map(laneId => LANES.find(lane => lane.id === laneId))
-  );
+  return selectedLaneIds.map(laneId => LANES.find(lane => lane.id === laneId));
 }
 
 function shell(command, opts = {}) {
@@ -3400,6 +3375,10 @@ async function main() {
 
   try {
     let selectedLanes = selectLanes(laneGroup);
+    const skipLaneIds = parseSkipLaneIds(process.env.CI_FAST_SKIP_LANE_IDS);
+    if (skipLaneIds.size > 0) {
+      selectedLanes = selectedLanes.filter(lane => !skipLaneIds.has(lane.id));
+    }
     if (process.env.CI_FAST_ONLY_STRUCTURAL === 'true') {
       selectedLanes = selectedLanes.filter(lane => lane.id === 'structural');
     }
