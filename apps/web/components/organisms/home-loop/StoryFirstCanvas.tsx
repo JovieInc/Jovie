@@ -318,7 +318,8 @@ export function StoryFirstCanvas({
           // Melt uses three compositor-safe channels: opacity, translate, blur.
           // Loading → ready softens via the same opacity transition (no enter
           // keyframes — polls must not re-fire motion or thrash layout).
-          'flex min-h-0 flex-1 flex-col gap-10 transition-[opacity,transform,filter] duration-cinematic ease-cinematic',
+          // `transition` covers opacity/transform/filter without arbitrary props.
+          'flex min-h-0 flex-1 flex-col gap-10 transition duration-cinematic ease-cinematic',
           melting ? BOARD_MELT : BOARD_IDLE,
           !boardReady && !melting && 'opacity-90'
         )}
@@ -328,11 +329,11 @@ export function StoryFirstCanvas({
         // does not).
         inert={melting || undefined}
       >
-        <div className='flex flex-col gap-10 lg:flex-row lg:items-start lg:gap-14'>
+        <div className='flex flex-col gap-10 lg:flex-row lg:items-start lg:gap-12'>
           <BottleneckHero story={bottleneck} />
           <aside
             aria-label='Glance'
-            className='flex w-full shrink-0 flex-col divide-y divide-subtle lg:w-52'
+            className='flex w-full shrink-0 flex-col divide-y divide-subtle lg:w-48'
             data-testid='story-first-glance'
           >
             {glance.map(pulse => (
@@ -354,10 +355,10 @@ export function StoryFirstCanvas({
       {answer ? (
         <div
           className={cn(
-            'max-h-1/2 shrink-0 overflow-y-auto transition-[opacity,transform] duration-cinematic ease-cinematic',
+            'max-h-1/2 shrink-0 overflow-y-auto transition duration-cinematic ease-cinematic',
             melting
               ? 'translate-y-0 opacity-100'
-              : 'translate-y-0.5 opacity-90 motion-reduce:translate-y-0'
+              : 'translate-y-1 opacity-90 motion-reduce:translate-y-0'
           )}
           data-testid='story-first-answer'
         >
