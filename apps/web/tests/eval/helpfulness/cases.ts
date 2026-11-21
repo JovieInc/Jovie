@@ -5,34 +5,21 @@
  * are deterministic; `great` tells the judge what a top answer does.
  * New cases from real conversations must be anonymized: rewrite the ask in
  * your own words, map the artist onto a fixture, never paste user text.
+ *
+ * ASS-12 quota-fill cases live in cohesive modules under 500 lines (company
+ * size budget). This file keeps the core + ASS-7 seed bank and composes them.
  */
 
-import type { FixtureId } from './fixtures';
+import type { HelpfulnessCase } from './case-types';
+import { QUOTA_FAN_LINK_AD_PLAYLIST_CASES } from './cases-quota-fan-link-ad-playlist';
+import { QUOTA_OPS_CASES } from './cases-quota-ops';
+import { QUOTA_RELEASE_POST_CASES } from './cases-quota-release-post';
+import { QUOTA_SAFETY_LANES_CASES } from './cases-quota-safety-lanes';
 
-export interface HelpfulnessCase {
-  readonly id: string;
-  readonly fixture: FixtureId;
-  /** Prior turns, oldest first, for multi-turn cases. */
-  readonly history?: readonly { role: 'user' | 'assistant'; text: string }[];
-  readonly ask: string;
-  /**
-   * Grounding hard check: every group must have at least one
-   * case-insensitive match in the reply or in a tool call's input.
-   */
-  readonly mustMentionAny?: readonly (readonly string[])[];
-  /** At least one of these tools must be called. */
-  readonly expectToolsAny?: readonly string[];
-  /** Word cap for the final text; default DEFAULT_MAX_WORDS. */
-  readonly maxWords?: number;
-  /** What a great reply does. Judge guidance only. */
-  readonly great: string;
-  /** Run in the cheap CI live subset. */
-  readonly ciSubset?: boolean;
-}
+export type { HelpfulnessCase } from './case-types';
+export { DEFAULT_MAX_WORDS } from './case-types';
 
-export const DEFAULT_MAX_WORDS = 170;
-
-export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = [
+export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = ([] = [
   {
     id: 'week-plan',
     fixture: 'established',
@@ -457,4 +444,9 @@ export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = [
     great:
       'Picks one: a short nudge draft held for yes, or drop and move on - with a reason tied to Night Swim timing. Never sends the nudge unasked; does not invent that River Lantern replied.',
   },
-];
+
+  ...QUOTA_RELEASE_POST_CASES,
+  ...QUOTA_FAN_LINK_AD_PLAYLIST_CASES,
+  ...QUOTA_OPS_CASES,
+  ...QUOTA_SAFETY_LANES_CASES,
+]);

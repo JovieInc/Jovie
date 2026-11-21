@@ -70,7 +70,7 @@ import {
 } from './workers-ai';
 
 /** Hard cap on cases per run so a loop can never fan out unbounded spend. */
-export const MAX_CASES_PER_RUN = 45;
+export const MAX_CASES_PER_RUN = 120;
 
 interface Args {
   judge: string;

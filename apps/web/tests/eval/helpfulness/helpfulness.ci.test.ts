@@ -27,7 +27,7 @@ describe('helpfulness case set', () => {
     expect(HELPFULNESS_EVAL_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/);
     const ids = HELPFULNESS_CASES.map(c => c.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.length).toBeLessThanOrEqual(45);
+    expect(ids.length).toBeLessThanOrEqual(120);
     expect(HELPFULNESS_CASES.filter(c => c.ciSubset).length).toBeGreaterThan(4);
   });
 
