@@ -90,10 +90,10 @@ export const VenmoConnectDialog = memo(function VenmoConnectDialog({
           <Wallet className='h-4 w-4 text-accent-token' />
         </div>
         <div className='min-w-0 flex-1'>
-          <DialogTitle className='text-mid font-semibold tracking-tight text-primary-token'>
+          <DialogTitle>
             Connect Venmo
           </DialogTitle>
-          <DialogDescription className='mt-0.5 text-app leading-5 text-secondary-token'>
+          <DialogDescription className='mt-0.5'>
             Link your Venmo to start receiving payments from fans.
           </DialogDescription>
         </div>
