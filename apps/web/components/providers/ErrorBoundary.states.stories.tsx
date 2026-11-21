@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { ErrorBoundary } from './ErrorBoundary';
 
 function ThrowingChild(): never {
-  throw new Error('Simulated render error for the story');
+  throw new TypeError('Simulated render error for the story');
 }
 
 const meta = {
