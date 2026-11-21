@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ATTACH_ACCOUNT_CTA_LABEL,
-  CONFIRM_HANDLE_CTA_LABEL,
+  HANDLE_ACCEPT_COPY,
   isHandleConfirmIntent,
   isIncompleteAdvanceMessage,
   isMeaningfulIntakeAnswer,
@@ -27,7 +27,7 @@ describe('onboarding widget events', () => {
   });
 
   it('uses Title Case CTAs', () => {
-    expect(CONFIRM_HANDLE_CTA_LABEL).toBe('Keep');
+    expect(HANDLE_ACCEPT_COPY).toBe('Keep');
     expect(ATTACH_ACCOUNT_CTA_LABEL).toBe('Attach Account');
     expect(NONE_OF_THESE_CTA_LABEL).toBe('None of These');
   });

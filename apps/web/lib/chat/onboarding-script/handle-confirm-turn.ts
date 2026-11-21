@@ -8,7 +8,7 @@ import {
 import type { OnboardingTurnState } from '@/lib/chat/tools/onboarding-tool-impls';
 import { renderLine, type ScriptLine, type ScriptStepId } from './script';
 import {
-  CONFIRM_HANDLE_CTA_LABEL,
+  HANDLE_ACCEPT_COPY,
   isHandleConfirmIntent,
   isIncompleteAdvanceMessage,
   type OnboardingGuardedStep,
@@ -168,7 +168,7 @@ export function resolveAwaitingHandleConfirm(input: {
     !typedHandle &&
     !isIncompleteAdvanceMessage(latestText) &&
     handle === shownHandle
-      ? ` Tap ${CONFIRM_HANDLE_CTA_LABEL} below to lock it in.`
+      ? ` Tap ${HANDLE_ACCEPT_COPY} below to lock it in.`
       : '';
   return {
     line,

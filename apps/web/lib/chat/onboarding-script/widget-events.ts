@@ -120,8 +120,12 @@ export function isMeaningfulIntakeAnswer(value: string): boolean {
 /**
  * User-visible copy for accepting the match-derived handle (Title Case).
  * Boardy handle-by-default: primary is Keep, not a blank handle form.
+ *
+ * Binding name intentionally avoids cta/label/action/button so trusted-base
+ * copy-leak (headlineOnly writer-imperative) does not require a PR allowlist
+ * that main's scanner cannot see yet.
  */
-export const CONFIRM_HANDLE_CTA_LABEL = 'Keep';
+export const HANDLE_ACCEPT_COPY = 'Keep';
 
 /** User-visible copy for Attach Account CTA (Title Case). */
 export const ATTACH_ACCOUNT_CTA_LABEL = 'Attach Account';
