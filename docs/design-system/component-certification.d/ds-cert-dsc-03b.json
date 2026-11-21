@@ -1,5 +1,14 @@
 {
   "gates": {
+    "apps/web/components/features/ui/CopyableField.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/jovie/components/AudioPreviewStrip.tsx": [
       "ds-owner",
       "tokens",
@@ -90,6 +99,15 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/jovie/release-calendar/ReleaseMomentDrawer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/marketing/ClientFaqAccordion.tsx": [
       "ds-owner",
       "tokens",
@@ -100,6 +118,15 @@
       "forced-caps"
     ],
     "apps/web/components/marketing/FeatureAccordion.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/OptimizedImage.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -126,6 +153,15 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/molecules/WrappedSocialLink.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/molecules/drawer/DrawerLinkSection.tsx": [
       "ds-owner",
       "tokens",
@@ -143,11 +179,33 @@
       "a11y",
       "frontend-rules",
       "forced-caps"
+    ],
+    "apps/web/components/organisms/billing/PlanComparisonSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
     ]
   },
   "waivers": {
     "apps/web/components/jovie/components/ChatPitchCard.tsx": {
       "offline": "No offline UI exists: the card never fetches, and its only async call is navigator.clipboard.writeText, whose rejection takes the toast.error('Failed to copy') path covered by ChatPitchCard.test.tsx."
+    },
+    "apps/web/components/jovie/release-calendar/ReleaseMomentDrawer.tsx": {
+      "permission-denied": "No permission-gated UI exists: the drawer only reads a demo moment passed in as a prop and has no role or entitlement check."
+    },
+    "apps/web/components/molecules/OptimizedImage.tsx": {
+      "offline": "No offline UI exists: the component never fetches itself, and an image that cannot load takes the onError fallback covered by OptimizedImage.test.tsx."
+    },
+    "apps/web/components/molecules/WrappedSocialLink.tsx": {
+      "empty": "The component renders one link and no collection, so there is no empty state.",
+      "offline": "No offline UI exists: the wrap request failing offline takes the onError branch that falls back to the original URL, which WrappedSocialLink.test.tsx covers."
+    },
+    "apps/web/components/organisms/billing/PlanComparisonSection.tsx": {
+      "long-content": "Plan names, taglines and features come from the fixed PLAN_FEATURES registry, so no user-supplied content can overflow the cards."
     }
   }
 }

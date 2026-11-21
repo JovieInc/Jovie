@@ -23,6 +23,8 @@ function formatRelativeDays(n: number): string {
   return `T+${n}`;
 }
 
+const CHANNEL_LABEL = { email: 'Email', sms: 'SMS' } as const;
+
 export interface ReleaseMomentDrawerProps {
   readonly moment: DemoMoment | null;
   readonly onClose: () => void;
@@ -49,7 +51,7 @@ export function ReleaseMomentDrawer({
         >
           <SheetHeader>
             <div className='flex items-center gap-2'>
-              <span className='rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2 py-0.5 text-3xs font-semibold uppercase tracking-wide text-(--linear-text-secondary)'>
+              <span className='rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2 py-0.5 text-3xs font-semibold tracking-wide text-(--linear-text-secondary)'>
                 {MOMENT_LABEL[moment.momentType]}
               </span>
               <span className='text-xs text-(--linear-text-tertiary)'>
@@ -60,7 +62,7 @@ export function ReleaseMomentDrawer({
           </SheetHeader>
 
           <section className='flex flex-col gap-2'>
-            <h3 className='text-xs font-semibold uppercase tracking-wide text-(--linear-text-secondary)'>
+            <h3 className='text-xs font-semibold tracking-wide text-(--linear-text-secondary)'>
               Workflow
             </h3>
             <ul className='flex flex-col gap-1.5'>
@@ -114,11 +116,11 @@ function FanNotificationPreview({ moment }: { readonly moment: DemoMoment }) {
       className='flex flex-col gap-1.5 rounded-md border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-3'
     >
       <div className='flex items-center justify-between'>
-        <h3 className='text-xs font-semibold uppercase tracking-wide text-(--linear-text-secondary)'>
+        <h3 className='text-xs font-semibold tracking-wide text-(--linear-text-secondary)'>
           Fan Notification
         </h3>
-        <span className='rounded-full bg-emerald-500/15 px-2 py-0.5 text-3xs font-semibold uppercase text-emerald-300'>
-          {notif.channel}
+        <span className='rounded-full bg-success-subtle px-2 py-0.5 text-3xs font-semibold text-success-text'>
+          {CHANNEL_LABEL[notif.channel]}
         </span>
       </div>
       <p className='text-sm font-medium text-(--linear-text-primary)'>
