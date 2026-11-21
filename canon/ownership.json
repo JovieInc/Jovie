@@ -38,6 +38,7 @@
     {"id": "workflow:delivery-control-receipts", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/delivery-control-receipts.yml"},
     {"id": "workflow:dependabot-auto-merge", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/dependabot-auto-merge.yml"},
     {"id": "workflow:dependabot-pin-sync", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/dependabot-pin-sync.yml"},
+    {"id": "workflow:helpfulness-live-ci-subset", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/helpfulness-live-ci-subset.yml", "note": "Manual live helpfulness CI-subset via Workers AI relay (ASS-18); soft-skips missing secret / model-not-allowed until ASS-17 deploy."},
     {"id": "workflow:security-advisory-loop", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/security-advisory-loop.yml", "note": "Summer owns Dependabot advisory intake to Linear (security/Bug/area:security) with severity SLA; Gem 4h clock is backstop host; ratchet fails on breach."},
     {"id": "workflow:deprecation-intake", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/deprecation-intake.yml", "note": "Workflow header names TimWhite as accountable writer; the routine owner is the agent role here."},
     {"id": "workflow:design-gate", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/design-gate.yml"},
