@@ -690,10 +690,17 @@ jobs:
           fi
           PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
           cd apps/web
+          # Stripe TEST fixtures match claim-checkout-dogfood.yml (not Doppler):
+          # price + test account are public fixtures; keys come from GH secrets.
+          # Doppler holds CRON_SECRET + DATABASE_URL for canary reset only.
           doppler run --project jovie-web --config prd \
-            --only-secrets=CRON_SECRET,DATABASE_URL,STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY,STRIPE_TEST_ACCOUNT_ID,STRIPE_SECRET_KEY,STRIPE_WEBHOOK_SECRET \
+            --only-secrets=CRON_SECRET,DATABASE_URL \
             --no-fallback -- env -u DOPPLER_TOKEN \
               CI=true BASE_URL="$PRODUCTION_BASE_URL" PLAYWRIGHT_TEST_BASE_URL="$PRODUCTION_BASE_URL" E2E_SKIP_WEB_SERVER=1 \
+              STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
+              STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \
+              STRIPE_TEST_ACCOUNT_ID=acct_1T1DV0ASl9B9udHv \
+              STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY=price_1USkjzASl9B9udHvEYkZLYZp \
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
                 pnpm exec playwright test tests/e2e/canary-claim-checkout.spec.ts --project=chromium --reporter=line --workers=1
         env:
@@ -703,6 +710,8 @@ jobs:
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           PRODUCTION_BASE_URL_B64: ${{ needs.resolve-target.outputs.deployment_url_b64 }}
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
 
       # Step names, timestamps and one-line summaries only; no cookies, codes
       # or addresses (the step helper never records them).

@@ -1614,6 +1614,38 @@ ${fixtureCheckout}
     }
   });
 
+  // JOV-17 / JOV-9826: canary walk must use the same Stripe TEST custody as
+  // claim-checkout-dogfood (GH secrets + pinned fixtures). Doppler prd does
+  // not hold STRIPE_PRICE_* / STRIPE_TEST_ACCOUNT_ID — asking for them aborts
+  // before any cone-* steps are written.
+  it('wires canary claim-checkout Stripe TEST custody like claim-checkout-dogfood', () => {
+    const source = readFileSync(
+      join(workflowsRoot, 'postdeploy-probes.yml'),
+      'utf8'
+    );
+    const job = workflowJobBlocks(source).find(({ id }) => id === 'auth-smoke');
+    expect(job).toBeDefined();
+    if (!job) return;
+    const producer = workflowStepBlocks(job.source).find(step =>
+      step.includes('tests/e2e/canary-claim-checkout.spec.ts')
+    );
+    expect(producer).toBeDefined();
+    if (!producer) return;
+    expect(producer).toContain(
+      'STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}'
+    );
+    expect(producer).toContain(
+      'STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}'
+    );
+    expect(producer).toContain('STRIPE_TEST_ACCOUNT_ID=acct_1T1DV0ASl9B9udHv');
+    expect(producer).toContain(
+      'STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY=price_1USkjzASl9B9udHvEYkZLYZp'
+    );
+    expect(producer).not.toContain(
+      'STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY,STRIPE_TEST_ACCOUNT_ID'
+    );
+  });
+
   it('detects structured, attachment, labeled, and exact environment secrets', () => {
     const cases = [
       [
