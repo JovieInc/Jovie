@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type {
   StoryFirstBottleneck,
@@ -105,7 +106,8 @@ describe('StoryFirstCanvas', () => {
     ).toHaveAttribute('href', '/app/ov/shipping');
   });
 
-  it('shows a stages error with retry instead of zero counts', () => {
+  it('shows a stages error with retry instead of zero counts', async () => {
+    const user = userEvent.setup();
     const onRetry = vi.fn();
     render(
       <StoryFirstCanvas
@@ -121,7 +123,7 @@ describe('StoryFirstCanvas', () => {
       'error'
     );
     expect(screen.queryByTestId('story-first-stage-building')).toBeNull();
-    screen.getByRole('button', { name: 'Try again' }).click();
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
 

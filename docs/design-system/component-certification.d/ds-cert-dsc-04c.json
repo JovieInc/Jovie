@@ -23,6 +23,14 @@
       "permission-denied": "No role or gated branch; the controls show whenever the Electron runtime is present.",
       "rtl-overflow": "The row is a flex strip pinned to the window titlebar by the Electron shell; the traffic-light safe area is physically left on macOS regardless of document direction."
     },
+    "apps/web/components/organisms/HowItWorksSection.tsx": {
+      "rtl-overflow": "The section is a centered grid of text cards with no physical offsets except the decorative top border gradient, which is aria-hidden chrome."
+    },
+    "apps/web/components/organisms/OperatorListsNav.tsx": {
+      "error": "The list query's failure resolves to no data, which renders the same New List-only block as the Empty story; the create failure is a toast owned by the feedback layer and asserted in OperatorListsNav.test.tsx.",
+      "offline": "The nav makes no request of its own; the query hook owns connectivity and an offline read renders the same block as LoadingNoData.",
+      "rtl-overflow": "Rows use the shared sidebar row classes with min-w-0 truncation; direction handling belongs to the shell sidebar."
+    },
     "apps/web/components/organisms/combobox/Combobox.tsx": {
       "offline": "The combobox never fetches: options, loading and error arrive as props from the parent, so it renders identically offline.",
       "permission-denied": "The combobox has no role or gated branch; every visitor can search and pick. The detector matched the role attribute on the headless input wiring.",
@@ -42,6 +50,18 @@
     },
     "apps/web/components/organisms/footer-module/Footer.tsx": {
       "rtl-overflow": "The footer is a flex and grid layout with wrapping link rows and no physical offsets except the profile legal links pinned to the viewport corner by design; direction is owned by the page."
+    },
+    "apps/web/components/organisms/home-loop/HomeLoopAsks.tsx": {
+      "offline": "The list takes asks and answers as props and makes no request; a failed send resolves to the failed answer state shown in ErrorAnswerFailed.",
+      "permission-denied": "Asks arrive already filtered by the server; the component has no role or gated branch. The detector matched the decidable flag, which only enables the action.",
+      "rtl-overflow": "Cards are flex columns with line-clamp and min-w-0 and no physical offsets; direction is owned by the page."
+    },
+    "apps/web/components/organisms/home-loop/StoryFirstCanvas.tsx": {
+      "permission-denied": "The canvas renders the company loop for the operator route, which the server layout gates before it renders; it takes no role or permission input. The detector matched the role or status wiring on its regions."
+    },
+    "apps/web/components/organisms/opportunity-card/OpportunityRow.tsx": {
+      "permission-denied": "The row is a presentational list item driven by state and callbacks; it has no role or gated branch. The detector matched the accepted and rejected row states.",
+      "rtl-overflow": "Title and metadata truncate inside a flex row with min-w-0 and the actions are shrink-0; the row sets no physical offsets, and the swipe handlers read raw clientX by design."
     }
   },
   "gates": {
@@ -64,6 +84,24 @@
       "forced-caps"
     ],
     "apps/web/components/organisms/DesktopTitlebar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/HowItWorksSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/OperatorListsNav.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -109,6 +147,33 @@
       "forced-caps"
     ],
     "apps/web/components/organisms/footer-module/Footer.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/home-loop/HomeLoopAsks.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/home-loop/StoryFirstCanvas.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/opportunity-card/OpportunityRow.tsx": [
       "ds-owner",
       "tokens",
       "states",
