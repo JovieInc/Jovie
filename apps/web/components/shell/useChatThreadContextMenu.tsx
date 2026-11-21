@@ -1,9 +1,9 @@
 'use client';
 
 import { Archive, Copy } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { type MouseEvent, useCallback, useState } from 'react';
-import { ContextMenuOverlay } from '@/components/shell/ContextMenuOverlay';
 import type {
   ContextMenuItem,
   ContextMenuState,
@@ -13,6 +13,16 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useDeleteConversationMutation } from '@/lib/queries';
+
+// The overlay only renders after a right-click, so its code stays out of
+// every shell route's initial JS and loads on the first context menu.
+const ContextMenuOverlay = dynamic(
+  () =>
+    import('@/components/shell/ContextMenuOverlay').then(
+      m => m.ContextMenuOverlay
+    ),
+  { ssr: false }
+);
 
 type ThreadContextMenuState = ContextMenuState;
 
@@ -87,9 +97,9 @@ export function useChatThreadContextMenu(
     [buildMenuItems]
   );
 
-  const contextMenuOverlay = (
+  const contextMenuOverlay = contextMenu ? (
     <ContextMenuOverlay state={contextMenu} onClose={closeContextMenu} />
-  );
+  ) : null;
 
   return {
     onThreadContextMenu,

@@ -5,6 +5,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  PlainButton,
 } from '@jovie/ui';
 import { MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
@@ -55,7 +56,7 @@ export function CustomerNavMoreMenu({
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <Tooltip label='More' side='right' block>
           <DropdownMenuTrigger asChild>
-            <button
+            <PlainButton
               type='button'
               aria-label={open ? 'Close menu' : 'More options'}
               aria-expanded={open}
@@ -94,7 +95,7 @@ export function CustomerNavMoreMenu({
                   aria-hidden='true'
                 />
               ) : null}
-            </button>
+            </PlainButton>
           </DropdownMenuTrigger>
         </Tooltip>
         <DropdownMenuContent

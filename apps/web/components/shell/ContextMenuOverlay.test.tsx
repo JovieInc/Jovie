@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { Play } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ContextMenuOverlay } from './ContextMenuOverlay';
 import type { ContextMenuState } from './context-menu.types';
 
@@ -177,5 +178,24 @@ describe('JOV-5466 token retire', () => {
     );
     expect(container.innerHTML).toContain('shadow-(--shadow-popover)');
     expect(container.innerHTML).not.toMatch(/shadow-\[[^\]]*rgba/);
+  });
+
+  it('keeps an open menu axe-clean', async () => {
+    const state: ContextMenuState = {
+      x: 10,
+      y: 10,
+      items: [
+        { label: 'Rename', onSelect: () => undefined },
+        { kind: 'separator' },
+        { label: 'Delete', tone: 'danger', onSelect: () => undefined },
+        { label: 'Locked', disabled: true, onSelect: () => undefined },
+      ],
+    };
+    const { container } = render(
+      <ContextMenuOverlay state={state} onClose={() => undefined} />
+    );
+
+    expect(screen.getAllByRole('menuitem')).toHaveLength(3);
+    await expectNoA11yViolations(container);
   });
 });

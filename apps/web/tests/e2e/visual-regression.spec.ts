@@ -18,8 +18,12 @@ import { expect, test } from '@playwright/test';
  *
  * JOV-2081: Full viewport matrix (375, 768, 1024, 1280, 1440, 1728, 2560) added below
  * for homepage, /sign-up, and /sign-in with horizontal-scroll and CTA-clip guards.
- * Full-page auth breakpoint screenshots stay in auth-visual.spec.ts. This spec
- * retains only the distinct dark-mode auth baselines plus geometry guards.
+ * Auth page screenshots live in auth-visual.spec.ts; this spec keeps only the
+ * auth geometry guards. The dark-mode auth block was removed on 2026-11-21:
+ * theme switching ships off (lib/theme/route-policy.ts), so every route renders
+ * dark and auth-visual already covers /signin and /signup. Its two baselines
+ * were still the retired Clerk "Configuration Error" card and kept passing
+ * against the real Better Auth form inside the dark-on-dark diff tolerance.
  */
 
 // No auth — test public pages as anonymous visitor
@@ -129,41 +133,13 @@ test.describe('homepage visual regression', () => {
 });
 
 // ==========================================================================
-// 2. Auth pages — distinct dark-mode regression coverage
-// ==========================================================================
-test.describe('auth pages dark-mode visual regression', () => {
-  test.skip(
-    shouldSkipAuthVisual,
-    'E2E_SKIP_AUTH — Clerk secrets unavailable in visual CI'
-  );
-
-  for (const route of ['/signin', '/signup'] as const) {
-    test(`${route} dark mode`, async ({ page }) => {
-      await blockAnalytics(page);
-      await page.emulateMedia({ colorScheme: 'dark' });
-      await page.goto(route, {
-        waitUntil: 'networkidle',
-        timeout: 60_000,
-      });
-
-      if (isClerkRedirect(page.url())) {
-        test.skip(true, 'Clerk handshake redirect');
-        return;
-      }
-
-      await expect(
-        page.locator('form, [data-clerk-component]').first()
-      ).toBeVisible({ timeout: 15_000 });
-
-      await expect(page).toHaveScreenshot(`${route.slice(1)}-dark.png`, {
-        fullPage: false,
-      });
-    });
-  }
-});
-
-// ==========================================================================
-// 3. Pricing page — light/dark mode regressions
+// 2. Pricing page — one shared baseline while light mode is uncertified
+//
+// Theme switching ships off (THEME_SWITCHING_ENABLED in
+// lib/theme/route-policy.ts), so a light-scheme visitor must see the same dark
+// page. Both tests therefore compare against one `pricing.png`: the light test
+// is the tripwire that fails if light mode leaks out before it is certified.
+// Split the baseline again when light mode ships.
 // ==========================================================================
 test.describe('pricing visual regression', () => {
   test('dark mode', async ({ page }) => {
@@ -185,7 +161,7 @@ test.describe('pricing visual regression', () => {
     });
     await waitForVisualReadiness(page, 'pricing');
 
-    await expect(page).toHaveScreenshot('pricing-dark.png', {
+    await expect(page).toHaveScreenshot('pricing.png', {
       fullPage: false,
     });
   });
@@ -209,7 +185,7 @@ test.describe('pricing visual regression', () => {
     });
     await waitForVisualReadiness(page, 'pricing');
 
-    await expect(page).toHaveScreenshot('pricing-light.png', {
+    await expect(page).toHaveScreenshot('pricing.png', {
       fullPage: false,
     });
   });

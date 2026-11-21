@@ -95,4 +95,25 @@ describe('YouTubeChannelPilotPanel', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText('Channel Ledger')).not.toBeInTheDocument();
   });
+
+  it('shows the authorized-channel eyebrow label without forced uppercase classes', () => {
+    render(
+      <YouTubeChannelPilotPanel
+        workspace={{
+          state: 'connected',
+          authorizedChannelId: 'UC-owned',
+          scopes: [],
+          lastSyncAt: '2026-09-01T12:00:00.000Z',
+          errorMessage: null,
+          videos: [],
+        }}
+      />
+    );
+
+    const label = screen.getByText('Authorized Channel');
+    expect(label).not.toHaveClass('uppercase');
+    expect(
+      screen.getByTestId('youtube-channel-awaiting-sync')
+    ).toBeInTheDocument();
+  });
 });

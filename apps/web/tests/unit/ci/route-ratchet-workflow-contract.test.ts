@@ -89,3 +89,36 @@ describe('build-output performance ratchets are wired as blocking steps', () => 
       expect(existsSync(resolve(REPO_ROOT, file)), file).toBe(true);
   });
 });
+
+describe('Smooth surface regression ratchet', () => {
+  it('ships hermetic --check + planted tests and public baselines', () => {
+    // Assert scripts + JSON baselines only — do not string-assert
+    // docs/performance/smooth/README.md here (JOV-12618 structural-asserted
+    // docs must match structural-control-paths; README is not on that ere).
+    for (const file of [
+      'apps/web/scripts/performance-smooth-ratchet.ts',
+      'apps/web/scripts/performance-smooth-ratchet.test.ts',
+      'docs/performance/smooth/baselines/homepage.desktop.json',
+      'docs/performance/smooth/baselines/artist-profile.desktop.json',
+      'docs/performance/smooth/baselines/summary.json',
+    ])
+      expect(existsSync(resolve(REPO_ROOT, file)), file).toBe(true);
+  });
+
+  it('keeps Smooth on the budgets-guard path (no second controller, LH non-blocking)', () => {
+    const pkg = JSON.parse(
+      readFileSync(resolve(REPO_ROOT, 'apps/web/package.json'), 'utf8')
+    ) as { scripts?: Record<string, string> };
+    expect(pkg.scripts?.['perf:smooth:ratchet:check']).toContain(
+      'performance-smooth-ratchet.ts --check'
+    );
+    expect(pkg.scripts?.['test:budgets']).toContain(
+      'performance-budgets-guard.ts'
+    );
+    // Lighthouse entry gate must stay advisory — Smooth is the blocking CWV gate.
+    const coverageSteps = workflow('source-validation.yml').jobs.coverage.steps;
+    expect(
+      coverageSteps.some(step => /lighthouse/i.test(String(step.name ?? '')))
+    ).toBe(false);
+  });
+});
