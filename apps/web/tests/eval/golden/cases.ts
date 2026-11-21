@@ -334,4 +334,70 @@ export const GOLDEN_CASES: readonly GoldenCase[] = [
     groundTruth:
       'Never invent popularity, streams, or peer benchmarks. Prefer visible catalog dates and propose one dated Jovie recovery move. Do not narrate popularity scores to the artist (ASS-9 / ASS-16 / ASS-25).',
   },
+  {
+    name: 'One-rec gap: upcoming first sentence with days-left',
+    userPrompt: 'when is my next release?',
+    releaseOverrides: [
+      {
+        title: 'Night Swim',
+        releaseType: 'single',
+        releaseDate: '2099-12-05T00:00:00Z',
+        totalTracks: 1,
+      },
+    ],
+    mustSay: ['night swim', 'tomorrow', 'pre-save'],
+    mustNotSay: ['say the word and i can help', 'what are we working on'],
+    harmfulBlacklist: [
+      'say the word and i can help',
+      'smart links, release plan',
+      'here are some options',
+    ],
+    groundTruth:
+      'When Discography Context has an UPCOMING release, greeting / what’s-next / pre-save turns must name that release and the days left in the first content sentence, then give one dated prep move — not a menu of future help options (ASS-16 residual beyond #26382 title-in-window).',
+  },
+  {
+    name: 'One-rec gap: collab drafts one target',
+    userPrompt: 'who should I collaborate with?',
+    releaseOverrides: [
+      {
+        title: 'Night Swim',
+        releaseType: 'single',
+        releaseDate: '2099-12-05T00:00:00Z',
+        totalTracks: 1,
+      },
+    ],
+    mustSay: ['night swim', 'draft', 'artist'],
+    mustNotSay: ['name your pick', 'say the word and name your pick'],
+    harmfulBlacklist: [
+      'name your pick',
+      'say the word and name your pick',
+      'which artist would you',
+    ],
+    groundTruth:
+      'Collab / pitch / outreach: choose one target and draft. Do not ask the artist to pick from a list Jovie already produced when a dated Night Swim move exists (ASS-16 residual beyond #26382 pick-menu ban).',
+  },
+  {
+    name: 'One-rec gap: do-it calls the pitch tool',
+    userPrompt: 'ok do it',
+    releaseOverrides: [
+      {
+        title: 'Night Swim',
+        releaseType: 'single',
+        releaseDate: '2099-12-05T00:00:00Z',
+        totalTracks: 1,
+      },
+    ],
+    mustSay: ['night swim', 'pitch'],
+    mustNotSay: [
+      'three things are missing',
+      'confirm, edit, or say unknown',
+      'one at a time',
+    ],
+    harmfulBlacklist: [
+      'three things are missing',
+      'confirm, edit, or say unknown',
+    ],
+    groundTruth:
+      'After “ok do it,” call generateReleasePitch in-turn with known fields (Night Swim). Multi-question intake is not a next move when the tool call is available (ASS-16 residual; hermetic expected_tool + reply shape).',
+  },
 ] as const;
