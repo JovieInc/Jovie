@@ -149,7 +149,7 @@ describe('HeroSpotifySearch', () => {
       expect(input.closest('[data-component="composite-field"]')).toHaveClass(
         'contents'
       );
-      expect(input).toHaveClass('homepage-name-search__input');
+      expect(input).toHaveAttribute('role', 'combobox');
     });
 
     it('uses the shared editorial aura treatment for homepage pills', () => {

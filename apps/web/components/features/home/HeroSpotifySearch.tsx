@@ -444,10 +444,7 @@ export function HeroSpotifySearch({
               autoCapitalize='none'
               autoCorrect='off'
               autoComplete='off'
-              className={cn(
-                'min-w-0 flex-1',
-                isEditorial && 'homepage-name-search__input'
-              )}
+              className='min-w-0 flex-1'
               role='combobox'
               aria-invalid={isInvalidQuery || undefined}
               aria-describedby={

@@ -139,7 +139,7 @@ export function ClaimHandleForm({
   const isDisabled = navigating || hasClientError;
   const submitButtonSize = size === 'display' ? 'lg' : 'md';
   const submitButtonClassName = cn(
-    'shrink-0 gap-1.5 rounded-lg focus-ring-themed',
+    'shrink-0 rounded-lg',
     isHero && 'h-10 px-4 text-xs',
     size === 'display' && 'h-16 rounded-xl px-6 text-base sm:px-7',
     !isHeroLike && 'h-9 px-3.5 sm:px-4'

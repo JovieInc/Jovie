@@ -238,11 +238,15 @@ export function OnboardingInterviewModal({
           </PlainButton>
         </div>
 
-        <DialogTitle className='mb-2 text-mid font-medium text-primary-token'>
-          Quick Question
+        <DialogTitle asChild>
+          <h2 className='mb-2 text-mid font-medium text-primary-token'>
+            Quick Question
+          </h2>
         </DialogTitle>
-        <DialogDescription className='mb-4 text-app leading-5 text-secondary-token'>
-          Takes about 30 seconds. Your answers go straight to the founders.
+        <DialogDescription asChild>
+          <p className='mb-4 text-app leading-5 text-secondary-token'>
+            Takes about 30 seconds. Your answers go straight to the founders.
+          </p>
         </DialogDescription>
 
         <div className='mb-3 text-app font-medium leading-5 text-primary-token'>

@@ -2129,13 +2129,13 @@ body:has(.home-viewport)::-webkit-scrollbar {
   background: var(--homepage-editorial-field);
 }
 
-.homepage-name-search__input {
+.homepage-name-search__field input {
   font-size: var(--text-lg);
   line-height: var(--leading-tight);
   letter-spacing: -0.005em;
 }
 
-.homepage-name-search__input::placeholder {
+.homepage-name-search__field input::placeholder {
   color: var(--color-text-tertiary-token);
 }
 
@@ -2151,7 +2151,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
    own focus ring traces the pill edge, never a square box inside it. The
    glyph and the submit button sit above it; the padding keeps typed text
    clear of both. */
-.homepage-name-search__field .homepage-name-search__input {
+.homepage-name-search__field input {
   position: absolute;
   inset: 0;
   z-index: 0;
@@ -2162,7 +2162,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   padding-right: 7.5rem;
 }
 
-.homepage-name-search__field .homepage-name-search__input:focus-visible {
+.homepage-name-search__field input:focus-visible {
   /* Inset: the field clips at the pill edge, so the ring draws inside it. */
   box-shadow: inset 0 0 0 var(--space-0-5, 2px) var(--color-focus);
 }
@@ -2220,7 +2220,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
     padding-left: var(--space-4);
   }
 
-  .homepage-name-search__input {
+  .homepage-name-search__field input {
     font-size: var(--text-base);
   }
 }
