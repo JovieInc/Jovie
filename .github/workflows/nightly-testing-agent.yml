@@ -53,24 +53,27 @@ jobs:
       # Restore prior skill-delta before select so ranking compounds across nights.
       # github-token-budget: 11 calls/run - one prior-run list plus up to 10 skill-delta downloads
       - name: Restore prior skill delta
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           prior_dir=apps/web/test-results/nightly-agent/prior
           mkdir -p "$prior_dir"
-          mapfile -t run_ids < <(
-            node packages/api-client/cli.ts gh --priority default -- run list \
-              --workflow=nightly-testing-agent.yml \
-              --branch main \
-              --status success \
-              --limit 10 \
-              --json databaseId \
-              --jq '.[].databaseId'
-          )
+          run_ids=()
+          if list_out="$(node packages/api-client/cli.ts gh --priority default -- run list \
+            --workflow=nightly-testing-agent.yml \
+            --branch main \
+            --status success \
+            --limit 10 \
+            --json databaseId \
+            --jq '.[].databaseId')"; then
+            mapfile -t run_ids <<<"$list_out"
+          else
+            echo "Prior-run list unavailable; select will rank without skill-delta memory."
+            exit 0
+          fi
           for run_id in "${run_ids[@]}"; do
-            if [ "$run_id" = "${{ github.run_id }}" ]; then
+            if [ -z "$run_id" ] || [ "$run_id" = "${{ github.run_id }}" ]; then
               continue
             fi
             if node packages/api-client/cli.ts gh --priority default -- run download "$run_id" \
