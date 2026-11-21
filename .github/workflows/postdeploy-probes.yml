@@ -681,11 +681,19 @@ jobs:
       # JOV-9826 / JOV-6920: the canary claim checkout walk (reset -> claim ->
       # Stripe TEST-MODE payment -> activation -> reset). Stripe test mode only;
       # getStripeContextOrSkip fails closed on a live key or wrong price.
+      # Soft-skip when the landed SHA predates the producer (same pattern as
+      # Derive the canary passage key / prod-cert-start-chat above).
       - name: Run canary claim checkout walk (JOV-9826)
         id: canary-checkout
         if: steps.check-creds.outputs.skip != 'true'
         run: |
           set -euo pipefail
+          # Job checks out the landed production SHA; older SHAs lack the
+          # canary producer and must not fail auth-smoke.
+          if [ ! -f apps/web/tests/e2e/canary-claim-checkout.spec.ts ]; then
+            echo "::notice::Landed build predates canary-claim-checkout.spec.ts; JOV-9826 walk skipped for it."
+            exit 0
+          fi
           PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
           cd apps/web
           doppler run --project jovie-web --config prd \
