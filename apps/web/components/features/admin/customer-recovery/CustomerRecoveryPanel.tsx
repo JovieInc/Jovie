@@ -1,4 +1,4 @@
-import { Badge, Input } from '@jovie/ui';
+import { Badge, Input, PlainButton } from '@jovie/ui';
 import { Search } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
@@ -181,7 +181,7 @@ export function CustomerRecoveryPanel({
         className='flex items-center gap-2'
         data-testid='customer-recovery-search'
       >
-        <input type='hidden' name='view' value='recovery' />
+        <Input type='hidden' name='view' value='recovery' readOnly />
         <Input
           name='q'
           defaultValue={result.search}
@@ -190,12 +190,12 @@ export function CustomerRecoveryPanel({
           autoComplete='off'
           className='max-w-sm'
         />
-        <button
+        <PlainButton
           type='submit'
           className='inline-flex items-center gap-1 text-app text-secondary-token hover:text-primary-token'
         >
           <Search className='h-4 w-4' aria-hidden /> Search
-        </button>
+        </PlainButton>
       </form>
 
       {result.matches.length > 1 && (

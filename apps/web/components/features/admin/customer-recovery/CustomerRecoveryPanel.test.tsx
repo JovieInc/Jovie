@@ -1,9 +1,11 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type {
   CustomerRecoveryDossier,
   CustomerRecoveryResult,
 } from '@/lib/admin/customer-recovery';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { CustomerRecoveryPanel } from './CustomerRecoveryPanel';
 
 vi.mock('./RerunIngestionButton', () => ({
@@ -212,5 +214,49 @@ describe('CustomerRecoveryPanel', () => {
     expect(
       screen.getByText('Wait for the current run to finish.')
     ).toBeInTheDocument();
+  });
+
+  it('keeps the typed identifier and focus across a rerender and Escape', async () => {
+    const user = userEvent.setup();
+    const { container, rerender } = render(
+      <CustomerRecoveryPanel result={buildResult({ search: '' })} />
+    );
+    const input = screen.getByRole('textbox', {
+      name: 'Customer Identifier',
+    });
+    await user.type(input, 'ari@example.com');
+    rerender(<CustomerRecoveryPanel result={buildResult({ search: '' })} />);
+    await user.keyboard('{Escape}');
+
+    expect(screen.getByRole('textbox', { name: 'Customer Identifier' })).toBe(
+      input
+    );
+    expect(input).toHaveValue('ari@example.com');
+    expect(input).toHaveFocus();
+    await expectNoA11yViolations(container);
+  });
+
+  it('submits the search from the keyboard through a PlainButton that keeps its look', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <CustomerRecoveryPanel result={buildResult({ search: '' })} />
+    );
+    const form = screen.getByTestId('customer-recovery-search');
+    const submit = vi.fn((event: Event) => event.preventDefault());
+    form.addEventListener('submit', submit);
+
+    const button = screen.getByRole('button', { name: 'Search' });
+    expect(button).toHaveAttribute('type', 'submit');
+    expect(button).toHaveClass('text-secondary-token');
+    expect(form.querySelector('input[name="view"]')).toHaveAttribute(
+      'type',
+      'hidden'
+    );
+    await user.type(
+      screen.getByRole('textbox', { name: 'Customer Identifier' }),
+      'phoebe{Enter}'
+    );
+    expect(submit).toHaveBeenCalledTimes(1);
+    await expectNoA11yViolations(container);
   });
 });
