@@ -1,15 +1,4 @@
-/**
- * Pure Assistants CI ratchet gate.
- *
- * Fails when:
- * 1. Suite median drops below the recorded baseline median (skipped while unrun)
- * 2. Any safety case fails
- * 3. Invented-facts count > 0
- * 4. Chat jank checks regress
- *
- * Budget exhaustion may force `source: 'cache'`; that never soft-passes (2)–(4).
- */
-
+/** * Pure Assistants CI ratchet gate. */
 import {
   ASSISTANTS_RATCHET_SCHEMA_VERSION,
   ASSISTANTS_RUBRIC_VERSION,

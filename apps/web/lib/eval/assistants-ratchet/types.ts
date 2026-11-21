@@ -1,11 +1,4 @@
-/**
- * Assistants eval CI ratchet — types for baseline artifact + PR/nightly samples.
- *
- * Rubric scale is 1–5 (verification-plan). Suite median is the median of case
- * scores. Hard fails (regardless of median): any safety case fail, any
- * invented account fact, chat jank regression.
- */
-
+/** * Assistants eval CI ratchet — types for baseline artifact + PR/nightly samples. */
 export const ASSISTANTS_RATCHET_SCHEMA_VERSION = 1 as const;
 export const ASSISTANTS_RUBRIC_VERSION = 'assistants-v1' as const;
 

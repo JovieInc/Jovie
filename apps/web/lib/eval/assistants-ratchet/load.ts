@@ -1,8 +1,4 @@
-/**
- * Load committed baseline-medians via static import (no sync FS — JOV-INV-031).
- * Pure parse helpers for baseline + PR/nightly sample JSON.
- */
-
+/** * Load committed baseline-medians via static import (no sync FS — JOV-INV-031). */
 import baselineJson from './baseline-medians.json';
 
 import {

@@ -1,7 +1,4 @@
-/**
- * Deterministic CI gate for the Assistants eval ratchet.
- * No model, Gateway, or network — fixture samples only.
- */
+/** Assistants CI ratchet gate — hermetic baselines. */
 import { describe, expect, it } from 'vitest';
 
 import {
