@@ -27,6 +27,11 @@ import {
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import {
+  ActionDialIconTrack,
+  ActionDialSelectionCue,
+  actionDialStreamIcon,
+} from './ActionDialChrome';
+import {
   DIAL_HINT_SEEN_KEY,
   type DialGesture,
   dialBrowserScheduler,
@@ -41,11 +46,6 @@ import {
   TYPEAHEAD_RESET_MS,
   writeHintSeen,
 } from './action-dial-helpers';
-import {
-  ActionDialIconTrack,
-  ActionDialSelectionCue,
-  actionDialStreamIcon,
-} from './ActionDialChrome';
 import { SmartLinkProviderButton } from './SmartLinkProviderButton';
 
 export { DIAL_HINT_SEEN_KEY };
