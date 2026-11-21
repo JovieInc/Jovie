@@ -6,7 +6,19 @@ import { PrimaryDspRow } from './ListenNowForm.parts';
 const meta = {
   title: 'Dashboard/Organisms/ListenNowForm/Parts',
   component: PrimaryDspRow,
-  parameters: { layout: 'centered' },
+  parameters: {
+    layout: 'centered',
+    jovie: {
+      uncoveredProps: [
+        'link',
+        'isDarkTheme',
+        'usedPlatforms',
+        'onPlatformChange',
+        'onUrlChange',
+        'onRemove',
+      ],
+    },
+  },
   decorators: [
     Story => (
       <div className='w-full max-w-2xl'>
