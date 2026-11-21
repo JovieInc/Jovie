@@ -1,4 +1,4 @@
-import { Button } from '@jovie/ui';
+import { PlainButton } from '@jovie/ui';
 import type { ShortcutHint } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
 import { Tooltip } from './Tooltip';
@@ -38,17 +38,15 @@ export function IconBtn({
   const isGhost = tone === 'ghost';
   return (
     <Tooltip label={label} shortcut={shortcut} side={tooltipSide}>
-      <Button
+      <PlainButton
         type='button'
-        variant='ghost'
-        size='icon-sm'
         onClick={onClick}
         onPointerEnter={onPointerEnter}
         onFocus={onFocus}
         data-testid={testId}
         className={cn(
           // Square at rest (no border); full circle + soft fill on hover only (JOV-3511).
-          'grid place-items-center rounded-md border border-transparent transition-[background-color,color,border-color,border-radius] duration-subtle ease-subtle hover:rounded-full hover:border-subtle',
+          'h-7 w-7 grid place-items-center rounded-md border border-transparent transition-[background-color,color,border-color,border-radius] duration-subtle ease-subtle focus-ring-themed hover:rounded-full hover:border-subtle',
           isGhost
             ? active
               ? 'rounded-full border-subtle text-primary-token bg-surface-1/40'
@@ -61,7 +59,7 @@ export function IconBtn({
         aria-label={label}
       >
         {children}
-      </Button>
+      </PlainButton>
     </Tooltip>
   );
 }

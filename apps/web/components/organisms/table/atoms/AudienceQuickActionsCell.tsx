@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { PlainButton } from '@jovie/ui';
 import { Download, ShieldBan } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -26,28 +26,24 @@ export function AudienceQuickActionsCell({
       onClick={e => e.stopPropagation()}
       onKeyDown={e => e.stopPropagation()}
     >
-      <Button
+      <PlainButton
         type='button'
-        variant='ghost'
-        size='icon-sm'
         onClick={onExport}
-        className='rounded-md text-tertiary-token hover:bg-interactive-hover hover:text-secondary-token focus-visible:bg-interactive-hover'
+        className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
         aria-label='Export Contact'
         title='Export vCard'
       >
         <Download className='h-4 w-4' />
-      </Button>
-      <Button
+      </PlainButton>
+      <PlainButton
         type='button'
-        variant='ghost'
-        size='icon-sm'
         onClick={onBlock}
-        className='rounded-md text-tertiary-token hover:bg-error/10 hover:text-error focus-visible:bg-interactive-hover'
+        className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:bg-interactive-hover'
         aria-label='Block Member'
         title='Block'
       >
         <ShieldBan className='h-4 w-4' />
-      </Button>
+      </PlainButton>
     </div>
   );
 }

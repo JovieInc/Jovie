@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { PlainButton } from '@jovie/ui';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -53,12 +53,11 @@ export function ActivityHoverRow({
   className,
 }: ActivityHoverRowProps) {
   return (
-    <Button
+    <PlainButton
       type='button'
-      variant='ghost'
       onClick={onClick}
       className={cn(
-        'group/act flex h-8 min-h-0 w-auto items-center justify-start gap-2.5 border-0 px-2 rounded-md text-xs font-normal transition-colors duration-subtle ease-subtle',
+        'group/act flex items-center gap-2.5 h-8 px-2 rounded-md text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle',
         danger
           ? 'text-error-text/85 hover:bg-error/10 hover:text-error-text'
           : 'text-secondary-token hover:bg-surface-1/50 hover:text-primary-token',
@@ -82,6 +81,6 @@ export function ActivityHoverRow({
       <span className='text-3xs tracking-normal text-quaternary-token group-hover/act:text-tertiary-token transition-colors duration-subtle ease-subtle'>
         {meta}
       </span>
-    </Button>
+    </PlainButton>
   );
 }

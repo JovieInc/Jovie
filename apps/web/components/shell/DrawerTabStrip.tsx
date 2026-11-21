@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { PlainButton } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 
 export interface DrawerTab<T extends string = string> {
@@ -56,22 +56,21 @@ export function DrawerTabStrip<T extends string>({
         {tabs.map(t => {
           const on = active === t.value;
           return (
-            <Button
+            <PlainButton
               key={t.value}
               type='button'
-              variant='ghost'
               role='tab'
               aria-selected={on}
               onClick={() => onChange(t.value)}
               className={cn(
-                'h-7 min-h-0 flex-1 border-0 px-3 rounded-full text-2xs font-medium transition-colors duration-subtle ease-subtle',
+                'flex-1 h-7 px-3 rounded-full text-2xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle',
                 on
-                  ? 'bg-(--surface-2) text-primary-token ring-1 ring-inset ring-(--app-shell-border) hover:bg-(--surface-2)'
-                  : 'text-tertiary-token hover:bg-transparent hover:text-primary-token'
+                  ? 'bg-(--surface-2) text-primary-token ring-1 ring-inset ring-(--app-shell-border)'
+                  : 'text-tertiary-token hover:text-primary-token'
               )}
             >
               {t.label}
-            </Button>
+            </PlainButton>
           );
         })}
       </div>

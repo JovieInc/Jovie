@@ -159,6 +159,24 @@
       "frontend-rules",
       "forced-caps"
     ],
+    "apps/web/components/organisms/table/atoms/TableCheckboxCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/molecules/PageToolbarSelect.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
     "apps/web/components/shell/ActivityHoverRow.tsx": [
       "ds-owner",
       "tokens",
@@ -214,6 +232,15 @@
       "forced-caps"
     ],
     "apps/web/components/shell/EntityThreadGlyph.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/HeaderSearchSurfaceFromContext.tsx": [
       "ds-owner",
       "tokens",
       "states",

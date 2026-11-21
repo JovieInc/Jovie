@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { PlainButton } from '@jovie/ui';
 import { ChevronDown } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
@@ -79,13 +79,12 @@ export function SidebarSection({
 
   return (
     <div className={className}>
-      <Button
+      <PlainButton
         type='button'
-        variant='ghost'
         onClick={onToggle}
         className={cn(
           SIDEBAR_ENTRY_ROW_CLASS,
-          'relative min-h-0 w-full justify-start rounded-md border-0 font-normal text-primary-token hover:bg-sidebar-accent transition-[background-color] duration-subtle ease-subtle'
+          'relative w-full rounded-md hover:bg-sidebar-accent transition-[background-color] duration-subtle ease-subtle'
         )}
         aria-expanded={open}
       >
@@ -100,7 +99,7 @@ export function SidebarSection({
         <span className='text-app font-caption truncate text-primary-token'>
           {name}
         </span>
-      </Button>
+      </PlainButton>
       <div
         className='overflow-hidden'
         style={{
