@@ -51,8 +51,10 @@ export const SCREEN_CERTIFICATION_TEST_MARKER =
 
 /**
  * Paths that require screen-certification.test.mjs on the PR merged-with-base
- * pool. Covers the certification module, its screen-* / browser-owned-input /
- * product-reference helpers, registry data, and pool-control modules.
+ * pool. Covers the certification module, screen-proof-emit, screen-* /
+ * browser-owned-input / product-reference helpers, registry data,
+ * screenshots.yml + product-screenshots specs the suite reads, and
+ * pool-control modules. Shared child-process.mjs stays out (too broad).
  * Latency-sensitive stays a separate always-on segment after the package.json
  * split. Merge-group structural still runs full `invariants:check`.
  */
