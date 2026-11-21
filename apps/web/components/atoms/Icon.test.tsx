@@ -99,6 +99,30 @@ describe('Icon', () => {
     expect(icon).toHaveClass('text-secondary-token');
   });
 
+  it('applies optical stroke from size and Tailwind className (JOV-14004)', () => {
+    render(<Icon name='Bell' size={16} data-testid='chrome' />);
+    expect(screen.getByTestId('chrome')).toHaveAttribute('stroke-width', '1.5');
+
+    render(<Icon name='Bell' className='h-6 w-6' data-testid='feature' />);
+    expect(screen.getByTestId('feature')).toHaveAttribute(
+      'stroke-width',
+      '1.75'
+    );
+
+    render(
+      <Icon name='Bell' size={16} strokeWidth={2} data-testid='override' />
+    );
+    expect(screen.getByTestId('override')).toHaveAttribute('stroke-width', '2');
+  });
+
+  it('honors raw aria-label when ariaLabel is omitted', () => {
+    render(<Icon name='Bell' aria-label='Alerts' data-testid='raw' />);
+    const icon = screen.getByTestId('raw');
+    expect(icon).toHaveAttribute('aria-label', 'Alerts');
+    expect(icon).toHaveAttribute('aria-hidden', 'false');
+    expect(icon).toHaveAttribute('role', 'img');
+  });
+
   it('has no axe violations beside right-to-left text', async () => {
     const { container } = render(
       <p dir='rtl'>

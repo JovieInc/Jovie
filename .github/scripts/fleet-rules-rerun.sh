@@ -9,8 +9,9 @@
 # used to end the re-run hop red with nothing re-run (run 40160088831, 2026-10-25: this
 # script's jobs lookup deferred 19 minutes to the next reset on the then-shared github.token
 # bucket). This script absorbs its own deferrals: it prints a never-a-verdict notice and
-# exits 0 having re-run nothing — the hop stays green, and PR Fleet Rules' relay and the
-# quota-deferred-heads doctor own the retry. A rerun POST that loses a re-run race (HTTP
+# exits 0 having re-run nothing — the hop stays green. A lone PR Ready deferral is
+# retried once after the log's advertised reset by the fix-red quota route. The
+# quota-deferred-heads doctor remains the PR Fleet Rules backstop. A rerun POST that loses a re-run race (HTTP
 # 409) is done, not a failure: this script runs from both the hop and the evidence job's
 # tail, and both can re-run the same failed run for one head (run 41248056847, 2026-10-31:
 # the hop exited 1 having re-run nothing after a failed POST); the loser's POST 409s while
@@ -27,7 +28,7 @@ fi
 # deferred_exit: absorb a quota deferral as a green no-op; the deferral warning from the
 # api client has already reached stderr. Never a pass: nothing is re-run.
 deferred_exit() {
-  echo "::notice::github-quota-deferred; fleet-rules-rerun made no decision and re-ran nothing (quota/outage, never a verdict on this change). The PR Fleet Rules relay and the quota-deferred-heads doctor own the retry."
+  echo "::notice::github-quota-deferred; fleet-rules-rerun made no decision and re-ran nothing (quota/outage, never a verdict on this change). The fix-red quota route reruns a lone PR Ready once after the advertised reset. The quota-deferred-heads doctor remains the PR Fleet Rules backstop."
   exit 0
 }
 

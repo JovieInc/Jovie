@@ -33,5 +33,7 @@ describe('SmartLinkArtwork', () => {
     const icon = container.querySelector('svg.lucide-audio-lines');
     expect(icon).toBeTruthy();
     expect(container.querySelector('svg.lucide-disc-3')).toBeNull();
+    expect(icon).toHaveClass('text-on-media/20');
+    expect(container.innerHTML).not.toMatch(/(?:bg|ring|text)-white\//);
   });
 });

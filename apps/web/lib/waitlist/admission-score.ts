@@ -104,7 +104,12 @@ export function scoreAdmissionCandidate(
   let intent = 0;
   if (inputs.releaseStage && ACTIVE_STAGES.includes(inputs.releaseStage)) {
     intent += 12;
-  } else if (inputs.releaseStage === 'between_releases') {
+  } else if (
+    inputs.releaseStage === 'between_releases' ||
+    (inputs.releaseStage === 'no_active_release' &&
+      inputs.catalogReleases !== null &&
+      inputs.catalogReleases > 0)
+  ) {
     intent += 4;
   }
   if (inputs.chatTurns >= COMPLETED_CHAT_TURNS) intent += 8;

@@ -50,7 +50,7 @@
   border: 0;
   outline: none;
   background: transparent;
-  color: var(--color-text-primary);
+  color: var(--color-text-primary-token);
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
@@ -71,11 +71,16 @@
 }
 
 .auth-provider-button:enabled:hover .auth-provider-face {
-  background: rgb(255 255 255 / 0.05);
+  background: color-mix(
+    in oklab,
+    var(--color-text-primary-token) 5%,
+    transparent
+  );
 }
 
 .auth-provider-button:focus-visible .auth-provider-face {
-  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.5);
+  box-shadow: 0 0 0 2px
+    color-mix(in oklab, var(--color-text-primary-token) 50%, transparent);
 }
 
 /* Hydration disables the control; that wait is not a pending request. */
@@ -329,7 +334,7 @@
 /* Reserve balanced space only when the badge exists so Apple/Google labels
    remain centered and never run under Clerk's inline "Last used" badge. */
 :is(.cl-signIn-root, .cl-signUp-root)
-.cl-socialButtonsBlockButton:has(.cl-lastAuthenticationStrategyBadge) {
+  .cl-socialButtonsBlockButton:has(.cl-lastAuthenticationStrategyBadge) {
   padding-inline: 4.5rem;
 }
 

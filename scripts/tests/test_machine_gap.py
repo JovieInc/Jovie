@@ -34,6 +34,35 @@ class GateTest(unittest.TestCase):
         self.assertEqual(pair, "fix-red-6c3efaf400")
         self.assertNotEqual(solo, pair)
 
+    def test_a_superseded_cancelled_run_is_not_its_own_fix_red_class(self):
+        # 2026-11-11 #24646: Fleet Rules Evidence cancelled at 20:57:09Z and succeeded
+        # at 20:57:46Z. The rollup stayed FAILURE and hashed fix-red-72d43f8ba6.
+        superseded = {"statusCheckRollup": [
+            {"name": "Fleet Rules Evidence", "conclusion": "CANCELLED",
+             "completedAt": "2026-11-11T20:57:09Z"},
+            {"name": "Fleet Rules Evidence", "conclusion": "SUCCESS",
+             "completedAt": "2026-11-11T20:57:46Z"},
+        ]}
+        empty = "fix-red-" + hashlib.sha256(b"").hexdigest()[:10]
+        fleet = "fix-red-" + hashlib.sha256(b"Fleet Rules Evidence").hexdigest()[:10]
+        self.assertEqual(gap.check_fingerprint(superseded), empty)
+        self.assertNotEqual(empty, fleet)
+        later = {"statusCheckRollup": [
+            {"name": "Fleet Rules Evidence", "conclusion": "SUCCESS",
+             "completedAt": "2026-11-11T20:57:09Z"},
+            {"name": "Fleet Rules Evidence", "conclusion": "FAILURE",
+             "completedAt": "2026-11-11T21:00:00Z"},
+        ]}
+        self.assertEqual(gap.check_fingerprint(later), fleet)
+        import fix_red_classes
+        self.assertEqual(fix_red_classes.real_failures(superseded), [])
+        self.assertEqual(fix_red_classes.real_failures(later)[0]["conclusion"], "FAILURE")
+        same_stamp = {"statusCheckRollup": [
+            {"name": "Fleet Rules Evidence", "conclusion": "CANCELLED", "completedAt": "t"},
+            {"name": "Fleet Rules Evidence", "conclusion": "SUCCESS", "completedAt": "t"},
+        ]}
+        self.assertEqual(gap.check_fingerprint(same_stamp), empty)
+
     def test_an_advisory_sibling_does_not_define_a_second_fix_red_class(self):
         import pr_events
         self.assertEqual(gap.ADVISORY_CHECKS, pr_events.NON_REQUIRED_CHECKS)
@@ -49,6 +78,31 @@ class GateTest(unittest.TestCase):
         self.assertEqual(solo, "fix-red-" + hashlib.sha256(b"Source Validation").hexdigest()[:10])
         self.assertNotEqual(
             solo, "fix-red-" + hashlib.sha256(b"Source Validation|Tently").hexdigest()[:10])
+
+    def test_a_dequeued_merge_group_log_names_the_check_when_the_rollup_is_empty(self):
+        # 2026-11-17 #24748: the queue ejected the PR, the head rollup was green, and
+        # queue_failure's "### merge group: CI" log still hashed fix-red-e3b0c44298.
+        empty = "fix-red-" + hashlib.sha256(b"").hexdigest()[:10]
+        self.assertEqual(empty, "fix-red-e3b0c44298")
+        log = "\n".join([
+            "### merge group: CI",
+            "AssertionError [ERR_ASSERTION]: stub warden was invoked",
+            "Error: ENOENT: marker file missing",
+        ])
+        named = gap.check_fingerprint({
+            "statusCheckRollup": [{"name": "CI", "conclusion": "SUCCESS"}],
+            "queueFailure": log,
+        })
+        ci = "fix-red-" + hashlib.sha256(b"CI").hexdigest()[:10]
+        self.assertEqual(named, ci)
+        self.assertNotEqual(named, empty)
+        self.assertEqual(gap.merge_group_check_names({"mergeGroupLog": log}), ["CI"])
+        rollup = gap.check_fingerprint({
+            "statusCheckRollup": [{"name": "Source Validation", "conclusion": "FAILURE"}],
+            "queueFailure": log,
+        })
+        self.assertEqual(rollup, "fix-red-" + hashlib.sha256(b"Source Validation").hexdigest()[:10])
+        self.assertEqual(gap.check_fingerprint({"statusCheckRollup": [], "queueFailure": ""}), empty)
 
     def test_a_lone_pr_ready_failure_is_not_the_empty_fix_red_class(self):
         empty = "fix-red-" + hashlib.sha256(b"").hexdigest()[:10]

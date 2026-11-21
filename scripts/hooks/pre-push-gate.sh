@@ -70,8 +70,18 @@ run_affected() {
   # Certified source/owner edits need renewed browser evidence on this branch.
   # Catch stale census digests before typecheck, rather than in the merge group.
   pnpm design:authority:check
+  # Catch the same merged/head byte limits as PR Size Guard before slow checks.
+  node scripts/lib/projected-tree-budget.mjs --local
   # Keep pushes independent of the full repository suite while catching the
   # changed surface before CI has to spend a runner on it.
+  # Company Guards size ratchet. Fail before heavier steps when a baselined
+  # source file grows (the hosted job is still the authority).
+  node scripts/company-guards/size.mjs --base-ref origin/main
+  # Same verdicts as the required CI checks, before the remote sees the push:
+  # PR Size Guard (line/file cap via the CI modules) and the pinned JovieInc/ci
+  # size-500 guard itself (no mirror drift). CI stays authoritative.
+  node scripts/hooks/pr-size-local.mjs
+  bash scripts/hooks/company-size-local.sh
   run_lint
   # JOV-4421: hard ship gate (diff match + story quality + multi-root ratchet).
   echo "[pre-push-gate] running component-ship-gate"
@@ -89,6 +99,7 @@ run_affected() {
 }
 
 run_publication() {
+  node scripts/lib/projected-tree-budget.mjs --local
   # Draft publication is a feedback start, not a promotion qualification.
   # Keep the committed diff safe, then let rolling CI evaluate the broader
   # affected surface while implementation continues.
@@ -104,6 +115,13 @@ run_publication() {
     return 1
   fi
   git diff --check "${publication_base}..HEAD"
+  # Same 500-line ceiling Company Guards enforces. A grown baselined file
+  # fails here instead of after the next hosted round.
+  node scripts/company-guards/size.mjs --base-ref origin/main
+  # PR Size Guard cap (1500 lines / 75 files, tests+generated excluded) and the
+  # pinned canonical size-500 guard: fail here, not as another hosted round.
+  node scripts/hooks/pr-size-local.mjs
+  bash scripts/hooks/company-size-local.sh
   # Reuse the changed-file Biome guard so formatter failures never reach CI.
   bash scripts/hooks/biome-pre-push.sh
   # Catch missing component tests/stories before another Source Validation run.

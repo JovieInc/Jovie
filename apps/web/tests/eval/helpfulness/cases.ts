@@ -230,7 +230,7 @@ export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = [
     fixture: 'lapsed',
     ask: 'help me plan my next release',
     mustMentionAny: [['low tide choir', 'signal fires', 'weeks', 'date']],
-    expectToolsAny: ['createPromoStrategy', 'manageTasks', 'createRelease'],
+    expectToolsAny: ['useSkill', 'manageTasks', 'createRelease'],
     great:
       'Uses the planning/task tool or proposes a concrete dated timeline anchored on a Friday release date, informed by the gap since Low Tide Choir.',
   },
@@ -245,9 +245,9 @@ export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = [
     id: 'collab',
     fixture: 'established',
     ask: 'who should I collaborate with?',
-    expectToolsAny: ['suggestRelatedArtists'],
+    expectToolsAny: ['useSkill'],
     great:
-      'Calls suggestRelatedArtists and frames the result around one outreach move.',
+      'Loads the related-artists skill and frames the result around one outreach move.',
   },
   {
     id: 'followup-do-it',

@@ -1,6 +1,10 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import {
+  ACTION_BUTTON_FACE_CLASSNAME,
+  ACTION_BUTTON_PRESET,
+} from '@jovie/ui/atoms/button-contract';
 import type { ReactNode } from 'react';
 import {
   APP_CONTROL_BUTTON_CLASS,
@@ -8,12 +12,12 @@ import {
 } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 
-// JOV-5063: 32px visible surface-header actions. The canonical 44px pseudo hit
-// target from @jovie/ui stays intact; icon-only actions take the md (32px)
-// IconButton size instead of a height restyle.
+// Workspace header actions consume the shared ActionButton geometry preset
+// (web KEEP: 28 visible / 44 mobile hit). Native iOS 28-vs-32 is Tim-gated.
 export const DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,
-  'h-8 gap-1.5 rounded-full border-transparent bg-transparent px-2 text-xs font-semibold text-secondary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0 [&_svg]:h-3.5 [&_svg]:w-3.5'
+  ACTION_BUTTON_FACE_CLASSNAME,
+  'gap-1.5 rounded-full border-transparent bg-transparent px-2 text-xs font-semibold text-secondary-token shadow-none hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 active:border-transparent active:bg-surface-0 [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const DASHBOARD_HEADER_ACTION_TEXT_BUTTON_ACTIVE_CLASS =
@@ -59,7 +63,7 @@ export function DashboardHeaderActionButton({
       <Button
         type='button'
         variant='ghost'
-        size='sm'
+        size={ACTION_BUTTON_PRESET.size}
         onClick={onClick}
         aria-label={ariaLabel}
         aria-pressed={pressed}
@@ -86,7 +90,7 @@ export function DashboardHeaderActionButton({
       disabled={disabled}
       tooltipLabel={tooltipLabel}
       tooltipShortcut={tooltipShortcut}
-      size='md'
+      size={ACTION_BUTTON_PRESET.iconButtonSize}
       data-testid={dataTestId}
       className={cn(
         DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS,

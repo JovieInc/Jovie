@@ -13,7 +13,9 @@ import {
 } from '@/lib/cookies/consent-regions';
 import {
   CONSENT_COOKIE_NAME,
+  hasServerMarketingConsent,
   parseConsentCookieValue,
+  TRACKING_CONSENT_COOKIE_NAME,
 } from '@/lib/cookies/consent-state';
 import { db } from '@/lib/db';
 import {
@@ -205,10 +207,8 @@ export async function GET(
       recordAnonymousBotMetric(botDetection, 'redirect');
       return NextResponse.redirect(destinationUrl, { status: 302 });
     }
-    const rateLimitResult = await publicClickLimiter.limit(clientIP);
-    if (!rateLimitResult.success) {
-      return NextResponse.redirect(destinationUrl, { status: 302 });
-    }
+
+    // Rate limit + analytics after the 302 flush — never before Location.
     const geoCity = request.headers.get('x-vercel-ip-city');
     const geoCountry =
       request.headers.get('x-vercel-ip-country') ??
@@ -220,16 +220,20 @@ export async function GET(
     const consent = parseConsentCookieValue(
       request.cookies?.get(CONSENT_COOKIE_NAME)?.value
     );
-    // Match /api/track semantics: non-regulated visits remain default-allow,
-    // but consent-required visits need a valid marketing opt-in.
-    const hasMarketingConsent =
-      consent?.marketing === true ||
-      (consent === null && !requiresCookieConsent);
+    // Same semantics as /api/track (see hasServerMarketingConsent).
+    const hasMarketingConsent = hasServerMarketingConsent({
+      consent,
+      requiresCookieConsent,
+      secGpc: request.headers.get('sec-gpc'),
+      trackingConsent: request.cookies?.get(TRACKING_CONSENT_COOKIE_NAME)
+        ?.value,
+    });
 
-    // Analytics must never sit on the redirect critical path (time to
-    // destination); run it after the 302 is flushed.
     scheduleAfter(async () => {
       try {
+        const rateLimitResult = await publicClickLimiter.limit(clientIP);
+        if (!rateLimitResult.success) return;
+
         await withSystemIngestionSession(async tx => {
           await tx
             .update(audienceSourceLinks)

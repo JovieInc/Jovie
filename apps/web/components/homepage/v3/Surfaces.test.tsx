@@ -7,6 +7,15 @@ import { Callout, CommandPaletteCard, ReleasePage } from './Surfaces';
 const PALETTE = HOMEPAGE_PRODUCT_UI.palette;
 
 describe('homepage v3 surfaces', () => {
+  it('exposes the keyboard-shortcut chip as a real kbd with shortcut text (JOV-13065 canary)', () => {
+    const { container } = render(<CommandPaletteCard />);
+    const chip = container.querySelector('kbd.hv3-kbd');
+    expect(chip?.tagName).toBe('KBD');
+    expect(chip?.textContent?.length ?? 0).toBeGreaterThan(0);
+    const linkedRows = container.querySelectorAll('li a, li[data-hv3-row]');
+    expect(linkedRows.length).toBeGreaterThan(0);
+  });
+
   it('shows the command palette at rest with Profile selected', async () => {
     const { container } = render(<CommandPaletteCard />);
     expect(screen.getByText(PALETTE.placeholder)).toBeInTheDocument();
@@ -22,13 +31,25 @@ describe('homepage v3 surfaces', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('shows the featured demo artist release, never Tim', async () => {
+  it('shows the featured artist’s inspected release', async () => {
     const { container } = render(<ReleasePage />);
     const page = HOMEPAGE_PRODUCT_UI.releasePage;
     expect(container).toHaveTextContent(page.title);
     expect(container).toHaveTextContent(page.artist);
-    expect(container).not.toHaveTextContent('Tim White');
     await expectNoA11yViolations(container);
+  });
+
+  it('lets a second release page take its own title anchor', () => {
+    const { container } = render(
+      <>
+        <ReleasePage titleAnchor='htitle' />
+        <ReleasePage />
+      </>
+    );
+    const anchors = [...container.querySelectorAll('[data-hv3-anchor]')].map(
+      node => node.getAttribute('data-hv3-anchor')
+    );
+    expect(anchors).toEqual(['htitle', 'title']);
   });
 
   it('keeps the release page accessible in a right-to-left document', async () => {

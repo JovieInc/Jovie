@@ -3,10 +3,12 @@ import { spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { pathToFileURL } from 'node:url';
@@ -26,6 +28,33 @@ import {
 } from './trusted-planner-fixture.mjs';
 
 const ROOT = join(import.meta.dirname, '../../..');
+
+test('the isolated lane-runner snapshot loads the shared coverage-floor export', async t => {
+  const head = spawnSync('git', ['rev-parse', 'HEAD'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  });
+  assert.equal(head.status, 0, head.stderr);
+  const base = head.stdout.trim();
+  const scratch = mkdtempSync(join(tmpdir(), 'trusted-lane-snapshot-'));
+  t.after(() => rmSync(scratch, { recursive: true, force: true }));
+  const out = join(scratch, 'snapshot');
+  const manifest = snapshotTrustedTestPlanner({ repo: ROOT, base, out });
+  assert.ok(
+    manifest.files.some(
+      file => file.path === 'scripts/lib/ci-structural-shards.mjs'
+    ),
+    'the import closure must include the coverage-floor authority'
+  );
+  const mod = await import(
+    `${pathToFileURL(join(out, 'files', 'scripts/ci-fast-lanes.mjs')).href}?isolated=${base}`
+  );
+  assert.ok(
+    Array.isArray(mod.LANES_COVERAGE_FLOORS) &&
+      mod.LANES_COVERAGE_FLOORS.length > 0
+  );
+  assert.equal(typeof mod.runStructural, 'function');
+});
 
 test('trusted planner old BASE snapshots its actual imports without requiring future helpers', t => {
   const f = trustedPlannerFixture(t, false);
@@ -386,8 +415,10 @@ test('the trusted snapshot engine is present in every rolling sparse checkout an
     .map(match => match[1])
     .filter(block => block.includes('scripts/run-affected-tests.mjs'));
   assert.equal(blocks.length, 4);
-  for (const block of blocks)
+  for (const block of blocks) {
     assert.match(block, /scripts\/lib\/trusted-test-planner-snapshot\.mjs/);
+    assert.match(block, /scripts\/lib\/ci-source-guard-pool\.mjs/);
+  }
   const file = 'scripts/lib/trusted-test-planner-snapshot.mjs';
   const guard = selectSourceGuards('pull_request', [file]);
   assert.ok(guard.some(candidate => candidate.id === 'script-contracts'));

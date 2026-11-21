@@ -1,9 +1,10 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   formatPublicPriceDisplay,
   getPublicPriceClaim,
 } from '@/lib/billing/offer-truth';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ChatProposeCheckoutCard } from './ChatProposeCheckoutCard';
 
 function expectedLabel(plan: 'free' | 'pro' | 'max'): string {
@@ -107,4 +108,44 @@ describe('ChatProposeCheckoutCard', () => {
       '/onboarding/checkout?source=intent'
     );
   });
+
+  it('renders Continue with canonical primary button contrast and 44px hit target', () => {
+    render(
+      <ChatProposeCheckoutCard
+        payload={{
+          action: 'propose_checkout',
+          plan: 'pro',
+          handoffUrl: '/onboarding/checkout?plan=pro',
+        }}
+      />
+    );
+
+    const cta = screen.getByRole('link', { name: 'Continue' });
+    fireEvent.focus(cta);
+    fireEvent.click(cta);
+    expect(cta).toHaveClass(
+      'bg-btn-primary',
+      'text-btn-primary-foreground',
+      'before:min-h-11',
+      'before:min-w-11'
+    );
+    expect(cta).not.toHaveClass('dark:bg-surface-1');
+  });
+
+  it.each([
+    ['a proposed plan', 'max', '/onboarding/checkout?plan=max'],
+    ['no plan', null, ''],
+  ] as const)(
+    'has no accessibility violations with %s',
+    async (_name, plan, handoffUrl) => {
+      const { container } = render(
+        <div dir='rtl' lang='ar'>
+          <ChatProposeCheckoutCard
+            payload={{ action: 'propose_checkout', plan, handoffUrl }}
+          />
+        </div>
+      );
+      await expectNoA11yViolations(container);
+    }
+  );
 });

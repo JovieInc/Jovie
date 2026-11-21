@@ -71,6 +71,7 @@ import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import type { PublicRelease } from '../releases/types';
+import { DesktopSurfaceImage } from './DesktopSurfaceImage';
 
 // JOV-6201: reuse the 360px track at 1180px with min-w-0 on every desktop listen branch.
 export const PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME =
@@ -228,7 +229,7 @@ function DesktopSurfaceCard({
   return (
     <section
       className={cn(
-        'rounded-2xl border border-white/6 bg-white/[0.025] p-5',
+        'min-w-0 rounded-2xl border border-white/6 bg-white/[0.025] p-5',
         className
       )}
       data-testid={testId}
@@ -257,7 +258,7 @@ function EmptySurfaceBlock({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className='flex min-h-30 items-center rounded-2xl bg-white/[0.025] px-4 text-sm leading-6 text-white/54'>
+    <div className='flex min-h-14 items-center rounded-2xl bg-white/[0.025] px-4 py-3 text-sm leading-6 text-white/54'>
       {children}
     </div>
   );
@@ -490,7 +491,7 @@ export function ProfileDesktopSurface({
       data-side-rail-enabled={canGetUpdates ? 'true' : 'false'}
     >
       <div
-        className='grid min-h-0 min-w-0 gap-3.5 [@media(min-width:1180px)]:contents'
+        className='grid min-h-0 min-w-0 grid-cols-1 gap-3.5 [@media(min-width:1180px)]:contents'
         data-testid='profile-desktop-main-content'
       >
         {/* Composition rule (#11899): the desktop cover is a fixed standard
@@ -503,11 +504,9 @@ export function ProfileDesktopSurface({
         >
           <div className='absolute inset-0'>
             {heroImageUrl ? (
-              <ImageWithFallback
+              <DesktopSurfaceImage
                 src={heroImageUrl}
                 alt=''
-                fill
-                priority
                 sizes='(max-width: 1536px) 60vw, 900px'
                 className='object-cover object-center'
                 fallbackVariant='avatar'
@@ -529,7 +528,7 @@ export function ProfileDesktopSurface({
                 <Link
                   href={profileHref}
                   data-testid='profile-header'
-                  className='inline-flex min-w-0 max-w-full items-start gap-2 rounded-md text-[clamp(2.5rem,16cqi,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+                  className='inline-flex min-w-0 max-w-full items-start gap-2 rounded-md text-[clamp(2.5rem,16cqi,5.75rem)] font-semibold leading-[0.92] tracking-[-0.06em] text-white dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
                 >
                   <span className='min-w-0 line-clamp-2 wrap-anywhere'>
                     {artist.name}
@@ -597,7 +596,7 @@ export function ProfileDesktopSurface({
         </section>
 
         <div
-          className='grid min-h-0 min-w-0 content-start gap-3.5 [@media(min-width:1180px)]:col-start-2 [@media(min-width:1180px)]:row-start-1'
+          className='grid min-h-0 min-w-0 grid-cols-1 content-start gap-3.5 [@media(min-width:1180px)]:col-start-2 [@media(min-width:1180px)]:row-start-1'
           data-testid='profile-desktop-secondary-grid'
         >
           <DesktopSurfaceCard
@@ -613,7 +612,7 @@ export function ProfileDesktopSurface({
           >
             <div className='space-y-2'>
               {visibleReleases.length > 0 ? (
-                visibleReleases.slice(0, 4).map(release => (
+                visibleReleases.slice(0, 3).map(release => (
                   <a
                     key={release.id}
                     href={
@@ -621,14 +620,14 @@ export function ProfileDesktopSurface({
                         ? `/${artist.handle}/${release.slug}`
                         : undefined
                     }
-                    className='flex items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-3 transition-colors duration-subtle hover:bg-white/[0.04]'
+                    className='flex items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-2 transition-colors duration-subtle hover:bg-white/[0.04]'
                   >
-                    <div className='relative h-14 w-14 overflow-hidden rounded-xl'>
+                    <div className='relative h-11 w-11 overflow-hidden rounded-xl'>
                       <ImageWithFallback
                         src={release.artworkUrl}
                         alt={release.title}
                         fill
-                        sizes='56px'
+                        sizes='44px'
                         className='object-cover'
                         fallbackVariant='release'
                       />
@@ -661,10 +660,10 @@ export function ProfileDesktopSurface({
           >
             <div className='space-y-2'>
               {upcomingTourDates.length > 0 ? (
-                upcomingTourDates.slice(0, 5).map(tourDate => (
+                upcomingTourDates.slice(0, 2).map(tourDate => (
                   <div
                     key={tourDate.id}
-                    className='grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-3'
+                    className='grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-2'
                   >
                     <div className='rounded-xl border border-white/10 bg-white/[0.07] px-2 py-2 text-center'>
                       <div className='text-3xs font-semibold tracking-wide text-white/58'>
@@ -707,7 +706,7 @@ export function ProfileDesktopSurface({
 
       <div
         className={cn(
-          'min-h-0 min-w-0 gap-3.5',
+          'min-h-0 min-w-0 grid-cols-1 gap-3.5',
           canGetUpdates
             ? 'grid [@media(min-width:1180px)]:col-start-3 [@media(min-width:1180px)]:row-start-1'
             : 'hidden'
@@ -809,12 +808,10 @@ export function ProfileDesktopSurface({
       <DesktopSurfaceCard title='Latest Release'>
         <div className='space-y-4'>
           <div className='relative aspect-square overflow-hidden rounded-3xl border border-white/8'>
-            <ImageWithFallback
+            <DesktopSurfaceImage
               src={latestVisibleRelease?.artworkUrl}
               alt={latestVisibleRelease?.title ?? artist.name}
-              fill
               sizes='320px'
-              priority
               className='object-cover'
               fallbackVariant='release'
             />

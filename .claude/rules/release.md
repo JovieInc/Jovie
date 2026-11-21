@@ -238,8 +238,20 @@ feature/* ──► main (CI deploys to staging, then promotes to production)
 
 ### Bots to check
 
+- `sentry[bot]` (Sentry Seer, `<!-- BUG_PREDICTION -->` comments; retiring
+  into the local gate)
 - `coderabbitai[bot]` (CodeRabbit)
 - `greptile-apps[bot]` (Greptile)
+
+### Resolve bot threads yourself (founder rule, 2026-11-11)
+
+Resolve bot review comments yourself after you fix or answer them; leave
+human comments for their author. Fix a real finding on the same PR, or reply
+with the evidence that it is wrong, then resolve the thread
+(`resolveReviewThread`, or the GitHub MCP `resolve_review_thread` tool).
+Never resolve a thread a human started or replied in. A bot thread never
+holds a green PR: once PR Ready is green on the head, Auto-Ready Agent
+Drafts resolves the bot threads still open (`scripts/lib/bot-review-threads.mjs`).
 
 ### How to check
 
@@ -275,6 +287,7 @@ these states is a merge gate.
 
 ```
 BOT REVIEWS
+├─ Sentry:       N open (advisory)
 ├─ CodeRabbit:   N open (advisory)
 └─ Greptile:     N open (advisory)
 ```
@@ -409,8 +422,8 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | Stage | Exact responsibility |
 | --- | --- |
 | Source PR | Deterministic path + brand classification, risk classification, `ci-fast`, exact-head coverage, unit tests the exact diff can affect (`--changed` against the merge base, aggregated into `PR Ready`), diff secret scan, and `Golden Path Lock`. `Migration Guard`, `Fork PR Gate`, and `PR Size Guard` remain separate required contexts. |
-| Native merge queue | Re-run deterministic gates plus exact-head coverage on the exact `merge_group` head, then require only path-selected Web unit/build, Mac test/package, iOS Xcode, shared-contract integration, and model-free semantic evidence. |
-| Queue-proven main | Reuse the exact successful merge-group `PR Ready` proof and skip duplicate fallback work. |
+| Native merge queue | Re-run deterministic gates plus exact-head coverage on the exact `merge_group` head, then require only path-selected Web unit/build, shared-contract integration, and model-free semantic evidence. Path-selected Mac/iOS Fast Unit stays in the aggregate as forced skips (hosted macOS pool) and is not required evidence on the queue. |
+| Queue-proven main | Reuse the exact successful merge-group `PR Ready` proof and skip duplicate fallback work; `ci-apple-post-queue` reclassifies the push diff and recovers deferred iOS/Mac Fast Unit when selected. |
 | Direct/admin main | Fail closed through path/risk/fast/secret/migration plus every product lane selected by the exact push diff; skipped selected lanes and executed unselected lanes are invalid. |
 | Production release | One reusable staging/canary/promotion/rollback DAG under one non-cancelling caller lease. |
 | Post-deploy | Hosted public, auth, homepage, and explicitly provisioned Lighthouse probes settle into `Production Verified` before notification. |
@@ -420,12 +433,12 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 
 | Tier | Purpose | Merge-gate jobs |
 | --- | --- | --- |
-| Source Fast Gate | Cheap deterministic checks required on each source PR and repeated on the synthetic combined head. | `Path Changes` (both), `ci-fast` (both), `Secret Scan (gitleaks + trufflehog)` (both), `Golden Path Lock` (both), `Visual Snapshot Compare` (merge-group), `Migration Guard` (both), `Unit Tests` (merge-group) |
+| Source Fast Gate | Cheap deterministic checks required on each source PR and repeated on the synthetic combined head. | `Path Changes` (both), `ci-fast` (both), `Secret Scan (gitleaks + trufflehog)` (both), `Golden Path Lock` (both), `Visual Snapshot Compare` (merge-group), `Visual Snapshot Compare (homepage)` (merge-group), `Visual Snapshot Compare (marketing DOM)` (merge-group), `Visual Snapshot Compare (marketing routes)` (merge-group), `Migration Guard` (both), `Unit Tests` (merge-group) |
 | Structural Contract | Mechanical architecture, workflow, docs, and repo-rule checks. | `CI Risk Classifier` (both) |
 | Exact-Head Coverage | Meaningful V8 coverage and a 60% changed-line ratchet on exact source and synthetic combined heads, with no untrusted-code secrets; nightly retains the global risk-surface debt check. | `Exact-head Coverage` (both) |
 | Explicit Deep Evidence | Manual, scheduled, or event-driven deep evidence that never starts from or delays ordinary PR Ready. | none |
 | Preview Evidence | Hosted manual/event visual, a11y, performance, and preview evidence outside the source-PR event. | none |
-| Combined Integration | Affected unit, parallel hosted build-plus-layout, Ovie build, Ovie typecheck, and Storybook surface workspaces, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head. | `Blog Content Qualification` (both), `Build + Layout (combined)` (merge-group), `Ovie Build (combined)` (merge-group), `Ovie Typecheck (combined)` (merge-group), `Storybook Surface Matrix (combined)` (merge-group), `iOS Fast Unit + Coverage (combined)` (merge-group), `Mac Build + Test (combined)` (merge-group), `Cross-Product Integration (combined)` (merge-group), `Promptfoo Evals (deterministic)` (merge-group), `Golden Eval Set (deterministic)` (merge-group), `Lighthouse (dashboard gate)` (merge-group), `Lighthouse (onboarding gate)` (merge-group), `Database Certification (isolated Neon)` (merge-group) |
+| Combined Integration | Affected unit, parallel hosted build-plus-layout, Ovie build, Ovie typecheck, and Storybook surface workspaces, and model-free semantic evals for GitHub's exact merge-group head. Path-selected Xcode/Mac Fast Unit stays listed as merge-group needs but is forced skip on the queue (hosted macOS pool) and recovered on queue-proven main via ci-apple-post-queue. | `Blog Content Qualification` (both), `Build + Layout (combined)` (merge-group), `Ovie Build (combined)` (merge-group), `Ovie Typecheck (combined)` (merge-group), `Storybook Surface Matrix (combined)` (merge-group), `iOS Fast Unit + Coverage (combined)` (merge-group), `Mac Build + Test (combined)` (merge-group), `Cross-Product Integration (combined)` (merge-group), `Promptfoo Evals (deterministic)` (merge-group), `Golden Eval Set (deterministic)` (merge-group), `Lighthouse (dashboard gate)` (merge-group), `Lighthouse (onboarding gate)` (merge-group), `Database Certification (isolated Neon)` (merge-group) |
 | Production Release | Each exact successful main CI attempt feeds one fixed production-mutation FIFO from authorization through staging, promotion, centralized rollback, immutable probes, canonical proof, marker, and best-effort notification; one hosted monitor retry is bounded to controller attempt 1. Lineage is forward-only: after authorization a generation that is still an ancestor of main ships even though main advanced, yields only to a generation already queued behind it, and never yields once main has carried unshipped commits past the starvation bound (release-lineage-gate.sh, 90 min). | none |
 | Post-deploy Verification | Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease; authenticated exact-build smoke uses one allowlisted Better Auth identity and a fresh protected verification-store OTP before promotion, while public Better Auth/OAuth gates remain blocking. JOV-INV-033 rescans Done-sprint HTML (JOV-6218 pricing truth, JOV-6260 directory hygiene) against that same URL before the `Production Verified` marker. When a controller generation is superseded before those in-lease probes run, a read-only follow-up re-probes the landed canonical production deployment outside the lease. The five-minute continuity guard also reports production-stale (main has carried unshipped commits for 2 h) to the founder Slack path without admitting a provider-recovery task. | none |
 | Scheduled Cleanup | Report-first cleanup loops for flakes, coverage drift, harness health, and main-CI repair. | none |
@@ -443,6 +456,9 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `Secret Scan (gitleaks + trufflehog)` | both | fast-gate | `./scripts/security/scan-secrets.sh ci-pr origin/main` |
 | `Golden Path Lock` | both | fast-gate | `node scripts/golden-path-lock.mjs merge-gate` |
 | `Visual Snapshot Compare` | merge-group | fast-gate | `node scripts/visual-snapshot-compare.mjs compare` |
+| `Visual Snapshot Compare (homepage)` | merge-group | fast-gate | `node scripts/visual-snapshot-compare.mjs compare` |
+| `Visual Snapshot Compare (marketing DOM)` | merge-group | fast-gate | `cd apps/web && pnpm exec playwright test tests/product-screenshots/route-dom-certification.spec.ts --config=playwright.config.screenshots.ts --project=screenshots --workers=1 --retries=0 -g 'deliberate-red|certifies every marketing route'` |
+| `Visual Snapshot Compare (marketing routes)` | merge-group | fast-gate | `cd apps/web && pnpm exec playwright test tests/product-screenshots/marketing-routes.spec.ts --config=playwright.config.screenshots.ts --project=screenshots --workers=4 --retries=0` |
 | `Migration Guard` | both | fast-gate | `cd apps/web && ./scripts/check-migrations.sh && ./scripts/validate-migrations.sh` |
 | `Unit Tests` | merge-group | fast-gate | `pnpm --filter=@jovie/web run test:fast` |
 | `Exact-head Coverage` | both | exact-head-coverage | `pnpm --filter @jovie/web test:coverage && node scripts/check-changed-test-coverage.mjs --base <base-sha> --head <head-sha>` |

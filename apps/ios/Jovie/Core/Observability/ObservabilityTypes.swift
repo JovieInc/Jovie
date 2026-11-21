@@ -16,7 +16,12 @@ enum ObservabilityEvent: String, CaseIterable, Equatable {
   case authProviderSelected = "auth_provider_selected"
   case authCallbackReceived = "auth_callback_received"
   case authCallbackURLParsed = "auth_callback_url_parsed"
-  case authSessionClosed = "auth_session_closed"
+  /// Terminal user dismiss of the system auth sheet. Never a failure.
+  case authCancelled = "auth_cancelled"
+  /// Terminal auth failure (URL build, session start, provider, exchange).
+  case authFailed = "auth_failed"
+  /// Non-terminal presentation retry before another sheet open. Not cancel/fail.
+  case authPresentationRetry = "auth_presentation_retry"
   case nativeAuthExchangeStarted = "native_auth_exchange_started"
   case nativeAuthExchangeSucceeded = "native_auth_exchange_succeeded"
   case nativeAuthExchangeFailed = "native_auth_exchange_failed"
@@ -34,6 +39,24 @@ enum ObservabilityEvent: String, CaseIterable, Equatable {
   case teleprompterRecordingStarted = "teleprompter_recording_started"
   case teleprompterRecordingCompleted = "teleprompter_recording_completed"
   case teleprompterRecordingFailed = "teleprompter_recording_failed"
+  /// Identity share stage: public URL copied to pasteboard. Not delivery.
+  case profileUrlCopied = "profile_url_copied"
+  /// Identity share stage: system share sheet presented. Not recipient visit.
+  case profileSharePresented = "profile_share_presented"
+  /// Identity first-value land completed. Funnel denominator — not chat activation.
+  case identityFirstValueSeen = "identity_first_value_seen"
+  /// Empty chat home visible after Identity. Stage only — not activation.
+  case chatEmptyHomeSeen = "chat_empty_home_seen"
+  /// Empty chat still visible ~30s with no first send started. Stall signal, not fail.
+  case chatEmptyHomeDwell = "chat_empty_home_dwell"
+  /// First post-Identity chat send authorized. No prompt text.
+  case chatFirstSendStarted = "chat_first_send_started"
+  /// First post-Identity chat send completed without fail/cancel.
+  case chatFirstSendSucceeded = "chat_first_send_succeeded"
+  /// First post-Identity chat send cancelled. Never a failure.
+  case chatFirstSendCancelled = "chat_first_send_cancelled"
+  /// First post-Identity chat send failed. Distinct from cancel.
+  case chatFirstSendFailed = "chat_first_send_failed"
 }
 
 struct ObservabilityConfiguration: Equatable {

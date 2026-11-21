@@ -58,6 +58,22 @@ describe('AlertsSettingsView', () => {
     ).toBeVisible();
   });
 
+  it('renders the empty-state copy on the AA-contrast muted token', () => {
+    render(
+      <AlertsSettingsView
+        {...viewProps}
+        isSubscribed={false}
+        onTogglePref={vi.fn()}
+      />
+    );
+
+    const emptyState = screen.getByText(
+      'Alert preferences appear here after alerts are enabled.'
+    );
+    expect(emptyState).toHaveClass('text-on-media/50');
+    expect(emptyState.className).not.toContain('text-on-media/42');
+  });
+
   it('pairs each canonical switch with its row description for announced labels', () => {
     render(
       <AlertsSettingsView {...viewProps} isSubscribed onTogglePref={vi.fn()} />
@@ -77,5 +93,24 @@ describe('AlertsSettingsView', () => {
               : 'Occasional artist updates.'
       );
     }
+  });
+
+  it('draws the turn-off control as a non-submitting button on the media token', () => {
+    const onUnsubscribe = vi.fn();
+    render(
+      <AlertsSettingsView
+        {...viewProps}
+        isSubscribed
+        onTogglePref={vi.fn()}
+        onUnsubscribe={onUnsubscribe}
+      />
+    );
+
+    const turnOff = screen.getByRole('button', { name: 'Turn off alerts' });
+    expect(turnOff).toHaveAttribute('type', 'button');
+    expect(turnOff).toHaveClass('text-on-media/72');
+    expect(turnOff.className).not.toContain('text-white');
+    turnOff.click();
+    expect(onUnsubscribe).toHaveBeenCalledTimes(1);
   });
 });

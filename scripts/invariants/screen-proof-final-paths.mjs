@@ -11,6 +11,10 @@
 // every route without an entry keeps the exact-route rule.
 export const SCREEN_PROOF_FINAL_PATHS = Object.freeze({
   '/start': Object.freeze(['/waitlist']),
+  // One front door (Tim, 2026-11-09): with public signup open, the anonymous
+  // /waitlist proof follows the /start handoff — the other flag state of the
+  // same seam as the closed-signup entry above.
+  '/waitlist': Object.freeze(['/start']),
 });
 
 /**

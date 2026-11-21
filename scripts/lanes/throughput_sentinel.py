@@ -216,7 +216,7 @@ def sample_release_flow(state: Path, now: float, run=None, repo: str = REPO) -> 
                   if (started := _iso_epoch(row.get("run_started_at"))) is not None]
         runs = [row.get("id") for row in held.get("workflow_runs") or []]
         # Hosted-runner backlog: queued runs and the oldest one's wait (2026-10-28: 990 queued, oldest 18 min).
-        day = datetime.fromtimestamp(now - 86400, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")  # GitHub cancels queued runs after 24h; older "queued" rows are ghosts (2026-11-07: Aug-Oct ghosts held the brake)
+        day = datetime.fromtimestamp(now - 7200, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")  # runs queued >2h are uncancellable ghosts, not backlog (2026-11-12: 134 held intake at 0 for 14h)
         queued = _gh_json(run, f"repos/{repo}/actions/runs?status=queued&per_page=1&created=%3E%3D{day}")
         queued_total = queued.get("total_count") if isinstance(queued.get("total_count"), int) else None
         oldest_min = None
@@ -586,7 +586,7 @@ def growth_bounds(state: Path, limits: dict) -> list[dict]:
         ("worktree-scan", count("worktrees"), limits.get("worktreeScan", 256), "dirs",
          "maintenance_preserved scans at most 256 checkouts"),
         ("outcome-candidate-scan", queue_scanned(), 200, "issues",
-         "outcome_lane.candidates stops after 200 Validating issues; later issues never get a receipt"),
+         "outcome scan page budget; inspect successive passes for cursor progress through the remaining Validating issues"),
     ]
     out = []
     for ident, used, limit, unit, effect in rows:

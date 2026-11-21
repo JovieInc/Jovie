@@ -52,7 +52,6 @@ def providers():
     }
 
 
-
 def ask_classify(*args, **kwargs):
     """Detection view of classify_blocker. EVENT 2026-10-28: a reserved decision never changes the
     class (nothing parks); it rides along as `decisionAsk`. These tests keep asserting what counts
@@ -797,6 +796,7 @@ class DoctorAndIntakeTest(unittest.TestCase):
         self.assertIn("ws:reliability", plan["labels"])
         self.assertIsNone(remediation.non_pr_event("workflow_run", {"workflow_run": {
             "event": "pull_request", "conclusion": "failure", "pull_requests": [{"number": 1}]}}))
+
 
     def test_registry_hyperagent_is_a_remote_only_regular_lane(self):
         # JOV-7706: Hyperagent is enabled, on a deliberate auto-mode agent id, but it cannot

@@ -30,7 +30,6 @@ import {
   postStripeWebhook,
   sendSubscriptionWebhook,
 } from './helpers/stripe-helpers';
-import { measureWebVitals } from './utils/performance-test-utils';
 
 /**
  * $12/month self-serve artist profile (EVENT: Tim, 2026-10-20):
@@ -43,17 +42,10 @@ import { measureWebVitals } from './utils/performance-test-utils';
  * with Stripe's documented test PaymentMethod and the signed event goes
  * through the real webhook route.
  */
-// A paying artist must not watch the claim or unlock screen jump around.
-// 0.1 is the Web Vitals "good" ceiling for cumulative layout shift.
-async function expectStableLayout(page: Page, screen: string): Promise<void> {
-  await page.waitForTimeout(1500); // let late shifts land
-  const { cls = 0 } = await measureWebVitals(page);
-  test
-    .info()
-    .annotations.push({ type: 'cls', description: `${screen} ${cls}` });
-  // Soft, so a shift is reported without hiding the payment checks after it.
-  expect.soft(cls, `${screen} layout shift`).toBeLessThan(0.1);
-}
+// One spec asserts one class: this file is the functional journey only.
+// The layout-shift budget for /claim and /billing/success lives in
+// claim-checkout-layout.perf.spec.ts and reports as its own check, so a
+// layout regression never turns the revenue canary red (docs/ON_CALL_PROCESS.md).
 
 test.describe('Self-serve artist profile checkout', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
@@ -104,7 +96,6 @@ test.describe('Self-serve artist profile checkout', () => {
     );
 
     await page.goto('/claim', { waitUntil: 'domcontentloaded' });
-    await expectStableLayout(page, '/claim');
     const { sessionId } = await createCheckoutSession(page, priceId, {
       source: 'onboarding',
       returnTo: '/chat?from=onboarding',
@@ -147,30 +138,25 @@ test.describe('Self-serve artist profile checkout', () => {
         .toBe(true);
       expect((await getBillingStatus(page)).plan).toBe('pro');
 
-      // Paid value (golden-path step): the buyer lands on the unlock screen,
-      // not a bare receipt. This is the only run that can pay, so it asserts it.
-      // ponytail: Stripe forbids automating hosted Checkout, so this session
-      // never reaches status 'complete' and /api/billing/checkout-session
-      // answers { plan: null }. The paid entitlement is already proven by the
-      // signed webhook above; stub only that read to render the paid screen.
-      await page.route('**/api/billing/checkout-session**', route =>
-        route.fulfill({
-          json: {
-            plan: 'pro',
-            priceId,
-            needsProfile: false,
-            proofPending: false,
-            profileShareUrl: null,
-          },
-        })
-      );
+      // Open Stripe session (`status === 'open'`) lands on honest recovery
+      // (never a stubbed false-green celebration), then unstubbed /billing/success
+      // renders the live Pro unlock screen from real entitlement + profile state.
       await page.goto(`/billing/success?session_id=${sessionId}`, {
         waitUntil: 'domcontentloaded',
+      });
+      await expect(page.getByTestId('checkout-success-recovery')).toBeVisible({
+        timeout: 30_000,
+      });
+
+      await page.goto('/billing/success', {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(page.getByTestId('checkout-success-paid')).toBeVisible({
+        timeout: 30_000,
       });
       await expect(page.getByText(/You're on .+: unlocked/)).toBeVisible({
         timeout: 30_000,
       });
-      await expectStableLayout(page, '/billing/success');
 
       // An existing subscriber is never charged twice.
       const again = await page.request.get('/claim/start?new=1', {
@@ -270,12 +256,24 @@ test.describe('Claim checkout dogfood', () => {
         `/${DOGFOOD_LOW_REACH_ARTIST.handle}/claim?next=auth`
       );
 
-      // At or above it: the buyer's own sign-up and checkout, never a dead end.
+      // At or above it: the buyer's own sign-up and checkout, never a dead
+      // end. One front door (Tim, 2026-11-09): anonymous claim start hands
+      // off into the /start onboarding chat with the artist context; the
+      // Pro-monthly intent rides the plan-intent cookies, not the URL.
       await options.filter({ hasText: DOGFOOD_HIGH_REACH_ARTIST.name }).click();
-      await expect(page).toHaveURL(/\/signup\?.*plan=pro/, { timeout: 30_000 });
+      await expect(page).toHaveURL(/\/start\?.*starter_prompt=/, {
+        timeout: 30_000,
+      });
       expect(decodeURIComponent(page.url())).toContain(
         DOGFOOD_HIGH_REACH_ARTIST.id
       );
+      const planIntentCookies = await page.context().cookies();
+      expect(
+        planIntentCookies.find(c => c.name === 'jovie_plan_intent')?.value
+      ).toBe('pro');
+      expect(
+        planIntentCookies.find(c => c.name === 'jv_claim_flow')?.value
+      ).toBe('1');
 
       await expect
         .poll(() => readFunnelStages(acquisitionId), { timeout: 15_000 })
@@ -300,9 +298,13 @@ test.describe('Claim checkout dogfood', () => {
 
     await interceptTrackingRoutes(page);
     await setTestAuthBypassSession(page, 'creator-ready');
-    await ensureUserIsFree(page, stripeClient).catch(async () => {
-      await resetDogfoodBilling(buyerEmail);
-    });
+    // Reset the persona's derived billing state up front: the price-lock era
+    // (JOV-INV-048) fails checkout closed on a stale lock or subscription row,
+    // and one poisoned run then fails every later run with a masked 400
+    // (JOV-8805, red 2026-11-17..19). This normalizes pre-existing persona
+    // state only; the checkout under test is still exercised end to end.
+    await resetDogfoodBilling(buyerEmail);
+    await ensureUserIsFree(page, stripeClient);
     await detachCustomerPaymentMethods(stripeClient, buyerEmail);
     const { profileId } = await readActiveClaimVerification(buyerEmail);
     await clearDogfoodClaim(profileId, artist);
@@ -371,6 +373,20 @@ test.describe('Claim checkout dogfood', () => {
       expect(pending.spotifyId).not.toBe(artist.id);
       expect(pending.record?.paidAt).toBeTruthy();
       expect((await getBillingStatus(page)).isPro).toBe(true);
+
+      // Proof-pending paid buyer: /billing/success?source=onboarding keeps the
+      // page private (`shareUrl: null`) and never claims the profile is live.
+      await page.goto('/billing/success?source=onboarding', {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(page.getByTestId('checkout-success-paid')).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect(
+        page.getByRole('heading', { name: 'Your plan is active' })
+      ).toBeVisible();
+      await expect(page.getByTestId('paid-share-prompt')).toHaveCount(0);
+      await expect(page.getByRole('heading', { name: /live/i })).toHaveCount(0);
 
       // Ovie inbox card for Tim's queue.
       await expect

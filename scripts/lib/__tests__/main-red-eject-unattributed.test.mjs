@@ -303,4 +303,22 @@ describe('workflow gate', () => {
     );
     expect(wf).not.toMatch(/^\s*schedule:/m);
   });
+
+  it('still attributes and ejects when the Main Health revert opener fails (Seer review on #25020)', () => {
+    const step = name => {
+      const start = wf.indexOf(`- name: ${name}`);
+      expect(start).toBeGreaterThan(0);
+      const next = wf.indexOf('\n      - ', start + 1);
+      return wf.slice(start, next === -1 ? undefined : next);
+    };
+    expect(step('Revert the culprit Main Health named (revert first)')).toMatch(
+      /\n\s+id: revert-first\n/
+    );
+    // Without an explicit status function the ejector's `if` is implicitly
+    // success() and a failed revert opener would skip it on the very wake
+    // meant to eject the culprit.
+    expect(step('Attribute and eject the culprit')).toContain(
+      "(success() || steps.revert-first.outcome == 'failure')"
+    );
+  });
 });

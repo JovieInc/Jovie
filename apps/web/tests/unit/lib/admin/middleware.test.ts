@@ -6,6 +6,7 @@ const {
   mockGetCachedAuth,
   mockGetFreshAuth,
   mockIsAdmin,
+  mockHasRecentAdminMfa,
   mockCaptureWarning,
   mockAddBreadcrumb,
 } = vi.hoisted(() => ({
@@ -13,6 +14,7 @@ const {
   mockGetCachedAuth: vi.fn(),
   mockGetFreshAuth: vi.fn(),
   mockIsAdmin: vi.fn(),
+  mockHasRecentAdminMfa: vi.fn(),
   mockCaptureWarning: vi.fn(),
   mockAddBreadcrumb: vi.fn(),
 }));
@@ -38,6 +40,10 @@ vi.mock('@/lib/admin/roles', () => ({
   isAdmin: mockIsAdmin,
 }));
 
+vi.mock('@/lib/admin/mfa', () => ({
+  hasRecentAdminMfaReverification: mockHasRecentAdminMfa,
+}));
+
 vi.mock('@/lib/error-tracking', () => ({
   captureWarning: mockCaptureWarning,
 }));
@@ -54,6 +60,7 @@ describe('requireAdmin (Better Auth)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrivacy.mockResolvedValue(undefined);
+    mockHasRecentAdminMfa.mockResolvedValue(true);
     vi.resetModules();
   });
 
@@ -99,6 +106,27 @@ describe('requireAdmin (Better Auth)', () => {
     expect(mockCaptureWarning).toHaveBeenCalledWith(
       expect.stringContaining('masked:user_regular')
     );
+    expect(mockHasRecentAdminMfa).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when admin lacks passkey step-up', async () => {
+    const auth = {
+      userId: 'user_admin',
+      sessionId: 'sess_stale',
+      orgId: null,
+    };
+    mockGetCachedAuth.mockResolvedValue(auth);
+    mockIsAdmin.mockResolvedValue(true);
+    mockHasRecentAdminMfa.mockResolvedValue(false);
+    const { requireAdmin } = await import('@/lib/admin/middleware');
+    const response = await requireAdmin();
+    expect(mockHasRecentAdminMfa).toHaveBeenCalledWith(auth);
+    expect(response?.status).toBe(403);
+    await expect(response?.json()).resolves.toEqual({
+      error: 'Verify your passkey for this privileged action.',
+      code: 'PASSKEY_STEP_UP_REQUIRED',
+    });
+    expect(mockPrivacy).not.toHaveBeenCalled();
   });
 
   it('returns null when authenticated admin', async () => {
@@ -114,6 +142,11 @@ describe('requireAdmin (Better Auth)', () => {
 
     expect(response).toBeNull();
     expect(mockIsAdmin).toHaveBeenCalledWith('user_admin');
+    expect(mockHasRecentAdminMfa).toHaveBeenCalledWith({
+      userId: 'user_admin',
+      sessionId: 'sess_admin',
+      orgId: null,
+    });
     expect(mockAddBreadcrumb).toHaveBeenCalledWith(
       expect.objectContaining({
         category: 'admin',
@@ -199,6 +232,7 @@ describe('admin API private data boundary', () => {
       sessionId: 's1',
     });
     mockIsAdmin.mockResolvedValue(true);
+    mockHasRecentAdminMfa.mockResolvedValue(true);
     mockPrivacy.mockRejectedValue(Error('privacy locked'));
     const { requireAdmin } = await import('@/lib/admin/middleware');
     expect((await requireAdmin())?.status).toBe(403);

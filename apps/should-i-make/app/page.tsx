@@ -46,6 +46,7 @@ function QuizContent() {
     const currentIndex = stepOrder.indexOf(step);
     if (currentIndex > 0) {
       const prevStep = stepOrder[currentIndex - 1];
+      if (prevStep === undefined) return;
       if (prevStep === 'start') {
         router.push('/');
       } else {

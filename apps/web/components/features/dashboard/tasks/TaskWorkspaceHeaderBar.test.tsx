@@ -25,3 +25,17 @@ describe('TaskWorkspaceHeaderBar', () => {
     expect(source).not.toContain("'hidden lg:inline-flex'");
   });
 });
+
+describe('TaskWorkspaceHeaderBar focus', () => {
+  it('moves focus to the draft field on entering create mode, not with autoFocus', () => {
+    const source = readFileSync(
+      resolve(__dirname, './TaskWorkspaceHeaderBar.tsx'),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/\bautoFocus\b/);
+    expect(source).toContain(
+      "if (mode === 'create') draftInputRef.current?.focus();"
+    );
+  });
+});

@@ -83,6 +83,25 @@ jobs:
     outputs:
       requested: ${{ steps.rerun.outputs.requested }}
     steps:
+      - name: Count gh calls (start)
+        shell: bash
+        env:
+          GITHUB_TOKEN_FOR_TALLY: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # One line per gh invocation, tagged with a hash of the token it ran with, so the
+          # job can report how many calls spent github.token. Reported by the last step.
+          d="$RUNNER_TEMP/gh-tally-bin"; mkdir -p "$d"
+          printf '%s\n' '#!/usr/bin/env bash' \
+            'printf "%s\t%s %s\n" "$(printf %s "${GH_TOKEN:-${GITHUB_TOKEN:-}}" | sha256sum | cut -c1-8)" "${1:-}" "${2:-}" >> "$GH_CALL_TALLY_FILE" 2>/dev/null || true' \
+            'exec "$GH_CALL_TALLY_REAL" "$@"' > "$d/gh"
+          chmod +x "$d/gh"
+          echo "$d" >> "$GITHUB_PATH"
+          {
+            echo "GH_CALL_TALLY_FILE=$RUNNER_TEMP/gh-calls.tsv"
+            echo "GH_CALL_TALLY_REAL=$(command -v gh)"
+            echo "GH_CALL_TALLY_GITHUB_HASH=$(printf %s "$GITHUB_TOKEN_FOR_TALLY" | sha256sum | cut -c1-8)"
+          } >> "$GITHUB_ENV"
       - name: Checkout trusted rerun policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -99,6 +118,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPOSITORY: ${{ github.repository }}
         run: node scripts/pr-unacquired-runner-rerun.mjs
+      - name: Report gh call tally
+        if: always()
+        shell: bash
+        run: |
+          f="${GH_CALL_TALLY_FILE:-}"
+          if [ -z "$f" ] || [ ! -s "$f" ]; then
+            echo "::notice title=gh-tally::workflow=$GITHUB_WORKFLOW job=$GITHUB_JOB calls=0 github_token=0 other=0 top="
+            exit 0
+          fi
+          total="$(wc -l < "$f" | tr -d ' ')"
+          gt="$(awk -F'\t' -v h="${GH_CALL_TALLY_GITHUB_HASH:-}" '$1==h' "$f" | wc -l | tr -d ' ')"
+          top="$(cut -f2 "$f" | sort | uniq -c | sort -rn | head -4 | awk '{c=$1; $1=""; sub(/^ /,""); printf "%s:%s,", $0, c}')"
+          echo "::notice title=gh-tally::workflow=$GITHUB_WORKFLOW job=$GITHUB_JOB calls=$total github_token=$gt other=$((total-gt)) top=${top%,}"
+
 
   # Success wakes of this heavy job come only from Source Validation (2026-10-26).
   # Waking it on every other workflow's success started ~3 extra runs per head, each
@@ -108,6 +141,10 @@ jobs:
   # and do not sleep. `green` is still applied only to a lane draft
   # (pr_events.in_scope). A stale lane-fix-red is deleted when the rollup is settled
   # success, including while merge state still says BLOCKED.
+  # Red path (Tim 2026-11-12, scripts/lanes/red_repair.py): drafts get lane-fix-red too,
+  # whatever their branch prefix, unless an active worker holds the head (an unexpired
+  # exact-head lane claim, or a commit under an hour old). No label while Main Health is
+  # red on main, and none for a check failing on more than 5 PRs in 30 min (one intake).
   relay:
     name: Queue lane repair
     needs: rerun-unacquired
@@ -147,6 +184,25 @@ jobs:
         if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
         run: sleep 20
 
+      - name: Count gh calls (start)
+        shell: bash
+        env:
+          GITHUB_TOKEN_FOR_TALLY: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # One line per gh invocation, tagged with a hash of the token it ran with, so the
+          # job can report how many calls spent github.token. Reported by the last step.
+          d="$RUNNER_TEMP/gh-tally-bin"; mkdir -p "$d"
+          printf '%s\n' '#!/usr/bin/env bash' \
+            'printf "%s\t%s %s\n" "$(printf %s "${GH_TOKEN:-${GITHUB_TOKEN:-}}" | sha256sum | cut -c1-8)" "${1:-}" "${2:-}" >> "$GH_CALL_TALLY_FILE" 2>/dev/null || true' \
+            'exec "$GH_CALL_TALLY_REAL" "$@"' > "$d/gh"
+          chmod +x "$d/gh"
+          echo "$d" >> "$GITHUB_PATH"
+          {
+            echo "GH_CALL_TALLY_FILE=$RUNNER_TEMP/gh-calls.tsv"
+            echo "GH_CALL_TALLY_REAL=$(command -v gh)"
+            echo "GH_CALL_TALLY_GITHUB_HASH=$(printf %s "$GITHUB_TOKEN_FOR_TALLY" | sha256sum | cut -c1-8)"
+          } >> "$GITHUB_ENV"
       - name: Checkout trusted lane policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -183,6 +239,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_READ_TOKEN: ${{ steps.read-token.outputs.token }}
           MODE: ${{ github.event_name == 'workflow_dispatch' && 'backfill' || 'relay' }}
+          # JOV-13077: reuse the existing repo secret; no new secret. LANES_RELAY_LINEAR
+          # scopes this key to the hosted relay so the Gem lane host does not fall back
+          # to a personal key (Tim 2026-10-20).
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          LANES_RELAY_LINEAR: "1"
         run: python3 scripts/lanes/pr_events.py "$MODE"
 
       # 2026-10-29: this relay is the one topology-approved remediation dispatcher, but nothing
@@ -206,17 +267,32 @@ jobs:
           PYTHONPATH=scripts python3 -m apiclient gh --priority repair -- api "repos/$GITHUB_REPOSITORY/dispatches" -f event_type=swarm-remediate \
             -f "client_payload[pr]=$PR" -f "client_payload[sha]=$SHA"
           echo "swarm-remediate pr=$PR sha=$SHA first_failed=$WORKFLOW at=$(date -u +%FT%TZ)"
+      - name: Report gh call tally
+        if: always()
+        shell: bash
+        run: |
+          f="${GH_CALL_TALLY_FILE:-}"
+          if [ -z "$f" ] || [ ! -s "$f" ]; then
+            echo "::notice title=gh-tally::workflow=$GITHUB_WORKFLOW job=$GITHUB_JOB calls=0 github_token=0 other=0 top="
+            exit 0
+          fi
+          total="$(wc -l < "$f" | tr -d ' ')"
+          gt="$(awk -F'\t' -v h="${GH_CALL_TALLY_GITHUB_HASH:-}" '$1==h' "$f" | wc -l | tr -d ' ')"
+          top="$(cut -f2 "$f" | sort | uniq -c | sort -rn | head -4 | awk '{c=$1; $1=""; sub(/^ /,""); printf "%s:%s,", $0, c}')"
+          echo "::notice title=gh-tally::workflow=$GITHUB_WORKFLOW job=$GITHUB_JOB calls=$total github_token=$gt other=$((total-gt)) top=${top%,}"
 
-  # CI can finish after Source Validation. That completion is the event that
-  # settles the rollup. This job does not sleep and does not run for the fast
-  # producers. A head with no lane-fix-red returns after one read.
+
+  # Source Validation (workflow 369845917) is the pull_request gate.
+  # ci.yml has no pull_request trigger, so a name == 'CI' wake never runs.
+  # This job does not sleep and does not run for the fast producers.
+  # A head with no lane-fix-red returns after one read.
   clear-settled-red:
     name: Clear lane-fix-red when CI succeeded
     if: >-
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.name == 'CI'
+      github.event.workflow_run.workflow_id == 369845917
     # A new job cannot float. The control-plane expression stays on the two
     # jobs already listed in the runner-pin allowlist.
     runs-on: ubuntu-24.04

@@ -13,32 +13,14 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { runInNewContext } from 'node:vm';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 import { SUITES } from '../../../scripts/lighthouse-relative-gate.mjs';
-
-interface LighthouseStep {
-  id?: string;
-  uses?: string;
-  name?: string;
-  if?: string;
-  run: string;
-  env: Record<string, string>;
-  'continue-on-error'?: unknown;
-}
-interface LighthouseJob {
-  steps: LighthouseStep[];
-  'continue-on-error'?: unknown;
-}
-interface SelectOptions {
-  download?: string;
-  ephemeral?: boolean;
-  relevant?: boolean;
-  failed?: boolean;
-  branch?: string;
-  baseline?: boolean;
-}
+import {
+  type LighthouseJob,
+  type LighthouseStep,
+  selected,
+} from './lighthouse-launch-fixture';
 
 const REPO_ROOT = resolve(process.cwd(), '../..');
 
@@ -52,49 +34,33 @@ describe('Lighthouse identity admission', () => {
   const workflow = load(
     readFileSync(resolve(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8')
   ) as { jobs: Record<string, LighthouseJob> };
-  const selected = (
-    step: LighthouseStep | undefined,
-    available: string,
-    {
-      download = 'failure',
-      ephemeral = false,
-      relevant = true,
-      failed = false,
-      branch = 'fixture-branch',
-      baseline = false,
-    }: SelectOptions = {}
-  ): boolean => {
-    const expression = (step?.if ?? 'success()')
-      .replace(/\$\{\{|\}\}/g, '')
-      .replace(
-        /\.(lighthouse-identity|lighthouse-baseline|download-build|neon-branch|ci-path-changes|neon-db)\b/g,
-        "['$1']"
-      );
-    // Actions implicitly applies success() unless the expression explicitly
-    // selects a status, such as the always() on evidence and cleanup steps.
-    if (failed && !/\b(?:always|success|failure|cancelled)\(/.test(expression))
-      return false;
-    return runInNewContext(expression, {
-      success: () => !failed,
-      always: () => true,
-      steps: {
-        'lighthouse-identity': { outputs: { available } },
-        'lighthouse-baseline': { outputs: { built: String(baseline) } },
-        check_changes: { outputs: { run_full_ci: String(relevant) } },
-        'download-build': { outcome: download },
-        'neon-branch': { outputs: { branch_id: branch } },
-      },
-      needs: {
-        'ci-path-changes': { outputs: { run_neon: String(ephemeral) } },
-        'neon-db': { result: ephemeral ? 'success' : 'skipped' },
-      },
-    });
-  };
 
   const PROBE_NAMES = {
     dashboard: 'Run signed-in shell navigation',
     onboarding: 'Run authenticated onboarding Lighthouse',
   } as const;
+
+  it('dashboard: uses a prepared workspace only after merge-group DB certification', () => {
+    const job = workflow.jobs['ci-lighthouse-dashboard-pr'];
+    expect(job.needs).toEqual([
+      'ci-path-changes',
+      'neon-db',
+      'ci-build-public',
+    ]);
+    const setup = job.steps.find(
+      step => step.uses === './.github/actions/setup-node-pnpm'
+    );
+    expect(setup?.with?.prefer_prepared_workspace).toBe(
+      "${{ github.event_name == 'merge_group' && needs.neon-db.result == 'success' }}"
+    );
+    expect(
+      Object.values(workflow.jobs).filter(candidate =>
+        candidate.steps?.some(
+          step => step.with?.prefer_prepared_workspace !== undefined
+        )
+      )
+    ).toEqual([job]);
+  });
 
   it('dashboard: runs without an identity secret and blocks on the shell nav click-through', () => {
     const job = workflow.jobs['ci-lighthouse-dashboard-pr'];
@@ -208,7 +174,7 @@ describe('Lighthouse identity admission', () => {
     expect(names.indexOf(restore.name)).toBe(names.indexOf(baseline.name) + 1);
     for (const later of [
       'Extract build artifact',
-      'Build app fallback for dashboard Lighthouse',
+      'Start fallback build in background',
       'Run signed-in shell navigation',
       'Run signed-in Lighthouse budgets',
     ]) {
@@ -218,11 +184,8 @@ describe('Lighthouse identity admission', () => {
     }
     // Base and head are built by the same command with the same env, so the
     // prebuilt artifact (other env) is not used once a baseline exists.
-    const fallback = stepNamed(
-      job,
-      'Build app fallback for dashboard Lighthouse'
-    );
-    expect(fallback.run).toBe('pnpm --filter=@jovie/web run build');
+    const fallback = stepNamed(job, 'Start fallback build in background');
+    expect(fallback.run).toContain('pnpm --filter=@jovie/web run build');
     for (const key of Object.keys(fallback.env)) {
       expect(baseline.env[key], key).toBe(fallback.env[key]);
     }
@@ -354,6 +317,8 @@ describe('Lighthouse identity admission', () => {
       'apps/web/scripts/lighthouse-relative-budget.mjs',
       'apps/web/scripts/lighthouse-relative-gate.mjs',
       '.github/scripts/lighthouse-build-baseline.sh',
+      '.github/scripts/lighthouse-install-scope.mjs',
+      'scripts/ci/wait-background-build.sh',
     ]) {
       expect(pattern.test(path), path).toBe(true);
     }
@@ -416,7 +381,11 @@ describe('Lighthouse identity admission', () => {
     const job = workflow.jobs[`ci-lighthouse-${surface}-pr`];
     it(`${surface}: present identity preserves artifact fallback, real probes and failure cleanup`, () => {
       const byName = (name: string) => stepNamed(job, name);
-      const fallback = byName(`Build app fallback for ${surface} Lighthouse`);
+      const fallback = byName(
+        surface === 'dashboard'
+          ? 'Start fallback build in background'
+          : `Build app fallback for ${surface} Lighthouse`
+      );
       expect(selected(fallback, 'true')).toBe(true);
       expect(selected(fallback, 'true', { failed: true })).toBe(false);
       expect(selected(fallback, 'true', { download: 'success' })).toBe(false);

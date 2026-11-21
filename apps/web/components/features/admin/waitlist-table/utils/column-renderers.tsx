@@ -37,7 +37,7 @@ export function renderEmailCell(value: string) {
   return (
     <a
       href={`mailto:${value}`}
-      className='text-secondary-token hover:underline'
+      className='inline-block py-1 leading-5 text-secondary-token hover:underline'
     >
       {value}
     </a>

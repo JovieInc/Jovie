@@ -6,7 +6,7 @@ measuredBaseline:
   checkRecords: 487
 budgets:
   blockingPrChecks: 12
-  normalPrCheckRecords: 25
+  normalPrCheckRecords: 26
   normalPrExternalAllowance: 8
   mainShaWorkflowRuns: 72
 authoritativeOwners:
@@ -56,7 +56,7 @@ inactiveWorkflows:
   - Rolling CI Dispatch
   - Stuck Draft Auto-Close
 generatedAt: deterministic
-normalPrCheckRecords: 25
+normalPrCheckRecords: 26
 nodes:
   - name: Workflow Lint
     path: .github/workflows/actionlint.yml
@@ -91,6 +91,18 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
     terminalReceipt: job:report
+    jobCount: 1
+  - name: Artifact Freshness
+    path: .github/workflows/artifact-freshness.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:reconcile
     jobCount: 1
   - name: Auto-Merge Base Guard
     path: .github/workflows/auto-merge-base-guard.yml
@@ -127,6 +139,17 @@ nodes:
       - workflow_run
     terminalReceipt: job:liveness
     jobCount: 3
+  - name: Buyer Eval Gate
+    path: .github/workflows/buyer-eval-gate.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:buyer-eval-gate
+    jobCount: 1
   - name: Canary Health Gate
     path: .github/workflows/canary-health-gate.yml
     active: true
@@ -160,8 +183,8 @@ nodes:
       - push
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:measure
-    jobCount: 2
+    terminalReceipt: job:fan-out-budget
+    jobCount: 3
   - name: CI Shard Contract Canary
     path: .github/workflows/ci-shard-contract-canary.yml
     active: true
@@ -183,6 +206,7 @@ nodes:
       - iOS CI
       - Mac CI
       - Component Certificate
+      - desktop-dogfood
       - Fleet Gate Refresh
       - Lane Fix Relay
       - Main Red Eject
@@ -197,7 +221,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
-    jobCount: 68
+    jobCount: 74
   - name: Claim Checkout Dogfood
     path: .github/workflows/claim-checkout-dogfood.yml
     active: true
@@ -208,8 +232,8 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:dogfood
-    jobCount: 1
+    terminalReceipt: job:layout-budget
+    jobCount: 2
   - name: CLI Chaos Nightly
     path: .github/workflows/cli-chaos-nightly.yml
     active: true
@@ -282,7 +306,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:certify
-    jobCount: 1
+    jobCount: 2
   - name: Controller Quota Replay
     path: .github/workflows/controller-quota-replay.yml
     active: true
@@ -391,13 +415,26 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:invariant-stewardship
     jobCount: 2
+  - name: desktop-dogfood
+    path: .github/workflows/desktop-dogfood.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:rebuild-deferred-desktop
+    jobCount: 4
   - name: desktop-release
     path: .github/workflows/desktop-release.yml
     active: true
     category: release-orchestration
     authoritativeProducer: Production Controller
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Artifact Freshness
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
@@ -453,6 +490,17 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:canary
     jobCount: 1
+  - name: Flake Ledger
+    path: .github/workflows/flake-ledger.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_run
+    terminalReceipt: job:retry-infra
+    jobCount: 2
   - name: Fleet Gate Refresh
     path: .github/workflows/fleet-gate-refresh.yml
     active: true
@@ -725,8 +773,8 @@ nodes:
       - Mac Lane Route
     triggeringStateTransition:
       - workflow_call
-    terminalReceipt: job:build
-    jobCount: 2
+    terminalReceipt: job:startup-budget
+    jobCount: 3
   - name: Main Health
     path: .github/workflows/main-health.yml
     active: true
@@ -765,6 +813,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:produce
     jobCount: 1
+  - name: Merge Group Dead Run Sweep
+    path: .github/workflows/merge-group-dead-run-sweep.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+      - workflow_dispatch
+    terminalReceipt: job:sweep
+    jobCount: 1
   - name: Merge Queue Green Enroll
     path: .github/workflows/merge-queue-green-enroll.yml
     active: true
@@ -799,24 +859,14 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Component Certificate
     triggeringStateTransition:
       - push
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:sweep
-    jobCount: 2
-  - name: Neon Ephemeral Branch Cleanup
-    path: .github/workflows/neon-ephemeral-branch-cleanup.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - pull_request
-    terminalReceipt: job:delete-neon-branch
-    jobCount: 1
+    terminalReceipt: job:baseline-merge
+    jobCount: 4
   - name: Neon Scheduled Branch Cleanup
     path: .github/workflows/neon-scheduled-cleanup.yml
     active: true
@@ -838,8 +888,8 @@ nodes:
     triggeringStateTransition:
       - push
       - workflow_dispatch
-    terminalReceipt: job:warm
-    jobCount: 1
+    terminalReceipt: job:warm-ovie
+    jobCount: 2
   - name: Nightly Testing Agent
     path: .github/workflows/nightly-testing-agent.yml
     active: true
@@ -889,7 +939,7 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:bump
-    jobCount: 2
+    jobCount: 3
   - name: Publish @jovie/cli to npm
     path: .github/workflows/npm-publish.yml
     active: true
@@ -926,13 +976,26 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:canary
     jobCount: 1
+  - name: Pen draft pictures to Linear
+    path: .github/workflows/pen-draft-publish.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:publish
+    jobCount: 3
   - name: Pen draft missing frames
     path: .github/workflows/pen-draft.yml
     active: true
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Pen draft pictures to Linear
     triggeringStateTransition:
       - pull_request
       - push
@@ -988,7 +1051,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:notify-failure
-    jobCount: 8
+    jobCount: 10
   - name: PR Conflict Handler
     path: .github/workflows/pr-conflict-handler.yml
     active: false
@@ -1012,7 +1075,6 @@ nodes:
     allowedConsumers:
       - Lane Fix Relay
     triggeringStateTransition:
-      - merge_group
       - pull_request
     terminalReceipt: job:fleet
     jobCount: 1
@@ -1119,7 +1181,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - pull_request
       - workflow_dispatch
     terminalReceipt: job:crawl
     jobCount: 1
@@ -1228,6 +1289,7 @@ nodes:
       - push
       - repository_dispatch
       - workflow_dispatch
+      - workflow_run
     terminalReceipt: job:find
     jobCount: 1
   - name: Remediation Sweep
@@ -1327,7 +1389,7 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:certify
     jobCount: 3
-  - name: Security Advisory Loop (Linear devin lane)
+  - name: Security Advisory Loop (Summer owned)
     path: .github/workflows/security-advisory-loop.yml
     active: true
     category: source-validation
@@ -1379,17 +1441,6 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:recurrence
-    jobCount: 1
-  - name: Sentry Autofix
-    path: .github/workflows/sentry-autofix.yml
-    active: true
-    category: remediation-dispatch
-    authoritativeProducer: Lane Fix Relay
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - repository_dispatch
-    terminalReceipt: job:autofix
     jobCount: 1
   - name: Shipping Origin Receipt
     path: .github/workflows/shipping-origin.yml
@@ -1447,13 +1498,14 @@ nodes:
     allowedConsumers:
       - Auto-Ready Agent Drafts
       - Dependabot Pin Sync
+      - Flake Ledger
       - Fleet Rules Evidence
       - Lane Fix Relay
       - Merge Queue Green Enroll
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:ready
-    jobCount: 7
+    jobCount: 8
   - name: Spend Guard
     path: .github/workflows/spend-guard.yml
     active: true
@@ -1506,6 +1558,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:check
     jobCount: 2
+  - name: Summer PR No-Stall
+    path: .github/workflows/summer-pr-no-stall.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:reclaim
+    jobCount: 1
   - name: Surface Recertify
     path: .github/workflows/surface-recertify.yml
     active: true
@@ -1537,6 +1601,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
+      - Quality Gap Finder
       - SonarCloud
     triggeringStateTransition:
       - repository_dispatch
@@ -1566,6 +1631,17 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:warm
+    jobCount: 1
+  - name: Native Typecheck Qualification
+    path: .github/workflows/typecheck-native-qualification.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:qualification
     jobCount: 1
   - name: UI Story Coverage Audit
     path: .github/workflows/ui-story-coverage-audit.yml
@@ -1609,12 +1685,13 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Component Certificate
     triggeringStateTransition:
       - push
       - workflow_dispatch
     terminalReceipt: job:report-scheduled-failure
-    jobCount: 4
+    jobCount: 6
   - name: Visual Regression
     path: .github/workflows/visual-regression.yml
     active: true
@@ -1626,7 +1703,7 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:report-scheduled-failure
-    jobCount: 2
+    jobCount: 6
   - name: VOC Mine
     path: .github/workflows/voc-mine.yml
     active: true
@@ -1664,6 +1741,9 @@ nodes:
     terminalReceipt: job:ingest
     jobCount: 1
 edges:
+  - from: desktop-release
+    to: Artifact Freshness
+    type: workflow_run
   - from: Production Continuity Guard
     to: Automation Liveness
     type: workflow_run
@@ -1685,6 +1765,12 @@ edges:
   - from: CI
     to: Component Certificate
     type: workflow_run
+  - from: Visual & A11y Tests
+    to: Component Certificate
+    type: workflow_run
+  - from: Mutation Diff
+    to: Component Certificate
+    type: workflow_run
   - from: Staging Controller
     to: Controller Quota Replay
     type: workflow_run
@@ -1697,8 +1783,14 @@ edges:
   - from: Source Validation
     to: Dependabot Pin Sync
     type: workflow_run
+  - from: CI
+    to: desktop-dogfood
+    type: workflow_run
   - from: Production Controller
     to: desktop-release
+    type: workflow_run
+  - from: Source Validation
+    to: Flake Ledger
     type: workflow_run
   - from: CI
     to: Fleet Gate Refresh
@@ -1796,6 +1888,9 @@ edges:
   - from: Publish @jovie/cli to npm
     to: CLI Chaos
     type: workflow_call
+  - from: Pen draft missing frames
+    to: Pen draft pictures to Linear
+    type: workflow_run
   - from: Production Controller
     to: Post-Deploy Probes
     type: workflow_run
@@ -1808,6 +1903,9 @@ edges:
   - from: Production Release
     to: Canary Health Gate
     type: workflow_call
+  - from: Test Coverage Audit
+    to: Quality Gap Finder
+    type: workflow_run
   - from: Eve Pilot
     to: Safe PR Remediation
     type: workflow_run

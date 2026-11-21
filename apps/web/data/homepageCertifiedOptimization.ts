@@ -1,5 +1,3 @@
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
-
 /**
  * JOV-INV-012 optimization contract for the certified root homepage.
  *
@@ -28,7 +26,7 @@ export const HOMEPAGE_CERTIFIED_CONTEXT = {
   variantIdentity: HOMEPAGE_CERTIFIED_VARIANT_ID,
   platform: 'web',
   contentVariant: 'certified-section-1',
-  actionState: FEATURE_FLAGS.WAITLIST_ENABLED ? 'waitlist-on' : 'waitlist-off',
+  actionState: 'waitlist-off',
 } as const;
 
 export const HOMEPAGE_CERTIFIED_OPTIMIZATION_CONTRACT = {

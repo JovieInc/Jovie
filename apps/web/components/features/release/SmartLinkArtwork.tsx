@@ -47,7 +47,7 @@ export function SmartLinkArtwork({
       >
         <ArtworkFrame
           size={224}
-          className='size-56 bg-white/5 shadow-2xl shadow-black/50 ring-1 ring-white/10'
+          className='size-56 bg-on-media/5 shadow-2xl shadow-black/50 ring-1 ring-on-media/10'
         >
           {src && !imgError ? (
             <Image
@@ -63,7 +63,7 @@ export function SmartLinkArtwork({
             <div className='flex h-full w-full items-center justify-center'>
               <Icon
                 name='AudioLines'
-                className='h-16 w-16 text-white/20'
+                className='h-16 w-16 text-on-media/20'
                 aria-hidden='true'
               />
             </div>

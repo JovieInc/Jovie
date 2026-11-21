@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-// @coverage-via apps/web/tests/unit/dashboard/SettingsPanel.test.tsx
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { cn } from '@/lib/utils';
 
@@ -91,6 +90,53 @@ export function SettingsPanel({
         ) : (
           children
         )}
+      </ContentSurfaceCard>
+    </div>
+  );
+}
+
+export interface SettingsGroupProps {
+  /** Plain section heading above the group. */
+  readonly title?: string;
+  /** One control beside the heading, such as an Add button. */
+  readonly action?: ReactNode;
+  /** SettingsRow elements; the group draws the hairlines between them. */
+  readonly children: ReactNode;
+  readonly 'data-testid'?: string;
+}
+
+/**
+ * SettingsGroup is one settings section: a plain heading and ONE rounded
+ * group whose rows are divided by hairlines. It takes no description,
+ * padding or className, so every settings page has the same rhythm.
+ * SettingsPanel above is the legacy shape; its consumers move here.
+ */
+export function SettingsGroup({
+  title,
+  action,
+  children,
+  'data-testid': testId,
+}: Readonly<SettingsGroupProps>) {
+  return (
+    <div className='space-y-2' data-testid={testId}>
+      {title || action ? (
+        <div className='flex min-h-8 items-center justify-between gap-2'>
+          {title ? (
+            <h2 className='text-sm font-medium text-balance text-primary-token'>
+              {title}
+            </h2>
+          ) : null}
+          {action ? (
+            <div className='ms-auto flex shrink-0 items-center'>{action}</div>
+          ) : null}
+        </div>
+      ) : null}
+      <ContentSurfaceCard
+        surface='settings'
+        className='overflow-hidden'
+        data-settings-group=''
+      >
+        <div className='divide-y divide-(--app-shell-border)'>{children}</div>
       </ContentSurfaceCard>
     </div>
   );

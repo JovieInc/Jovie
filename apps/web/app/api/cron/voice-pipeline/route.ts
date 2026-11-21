@@ -13,7 +13,8 @@
  * Schedule: every 5 minutes (added to vercel.json crons).
  * Max duration 300s (covered by the app/api/cron/** glob in vercel.json).
  *
- * Auth: verifyCronRequest (trusted hosts + optional CRON_SECRET bearer).
+ * Auth: verifyCronRequest (requires CRON_SECRET bearer; trusted host is
+ * additive when requireTrustedOrigin is set, never a substitute).
  *
  * Current implementation (minimal complete per plan HOT ZONE + P1/P6):
  * - Verifies cron auth

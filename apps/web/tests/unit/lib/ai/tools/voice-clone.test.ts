@@ -87,9 +87,4 @@ describe('voice-clone tool (gh-9807)', () => {
       'clean single-speaker audio'
     );
   });
-
-  it('handles 11Labs errors gracefully (fail closed)', async () => {
-    // Contract covered by missing-key and consent cases above.
-    expect(true).toBe(true);
-  });
 });

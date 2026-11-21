@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { APP_ROUTES } from '@/constants/routes';
@@ -64,20 +65,22 @@ export function ChatProposeCheckoutCard({
   const href = checkoutHref(payload.handoffUrl);
 
   return (
-    <div className='flex items-center justify-between gap-3 rounded-xl border border-subtle bg-surface-1 px-4 py-3'>
+    <div
+      className='flex items-center justify-between gap-3 rounded-xl border border-subtle bg-surface-1 px-4 py-3'
+      data-testid='chat-propose-checkout-card'
+    >
       <div className='min-w-0'>
         <p className='text-app text-secondary-token'>Continue to checkout</p>
-        <p className='truncate text-mid font-semibold text-primary-token'>
+        <p className='truncate text-mid font-semibold tabular-nums text-primary-token'>
           {label}
         </p>
       </div>
-      <Link
-        href={href}
-        className='inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-white dark:bg-surface-1 px-4 text-app font-semibold text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90 focus-ring-themed'
-      >
-        Continue
-        <ArrowRight className='h-4 w-4' aria-hidden />
-      </Link>
+      <Button asChild variant='primary' size='lg' className='shrink-0'>
+        <Link href={href} data-testid='chat-propose-checkout-cta'>
+          Continue
+          <ArrowRight className='h-3.5 w-3.5' aria-hidden />
+        </Link>
+      </Button>
     </div>
   );
 }

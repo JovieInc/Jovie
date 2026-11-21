@@ -13,10 +13,15 @@ if [[ -z "$REPO_ROOT" ]]; then
   exit 0
 fi
 
-if [[ ! -x "$REPO_ROOT/.husky/pre-push" ]]; then
-  echo "[git-hooks] expected tracked hook missing: $REPO_ROOT/.husky/pre-push" >&2
-  exit 1
-fi
+for hook in "$REPO_ROOT/.husky/pre-commit" "$REPO_ROOT/.husky/pre-push"; do
+  if [[ ! -x "$hook" ]]; then
+    echo "[git-hooks] expected tracked hook missing or not executable: $hook" >&2
+    exit 1
+  fi
+done
 
 git -C "$REPO_ROOT" config core.hooksPath .husky
 echo "[git-hooks] core.hooksPath=.husky (tracked hooks work in every worktree)"
+
+# Fail closed if the hook still is not armed (wrong hooksPath or missing pre-push).
+bash "$REPO_ROOT/scripts/hooks/verify-git-hooks.sh"

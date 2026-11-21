@@ -248,13 +248,72 @@ surfaces:
       full load and by click, failing on console errors and error
       boundaries).
     last_reviewed: 2026-11-08
+
+  - id: waitlist-and-admission
+    surface: Waitlist, Golden Path admission & scoring
+    glob: apps/web/lib/waitlist/**
+    key_ranges:
+      - apps/web/lib/waitlist/admission-score.ts:1-140
+      - apps/web/lib/waitlist/approval.ts:1-220
+      - apps/web/lib/waitlist/golden-path-admission.ts:1-120
+    blast_radius: 5
+    reversibility: 4
+    visibility: 5
+    target_coverage: 90
+    target_e2e: 2
+    owner: '@itstimwhite'
+    last_incident: 2026-11-20
+    lessons_ref: null
+    notes: >-
+      Controls public signup gate, Golden Path artist admission, waitlist ranking,
+      and approval state transitions. Covered by Mutation Diff (lib/waitlist/ prefix).
+    last_reviewed: 2026-11-20
+
+  - id: acquisition-and-agent-claim
+    surface: Acquisition eligibility, agent draft claim & onboarding APIs
+    glob: apps/web/lib/{acquisition,agent-acquisition}/**
+    key_ranges:
+      - apps/web/lib/acquisition/eligibility.ts:1-260
+      - apps/web/lib/agent-acquisition/service.ts:1-280
+      - apps/web/app/api/onboarding/claim/route.ts:1-200
+    blast_radius: 5
+    reversibility: 4
+    visibility: 5
+    target_coverage: 85
+    target_e2e: 2
+    owner: '@itstimwhite'
+    last_incident: 2026-11-20
+    lessons_ref: null
+    notes: >-
+      Enforces Golden Path eligibility gate, proof-only draft claims for high-profile
+      artists, and /api/onboarding/claim materialization. Covered by Mutation Diff.
+    last_reviewed: 2026-11-20
+
+  - id: golden-path-certifications-and-truth
+    surface: Golden Path certifications & product-truth claims
+    glob: apps/web/{lib/ovie/certifications,data/product-truth}/**
+    key_ranges:
+      - apps/web/lib/ovie/certifications/golden-path-status.ts:1-220
+      - apps/web/data/product-truth/golden-path-claims.ts:1-260
+    blast_radius: 5
+    reversibility: 3
+    visibility: 4
+    target_coverage: 85
+    target_e2e: 1
+    owner: '@itstimwhite'
+    last_incident: 2026-11-20
+    lessons_ref: null
+    notes: >-
+      Computes live Golden Path certification status and audits every numeric or
+      offer-bearing claim rendered on homepage, pricing, and checkout surfaces.
+    last_reviewed: 2026-11-20
 ---
 
 # Test Risk Register
 
 > **Question this answers:** "Which surfaces in the codebase carry the highest blast radius if they break, and what coverage do they require?"
 
-> This file is the **input taxonomy** for the risk-based testing strategy. The auto-generated heatmap at [`TEST_COVERAGE_HEATMAP.md`](TEST_COVERAGE_HEATMAP.md) joins these rows with measured coverage to produce a prioritized action list.
+> This file is the **input taxonomy** for the risk-based testing strategy. The daily artifact-backed heatmap (restore it using [testing guidelines](TESTING_GUIDELINES.md)) joins these rows with measured coverage to produce a prioritized action list.
 
 ## Scoring
 
@@ -281,6 +340,9 @@ The heatmap generator computes a numeric priority score and joins it with measur
 | Marketing (static) | `apps/web/app/(marketing)/**` | 2 | 1 | 5 | 30% | 4 |
 | RLS access control | `apps/web/lib/db/schema/**` | 5 | 5 | 3 | 80% | 0 |
 | App shell navigation | `apps/web/components/features/dashboard/dashboard-nav/**` | 5 | 2 | 5 | 80% | 2 |
+| Waitlist & Golden Path admission | `apps/web/lib/waitlist/**` | 5 | 4 | 5 | 90% | 2 |
+| Acquisition & agent draft claim | `apps/web/lib/{acquisition,agent-acquisition}/**` | 5 | 4 | 5 | 85% | 2 |
+| Golden Path certifications & product-truth | `apps/web/{lib/ovie/certifications,data/product-truth}/**` | 5 | 3 | 4 | 85% | 1 |
 
 ## Maintenance
 

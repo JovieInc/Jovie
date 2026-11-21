@@ -62,3 +62,31 @@ export const Linear: Story = {
   },
   render: () => <ControlledSegmented variant='linear' />,
 };
+
+/** Without the keyboard-shortcut hint: the buttons carry no description. */
+export const PartialWithoutShortcutHint: Story = {
+  args: {
+    currentTheme: 'light',
+    indicatorX: THEME_SEGMENT_WIDTH_PX,
+    setTheme: () => {},
+    wrapButton: button => button,
+  },
+};
+
+/** The footer rail inside a right-to-left page. */
+export const Rtl: Story = {
+  args: {
+    currentTheme: 'dark',
+    indicatorX: 2 * THEME_SEGMENT_WIDTH_PX,
+    setTheme: () => {},
+    size: 'footer',
+    wrapButton: button => button,
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' lang='ar'>
+        <Story />
+      </div>
+    ),
+  ],
+};

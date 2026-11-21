@@ -22,6 +22,15 @@ Founder-locked 2026-10-02.
   metadata in `settings-decision-admission.ts`, and UnifiedSidebar renderer.
   Admission joins the existing app-screen registry; aliases do not earn
   duplicate screens. Update the existing snapshot/admission tests deliberately.
+- **Settings admission monopoly (Drift W1 / C4):**
+  `userSettingsNavigation` + `artistSettingsNavigation` (+ gated payments) are
+  the only settings IA. Experiment shells (`/exp/shell-v1` and successors)
+  project those admission groups or stay non-customer demos. Do not invent a
+  parallel Workspace / Channels / Danger settings inventory.
+- **Audience & Tracking (Drift W1 / C3):** that settings row is consent /
+  preference / verification only. The primary Audience door remains
+  `/app/contacts?tab=audience`; Insights is contextual. `/app/audience` is
+  compatibility only.
 - Contextual menus contain relevant secondary actions, not unrelated settings or
   hidden essential consent. Usage surfaces show one truthful snapshot and status.
 - Verify behavior through existing local, weekly and shadow checks. Metadata and
@@ -143,13 +152,18 @@ primary conversion (#17055 / JOV-5864).
 
 ### Type Scale — App (System B)
 
-| Level | Size | Weight | Usage |
-|-------|------|--------|-------|
-| 2xs | 11px | 450 | Counts, badges, small indicators |
-| App default | 13px | 450 | Linear's primary app text size |
-| Nav item | 12px | 500 | Sidebar navigation |
-| Workspace name | 13px | 500 | Sidebar workspace label |
-| Heading | 13px | 510 | List/view headings |
+Runtime tokens (`--text-app`, `--text-2xs`, `--text-mid`) are authoritative.
+App default consolidated to **12px** (2026-09-27); do not reintroduce 13px as
+the product default. Inter uses OpenType `"cv01", "ss03"` (+ `rlig`/`calt`).
+
+| Level | Size | Weight | Token / usage |
+|-------|------|--------|---------------|
+| 2xs | 12px | 450 | `--text-2xs` — counts, badges, small indicators |
+| App default | 12px | 450 | `--text-app` — product UI body (Linear-compact) |
+| Nav item | 12px | 510 | Sidebar navigation (`--font-weight-nav`) |
+| Workspace name | 12px | 510 | Sidebar workspace label |
+| Mid | 14px | 450 | `--text-mid` — denser secondary copy |
+| Heading | 12–14px | 510 | List/view headings |
 | Body | 15px | 400 | Document body, descriptions |
 
 ### Responsive Typography
@@ -704,6 +718,9 @@ These are surface-side aliases of `--ds-motion-*` tokens (DS_FOUNDATION_V1).
   capture submits on its finishing activation.
 - Press feedback uses the shared `--scale-press` token. The canonical value is
   `0.98`: enough tactile response to register without visible shrink or jump.
+  **SoT lock (Drift W1 / T0.5):** web `design-system.css` owns `--scale-press:
+  0.98`; iOS/macOS must project the same value (native implementation track
+  T4.1). `0.96` and hardcoded active scales are forbidden forks.
 - Press compression is opt-in. Use it only when an action has no immediate
   visible response; dropdowns, accordions, tabs, toggles, and rail controls
   already communicate their state change and must stay geometrically static.
@@ -811,10 +828,11 @@ or mutually exclusive surfaces, not additions to the four-item root IA.
 | Primary | Home | `/app` | Opens the opportunity and attention queue without exposing its internal entity model |
 | Primary | Identity | `/app/presence` | Owns bio, profile, social, contact, and search representation |
 | Primary | Work | `/app/library` | Owns releases, videos, merch, products, events, writing, campaigns, and shareable links |
-| Primary | Audience | `/app/contacts?tab=audience` | Opens the audience context inside the Contacts workspace |
+| Primary | Audience | `/app/contacts?tab=audience` | Opens the audience context inside the Contacts workspace (sole Audience door; C3) |
 | Utility | Inbox | `/app` | Compact shell action for pending opportunities and runtime attention |
 | Utility | New Chat | `/app/chat` | Compact shell action that starts a conversation |
 | Contextual | Links | `/app/chat?panel=profile` and existing destination routes | Represents or distributes Identity and Work without becoming a third top-level concept |
+| Contextual | Insights | Existing insights routes / chat cards | Same Audience job as contextual views — not an alternate root (C3) |
 | Contextual | Events, Products, Releases, Videos, and other entities | Existing workspace routes and entity rails | Materialize as concrete Work filters or in-context views instead of permanent peer rows |
 
 Any permanent IA change must update `primaryNavigation`, its exact structure
@@ -915,8 +933,8 @@ Each focused surface declares its default-state control budget and covers loadin
 | Item foreground RGB | `88 90 96` | `214 218 226` |
 | Item icon RGB | `122 125 132` | `116 120 128` |
 | Muted RGB | `98 104 114` | `107 111 118` |
-| Nav font | 12px / weight 500 | — |
-| Item font | 13px / weight 450 | — |
+| Nav font | 12px / weight 510 | — |
+| Item font | ~12.5px history / 12px app (`--text-app`) / weight 450 | — |
 
 Linear-scale density (founder lock 2026-09-25): 28px nav/history rows, 16px
 sidebar icons, 44px app header everywhere (single token, no separate
@@ -1031,6 +1049,14 @@ becomes ineligible. List hints open below/start; sidebar hints retain their seam
 Mouse and hardware-keyboard hints remain available on hybrid devices. Actual
 touch activates the control first and leaves no sticky hint. Essential actions
 remain visible for coarse/no-hover input.
+
+Tooltip content never outlives its trigger: the shared `@jovie/ui` root closes
+it when the trigger unmounts, hides, collapses to zero size, or leaves the
+viewport or its clipping container. Tooltip copy is a title of 6 words or fewer
+plus at most one sentence of 15 words or fewer, with no claims or how-it-works
+explanations; rich content is `Kbd` or a list of at most 3 items, never
+interactive. `pnpm design:tooltip-copy:check` fails new violations. See
+`apps/web/components/atoms/Tooltip.README.md`.
 
 An open interactive menu belongs to its rail through the trigger's ARIA control
 relationship, including nested portals. Retain that rail's presentation until
@@ -1241,9 +1267,10 @@ for the canonical CSS + Tailwind references.
 | `apps/web/design/ziawi-color-sot.json` | **Color SoT (`ziawi-color-sot-v1`)** — Pen node ZiaWI hex lock. React projects this file. |
 | `apps/web/design/oklch-palette.json` | **OKLCH projection of ZiaWI** — not a color root; hex must match `ziawi-color-sot-v1` |
 | `apps/web/design/tokens.json` | **Machine-readable base-token source** — compiler-owned brand, gray, and radius values plus explicit migration divergences; accent hexes project ZiaWI |
+| `design.tokens.json` (repo root) | **Phase 2 write-SoT target** — today a generated export (`pnpm design:tokens:export`); Tim owns flip timing; never hand-edit |
 | `apps/web/styles/generated/design-tokens.css` | **Generated base-token emitter** — CSS projection of `design/tokens.json`; never hand-edit |
-| `apps/web/styles/design-system.css` | **Live semantic emitter** — imports generated base tokens and projects unmigrated semantic/color properties; color hex must match ZiaWI |
-| `apps/web/styles/linear-tokens.css` | Marketing-specific Linear-extracted tokens |
+| `apps/web/styles/design-system.css` | **Live semantic emitter** — imports generated base tokens and projects unmigrated semantic/color properties; color hex must match ZiaWI; owns `--scale-press: 0.98` |
+| `apps/web/styles/linear-tokens.css` | Deprecated `--linear-*` marketing extract — shrink-only; no new tokens |
 | `apps/web/styles/theme.css` | Feature accents & animations only |
 | `apps/web/app/globals.css` | Tailwind registration + shared utilities |
 | `apps/web/tailwind.config.js` | Tailwind v4 token mapping |

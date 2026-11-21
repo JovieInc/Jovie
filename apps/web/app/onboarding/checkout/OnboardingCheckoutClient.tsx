@@ -24,6 +24,10 @@ import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import type { ClaimTimeFinding } from '@/lib/proof/claim-time-proof';
 import { cn } from '@/lib/utils';
 import { formatAmount } from '@/lib/utils/format-number';
+import {
+  getAnnualSavingsPercent,
+  getCheckoutHeaderHint,
+} from './checkout-copy';
 import { OnboardingCheckoutColumn } from './OnboardingCheckoutColumn';
 import { OnboardingCheckoutFrame } from './OnboardingCheckoutFrame';
 
@@ -39,22 +43,10 @@ interface OnboardingCheckoutClientProps {
   readonly avatarUrl: string | null;
   readonly spotifyFollowers: number | null;
   readonly isDefaultUpsell: boolean;
-  /** Computed claim-time proof; empty hides the card (JOV-7794). */
+  readonly profileLive?: boolean;
   readonly proofFindings?: readonly ClaimTimeFinding[];
-  /** Free-admission page waiting for ownership proof: say so before paying. */
   readonly proofPending?: boolean;
-  /** JOV-9758: the artist's real catalog, shown above the price. */
   readonly catalog?: OnboardingCatalogPreview | null;
-}
-
-// formatPrice replaced by formatAmount per @jovie/no-ad-hoc-currency rule
-
-function getAnnualSavingsPercent(
-  monthlyAmount: number,
-  annualAmount: number
-): number {
-  const yearlyAtMonthly = monthlyAmount * 12;
-  return Math.round(((yearlyAtMonthly - annualAmount) / yearlyAtMonthly) * 100);
 }
 
 const PRO_ANALYTICS_DAYS = getLimit('pro', 'analyticsRetentionDays');
@@ -83,25 +75,22 @@ function releaseYear(releaseDate: string | null): string | null {
   return releaseDate?.slice(0, 4) || null;
 }
 
-/**
- * JOV-9758: value before price. The artist sees their own releases on their
- * page before the plan and price render.
- */
 function CatalogPreviewCard({
   catalog,
+  canClaimLive,
 }: {
   readonly catalog: OnboardingCatalogPreview;
+  readonly canClaimLive: boolean;
 }) {
   const visible = catalog.releases.slice(0, 3);
   if (visible.length === 0) return null;
+  const suffix = canClaimLive ? 'on your page' : 'ready for your page';
   return (
     <div className='mb-6' data-testid='checkout-catalog-preview'>
       <ContentSurfaceCard>
         <div className='p-4'>
           <p className='mb-3 text-xs font-medium text-tertiary-token tabular-nums'>
-            {catalog.total === 1
-              ? '1 release on your page'
-              : `${catalog.total} releases on your page`}
+            {`${catalog.total} ${catalog.total === 1 ? 'release' : 'releases'} ${suffix}`}
           </p>
           <ul className='space-y-2'>
             {visible.map((release, index) => (
@@ -116,7 +105,7 @@ function CatalogPreviewCard({
                     alt=''
                     width={40}
                     height={40}
-                    className='h-10 w-10 shrink-0 rounded-md object-cover'
+                    className='h-10 w-10 shrink-0 rounded-md object-contain'
                   />
                 ) : (
                   <div className='h-10 w-10 shrink-0 rounded-md bg-surface-2' />
@@ -180,7 +169,7 @@ function ProfilePreviewCard({
           </div>
 
           <div className='w-full'>
-            <div className='flex items-center justify-between rounded-xl border border-subtle bg-surface-1 px-3.5 py-2.5'>
+            <div className='flex items-center justify-between rounded-xl border border-subtle bg-surface-2 px-3.5 py-2.5'>
               <span className='text-app text-secondary-token'>
                 Jovie branding
               </span>
@@ -199,16 +188,21 @@ function ProfilePreviewCard({
 
       {spotifyFollowers && spotifyFollowers > 0 ? (
         <ContentSurfaceCard className='mb-4 px-4 py-3'>
-          <Sparkles className='mt-0.5 h-4 w-4 shrink-0 text-(--linear-accent)' />
-          <p className='text-app text-secondary-token'>
-            You have{' '}
-            <span className='font-medium text-primary-token'>
-              {spotifyFollowers.toLocaleString()} Spotify followers
-            </span>
-            {'. '}
-            {offerName} analytics shows exactly where they&apos;re listening
-            from.
-          </p>
+          <div className='flex items-start gap-3'>
+            <Sparkles
+              className='mt-0.5 h-4 w-4 shrink-0 text-(--linear-accent)'
+              aria-hidden='true'
+            />
+            <p className='text-app text-secondary-token'>
+              You have{' '}
+              <span className='font-medium tabular-nums text-primary-token'>
+                {spotifyFollowers.toLocaleString()} Spotify followers
+              </span>
+              {'. '}
+              {offerName} analytics shows exactly where they&apos;re listening
+              from.
+            </p>
+          </div>
         </ContentSurfaceCard>
       ) : null}
     </>
@@ -320,10 +314,12 @@ export function OnboardingCheckoutClient({
   avatarUrl,
   spotifyFollowers,
   isDefaultUpsell,
+  profileLive,
   proofFindings = [],
   proofPending = false,
   catalog = null,
 }: OnboardingCheckoutClientProps) {
+  const canClaimLive = Boolean((profileLive ?? !proofPending) && !proofPending);
   const searchParams = useSearchParams();
   // Pre-compute savings to determine annual default
   const hasAnnualOption = annualPriceId !== null && annualAmount !== null;
@@ -434,11 +430,13 @@ export function OnboardingCheckoutClient({
             {`Upgrade To ${planMarketing.displayName}`}
           </h1>
           <p className={FORM_LAYOUT.hint}>
-            {isDefaultUpsell && username
-              ? `Your profile, links, and fan capture are live at jov.ie/${username}, free forever. Here's what ${planMarketing.displayName} adds on top.`
-              : username
-                ? `Your profile is live and stays free either way. Here's what ${planMarketing.displayName} adds on top.`
-                : `Here's what ${planMarketing.displayName} adds on top of the free plan.`}
+            {getCheckoutHeaderHint({
+              isDefaultUpsell,
+              username,
+              displayName: planMarketing.displayName,
+              canClaimLive,
+              proofPending,
+            })}
           </p>
         </div>
 
@@ -452,7 +450,9 @@ export function OnboardingCheckoutClient({
           />
         ) : null}
 
-        {catalog ? <CatalogPreviewCard catalog={catalog} /> : null}
+        {catalog ? (
+          <CatalogPreviewCard catalog={catalog} canClaimLive={canClaimLive} />
+        ) : null}
 
         {proofPending ? (
           <p
@@ -466,13 +466,17 @@ export function OnboardingCheckoutClient({
         <ClaimTimeProofCard findings={proofFindings} />
 
         {/* Certified plan highlights (JOV-7794) */}
-        <ContentSurfaceCard className='mb-6 p-4'>
-          <div className='space-y-2.5'>
+        <ContentSurfaceCard
+          className='mb-6 p-4'
+          data-testid='onboarding-checkout-offer-card'
+        >
+          <div className='space-y-3'>
             {OFFER_HIGHLIGHTS.map(item => (
               <div key={item.label} className='flex items-start gap-3'>
-                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-1'>
-                  <item.icon className='h-4 w-4 text-(--linear-accent)' />
-                </div>
+                <item.icon
+                  className='mt-0.5 h-4 w-4 shrink-0 text-(--linear-accent)'
+                  aria-hidden='true'
+                />
                 <div>
                   <p className='text-app font-medium text-primary-token'>
                     {item.label}
@@ -484,7 +488,6 @@ export function OnboardingCheckoutClient({
           </div>
         </ContentSurfaceCard>
 
-        {/* Annual toggle */}
         {hasAnnualOption ? (
           <BillingIntervalSelector
             isAnnual={isAnnual}
@@ -493,7 +496,6 @@ export function OnboardingCheckoutClient({
           />
         ) : null}
 
-        {/* Price display */}
         <div className='mb-6 text-center'>
           <span className='text-3xl font-semibold tracking-tight tabular-nums text-primary-token'>
             {formatAmount(currentAmount)}
@@ -503,12 +505,11 @@ export function OnboardingCheckoutClient({
           </span>
         </div>
 
-        {/* CTA */}
         <Button
           onClick={handleCheckout}
           disabled={isLoading}
           variant='primary'
-          size='xl'
+          size='lg'
           className='w-full'
           aria-busy={isLoading}
         >
@@ -517,7 +518,6 @@ export function OnboardingCheckoutClient({
             : `Upgrade to ${planMarketing.displayName}`}
         </Button>
 
-        {/* Below the button, so a failed checkout never pushes it down */}
         {error ? (
           <ContentSurfaceCard
             className='mt-4 border-error/30 bg-error/5 px-4 py-3 text-app text-error'
@@ -528,15 +528,18 @@ export function OnboardingCheckoutClient({
         ) : null}
 
         {/* Skip — the free profile is already live; never imply otherwise */}
-        <button
-          type='button'
-          onClick={handleSkip}
-          disabled={isLoading}
-          className='mt-4 w-full text-center text-app text-tertiary-token hover:text-secondary-token transition-colors disabled:opacity-50'
-        >
-          {isDefaultUpsell ? 'Keep My Free Profile' : 'Continue with Free'}
-        </button>
-        {isDefaultUpsell ? (
+        <div className='mt-4 flex justify-center'>
+          <button
+            type='button'
+            onClick={handleSkip}
+            disabled={isLoading}
+            data-testid='onboarding-checkout-skip'
+            className='relative inline-flex min-h-7 items-center justify-center rounded-full px-3 text-center text-app text-tertiary-token transition-colors hover:text-secondary-token focus-ring-themed disabled:opacity-50 before:absolute before:left-1/2 before:top-1/2 before:h-full before:min-h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-empty'
+          >
+            {isDefaultUpsell ? 'Keep My Free Profile' : 'Continue with Free'}
+          </button>
+        </div>
+        {isDefaultUpsell && canClaimLive ? (
           <p className='mt-2 text-center text-xs text-tertiary-token'>
             Your public profile stays live and free forever.
           </p>

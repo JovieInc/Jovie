@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   mockClearLeadAttributionCookie,
   mockGetProfileByUsername,
-  mockHashClaimToken,
   mockIsClaimTokenValid,
   mockLookupLeadByClaimToken,
   mockLookupUsernameByClaimToken,
@@ -16,7 +15,6 @@ const {
 } = vi.hoisted(() => ({
   mockClearLeadAttributionCookie: vi.fn(),
   mockGetProfileByUsername: vi.fn(),
-  mockHashClaimToken: vi.fn(),
   mockIsClaimTokenValid: vi.fn(),
   mockLookupLeadByClaimToken: vi.fn(),
   mockLookupUsernameByClaimToken: vi.fn(),
@@ -38,20 +36,24 @@ vi.mock('@/lib/rate-limit', () => ({
   createRateLimitHeaders: (result: { readonly reset?: number }) => ({
     'retry-after': String(result.reset ?? 60),
   }),
-  // Faithful mirror of the real helper's contract: a degraded/unavailable
-  // backend downgrades a hard block to an advisory allow (fail-open).
-  allowIfRateLimitBackendDegraded: (result: {
-    readonly success: boolean;
-    readonly degraded?: boolean;
-    readonly unavailable?: boolean;
-  }) =>
-    !result.success && (result.degraded === true || result.unavailable === true)
-      ? { ...result, success: true }
-      : result,
+  rateLimitDenialStatus: (result: { unavailable?: boolean }) =>
+    result.unavailable === true ? 503 : 429,
+  rateLimitDenialMessage: (
+    result: { unavailable?: boolean },
+    exhausted: string,
+    unavailable = 'Temporarily unavailable.'
+  ) => (result.unavailable === true ? unavailable : exhausted),
 }));
 
 vi.mock('@/lib/claim/context', () => ({
   writePendingClaimContext: mockWritePendingClaimContext,
+  readPendingClaimContext: vi.fn(async () => ({
+    mode: 'token_backed',
+    creatorProfileId: 'profile-1',
+    username: 'claimableartist',
+    claimTokenHash: 'synthetic-hash',
+  })),
+  clearPendingClaimContext: vi.fn(),
   applyPendingClaimCookie: (
     response: {
       cookies: { set: (name: string, value: string) => void };
@@ -70,12 +72,9 @@ vi.mock('@/lib/leads/funnel-events', () => ({
   setLeadAttributionCookieFromToken: mockSetLeadAttributionCookieFromToken,
 }));
 
-vi.mock('@/lib/security/claim-token', () => ({
-  hashClaimToken: mockHashClaimToken,
-}));
-
 vi.mock('@/lib/services/profile', () => ({
   getProfileByUsername: mockGetProfileByUsername,
+  isClaimTokenValid: mockIsClaimTokenValid,
 }));
 
 vi.mock('@/lib/services/profile/queries', () => ({
@@ -83,6 +82,13 @@ vi.mock('@/lib/services/profile/queries', () => ({
   lookupUsernameByClaimToken: mockLookupUsernameByClaimToken,
 }));
 
+vi.mock('@/lib/auth/cached', () => ({
+  getOptionalAuth: vi.fn(async () => ({ userId: null })),
+}));
+vi.mock('@/lib/db', () => ({ db: {} }));
+
+import { claimHrefWithAttribution } from '@/lib/claim/attribution';
+import { GET as claimAuth } from '../../../app/[username]/claim/route';
 import { GET } from '../../../app/claim/[token]/route';
 
 describe('Claim token route', () => {
@@ -96,7 +102,6 @@ describe('Claim token route', () => {
       reset: 60,
     });
     mockLookupLeadByClaimToken.mockResolvedValue(null);
-    mockHashClaimToken.mockResolvedValue('hashed-token');
     mockGetProfileByUsername.mockResolvedValue({
       id: 'profile_1',
       usernameNormalized: 'claimableartist',
@@ -124,6 +129,78 @@ describe('Claim token route', () => {
     // An invalid token is not a claim-link open.
     expect(mockRecordArtistOfferStage).not.toHaveBeenCalled();
   });
+
+  it.each([true, false])(
+    'preserves safe attribution for public=%s without forwarding unsafe parameters',
+    async isPublic => {
+      mockLookupUsernameByClaimToken.mockResolvedValue('claimableartist');
+      mockIsClaimTokenValid.mockResolvedValue(true);
+      mockGetProfileByUsername.mockResolvedValue({
+        id: 'profile-1',
+        usernameNormalized: 'claimableartist',
+        spotifyId: null,
+        isPublic,
+      });
+      const response = await GET(
+        new NextRequest(
+          'https://jov.ie/claim/synthetic-token?utm_source=claim_link&utm_medium=dm&utm_campaign=claim-link-outreach&redirect_url=https://evil.example&email=person@example.com&utm_content=person%40example.com'
+        ),
+        { params: Promise.resolve({ token: 'synthetic-token' }) }
+      );
+      const redirectUrl = new URL(response.headers.get('location')!);
+      expect(redirectUrl.searchParams.get('utm_campaign')).toBe(
+        'claim-link-outreach'
+      );
+      expect(redirectUrl.searchParams.get('utm_source')).toBe('claim_link');
+      expect(redirectUrl.searchParams.get('utm_medium')).toBe('dm');
+      expect(redirectUrl.searchParams.has('redirect_url')).toBe(false);
+      expect(redirectUrl.searchParams.has('email')).toBe(false);
+      expect(redirectUrl.searchParams.has('utm_content')).toBe(false);
+      expect(redirectUrl.origin).toBe('https://jov.ie');
+      expect(response.cookies.getAll().map(cookie => cookie.name)).toEqual([
+        'jovie_pending_claim',
+      ]);
+      expect(mockRecordArtistOfferStage).toHaveBeenCalledWith(
+        undefined,
+        'claim-link-open'
+      );
+      const handoff = isPublic
+        ? new URL(
+            claimHrefWithAttribution(
+              '/claimableartist/claim?next=auth',
+              redirectUrl.searchParams
+            ),
+            redirectUrl.origin
+          )
+        : redirectUrl;
+      const signup = await claimAuth(new NextRequest(handoff), {
+        params: Promise.resolve({ username: 'claimableartist' }),
+      });
+      const signupUrl = new URL(signup.headers.get('location')!);
+      expect(signupUrl.pathname).toBe('/signup');
+      expect(signupUrl.searchParams.get('utm_campaign')).toBe(
+        'claim-link-outreach'
+      );
+      expect(signupUrl.searchParams.get('utm_source')).toBe('claim_link');
+      expect(signupUrl.searchParams.get('utm_medium')).toBe('dm');
+      expect(signupUrl.searchParams.has('token')).toBe(false);
+      expect(signupUrl.searchParams.has('email')).toBe(false);
+      const afterSignup = new URL(
+        signupUrl.searchParams.get('redirect_url')!,
+        signupUrl.origin
+      );
+      expect(afterSignup.pathname).toBe('/start');
+      expect(afterSignup.searchParams.get('utm_campaign')).toBe(
+        'claim-link-outreach'
+      );
+      expect(afterSignup.searchParams.has('token')).toBe(false);
+      expect(
+        signup.cookies
+          .getAll()
+          .every(cookie => cookie.name === 'jovie_pending_claim')
+      ).toBe(true);
+    }
+  );
 
   it('stores claim context and redirects valid tokens to the public profile preview', async () => {
     mockLookupUsernameByClaimToken.mockResolvedValue('claimableartist');
@@ -159,7 +236,8 @@ describe('Claim token route', () => {
       mode: 'token_backed',
       creatorProfileId: 'profile_1',
       username: 'claimableartist',
-      claimTokenHash: 'hashed-token',
+      claimTokenHash:
+        '397a2a9c5bf5e2ccec38c2596b682bb1bd05fe6e4ecea6c10cf42755ff225403',
       leadId: 'lead_1',
       expectedSpotifyArtistId: 'spotify_123',
     });
@@ -203,7 +281,8 @@ describe('Claim token route', () => {
         mode: 'token_backed',
         creatorProfileId: 'fixture-profile',
         username: 'e2eclaimartist',
-        claimTokenHash: 'hashed-token',
+        claimTokenHash:
+          'd07f963c2bb7a3cc74a910e51ca0075b194da412a93737881f105a55156a988f',
       })
     );
   });
@@ -306,16 +385,14 @@ describe('Claim token route', () => {
     expect(mockClaimLimit).toHaveBeenCalledWith('203.0.113.7');
   });
 
-  it('fails open (proceeds) when the rate-limit backend is degraded', async () => {
+  it('fails closed when the rate-limit backend is unavailable', async () => {
     mockClaimLimit.mockResolvedValue({
       success: false,
-      degraded: true,
+      unavailable: true,
       limit: 20,
       remaining: 0,
-      reset: 60,
+      reset: new Date(Date.now() + 60_000),
     });
-    mockLookupUsernameByClaimToken.mockResolvedValue('claimableartist');
-    mockIsClaimTokenValid.mockResolvedValue(true);
 
     const response = await GET(
       new NextRequest('http://localhost/claim/valid-token'),
@@ -324,10 +401,30 @@ describe('Claim token route', () => {
       }
     );
 
-    expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe(
-      'http://localhost/claimableartist?claim=1'
+    expect(response.status).toBe(503);
+    expect(await response.text()).toContain('temporarily unavailable');
+    expect(mockLookupUsernameByClaimToken).not.toHaveBeenCalled();
+    expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the rate-limit backend is degraded', async () => {
+    mockClaimLimit.mockResolvedValue({
+      success: false,
+      degraded: true,
+      limit: 20,
+      remaining: 0,
+      reset: new Date(Date.now() + 60_000),
+    });
+
+    const response = await GET(
+      new NextRequest('http://localhost/claim/valid-token'),
+      {
+        params: Promise.resolve({ token: 'valid-token' }),
+      }
     );
-    expect(mockWritePendingClaimContext).toHaveBeenCalledTimes(1);
+
+    expect(response.status).toBe(429);
+    expect(mockLookupUsernameByClaimToken).not.toHaveBeenCalled();
+    expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
   });
 });

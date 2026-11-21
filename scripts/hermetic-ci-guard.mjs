@@ -17,13 +17,15 @@
  *   seeds         a test draws unseeded randomness
  *
  * Existing sites are grandfathered per rule and file in
- * scripts/lib/hermetic-ci-guard.ratchet.json and only shrink. No dependencies:
- * the same file runs in JovieInc/Jovie and JovieInc/summer-config.
+ * scripts/lib/hermetic-ci-guard.ratchet.json and only shrink. No package
+ * dependencies: JovieInc/summer-config runs this file with
+ * scripts/wall-clock-test-guard.mjs and scripts/lib/quoted-draws.mjs.
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { countDraws } from './lib/quoted-draws.mjs';
 import { language, stripComments } from './wall-clock-test-guard.mjs';
 
 export const RATCHET_PATH = 'scripts/lib/hermetic-ci-guard.ratchet.json';
@@ -68,7 +70,7 @@ const PY_RANDOM =
 const PY_RANDOM_CONTROL =
   /\brandom\.seed\(\s*\S|\brandom\.Random\(\s*[^)\s]|\bpatch(?:\.object)?\([^)\n]*random/u;
 
-/** Unseeded random draws in a test. */
+/** Unseeded random draws in executable test code. A quoted example is not a draw. */
 export function seedsIn(text, lang = 'js') {
   const [draw, control] =
     lang === 'py'
@@ -76,7 +78,8 @@ export function seedsIn(text, lang = 'js') {
       : [JS_RANDOM, JS_RANDOM_CONTROL];
   if (count(text, draw) === 0) return 0;
   const code = stripComments(text, lang);
-  return control.test(code) ? 0 : count(code, draw);
+  if (control.test(code)) return 0;
+  return countDraws(code, draw, lang);
 }
 
 // ----------------------------------------------------------- shared state

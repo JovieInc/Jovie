@@ -48,14 +48,14 @@ const SCOPE_LABEL: Record<Exclude<MergedPrScope, 'org'>, string> = {
 
 const int = (n: number) => n.toLocaleString('en-US');
 
-const shortDate = (date: string) =>
+export const shortDate = (date: string) =>
   new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     timeZone: 'UTC',
   });
 
-const weekday = (date: string) =>
+export const weekday = (date: string) =>
   new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', {
     weekday: 'short',
     timeZone: 'UTC',
@@ -97,7 +97,13 @@ function axisLabel(point: WindowPoint, index: number, days: number) {
   return (days - 1 - index) % 7 === 0 ? shortDate(point.date) : '';
 }
 
-function Bars({ summary }: { readonly summary: WindowSummary }) {
+export function Bars({
+  summary,
+  format = int,
+}: {
+  readonly summary: WindowSummary;
+  readonly format?: (n: number) => string;
+}) {
   const values = summary.points.map(p => p.count ?? 0);
   const max = Math.max(1, ...values);
   const showEveryValue = summary.days <= 14;
@@ -148,7 +154,7 @@ function Bars({ summary }: { readonly summary: WindowSummary }) {
                 fontVariantNumeric: 'tabular-nums',
               }}
             >
-              {point.count === null ? '–' : int(point.count)}
+              {point.count === null ? '–' : format(point.count)}
             </div>
             {point.count === null ? (
               <div
@@ -184,7 +190,7 @@ function Bars({ summary }: { readonly summary: WindowSummary }) {
   );
 }
 
-function Axis({ summary }: { readonly summary: WindowSummary }) {
+export function Axis({ summary }: { readonly summary: WindowSummary }) {
   const gap = summary.days <= 14 ? 20 : 6;
   const lastIndex = summary.points.length - 1;
   return (
@@ -216,7 +222,7 @@ function Axis({ summary }: { readonly summary: WindowSummary }) {
   );
 }
 
-function Stat({
+export function Stat({
   label,
   value,
 }: {

@@ -24,12 +24,9 @@ import {
   checkKey,
   classifyEvidence,
   decideEject,
-  decideFailingHead,
   detectConsecutiveGroupFailure,
   detectStuckHead,
   FIX_RED_LABEL,
-  failingHeadComment,
-  failingRequiredChecks,
   failureSignature,
   HEAD_STUCK_ALERT_MIN,
   headDwell,
@@ -47,6 +44,11 @@ import {
   titles,
   verifyJump,
 } from './lib/main-red-eject.mjs';
+import {
+  applyFailingHeadEpisode,
+  decideFailingHead,
+  failingRequiredChecks,
+} from './lib/main-red-eject-failing-head.mjs';
 import {
   remediateUnrevertable,
   unattributedPlan,
@@ -234,18 +236,7 @@ export async function plan({
   const open = await api(`repos/${REPO}/pulls?state=open&per_page=100`, 'poll');
   const openReverts = open
     .filter(p => p.labels.some(l => l.name === REVERT_LABEL))
-    .map(p => ({ number: p.number, check: readMarker(p.body)?.check }));
-  const repairs = open
-    .filter(
-      p =>
-        p.labels.some(l => l.name === COMPOUNDING_LABEL) &&
-        /main (is )?red|recert|renew|census/i.test(p.title)
-    )
-    .map(p => ({
-      number: p.number,
-      createdAt: p.created_at,
-      queued: Boolean(p.auto_merge),
-    }));
+    .map(p => ({ number: p.number, ...readMarker(p.body) }));
   const prior = culprit?.pr
     ? await api(`repos/${REPO}/issues/${culprit.pr}`, 'poll').catch(() => null)
     : null;
@@ -254,9 +245,7 @@ export async function plan({
     culprit,
     check,
     openReverts,
-    repairs,
     priorAttempts,
-    now,
     mode,
     ambiguous: attribution.status === 'ambiguous',
     culpritLabels: (prior?.labels ?? []).map(l => l.name),
@@ -306,7 +295,9 @@ function commandProbe(cmd) {
 // ---- queue -----------------------------------------------------------------
 
 async function queueEntries() {
-  const q = `query($o:String!,$r:String!){repository(owner:$o,name:$r){mergeQueue(branch:"main"){entries(first:50){nodes{position state enqueuedAt headCommit{oid} pullRequest{number labels(first:30){nodes{name}}}}}}}}`;
+  // headCommit = merge-group synthetic SHA (check-runs live here).
+  // pullRequest.headRefOid = PR tip — eject-hold status + reconcile use this.
+  const q = `query($o:String!,$r:String!){repository(owner:$o,name:$r){mergeQueue(branch:"main"){entries(first:50){nodes{position state enqueuedAt headCommit{oid} pullRequest{number headRefOid labels(first:30){nodes{name}}}}}}}}`;
   const [o, r] = REPO.split('/');
   const out = JSON.parse(
     await gh(
@@ -318,6 +309,7 @@ async function queueEntries() {
     number: n.pullRequest.number,
     position: n.position,
     sha: n.headCommit?.oid ?? null,
+    headRefOid: n.pullRequest.headRefOid ?? null,
     state: n.state,
     enqueuedAt: n.enqueuedAt,
     compounding: n.pullRequest.labels.nodes.some(
@@ -478,6 +470,7 @@ async function incident(key, title, body) {
 
 const git = (...args) =>
   execFileSync('git', args, {
+    maxBuffer: 256 * 1024 * 1024,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   }).trim();
@@ -531,6 +524,8 @@ export async function apply(p) {
       culprit.pr +
       ' is re-landed as a repair PR with this failure attached.',
     '<!-- customer-changelog/v1 {"releaseWorthy":false} -->',
+    // `compounding` PRs owe a Win section (Fleet Rules, scripts/lib/wins-ledger.mjs requiresWin).
+    `## Win\n\n- Claim: main is restored by a revert instead of waiting for a forward fix\n- Area: queue\n- Theme: main-red-repair\n- Metric: main-red minutes to revert opened | min | lower | ? | ? | merge-group CI runs | first failed merge group to this PR's created_at\n- Verify: https://github.com/${REPO}/actions/runs/${p.trigger.groups[0]}\n- Pending: yes`,
   ].join('\n\n');
   const pr = JSON.parse(
     await gh(
@@ -667,18 +662,15 @@ async function failingHead(head, doApply) {
   });
   if (!decision.dequeue || !doApply) return { failingHead: true, ...decision };
   await dequeue(head.number);
-  // The dequeue is the fix; a failed comment must not undo or retry it.
-  await gh([
-    'api',
-    '-X',
-    'POST',
-    `repos/${REPO}/issues/${head.number}/comments`,
-    '-f',
-    `body=${failingHeadComment(head, failing)}`,
-  ]).catch(error =>
-    console.error(`::warning::failing-head comment failed: ${error.message}`)
-  );
-  return { failingHead: true, ...decision, dequeued: true };
+  // jovie-bot lane-fix-red is a merge-group hold (label_episodes.py). Eject
+  // job mints the Jovie Bot app token, so label+status are a jovie-bot episode.
+  const { labeled } = await applyFailingHeadEpisode({
+    gh,
+    repo: REPO,
+    head,
+    failing,
+  });
+  return { failingHead: true, ...decision, dequeued: true, labeled };
 }
 
 // ---- stuck head ------------------------------------------------------------

@@ -13,14 +13,9 @@ import type { CertificationPacketFile } from './packet-files.server';
 import type { OvieCertificationDomainId } from './types';
 
 /**
- * Production golden-path certification ledger (JOV-9625).
- *
- * After every production promotion the post-deploy probes run the golden path
- * against https://jov.ie and post one SHA-bound receipt per surface. This
- * ledger keeps the latest receipt per surface and projects each into a
- * certification packet (runtime_dogfood tier) so the existing Ovie inventory
- * (`/api/ovie/certifications`, `/app/admin/certifications`) shows per-surface
- * production state. A missing ledger is disconnected evidence, never a zero.
+ * Production golden-path certification ledger (JOV-9625): stores the latest
+ * SHA-bound post-deploy receipt per surface and projects runtime_dogfood
+ * packets into `/api/ovie/certifications`. A missing ledger is never a zero.
  */
 
 export const PROD_GOLDEN_PATH_RECEIPT_SCHEMA =
@@ -272,11 +267,20 @@ export async function readProdGoldenPathLedger(
 export const PROD_GOLDEN_PATH_CERTIFICATION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const CLOCK_SKEW_MS = 5 * 60 * 1000;
 
+/** True only when `endedAtIso` parses inside `(nowMs - maxAgeMs, nowMs + 5m]`. */
+export function isFreshProdGoldenPathPass(
+  endedAtIso: string,
+  nowMs: number,
+  maxAgeMs: number = PROD_GOLDEN_PATH_FRESHNESS_MS
+): boolean {
+  const endedAt = Date.parse(endedAtIso);
+  return endedAt <= nowMs + CLOCK_SKEW_MS && nowMs - endedAt <= maxAgeMs;
+}
+
 /**
  * Surfaces with a current production certification, in launch order. The
- * production alias perf gate blocks only on these (Tim 2026-10-31): the
- * blocking set grows as surfaces certify, and a missing ledger certifies
- * nothing, so it can never block.
+ * production alias perf gate blocks only on these (Tim 2026-10-31); a missing
+ * ledger certifies nothing, so it can never block.
  */
 export function certifiedProdGoldenPathSurfaces(
   ledger: ProdGoldenPathLedger | null,
@@ -286,9 +290,10 @@ export function certifiedProdGoldenPathSurfaces(
   if (!ledger) return [];
   return PROD_GOLDEN_PATH_SURFACE_IDS.filter(id => {
     const latest = ledger.surfaces[id]?.latest;
-    if (!latest || latest.status !== 'passed') return false;
-    const endedAt = Date.parse(latest.endedAt);
-    return endedAt <= now + CLOCK_SKEW_MS && now - endedAt <= maxAgeMs;
+    return Boolean(
+      latest?.status === 'passed' &&
+        isFreshProdGoldenPathPass(latest.endedAt, now, maxAgeMs)
+    );
   });
 }
 
@@ -400,14 +405,11 @@ function runtimeState(
   nowMs: number
 ): ProdGoldenPathRuntimeState | undefined {
   if (!receipt) return 'missing';
-  // A failed/blocked receipt was exercised on production: it keeps its own
-  // status and carries no lifecycle state, so it is never conflated with a
-  // surface that has no receipt at all (JOV-9625 review rework).
+  // Failed/blocked receipts keep their own status and carry no lifecycle state.
   if (receipt.status !== 'passed') return undefined;
-  if (nowMs - Date.parse(receipt.endedAt) > PROD_GOLDEN_PATH_FRESHNESS_MS) {
-    return 'expired';
-  }
-  return 'certified';
+  return isFreshProdGoldenPathPass(receipt.endedAt, nowMs)
+    ? 'certified'
+    : 'expired';
 }
 
 function summarize(
@@ -423,8 +425,6 @@ function summarize(
     typeof receipt.networkErrorCount === 'number'
       ? `; consoleErrors=${receipt.consoleErrorCount ?? 'n/a'}; networkErrors=${receipt.networkErrorCount ?? 'n/a'}`
       : '';
-  // Blocked and failed receipts carry no `state=` marker: their own status
-  // is the verdict, and `missing` is reserved for never-recorded surfaces.
   if (receipt.status === 'blocked') {
     return `Not exercised on production: ${receipt.blocker}${evidenceCounts}`;
   }
@@ -436,23 +436,19 @@ function summarize(
     );
   }
   if (state === 'expired') {
-    const ageHours = (
-      (nowMs - Date.parse(receipt.endedAt)) /
-      3_600_000
-    ).toFixed(1);
-    return `state=expired; Last production pass on ${receipt.sha.slice(0, 8)} is ${ageHours}h old (freshness window 24h)${evidenceCounts}`;
+    const ageMs = nowMs - Date.parse(receipt.endedAt);
+    const why =
+      Number.isFinite(ageMs) && ageMs >= 0
+        ? `is ${(ageMs / 3_600_000).toFixed(1)}h old (freshness window 24h)`
+        : 'has a future or unparseable timestamp';
+    return `state=expired; Last production pass on ${receipt.sha.slice(0, 8)} ${why}${evidenceCounts}`;
   }
   return `state=certified; ${receipt.checks.length} production checks passed as ${receipt.identity}${evidenceCounts}`;
 }
 
 /**
- * Project each stored surface into the packet-file shape the Ovie inventory
- * already renders. The evidence is runtime_dogfood bound to the deployed SHA.
- * Every surface emits a row — a surface with no receipt projects the
- * explicit `missing` state instead of vanishing — and each row carries the
- * runtime lifecycle state (`certified` / `expired` / `missing`) plus the
- * receipt's per-surface browser evidence (screenshot frame, console and
- * network error counts) so the inventory preserves what the run measured.
+ * Project each surface into Ovie inventory `runtime_dogfood` packets bound to
+ * the deployed SHA (`certified` / `expired` / `missing` + browser telemetry).
  */
 export function prodGoldenPathPacketFiles(
   ledger: ProdGoldenPathLedger,

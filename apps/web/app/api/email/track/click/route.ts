@@ -11,7 +11,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   hashIP,
   inferDeviceType,
+  isFirstPartyClickDestination,
   recordEngagement,
+  safeEqualString,
   verifyTrackingToken,
 } from '@/lib/email/tracking';
 import { captureError } from '@/lib/error-tracking';
@@ -72,14 +74,39 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Fail closed: never redirect on an invalid/missing token (SEC-18).
     const payload = verifyTrackingToken(token);
     if (!payload) {
       logger.warn('[Email Click Track] Invalid tracking token');
-      // Still redirect to avoid broken UX, but don't track
-      return NextResponse.redirect(targetUrl, {
-        status: 302,
-        headers: NO_STORE_HEADERS,
-      });
+      return NextResponse.json(
+        { error: 'Invalid tracking token' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Resolve redirect destination without reintroducing open redirects:
+    // - New tokens: `clickUrl` is HMAC-bound; query `u` must match.
+    // - Legacy unbound tokens: allow only first-party hosts (claim/recovery).
+    let redirectUrl: string;
+    if (payload.clickUrl) {
+      if (!safeEqualString(payload.clickUrl, targetUrl)) {
+        logger.warn('[Email Click Track] Click URL does not match token');
+        return NextResponse.json(
+          { error: 'Invalid tracking token' },
+          { status: 400, headers: NO_STORE_HEADERS }
+        );
+      }
+      redirectUrl = payload.clickUrl;
+    } else if (isFirstPartyClickDestination(targetUrl)) {
+      redirectUrl = targetUrl;
+    } else {
+      logger.warn(
+        '[Email Click Track] Unbound token with non-first-party destination'
+      );
+      return NextResponse.json(
+        { error: 'Invalid tracking token' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     // Extract metadata
@@ -97,7 +124,7 @@ export async function GET(request: NextRequest) {
       recipientEmail: payload.email,
       providerMessageId: payload.messageId,
       metadata: {
-        clickUrl: targetUrl,
+        clickUrl: redirectUrl,
         linkId,
         userAgent: userAgent ?? undefined,
         ipHash: hashIP(ipAddress),
@@ -117,8 +144,8 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // Redirect to the target URL
-    return NextResponse.redirect(targetUrl, {
+    // Redirect to the HMAC-bound target URL
+    return NextResponse.redirect(redirectUrl, {
       status: 302,
       headers: NO_STORE_HEADERS,
     });

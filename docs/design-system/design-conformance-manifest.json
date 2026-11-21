@@ -32,7 +32,7 @@
     {
       "id": "atom.button",
       "state": "source-bound",
-      "revision": 13,
+      "revision": 14,
       "platforms": ["web"],
       "source": "packages/ui/atoms/button.tsx",
       "contractSource": "packages/ui/atoms/button-contract.ts",
@@ -44,7 +44,7 @@
         "packages/ui/atoms/button.test.tsx"
       ],
       "penRootId": "g3IC1",
-      "sourceDigest": "4f05282b5d4d769c2bfe40bd42db7f6968995355cf532a3fa948febf3ae7931b"
+      "sourceDigest": "dfd9b29d9a920d5a42bcf571604f8ba5fe6d98bb59a3da0af9f5891232a1cc45"
     },
     {
       "id": "atom.input",
@@ -115,7 +115,7 @@
     {
       "id": "atom.icon-button",
       "state": "source-bound",
-      "revision": 3,
+      "revision": 4,
       "platforms": ["web"],
       "source": "packages/ui/atoms/icon-button.tsx",
       "contractSource": "packages/ui/atoms/icon-button-contract.ts",
@@ -123,7 +123,7 @@
       "storySources": ["packages/ui/atoms/icon-button.stories.tsx"],
       "testSources": ["packages/ui/atoms/icon-button.test.tsx"],
       "penRootId": "XYhft",
-      "sourceDigest": "7ab4475b11ac4867ca6163f37e048a4ff86a3f9468677e8f5a773761e8801f20"
+      "sourceDigest": "96a986490ae9fb7cb80450bca34b00cac56b7ffd8bd243585732c140d6180c2c"
     }
   ],
   "legacy": {

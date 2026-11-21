@@ -1,0 +1,44 @@
+{
+  "schema": "jovie.apple-change-sources/v1",
+  "owner": "swift-project",
+  "accessConstraints": "public Apple Developer RSS; attribution required; no scraping beyond feed entries",
+  "freshness": {
+    "mechanism": "github-cron daily; no Apple push webhook",
+    "cdnCacheSeconds": 300,
+    "pollCron": "17 16 * * *",
+    "hostWorkflow": ".github/workflows/node-runtime-freshness.yml",
+    "documentedLimit": "Up to ~24h detection lag under the existing node-runtime-freshness cron (no new timer), plus Apple CDN cache (max-age 300). GitHub may delay sub-daily crons; automation-liveness watches github:jovie:node-runtime-freshness (maxStalenessMinutes 3240)."
+  },
+  "sources": [
+    {
+      "id": "apple-developer-releases",
+      "label": "Apple Developer Releases",
+      "canonicalUrl": "https://developer.apple.com/news/releases/rss/releases.rss",
+      "kind": "rss",
+      "topics": [
+        "ios",
+        "ipados",
+        "macos",
+        "xcode",
+        "sdk",
+        "testflight",
+        "app-store-connect"
+      ]
+    },
+    {
+      "id": "apple-developer-news",
+      "label": "Apple Developer News",
+      "canonicalUrl": "https://developer.apple.com/news/rss/news.rss",
+      "kind": "rss",
+      "topics": [
+        "hig",
+        "accessibility",
+        "performance",
+        "security",
+        "distribution",
+        "wwdc",
+        "guidance"
+      ]
+    }
+  ]
+}

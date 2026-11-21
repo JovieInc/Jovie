@@ -9,20 +9,26 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-vi.mock('@jovie/ui', () => ({
-  DropdownMenu: ({ children }: { readonly children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  DropdownMenuTrigger: ({ children }: { readonly children: ReactNode }) => (
-    <>{children}</>
-  ),
-  DropdownMenuContent: ({ children }: { readonly children: ReactNode }) => (
-    <div>{children}</div>
-  ),
-  DropdownMenuItem: ({ children }: { readonly children: ReactNode }) => (
-    <>{children}</>
-  ),
-}));
+vi.mock('@jovie/ui', async () => {
+  const { PlainButton } = await vi.importActual<
+    typeof import('@jovie/ui/atoms/plain-button')
+  >('@jovie/ui/atoms/plain-button');
+  return {
+    PlainButton,
+    DropdownMenu: ({ children }: { readonly children: ReactNode }) => (
+      <div>{children}</div>
+    ),
+    DropdownMenuTrigger: ({ children }: { readonly children: ReactNode }) => (
+      <>{children}</>
+    ),
+    DropdownMenuContent: ({ children }: { readonly children: ReactNode }) => (
+      <div>{children}</div>
+    ),
+    DropdownMenuItem: ({ children }: { readonly children: ReactNode }) => (
+      <>{children}</>
+    ),
+  };
+});
 
 const workspaces = [
   {
@@ -154,5 +160,25 @@ describe('WorkspaceSelector', () => {
     );
 
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('rests on the brand mark and keeps the workspace name in the reveal box', () => {
+    render(
+      <WorkspaceSelector
+        currentWorkspaceId='customer'
+        workspaces={workspaces}
+      />
+    );
+    const trigger = screen.getByRole('button', {
+      name: 'Switch Workspace: Jovie',
+    });
+    // globals.css hides `.sidebar-wordmark` at rest and grows it on hover,
+    // focus-visible or while the menu is open.
+    expect(trigger).toHaveClass('sidebar-wordmark-reveal');
+    const wordmark = trigger.querySelector('.sidebar-wordmark');
+    expect(wordmark).toHaveClass('overflow-hidden');
+    expect(wordmark).toHaveTextContent('Jovie');
+    // No flex gap: the hidden name must not pad the resting trigger.
+    expect(trigger.className).not.toMatch(/(?:^|\s)gap-/);
   });
 });

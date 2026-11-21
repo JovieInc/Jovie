@@ -2,6 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/components/table/PageToolbar.test.tsx
 import { Button, TooltipShortcut } from '@jovie/ui';
+import { ACTION_BUTTON_PRESET } from '@jovie/ui/atoms/button-contract';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import type { ComponentProps, ReactNode } from 'react';
@@ -39,7 +40,7 @@ export const PAGE_TOOLBAR_META_TEXT_CLASS =
   'text-xs text-tertiary-token tabular-nums';
 
 export const PAGE_TOOLBAR_TAB_BUTTON_CLASS =
-  'inline-flex h-7.5 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-pill bg-transparent px-2.5 text-2xs font-caption font-[540] tracking-tight text-tertiary-token shadow-none transition-[background-color,color,box-shadow] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 disabled:pointer-events-none disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5';
+  'inline-flex h-7 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-pill bg-transparent px-2.5 text-2xs font-caption font-[540] tracking-tight text-tertiary-token shadow-none transition-[background-color,color,box-shadow] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 disabled:pointer-events-none disabled:opacity-50 [&_svg]:h-3.5 [&_svg]:w-3.5';
 
 export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS = 'bg-surface-1 text-primary-token';
 
@@ -246,7 +247,7 @@ export function PageToolbarActionButton({
     <Button
       type='button'
       variant='ghost'
-      size='sm'
+      size={ACTION_BUTTON_PRESET.size}
       onClick={onClick}
       disabled={disabled}
       {...buttonProps}

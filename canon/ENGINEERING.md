@@ -101,7 +101,8 @@ planning authority; scoped rules, task packets and review project it.
    Electron), SimpleWebAuthn/platform contracts and supported endpoints/hooks.
 7. Routine adoption within existing security/license/budget authority proceeds
    autonomously. Paid commitments, data disclosure, credentials and external
-   authority retain applicable authorization. Missing network/package access
+   authority retain applicable authorization; routine PR and Linear text is not
+   data disclosure ([routine writes](FLEET.md#routine-writes)). Missing network/package access
    routes to bounded research or trusted dependency preparation; it never proves
    no SDK exists or authorizes a rewrite. Keep unrelated delivery moving.
 8. Verify the same behavior/failure/security contract for incumbent and candidate.
@@ -137,6 +138,53 @@ does not create a parallel app, repository, native rewrite or second shell
   communications or closure-health registries.
 - Plans that add a repo or app must name the shell they extend in the IA
   preflight below; "new repo" is not an answer to "where does this live".
+
+### Native / web / Electron boundary
+
+<!-- Project Swift; projects capability sourcing + product-surfaces + Mac ADR -->
+
+Choose the **thinnest client that still delivers the user job**. Stack fashion
+is not a reason. This section is the single client-boundary authority; Mac ADR,
+iOS/macOS rules, and decision records project it. Applied receipts:
+[`docs/architecture/native-web-electron-decisions.md`](../docs/architecture/native-web-electron-decisions.md).
+
+**Favor native** when it materially improves latency, platform UX, credentials
+(Keychain/Secure Enclave/biometrics), notifications, files, media capture,
+HealthKit/background work, or accessibility/input conventions the platform
+owns. Core daily loops (sign-in, home/shell, chat type/send/stream, onboarding
+profile completion) belong native on installed clients unless a dated receipt
+proves otherwise.
+
+**Retain web (or Electron wrapping hosted web)** when total ownership cost is
+better: content/admin/infrequent surfaces, Stripe Customer Portal and legal
+docs, dense long-tail workspaces without a native IA, or a single hosted engine
+that must not fork (example: public-profile playback). Electron on Mac remains
+the shipped product shell until the accepted native cutover in
+[`docs/macos/ADR-swift-native-mac.md`](../docs/macos/ADR-swift-native-mac.md);
+new Mac product surfaces default to SwiftUI, not new Electron chrome.
+
+**Shared layer stays server-authoritative.** Entitlements, billing state, action
+policy, auth verification, and health/safety dispositions are owned by shared
+server contracts. Clients present and collect; they do not invent a second
+business-rule implementation. One Ovie remains web on the shared shell
+(`canon/PRODUCT.md`); do not grow a native Ovie.
+
+**Evidence before migration.** Inspect the current experience and code first.
+A rewrite needs a measured user problem, a named owner/runtime, rollback, and
+what the old path retires. Source checks are not installed-app proof. Broad
+native or web migrations stay blocked until a decision record exists.
+
+**Decision record (required for each meaningful boundary change):** user problem
++ evidence; why chosen impl; API/auth/nav/state boundary; compatibility/fallback;
+migration/rollback; what can be retired; what would justify revisiting. Ship the
+record with the PR that changes the boundary; extend the decisions file rather
+than inventing a parallel doctrine.
+
+**Ship now:** this policy and applied receipts for existing surfaces.
+**Re-evaluate when:** a measured journey shows native/web mismatch costing
+activation, trust, or ownership (hangs, auth failures, stranded deep links, or
+duplicated business rules). **Then:** update the matching decision record and
+cut over only with rollback.
 
 ### IA preflight for UI-bearing plans
 
@@ -244,6 +292,37 @@ documentation change does not establish technical enforcement in other repos.
 Each delivery owner must supply its own shadow and promotion receipts; existing
 canonical review and governance paths apply this rule without a new control plane.
 
+### Code or skill: thin harness, thick skills
+
+EVENT: Founder direction, 2026-11-09. Jovie chat had grown a 3,265-line route
+with about 40 hand-wired tools, several of which only handed the model an
+instruction string. Agents shipped prompts as features, and nothing pruned
+them. The fix is one rule for what is code and what is a skill.
+
+- **Code** is for what must be deterministic or safe: reading or writing data,
+  calling a provider, enforcing a rule (artist rules, plan gates, the copy
+  floor), formatting that must be exact (lyrics), and rendering UI.
+- **A skill** is for judgment or a method: a strategy, a plan, a playbook, a
+  checklist, a tone. It is a markdown file,
+  `apps/web/lib/chat/skills/library/<name>/SKILL.md`, with `name`,
+  `description` (ending in "Use when ...") and optional `plan: pro`
+  frontmatter. Adding one needs no tool, route or prompt edit; run
+  `node apps/web/scripts/generate-chat-skill-index.mjs` to refresh the
+  precomputed index the prompt reads.
+- A tool whose result is an instruction for the model is a skill in disguise.
+  The system prompt holds rules that apply to every turn, not feature
+  playbooks.
+- When Jovie can't do something, it says so and calls `requestCapability`
+  instead of improvising. The founder's requests reach Summer as Founder
+  priority.
+- Every change that adds code to the chat harness removes or merges at least
+  as much: tool count, prompt sections and file sizes only go down.
+
+Enforced by `apps/web/lib/chat/thin-harness.test.ts` (no prompt-only tool,
+tool and prompt-section ceilings, skill shape) and the size baseline in
+`scripts/company-guards/size-baseline.json`. A ceiling is never raised to
+fit a change; the change makes room under it.
+
 AI agents should:
 
 1. Observe the bottleneck.
@@ -272,5 +351,6 @@ Concrete implementation lives in `../CLAUDE.md`, `../CODEX.md`, `.claude/rules/*
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-11-09 | Code or skill: thin harness, thick skills, with ceilings enforced by the thin-harness test. | Tim White |
 | 2026-10-23 | Blocking pull-request dependency review and Squawk on changed migration SQL. | grok/extra-guards |
 | 2026-07-17 | Created as domain canon under `/canon`. | Tim White |

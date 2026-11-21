@@ -56,7 +56,7 @@ export function ProviderCopyButton({
       <span
         className={cn(
           'relative flex h-3.5 w-3.5 items-center justify-center',
-          isCopied ? 'text-success' : undefined
+          isCopied ? 'text-success-text' : undefined
         )}
       >
         <Icon
@@ -79,7 +79,10 @@ export function ProviderCopyButton({
         />
       </span>
       <span
-        className={cn('line-clamp-1', isCopied ? 'text-success' : undefined)}
+        className={cn(
+          'line-clamp-1',
+          isCopied ? 'text-success-text' : undefined
+        )}
       >
         {buttonLabel}
       </span>

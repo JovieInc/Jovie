@@ -238,12 +238,16 @@ describe('GET /s/[code]', () => {
 
   it('flushes the 302 before analytics finish (redirect latency budget)', async () => {
     let releaseAnalytics: () => void = () => undefined;
-    mocks.withSystemIngestionSession.mockImplementationOnce(
-      () =>
-        new Promise<void>(resolve => {
-          releaseAnalytics = resolve;
-        })
-    );
+    let markAnalyticsStarted: () => void = () => undefined;
+    const analyticsStarted = new Promise<void>(resolve => {
+      markAnalyticsStarted = resolve;
+    });
+    mocks.withSystemIngestionSession.mockImplementationOnce(() => {
+      markAnalyticsStarted();
+      return new Promise<void>(resolve => {
+        releaseAnalytics = resolve;
+      });
+    });
 
     const response = await GET(new NextRequest('http://localhost/s/abc123'), {
       params: Promise.resolve({ code: 'abc123' }),
@@ -251,9 +255,49 @@ describe('GET /s/[code]', () => {
 
     // The route resolved while the analytics transaction is still pending.
     expect(response.status).toBe(302);
+    await analyticsStarted;
     expect(recordAudienceEvent).not.toHaveBeenCalled();
     releaseAnalytics();
     await Promise.all(mocks.afterTasks.splice(0));
+  });
+
+  it('flushes the 302 before the rate limiter resolves (redirect latency budget)', async () => {
+    let releaseLimit: (result: {
+      success: boolean;
+      limit: number;
+      remaining: number;
+      reset: Date;
+    }) => void = () => undefined;
+    vi.mocked(publicClickLimiter.limit).mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          releaseLimit = resolve;
+        })
+    );
+
+    const response = await GET(
+      new NextRequest('http://localhost/s/abc123', {
+        headers: { 'x-vercel-ip-country': 'US' },
+      }),
+      {
+        params: Promise.resolve({ code: 'abc123' }),
+      }
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get('location')).toBe(
+      'https://example.com/profile'
+    );
+    expect(mocks.withSystemIngestionSession).not.toHaveBeenCalled();
+
+    releaseLimit({
+      success: true,
+      limit: 60,
+      remaining: 59,
+      reset: new Date(Date.now() + 60_000),
+    });
+    await Promise.all(mocks.afterTasks.splice(0));
+    expect(mocks.withSystemIngestionSession).toHaveBeenCalled();
   });
 
   it('treats partial consent cookies as malformed through the shared parser', async () => {
@@ -315,12 +359,21 @@ describe('GET /s/[code]', () => {
   it.each([
     ['absent consent cookie', 'jv_cc_required=1'],
     ['malformed consent cookie', 'jv_cc_required=1; jv_cc=not-json'],
+    [
+      'pending advertising opt-out',
+      'jv_cc_required=0; jv_tracking_consent=rejected',
+    ],
+    [
+      'advertising opt-out with stale server consent',
+      'jv_cc_required=0; jv_tracking_consent=rejected; jv_cc={"essential":true,"analytics":true,"marketing":true}',
+    ],
   ])(
-    'skips audience recording in consent-required regions with %s',
+    'skips audience recording when consent is withheld: %s',
     async (_caseName, cookieHeader) => {
       const request = new NextRequest('http://localhost/s/abc123', {
         headers: {
           Cookie: cookieHeader,
+          'x-vercel-ip-country': 'US',
         },
       });
 
@@ -356,4 +409,28 @@ describe('GET /s/[code]', () => {
     expect(mocks.txInsertMock).not.toHaveBeenCalled();
     expect(recordAudienceEvent).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['records', '0', true],
+    ['skips', '1', false],
+  ] as const)(
+    '%s audience recording for a US/CA visitor with Sec-GPC: %s',
+    async (_verb, secGpc, recorded) => {
+      const request = new NextRequest('http://localhost/s/abc123', {
+        headers: {
+          'Sec-GPC': secGpc,
+          'x-vercel-ip-country': 'US',
+          'x-vercel-ip-country-region': 'CA',
+        },
+      });
+
+      const response = await callRoute(request, {
+        params: Promise.resolve({ code: 'abc123' }),
+      });
+
+      expect(response.status).toBe(302);
+      expect(recordAudienceEvent).toHaveBeenCalledTimes(recorded ? 1 : 0);
+      expect(mocks.txInsertMock).toHaveBeenCalledTimes(recorded ? 1 : 0);
+    }
+  );
 });

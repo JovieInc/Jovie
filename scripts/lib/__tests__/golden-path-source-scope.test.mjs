@@ -36,6 +36,7 @@ function fixture(paths = ['docs/company/shipping.md']) {
   };
   const git = (...args) =>
     execFileSync('git', args, {
+      maxBuffer: 256 * 1024 * 1024,
       cwd: dir,
       env,
       encoding: 'utf8',
@@ -204,6 +205,13 @@ for (const path of [
   'scripts/lanes/vitest.config.mjs',
   'scripts/golden-path-lock.mjs',
   'scripts/lib/golden-path-source-scope.mjs',
+  'scripts/prod-cert.mjs',
+  'scripts/lib/prod-cert-probes.mjs',
+  'apps/web/lib/ovie/certifications/golden-path-status.ts',
+  'apps/web/lib/ovie/certifications/prod-golden-path-ledger.ts',
+  'apps/web/lib/acquisition/eligibility.ts',
+  'apps/web/lib/acquisition/eligibility-cache.ts',
+  'apps/web/lib/acquisition/eligibility.server.ts',
   'apps/web/data/marketing/routeManifest.ts',
 ]) {
   it(`retains coverage for shared/config/unknown neighbor: ${path}`, () => {
@@ -353,7 +361,7 @@ it('keeps pure CI measurement dependencies outside product source', () => {
       '*.ts',
       '*.tsx',
     ],
-    { cwd: root, encoding: 'utf8' }
+    { maxBuffer: 256 * 1024 * 1024, cwd: root, encoding: 'utf8' }
   )
     .trim()
     .split('\n')

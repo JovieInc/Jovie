@@ -30,7 +30,7 @@ function getJobBlock(workflow: string, jobKey: string): string {
 
 describe('Node runtime contract', () => {
   it('keeps canonical version files and workspace engines aligned', () => {
-    expect(canonicalNodeVersion).toBe('24.22.2');
+    expect(canonicalNodeVersion).toBe('24.22.3');
     expect(read('.node-version').trim()).toBe(canonicalNodeVersion);
 
     const majorPinnedPackagePaths = [
@@ -52,14 +52,14 @@ describe('Node runtime contract', () => {
       const packageJson = JSON.parse(read(packagePath)) as {
         engines?: { node?: string };
       };
-      expect(packageJson.engines?.node, packagePath).toBe('>=24.22.2 <25');
+      expect(packageJson.engines?.node, packagePath).toBe('>=24.22.3 <25');
     }
 
     for (const packagePath of minimumOnlyPackagePaths) {
       const packageJson = JSON.parse(read(packagePath)) as {
         engines?: { node?: string };
       };
-      expect(packageJson.engines?.node, packagePath).toBe('>=24.22.2');
+      expect(packageJson.engines?.node, packagePath).toBe('>=24.22.3');
     }
 
     const evePilot = JSON.parse(read('apps/eve-pilot/package.json')) as {
@@ -98,7 +98,7 @@ describe('Node runtime contract', () => {
       '- name: Detect path changes for all job types'
     );
     const ciFastTypecheck = getJobBlock(workflow, 'ci-fast-typecheck');
-    const ciFastRemaining = getJobBlock(workflow, 'ci-fast-remaining');
+    const ciFastRemaining = getJobBlock(workflow, 'ci-fast-remaining-shards');
 
     expect(pathDetection).toBeGreaterThanOrEqual(0);
     expect(workflow.indexOf('  ci-fast-typecheck:')).toBeGreaterThan(
@@ -107,7 +107,7 @@ describe('Node runtime contract', () => {
 
     for (const [jobId, job] of [
       ['ci-fast-typecheck', ciFastTypecheck],
-      ['ci-fast-remaining', ciFastRemaining],
+      ['ci-fast-remaining-shards', ciFastRemaining],
     ] as const) {
       const canonicalSetup = job.indexOf(
         '- uses: ./.github/actions/setup-node-pnpm'

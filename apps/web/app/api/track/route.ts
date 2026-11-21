@@ -14,7 +14,9 @@ import {
 } from '@/lib/cookies/consent-regions';
 import {
   CONSENT_COOKIE_NAME,
+  hasServerMarketingConsent,
   parseConsentCookieValue,
+  TRACKING_CONSENT_COOKIE_NAME,
 } from '@/lib/cookies/consent-state';
 import { db, doesTableExist } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
@@ -24,10 +26,10 @@ import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
-  createRateLimitHeaders,
   trackingClicksLimiter,
   trackingIpClicksLimiter,
 } from '@/lib/rate-limit';
+import { trackingLimiterResponse } from '@/lib/rate-limit/tracking-outage';
 import { resolveSyntheticPassageToken } from '@/lib/synthetic/passage-token.server';
 import {
   classifySyntheticClick,
@@ -72,7 +74,6 @@ function anonymizeIp(ip: string): string {
   return '0.0.0.0';
 }
 
-// API routes should be dynamic
 export const dynamic = 'force-dynamic';
 
 export const runtime = 'nodejs';
@@ -326,21 +327,19 @@ function resolveTrackSourceLabel(
 
 export async function POST(request: NextRequest) {
   try {
-    // Rate limiting: Check IP-based rate limit for track events
+    // Rate limiting: Check IP-based rate limit for track events.
+    // Tracking is optionalDrop: durable Redis when healthy; on outage drop the
+    // beacon (ack without write) instead of 429/memory fallback (SEC-04).
     const ipAddress = extractClientIP(request.headers);
     const rateLimitResult = await trackingIpClicksLimiter.limit(ipAddress);
-
-    if (!rateLimitResult.success) {
-      return NextResponse.json(
-        { error: 'Too many tracking requests. Please try again later.' },
-        {
-          status: 429,
-          headers: {
-            ...NO_STORE_HEADERS,
-            ...createRateLimitHeaders(rateLimitResult),
-          },
-        }
-      );
+    const ipDenied = trackingLimiterResponse(rateLimitResult, {
+      dropBody: { success: true, dropped: true },
+      throttleBody: {
+        error: 'Too many tracking requests. Please try again later.',
+      },
+    });
+    if (ipDenied) {
+      return ipDenied;
     }
 
     let body: unknown;
@@ -375,7 +374,6 @@ export async function POST(request: NextRequest) {
     const userAgent = request.headers.get('user-agent');
     const platformDetected = detectPlatformFromUA(userAgent || undefined);
     const botDetection = detectBot(request, '/api/track');
-    // ipAddress already extracted above for rate limiting
     // Filter out self-referrals: the HTTP Referer header on same-origin fetch()
     // is the current page URL, not the external traffic source.
     const httpReferer = request.headers.get('referer') ?? undefined;
@@ -393,18 +391,19 @@ export async function POST(request: NextRequest) {
       request.headers.get('x-vercel-ip-country-region') ?? undefined;
     const audienceDeviceType = inferAudienceDeviceType(userAgent);
 
-    // Determine marketing consent from jv_cc cookie.
-    // Non-regulated jurisdictions remain default-allow when no banner was
-    // required, but consent-required visitors need a valid marketing opt-in.
+    // Determine marketing consent from jv_cc cookie, region and Sec-GPC.
     const requiresCookieConsent =
       request.cookies?.get(COOKIE_BANNER_REQUIRED_COOKIE)?.value === '1' ||
       isCookieBannerRequired(geoCountry ?? null, geoRegion ?? null);
-    const consent = parseConsentCookieValue(
-      request.cookies?.get(CONSENT_COOKIE_NAME)?.value
-    );
-    const hasMarketingConsent =
-      consent?.marketing === true ||
-      (consent === null && !requiresCookieConsent);
+    const hasMarketingConsent = hasServerMarketingConsent({
+      consent: parseConsentCookieValue(
+        request.cookies?.get(CONSENT_COOKIE_NAME)?.value
+      ),
+      requiresCookieConsent,
+      secGpc: request.headers.get('sec-gpc'),
+      trackingConsent: request.cookies?.get(TRACKING_CONSENT_COOKIE_NAME)
+        ?.value,
+    });
 
     // Without marketing consent: anonymize IP and use generic fingerprint.
     // With consent: full behavior (store real IP, create audience members).
@@ -415,7 +414,6 @@ export async function POST(request: NextRequest) {
       ? createFingerprint(ipAddress, userAgent)
       : 'anonymous';
 
-    // Find the creator profile
     const [profile] = await db
       .select({ id: creatorProfiles.id })
       .from(creatorProfiles)
@@ -433,17 +431,15 @@ export async function POST(request: NextRequest) {
     // stays under trackingIpClicksLimiter, so also meter by profile identity.
     // Matches the /api/audience/click creator limit (same limiter/prefix).
     const creatorRateLimit = await trackingClicksLimiter.limit(profile.id);
-    if (!creatorRateLimit.success) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded', reason: 'Creator rate limit exceeded' },
-        {
-          status: 429,
-          headers: {
-            ...NO_STORE_HEADERS,
-            ...createRateLimitHeaders(creatorRateLimit),
-          },
-        }
-      );
+    const creatorDenied = trackingLimiterResponse(creatorRateLimit, {
+      dropBody: { success: true, dropped: true },
+      throttleBody: {
+        error: 'Rate limit exceeded',
+        reason: 'Creator rate limit exceeded',
+      },
+    });
+    if (creatorDenied) {
+      return creatorDenied;
     }
 
     // JOV-9625: a short-lived, single-use canary passage token (scope

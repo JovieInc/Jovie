@@ -269,13 +269,8 @@ describe('published smart-link content', () => {
 
   it('uses invalidatable production content and creator caches and fails soft if the cache fails', async () => {
     vi.stubEnv('NODE_ENV', 'production');
-    queries(
-      [release],
-      [spotify],
-      [],
-      [],
-      [{ id: 'profile-1', isClaimed: false }]
-    );
+    const row = { id: 'profile-1', isPublic: true, isClaimed: false };
+    queries([release], [spotify], [], [], [row], [row], []);
     expect((await getContentBySlug('profile-1', 'album'))?.releaseDate).toEqual(
       release.releaseDate
     );
@@ -291,20 +286,20 @@ describe('published smart-link content', () => {
         revalidate: 300,
       }
     );
-    expect(await getCreatorByUsername('testartist')).toMatchObject({
+    expect(await getCreatorByUsername('signalartist')).toMatchObject({
       id: 'profile-1',
       isClaimed: false,
     });
     expect(mocks.cache).toHaveBeenCalledWith(
       expect.any(Function),
-      ['smartlink-creator-testartist'],
+      ['smartlink-creator-signalartist'],
       expect.objectContaining({ revalidate: 3600 })
     );
     mocks.cache.mockImplementation(() => async () => {
       throw new Error('cache failed');
     });
     expect(await getContentBySlug('profile-1', 'album')).toBeNull();
-    expect(await getCreatorByUsername('testartist')).toBeNull();
+    expect(await getCreatorByUsername('signalartist')).toBeNull();
   });
 
   it('preserves every canonical role through the production cache round trip', async () => {

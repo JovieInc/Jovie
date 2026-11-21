@@ -32,20 +32,17 @@ import { ChatLinkConfirmationCard } from './components/ChatLinkConfirmationCard'
 import { ChatLinkRemovalCard } from './components/ChatLinkRemovalCard';
 import { ChatMerchActionCard } from './components/ChatMerchActionCard';
 import {
-  ChatMerchOptionsCard,
   ChatMerchSelectionCard,
-  isChatMerchGenerationResult,
   isChatMerchSelectionResult,
 } from './components/ChatMerchCard';
-import {
-  ChatMerchDesignCarousel,
-  ChatMerchDesignCarouselLoading,
-  isChatMerchDesignCarouselResult,
-} from './components/ChatMerchDesignCarousel';
 import { ChatOpsDataCard } from './components/ChatOpsDataCard';
 import { ChatPitchCard } from './components/ChatPitchCard';
 import { ChatPresenceArtifactCard } from './components/ChatPresenceArtifactCard';
 import { ChatVideoRecordingProposalCard } from './components/ChatVideoRecordingProposalCard';
+import {
+  merchOutcomeStatusTitle,
+  renderMerchGenerationArtifact,
+} from './merch-tool-artifacts';
 import { resolveToolStatuses } from './tool-status';
 import type {
   ChatInsightsToolResult,
@@ -165,7 +162,9 @@ function getToolStatusTitle(event: PersistedToolEvent): string {
     case 'needs-approval':
       return `${config.label} needs your OK`;
     case 'succeeded':
-      return config.successTitle ?? config.label;
+      return (
+        merchOutcomeStatusTitle(event) ?? config.successTitle ?? config.label
+      );
   }
 }
 
@@ -574,25 +573,6 @@ function renderReleasePitchArtifact(event: PersistedToolEvent): ReactNode {
       pitches={event.output.pitches}
     />
   );
-}
-
-function renderMerchGenerationArtifact(
-  event: PersistedToolEvent,
-  profileId?: string
-): ReactNode {
-  if (event.state === 'running') {
-    return <ChatMerchDesignCarouselLoading />;
-  }
-  if (isChatMerchDesignCarouselResult(event.output)) {
-    return (
-      <ChatMerchDesignCarousel result={event.output} profileId={profileId} />
-    );
-  }
-  if (!isChatMerchGenerationResult(event.output)) {
-    return null;
-  }
-
-  return <ChatMerchOptionsCard result={event.output} />;
 }
 
 function renderMerchSelectionArtifact(

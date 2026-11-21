@@ -1,25 +1,34 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-
+import { fixtureClient } from './fixtures/production-freshness-client.mjs';
 import {
   aggregateContinuity,
   classifyEndpointObservation,
   continuityIncidentKey,
-  DEFAULT_STALE_AFTER_SECONDS,
   FRESHNESS_INCIDENT_CLASS,
   FRESHNESS_TARGET_ID,
   forecastBudgetExhaustion,
-  observeProductionContinuity,
-  observeProductionFreshness,
+  observeProductionContinuity as observeContinuity,
+  observeProductionFreshness as observeFreshness,
   parseCliArgs,
   parseTargets,
   planBudgetContinuityAction,
   remediationConclusion,
-  resolveStaleAfterSeconds,
-  runCli,
+  runCli as runContinuityCli,
 } from './production-continuity.mjs';
 
 const NOW = new Date('2026-09-13T15:38:12.000Z');
+const observeProductionFreshness = o =>
+  observeFreshness({ ...o, githubClient: fixtureClient(o.fetchImpl) });
+const observeProductionContinuity = o =>
+  observeContinuity({
+    ...o,
+    freshness: o.freshness
+      ? { ...o.freshness, githubClient: fixtureClient(o.fetchImpl) }
+      : null,
+  });
+const runCli = o =>
+  runContinuityCli({ ...o, githubClient: fixtureClient(o.fetchImpl) });
 const observation = overrides =>
   classifyEndpointObservation({
     id: 'jovie-production',
@@ -374,6 +383,9 @@ describe('production freshness', () => {
     failCompare = false,
   } = {}) => {
     const calls = [];
+    const shas = Array.from({ length: aheadBy }, (_, index) =>
+      index === aheadBy - 1 ? mainSha : index.toString(16).padStart(40, '0')
+    );
     const json = (body, status = 200) => ({
       status,
       json: async () => body,
@@ -384,6 +396,16 @@ describe('production freshness', () => {
       calls.push({ url, init });
       if (url.endsWith('/build-info')) return json({ commitSha: liveSha });
       if (url.endsWith('/commits/main')) return json({ sha: mainSha });
+      if (url.includes('/actions/workflows/ci.yml/runs'))
+        return json({
+          total_count: shas.length,
+          workflow_runs: shas.map(head_sha => ({
+            head_sha,
+            created_at: oldestAt,
+            event: 'push',
+            head_branch: 'main',
+          })),
+        });
       if (url.includes('/compare/')) {
         if (failCompare) return json({ message: 'boom' }, 500);
         return json({
@@ -391,7 +413,10 @@ describe('production freshness', () => {
           ahead_by: aheadBy,
           commits:
             aheadBy > 0
-              ? [{ commit: { committer: oldestAt ? { date: oldestAt } : {} } }]
+              ? shas.map(sha => ({
+                  sha,
+                  commit: { committer: oldestAt ? { date: oldestAt } : {} },
+                }))
               : [],
         });
       }
@@ -745,18 +770,17 @@ describe('production freshness', () => {
       [current.healthy, current.reason],
       [true, 'production-current']
     );
-    const stale = await run(4);
+    const stale = await observe({
+      aheadBy: 4,
+      oldestAt: '2026-09-13T10:00:00Z',
+    });
     assert.deepEqual(
       [stale.healthy, stale.incidentClass],
       [false, FRESHNESS_INCIDENT_CLASS]
     );
-    const fresh = await observeProductionFreshness({
-      fetchImpl: rawFetch({
-        ahead_by: 4,
-        commits: [{ commit: { committer: { date: '2026-09-13T15:00:00Z' } } }],
-      }),
-      now: NOW,
-      repository: 'JovieInc/Jovie',
+    const fresh = await observe({
+      aheadBy: 4,
+      oldestAt: '2026-09-13T15:00:00Z',
     });
     assert.deepEqual(
       [fresh.healthy, fresh.reason],
@@ -782,7 +806,10 @@ describe('production freshness', () => {
           if (url.endsWith('/commits/main')) return json({ sha: main });
           return json({
             ahead_by: 2,
-            commits: [{ commit: { committer: { date } } }],
+            commits: ['e'.repeat(40), MAIN].map(sha => ({
+              sha,
+              commit: { committer: { date } },
+            })),
           });
         },
         now: NOW,
@@ -846,51 +873,6 @@ describe('production freshness', () => {
     assert.equal(
       without.targets.some(t => t.id === FRESHNESS_TARGET_ID),
       false
-    );
-  });
-});
-
-describe('resolveStaleAfterSeconds (weekly measured limit from the lanes feed)', () => {
-  const feed = ageS => async () => ({
-    ok: true,
-    json: async () => ({
-      deployHealth: { limits: { 'JovieInc/Jovie': { ageS } } },
-    }),
-  });
-  const base = {
-    limitsUrl: 'https://feed.test/lanes.json',
-    repository: 'JovieInc/Jovie',
-  };
-
-  it('uses the feed limit when sane and the fallback otherwise', async () => {
-    assert.equal(
-      await resolveStaleAfterSeconds({ ...base, fetchImpl: feed(9000) }),
-      9000
-    );
-    for (const bad of [10, 999_999, null, 'x'])
-      assert.equal(
-        await resolveStaleAfterSeconds({ ...base, fetchImpl: feed(bad) }),
-        DEFAULT_STALE_AFTER_SECONDS
-      );
-    assert.equal(
-      await resolveStaleAfterSeconds({
-        ...base,
-        fetchImpl: async () => ({ ok: false }),
-      }),
-      DEFAULT_STALE_AFTER_SECONDS
-    );
-    assert.equal(
-      await resolveStaleAfterSeconds({
-        ...base,
-        fetchImpl: async () => {
-          throw new Error('down');
-        },
-      }),
-      DEFAULT_STALE_AFTER_SECONDS
-    );
-    assert.equal(
-      await resolveStaleAfterSeconds({ repository: 'JovieInc/Jovie' }),
-      DEFAULT_STALE_AFTER_SECONDS
     );
   });
 });

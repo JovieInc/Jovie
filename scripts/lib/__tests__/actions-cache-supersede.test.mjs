@@ -17,17 +17,19 @@ const rows = [
   'Linux-playwright-chromium-a',
   'Linux-playwright-chromium-b',
   'Linux-next-build-web-v1-c-20270101',
+  'Linux-next-build-ovie-v1-a1-20260925',
+  'Linux-next-build-ovie-v1-b2-2026092614',
 ].map((key, i) => ({
   id: i + 1,
   key,
   ref: i === 11 ? 'refs/pull/1/merge' : 'refs/heads/main',
-  created_at: `2026-09-26T0${[1, 2, 3, 4, 4, 1, 5, 1, 9, 1, 2, 3][i]}:00Z`,
+  created_at: `2026-09-26T0${[1, 2, 3, 4, 4, 1, 5, 1, 9, 1, 2, 3, 1, 2][i]}:00Z`,
 }));
 const ids = list => planSuperseded(list).map(c => c.id);
 
 it('keeps the newest per allowlisted main stem, drops dead v1/v2/v3', () => {
-  expect(ids(rows).sort((a, b) => a - b)).toEqual([1, 3, 4, 6, 9]);
-  expect(ids(rows.slice(9))).toEqual([]);
+  expect(ids(rows).sort((a, b) => a - b)).toEqual([1, 3, 4, 6, 9, 13]);
+  expect(ids(rows.slice(9, 12))).toEqual([]);
   const v1 = { ...rows[8], key: 'pnpm-node-modules-v1-Linux-X64-a' };
   expect(ids([v1])).toEqual([9]);
   const v3 = { ...rows[8], key: 'pnpm-node-modules-v3-Linux-X64-a' };

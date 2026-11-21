@@ -32,6 +32,7 @@ import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
 from atomic_state import atomic_write_text  # noqa: E402
 import macos_pool
+import execution_attempt
 
 READY_LABEL = "agent-ready"  # retired as a requirement (2026-10-29); still produced by some intake, never required
 # Labels that mean a human decision, a human-owned task or a container: never auto-promoted.
@@ -90,8 +91,27 @@ def skip_reason(row: dict, open_ids: set[str], excluded: frozenset[str], red_lin
     return None
 
 
+def execution_skips(state: Path, rows: list[dict]) -> dict[str, str]:
+    """Negative observations from the existing execution mirror, never a dispatch grant.
+
+    A missing observation leaves the canonical execution coordinator fully
+    blocking at claim time. A known terminal is generation-specific: priority,
+    label and timestamp churn cannot release it. Source revisions still take
+    the existing authoritative reentry and execution gates.
+    """
+    try:
+        history = execution_attempt._rows(Path(state) / 'runs' / 'execution-attempts.jsonl')
+        stopped = {item['identityDigest'] for item in history
+                   if item.get('terminalState') in execution_attempt.TERMINAL or item.get('event') == 'completion_fenced'}
+    except (OSError, ValueError, TypeError, AttributeError, RuntimeError, KeyError):
+        return {row['identifier']: 'execution-mirror-unreadable' for row in rows}
+    return {row['identifier']: 'execution-generation-terminal' for row in rows
+            if execution_attempt.identity('linear-work', {'issue': row['identifier'], 'outcome': 'draft-pr'},
+                {'title': row.get('title') or '', 'description': row.get('description') or ''})['identityDigest'] in stopped}
+
+
 def select(rows: list[dict], need: int, excluded=(), red_line=lambda row: False, now: float | None = None,
-           factory_share: float | None = None) -> tuple[list[dict], dict]:
+           factory_share: float | None = None, observed_skips: dict | None = None) -> tuple[list[dict], dict]:
     """The next `need` Backlog rows to promote in `backlog_rank` order (value x confidence / effort
     plus age, factory floor first when the fleet is under it), plus a reason for every Backlog
     row left behind."""
@@ -102,7 +122,7 @@ def select(rows: list[dict], need: int, excluded=(), red_line=lambda row: False,
     for row in rows:
         if row.get("state") != "Backlog":
             continue
-        reason = skip_reason(row, open_ids, excluded, red_line)
+        reason = skip_reason(row, open_ids, excluded, red_line) or (observed_skips or {}).get(row["identifier"])
         if reason:
             skipped[row["identifier"]] = reason
         else:
@@ -133,12 +153,13 @@ def groom_queue(rows: list[dict], now: float, keep: int = GROOM_KEEP) -> list[di
             for row in backlog_rank.order(queue, now)[:keep]]
 
 
-def view(rows: list[dict], now: float) -> dict:
+def view(rows: list[dict], now: float, observed_skips: dict | None = None) -> dict:
     """Backlog health for one team from the mirror: agent-ready count and age p50/p95 in days."""
     open_ids = {row["identifier"] for row in rows}
     ages = []
     for row in rows:
-        if row.get("state") == "Backlog" and skip_reason(row, open_ids, frozenset()) is None:
+        if (row.get("state") == "Backlog" and row["identifier"] not in (observed_skips or {})
+                and skip_reason(row, open_ids, frozenset()) is None):
             created = backlog_rank._epoch(row.get("createdAt"))
             if created:
                 ages.append((now - created) / 86400)
@@ -156,6 +177,7 @@ def refill(lane, host, binding, linear, floor: int = 0, now: float | None = None
     state = Path(host.state)
     mirror = lane.linear_sync.read_mirror(state, binding.key)
     rows = list((mirror.get("issues") or {}).values())
+    execution_held = execution_skips(state, rows)
     todo = lane.linear_sync.todo(state, binding.key)
     pending = lane.linear_sync._pending_moves(state)  # promotions still in the outbox count as Todo
     depth, goal = len(todo), target(state, floor)  # todo() already counts promotions waiting in the outbox
@@ -172,7 +194,7 @@ def refill(lane, host, binding, linear, floor: int = 0, now: float | None = None
         if since:
             receipt["lastRefillLatencyS"] = round(now - since, 1)
         receipt["deficitSince"] = None
-        receipt.update(view(rows, now))
+        receipt.update(view(rows, now, execution_held))
         _write(path, receipt)
         return receipt
     receipt["deficitSince"] = since or now
@@ -187,8 +209,9 @@ def refill(lane, host, binding, linear, floor: int = 0, now: float | None = None
     admission = macos_pool.admission(state, now) if binding.key == "LYB" else {"hold": False}
     live, macos_held = macos_pool.partition_ios(live, admission["hold"])
     picked, skipped = select(live, goal - depth, binding.excluded, lambda row: lane.issue_hits_red_line(_issue(lane, row)),
-                             now, _factory_share(state))
+                             now, _factory_share(state), observed_skips=execution_held)
     skipped.update(macos_held)
+    skipped.update(execution_held)
     if binding.key == "LYB":
         receipt["macosAdmission"] = admission
     outbox = lane.linear_sync.Outboxed(state, linear)
@@ -204,7 +227,7 @@ def refill(lane, host, binding, linear, floor: int = 0, now: float | None = None
     receipt["skipped"] = dict(sorted(skipped.items())[:100])
     receipt["short"] = max(0, goal - depth - len(picked))
     receipt["groomQueue"] = groom_queue(live, now)
-    receipt.update(view(rows, now))
+    receipt.update(view(rows, now, execution_held))
     # Guard: ready work waited in Backlog while Todo sat under target. Promotion normally closes the
     # deficit within a tick, so a deficit this old means writes are not landing.
     if receipt["deficitSince"] and now - receipt["deficitSince"] > ALARM_AFTER_S and receipt["ready"] > len(picked):
@@ -291,8 +314,11 @@ def rank_pass(lane, host, binding, linear, now: float | None = None, force: bool
         ready = [row for row in rows if skip_reason(row, open_ids, frozenset(label.lower() for label in binding.excluded)) is None]
         top = backlog_rank.order(ready, now)[:RANK_TOP]
         top_ids = {row["id"] for row in top}
-        others = [value for key, value in current.items() if key not in top_ids]
-        pending = backlog_rank.plan_sort_orders(top, current, min(others) if others else 0.0)
+        # Only rows that could be promoted compete with the ranked list; unready or held rows may sit
+        # anywhere. Otherwise every new issue (Linear lists it first) forced a rewrite of all
+        # RANK_TOP rows, and each write is a webhook to every subscriber (JOV-12550).
+        others = {row["id"]: current[row["id"]] for row in ready if row["id"] not in top_ids}
+        pending = backlog_rank.plan_sort_orders(top, current, min(others.values()) if others else float("inf"), others=others)
         receipt.update(readAt=now, backlog=len(rows), top=len(top))
     outbox = lane.linear_sync.Outboxed(state, linear)
     for issue_id in list(pending)[:RANK_WRITES_PER_TICK]:

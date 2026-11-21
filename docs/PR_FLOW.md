@@ -37,9 +37,19 @@ CI flight.
 
 A draft reaches ready on its own (Auto-Ready green-source) when its exact head
 is CLEAN with PR Ready and required checks SUCCESS, and its body carries either
-a complete writer-proof receipt or a trusted writer's on-green opt-in,
-`<!-- jovie-auto-ready: on-green -->`. Leave it off to keep a WIP draft
-parked. Holds, parks and controlled-proof markers still win.
+a complete writer-proof receipt or comes from a trusted writer, who ships on
+green by default (`pnpm pr:open` also writes `<!-- jovie-auto-ready: on-green -->`).
+To keep a WIP draft parked, pass `--park`: it writes
+`<!-- jovie-auto-ready: park -->`, and a refreshed body keeps it until
+`--on-green` replaces it. Holds, parks and controlled-proof markers still win.
+
+A draft that must wait on a designated outside review — or must not be readied
+at all — pins itself deterministically (JOV-13139): the writer or an agent adds
+the `needs-outside-review` (or `do-not-ready`) label, or writes the park
+marker; prose like "stays DRAFT" in the body is not machine-readable and never
+holds the flip. Both undraft controllers also refuse the flip while GitHub's
+`reviewDecision` is `CHANGES_REQUESTED` (an unresolved must-fix review); an
+approving review or a re-read clears it without a label.
 
 Missing ownership, stale/changed heads, failed checks, lost or duplicate events,
 and expired holds remain bounded repair/evidence outcomes. The policy digest is
@@ -162,8 +172,8 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
   every admitted environment is recorded with the
   `jovie-preview-env-admission/v1` contract and torn down with a
   `jovie-preview-env-cleanup/v1` receipt (PR close →
-  `neon-ephemeral-branch-cleanup.yml` + `vercel-preview-cleanup.yml`; Neon
-  branch TTLs and on-limit cleanup cover missed events). External Vercel
+  `vercel-preview-cleanup.yml`; Neon branches expire on their own TTL and
+  branch creation cleans up when the project nears its limit). External Vercel
   preview status remains informational — see
   [`release.md`](../.claude/rules/release.md).
 
@@ -173,6 +183,11 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
   GitHub enforces required checks, queue admission, merge-group checks, and the
   final merge. Do not use a direct merge or the retired `merge-queue` label.
   The retired Auto-Enroll bot identity and status receipt are not merge-group gates.
+- **Bot review threads never hold a green PR.** Resolve bot review comments
+  yourself after you fix or answer them (`sentry[bot]` Seer, `coderabbitai[bot]`
+  and similar); leave human comments for their author. Auto-Ready Agent Drafts
+  resolves bot threads still open once PR Ready is green on the head
+  ([release rule](../.claude/rules/release.md#resolve-bot-threads-yourself-founder-rule-2026-11-11)).
 - **The queue tolerates transient state.** A PR is only dequeued on a real merge
   conflict, `needs-conflict-resolution`, or a **terminal** failing check
   (`FAILURE`/`ERROR`/`TIMED_OUT`/`ACTION_REQUIRED`). A `pending`/`queued`/`cancelled`
@@ -489,3 +504,28 @@ Related: [`pr-stacking.md`](../.claude/rules/pr-stacking.md),
 [`ci-branching.md`](../.claude/rules/ci-branching.md),
 [`release.md`](../.claude/rules/release.md),
 [`docs/company/autonomous-shipping-doctrine.md`](company/autonomous-shipping-doctrine.md).
+
+## Local AI review (Sentry Warden)
+
+AI code review runs LOCALLY through Sentry Warden (`warden.toml`), never as a
+remote gate. The husky hooks run it for you:
+`warden --staged` on pre-commit (staged diff), `warden` on pre-push (branch vs
+`main`), via `scripts/hooks/warden-local-review.sh` (advisory rung
+`warden-local-review` in the gate ladder). A missing `warden` CLI or model
+credentials only warns — commits and pushes proceed, and Warden must never be
+wired as a status check, branch-protection rule, or merge gate (no
+`.github/workflows/warden.yml` in this repo). `WARDEN_LOCAL_REVIEW` switches
+behavior: `off` skips, `warn` (default) reports findings and proceeds, `strict`
+fails the hook on a non-zero Warden exit.
+
+One-time local setup (not committed):
+
+```sh
+pnpm add -g @sentry/warden
+export WARDEN_MODEL=openai/gpt-5.5        # or anthropic/claude-sonnet-4-6
+export WARDEN_OPENAI_API_KEY=sk-...       # or WARDEN_ANTHROPIC_API_KEY=...
+warden                                    # review the current branch
+```
+
+Without a provider key, Warden falls back to local Claude Code auth when
+available. Never commit keys.

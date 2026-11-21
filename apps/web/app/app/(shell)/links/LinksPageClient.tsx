@@ -1,17 +1,31 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { ExternalLink, Link2 } from 'lucide-react';
+import { Button, type CommonDropdownItem } from '@jovie/ui';
+import { ExternalLink, Link2, Share2 } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type MutableRefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { toast } from '@/components/feedback';
 import { EntitySidebarShell } from '@/components/molecules/drawer';
 import { TableEmptyState } from '@/components/organisms/table/atoms/TableEmptyState';
+import type { ContextMenuItemType } from '@/components/organisms/table/molecules/TableContextMenu';
 import { UnifiedTable } from '@/components/organisms/table/organisms/UnifiedTable';
 import { typography } from '@/components/organisms/table/table.styles';
 import { APP_ROUTES } from '@/constants/routes';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { captureError } from '@/lib/error-tracking';
+import {
+  getUTMShareContextMenuItems,
+  getUTMShareDropdownItems,
+} from '@/lib/utm/share-menu-items';
 import {
   LINKS_COLUMNS,
   LINKS_ROW_MODE,
@@ -19,6 +33,77 @@ import {
   stripProtocol,
 } from './links-columns';
 import type { LinkRow } from './links-model';
+import {
+  buildLinksUtmContext,
+  buildOneTapTrackedUrl,
+  isAudienceSourceLinkRow,
+} from './links-tracked';
+
+const COPY_FEEDBACK_MS = 1200;
+
+async function copyOneTapTrackedLink(row: LinkRow): Promise<boolean> {
+  const { url, presetLabel } = buildOneTapTrackedUrl(row);
+  const copied = await copyToClipboard(url);
+
+  if (copied) {
+    toast.success(
+      presetLabel ? `Copied with ${presetLabel} UTM` : 'Copied Tracked Link',
+      {
+        description: isAudienceSourceLinkRow(row)
+          ? 'Short link already includes campaign tracking'
+          : 'Link includes tracking parameters',
+      }
+    );
+    return true;
+  }
+
+  captureError(
+    'Failed to copy tracked link',
+    new Error('Tracked link clipboard copy failed'),
+    { linkId: row.id, linkType: row.type }
+  );
+  toast.error('Could not copy tracked link', {
+    description: 'Please try again or copy manually.',
+  });
+  return false;
+}
+
+function buildLinksTrackedDropdownItems(row: LinkRow): CommonDropdownItem[] {
+  return [
+    {
+      type: 'action',
+      id: 'copy-tracked-link',
+      label: 'Copy Tracked Link',
+      icon: Share2,
+      onClick: () => {
+        void copyOneTapTrackedLink(row);
+      },
+    },
+    ...getUTMShareDropdownItems({
+      smartLinkUrl: row.jovieUrl,
+      context: buildLinksUtmContext(row),
+    }),
+  ];
+}
+
+function buildLinksTrackedContextMenuItems(
+  row: LinkRow
+): ContextMenuItemType[] {
+  return [
+    {
+      id: 'copy-tracked-link',
+      label: 'Copy Tracked Link',
+      icon: <Share2 className='h-4 w-4' aria-hidden='true' />,
+      onClick: () => {
+        void copyOneTapTrackedLink(row);
+      },
+    },
+    ...getUTMShareContextMenuItems({
+      smartLinkUrl: row.jovieUrl,
+      context: buildLinksUtmContext(row),
+    }),
+  ];
+}
 
 function LinkInspector({
   row,
@@ -30,7 +115,13 @@ function LinkInspector({
   readonly onUnmount: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [trackedCopied, setTrackedCopied] = useState(false);
   const copiedResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const trackedResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const trackedMenuItems = useMemo(
+    () => buildLinksTrackedDropdownItems(row),
+    [row]
+  );
 
   useEffect(() => onUnmount, [onUnmount]);
 
@@ -40,9 +131,21 @@ function LinkInspector({
   useEffect(
     () => () => {
       if (copiedResetRef.current !== null) clearTimeout(copiedResetRef.current);
+      if (trackedResetRef.current !== null) {
+        clearTimeout(trackedResetRef.current);
+      }
     },
     []
   );
+
+  const markCopied = (
+    setter: (value: boolean) => void,
+    resetRef: MutableRefObject<ReturnType<typeof setTimeout> | null>
+  ) => {
+    setter(true);
+    if (resetRef.current !== null) clearTimeout(resetRef.current);
+    resetRef.current = setTimeout(() => setter(false), COPY_FEEDBACK_MS);
+  };
 
   return (
     <EntitySidebarShell
@@ -51,6 +154,7 @@ function LinkInspector({
       title={row.title}
       onClose={onClose}
       scrollStrategy='shell'
+      contextMenuItems={trackedMenuItems}
       data-testid='links-inspector'
     >
       <div className='flex flex-col gap-4 text-sm'>
@@ -73,14 +177,7 @@ function LinkInspector({
               size='sm'
               onClick={async () => {
                 if (await copyToClipboard(row.jovieUrl)) {
-                  setCopied(true);
-                  if (copiedResetRef.current !== null) {
-                    clearTimeout(copiedResetRef.current);
-                  }
-                  copiedResetRef.current = setTimeout(
-                    () => setCopied(false),
-                    1200
-                  );
+                  markCopied(setCopied, copiedResetRef);
                 }
               }}
             >
@@ -88,6 +185,21 @@ function LinkInspector({
             </Button>
           </div>
         </div>
+
+        <Button
+          type='button'
+          variant='secondary'
+          size='sm'
+          className='w-full'
+          data-testid='links-copy-tracked-link'
+          onClick={async () => {
+            if (await copyOneTapTrackedLink(row)) {
+              markCopied(setTrackedCopied, trackedResetRef);
+            }
+          }}
+        >
+          {trackedCopied ? 'Copied Tracked Link' : 'Copy Tracked Link'}
+        </Button>
 
         <dl className='flex flex-col gap-3'>
           <div className='flex flex-col gap-0.5'>
@@ -178,18 +290,28 @@ export function LinksPageClient({ rows }: { readonly rows: LinkRow[] }) {
     target.focus({ preventScroll: true });
   }, []);
 
+  const getContextMenuItems = useCallback(
+    (row: LinkRow) => buildLinksTrackedContextMenuItems(row),
+    []
+  );
+
   // Entity-rail parity: present the inspector through the shell's right-rail
   // slot (AppShellFrame + AppShellRightRail) like every other workspace,
   // instead of a local aside bolted onto the table row.
-  useRegisterRightPanel(
-    selectedRow ? (
-      <LinkInspector
-        row={selectedRow}
-        onClose={closeInspector}
-        onUnmount={restoreOriginatingFocus}
-      />
-    ) : null
+  // Memoized so a page render that does not change the selection does not
+  // push a new panel element through the shell frame.
+  const inspectorPanel = useMemo(
+    () =>
+      selectedRow ? (
+        <LinkInspector
+          row={selectedRow}
+          onClose={closeInspector}
+          onUnmount={restoreOriginatingFocus}
+        />
+      ) : null,
+    [selectedRow, closeInspector, restoreOriginatingFocus]
   );
+  useRegisterRightPanel(inspectorPanel);
 
   if (rows.length === 0) {
     return (
@@ -219,6 +341,7 @@ export function LinksPageClient({ rows }: { readonly rows: LinkRow[] }) {
           isRowSelected={row => row.id === selectedId}
           onRowClick={handleRowClick}
           onFocusedRowChange={handleFocusedRowChange}
+          getContextMenuItems={getContextMenuItems}
           minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
           className='text-app'
           caption='Links'

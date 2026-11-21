@@ -37,6 +37,11 @@ export interface HomeCanvasState {
   /** A turn is being submitted or streamed. */
   readonly isStreaming: boolean;
   readonly onOpenTranscript: () => void;
+  /**
+   * Composer carries intent (typing, picker, chips). Story First melts the
+   * board while the docked composer stays (Tim 2026-11-21).
+   */
+  readonly composerHasIntent?: boolean;
 }
 
 /** The subset of a chat message a canvas reads; parts are untyped tool data. */

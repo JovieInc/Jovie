@@ -1,7 +1,7 @@
 {
   "schema": "jovie-model-task-registry/v1",
-  "_comment": "Every AI loop/task: type, current model, where it is configured (sourcePath must contain sourceMatch; the radar test fails CI on drift), buying channel, cost per run, quality metric and eval set. Screened by scripts/lanes/model_radar.py. automation = ops/automation/registry.json id.",
-  "updatedAt": "2026-10-20",
+  "_comment": "Every AI loop/task: type, current model, where it is configured (sourcePath must contain sourceMatch; the radar test fails CI on drift), buying channel, cost per run, quality metric and eval set. Screened by scripts/lanes/model_radar.py. automation = canon/automation-registry.jsonl id. status inactive = still drift-checked, never screened for successors.",
+  "updatedAt": "2026-11-19",
   "channels": {
     "subscription-claude": "Claude Code subscription (claude CLI). Marginal $0 inside the pool.",
     "subscription-codex": "ChatGPT/Codex subscription (codex CLI). Marginal $0 inside the pool.",
@@ -33,7 +33,6 @@
       "candidates": [
         "deepseek/deepseek-v4.1-flash",
         "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
-        "@cf/zai-org/glm-5.3-flash",
         "claude-haiku-5-5",
         "claude-sonnet-5-5",
         "claude-opus-5-5",
@@ -187,6 +186,7 @@
     },
     {
       "id": "fx-ci-repair",
+      "status": "inactive",
       "taskType": "agentic-coding",
       "automation": null,
       "currentModel": "zai/glm-5.3",
@@ -200,7 +200,7 @@
       "evalRef": null,
       "evalSize": 0,
       "screens": ["same-family-successor"],
-      "notes": "Routed to the allowlisted zai/glm-5.3 (JOV-8702, #22393)."
+      "notes": "Routed to the allowlisted zai/glm-5.3 (JOV-8702, #22393). Inactive: rolling-ci-dispatch.yml disabled_manually on GitHub since 2026-09-02 (last run that day)."
     },
     {
       "id": "pr-conflict-resolution",
@@ -259,7 +259,6 @@
       "channel": "gateway-allowlist",
       "sourcePath": "scripts/invariants/jev-ci-failure-triage.mjs",
       "sourceMatch": "jev-gateway.mjs",
-      "sourcePending": "PR #22324",
       "costUsd": 0.0001,
       "costBasis": "measured 2026-10-20 (39 jobs)",
       "qualityMetric": "precision at the 0.8 floor on labeled tails; misroutes of unclear tails",
@@ -276,7 +275,6 @@
       "channel": "workers-ai",
       "sourcePath": "scripts/invariants/clef-screenshot-evaluator.mjs",
       "sourceMatch": "'@cf/cloudflare/clef'",
-      "sourcePending": "PR #22339",
       "costUsd": 0.001,
       "costBasis": "$0.24 per M input tokens; output free",
       "qualityMetric": "rule violations caught vs design review labels",
@@ -292,7 +290,6 @@
       "channel": "workers-ai",
       "sourcePath": "packages/research/judge.ts",
       "sourceMatch": "'clef-flash'",
-      "sourcePending": "wt-research (ops/research-system)",
       "costUsd": 0.0001,
       "costBasis": "$0.038 per M input",
       "qualityMetric": "relevance precision of kept sources",
@@ -309,7 +306,6 @@
       "channel": "gateway-allowlist",
       "sourcePath": "scripts/signals/signal_watch.py",
       "sourceMatch": "JEV_MODEL = \"typesafe-ai/jev\"",
-      "sourcePending": "wt-signals (ops/signal-watchers)",
       "costUsd": 2e-5,
       "costBasis": "per item, from the watcher docstring",
       "qualityMetric": "high-score items Summer acts on",

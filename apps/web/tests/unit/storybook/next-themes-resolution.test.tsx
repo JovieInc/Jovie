@@ -44,6 +44,7 @@ describe('Storybook next-themes resolution', () => {
     expect(manualConfig.stories).toEqual([
       './stories/**/*.stories.@(js|jsx|ts|tsx|mdx)',
       '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+      '../app/claim/ClaimArtistSearch.stories.tsx',
       '../../../packages/ui/**/*.stories.@(js|jsx|ts|tsx|mdx)',
     ]);
   });

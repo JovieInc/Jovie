@@ -1,6 +1,6 @@
 {
   "file": "apps/web/components/site/MarketingHeader.tsx",
-  "sha256": "f9d37f2ede2085a23e002a7653ff93f88af408dd9d022111ee5c82cbcd935ebb",
-  "at": "2026-11-09T03:00:11.997Z",
-  "ref": "Carried over unchanged from the single pricing row digest 8e1f02b52a25 certified at 2026-11-09T03:00:11.997Z; that certification is described in the row's evidence.ref in surfaceCensus.json."
+  "sha256": "e7525674584370918d4a804b019db5ec5888e9d5e384dfbc07e3d70e1756ff73",
+  "at": "2026-11-13T14:57:14.310Z",
+  "ref": "WAITLIST_ENABLED removed and constant-true SHOW_MARKETING_CENTER_NAV / SHOW_MARKETING_FULL_FOOTER gates removed. Default marketing header CTA is Claim your free profile -> /start; homepage header stays Claim your profile -> /start. Verified with MarketingHeader and HeaderNav vitest render suites (jsdom), not a browser capture."
 }

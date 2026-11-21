@@ -45,6 +45,20 @@
       "scan": "plan-prices"
     },
     {
+      "id": "api-usage-pricing-proposal",
+      "title": "API free-to-start usage pricing proposal",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/lib/config/api-usage-pricing-proposal.ts",
+        "note": "JOV-4875 proposal only. Paid activation is disabled and exact amounts are not stored here. Subscription prices stay in plan-prices.ts. Account ledgers and live cache leases stay with JOV-4073, JOV-4075, JOV-7831, and JOV-8746."
+      },
+      "derived": [
+        "docs/company/PRICING-STRATEGY.md",
+        "docs/product/api-agentic-self-serve.md",
+        "docs/FEATURE_REGISTRY.md"
+      ]
+    },
+    {
       "id": "stripe-price-ids",
       "title": "Stripe price ids",
       "owner": {
@@ -59,6 +73,23 @@
         "apps/web/scripts/check-stripe-price-ids.mjs"
       ],
       "liveAuthority": "Stripe prices"
+    },
+    {
+      "id": "person-price-lock",
+      "title": "A person's price (price lock)",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/lib/billing/price-versions.ts",
+        "note": "Price versions name each list price; the price_locks table holds the snapshot each person signed up at. A person's price is resolveLockedPrice(lock), never the list price."
+      },
+      "derived": [
+        "apps/web/lib/billing/price-lock-checkout.ts",
+        "apps/web/lib/billing/price-lock-view.ts",
+        "apps/web/lib/billing/price-lock.server.ts",
+        "apps/web/app/api/billing/price-lock/route.ts",
+        "apps/web/lib/queries/usePricingOptionsQuery.ts"
+      ],
+      "liveAuthority": "Stripe subscriptions (daily price lock reconcile)"
     },
     {
       "id": "entitlements-limits",

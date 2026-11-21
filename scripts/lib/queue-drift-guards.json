@@ -29,6 +29,20 @@
       "semantic": "shrink-only",
       "check": "node scripts/invariants/stat-claims/check.mjs",
       "tighten": "node scripts/invariants/stat-claims/check.mjs --tighten"
+    },
+    {
+      "id": "size-500",
+      "baseline": "scripts/company-guards/size-baseline.json",
+      "semantic": "shrink-only",
+      "check": "node scripts/company-guards/size-ratchet.mjs --no-raise origin/main",
+      "tighten": "node scripts/company-guards/size-ratchet.mjs --tighten"
+    },
+    {
+      "id": "test-hygiene",
+      "baseline": "scripts/test-quality/test-hygiene-baseline.json",
+      "semantic": "shrink-only",
+      "check": "node scripts/test-hygiene.mjs",
+      "tighten": "node scripts/test-hygiene.mjs --tighten"
     }
   ],
   "combineSafe": {
@@ -49,6 +63,7 @@
       "scripts/invariants/duplicate-literals.baseline.json",
       "scripts/invariants/native-spacing-scale.baseline.json",
       "scripts/invariants/shell-ia.baseline.json",
+      "scripts/invariants/type-safety-ratchet.baseline.json",
       "scripts/shared-ui-visual-arbitrary.baseline.json"
     ]
   },
@@ -116,9 +131,7 @@
       "config/slop-guard/baseline.json",
       "docs/metrics/shipping-slo-baseline.json",
       "docs/pen-stills/pen-variable-baseline.json",
-      "docs/performance/bundle-baseline.json",
       "ops/registry/secrets-lint-baseline.json",
-      "scripts/company-guards/size-baseline.json",
       "scripts/design-authority-interactive-baseline.json",
       "scripts/invariants/overlay-layer-contract.baseline.json",
       "scripts/mutation-score-baseline.json",

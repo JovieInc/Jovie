@@ -55,12 +55,25 @@ function useActiveMobileDrawer(
   // document keydown listener unarmed.
   const [supersededById, setSupersededById] = useState<string | null>(null);
 
+  // Each open or close starts a fresh presentation that no other rail has
+  // superseded yet. Reset during render when that input changes (React's
+  // adjust-state-on-prop-change pattern) instead of in an effect, so the
+  // reset lands on the same render as the open/close itself.
+  const presenting = isOpen && isMobile;
+  const [wasPresenting, setWasPresenting] = useState(presenting);
+  if (wasPresenting !== presenting) {
+    setWasPresenting(presenting);
+    setSupersededById(null);
+  }
+
   useEffect(() => {
     const handleDrawerOpen = (event: Event) => {
       const openedDrawerId = (event as CustomEvent<string>).detail;
-      if (openedDrawerId !== drawerId) {
-        setSupersededById(openedDrawerId);
-      }
+      // A rail also hears its own open event, which clears any superseding
+      // it picked up earlier in the same commit. When two rails open
+      // together the last one to dispatch wins, as before, instead of each
+      // superseding the other and both going inert.
+      setSupersededById(openedDrawerId === drawerId ? null : openedDrawerId);
     };
 
     document.addEventListener('jovie:right-drawer-open', handleDrawerOpen);
@@ -69,20 +82,16 @@ function useActiveMobileDrawer(
   }, [drawerId]);
 
   useEffect(() => {
-    if (!isOpen || !isMobile) {
-      setSupersededById(null);
-      return;
-    }
+    if (!presenting) return;
 
-    setSupersededById(null);
     document.dispatchEvent(
       new CustomEvent<string>('jovie:right-drawer-open', {
         detail: drawerId,
       })
     );
-  }, [drawerId, isMobile, isOpen]);
+  }, [drawerId, presenting]);
 
-  return isOpen && isMobile && supersededById === null;
+  return presenting && supersededById === null;
 }
 
 function isRestorableFocusTarget(
@@ -415,7 +424,9 @@ export function RightDrawer({
         // The shell owns placement, the gap and the route's yield. The drawer
         // owns its raised surface, interrupted reveal, focus and interaction
         // lifecycle; its width transition is the allocation the route follows.
-        'z-10 shrink-0 h-full min-h-0 flex flex-col rounded-(--app-shell-radius) border border-(--app-shell-frame-seam) bg-surface-1 shadow-(--app-shell-drawer-shadow)',
+        // The border is the only hairline; a ring is clipped on three sides
+        // by the main plane and doubles the left seam. Use the shell's soft shadow.
+        'z-10 shrink-0 h-full min-h-0 flex flex-col rounded-(--app-shell-radius) border border-(--app-shell-frame-seam) bg-surface-1 shadow-(--app-shell-shadow)',
         'outline-none focus:outline-none focus-visible:ring-0',
         'overflow-hidden',
         SHELL_RAIL_ALLOCATION,

@@ -1,7 +1,7 @@
 [
   {
     "heading": "## Authority and precedence",
-    "sha256": "a336c34246bac56de9f23fb708dc11e3a2ea6d584320a849cdeca91486659dba"
+    "sha256": "42e03207788cf19702f89482d8fc217a232c9ecc7a7ff0e1f067c56f9910597c"
   },
   {
     "heading": "## Surface Classification",
@@ -9,7 +9,7 @@
   },
   {
     "heading": "## Typography",
-    "sha256": "3017a47fff5776cfebbd100636858ff9fac8d6d3149d57533a857f8d41c72b24"
+    "sha256": "fe32c840bf0be6a54e3b5fae17a532ee66cde8910a27a913e5fc089545281301"
   },
   {
     "heading": "## Copywriting",
@@ -21,7 +21,7 @@
   },
   {
     "heading": "## Use Tokens, Not Raw Colors",
-    "sha256": "b3628885b771b13b78328df115c2bd3dae3f28b7054904a74f7281b8060f446e"
+    "sha256": "459e0ed70bead10a5875ffdc7bf774489fd3476d6c99f4434b368e2b74baaf00"
   },
   {
     "heading": "## Color System",
@@ -45,11 +45,11 @@
   },
   {
     "heading": "## Motion",
-    "sha256": "1a00660de1e58d0c5331245c46fa3c894e60406b226296bd6b6ca94bc29aef5f"
+    "sha256": "041e170569f53e71deddc8b7e6976c2b14069117aef97c22122da8f885f2fcc8"
   },
   {
     "heading": "## App IA & Page Scaffold",
-    "sha256": "3f4917fa28e4c03a78ce89c171ae16ddf4004970b856b1aab9afff00eeaa69f7"
+    "sha256": "7c68f5a0521617dcc245afd35e28fe55827f0eb852a0d94240533fc93bf5348a"
   },
   {
     "heading": "## Component Patterns",
@@ -73,7 +73,7 @@
   },
   {
     "heading": "## Source-of-Truth File Map",
-    "sha256": "f9ffaf9d908bdb8a980303f3d0f643296eea4431635614ffae2a7f47488e21d2"
+    "sha256": "ce8363fcdd1190af7fdf0ef59cf338c5e1dea51c0ce05030b8ec0d7a1876781e"
   },
   {
     "heading": "## Decisions Log",

@@ -5,14 +5,15 @@
  * Reads:
  *   docs/TEST_RISK_REGISTER.md                       — hand-curated surface taxonomy (YAML front-matter)
  *   apps/web/coverage/coverage-final.json            — v8 line/branch coverage per file
- *   apps/web/reports/stryker-incremental.json        — Stryker mutation score per file (optional)
+ *   apps/web/reports/stryker-incremental.json        — live Stryker mutation score per file (optional)
+ *   scripts/mutation-score-baseline.json             — committed measured floors (Mut fallback)
  *   apps/web/reports/test-coverage-snapshot.json     — previous baseline, for Δ7d (optional)
  *   apps/web/tests/quarantine/flaky-tests.json       — flake report from test:flaky (optional)
  *
  * Writes:
- *   docs/TEST_COVERAGE_HEATMAP.md                    — committed, idempotent (only writes on change)
- *   apps/web/reports/test-coverage-snapshot.json     — committed by the nightly cron;
- *                                                       canonical baseline that --check-pr compares against
+ *   docs/TEST_COVERAGE_HEATMAP.md                    — runtime report, idempotent (only writes on change)
+ *   apps/web/reports/test-coverage-snapshot.json     — published to the runtime store;
+ *                                                       restored before nightly --check-pr drift checks
  *
  * Modes:
  *   (default)    — regenerate heatmap + snapshot
@@ -29,12 +30,14 @@ import { glob } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { listSurfaceFiles } from './lib/coverage-surface-files.mjs';
+import { testPathMatchesSurface } from './lib/coverage-surface-tokens.mjs';
+import { readMutationHeatmapScores } from './lib/mutation-heatmap-scores.mjs';
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), '..', '..');
 const REGISTER_PATH = resolve(REPO_ROOT, 'docs/TEST_RISK_REGISTER.md');
 const HEATMAP_PATH = resolve(REPO_ROOT, 'docs/TEST_COVERAGE_HEATMAP.md');
-// Committed baseline — written by the nightly cron, consumed by --check-pr
-// in any PR context. Lives next to Stryker's incremental file by convention.
+// Runtime baseline restored by the nightly audit before --check-pr. The
+// committed snapshot is the initial seed and local/offline fallback.
 const SNAPSHOT_PATH = resolve(
   REPO_ROOT,
   'apps/web/reports/test-coverage-snapshot.json'
@@ -42,10 +45,6 @@ const SNAPSHOT_PATH = resolve(
 const COVERAGE_PATH = resolve(
   REPO_ROOT,
   'apps/web/coverage/coverage-final.json'
-);
-const STRYKER_PATH = resolve(
-  REPO_ROOT,
-  'apps/web/reports/stryker-incremental.json'
 );
 const FLAKY_PATH = resolve(
   REPO_ROOT,
@@ -239,24 +238,8 @@ function readCoverage(): V8Coverage | null {
   return JSON.parse(readFileSync(COVERAGE_PATH, 'utf8')) as V8Coverage;
 }
 
-function readStryker(): Record<string, number> | null {
-  if (!existsSync(STRYKER_PATH)) return null;
-  try {
-    const raw = JSON.parse(readFileSync(STRYKER_PATH, 'utf8')) as {
-      files?: Record<string, { mutants?: Array<{ status: string }> }>;
-    };
-    if (!raw.files) return null;
-    const scores: Record<string, number> = {};
-    for (const [file, payload] of Object.entries(raw.files)) {
-      const mutants = payload.mutants ?? [];
-      if (mutants.length === 0) continue;
-      const killed = mutants.filter(m => m.status === 'Killed').length;
-      scores[file] = Math.round((killed / mutants.length) * 100);
-    }
-    return scores;
-  } catch {
-    return null;
-  }
+function readMutationScores(): Record<string, number> | null {
+  return readMutationHeatmapScores({ repoRoot: REPO_ROOT });
 }
 
 function readPreviousSnapshot(): Snapshot | null {
@@ -470,9 +453,8 @@ function countSurfaceTests(
   e2eCount: number;
   assertionRatio: number | null;
 } {
-  const tokens = extractTokens(surface);
   const matches = (testPath: string) =>
-    tokens.some(t => testPath.toLowerCase().includes(t));
+    testPathMatchesSurface(testPath, surface);
 
   const unitCount = inventory.unit.filter(matches).length;
   const integrationCount = inventory.integration.filter(matches).length;
@@ -486,64 +468,6 @@ function countSurfaceTests(
   const assertionRatio: number | null = null;
 
   return { unitCount, integrationCount, e2eCount, assertionRatio };
-}
-
-// Generic path segments to ignore when extracting matching tokens — they appear
-// in too many test paths and would match everything.
-const GENERIC_PATH_SEGMENTS = new Set([
-  'apps',
-  'web',
-  'app',
-  'api',
-  'lib',
-  'src',
-  'tests',
-  'test',
-  'unit',
-  'integration',
-  'e2e',
-  'spec',
-  'dev',
-  'auth',
-  'utils',
-  'helpers',
-  'config',
-  'route',
-  'routes',
-  'page',
-  'pages',
-  'index',
-  'common',
-  'components',
-]);
-
-function extractTokens(surface: Surface): string[] {
-  // Use distinctive path segments from the glob, plus the surface id.
-  // For "apps/web/app/api/stripe/webhooks/**" → ['stripe', 'webhooks', 'stripe/webhooks', 'stripe-webhooks']
-  const pathOnly = surface.glob.split(':')[0].replace(/\/\*\*?$/, '');
-  const segments = pathOnly
-    .split('/')
-    .map(s => s.toLowerCase().replace(/[()]/g, ''))
-    .filter(
-      s =>
-        s.length > 0 &&
-        !GENERIC_PATH_SEGMENTS.has(s) &&
-        !s.startsWith('[') &&
-        !s.includes('*')
-    );
-
-  const tokens = new Set<string>();
-  if (segments.length > 0) {
-    tokens.add(segments[segments.length - 1]);
-    if (segments.length >= 2) {
-      tokens.add(segments.slice(-2).join('/'));
-    }
-  }
-  // Also include the surface id itself if it's distinctive (has a hyphen).
-  if (surface.id.includes('-')) {
-    tokens.add(surface.id);
-  }
-  return Array.from(tokens);
 }
 
 // ---------------------------------------------------------------------------
@@ -560,12 +484,22 @@ function priorityQueue(
   rows: Array<{ surface: Surface; metrics: SurfaceMetrics }>
 ): PriorityRow[] {
   return rows
-    .map(r => ({
-      ...r,
-      priorityScore:
-        r.metrics.risk_score *
-        Math.max(0, r.surface.target_coverage - r.metrics.coverage_pct),
-    }))
+    .map(r => {
+      const coverageGap = Math.max(
+        0,
+        r.surface.target_coverage - r.metrics.coverage_pct
+      );
+      // Weak mutation evidence (incidental coverage) is second-order risk —
+      // surfaces with known Mut < 60 get a debt term so they stay visible.
+      const mutationDebt =
+        r.metrics.mutation_score !== null && r.metrics.mutation_score < 60
+          ? (60 - r.metrics.mutation_score) / 10
+          : 0;
+      return {
+        ...r,
+        priorityScore: r.metrics.risk_score * (coverageGap + mutationDebt),
+      };
+    })
     .sort((a, b) => b.priorityScore - a.priorityScore)
     .slice(0, 5);
 }
@@ -585,10 +519,7 @@ async function detectUnmappedHighChurn(surfaces: Surface[]): Promise<string[]> {
   try {
     churnRaw = execSync(
       'git log --since=90.days --name-only --pretty=format: -- apps/web',
-      {
-        cwd: REPO_ROOT,
-        encoding: 'utf8',
-      }
+      { maxBuffer: 256 * 1024 * 1024, cwd: REPO_ROOT, encoding: 'utf8' }
     );
   } catch {
     return [];
@@ -641,11 +572,15 @@ function renderHeatmap(
 
   const priorityList = priority.map((p, idx) => {
     const gap = p.surface.target_coverage - p.metrics.coverage_pct;
+    const mut =
+      p.metrics.mutation_score === null
+        ? 'no Mut'
+        : `Mut ${p.metrics.mutation_score}%`;
     const ranges =
       p.surface.key_ranges.length > 0
         ? p.surface.key_ranges.join(', ')
         : p.surface.glob;
-    return `${idx + 1}. **${p.surface.surface}** — gap ${gap.toFixed(1)}pp, risk ${p.metrics.risk_score} → add tests at \`${ranges}\``;
+    return `${idx + 1}. **${p.surface.surface}** — gap ${gap.toFixed(1)}pp, risk ${p.metrics.risk_score}, ${mut} → add tests at \`${ranges}\``;
   });
 
   const staleSection =
@@ -729,7 +664,7 @@ ${tableRows.join('\n')}
 
 ## Priority Queue
 
-Top 5 by \`risk_score × coverage_gap\`. Start here.
+Top 5 by \`risk_score × (coverage_gap + mutation_debt)\` (Mut &lt; 60 adds debt). Start here.
 
 ${priorityList.join('\n')}
 
@@ -758,7 +693,7 @@ ${mutationSection}
 - **Risk** is calibrated by blast radius (1-5), reversibility (1-5), and visibility (1-5) per the register, minus a coverage discount.
 - **Cov %** is statement coverage from v8 (\`apps/web/coverage/coverage-final.json\`).
 - **Branch %** is branch coverage from v8 — the metric that actually matters for critical paths.
-- **Mut** is mutation score from Stryker (\`apps/web/reports/stryker-incremental.json\`). \`—\` means Stryker hasn't run for this surface.
+- **Mut** is the average per-file mutation score for the surface. Live Stryker (\`apps/web/reports/stryker-incremental.json\`) wins when present; otherwise the committed floors in \`scripts/mutation-score-baseline.json\` fill the gap. \`—\` means neither source has a score for files in this surface.
 - **Δ7d** is coverage delta vs the previous snapshot at \`apps/web/reports/test-coverage-snapshot.json\`.
 
 ## Update Cadence
@@ -778,7 +713,7 @@ async function main() {
 
   const { surfaces } = parseRegister();
   const coverage = readCoverage();
-  const stryker = readStryker();
+  const stryker = readMutationScores();
   const previousSnapshot = readPreviousSnapshot();
   const flakyReport = readFlakyTests();
 
@@ -821,7 +756,7 @@ async function main() {
     flakyReport
   );
 
-  // PR-check mode: compare current to snapshot in main, exit 1 on RED degradation.
+  // Compare current coverage to the restored snapshot, exit 1 on RED degradation.
   if (checkPr) {
     if (!previousSnapshot) {
       console.log('No previous snapshot found — skipping check.');

@@ -152,6 +152,7 @@ describe('selected web unit lane', () => {
       write('runtime-input.txt', 'valid');
       const git = (...args) =>
         execFileSync('git', args, {
+          maxBuffer: 256 * 1024 * 1024,
           cwd: dir,
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'pipe'],
@@ -362,5 +363,6 @@ describe('selected web unit lane', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  }, 60_000);
+    // Real Turbo fixture: allow headroom under serial/preflight load.
+  }, 180_000);
 });

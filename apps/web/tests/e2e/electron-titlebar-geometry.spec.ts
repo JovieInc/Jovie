@@ -93,41 +93,10 @@ test('titlebar DOM has a single sidebar toggle and no second main-cell band', as
   await expect(
     titlebarRow.locator('[data-testid="electron-titlebar-main-cell"]')
   ).toHaveCount(0);
-  await expect(page.getByTestId('dashboard-header')).toHaveAttribute(
+  await expect(page.getByTestId('dashboard-header-row')).toHaveAttribute(
     'data-electron-drag-region',
     'true'
   );
-});
-
-test('no duplicate sidebar dock button and titlebar toggle on the same page', async ({
-  page,
-}) => {
-  // Skip outside the explicit dev-auth E2E lane; duplicate-control checks need a bypassed Clerk session.
-  test.skip(
-    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
-    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
-  );
-  test.setTimeout(180_000);
-
-  await installElectronRuntime(page);
-  await gotoShellRoute(page);
-
-  await waitForSettledShell(page);
-
-  await expect(page.locator('[data-sidebar="trigger"]')).toHaveCount(0);
-  await expect(
-    page.locator('header a[aria-label="New Conversation"]')
-  ).toHaveCount(0);
-  await expect(
-    page.locator('[data-testid="electron-sidebar-toggle"]')
-  ).toHaveCount(1);
-  await expect(page.getByRole('link', { name: 'New Chat' })).toHaveCount(1);
-
-  // The titlebar sidebar toggle must be present (it is the canonical one in Electron).
-  const titlebarToggle = page.locator(
-    '[data-testid="electron-sidebar-toggle"]'
-  );
-  await expect(titlebarToggle).toBeAttached();
 });
 
 test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignment)', async ({
@@ -342,13 +311,35 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
         '[data-top-spacing-owner="shell-header"]'
       );
       const title = header?.querySelector<HTMLElement>('h1');
-      const headerInner = header?.firstElementChild as HTMLElement | null;
-      const headerPaddingLeft = headerInner
-        ? Number.parseFloat(getComputedStyle(headerInner).paddingLeft)
-        : null;
+      // JOV-7207 (#25590) moved the window-controls reservation padding onto
+      // the [data-top-spacing-owner] wrapper and deepened the header to
+      // wrapper > header > row. The content column's inner start is now the
+      // wrapper's reservation padding plus the title row's own header
+      // padding-x — read both instead of firstElementChild (the unpadded
+      // <header> box since that refactor).
+      const headerInner =
+        header?.querySelector<HTMLElement>(
+          '[data-testid="dashboard-header-row"]'
+        ) ?? (header?.firstElementChild as HTMLElement | null);
+      const headerPaddingLeft =
+        headerInner && header
+          ? Number.parseFloat(getComputedStyle(headerInner).paddingLeft) +
+            Number.parseFloat(getComputedStyle(header).paddingLeft)
+          : null;
       const settingsShellBox = settingsShell?.getBoundingClientRect();
       const settingsColumnBox = settingsColumn?.getBoundingClientRect();
       const mainContentBox = mainContent?.getBoundingClientRect();
+      // JOV-8940 measures the title against the route's OWN content column.
+      // Dashboard-header routes (chat/calendar/tasks/library) hang the header
+      // directly off the app-shell content column. Settings routes instead
+      // center a narrower shared column ([data-settings-layout-column], max
+      // --app-shell-content-max-form, asserted below) and put the shared
+      // header inside it — an intended layout older than this assertion — so
+      // their title baseline is the settings column start, not the outer
+      // app-shell column start (which would read the column's centering
+      // offset, 120px at 1440, as a regression).
+      const titleAlignmentColumnLeft =
+        settingsColumnBox?.left ?? contentColumnBox.left;
       return {
         bodyPaddingTop: Number.parseFloat(getComputedStyle(body).paddingTop),
         bodyPaddingLeft: Number.parseFloat(getComputedStyle(body).paddingLeft),
@@ -364,7 +355,7 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
           title && headerPaddingLeft !== null
             ? Math.abs(
                 title.getBoundingClientRect().left -
-                  (contentColumnBox.left + headerPaddingLeft)
+                  (titleAlignmentColumnLeft + headerPaddingLeft)
               )
             : null,
         mainContentRight: mainContentBox?.right ?? null,

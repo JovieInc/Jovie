@@ -27,7 +27,6 @@ export const INCIDENT_LABEL = 'main-health-incident';
 export const MIN_CONSECUTIVE_GROUPS = 2;
 export const MAX_LOOKBACK_COMMITS = 30;
 export const MAX_ATTEMPTS_PER_CHANGE = 2;
-export const REPAIR_GRACE_MIN = 20;
 export const UNMERGEABLE_DWELL_MIN = 5;
 
 const ABORTED = new Set(['cancelled', 'skipped', 'neutral', 'stale']);
@@ -246,8 +245,10 @@ export async function bisectFirstRed(candidates, probe) {
 }
 
 /**
- * May the culprit be reverted automatically? One revert in flight per check,
- * never a revert, bounded attempts per change, and give an existing repair a grace.
+ * May the culprit be reverted automatically? One revert in flight per check and
+ * per culprit, never a revert, bounded attempts per change. Revert first
+ * (canon/MERGE_QUEUE_STEWARD.md): an open forward fix does not hold the revert
+ * back; it replaces the revert only by landing first.
  */
 export function decideEject({
   culprit,
@@ -255,8 +256,6 @@ export function decideEject({
   openReverts = [],
   priorAttempts = 0,
   culpritLabels = [],
-  repairs = [],
-  now = Date.now(),
   mode = 'apply',
   ambiguous = false,
 }) {
@@ -269,13 +268,12 @@ export function decideEject({
     return no('alert', 'culprit-is-a-revert');
   if (openReverts.some(pr => pr.check === check))
     return no('skip', 'revert-in-flight-for-check');
+  // Main Health's opener (scripts/main_health_revert.py) may already revert this commit.
+  if (openReverts.some(pr => pr.culprit === culprit.sha))
+    return no('skip', 'revert-in-flight-for-culprit');
   if (priorAttempts >= MAX_ATTEMPTS_PER_CHANGE)
     return no('alert', 'attempt-cap');
   if (!culprit.pr) return no('alert', 'culprit-has-no-pr');
-  const live = repairs.find(
-    r => now - Date.parse(r.createdAt) < REPAIR_GRACE_MIN * 60_000 || r.queued
-  );
-  if (live) return no('alert', `repair-in-flight:#${live.number}`);
   return no(mode === 'dry' ? 'dry-revert' : 'revert', 'culprit-attributed');
 }
 
@@ -446,55 +444,3 @@ export function shouldFailOver(result, fallbackToken) {
     /rate limit (already )?exceeded/i.test(result.stderr ?? '')
   );
 }
-
-/** Required merge-group contexts (CI / PR Ready aggregates ci-fast, so a red ci-fast guarantees it). */
-export const REQUIRED_CHECK_NAMES = Object.freeze([
-  'PR Ready',
-  'Migration Guard',
-  'Fork PR Gate',
-  'PR Size Guard',
-  'Company guards',
-]);
-export const REQUIRED_CHECK_PREFIXES = Object.freeze(['ci-fast (']);
-
-const isRequiredCheck = name => {
-  const bare = String(name).replace(/^CI \/ /, '');
-  return (
-    REQUIRED_CHECK_NAMES.includes(bare) ||
-    REQUIRED_CHECK_PREFIXES.some(p => bare.startsWith(p))
-  );
-};
-
-/**
- * Required checks whose latest run on the merge-group head concluded FAILURE.
- * @param {Array<{id:number, name:string, conclusion:string|null}>} checkRuns
- * @returns {string[]} sorted names
- */
-export function failingRequiredChecks(checkRuns = []) {
-  const latest = new Map();
-  for (const c of checkRuns) {
-    const prev = latest.get(c.name);
-    if (!prev || c.id > prev.id) latest.set(c.name, c);
-  }
-  return [...latest.values()]
-    .filter(c => c.conclusion === 'failure' && isRequiredCheck(c.name))
-    .map(c => c.name)
-    .sort();
-}
-
-/**
- * A queue head with a failed required check blocks everyone behind it even
- * though GitHub never ejects it (#23966: 5 h). Dequeue only when main is green,
- * so a red main stays the revert path's business. Never re-enqueues, never jumps.
- * @param {{head?: {number:number, position:number, state:string, sha?:string|null}|null, failing: string[], mainGreen: boolean}} input
- */
-export function decideFailingHead({ head, failing, mainGreen }) {
-  const no = reason => ({ dequeue: false, reason });
-  if (!head || head.position !== 1) return no('no-head');
-  if (!failing.length) return no('no-failed-required-check');
-  if (!mainGreen) return no('main-not-green');
-  return { dequeue: true, reason: 'required-check-failed', failing };
-}
-
-export const failingHeadComment = (head, failing) =>
-  `${marker({ failingHeadDequeued: head.sha ?? null })}\nRemoved from the merge queue: required check${failing.length === 1 ? '' : 's'} failed on the merge group (${failing.map(n => `\`${n}\``).join(', ')}) while main CI is green. Fix and push; Merge Queue Green Enroll re-admits it when checks pass.`;

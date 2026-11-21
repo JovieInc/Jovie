@@ -711,6 +711,8 @@ interface OnboardingMessageRegionProps {
   readonly entryMode: OnboardingEntryMode;
   readonly entryProfile: StartEntryProfile | null;
   readonly onTryAnotherName: () => void;
+  /** Sends the selected default-walkthrough prompt through the real submit path. */
+  readonly onSuggestionSelect: (prompt: string) => void;
   readonly composerPickerOpen: boolean;
 }
 
@@ -733,6 +735,7 @@ function OnboardingMessageRegion({
   profileBuilderState,
   shouldDockComposer,
   pinThreadToTop,
+  onSuggestionSelect,
 }: OnboardingMessageRegionProps) {
   if (shouldDockComposer) {
     return (
@@ -769,6 +772,7 @@ function OnboardingMessageRegion({
               mode={entryMode}
               entryProfile={entryProfile}
               onTryAnotherName={onTryAnotherName}
+              onSuggestionSelect={onSuggestionSelect}
             />
           </div>
         }
@@ -1134,8 +1138,15 @@ export function OnboardingChat({
   useEffect(() => {
     if (hasInjectedStarterPromptRef.current) return;
     let nextPrompt: string | null = null;
+    let nextMode: OnboardingEntryMode = 'prompt_handoff';
 
-    if (intentId) {
+    if (!takenHandleEntry && starterHandoff?.prompt) {
+      nextPrompt = starterHandoff.prompt;
+      nextMode =
+        starterHandoff.kind === 'spotify_artist'
+          ? 'spotify_handoff'
+          : 'prompt_handoff';
+    } else if (intentId) {
       const intent = readHomepageIntent(intentId);
       if (intent) {
         nextPrompt = sanitizeHomepagePrompt(intent.finalPrompt);
@@ -1147,11 +1158,17 @@ export function OnboardingChat({
       setComposerInput(nextPrompt);
       pendingStarterPromptRef.current = nextPrompt;
       hasInjectedStarterPromptRef.current = true;
-      setEntryMode('prompt_handoff');
+      setEntryMode(nextMode);
     } else {
       setEntryMode(entryProfile ? 'handle_entry' : 'blank');
     }
-  }, [entryProfile, intentId, setComposerInput]);
+  }, [
+    entryProfile,
+    intentId,
+    setComposerInput,
+    starterHandoff,
+    takenHandleEntry,
+  ]);
 
   useEffect(() => {
     const prompt = pendingStarterPromptRef.current;
@@ -1403,9 +1420,12 @@ export function OnboardingChat({
       data-picker-open={composerPickerOpen ? 'true' : undefined}
     >
       {/* Scroll area (flex-1) — upper content morphs on first message */}
-      <div
+      <section
         ref={scrollContainerRef}
         onScroll={onScroll}
+        aria-label='Onboarding Conversation'
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard entry point for the scrollable transcript (axe scrollable-region-focusable)
+        tabIndex={0}
         className={cn(
           'relative min-h-0 flex-1 overflow-y-auto px-4 pb-5 sm:px-6 lg:px-8',
           // Under the floating sign-in row, scrolled-away messages fade out
@@ -1445,9 +1465,10 @@ export function OnboardingChat({
             profileBuilderState={profileBuilderState}
             shouldDockComposer={shouldDockComposer}
             pinThreadToTop={hasInitialStarterPrompt}
+            onSuggestionSelect={submitText}
           />
         </div>
-      </div>
+      </section>
 
       {shouldDockComposer ? (
         <div

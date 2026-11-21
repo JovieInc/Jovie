@@ -33,6 +33,7 @@ import {
   normalizeEvent,
   type PlatformConfig,
 } from './types';
+import { profileHasYoungAudienceSuppress } from './young-audience-suppress';
 
 export type {
   ForwardingResult,
@@ -167,9 +168,6 @@ function getJoviePixelConfigs(): {
   };
 }
 
-/**
- * Mark event as skipped in the database
- */
 async function markEventSkipped(
   eventId: string,
   reason: string
@@ -188,9 +186,6 @@ async function markEventSkipped(
     .where(eq(pixelEvents.id, eventId));
 }
 
-/**
- * Forward event to Jovie's own pixels
- */
 async function forwardToJoviePixels(
   normalizedEvent: ReturnType<typeof normalizeEvent>,
   alreadySent?: Set<string>
@@ -321,6 +316,10 @@ export async function forwardEvent(
       eventId: event.id,
     });
     await markEventSkipped(event.id, 'consent_not_given');
+    return [];
+  }
+  if (await profileHasYoungAudienceSuppress(event.profileId)) {
+    await markEventSkipped(event.id, 'young_audience');
     return [];
   }
 

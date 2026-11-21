@@ -7,6 +7,19 @@ import {
   addLinearIssueComment,
   reopenLinearIssue,
 } from './lib/linear-issue-intake.mjs';
+import {
+  buildRankedFindingBody,
+  pickRankedSloIntake,
+  rankSloIntakeCandidates,
+} from './lib/shipping-slo-ranked-intake.mjs';
+
+export {
+  buildRankedFindingBody,
+  pickRankedSloIntake,
+  rankSloIntakeCandidates,
+  SLO_LATEST_PATHS,
+  suggestedWinMetricLine,
+} from './lib/shipping-slo-ranked-intake.mjs';
 
 const hash = value => createHash('sha256').update(value).digest('hex');
 const fail = reason => {
@@ -18,6 +31,87 @@ const fail = reason => {
 // 80-character label-name limit.
 export function sloFingerprint(repo, metric) {
   return hash(JSON.stringify(['shipping-slo', repo, metric]));
+}
+
+const OPEN_STATE_TYPES = new Set(['triage', 'backlog', 'unstarted', 'started']);
+
+/**
+ * Parse open JOV-6783 children whose descriptions carry our fingerprint markers
+ * for the given candidate metrics. Used for sticky ranked intake.
+ */
+export async function listOpenRankedSloMetrics(
+  { repo, metrics, ownerIssueId },
+  { apiKey = process.env.LINEAR_API_KEY, fetchImpl = fetch } = {}
+) {
+  if (!ownerIssueId || !Array.isArray(metrics) || !metrics.length) return [];
+  const request = async (query, variables, reason) => {
+    const result = await linearRequest({
+      key: apiKey,
+      query,
+      variables,
+      fetchImpl,
+    });
+    if (!result.ok || result.data?.errors?.length || !result.data?.data) {
+      fail(
+        result.reason === 'missing_linear_api_key' || result.rateLimited
+          ? result.reason
+          : reason
+      );
+    }
+    return result.data.data;
+  };
+  const fingerprintByMetric = new Map(
+    metrics.map(metric => [metric, sloFingerprint(repo, metric)])
+  );
+  const markerByFingerprint = new Map(
+    [...fingerprintByMetric.entries()].map(([metric, fp]) => [
+      `Shipping SLO fingerprint: ${fp}`,
+      metric,
+    ])
+  );
+  const openMetrics = [];
+  let after = null;
+  const cursors = new Set();
+  for (let page = 0; page < 20; page++) {
+    const data = await request(
+      `query ShippingSloOpenChildren($id: String!, $after: String) {
+        issue(id: $id) {
+          children(first: 50, after: $after) {
+            nodes {
+              id
+              identifier
+              description
+              archivedAt
+              state { type }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }`,
+      { id: ownerIssueId, after },
+      'open_children_lookup_failed'
+    );
+    const connection = data.issue?.children;
+    if (
+      !Array.isArray(connection?.nodes) ||
+      typeof connection.pageInfo?.hasNextPage !== 'boolean'
+    )
+      fail('open_children_lookup_failed');
+    for (const child of connection.nodes) {
+      if (child?.archivedAt) continue;
+      if (!OPEN_STATE_TYPES.has(child?.state?.type)) continue;
+      const description = String(child.description ?? '');
+      for (const [marker, metric] of markerByFingerprint) {
+        if (description.includes(marker)) openMetrics.push(metric);
+      }
+    }
+    if (!connection.pageInfo.hasNextPage) return [...new Set(openMetrics)];
+    after = connection.pageInfo.endCursor;
+    if (!after || cursors.has(after)) fail('open_children_lookup_incomplete');
+    cursors.add(after);
+  }
+  // Same exhaustion guard as upsertSloFinding pages(): never silently truncate.
+  fail('open_children_lookup_incomplete');
 }
 
 export async function upsertSloFinding(
@@ -190,6 +284,10 @@ export async function upsertSloFinding(
   return { action: 'observed', ...receipt(issue) };
 }
 
+/**
+ * Deliver exactly one ranked slo-regression finding for the current top
+ * (or sticky open) regression. Idempotent via per-metric fingerprint upsert.
+ */
 export async function deliverReport(
   report,
   { repo, runUrl, apiKey, fetchImpl } = /** @type {{
@@ -199,71 +297,88 @@ export async function deliverReport(
     fetchImpl?: typeof fetch,
   }} */ ({})
 ) {
-  const findings = (report.evaluation?.regressions ?? []).map(row => ({
-    metric: row.key,
-    title: `slo-regression: ${row.key} >20% over baseline`,
-    body: [
-      'Rolling 7d SLO regression detected by the shipping-SLO ratchet (JOV-6783).',
-      '',
-      '| Metric | Baseline | Observed | Change |',
-      '| --- | --- | --- | --- |',
-      `| \`${row.key}\` | ${row.baseline} | ${row.observed} | ${Math.floor(row.changeFraction * 100)}% |`,
-      '',
-      '## Top offenders',
-      ...(report.offenders?.slowestPrs ?? []).map(
-        pr =>
-          `- #${pr.number} ${pr.title} — ${pr.lane} lane, ${Math.floor(pr.leadTimeSeconds / 360) / 10}h lead time`
-      ),
-      '',
-      'Slowest CI gate runs in the window:',
-      ...(report.offenders?.slowestCiRuns ?? []).map(
-        run =>
-          `- run ${run.id} \`${run.head_branch}\` — ${Math.floor(run.seconds / 6) / 10}m (${run.conclusion})`
-      ),
-      '',
-      `Measurement run: ${runUrl}`,
-      'Baseline: `docs/metrics/shipping-slo-baseline.json`',
-    ].join('\n'),
-  }));
-  if (report.evaluation?.flatStall)
-    findings.push({
-      metric: 'throughput.growth_flat',
-      title: 'slo-regression: throughput growth flat below +8% WoW target',
-      body: [
-        'Throughput improvement has flattened (JOV-6783).',
-        'Investigate the limiting stage through the existing JOV-5817/JOV-5484 owner.',
-        `Current readings: ${JSON.stringify(report.flat ?? {})}`,
-        `Measurement run: ${runUrl}`,
-      ].join('\n'),
-    });
+  const ranked = rankSloIntakeCandidates(report);
   const receipt = {
     schema: 'jovie-shipping-slo-delivery/v1',
     owner: 'JOV-6783',
     destination: 'linear',
+    mode: 'ranked-one',
     runUrl,
     status: 'succeeded',
+    ranked: ranked.map(row => ({
+      metric: row.metric,
+      severity: row.severity,
+      changeFraction: row.changeFraction,
+    })),
     findings: [],
   };
-  for (const finding of findings) {
-    try {
-      receipt.findings.push({
-        status: 'succeeded',
-        ...(await upsertSloFinding(
-          { ...finding, repo, runUrl },
-          { apiKey, fetchImpl }
-        )),
-      });
-    } catch (error) {
-      receipt.status = 'failed';
-      receipt.findings.push({
-        metric: finding.metric,
-        status: 'failed',
-        reason: error.reason ?? 'delivery_failed',
-        retryDecision: 'reconcile-before-retry',
-      });
-      // Stop this sweep at the first unknown state; a later run reconciles its marker.
-      break;
+  if (!ranked.length) return receipt;
+
+  let openMetrics = [];
+  let ownerIssueId = null;
+  try {
+    const ownerLookup = await linearRequest({
+      key: apiKey ?? process.env.LINEAR_API_KEY,
+      query: `query ShippingSloOwnerId {
+        issue(id: "JOV-6783") { id }
+      }`,
+      variables: {},
+      fetchImpl,
+    });
+    if (
+      !ownerLookup.ok ||
+      ownerLookup.data?.errors?.length ||
+      !ownerLookup.data?.data?.issue?.id
+    ) {
+      fail(
+        ownerLookup.reason === 'missing_linear_api_key' ||
+          ownerLookup.rateLimited
+          ? ownerLookup.reason
+          : 'owner_lookup_failed'
+      );
     }
+    ownerIssueId = ownerLookup.data.data.issue.id;
+    openMetrics = await listOpenRankedSloMetrics(
+      { repo, metrics: ranked.map(r => r.metric), ownerIssueId },
+      { apiKey, fetchImpl }
+    );
+  } catch (error) {
+    receipt.status = 'failed';
+    receipt.findings.push({
+      metric: ranked[0]?.metric,
+      status: 'failed',
+      reason: error.reason ?? 'delivery_failed',
+      retryDecision: 'reconcile-before-retry',
+    });
+    return receipt;
+  }
+
+  const pick = pickRankedSloIntake(ranked, { openMetrics });
+  if (!pick) return receipt;
+  receipt.selection = { metric: pick.target.metric, mode: pick.mode };
+  const finding = buildRankedFindingBody(pick.target, {
+    runUrl,
+    ranked: pick.ranked,
+    mode: pick.mode,
+  });
+
+  try {
+    receipt.findings.push({
+      status: 'succeeded',
+      selectionMode: pick.mode,
+      ...(await upsertSloFinding(
+        { ...finding, repo, runUrl },
+        { apiKey, fetchImpl }
+      )),
+    });
+  } catch (error) {
+    receipt.status = 'failed';
+    receipt.findings.push({
+      metric: finding.metric,
+      status: 'failed',
+      reason: error.reason ?? 'delivery_failed',
+      retryDecision: 'reconcile-before-retry',
+    });
   }
   return receipt;
 }
@@ -289,6 +404,7 @@ if (
       schema: 'jovie-shipping-slo-delivery/v1',
       owner: 'JOV-6783',
       destination: 'linear',
+      mode: 'ranked-one',
       status: 'failed',
       reason: 'invalid_report',
       retryDecision: 'repair-input',

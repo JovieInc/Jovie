@@ -6,6 +6,7 @@ export default mergeConfig(
   defineConfig({
     test: {
       include: ['tests/integration/**/*.test.ts'],
+      environment: 'node',
       singleFork: true,
       fileParallelism: false,
       passWithNoTests: false,

@@ -1,4 +1,15 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mockRecordShippedFixDeploys = vi.hoisted(() =>
+  vi.fn(() => Promise.resolve())
+);
+
+vi.mock('@/lib/recovery/probes.server', () => ({
+  recordShippedFixDeploys: mockRecordShippedFixDeploys,
+}));
 
 vi.mock('@/lib/env', () => ({
   env: new Proxy(
@@ -28,6 +39,19 @@ describe('@critical GET /api/health/build-info', () => {
     cwdSpy?.mockRestore();
     cwdSpy = undefined;
     vi.unstubAllEnvs();
+  });
+
+  it('never touches the recovery/DB hooks on the request path (JOV-12766)', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    const { GET } = await import('@/app/api/health/build-info/route');
+    const response = await GET();
+    expect(response.status).toBe(200);
+
+    // The public identity receipt is read by monitors on every probe; its
+    // request path must not kick off database work (the recovery deploy-time
+    // stamp runs from the instrumentation boot hook instead).
+    expect(mockRecordShippedFixDeploys).not.toHaveBeenCalled();
   });
 
   it('logs warning and returns fallback when build info read fails in production', async () => {
@@ -161,5 +185,59 @@ describe('@critical GET /api/health/build-info', () => {
 
     expect(body.version).not.toBe('0.0.0');
     expect(body.version).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
+  it('does not report the request time as deployedAt (JOV-8658)', async () => {
+    const requestNow = 1_700_000_000_000;
+    const laterRequestNow = 1_700_000_000_500;
+    const now = vi.spyOn(Date, 'now');
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_DEPLOYMENT_TIME', '');
+    vi.stubEnv('JOVIE_BUILD_DEPLOYED_AT', '');
+
+    try {
+      const { GET } = await import('@/app/api/health/build-info/route');
+      now.mockReturnValue(requestNow);
+      const first = await (await GET()).json();
+      now.mockReturnValue(laterRequestNow);
+      const second = await (await GET()).json();
+
+      expect(first.deployedAt).not.toBe(requestNow);
+      expect(second.deployedAt).not.toBe(laterRequestNow);
+      expect(first.deployedAt).toBe(second.deployedAt);
+      expect(first.deployedAt).toBeNull();
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('returns an explicit deploy stamp instead of the request clock (JOV-8658)', async () => {
+    const requestNow = 1_700_000_000_000;
+    const buildStamp = 1_762_000_000_000;
+    const now = vi.spyOn(Date, 'now').mockReturnValue(requestNow);
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('VERCEL_DEPLOYMENT_TIME', '');
+    vi.stubEnv('JOVIE_BUILD_DEPLOYED_AT', String(buildStamp));
+
+    try {
+      const { GET } = await import('@/app/api/health/build-info/route');
+      const body = await (await GET()).json();
+
+      expect(body.deployedAt).toBe(buildStamp);
+      expect(body.deployedAt).not.toBe(requestNow);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('keeps Date.now out of the build-info request path (JOV-8658)', () => {
+    const source = readFileSync(
+      resolve(
+        dirname(fileURLToPath(import.meta.url)),
+        '../../../../lib/observability/build-info.ts'
+      ),
+      'utf8'
+    );
+    expect(source).not.toMatch(/Date\.now\s*\(/);
   });
 });

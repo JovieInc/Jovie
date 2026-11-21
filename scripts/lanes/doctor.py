@@ -56,6 +56,7 @@ import stage_events  # noqa: E402  (jovie-stage-event/v1 rows for the stage coll
 import ledger_archive  # noqa: E402  (bounded runs/ledger.jsonl)
 import throughput_sentinel  # noqa: E402
 import health_checks  # noqa: E402  (source certification and release health providers)
+import credentials_spend  # noqa: E402  (shared redacted Linear app metadata)
 import integration_probes  # noqa: E402  (synthetic probes of the Gem integrations fleet work depends on)
 
 COOL_OFF_S = 6 * 3600
@@ -603,6 +604,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "gateWaitMedianS24h": int(statistics.median(gate_waits)) if gate_waits else None,
         "gateWaitMaxS24h": int(max(gate_waits)) if gate_waits else None,
         "failed24h": sum(1 for r in receipts if r.get("verdict") == "failed"),
+        "failed24hByReason": failed_run_reason_counts(receipts),
         "noWorkRepairs24h": dict(Counter(
             (r.get("reasons") or ["?"])[0].split(":", 1)[0] for r in receipts
             if r.get("kind") == "fix-red" and r.get("verdict") in NO_WORK_REPAIR_VERDICTS)),
@@ -646,6 +648,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "publicFeed": read_json(state / "public-feed-sizes.json", {}),
         "installLag": {key: read_json(state / "update.json", {}).get(key) for key in ("behindS", "behindCommit", "error", "at")},
         "linearAppCredential": _linear_app_credential(lane),
+        # Local status only: this remains observable when Linear itself cannot file an issue.
+        "linearAppToken": credentials_spend.app_token_status(state, now, True),
         "strandedClaims": stranded_claims,
         "ownership": {key: value for key, value in read_json(state / "ownership.json", {}).items()
                       if key not in ("ownerlessSince", "evidenceNoted", "moved", "claimsReleased")},
@@ -823,6 +827,26 @@ def sample_quota_drain(state: Path, now: float, run=lifecycle.run) -> tuple[dict
         if report.get("schema") != "jovie-actions-quota-drain/v1" or not isinstance(report.get("alerts"), list):
             raise ValueError("quota drain output missing the schema")
         signal = {"schema": "jovie-quota-drain/v1", "observedAt": now, "alerts": report["alerts"][:8]}
+        if report["alerts"]:
+            # Name the top github.token callers only while draining, with a bounded eight-read diagnostic pass.
+            try:
+                tallied = run(["node", str(QUOTA_DRAIN_SCRIPT), "tally", "--json", "--hours", "1", "--max-reads", "8"],
+                              capture_output=True, text=True, timeout=150)
+                line = next((row for row in (tallied.stdout or "").splitlines() if row.startswith("{")), "")
+                tally = json.loads(line) if tallied.returncode == 0 and line else {}
+                rows = tally.get("rows")
+                if tally.get("schema") == "jovie-gh-call-tally/v1" and tally.get("complete") is True and isinstance(rows, list):
+                    for row in rows:
+                        if not isinstance(row, dict) or not isinstance(row.get("key"), str):
+                            raise ValueError("malformed quota tally row")
+                        values = [row.get("githubTokenPerHour"), row.get("githubTokenPerRun")]
+                        if any(not isinstance(value, (int, float)) or isinstance(value, bool)
+                               or not 0 <= value < float("inf") for value in values):
+                            raise ValueError("malformed quota tally rate")
+                    signal["topCallers"] = [{"key": row.get("key"), "githubTokenPerHour": row.get("githubTokenPerHour"),
+                                             "githubTokenPerRun": row.get("githubTokenPerRun")} for row in rows[:5]]
+            except (OSError, ValueError, subprocess.SubprocessError):
+                pass  # the callers are context for the alert, never a reason to drop it
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(signal, indent=1, sort_keys=True))
@@ -839,6 +863,39 @@ def failed_by_reason(failures: dict) -> dict[str, int]:
         code = record.get("reason", "legacy") if isinstance(record, dict) else "legacy"
         counts[code] = counts.get(code, 0) + 1
     return dict(sorted(counts.items()))
+
+
+def failed_run_reason_counts(receipts: list) -> dict[str, int]:
+    """Verdict=="failed" run receipts by reason class: the first reason prefix (JOV-12820).
+
+    Mirrors the noWorkRepairs24h grouping (claim-error / timeout / harness-error / ...),
+    which names the failing layer without reading runs/ledger.jsonl on the host — the
+    per-run reason strings never leave gem, so the alert used to file 'Root cause:
+    UNKNOWN' and every condition generation auto-closed unlearned."""
+    counts = Counter((r.get("reasons") or ["?"])[0].split(":", 1)[0]
+                     for r in receipts if r.get("verdict") == "failed")
+    return dict(sorted(counts.items()))
+
+
+def no_landing_evidence(obs: dict) -> str:
+    """Why nothing landed, from signals the doctor already holds (JOV-13034).
+
+    Mirrors the failed-runs reason grouping (JOV-12820): the per-run reason strings
+    never leave gem, so the alert must name the failing layer itself instead of
+    filing 'Root cause: UNKNOWN' for every condition generation."""
+    evidence = []
+    if obs.get("failed24h"):
+        named = ", ".join(f"{reason} {count}" for reason, count in (obs.get("failed24hByReason") or {}).items())
+        evidence.append(f"{obs['failed24h']} harness-failed runs in 24h ({named or 'reason classes ungrouped'})")
+    if obs.get("gateTimeouts24h"):
+        evidence.append(f"{obs['gateTimeouts24h']} gate timeouts in 24h (p50/max wait "
+                        f"{obs.get('gateWaitMedianS24h')}/{obs.get('gateWaitMaxS24h')}s)")
+    if isinstance(obs.get("lastWorkAge"), (int, float)):
+        evidence.append(f"last lane run ended {int(obs['lastWorkAge'] // 60)}m ago")
+    if not evidence:
+        evidence.append("no 24h harness failures or gate timeouts; the busy runs neither failed nor timed out "
+                        "(check host holds and the busy runs' receipts on the host)")
+    return "; ".join(evidence)
 
 
 def _locked(path: Path) -> bool:
@@ -1217,6 +1274,15 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["linear-app-credential-missing"] = (
             "no Jovie Lanes Linear app credential (~/.config/jovie-lanes/linear-app.env); lanes Linear "
             "access fails closed (no personal-key fallback) until the lanes host owner reinstalls it")
+    app_status = obs.get("linearAppToken") or {}
+    expiry = app_status.get("expiresInS")
+    if obs.get("linearAppCredential") is True and (
+            app_status.get("mintFailed") or app_status.get("scopeMatches") is not True or
+            type(expiry) not in (int, float) or expiry <= 0):
+        alerts["linear-app-token-unavailable"] = (
+            "Jovie Lanes app token metadata is missing, expired, scope-mismatched, or reports a failed mint; "
+            "owner gem-lanes: inspect redacted token status. This condition remains in the independent "
+            "GitHub status feed when Linear filing is unavailable; credential changes need separate authority")
     probed = obs.get("integrationProbes")
     # A red probe of the same component is the more specific incident: one issue, not two.
     same_incident = integration_probes.suppressed_silence(probed)
@@ -1292,7 +1358,8 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     if waiting and busy and obs.get("runs24h") and (obs.get("lastLandingAge") is None or obs["lastLandingAge"] > NO_LANDING_S):
         last = "never in 24h" if obs.get("lastLandingAge") is None else f"{int(obs['lastLandingAge'] // 3600)}h ago"
         alerts["no-landing"] = (f"{busy} slots busy with {pool if pool is not None else 'unknown'} eligible new issues "
-                                f"and {obs.get('openPRCount', 'unknown')} open PRs but nothing passed the gate ({last})")
+                                f"and {obs.get('openPRCount', 'unknown')} open PRs but nothing passed the gate ({last})"
+                                f"; {no_landing_evidence(obs)}")
     elif (obs.get("lastLandingAge") is None or obs["lastLandingAge"] > NO_LANDING_S) and not new_work_empty(obs):
         # Losing demand/worker visibility is not a new landing or observed absence of demand.
         prior_alarm = ((previous or {}).get("alerts") or {}).get("no-landing")
@@ -1343,7 +1410,9 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     if obs.get("gateTimeouts24h", 0) >= GATE_TIMEOUT_ALERT:
         alerts["gate-timeouts"] = f"{obs['gateTimeouts24h']} gate timeouts in 24h: host too slow for the gate (fewer slots or a longer LANES_GATE_TIMEOUT_S)"
     if obs.get("failed24h", 0) >= FAILED_RUN_ALERT:
-        alerts["failed-runs"] = f"{obs['failed24h']} harness-failed runs in 24h; read runs/ledger.jsonl reasons"
+        named = ", ".join(f"{reason} {count}" for reason, count in (obs.get("failed24hByReason") or {}).items())
+        alerts["failed-runs"] = (f"{obs['failed24h']} harness-failed runs in 24h ({named or 'reason classes ungrouped'}); "
+                                 "full reason strings in runs/ledger.jsonl")
     no_work = obs.get("noWorkRepairs24h") or {}
     if sum(no_work.values()) >= NO_WORK_REPAIR_ALERT:
         causes = ", ".join(f"{reason} {count}" for reason, count in sorted(no_work.items(), key=lambda kv: -kv[1])[:3])
@@ -1425,8 +1494,11 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     if drain:
         listed = "; ".join(f"{row.get('bucket')} has {row.get('remaining')} left at ~{row.get('ratePerMinute')}/min, empty "
                            f"{row.get('minutesEarly')} min before its reset ({row.get('emptyAt')})" for row in drain[:4])
+        callers = ", ".join(f"{row.get('key')} ~{row.get('githubTokenPerHour')}/h"
+                            for row in ((obs.get("quotaDrain") or {}).get("topCallers") or [])[:3])
         alerts["quota-drain"] = (f"GitHub API budget is projected to run dry before it resets: {listed}. Pause bulk reruns "
-                                 f"and bulk gh work until the reset.")
+                                 f"and bulk gh work until the reset."
+                                 + (f" Top github.token callers: {callers}." if callers else ""))
     if obs.get("hudExpected") and (obs.get("hudBeatAge") is None or obs["hudBeatAge"] > HUD_STALE_S):
         beat = "never" if obs.get("hudBeatAge") is None else f"{int(obs['hudBeatAge'])}s ago"
         alerts["hud-stale"] = f"tty1 HUD heartbeat {beat}; the console is not showing current truth"
@@ -1549,7 +1621,8 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
             receipts[key]["recoveryEvidence"] = delivery
         fields = {"github-quota": ("githubRemaining",),
                   "linear-down": ("linearError", "linearSkipped", "pool", "eligiblePool"),
-                  "no-landing": ("lastLandingAge", "pool", "eligiblePool", "openPRCount", "newIssueBudgetByProvider"),
+                  "no-landing": ("lastLandingAge", "pool", "eligiblePool", "openPRCount", "newIssueBudgetByProvider",
+                                 "failed24h", "failed24hByReason", "gateTimeouts24h", "lastWorkAge"),
                   "workers-without-completions": ("busy", "lastWorkAge", "leaseAgesComplete", "oldestLeaseAge")}
         if key in fields:
             receipts[key]["source"] = {**old.get("source", {}), "status": "healthy",
@@ -2120,6 +2193,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "delivery": obs.get("delivery"),
             "diskFreePct": obs.get("diskFreePct"), "githubRemaining": obs.get("githubRemaining"),
             "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {},
+            "failed_runs_by_reason": obs.get("failed24hByReason") or {},
             "throughput": throughput, "throughputError": obs.get("mergedAttributionError"),
             "shippingAttribution": attribution,
             "sentinel": {key: (obs.get("sentinel") or {}).get(key) for key in

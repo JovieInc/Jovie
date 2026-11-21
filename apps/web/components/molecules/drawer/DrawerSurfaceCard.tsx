@@ -34,18 +34,15 @@ export const DrawerSurfaceCard = forwardRef<
   ref
 ) {
   return (
-    <Card
-      asChild
-      unstyled
-      className={cn(
-        variant === 'card'
-          ? DRAWER_SURFACE_CARD_CLASSNAME
-          : 'border-0 bg-transparent shadow-none',
-        className
-      )}
-    >
+    <Card asChild unstyled>
       <Component
         ref={ref}
+        className={cn(
+          variant === 'card'
+            ? DRAWER_SURFACE_CARD_CLASSNAME
+            : 'border-0 bg-transparent shadow-none',
+          className
+        )}
         data-testid={testId}
         data-variant={variant}
         data-surface-variant={variant}
