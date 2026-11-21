@@ -2,6 +2,11 @@
 
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import {
+  DELTA_TEXT_CLASS,
+  deltaSentiment,
+  type MetricPolarity,
+} from '@/lib/design/metric-tone';
 import { cn } from '@/lib/utils';
 import { Sparkline, type SparklineTrend } from './Sparkline';
 import { SHELL_CAPTION_CLASSNAME } from './shell-caption';
@@ -41,6 +46,8 @@ export interface PerformanceCardProps {
   >;
   /** Tone palette for the line + fill (forwarded to Sparkline). */
   readonly trend: SparklineTrend;
+  /** Whether a rise is good news; colors the delta and line (ASR-041). */
+  readonly polarity?: MetricPolarity;
   /** Percent change over the trailing window. Positive = up, negative = down. */
   readonly delta: number;
   /** Override the initial selected range. Falls back to the first range present. */
@@ -87,6 +94,7 @@ export function PerformanceCard({
   metricLabel,
   pointsByRange,
   trend,
+  polarity = 'higher-is-better',
   delta,
   initialRange,
   chartLabel,
@@ -173,11 +181,7 @@ export function PerformanceCard({
           <span
             className={cn(
               'ml-auto inline-flex items-center gap-0.5 text-2xs tabular-nums',
-              trendFlat
-                ? 'text-tertiary-token'
-                : trendUp
-                  ? 'text-cyan-200/85'
-                  : 'text-rose-300/85'
+              DELTA_TEXT_CLASS[deltaSentiment(trend, polarity)]
             )}
           >
             {trendUp ? (
@@ -193,6 +197,7 @@ export function PerformanceCard({
       <Sparkline
         points={points}
         trend={trend}
+        polarity={polarity}
         hoverIdx={hoverIdx}
         onHover={setHoverIdx}
         ariaLabel={chartLabel ?? `${title} ${range}`}
