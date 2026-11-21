@@ -13,8 +13,18 @@ vi.mock('@/hooks/useClerkSafe', () => ({
 }));
 
 vi.mock('@/features/auth', () => ({
-  AuthShell: ({ claimHandle }: { claimHandle?: string }) => (
-    <div data-testid='waitlist-signup' data-claim-handle={claimHandle ?? ''}>
+  AuthShell: ({
+    claimHandle,
+    accessKind = 'claim',
+  }: {
+    claimHandle?: string;
+    accessKind?: 'claim' | 'waitlist';
+  }) => (
+    <div
+      data-testid='waitlist-signup'
+      data-claim-handle={claimHandle ?? ''}
+      data-access-kind={accessKind}
+    >
       signup
     </div>
   ),
@@ -41,6 +51,10 @@ describe('ChatProposeNextStepCard waitlist truthfulness', () => {
     render(<ChatProposeNextStepCard payload={waitlistPayload} />);
 
     expect(screen.getByTestId('waitlist-signup')).toBeInTheDocument();
+    expect(screen.getByTestId('waitlist-signup')).toHaveAttribute(
+      'data-access-kind',
+      'waitlist'
+    );
     expect(
       screen.getByText(/save this request and reserve your name and profile/i)
     ).toBeInTheDocument();
@@ -84,9 +98,10 @@ describe('ChatProposeNextStepCard waitlist truthfulness', () => {
     ]);
   });
 
-  it('claims the handle the chat settled on, not the homepage ?handle=', () => {
+  it('binds the settled handle with waitlist access, not homepage ?handle=', () => {
     // Golden-path cert 2026-10-31 pm: the visitor typed jov.ie/gpwo879d on the
     // homepage, locked @unmarkedpave in chat, and the card said "Claim @gpwo879d".
+    // ONB-23: waitlist decisions pass accessKind=waitlist (Reserve, not Claim).
     render(
       <ChatProposeNextStepCard
         payload={waitlistPayload}
@@ -96,6 +111,10 @@ describe('ChatProposeNextStepCard waitlist truthfulness', () => {
     expect(screen.getByTestId('waitlist-signup')).toHaveAttribute(
       'data-claim-handle',
       'unmarkedpave'
+    );
+    expect(screen.getByTestId('waitlist-signup')).toHaveAttribute(
+      'data-access-kind',
+      'waitlist'
     );
   });
 });
