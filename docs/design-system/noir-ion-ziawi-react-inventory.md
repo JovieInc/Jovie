@@ -95,7 +95,7 @@ extension of the input.
 
 | Atom | Lock | React before this PR | Status |
 |---|---|---|---|
-| iOS `JovieActionButtonMetrics` | KEEP 28 / 44 / 510 / r999 | 28 / 44 / 510 / 999 (projected) | **Match** (Chat face stays 32) |
+| iOS `JovieActionButtonMetrics` | KEEP 28/44/510/r999 | 28/44/510/999 | **Match** (Chat 32) |
 | `--font-weight-medium` | 510 | 510 | **Match** |
 | Button `rounded-full` | r999 | `rounded-full` / `--radius-full` 9999px | **Match** |
 | `packages/ui` Button `sm`/`md`/`lg`/`marketing` | 28 visible / 44 mobile hit | `h-7` + 44px `::before` | **Lock** |
@@ -135,8 +135,8 @@ extension of the input.
 - **C4** full dual-token architecture — `linear-tokens.css` not deleted.
   Wholesale namespace collapse is blocked on Tim.
 
-C2 (ActionButton 32-in-44 vs 32/510) is superseded by KEEP + native
-sync-28: web/iOS ActionButton are 28 / 44 / 510 / 999; Chat face stays 32.
+C2 (ActionButton 32-in-44 vs 32/510) is superseded by KEEP + sync-28:
+web/iOS ActionButton are 28/44/510/999; Chat face stays 32.
 
 Other leftovers: shell carbon ladder; `--color-info` = mint after aqua→mint;
 light ion-on-light surfaces below 3:1 (KEEP — do not invent a darker ion);
