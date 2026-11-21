@@ -89,11 +89,15 @@ export type AccessDecisionKind =
 export interface AccessDecisionInput {
   /** Collapsed view of all interview signal so far. */
   readonly signal: InterviewSignal;
+  /** Server-resolved Spotify artist ID when confirmed. */
+  readonly spotifyArtistId?: string | null;
   /**
    * Spotify follower count from confirmSpotifyArtist (if resolved).
    * Prefer `metrics` when available — this field is normalized either way.
    */
   readonly spotifyFollowers: number | null;
+  /** Server-derived Spotify release count from catalog preview, if available. */
+  readonly catalogReleases?: number | null;
   /** Optional canonical metrics snapshot (preferred over bare followers). */
   readonly metrics?: CanonicalArtistMetrics | null;
   /** Number of LLM turns observed so far. Used to break stuck loops. */
@@ -185,6 +189,28 @@ export function evaluateAccessSignal(
     };
   }
 
+  // 2b. Verified Spotify catalog artist below 1k followers (including older
+  // catalogs in `no_active_release` / `between_releases`): real server-confirmed
+  // catalog depth qualifies without requiring self-reported audience size.
+  const verifiedCatalogReleases =
+    typeof input.catalogReleases === 'number' &&
+    Number.isFinite(input.catalogReleases)
+      ? Math.max(0, Math.floor(input.catalogReleases))
+      : 0;
+  if (
+    Boolean(input.spotifyArtistId) &&
+    verifiedCatalogReleases >= 1 &&
+    (verifiedCatalogReleases >= 2 || (spotifyFollowers ?? 0) >= 100)
+  ) {
+    return {
+      kind: 'instant_access',
+      rationale: `spotify_catalog_releases_${verifiedCatalogReleases}`,
+      score: 80,
+      proofRequired: true,
+      qualification,
+    };
+  }
+
   // 3. Turn cap reached — run the qualification decision on what was captured
   //    (Tim 2026-11-09): never a silent default waitlist. Self-reported
   //    audience size never grants access on its own (JOV-7144): it is
@@ -227,6 +253,8 @@ export interface OnboardingAccessInput {
   /** Any public profile link (propose_social_link); qualifies non-artists. */
   readonly publicProfileUrl?: string | null;
   readonly spotifyFollowers: number | null;
+  /** Server-derived Spotify release count from catalog preview, if available. */
+  readonly catalogReleases?: number | null;
   readonly metrics?: CanonicalArtistMetrics | null;
   /**
    * Golden-path verdict resolved once per turn by the handler (already null
@@ -310,7 +338,9 @@ export function decideOnboardingAccess(
   }
   return evaluateAccessSignal({
     signal: collapseInterviewSignals(signals),
+    spotifyArtistId: musicJob ? input.spotifyArtistId : null,
     spotifyFollowers: musicJob ? input.spotifyFollowers : null,
+    catalogReleases: musicJob ? (input.catalogReleases ?? null) : null,
     metrics: musicJob ? input.metrics : null,
     turnCount: input.turnCount,
   });

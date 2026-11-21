@@ -194,6 +194,7 @@ nodes:
       - iOS CI
       - Mac CI
       - Component Certificate
+      - desktop-dogfood
       - Fleet Gate Refresh
       - Lane Fix Relay
       - Main Red Eject
@@ -208,7 +209,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
-    jobCount: 73
+    jobCount: 74
   - name: Claim Checkout Dogfood
     path: .github/workflows/claim-checkout-dogfood.yml
     active: true
@@ -402,6 +403,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:invariant-stewardship
     jobCount: 2
+  - name: desktop-dogfood
+    path: .github/workflows/desktop-dogfood.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:rebuild-deferred-desktop
+    jobCount: 4
   - name: desktop-release
     path: .github/workflows/desktop-release.yml
     active: true
@@ -913,7 +926,7 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:bump
-    jobCount: 2
+    jobCount: 3
   - name: Publish @jovie/cli to npm
     path: .github/workflows/npm-publish.yml
     active: true
@@ -1532,6 +1545,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:check
     jobCount: 2
+  - name: Summer PR No-Stall
+    path: .github/workflows/summer-pr-no-stall.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:reclaim
+    jobCount: 1
   - name: Surface Recertify
     path: .github/workflows/surface-recertify.yml
     active: true
@@ -1741,6 +1766,9 @@ edges:
     type: workflow_run
   - from: Source Validation
     to: Dependabot Pin Sync
+    type: workflow_run
+  - from: CI
+    to: desktop-dogfood
     type: workflow_run
   - from: Production Controller
     to: desktop-release

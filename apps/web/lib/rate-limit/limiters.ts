@@ -10,6 +10,11 @@ import { env } from '@/lib/env-server';
 import { RATE_LIMITERS } from './config';
 import { createPlanAwareRateLimiter } from './plan-aware-limiter';
 import {
+  handleCheckLimiter,
+  publicProfileCaptureDismissalLimiter,
+  publicProfilePacEventLimiter,
+} from './public-anonymous-limiters';
+import {
   changelogSubscribeLimiter,
   waitlistJoinLimiter,
 } from './public-submission-limiters';
@@ -104,11 +109,11 @@ export const navigationTelemetryLimiter = createRateLimiter(
  */
 export const onboardingLimiter = createRateLimiter(RATE_LIMITERS.onboarding);
 
-/**
- * Rate limiter for handle availability checks
- * Limit: 30 checks per minute per IP - prevents enumeration attacks
- */
-export const handleCheckLimiter = createRateLimiter(RATE_LIMITERS.handleCheck);
+export {
+  handleCheckLimiter,
+  publicProfileCaptureDismissalLimiter,
+  publicProfilePacEventLimiter,
+};
 
 // ============================================================================
 // Anonymous Onboarding Chat (JOV-2132)
@@ -399,9 +404,9 @@ export const agentCreatorLookupLimiter = createRateLimiter(
 /**
  * Rate limiter for the public claim-token entry route (`/claim/[token]`)
  * Limit: 20 requests per minute per IP. Durable (Redis) so the throttle holds
- * across serverless instances; callers treat a degraded backend as advisory
- * (see allowIfRateLimitBackendDegraded) so a Redis outage never blocks a
- * legitimate creator following their claim link.
+ * across serverless instances. Callers MUST fail closed on unavailable /
+ * degraded backends (429/503) — do not wrap with
+ * `allowIfRateLimitBackendDegraded`.
  */
 export const claimTokenAccessLimiter = createRateLimiter(
   RATE_LIMITERS.claimTokenAccess,
@@ -462,25 +467,6 @@ export const publicClickLimiter = createRateLimiter(RATE_LIMITERS.publicClick, {
 export const publicVisitLimiter = createRateLimiter(RATE_LIMITERS.publicVisit, {
   requireRedis: true,
 });
-
-/**
- * Public profile capture dismissal limiter. A dedicated prefix prevents the
- * status read/write path from competing with unrelated general API traffic.
- */
-export const publicProfileCaptureDismissalLimiter = createRateLimiter(
-  RATE_LIMITERS.publicProfileCaptureDismissal,
-  { requireRedis: false }
-);
-
-/**
- * Public profile PAC telemetry limiter. Its 40/minute ceiling combines with
- * capture dismissal's 20/minute ceiling to preserve the former aggregate
- * 60/minute per-IP budget while isolating these endpoints from other APIs.
- */
-export const publicProfilePacEventLimiter = createRateLimiter(
-  RATE_LIMITERS.publicProfilePacEvent,
-  { requireRedis: false }
-);
 
 /**
  * Rate limiter for health endpoints

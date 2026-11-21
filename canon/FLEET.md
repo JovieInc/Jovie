@@ -69,6 +69,11 @@ merge authority. Gate and fixtures:
 Gem-dark Cursor Cloud recovery stays the isolated diagnostics lane; it is not a
 Project.
 
+Summer also owns **open-PR no-stall** for Jovie: inventory orphans, reclaim
+admission deadlocks (ready + `lane-fix-red` + idle owner) via the existing
+breaker/enroll path, and never use a Cursor Project as the stall watchdog.
+Canonical: [`docs/operations/SUMMER_NO_STALL.md`](../docs/operations/SUMMER_NO_STALL.md).
+
 ---
 
 ## Admission, not filing

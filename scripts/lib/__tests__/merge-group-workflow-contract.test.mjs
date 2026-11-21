@@ -1108,9 +1108,10 @@ describe('merge_group workflow contract', () => {
     );
     expect(macos).toContain("needs.mac.outputs.run_hosted == 'true'");
     // Node-only web inputs run the Mac lane's node checks on ubuntu; swift
-    // and the MenuMonitor artifact stay macOS-only.
+    // and the MenuMonitor artifact stay macOS-only. Queue-proven main recovers
+    // native via ci-apple-post-queue when Path Changes was skipped.
     expect(macosCaller).toContain(
-      "native: ${{ needs.ci-path-changes.outputs.run_macos_native != 'false' }}"
+      "native: ${{ (needs.ci-apple-post-queue.outputs.run_macos_native || needs.ci-path-changes.outputs.run_macos_native) != 'false' }}"
     );
     expect(CI_WORKFLOW).toContain(
       "run_macos_native: ${{ steps.detect.outputs.run_macos_native || 'true' }}"
@@ -2007,7 +2008,15 @@ describe('merge_group workflow contract', () => {
     expect(units).toContain("outputs.run_web == 'true'");
     expect(buildLayout).toContain("outputs.run_web == 'true'");
     expect(ios).toContain("outputs.run_ios == 'true'");
+    expect(ios).toContain('ci-apple-post-queue');
+    expect(ios).toContain(
+      "needs.ci-apple-post-queue.outputs.run_ios == 'true'"
+    );
     expect(macos).toContain("outputs.run_macos == 'true'");
+    expect(macos).toContain('ci-apple-post-queue');
+    expect(macos).toContain(
+      "needs.ci-apple-post-queue.outputs.run_macos == 'true'"
+    );
     expect(crossProduct).toContain("outputs.run_cross_product == 'true'");
     expect(
       getStepRunScript(crossProduct, 'Run model-free shared contracts')
@@ -2386,6 +2395,44 @@ ${selectedGateScript}`,
     expect(iosCaller).toContain(
       "concurrency-key: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || '' }}"
     );
+  });
+
+  it('recovers path-selected Apple lanes on queue-proven main (post-queue)', () => {
+    const apple = getJobBlock(CI_WORKFLOW, 'ci-apple-post-queue');
+    const ios = getJobBlock(CI_WORKFLOW, 'ci-ios');
+    const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
+    const release = getJobBlock(CI_WORKFLOW, 'main-release-ready');
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+
+    expect(apple).toContain("queue_proven == 'true'");
+    expect(apple).toContain('apple-post-queue-selection.mjs');
+    expect(apple).toContain('product-lane-classifier.mjs');
+    expect(apple).toContain('actions/setup-node@');
+    expect(apple).toContain("node-version-file: '.nvmrc'");
+    expect(apple).toContain(
+      "run_ios: ${{ steps.classify.outputs.run_ios || 'false' }}"
+    );
+    expect(ios).toContain('ci-apple-post-queue');
+    expect(macos).toContain('ci-apple-post-queue');
+    expect(release).toContain('ci-apple-post-queue');
+    expect(release).toContain('Queue-proven main deferred');
+    expect(release).not.toContain('"iOS Fast Unit + Coverage:$IOS_RESULT"');
+    // Queue still drops Apple lanes; only selected ones are recorded as deferred.
+    expect(pathChanges).toContain(
+      'merge queue does not wait on the hosted macOS pool'
+    );
+    expect(pathChanges).toContain('($selected | index($lane)) != null');
+  });
+
+  it('runs JovieMac Release boundary only on full regression', () => {
+    const iosGate = getJobBlock(IOS_CI_WORKFLOW, 'test');
+    const macBoundary = getStepBlock(
+      iosGate,
+      'Test native Mac development boundary'
+    );
+    expect(macBoundary).toContain('mac_configurations=(Debug)');
+    expect(macBoundary).toContain('mac_configurations=(Debug Release)');
+    expect(macBoundary).toContain('inputs.full-regression');
   });
 
   it('avoids redundant SwiftPM uploads on persistent Mac runners (JOV-7346)', () => {

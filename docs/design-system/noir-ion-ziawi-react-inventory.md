@@ -87,7 +87,7 @@ extension of the input.
 | `--noir-ion-ultra` / pulse / mint / orange / red | lock hexes | `#A982FF` / `#FF48D2` / `#39E58C` / `#FFC857` / `#FF677D` | **Lock** |
 | aqua / gold / flare | alias mint / orange / red | distinct 7th–9th hues | **Lock** |
 | Light `--color-accent` | ion `#11AFFF` | `#7170FF` then `#1F7BF5` | **Lock** |
-| `--linear-accent-blue` | marketing System A | `#2563ff` | **Conflict** (held) |
+| `--linear-accent-blue` | retired → `--color-accent-blue` ion | was `#2563ff` | **Resolved** (Drift T1.2 unify-ion) |
 | Scene `uiAnchor` | product UI hex `#11AFFF` | old `#11AFFF` family | **Lock** (scene refs stay) |
 | Brand-kit `PALETTE.feature` | 6 accents | 7 hues including Aqua | **Lock** |
 
@@ -128,9 +128,9 @@ extension of the input.
 
 ## Tim KEEP conflicts (not picked)
 
-- **C1** Aug-22 palette-core-accents vs noir-ion — marketing
-  `--linear-accent-blue: #2563ff` and homepage / waitlist copies stay.
-  Do not rewrite homepage.
+- **C1** Aug-22 palette-core-accents vs noir-ion — **resolved** Drift T1.2
+  unify-ion: `--linear-accent*` / `--linear-info*` / btn+pricing accent defs
+  deleted; consumers use System B ion `#11AFFF`. Homepage not rewritten.
 - **C3** homepage JOV-5092 vs #17055 / `#17156` HOLD — homepage not rewritten.
 - **C4** full dual-token architecture — `linear-tokens.css` not deleted.
   Wholesale namespace collapse is blocked on Tim.

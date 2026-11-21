@@ -2435,7 +2435,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-row-selected: rgba(255, 255, 255, 0.048);
 
   /* Cross-cutting interaction state tokens (state-matrix.md)
-     Links/focus use Ion blue — not marketing linear-accent-blue. */
+     Links/focus use Ion blue (Drift T1.2: marketing linear accent retired). */
   --color-link-default: var(--noir-ion-ion);
   --color-link-hover: color-mix(
     in oklab,
