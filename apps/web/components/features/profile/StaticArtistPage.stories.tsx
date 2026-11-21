@@ -2,6 +2,8 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { PROFILE_STORY_ARTIST } from './profile-story-fixture';
 import { StaticArtistPage } from './StaticArtistPage';
 
+// Visual evidence for public-profile pixel suppress (TRK-6) on /[username].
+
 const meta = {
   title: 'Profile/StaticArtistPage',
   component: StaticArtistPage,

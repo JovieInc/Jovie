@@ -30,109 +30,24 @@ import {
 } from '@/lib/chat/onboarding-script/engine';
 import { ONBOARDING_WIDGET_EVENTS } from '@/lib/chat/onboarding-script/widget-events';
 import { createOnboardingTurnState } from '@/lib/chat/tools/onboarding-tool-impls';
-
-const SESSION = '00112233-4455-6677-8899-aabbccddeeff';
-
-function user(text: string, metadata?: Record<string, unknown>): UIMessage {
-  return {
-    id: crypto.randomUUID(),
-    role: 'user',
-    parts: [{ type: 'text', text }],
-    ...(metadata ? { metadata } : {}),
-  } as UIMessage;
-}
-
-function assistant(
-  text: string,
-  toolParts: readonly {
-    toolName: string;
-    output: Record<string, unknown>;
-  }[] = []
-): UIMessage {
-  return {
-    id: crypto.randomUUID(),
-    role: 'assistant',
-    parts: [
-      { type: 'text', text },
-      ...toolParts.map(part => ({
-        type: `tool-${part.toolName}`,
-        toolCallId: crypto.randomUUID(),
-        state: 'output-available',
-        input: {},
-        output: part.output,
-      })),
-    ],
-  } as UIMessage;
-}
-
-function stateFor(messages: readonly UIMessage[], accessControlled = false) {
-  return createOnboardingTurnState({
-    sessionId: SESSION,
-    turnCount: messages.filter(m => m.role === 'user').length,
-    accessControlled,
-    messages,
-  });
-}
+import {
+  assistantMessage as assistant,
+  messagesThroughArtistConfirm as baseThroughArtist,
+  CONFIRMED_SPOTIFY_OUTPUT as CONFIRMED_OUTPUT,
+  HANDLE_CHECKED_PART as HANDLE_CHECKED,
+  HANDLE_CONFIRMED_PART as HANDLE_CONFIRMED,
+  ONBOARDING_SCRIPT_TEST_SESSION as SESSION,
+  SOCIAL_ATTACHED_PART as SOCIAL_ATTACHED,
+  SOCIAL_PROPOSED_PART as SOCIAL_PROPOSED,
+  turnStateFor as stateFor,
+  userMessage as user,
+} from './onboarding-script-test-fixtures';
 
 async function decide(messages: readonly UIMessage[]) {
   return decideFallbackTurn({
     uiMessages: messages,
     state: stateFor(messages),
   });
-}
-
-const CONFIRMED_OUTPUT = {
-  action: 'spotify_artist_confirmed',
-  spotifyArtistId: 'artist-1',
-  artist: {
-    id: 'artist-1',
-    name: 'Test Artist',
-    url: 'https://open.spotify.com/artist/artist-1',
-    followers: 12_300,
-    popularity: 48,
-    genres: ['house'],
-  },
-};
-
-const HANDLE_CHECKED = {
-  toolName: 'checkHandle',
-  output: { action: 'check_handle', handle: 'testartist' },
-} as const;
-
-const HANDLE_CONFIRMED = {
-  toolName: 'checkHandle',
-  output: {
-    action: 'handle_confirmed',
-    handle: 'testartist',
-    summary: 'Handle @testartist confirmed.',
-  },
-} as const;
-
-const SOCIAL_PROPOSED = {
-  toolName: 'proposeSocialLink',
-  output: {
-    action: 'propose_social_link',
-    url: null,
-    summary: 'Attach a public social account.',
-  },
-} as const;
-
-const SOCIAL_ATTACHED = {
-  toolName: 'proposeSocialLink',
-  output: {
-    action: 'social_attached',
-    url: 'https://instagram.com/testartist',
-    summary: 'Attached https://instagram.com/testartist.',
-  },
-} as const;
-
-function baseThroughArtist() {
-  return [
-    user('hey'),
-    assistant('Pulled you up.', [
-      { toolName: 'confirmSpotifyArtist', output: CONFIRMED_OUTPUT },
-    ]),
-  ] as const;
 }
 
 describe('parseArtistSelection', () => {
@@ -336,7 +251,7 @@ describe('decideFallbackTurn', () => {
     expect(turn.text).toContain('@testartist');
   });
 
-  it('advances on structured handle_confirmed widget event', async () => {
+  it('advances on structured handle_confirmed widget event to auth', async () => {
     const turn = await decide([
       ...baseThroughArtist(),
       assistant('Claiming @testartist.', [HANDLE_CHECKED]),
@@ -345,16 +260,18 @@ describe('decideFallbackTurn', () => {
         handle: 'testartist',
       }),
     ]);
-    // Metadata event satisfies the handle guard; next step opens social.
-    expect(turn.guardedStep).toBe('social');
+    // Keep → auth: skip social/audience after accepting the match handle.
+    expect(turn.guardedStep).toBe('waitlist_or_complete');
     expect(turn.toolEvents.map(e => e.output.action)).toContain(
       'handle_confirmed'
     );
     expect(turn.toolEvents.map(e => e.output.action)).toContain(
+      'propose_next_step'
+    );
+    expect(turn.toolEvents.map(e => e.output.action)).not.toContain(
       'propose_social_link'
     );
-    // One ask per turn: the line asks for the link the card collects.
-    expect(turn.line.stepId).toBe('attach_social');
+    expect(turn.line.stepId).not.toBe('attach_social');
   });
 
   it('advances social on Attach Account widget event', async () => {

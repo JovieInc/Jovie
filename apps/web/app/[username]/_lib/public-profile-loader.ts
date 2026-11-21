@@ -19,7 +19,10 @@ import { resolveEffectivePlan } from '@/lib/entitlements/creator-plan';
 import { checkBoolean } from '@/lib/entitlements/registry';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { mergeProfileTheme } from '@/lib/profile/profile-theme';
-import { isPublicProfilePublished } from '@/lib/profile/public-profile-access';
+import {
+  isPublicProfilePublished,
+  isYoungAudienceProfile,
+} from '@/lib/profile/public-profile-access';
 import { shouldHideTestProfileFromDirectUrl } from '@/lib/profile/test-profile-policy';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { isDspPlatform } from '@/lib/services/social-links/types';
@@ -247,10 +250,12 @@ const fetchProfileAndLinks = async (
 
     const contacts: DbCreatorContact[] = result.contacts ?? [];
     const latestRelease = result.latestRelease ?? null;
-    const creatorMetaPixelId = await getCreatorMetaPixelId(
-      result.id,
-      normalizeCreatorPixelPlan(result.userPlan, result.userTrialEndsAt)
-    );
+    const creatorMetaPixelId = isYoungAudienceProfile(result.settings)
+      ? null
+      : await getCreatorMetaPixelId(
+          result.id,
+          normalizeCreatorPixelPlan(result.userPlan, result.userTrialEndsAt)
+        );
 
     return {
       profile,
@@ -417,10 +422,15 @@ async function withFreshEntitlements(
     creatorIsPro: Boolean(authority.userIsPro),
     creatorClerkId:
       typeof authority.userClerkId === 'string' ? authority.userClerkId : null,
-    creatorMetaPixelId: await getCreatorMetaPixelId(
-      authority.id,
-      normalizeCreatorPixelPlan(authority.userPlan, authority.userTrialEndsAt)
-    ),
+    creatorMetaPixelId: isYoungAudienceProfile(body.profile?.settings)
+      ? null
+      : await getCreatorMetaPixelId(
+          authority.id,
+          normalizeCreatorPixelPlan(
+            authority.userPlan,
+            authority.userTrialEndsAt
+          )
+        ),
   };
 }
 

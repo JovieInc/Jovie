@@ -151,6 +151,16 @@ test('script test files use derived selection, not the full contract lists', () 
     selected.node.length + selected.vitest.length < 120,
     `expected derived << full, got ${selected.node.length}+${selected.vitest.length}`
   );
+  // #26235 shape: test + baseline json must stay derived (json is not toolchain).
+  const floorWithJson = selectScriptContracts(
+    [floor, 'scripts/mutation-score-baseline.json'],
+    { root: ROOT }
+  );
+  assert.equal(floorWithJson.full, false);
+  assert.ok(
+    floorWithJson.node.length + floorWithJson.vitest.length < 120,
+    `expected derived << full for test+json, got ${floorWithJson.node.length}+${floorWithJson.vitest.length}`
+  );
 });
 
 test('other diffs run only contracts whose derived reads they touch', () => {
