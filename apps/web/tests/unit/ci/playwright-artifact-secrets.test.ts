@@ -2929,6 +2929,7 @@ ${fixtureCheckout}
       'apps/web/test-results/nightly-agent/skill-delta.json',
       'docs/NIGHTLY_TESTING_AGENT_REPORT.md',
       'apps/web/reports/nightly-agent/last-run.json',
+      'apps/web/reports/nightly-agent/skill-delta.json',
     ];
     const reportContents = Object.fromEntries(
       reportPaths.map((path, index) => [
