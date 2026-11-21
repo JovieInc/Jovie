@@ -1,17 +1,17 @@
 {
   "schema": "jovie-review-escapes/v1",
   "windowDays": 30,
-  "mergedPrs": 957,
-  "escapedPrs": 37,
-  "escapeRate": 0.0387,
+  "mergedPrs": 970,
+  "escapedPrs": 30,
+  "escapeRate": 0.0309,
   "byLayer": {
     "preflight": 0,
-    "unit_test": 14,
-    "ci_guard": 18,
+    "unit_test": 10,
+    "ci_guard": 15,
     "risk_tier_review": 4,
     "production_cert": 2
   },
-  "guardRate": 0.9737,
+  "guardRate": 0.9677,
   "unguarded": [
     {
       "originPr": 23990,
@@ -20,6 +20,14 @@
     }
   ],
   "escapes": [
+    {
+      "originPr": 26159,
+      "fixPr": 26276,
+      "kind": "fix",
+      "hours": 11.4,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
     {
       "originPr": 25587,
       "fixPr": 25630,
@@ -259,71 +267,7 @@
       "hours": 0.6,
       "layer": "ci_guard",
       "guardAdded": true
-    },
-    {
-      "originPr": 22328,
-      "fixPr": 22456,
-      "kind": "fix",
-      "hours": 47.1,
-      "layer": "ci_guard",
-      "guardAdded": true
-    },
-    {
-      "originPr": 22331,
-      "fixPr": 22456,
-      "kind": "fix",
-      "hours": 42.9,
-      "layer": "ci_guard",
-      "guardAdded": true
-    },
-    {
-      "originPr": 22447,
-      "fixPr": 22451,
-      "kind": "fix",
-      "hours": 3.8,
-      "layer": "ci_guard",
-      "guardAdded": true
-    },
-    {
-      "originPr": 22324,
-      "fixPr": 22435,
-      "kind": "fix",
-      "hours": 3.9,
-      "layer": "unit_test",
-      "guardAdded": true
-    },
-    {
-      "originPr": 22337,
-      "fixPr": 22435,
-      "kind": "fix",
-      "hours": 3.8,
-      "layer": "unit_test",
-      "guardAdded": true
-    },
-    {
-      "originPr": 22354,
-      "fixPr": 22427,
-      "kind": "fix",
-      "hours": 6.1,
-      "layer": "unit_test",
-      "guardAdded": true
-    },
-    {
-      "originPr": 22320,
-      "fixPr": 22448,
-      "kind": "fix",
-      "hours": 0.8,
-      "layer": "unit_test",
-      "guardAdded": true
-    },
-    {
-      "originPr": 21956,
-      "fixPr": 22307,
-      "kind": "fix",
-      "hours": 1.7,
-      "layer": "ci_guard",
-      "guardAdded": true
     }
   ],
-  "generatedAt": "2026-11-19T16:39:29.541Z"
+  "generatedAt": "2026-11-21T15:22:42.468Z"
 }
