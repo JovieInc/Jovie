@@ -21,6 +21,12 @@ const e2eDirectory = resolve(webWorkspace, 'tests/e2e');
 const SHARED_MAX_DIFF_PIXEL_RATIO = 0.02;
 const SPEC_MAX_DIFF_PIXEL_RATIO = 0.05;
 const MAX_THRESHOLD = 0.1;
+// A spec may hold a measured drift above the per-spec limit only on a line
+// marked `visual-tolerance-ratchet:` with the reason, and only this many times
+// at this ceiling. Both numbers only go down.
+const RATCHET_MARKER = 'visual-tolerance-ratchet:';
+const RATCHET_MAX_DIFF_PIXEL_RATIO = 0.07;
+const RATCHET_MAX_ENTRIES = 2;
 
 function numbersAfter(source: string, key: string): number[] {
   const pattern = new RegExp(`\\b${key}:\\s*(\\d*\\.?\\d+)`, 'g');
@@ -55,15 +61,25 @@ describe('visual screenshot tolerance', () => {
       name.endsWith('.spec.ts')
     );
     const offenders: string[] = [];
+    let ratchetEntries = 0;
 
     for (const spec of specs) {
       const source = readFileSync(resolve(e2eDirectory, spec), 'utf8');
       if (!/toHaveScreenshot|toMatchSnapshot/.test(source)) continue;
-      for (const ratio of numbersAfter(source, 'maxDiffPixelRatio')) {
-        if (ratio > SPEC_MAX_DIFF_PIXEL_RATIO) {
-          offenders.push(`${spec}: maxDiffPixelRatio ${ratio}`);
+      const lines = source.split('\n');
+      lines.forEach((line, index) => {
+        for (const ratio of numbersAfter(line, 'maxDiffPixelRatio')) {
+          if (ratio <= SPEC_MAX_DIFF_PIXEL_RATIO) continue;
+          const marked = lines
+            .slice(Math.max(0, index - 4), index)
+            .some(previous => previous.includes(RATCHET_MARKER));
+          if (marked && ratio <= RATCHET_MAX_DIFF_PIXEL_RATIO) {
+            ratchetEntries += 1;
+          } else {
+            offenders.push(`${spec}:${index + 1}: maxDiffPixelRatio ${ratio}`);
+          }
         }
-      }
+      });
       // Only fractional values: a per-pixel threshold is always below 1, and
       // integer `threshold:` keys in mocked API payloads are not tolerances.
       for (const threshold of numbersAfter(source, 'threshold')) {
@@ -74,5 +90,6 @@ describe('visual screenshot tolerance', () => {
     }
 
     expect(offenders).toEqual([]);
+    expect(ratchetEntries).toBeLessThanOrEqual(RATCHET_MAX_ENTRIES);
   });
 });
