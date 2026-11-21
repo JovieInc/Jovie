@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from '@/components/feedback';
@@ -56,11 +57,11 @@ export function CopyableField({
         toast.error('Failed to copy');
       }
     },
-    [value, label, showToast]
+    [value, showToast]
   );
 
   return (
-    <button
+    <PlainButton
       type='button'
       onClick={handleCopy}
       className={cn(
@@ -78,7 +79,7 @@ export function CopyableField({
           aria-label={`Copy ${label}`}
         />
       )}
-    </button>
+    </PlainButton>
   );
 }
 

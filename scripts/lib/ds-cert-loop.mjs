@@ -122,8 +122,17 @@ export function verifyOrder(components, report, gates = {}, skipped = {}) {
   const problems = [];
   let done = 0;
   for (const component of components) {
-    if (skipped[component]) continue;
     const cert = byPath.get(component);
+    if (skipped[component]) {
+      // A skipped component that a gate still holds fails the certificate
+      // gate in CI, so a revert must take its gate entry with it.
+      const row = cert && assessCertificate(cert, gates);
+      if (row?.gated && row.failing.length)
+        problems.push(
+          `${component}: skipped but still gated while it fails ${row.failing.join(', ')}; remove its gate entry`
+        );
+      continue;
+    }
     if (!cert) {
       problems.push(`${component}: not found by the certifier`);
       continue;
