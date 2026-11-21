@@ -345,7 +345,10 @@ test('Node contract coverage isolates the original behavior suites and preserves
     const selected = batches.flatMap(args =>
       args.filter(arg => !arg.startsWith('--'))
     );
-    assert.deepEqual([...selected].sort(), [...selection].sort());
+    const expected = selection.flatMap(test =>
+      String(test).split(/\s+/u).filter(Boolean)
+    );
+    assert.deepEqual([...selected].sort(), [...expected].sort());
     for (const args of batches) {
       const tests = args.filter(arg => !arg.startsWith('--'));
       if (args.includes('--experimental-test-coverage')) {
@@ -371,6 +374,24 @@ test('Node contract coverage isolates the original behavior suites and preserves
     );
     assert.equal(SCRIPT_CONTRACT_NODE_COMMAND.split(file).length, 2);
   }
+});
+
+test('scriptContractNodeArgs flattens space-joined catalog entries for spawn', () => {
+  const a = 'scripts/lib/__tests__/wins-store.test.mjs';
+  const b = 'scripts/lib/__tests__/wins-summer-loop.test.mjs';
+  const batches = scriptContractNodeArgs([`${a} ${b}`]);
+  assert.deepEqual(batches, [['--test', a, b]]);
+  // Live catalog uses the same space-join for the wins pair.
+  const catalog = SCRIPT_CONTRACT_NODE_TESTS.find(
+    entry => entry.includes(a) && entry.includes(b)
+  );
+  assert.ok(catalog, 'wins-store + wins-summer-loop catalog entry');
+  const fromCatalog = scriptContractNodeArgs([catalog]);
+  assert.ok(fromCatalog.some(args => args.includes(a) && args.includes(b)));
+  assert.ok(
+    fromCatalog.every(args => args.every(arg => !arg.includes(' '))),
+    'no spawn arg may contain a space (would be a nonexistent path)'
+  );
 });
 
 /** @type {Array<[string, string[]]>} */
