@@ -92,13 +92,15 @@ describe('build-output performance ratchets are wired as blocking steps', () => 
 
 describe('Smooth surface regression ratchet', () => {
   it('ships hermetic --check + planted tests and public baselines', () => {
+    // Assert scripts + JSON baselines only — do not string-assert
+    // docs/performance/smooth/README.md here (JOV-12618 structural-asserted
+    // docs must match structural-control-paths; README is not on that ere).
     for (const file of [
       'apps/web/scripts/performance-smooth-ratchet.ts',
       'apps/web/scripts/performance-smooth-ratchet.test.ts',
       'docs/performance/smooth/baselines/homepage.desktop.json',
       'docs/performance/smooth/baselines/artist-profile.desktop.json',
       'docs/performance/smooth/baselines/summary.json',
-      'docs/performance/smooth/README.md',
     ])
       expect(existsSync(resolve(REPO_ROOT, file)), file).toBe(true);
   });
