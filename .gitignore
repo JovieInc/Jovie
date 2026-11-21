@@ -305,3 +305,14 @@ scripts/copy-inventory/inventory.gen.json
 
 # Focused native titlebar regression suite.
 !apps/desktop/scripts/desktop-titlebar-contract.cases.mjs
+
+# Screenshot binaries live in R2 (jovie-screenshots); git tracks only *.pointer.json.
+# Fetch them with: node scripts/screenshot-store.mjs hydrate
+/apps/web/screenshot-catalog/current/*.png
+/docs/screenshots/**/*.png
+/docs/screenshots/**/*.jpg
+/docs/screenshots/**/*.jpeg
+/docs/screenshots/**/*.webp
+/docs/screenshots/**/*.mp4
+!/docs/screenshots/gem-symphony-hud-430x90.png
+!/docs/screenshots/jov-7878-shell/mobile-history-short.png

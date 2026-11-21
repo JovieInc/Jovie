@@ -1,0 +1,79 @@
+name: Screenshots to R2 upload
+
+# One-time (and repeatable) upload of screenshot binaries to the public,
+# content-addressed R2 bucket that now holds them instead of git. Idempotent:
+# objects already in the store are skipped.
+#
+# Why a push trigger on the migration branch: a workflow_dispatch workflow must
+# exist on the default branch before it can be dispatched, but the migration PR
+# cannot merge until the objects are uploaded (PR Size Guard fails any pointer
+# whose object is missing). A push run uses this file from the branch, so after
+# the secret exists, "Re-run all jobs" on the latest run of this workflow for
+# claude/r2-screenshots uploads everything. After the migration lands, use
+# workflow_dispatch from main.
+#
+# Bytes come from git history (binaries_ref), because the migration commit
+# deletes them from the tree. Every download is verified against its pointer's
+# sha256 before upload.
+#
+# Needs: secret CF_SCREENSHOTS_R2_TOKEN (Cloudflare API token, R2 edit on the
+# jovie-screenshots bucket) and variable CF_ACCOUNT_ID.
+on:
+  push:
+    branches: [claude/r2-screenshots]
+    paths:
+      - '.github/workflows/screenshots-r2-upload.yml'
+      - 'apps/web/screenshot-catalog/pointers/**'
+      - 'docs/screenshots/**/*.pointer.json'
+      - 'scripts/screenshot-store.mjs'
+      - 'scripts/lib/screenshot-store.mjs'
+  workflow_dispatch:
+    inputs:
+      binaries_ref:
+        description: 'Git ref that still holds the binaries (default: the commit the migration branched from)'
+        required: false
+        default: '8c091d12237d4488cac447ada35465da261866a8'
+
+permissions: {}
+
+concurrency:
+  group: screenshots-r2-upload
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    name: Upload screenshots to R2
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CF_SCREENSHOTS_R2_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
+      BINARIES_REF: ${{ inputs.binaries_ref || '8c091d12237d4488cac447ada35465da261866a8' }}
+    steps:
+      - name: Require Cloudflare credentials
+        shell: bash
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Screenshot upload not done: add secret CF_SCREENSHOTS_R2_TOKEN (R2 edit on bucket jovie-screenshots) and variable CF_ACCOUNT_ID, then re-run this workflow."
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+
+      - name: Install wrangler
+        run: npm install --global wrangler@4.45.0
+
+      - name: Upload missing objects (sha256 verified)
+        run: node scripts/screenshot-store.mjs upload --from-git "$BINARIES_REF"
+
+      - name: Verify every pointer's object is in the store
+        run: node scripts/screenshot-store.mjs verify --remote

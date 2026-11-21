@@ -17,6 +17,7 @@ import {
   HYGIENE_LIMITS,
   MAX_GEN_JSON_BYTES,
 } from './lib/repo-hygiene-limits.mjs';
+import { isMovedBinary } from './lib/screenshot-store.mjs';
 
 export { HYGIENE_LIMITS } from './lib/repo-hygiene-limits.mjs';
 
@@ -81,9 +82,11 @@ const BINARY_ALLOWLIST = [
   /^apps\/should-i-make\/public\//,
   /^apps\/web\/assets\//,
   /^apps\/web\/public\//,
-  /^apps\/web\/screenshot-catalog\/current\//,
   /^apps\/web\/tests\/(?:[^/]+\/)*__snapshots__\//,
-  /^docs\/(?:pen-stills|screenshots)\//,
+  /^docs\/pen-stills\//,
+  // docs/screenshots keeps only the two small files in MOVED_BINARY_ALLOWED;
+  // every other image lives in R2 behind a pointer (see below).
+  /^docs\/screenshots\/(?:gem-symphony-hud-430x90\.png|jov-7878-shell\/mobile-history-short\.png)$/,
 ];
 
 const FORBIDDEN_ROOT_DIRECTORIES = new Set([
@@ -676,7 +679,11 @@ export function evaluateRepoHygiene({
       errors.push(`${path}: binary files are not allowed at repository root`);
     if (TEMP_FILE_PATTERN.test(path))
       errors.push(`${path}: temporary/backup files are not tracked`);
-    if (isBinary(path) && !isAllowedBinary(path))
+    if (isMovedBinary(path))
+      errors.push(
+        `${path}: screenshot binaries live in R2, not git. Add a pointer instead: node scripts/screenshot-store.mjs pointers (then commit the *.pointer.json and run the "Screenshots to R2 upload" workflow); see ${HYGIENE_POLICY_DOC}`
+      );
+    else if (isBinary(path) && !isAllowedBinary(path))
       errors.push(
         `${path}: binary addition is outside the allowlisted asset paths`
       );

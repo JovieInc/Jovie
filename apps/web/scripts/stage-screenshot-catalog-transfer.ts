@@ -28,6 +28,7 @@ const execFileAsync = promisify(execFile);
 const SOURCE_DIRECTORIES = [
   'apps/web/public/product-screenshots',
   'apps/web/screenshot-catalog/current',
+  'apps/web/screenshot-catalog/pointers',
 ] as const;
 const PUBLIC_EXPORT_DIRECTORY = SOURCE_DIRECTORIES[0];
 const CATALOG_DIRECTORY = SOURCE_DIRECTORIES[1];

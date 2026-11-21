@@ -28,8 +28,11 @@ async function createFixture() {
   fixtureRoots.push(repoRoot);
   const catalog = join(repoRoot, 'apps/web/screenshot-catalog/current');
   const publicExports = join(repoRoot, 'apps/web/public/product-screenshots');
+  const pointers = join(repoRoot, 'apps/web/screenshot-catalog/pointers');
   await mkdir(catalog, { recursive: true });
+  await mkdir(pointers, { recursive: true });
   await mkdir(publicExports, { recursive: true });
+  await writeFile(join(pointers, 'homepage.png.pointer.json'), '{}\n');
   await writeFile(join(catalog, 'manifest.json'), '{}\n');
   await writeFile(join(catalog, 'homepage.png'), 'catalog-image');
   await writeFile(join(publicExports, 'copied.png'), 'public-image');
@@ -57,7 +60,7 @@ describe('stageScreenshotCatalogTransfer', () => {
     const fixture = await createFixture();
 
     await expect(stageScreenshotCatalogTransfer(fixture)).resolves.toEqual({
-      copiedFiles: 3,
+      copiedFiles: 4,
       skippedTrackedSymlinks: 1,
     });
     await expect(
@@ -69,6 +72,15 @@ describe('stageScreenshotCatalogTransfer', () => {
         'utf8'
       )
     ).resolves.toBe('catalog-image');
+    await expect(
+      readFile(
+        join(
+          fixture.outputDirectory,
+          'apps/web/screenshot-catalog/pointers/homepage.png.pointer.json'
+        ),
+        'utf8'
+      )
+    ).resolves.toBe('{}\n');
     await expect(
       readFile(
         join(

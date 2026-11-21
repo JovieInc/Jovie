@@ -414,6 +414,7 @@ jobs:
           if git diff --quiet "$PR_DIFF_BASE" HEAD -- \
             apps/web/lib/screenshots/ \
             apps/web/screenshot-catalog/current/ \
+            apps/web/screenshot-catalog/pointers/ \
             apps/web/public/product-screenshots/ \
             'apps/web/scripts/check-screenshot-catalog*.ts'; then
             echo "required=false" >> "$GITHUB_OUTPUT"
@@ -422,6 +423,33 @@ jobs:
             [[ "$status" -eq 1 ]] || exit "$status"
             echo "required=true" >> "$GITHUB_OUTPUT"
           fi
+
+      # Screenshot binaries are not in git. A PR that adds or changes a pointer
+      # must not go green (or merge) until every object is in the public R2
+      # store, otherwise live product screenshots would 404. Fails with an
+      # "upload not done" message until the upload workflow has run. The script
+      # has no dependencies, so it needs no pnpm install.
+      - name: Detect screenshot pointer changes
+        id: screenshot-pointers
+        env:
+          PR_DIFF_BASE: ${{ steps.pr-merge-base.outputs.sha }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet "$PR_DIFF_BASE" HEAD -- \
+            apps/web/screenshot-catalog/pointers/ \
+            'docs/screenshots/**/*.pointer.json' \
+            scripts/lib/screenshot-store.mjs \
+            scripts/screenshot-store.mjs; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            status=$?
+            [[ "$status" -eq 1 ]] || exit "$status"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Require screenshot objects in R2
+        if: steps.screenshot-pointers.outputs.changed == 'true'
+        run: node scripts/screenshot-store.mjs verify --remote
 
       - name: Set up Node and pnpm for screenshot integrity
         if: steps.screenshot-integrity.outputs.required == 'true'

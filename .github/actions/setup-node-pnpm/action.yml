@@ -318,3 +318,13 @@ runs:
           packages/*/node_modules
           workers/*/node_modules
         key: ${{ steps.node-modules-cache.outputs.cache-primary-key }}
+
+    # Screenshot binaries live in R2 (public-read, content-addressed); git holds
+    # only *.pointer.json. Fetch and sha256-verify them so tests and builds that
+    # read the catalog or docs/screenshots see the real images. Needs no secret
+    # and no node_modules. A failure is a warning here: jobs that never read the
+    # images should not fail on a store outage, and jobs that do will fail on the
+    # missing file with the hydrate error above it.
+    - name: Hydrate screenshot binaries (R2)
+      shell: bash
+      run: node scripts/screenshot-store.mjs hydrate || echo "::warning::Screenshot hydrate failed; jobs that read catalog or docs/screenshots images will fail."
