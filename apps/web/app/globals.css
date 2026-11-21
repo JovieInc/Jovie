@@ -1644,9 +1644,9 @@ body {
 }
 
 /* Native popover entry for marketing glass flyouts lives in HeaderNav.css
-   (scoped `.marketing-glass-header__flyout[popover]`). A root `[popover]`
-   rule here regressed /start LCP under the signed-in Lighthouse relative
-   gate (JOV-14244 / merge-group-breaker). */
+   (scoped to that owner’s flyout panel). A root `[popover]` rule here
+   regressed /start LCP under the signed-in Lighthouse relative gate
+   (JOV-14244 / merge-group-breaker). */
 
 /* scrollbar-hide - MIGRATED TO PLUGIN
    Now in lib/tailwind/utilities-plugin.js */
