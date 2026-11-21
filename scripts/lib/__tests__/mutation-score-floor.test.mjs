@@ -27,9 +27,9 @@ const MEASURED = {
     runId: 39691992741,
   },
   'app/api/webhooks/stripe-merch/route.ts': {
-    measured: 39.4,
-    valid: 104,
-    runId: 39691992741,
+    measured: 63.4,
+    valid: 101,
+    runId: 21112026005,
   },
   'app/api/webhooks/stripe-tips/route.ts': {
     measured: 58.4,

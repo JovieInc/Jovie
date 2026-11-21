@@ -1001,21 +1001,20 @@ describe('invariant-scanned structural selection', () => {
     expect(plan.runJovieProduct).toBe(false);
   });
 
-  it('routes every feedback inventory and linked guard edit through invariants', async () => {
-    const paths = new Set([
+  it.each([
+    ...new Set([
       'LESSONS.md',
       'LESSONS.guards.json',
       ...readFeedbackGuardPaths(),
-    ]);
-    for (const path of paths) {
-      expect(isInvariantScannedPath(path), path).toBe(true);
-      const { execute } = await runFor(
-        'pull_request',
-        [path],
-        classifyProductLanes([path]).selectedLanes
-      );
-      expect(invariantRuns(execute), path).toBe(1);
-    }
+    ]),
+  ])('routes feedback input %s through invariants', async path => {
+    expect(isInvariantScannedPath(path), path).toBe(true);
+    const { execute } = await runFor(
+      'pull_request',
+      [path],
+      classifyProductLanes([path]).selectedLanes
+    );
+    expect(invariantRuns(execute), path).toBe(1);
   });
 
   it('classifies every scanned path into a lane that reaches structural', () => {

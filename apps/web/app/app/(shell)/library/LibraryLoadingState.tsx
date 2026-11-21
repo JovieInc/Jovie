@@ -151,9 +151,9 @@ export const LIBRARY_CATALOG_SKELETON_COLUMNS = [
   {
     id: 'type',
     header: 'Type',
-    size: 120,
+    size: 112,
     minSize: 96,
-    meta: { className: 'pl-2 pr-3', priority: 6, minWidth: 120 },
+    meta: { className: 'pl-2 pr-3', priority: 6, minWidth: 112 },
   },
   {
     id: 'length',
