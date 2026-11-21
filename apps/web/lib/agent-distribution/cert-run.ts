@@ -1,11 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import {
+  CERT_DEFAULT_ARTIST_URL,
+  CERT_DEFAULT_RELEASE_METADATA,
+  type CertReleaseMetadata,
+} from './cert-fixtures';
+import {
   findKey,
   isRateLimited,
   latencyByTool,
   parseMcpBody,
-  REQUIRED_OUTCOME_CHECKS,
 } from './cert-helpers';
+import { exerciseClaimOutcomes } from './cert-outcomes';
 import { hashTools } from './hash';
 
 export type CertStatus = 'PASS' | 'FAIL' | 'RATE_LIMITED' | 'SKIP';
@@ -18,10 +23,14 @@ export interface CertCheck {
 export interface CertOptions {
   readonly base: string;
   readonly query: string;
-  readonly releaseUrl: string;
+  /** Optional release URL; omit when releaseMetadata alone is enough. */
+  readonly releaseUrl?: string;
+  /** Matching release facts so prepare_launch can reach launch_draft_ready. */
+  readonly releaseMetadata?: CertReleaseMetadata;
   readonly fetchImpl?: typeof fetch;
   readonly run?: string;
   readonly now?: () => Date;
+  readonly env?: Readonly<Record<string, string | undefined>>;
 }
 
 export function normalizeBase(base: string): string {
@@ -33,9 +42,12 @@ export function normalizeBase(base: string): string {
 export async function runCert(opts: CertOptions) {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const BASE = normalizeBase(opts.base);
-  const QUERY = opts.query;
+  const QUERY = opts.query || CERT_DEFAULT_ARTIST_URL;
   const RELEASE_URL = opts.releaseUrl;
+  const RELEASE_METADATA =
+    opts.releaseMetadata ?? CERT_DEFAULT_RELEASE_METADATA;
   const RUN = opts.run ?? `cert-${randomUUID().slice(0, 10)}`;
+  const ORIGIN = new URL(BASE).origin;
   const ACQ = {
     agent_source: 'jovie-cert-harness',
     client: 'harness/0.2',
@@ -258,17 +270,23 @@ export async function runCert(opts: CertOptions) {
       );
 
     if (draftId && token && !abortIfLimited()) {
-      const prep = await call('release.prepare_launch', {
+      const prepArgs: Record<string, unknown> = {
         draft_id: draftId,
         draft_token: token,
-        release_url: RELEASE_URL,
+        release_metadata: RELEASE_METADATA,
         goal: 'Set up a release page and smart link for my latest single',
-      });
+      };
+      if (RELEASE_URL) prepArgs.release_url = RELEASE_URL;
+      const prep = await call('release.prepare_launch', prepArgs);
       const prepStatus = str(findKey(prep.data, ['status']));
       record(
         'prepare_launch with release_url succeeds',
         !prep.rejected && prepStatus === 'launch_draft_ready',
-        { status: prepStatus },
+        {
+          status: prepStatus,
+          questions: findKey(prep.data, ['questions']),
+          missing_fields: findKey(prep.data, ['missing_fields']),
+        },
         prep.ms
       );
       claimUrl = claimUrl ?? str(findKey(prep.data, ['claim_url']));
@@ -310,12 +328,15 @@ export async function runCert(opts: CertOptions) {
         'no claim_url in create_draft or prepare_launch (JOV-9760)'
       );
 
-    // The current RPC probe has no authenticated claim, persisted profile/release/
-    // smart-link/attribution readback, or run-owned fixture cleanup. Keep that
-    // missing evidence explicit until the isolated claim harness supplies it.
-    // Do not turn a 200 error/sign-in page into an outcome receipt.
-    for (const check of REQUIRED_OUTCOME_CHECKS)
-      skip(check, 'not exercised by this RPC probe; see JOV-9760');
+    // JOV-9760 creator outcomes: never promote claim_url 200 into a claim.
+    for (const outcome of await exerciseClaimOutcomes({
+      origin: ORIGIN,
+      run: RUN,
+      draftId,
+      claimUrl,
+      env: opts.env,
+    }))
+      checks.push(outcome);
 
     if (!abortIfLimited()) {
       const empty = await call('artist.search_or_import', {
