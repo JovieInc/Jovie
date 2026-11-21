@@ -1,5 +1,4 @@
 import { pathToFileURL } from 'node:url';
-import { react } from './tests/vitest-catalog-image-stub';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
@@ -8,6 +7,7 @@ import {
   type TestProjectInlineConfiguration,
 } from 'vitest/config';
 import DurationShardSequencer from './scripts/vitest-duration-sequencer.mjs';
+import { react } from './tests/vitest-catalog-image-stub';
 
 // Resolve the real filesystem path (handles Windows short-name paths like TIMWHI~1)
 // so that Vite's @fs handler can locate files when the path contains spaces.

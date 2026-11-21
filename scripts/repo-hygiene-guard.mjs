@@ -11,13 +11,13 @@ import {
 import { extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { validateControllerHopChanges } from './invariants/controller-hop-contract.mjs';
+import { binaryAdditionError, isMovedBinary } from './lib/moved-binary.mjs';
 import { findOrphanReviewImages } from './lib/orphan-screenshot-guard.mjs';
 import {
   GEN_JSON_SIZE_ALLOWLIST,
   HYGIENE_LIMITS,
   MAX_GEN_JSON_BYTES,
 } from './lib/repo-hygiene-limits.mjs';
-import { binaryAdditionError, isMovedBinary } from './lib/moved-binary.mjs';
 
 export { HYGIENE_LIMITS } from './lib/repo-hygiene-limits.mjs';
 
