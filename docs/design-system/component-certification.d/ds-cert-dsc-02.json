@@ -1,0 +1,62 @@
+{
+  "gates": {
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/FilterSubmenu.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseFilterDropdown.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/youtube/YouTubeChannelPilotPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/TestimonialCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/onboarding/OnboardingTurnstile.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/FilterSubmenu.tsx": {
+      "permission-denied": "The submenu has no role or plan gating; the parent menu decides whether it renders through isVisible."
+    },
+    "apps/web/components/features/dashboard/youtube/YouTubeChannelPilotPanel.tsx": {
+      "offline": "The panel renders server-provided workspace data and never fetches; sync freshness shows through the last-sync copy."
+    },
+    "apps/web/components/features/onboarding/OnboardingTurnstile.tsx": {
+      "error": "Hard failures surface through onStateChange to the OnboardingShell toast; the widget host renders no inline error UI.",
+      "offline": "The host never fetches; Cloudflare's script owns network failure and reports it through onStateChange.",
+      "permission-denied": "The widget has no role or plan gating."
+    }
+  }
+}

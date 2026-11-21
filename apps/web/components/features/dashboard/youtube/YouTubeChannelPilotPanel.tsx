@@ -102,7 +102,7 @@ export function YouTubeChannelPilotPanel({
             <ContentSurfaceCard className='p-4'>
               <div className='flex flex-wrap items-start justify-between gap-3'>
                 <div>
-                  <p className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
+                  <p className='text-2xs font-medium tracking-wide text-tertiary-token'>
                     Authorized Channel
                   </p>
                   <h1 className='mt-1 font-mono text-app text-primary-token'>
