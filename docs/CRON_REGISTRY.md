@@ -65,6 +65,7 @@ Retired with Hermes (2026-09-05); the registry records them as `retired` with ar
 |------|----------|---------|--------|
 | `co.jovie.hermes.cron-pipeline-scoreboard` | retired | Hard-exits with `retired_linear_only` before reading or publishing historical GitHub-Issue funnel counts. The Linear-primary Gem HUD retains PR/Actions delivery reporting and fails closed when Linear backlog data is unavailable. | `symphony-control/jobs/pipeline-scoreboard.ts` |
 | `co.jovie.hermes.cron-gbrain-health-summary` | 07:15 local daily | Verifies the Tailscale-bound HTTP health endpoint, source freshness, and that exactly one server is running; retains `gbrain doctor` as an advisory diagnostic, writes `ops/gbrain-health/latest`, and posts the summary to Telegram/Slack. | `symphony-control/jobs/gbrain-health-summary.ts` |
+| `jovie.gbrain-compounding.health-claims` | After health summary (same host); `workflow_dispatch` verify only | Compounds the health digest into durable claim pages under `ops/gbrain-health/claims/*` with put+read-back; exits 0 with explicit `needs-probe` / `gbrain-unavailable` when the CLI is missing. No new GitHub cron (JOV-INV-042). | `scripts/gbrain-compounding/run.mjs` |
 
 ## Local Symphony Host Schedule
 
