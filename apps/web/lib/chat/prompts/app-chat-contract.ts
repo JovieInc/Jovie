@@ -34,7 +34,7 @@ export function checkAppChatPromptContract(prompt: string) {
     ),
     requiresDraftHoldOutbound: includesAll(
       'Draft every outbound artifact',
-      'Hold for the artist\'s one-tap yes',
+      "Hold for the artist's one-tap yes",
       'Never send, post, schedule, pitch live, or spend money'
     ),
     keepsGroundingToPromptOrTools: includesAll(

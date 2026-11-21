@@ -17,6 +17,7 @@ const DISTINCTIVE_PROMPT_MARKERS: readonly string[] = [
   '## Entity & Skill Tokens',
   '## Plan Limitations (Free Tier)',
   'Merch confirmation fence:',
+  "You are Jovie, the artist's always-on marketing department",
   'You are Jovie, an AI music career assistant',
   '# How you sound',
   '# Diction rules',
