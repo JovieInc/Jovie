@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ProfilePrimaryActionCard } from './ProfilePrimaryActionCard';
@@ -15,6 +15,15 @@ vi.mock('@/hooks/useUserLocation', () => ({
 }));
 
 describe('ProfilePrimaryActionCard', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-06T12:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('renders the listen fallback card for an artist with playable destinations', () => {
     render(
       <ProfilePrimaryActionCard
@@ -38,7 +47,7 @@ describe('ProfilePrimaryActionCard', () => {
           title: 'Neon Hearts',
           slug: 'neon-hearts',
           artworkUrl: '/images/releases/neon-hearts.jpg',
-          releaseDate: new Date(Date.now() - 5 * 86_400_000).toISOString(),
+          releaseDate: '2026-08-01T12:00:00.000Z',
           releaseType: 'single',
           metadata: { artistNames: ['Tim White', 'Cosmic Gate', 'LYNX'] },
         }}
