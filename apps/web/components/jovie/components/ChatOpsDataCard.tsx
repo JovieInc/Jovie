@@ -28,6 +28,11 @@ function formatObservedAt(observedAt: string | null): string | null {
   });
 }
 
+function formatKindLabel(kind: string): string {
+  const label = kind.replaceAll('-', ' ');
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
 function seriesMax(card: SummerOpsCard): number {
   return Math.max(1, ...(card.series?.points.map(point => point.value) ?? []));
 }
@@ -63,8 +68,8 @@ export function ChatOpsDataCard({ card, summary }: ChatOpsDataCardProps) {
               <Activity className='h-3.5 w-3.5' strokeWidth={2} />
             </div>
             <div className='min-w-0'>
-              <p className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
-                {card.kind.replaceAll('-', ' ')}
+              <p className='text-2xs font-medium tracking-wide text-tertiary-token'>
+                {formatKindLabel(card.kind)}
               </p>
               <p className='mt-0.5 text-sm font-semibold leading-5 text-primary-token'>
                 {card.title}

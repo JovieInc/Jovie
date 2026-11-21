@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import Link from 'next/link';
 import type { CSSProperties, MouseEvent, ReactNode } from 'react';
 import {
@@ -171,9 +172,9 @@ function EntityCtaControl({
   }
 
   return (
-    <button type='button' onClick={cta.onClick} className={className}>
+    <PlainButton type='button' onClick={cta.onClick} className={className}>
       {cta?.label || 'Action'}
-    </button>
+    </PlainButton>
   );
 }
 
@@ -368,7 +369,7 @@ export function EntityCard({
             // guaranteed-opaque well underneath rather than a token bump
             // (JOV-INV-019 image-contrast).
             <div className='flex flex-col items-center justify-center rounded-lg bg-surface-0 px-4 py-3 text-primary-token'>
-              <span className='text-2xs font-semibold uppercase tracking-[0.12em] text-primary-token'>
+              <span className='text-2xs font-semibold tracking-wide text-primary-token'>
                 {model.datePill.month}
               </span>
               <span className='text-[34px] font-bold leading-none tracking-tighter tabular-nums'>

@@ -107,7 +107,7 @@ export const LoadingFacts: Story = {
   args: { certification: null, certificationLoading: true },
 };
 
-export const DecisionFailed: Story = {
+export const ErrorDecisionFailed: Story = {
   args: {
     certification: certification('certified_for_outreach'),
     pending: null,
@@ -284,5 +284,29 @@ export const LongProfilePath: Story = {
       profilePath: '/' + 'w'.repeat(30),
       handle: 'w'.repeat(30),
     }),
+  },
+};
+
+export const OfflineSaveFailed: Story = {
+  args: {
+    certification: certification('certified_for_outreach'),
+    activeFactKey: null,
+    error: 'You are offline. Your draft was not saved.',
+  },
+};
+
+export const RtlSubjectAndBody: Story = {
+  args: {
+    row: outboundFixtureRow({
+      name: 'عدا',
+      message: {
+        channel: 'email',
+        subject: 'صفحتك على جووفي جاهزة',
+        body: 'مرحبا عدا، صفحتك جاهزة للمراجعة.',
+        revision: null,
+      },
+    }),
+    certification: certification('certified_for_outreach'),
+    activeFactKey: null,
   },
 };
