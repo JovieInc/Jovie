@@ -1,8 +1,8 @@
 // @coverage-via apps/web/tests/unit/home/homepage-contract.test.tsx
+import { Button, Input } from '@jovie/ui';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, type ReactNode } from 'react';
-import { HomepageClaimEntryForm } from '@/app/(marketing)/home/HomepageClaimEntryForm';
 import { WaitlistRoleForm } from '@/components/features/waitlist/WaitlistRoleForm';
 import { HomepageProfilePhone } from '@/components/homepage/HomepageProfilePhone';
 import {
@@ -16,6 +16,10 @@ import {
   resolveHomepageHeroPrimaryAction,
 } from '@/data/homepageStartCta';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import {
+  CLAIM_PROFILE_STARTER_PROMPT,
+  getClaimProfileIntent,
+} from '@/data/marketingCtaIntents';
 import { HOME_SPEC } from './v3/home-spec';
 import { Orbit } from './v3/Orbit';
 import { AppWindow, CatalogPlate } from './v3/ProductUi';
@@ -318,6 +322,7 @@ export function HomepageReleasesChapter({
  */
 function ClaimCloseBody() {
   const claim = COPY.claim;
+  const intent = getClaimProfileIntent();
   return (
     <>
       <ChapterRule index='04' label={claim.chapter} />
@@ -325,7 +330,44 @@ function ClaimCloseBody() {
         <h2 className='hv3-statement text-balance'>{lines(claim.headline)}</h2>
         <p className='hv3-lede hv3-lede--center'>{claim.subhead}</p>
         <div className='hv3-form'>
-          <HomepageClaimEntryForm />
+          {/*
+            Native GET: valid handles keep handle=. Display names fail the
+            pattern (reject) so handle=Taylor+Swift never lands. /start also
+            rewrites any poisoned claim+display-name URL to a Spotify search
+            prior (JOV-10127 entry hygiene).
+          */}
+          <form
+            method='get'
+            action={intent.href}
+            data-testid='homepage-claim-entry'
+            className='hv3-claim'
+          >
+            <Input
+              type='hidden'
+              name='starter_prompt'
+              value={CLAIM_PROFILE_STARTER_PROMPT}
+            />
+            <label
+              className='hv3-claim__label'
+              htmlFor='homepage-claim-entry-handle'
+            >
+              {claim.handleLabel}
+            </label>
+            <Input
+              id='homepage-claim-entry-handle'
+              name='handle'
+              type='text'
+              autoComplete='off'
+              spellCheck={false}
+              maxLength={30}
+              placeholder={claim.handlePlaceholder}
+              aria-label={claim.handleLabel}
+              pattern='[A-Za-z0-9._-]{3,30}'
+            />
+            <Button type='submit' data-testid='homepage-close-cta'>
+              {intent.label}
+            </Button>
+          </form>
         </div>
         <Steps steps={claim.steps} />
       </div>

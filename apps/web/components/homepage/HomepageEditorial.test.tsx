@@ -138,8 +138,10 @@ describe('HomepageEditorial chapters', () => {
       'action',
       claim.href
     );
-    // JOV-10127 entry hygiene: display names must not become handle= (form
-    // owns the handoff; this asserts the close still mounts the claim field).
+    // JOV-10127: native pattern rejects display-name handle= (Taylor Swift).
+    expect(
+      within(section).getByRole('textbox', { name: 'Your handle' })
+    ).toHaveAttribute('pattern', '[A-Za-z0-9._-]{3,30}');
     expect(
       within(section).getByRole('textbox', { name: 'Your handle' })
     ).toHaveAttribute('placeholder', COPY.claim.handlePlaceholder);

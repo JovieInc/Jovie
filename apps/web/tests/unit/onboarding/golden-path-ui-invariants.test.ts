@@ -248,13 +248,13 @@ describe('Golden Path UI & UX closed-loop invariants', () => {
     const editorialSource = readWebSource(
       'components/homepage/HomepageEditorial.tsx'
     );
-    const claimEntrySource = readWebSource(
-      'app/(marketing)/home/HomepageClaimEntryForm.tsx'
-    );
     expect(editorialSource).not.toMatch(/href=['"]\/start['"]/);
-    expect(editorialSource).toContain('HomepageClaimEntryForm');
-    expect(claimEntrySource).toMatch(
+    expect(editorialSource).toMatch(
       /type=['"]hidden['"][\s\S]{0,120}?name=['"]starter_prompt['"][\s\S]{0,120}?value=\{CLAIM_PROFILE_STARTER_PROMPT\}/
+    );
+    // JOV-10127: reject display-name handle= on the native close form.
+    expect(editorialSource).toMatch(
+      /pattern=['"]\[A-Za-z0-9\._-\]\{3,30\}['"]/
     );
   });
 
