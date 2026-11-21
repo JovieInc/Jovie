@@ -103,8 +103,6 @@
     "apps/web/components/organisms/CmdKPalette.tsx": "a11y,ds-owner,frontend-rules,states",
     "apps/web/components/organisms/PaySection.tsx": "ds-owner,states",
     "apps/web/components/organisms/UnifiedSidebar.tsx": "a11y,ds-owner,states,tests",
-    "apps/web/components/shell/HeaderSearchSurfaceFromContext.tsx": "a11y,ds-owner,states",
-    "apps/web/components/shell/IconBtn.tsx": "a11y,ds-owner,states",
     "apps/web/components/shell/ScrubGradient.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens"
   }
 }

@@ -45,3 +45,14 @@ describe('DropDateChip', () => {
     ).not.toContain('bg-accent/10');
   });
 });
+
+describe('DropDateChip accent-text token', () => {
+  it('tints the soon calendar icon with accent-text and no cyan palette class', () => {
+    const { container } = render(
+      <DropDateChip label='Drops in 4 days' tone='soon' />
+    );
+    const icon = container.querySelector('svg');
+    expect(icon).toHaveClass('text-accent-text/80');
+    expect(container.innerHTML).not.toContain('cyan-');
+  });
+});
