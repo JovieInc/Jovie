@@ -98,10 +98,15 @@ jobs:
           apps/ios/scripts/validate-testflight-artifact.test.mjs \
           apps/ios/scripts/validate-distribution-capabilities.test.mjs \
           apps/ios/scripts/settings-style-guard.test.mjs \
-          .github/scripts/testflight-release-lease.test.mjs
+          .github/scripts/testflight-release-lease.test.mjs \
+          scripts/ios-xcode-pin.test.mjs \
+          scripts/ios-beta-lanes.test.mjs
 
       - name: Ensure iOS local configuration exists
         run: bash apps/ios/scripts/ensure-configuration.sh
+
+      - name: Pin Xcode 27.1
+        run: bash .github/scripts/pin-xcode-27.sh
 
       - name: Show Xcode version
         id: xcode-version

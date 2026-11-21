@@ -30,6 +30,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Pin Xcode 27.1
+        run: bash .github/scripts/pin-xcode-27.sh
+
       - name: Show Xcode version
         run: xcodebuild -version
 
