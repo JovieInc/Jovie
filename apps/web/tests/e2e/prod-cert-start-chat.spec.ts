@@ -218,9 +218,7 @@ test('anonymous /start reaches a real catalog preview on production', async ({
           .first()
       ).toBeVisible({ timeout: 60_000 });
       const rail = page
-        .locator(
-          '[data-testid="onboarding-profile-rail"], [data-testid="onboarding-profile-rail-inline"]'
-        )
+        .locator('[data-testid="onboarding-profile-rail"]')
         .filter({ visible: true })
         .first();
       const expectedMinReleases =
@@ -255,24 +253,24 @@ test('anonymous /start reaches a real catalog preview on production', async ({
       await expectRequiredFieldsPainted(rail);
       await expectNoForcedCaps(page.locator('main'));
 
-      // The same preview on a phone: the inline rail in the conversation must
-      // be just as real as the desktop side rail.
+      // JOV-14243: on 390 the full phone preview collapses to a peek strip
+      // above the keyboard so inputs are never pushed. Catalog truth stays
+      // on the desktop side rail above; the peek only asserts identity.
       const desktopViewport = page.viewportSize();
       await page.setViewportSize(PHONE_VIEWPORT);
       try {
-        const phoneRail = page
-          .getByTestId('onboarding-profile-rail-inline')
+        await expect(
+          page.getByTestId('onboarding-profile-rail-inline')
+        ).toHaveCount(0);
+        const peekStrip = page
+          .getByTestId('onboarding-profile-peek-strip')
           .filter({ visible: true })
           .first();
         await expect(
-          phoneRail,
-          'phone showed no inline preview of the draft profile'
+          peekStrip,
+          'phone showed no peek strip for the draft profile'
         ).toBeVisible({ timeout: 15_000 });
-        await phoneRail.scrollIntoViewIfNeeded();
-        if (releases > 0) {
-          await expectPreviewMediaPainted(phoneRail);
-        }
-        await expectRequiredFieldsPainted(phoneRail);
+        await expect(peekStrip.getByText('Preview')).toBeVisible();
         await expectNoForcedCaps(page.locator('main'));
       } finally {
         if (desktopViewport) await page.setViewportSize(desktopViewport);

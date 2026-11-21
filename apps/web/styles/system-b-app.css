@@ -59,6 +59,10 @@
    SYSTEM B ONBOARDING V2 PRIMITIVES
    ============================================ */
 
+:where(.system-b-onboarding-frame) {
+  color-scheme: dark;
+}
+
 :where(.system-b-onboarding-flat-panel) {
   border-bottom: 1px solid
     color-mix(in oklab, var(--system-b-app-frame-seam) 72%, transparent);
@@ -132,6 +136,115 @@
   font-size: var(--text-sm);
   font-weight: var(--font-weight-semibold);
   line-height: 1.4;
+}
+
+/* Quiet /start step rail (JOV-14243). Active label readable; done contracts. */
+:where(.system-b-onboarding-step-rail) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+  padding-bottom: var(--space-2);
+}
+
+:where(.system-b-onboarding-step-rail-list) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+:where(.system-b-onboarding-step-rail-item[data-status="todo"])
+  .system-b-onboarding-step-rail-label {
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+:where(.system-b-onboarding-step-rail-item[data-status="done"])
+  .system-b-onboarding-step-rail-label {
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+:where(.system-b-onboarding-step-rail-item[data-status="active"])
+  .system-b-onboarding-step-rail-label {
+  color: var(--color-text-primary-token);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+}
+
+:where(.system-b-onboarding-step-rail-hint) {
+  margin: 0;
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+/* 390 peek strip above the keyboard: fixed height, never pushes inputs. */
+:where(.system-b-onboarding-profile-peek) {
+  max-height: 2.75rem;
+  overflow: hidden;
+}
+
+:where(.system-b-onboarding-profile-peek-inner) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+  padding: var(--space-1) var(--space-1-5);
+  border: 1px solid
+    color-mix(in oklab, var(--app-shell-border) 70%, transparent);
+  border-radius: var(--radius-xl);
+  background: color-mix(
+    in oklab,
+    var(--app-shell-content-surface) 92%,
+    transparent
+  );
+}
+
+:where(.system-b-onboarding-profile-peek-avatar) {
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  object-fit: cover;
+}
+
+:where(.system-b-onboarding-profile-peek-avatar-empty) {
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-subtle);
+}
+
+:where(.system-b-onboarding-profile-peek-copy) {
+  flex: 1;
+  min-width: 0;
+}
+
+:where(.system-b-onboarding-profile-peek-name) {
+  margin: 0;
+  color: var(--color-text-primary-token);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+}
+
+:where(.system-b-onboarding-profile-peek-handle) {
+  margin: 0;
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-2xs);
+  line-height: 1.2;
+}
+
+:where(.system-b-onboarding-profile-peek-badge) {
+  flex-shrink: 0;
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
 }
 
 /* JOV-12045: the side rail's phone preview must fit the rail at rest. The
