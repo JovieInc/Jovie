@@ -67,14 +67,15 @@ describe('ShareableLinkRow', () => {
     );
   });
 
-  it('keeps table density copy/open targets on the 24px icon-button step', () => {
+  it('keeps table density copy/open on the sm step for 14px glyphs', () => {
+    // Pre-migration table glyphs were h-3.5; xs [&_svg] would force 12px.
+    // sm = 28px chrome + 14px glyph inside the h-8 table row.
     render(
       <ShareableLinkRow url='https://jov.ie/tim' density='table' testId='row' />
     );
-    expect(screen.getByRole('button', { name: 'Copy link' })).toHaveClass(
-      'h-6',
-      'w-6'
-    );
+    const copy = screen.getByRole('button', { name: 'Copy link' });
+    expect(copy).toHaveClass('h-7', 'w-7');
+    expect(copy.className).toContain('[&_svg]:h-3.5');
   });
 
   it('locks rail density to the 32px desktop control contract', () => {
