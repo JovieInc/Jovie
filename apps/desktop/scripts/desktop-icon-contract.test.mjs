@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { access, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -36,12 +35,6 @@ const ICON_SIZE = 512;
 
 async function pngMetadata(filePath) {
   return sharp(filePath).metadata();
-}
-
-async function sha256(filePath) {
-  return createHash('sha256')
-    .update(await readFile(filePath))
-    .digest('hex');
 }
 
 async function assertBlackCorners(filePath) {
