@@ -219,10 +219,12 @@ export async function pageSummerForFreshness(input) {
   const lines = pageable.map(
     m => `- \`${m.channel}\` \`${m.code}\`: ${m.reason}`
   );
-  const codes = pageable.map(m => m.code).join(', ');
+  // Title stays stable across updates: upsertLinearIssueByTitleFingerprint only
+  // refreshes description (not title) on reuse, and fingerprint dedupe keys on
+  // the title containing ARTIFACT_FRESHNESS_KEY. Variable codes live in the body.
   const result = await upsert({
     fingerprint: ARTIFACT_FRESHNESS_KEY,
-    title: `[${ARTIFACT_FRESHNESS_KEY}] Desktop stage mismatch: ${codes}`,
+    title: `[${ARTIFACT_FRESHNESS_KEY}] Desktop stage mismatch`,
     description: [
       'Automated artifact freshness graph (JOV-5368).',
       '',

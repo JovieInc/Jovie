@@ -153,8 +153,14 @@ test('pageSummerForFreshness puts stable fingerprint in title and labelKey', asy
   assert.equal(calls.length, 1);
   assert.equal(calls[0].fingerprint, ARTIFACT_FRESHNESS_KEY);
   assert.equal(calls[0].labelKey, ARTIFACT_FRESHNESS_KEY);
-  assert.match(calls[0].title, new RegExp(`\\[${ARTIFACT_FRESHNESS_KEY}\\]`));
-  assert.match(calls[0].title, new RegExp(ARTIFACT_FRESHNESS_KEY));
+  assert.equal(
+    calls[0].title,
+    `[${ARTIFACT_FRESHNESS_KEY}] Desktop stage mismatch`
+  );
+  // Codes stay in the description so reused issues never show a stale title
+  // (upsert updates description only).
+  assert.doesNotMatch(calls[0].title, /publication-unverified|certified-/);
+  assert.match(calls[0].description, /publication-unverified/);
   assert.match(calls[0].description, /feed digest mismatch/);
 });
 
