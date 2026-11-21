@@ -42,7 +42,7 @@ import {
   PEN_NODE_OPTIONS,
   writeCanonical,
 } from './pen-draft.mjs';
-import { frameFromArtifactName } from './pen-draft-frames.mjs';
+import { collectFrames, frameFromArtifactName } from './pen-draft-frames.mjs';
 
 export const PICTURE_SCHEMA = 'jovie.pen-draft-picture/v1';
 export const PICTURE_PREFIX = 'PEN_DRAFT_PICTURE ';
@@ -137,9 +137,19 @@ function draftPens(dir) {
     .sort((a, b) => a.frame.localeCompare(b.frame));
 }
 
-/** The frames under `dir` to render: CI gives each its own job. */
+/**
+ * The frames under `dir` CI gives a render job: every draft that left a .pen,
+ * and every frame deferred for want of model quota (JOV-12708). A deferred
+ * frame renders nothing — it has no .pen — but its receipt rides the same
+ * artifact path to the publish step, which explains it on Linear.
+ */
 export function planFrames(dir) {
-  return draftPens(dir).map(draft => draft.frame);
+  const deferred = collectFrames(dir)
+    .filter(entry => entry.deferred)
+    .map(entry => entry.frame);
+  return [
+    ...new Set([...draftPens(dir).map(draft => draft.frame), ...deferred]),
+  ].sort();
 }
 
 /**

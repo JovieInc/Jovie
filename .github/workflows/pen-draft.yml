@@ -19,6 +19,7 @@ on:
     paths:
       - 'docs/design-system/pen-briefs/**'
       - 'scripts/design/pen-draft.mjs'
+      - 'scripts/design/pen-draft-quota.mjs'
       - 'scripts/design/pen-trim.mjs'
       - '.github/workflows/pen-draft.yml'
   # A brief change drafts on its own PR too, so the frames are in review
@@ -28,6 +29,7 @@ on:
     paths:
       - 'docs/design-system/pen-briefs/**'
       - 'scripts/design/pen-draft.mjs'
+      - 'scripts/design/pen-draft-quota.mjs'
       - 'scripts/design/pen-trim.mjs'
       - '.github/workflows/pen-draft.yml'
   workflow_dispatch:

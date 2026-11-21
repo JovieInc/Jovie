@@ -22,7 +22,7 @@ const PNG_SIGNATURE = Buffer.from([
 /**
  * @typedef {{ok: false, reason: string, detail?: string}} Failure
  * @typedef {{ok: true, bytes: Buffer}} Picture
- * @typedef {{artifact: string, frame: string, png: string | null, sidecar: string | null}} FrameEntry
+ * @typedef {{artifact: string, frame: string, png: string | null, sidecar: string | null, deferred: {reason: string, reset: string | null, detail: string | null} | null}} FrameEntry
  */
 
 const FRAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -44,6 +44,27 @@ export function pngSize(bytes) {
   )
     return null;
   return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+}
+
+/**
+ * The frame's deferral from its draft receipt: the drafting agent was out of
+ * model quota (JOV-12708), so no draft exists yet. Null when absent,unreadable
+ * or not deferred.
+ * @param {string | null} path
+ * @param {(path: string) => Buffer} [readFile]
+ * @returns {{reason: string, reset: string | null, detail: string | null} | null}
+ */
+export function deferredFromReceipt(path, readFile = readFileSync) {
+  if (!path) return null;
+  try {
+    const receipt = JSON.parse(readFile(path).toString('utf8'));
+    const row = (receipt?.drafts ?? []).find(
+      draft => draft?.status === 'deferred'
+    );
+    return row?.deferred ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -72,6 +93,9 @@ export function collectFrames(dir) {
         ...entry,
         png: file(`${base}.frame.png`) ?? file(`${base}.png`),
         sidecar: file(`${base}.frame.json`),
+        deferred: deferredFromReceipt(
+          file(join(dir, entry.artifact, 'receipt.json'))
+        ),
       };
     });
 }

@@ -19,10 +19,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { linearRequest } from '../lib/linear-cooldown.mjs';
 import { JOVIE_TEAM_ID } from '../lib/linear-issue-intake.mjs';
-import { withLinearRetry } from '../lib/linear-retry.mjs';
 import { collectFrames, pictureFor } from './pen-draft-frames.mjs';
+import { linearGraphql, retried } from './pen-draft-linear.mjs';
 
 export const TITLE_PREFIX = 'Pen draft for approval: ';
 // The existing Ovie Linear inbox reads this label on active issues.
@@ -40,9 +39,15 @@ export const CREATE_STATE_NAME = 'Triage';
  * @typedef {{frame: string, ok: true, action: string, identifier?: string | null}} PublishedRow
  * @typedef {{frame: string, ok: false, reason: string, detail?: string}} FailedRow
  * @typedef {PublishedRow | FailedRow} FrameRow
- * @typedef {{ok: boolean, reason?: string, frames: FrameRow[]}} PublishResult
+ * @typedef {{ok: boolean, reason?: string, detail?: string, frames: FrameRow[]}} PublishResult
  * @typedef {{apiKey?: string, fetchImpl: typeof fetch, env: NodeJS.ProcessEnv, sleep?: (ms: number) => Promise<void>, log?: (line: string) => void}} Context
  */
+
+// One standing issue for run-level deferral notes (JOV-12708): no draft to approve gets a comment here, not an approval issue.
+export const DEFERRED_TITLE =
+  'Pen drafts deferred: drafting agent out of quota';
+export const DEFERRED_DESCRIPTION =
+  'Frames a pen-draft run could not draw because the drafting agent was out of its model quota. One comment per run; the next run after the quota resets drafts these frames again.';
 
 /**
  * scripts checkJs runs without strict null checks, so `!result.ok` does not
@@ -94,53 +99,6 @@ export function runUrlFor(runId, env = process.env) {
   const repo = env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
   return `${server}/${repo}/actions/runs/${runId}`;
 }
-
-/**
- * One Linear GraphQL call in the shape scripts/lib/linear-retry.mjs retries.
- * @param {Context} ctx
- * @param {string} op
- * @param {string} query
- * @param {Record<string, unknown>} variables
- * @returns {Promise<GraphqlOk | Failure>}
- */
-async function linearGraphql(ctx, op, query, variables) {
-  const result = await linearRequest({
-    key: ctx.apiKey,
-    query,
-    variables,
-    fetchImpl: ctx.fetchImpl,
-    env: ctx.env,
-  });
-  if (result.rateLimited) return { ok: false, reason: 'linear_rate_limited' };
-  if (result.reason === 'missing_linear_api_key')
-    return { ok: false, reason: result.reason };
-  if (result.reason === 'transport')
-    return { ok: false, reason: `${op}_transport` };
-  if (!result.ok) return { ok: false, reason: `${op}_${result.status}` };
-  if (Array.isArray(result.data?.errors) && result.data.errors.length > 0)
-    return {
-      ok: false,
-      reason: `${op}_graphql_error`,
-      detail: String(result.data.errors[0]?.message ?? '').slice(0, 200),
-    };
-  return { ok: true, data: result.data?.data ?? null };
-}
-
-/**
- * @template {{ok: boolean, reason?: string}} T
- * @param {Context} ctx
- * @param {string} frame
- * @param {string} op
- * @param {() => Promise<T>} run
- * @returns {Promise<T>}
- */
-const retried = (ctx, frame, op, run) =>
-  withLinearRetry(run, {
-    fingerprint: frame,
-    op,
-    sleep: ctx.sleep,
-    log: ctx.log,
-  });
 
 /**
  * The approval label's id and the state a new issue starts in.
@@ -327,6 +285,101 @@ export async function upsertApprovalIssue(ctx, { frame, description, refs }) {
   };
 }
 
+/** The comment one run's deferrals leave on the standing deferred issue. */
+export function deferralCommentBody({ deferred, runUrl }) {
+  const frames = deferred.map(entry => entry.frame).sort();
+  const refusal = deferred[0]?.deferred ?? {};
+  return [
+    `Pen draft run ${runUrl} deferred ${frames.length} frame${
+      frames.length === 1 ? '' : 's'
+    }: ${frames.join(', ')}.`,
+    `The drafting agent hit its model quota (${refusal.reason ?? 'rate_limit'})${
+      refusal.reset ? ` — resets ${refusal.reset}` : ''
+    }, so no draft exists for these frames yet.`,
+    'The next pen-draft run after the reset drafts them again; nothing here needs approval.',
+  ].join('\n');
+}
+
+/**
+ * The deferred frames of one run on the standing deferred issue: find it by
+ * its exact title, create it once if this is the first deferral, then leave
+ * one comment with the reason and the reset the agent reported. The comment
+ * is not retried: a retry whose first attempt landed would post it twice.
+ * @param {Context} ctx
+ * @param {{deferred: {frame: string, deferred: any}[], runUrl: string}} note
+ * @returns {Promise<Upserted | Failure>}
+ */
+export async function publishDeferredNote(ctx, { deferred, runUrl }) {
+  const found = await retried(ctx, 'deferred', 'pen_issue_find', () =>
+    linearGraphql(
+      ctx,
+      'pen_issue_find',
+      `query PenDraftDeferredIssue($teamId: ID!, $title: String!) {
+        issues(
+          filter: { team: { id: { eq: $teamId } }, title: { eq: $title } }
+          first: 50
+          includeArchived: true
+        ) {
+          nodes { id identifier title createdAt state { type } }
+        }
+      }`,
+      { teamId: JOVIE_TEAM_ID, title: DEFERRED_TITLE }
+    )
+  );
+  if (failed(found)) return found;
+  const issue = (found.data?.issues?.nodes ?? [])
+    .filter(node => node?.title === DEFERRED_TITLE)
+    .sort(
+      (a, b) =>
+        (TERMINAL_STATES.has(a?.state?.type) ? 1 : 0) -
+          (TERMINAL_STATES.has(b?.state?.type) ? 1 : 0) ||
+        String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? ''))
+    )[0];
+  if (!issue) {
+    const created = await linearGraphql(
+      ctx,
+      'pen_issue_create',
+      `mutation PenDraftDeferredCreate($input: IssueCreateInput!) {
+        issueCreate(input: $input) { success issue { id identifier } }
+      }`,
+      {
+        input: {
+          teamId: JOVIE_TEAM_ID,
+          title: DEFERRED_TITLE,
+          description: DEFERRED_DESCRIPTION,
+        },
+      }
+    );
+    if (failed(created)) return created;
+    if (!created.data?.issueCreate?.success)
+      return { ok: false, reason: 'pen_issue_create_unsuccessful' };
+    return {
+      ok: true,
+      action: 'created',
+      identifier: created.data.issueCreate.issue?.identifier ?? null,
+    };
+  }
+  const comment = await linearGraphql(
+    ctx,
+    'pen_comment_create',
+    `mutation PenDraftDeferredComment($id: String!, $body: String!) {
+      commentCreate(input: { issueId: $id, body: $body }) {
+        success
+        comment { id }
+      }
+    }`,
+    { id: issue.id, body: deferralCommentBody({ deferred, runUrl }) }
+  );
+  if (failed(comment)) return comment;
+  if (!comment.data?.commentCreate?.success)
+    return { ok: false, reason: 'pen_comment_create_unsuccessful' };
+  return {
+    ok: true,
+    action: 'commented',
+    identifier: issue.identifier ?? null,
+  };
+}
+
 /**
  * Publish every frame under `dir` that has a png. Returns one row per frame;
  * `ok` is false when any upload or issue write failed.
@@ -349,9 +402,16 @@ export async function publishDrafts({
   const rows = [];
   /** @type {{frame: string, bytes: Buffer}[]} */
   const pictures = [];
+  /** @type {{frame: string, deferred: any}[]} */
+  const deferred = [];
   // Every picture is checked before Linear is asked for anything.
   for (const entry of frames) {
     const { frame } = entry;
+    if (entry.deferred) {
+      deferred.push({ frame, deferred: entry.deferred });
+      rows.push({ frame, ok: true, action: 'deferred' });
+      continue;
+    }
     if (!entry.png && !entry.sidecar) {
       rows.push({ frame, ok: true, action: 'skipped-no-png' });
       continue;
@@ -370,38 +430,45 @@ export async function publishDrafts({
     ok: rows.every(row => row.ok),
     frames: rows.sort((a, b) => a.frame.localeCompare(b.frame)),
   });
-  if (pictures.length === 0) return done();
+  if (pictures.length === 0 && deferred.length === 0) return done();
   if (!apiKey)
     return { ...done(), ok: false, reason: 'missing_linear_api_key' };
-  const refs = await resolveTeamRefs(ctx);
-  if (failed(refs)) return { ...done(), ok: false, reason: refs.reason };
-  for (const { frame, bytes } of pictures) {
-    const upload = await retried(ctx, frame, 'pen_upload', () =>
-      uploadPng(ctx, { frame, bytes })
-    );
-    if (failed(upload)) {
-      rows.push({ frame, ok: false, reason: upload.reason });
-      continue;
-    }
-    const issue = await upsertApprovalIssue(ctx, {
-      frame,
-      description: approvalDescription({
+  if (pictures.length > 0) {
+    const refs = await resolveTeamRefs(ctx);
+    if (failed(refs)) return { ...done(), ok: false, reason: refs.reason };
+    for (const { frame, bytes } of pictures) {
+      const upload = await retried(ctx, frame, 'pen_upload', () =>
+        uploadPng(ctx, { frame, bytes })
+      );
+      if (failed(upload)) {
+        rows.push({ frame, ok: false, reason: upload.reason });
+        continue;
+      }
+      const issue = await upsertApprovalIssue(ctx, {
         frame,
-        assetUrl: upload.assetUrl,
-        runUrl,
-      }),
-      refs,
-    });
-    rows.push(
-      failed(issue)
-        ? { frame, ok: false, reason: issue.reason, detail: issue.detail }
-        : {
-            frame,
-            ok: true,
-            action: issue.action,
-            identifier: issue.identifier,
-          }
-    );
+        description: approvalDescription({
+          frame,
+          assetUrl: upload.assetUrl,
+          runUrl,
+        }),
+        refs,
+      });
+      rows.push(
+        failed(issue)
+          ? { frame, ok: false, reason: issue.reason, detail: issue.detail }
+          : {
+              frame,
+              ok: true,
+              action: issue.action,
+              identifier: issue.identifier,
+            }
+      );
+    }
+  }
+  if (deferred.length > 0) {
+    const note = await publishDeferredNote(ctx, { deferred, runUrl });
+    if (failed(note))
+      return { ...done(), ok: false, reason: note.reason, detail: note.detail };
   }
   return done();
 }

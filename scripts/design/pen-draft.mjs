@@ -25,7 +25,7 @@
  * each one in its own job, because ten briefs at up to 15 minutes each
  * outran the 75-minute job on Nov 8 and lost every draft to the timeout.
  */
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   existsSync,
   mkdirSync,
@@ -38,6 +38,7 @@ import { parseArgs } from 'node:util';
 import { reportBlockedRun } from './pen-draft-annotation.mjs';
 import { spliceDraft, trimCanonical } from './pen-trim.mjs';
 
+export { deferralReason, writeDeferredSummary } from './pen-draft-quota.mjs';
 export { briefTerms, spliceDraft, trimCanonical } from './pen-trim.mjs';
 
 // 0.3.16 is the first Pen CLI that lists claude-fable-5-2; older ones reject
@@ -117,6 +118,7 @@ export function attemptTimeout(elapsedMs, budgetMs = BUDGET_MS) {
 /** Files whose change means every frame has to be drafted again. */
 export const DRAFTER_FILES = [
   'scripts/design/pen-draft.mjs',
+  'scripts/design/pen-draft-quota.mjs',
   'scripts/design/pen-trim.mjs',
   '.github/workflows/pen-draft.yml',
 ];
@@ -343,11 +345,26 @@ async function main() {
   const model = penModel(process.env);
   console.log(`pen-draft: the Pen agent runs on ${model}`);
 
+  // A quota refusal is the account's, not one frame's: once the drafting
+  // agent reports it, the frames still queued in this run are deferred
+  // without another pen call (run 43621008907).
+  const { deferralReason, writeDeferredSummary } = await import(
+    './pen-draft-quota.mjs'
+  );
+  let quotaRefusal = null;
   for (const brief of briefs) {
     const startedAt = Date.now();
     const row = { frame: brief.frame, route: brief.route };
     let before = canonical;
     let from = input;
+    if (quotaRefusal) {
+      row.status = 'deferred';
+      row.deferred = quotaRefusal;
+      writeDeferredSummary(brief.frame, quotaRefusal);
+      receipt.drafts.push(row);
+      write();
+      continue;
+    }
     if (trim) {
       // Beside the canonical file, so its fonts and images still resolve.
       from = join(dirname(input), `${brief.frame}.trimmed.pen`);
@@ -373,18 +390,39 @@ async function main() {
       }
       row.attempts = attempt;
       delete row.error;
-      try {
-        execFileSync(
-          'npx',
-          penArgs(brief, { input: from, outDir, trim, model }),
-          {
-            stdio: ['ignore', 'inherit', 'inherit'],
-            timeout,
-            // Workspace fonts and images resolve relative to the .pen file.
-            cwd: dirname(input),
-            env: { ...process.env, NODE_OPTIONS: PEN_NODE_OPTIONS },
-          }
-        );
+      // Piped and echoed, so the agent's transcript still reaches the job
+      // log and the script can read why a call failed. Run 43621008907 had
+      // the rate limit only in the log, so the receipt read "Command failed:
+      // npx" and the run retried a call that could only fail again.
+      const run = spawnSync(
+        'npx',
+        penArgs(brief, { input: from, outDir, trim, model }),
+        {
+          stdio: ['ignore', 'pipe', 'pipe'],
+          maxBuffer: 64 * 1024 * 1024,
+          timeout,
+          // Workspace fonts and images resolve relative to the .pen file.
+          cwd: dirname(input),
+          env: { ...process.env, NODE_OPTIONS: PEN_NODE_OPTIONS },
+        }
+      );
+      const output = `${run.stdout ?? ''}\n${run.stderr ?? ''}`;
+      if (output)
+        process.stdout.write(output.endsWith('\n') ? output : `${output}\n`);
+      const refusal = run.status === 0 ? null : deferralReason(output);
+      if (refusal) {
+        quotaRefusal = refusal;
+        row.status = 'deferred';
+        row.deferred = refusal;
+        writeDeferredSummary(brief.frame, refusal);
+        break;
+      }
+      if (run.error || run.status !== 0) {
+        row.status = 'failed';
+        row.error = String(run.error?.message ?? `npx exited ${run.status}`)
+          .split('\n')[0]
+          .slice(0, 200);
+      } else {
         const missing = missingOutputs(brief, outDir);
         const problem = missing.length
           ? `pen wrote no ${missing.join(' or ')}`
@@ -402,11 +440,6 @@ async function main() {
             JSON.stringify(spliceDraft(canonical, before, readJsonFile(out)))
           );
         }
-      } catch (e) {
-        row.status = 'failed';
-        row.error = String(e.message || e)
-          .split('\n')[0]
-          .slice(0, 200);
       }
       if (row.status === 'drafted') break;
     }
@@ -414,7 +447,20 @@ async function main() {
     write();
   }
   const drafted = receipt.drafts.filter(d => d.status === 'drafted').length;
-  console.log(`pen-draft: ${drafted} of ${briefs.length} frames drafted`);
+  const deferred = receipt.drafts.filter(d => d.status === 'deferred');
+  console.log(
+    `pen-draft: ${drafted} of ${briefs.length} frames drafted` +
+      (deferred.length
+        ? `, ${deferred.length} deferred (${deferred[0]?.deferred?.reason ?? 'deferred'}${
+            deferred[0]?.deferred?.reset
+              ? `, resets ${deferred[0].deferred.reset}`
+              : ''
+          })`
+        : '')
+  );
+  // A deferred frame is still not a drafted one: the run stays red so the
+  // gap stays visible, and the receipt, the job summary and the publish
+  // step's Linear note say why.
   if (drafted < briefs.length) process.exitCode = 1;
 }
 
