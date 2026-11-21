@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  PlainButton,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -268,14 +269,13 @@ export function EntityChipPopover({
   return (
     <Root open={open} onOpenChange={handleOpenChange}>
       <Trigger asChild>
-        <button
+        <PlainButton
           ref={triggerRef}
           onClickCapture={event => {
             if (open && openedByHover.current) event.preventDefault();
             openedByHover.current = false;
             clearTimers();
           }}
-          type='button'
           aria-haspopup='dialog'
           aria-expanded={open}
           onPointerDown={() => {
@@ -313,7 +313,7 @@ export function EntityChipPopover({
               tone={tone}
             />
           )}
-        </button>
+        </PlainButton>
       </Trigger>
       {mobile ? (
         <SheetContent

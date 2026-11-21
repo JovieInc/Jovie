@@ -103,7 +103,7 @@ export function PromoDownloadsTable({
               <span
                 className={cn(
                   'text-2xs font-medium',
-                  file.isActive ? 'text-emerald-500' : 'text-tertiary-token'
+                  file.isActive ? 'text-success-text' : 'text-tertiary-token'
                 )}
               >
                 {file.isActive ? 'Active' : 'Hidden'}

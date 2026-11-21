@@ -25,8 +25,8 @@ describe('MetricsChart consumer states', () => {
   });
 
   it.each([
-    [[10, 20], '+100.0%', '15', '20', 'text-success'],
-    [[20, 10], '-50.0%', '15', '20', 'text-error'],
+    [[10, 20], '+100.0%', '15', '20', 'text-success-text'],
+    [[20, 10], '-50.0%', '15', '20', 'text-error-text'],
     [[0, 0], '+0.0%', '0', '0', 'text-tertiary-token'],
   ])(
     'renders truthful delta, average and peak for %j',

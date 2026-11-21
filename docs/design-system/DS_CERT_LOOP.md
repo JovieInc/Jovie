@@ -77,7 +77,7 @@ for a real product decision, such as deleting a feature, and says which one.
   overlays, shadow tokens). A glow that has no token goes.
 - **Categorical or decorative hues** (type badges, per-kind colours, stat
   tiles): neutral. Status colours mark status only and accent marks actions
-  and selection only (ASR-041, `lib/design/metric-tone.ts`).
+  and selection only.
 - **A theme-dependent white or black button** (`bg-white text-black`
   with dark overrides): the primary `Button` variant, which already flips per
   theme.
