@@ -59,4 +59,17 @@ describe('CreatorActionsMenu', () => {
     expect(trigger).not.toBeNull();
     expect(trigger).toHaveTextContent('Actions');
   });
+
+  it('draws the featured star from the warning token, not a yellow palette class', async () => {
+    const user = userEvent.setup();
+    renderMenu({ profile: { ...profile, isFeatured: true } });
+    await user.click(
+      screen.getByRole('button', { name: 'Open creator actions' })
+    );
+
+    const item = await screen.findByRole('menuitem', { name: 'Unfeature' });
+    const star = item.querySelector('svg');
+    expect(star).toHaveClass('fill-warning', 'text-warning');
+    expect(star?.getAttribute('class')).not.toMatch(/yellow/);
+  });
 });
