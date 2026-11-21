@@ -1,0 +1,161 @@
+{
+  "schema": "jovie-smooth-baseline-summary/v1",
+  "measuredAt": "2026-11-21T07:39:56.464Z",
+  "baseUrl": "https://jovie-aksqwggav-jovie.vercel.app",
+  "runsPerCell": 3,
+  "surfaces": [
+    {
+      "surfaceId": "homepage",
+      "platform": "desktop",
+      "resolvedPath": "/",
+      "median": {
+        "cls": 0.002,
+        "lcpMs": 456,
+        "inpMs": 1,
+        "fcpMs": 342,
+        "ttfbMs": 100,
+        "fullPageReloads": 1,
+        "duplicateFetches": 1,
+        "flickerEvents": 0,
+        "hydrationWarnings": 0
+      },
+      "flags": {
+        "clsPass": true,
+        "lcpPass": true,
+        "inpPass": true,
+        "reloadPass": false,
+        "dupFetchPass": false,
+        "flickerPass": true,
+        "hydrationPass": true
+      }
+    },
+    {
+      "surfaceId": "artist-profile",
+      "platform": "desktop",
+      "resolvedPath": "/demo",
+      "median": {
+        "cls": 0.028,
+        "lcpMs": 248,
+        "inpMs": 2,
+        "fcpMs": 186,
+        "ttfbMs": 100,
+        "fullPageReloads": 0,
+        "duplicateFetches": 0,
+        "flickerEvents": 0,
+        "hydrationWarnings": 0
+      },
+      "flags": {
+        "clsPass": false,
+        "lcpPass": true,
+        "inpPass": true,
+        "reloadPass": true,
+        "dupFetchPass": true,
+        "flickerPass": true,
+        "hydrationPass": true
+      }
+    },
+    {
+      "surfaceId": "onboarding-start",
+      "platform": "desktop",
+      "resolvedPath": "/start",
+      "median": {
+        "cls": 0,
+        "lcpMs": 412,
+        "inpMs": 2,
+        "fcpMs": 309,
+        "ttfbMs": 100,
+        "fullPageReloads": 0,
+        "duplicateFetches": 0,
+        "flickerEvents": 0,
+        "hydrationWarnings": 0
+      },
+      "flags": {
+        "clsPass": true,
+        "lcpPass": true,
+        "inpPass": true,
+        "reloadPass": true,
+        "dupFetchPass": true,
+        "flickerPass": true,
+        "hydrationPass": true
+      }
+    },
+    {
+      "surfaceId": "homepage",
+      "platform": "mobile",
+      "resolvedPath": "/",
+      "median": {
+        "cls": 0,
+        "lcpMs": 328,
+        "inpMs": 4,
+        "fcpMs": 246,
+        "ttfbMs": 100,
+        "fullPageReloads": 1,
+        "duplicateFetches": 1,
+        "flickerEvents": 0,
+        "hydrationWarnings": 0
+      },
+      "flags": {
+        "clsPass": true,
+        "lcpPass": true,
+        "inpPass": true,
+        "reloadPass": false,
+        "dupFetchPass": false,
+        "flickerPass": true,
+        "hydrationPass": true
+      }
+    },
+    {
+      "surfaceId": "artist-profile",
+      "platform": "mobile",
+      "resolvedPath": "/demo",
+      "median": {
+        "cls": 0,
+        "lcpMs": 276,
+        "inpMs": 4,
+        "fcpMs": 207,
+        "ttfbMs": 100,
+        "fullPageReloads": 0,
+        "duplicateFetches": 0,
+        "flickerEvents": 0,
+        "hydrationWarnings": 0
+      },
+      "flags": {
+        "clsPass": true,
+        "lcpPass": true,
+        "inpPass": true,
+        "reloadPass": true,
+        "dupFetchPass": true,
+        "flickerPass": true,
+        "hydrationPass": true
+      }
+    },
+    {
+      "surfaceId": "onboarding-start",
+      "platform": "mobile",
+      "resolvedPath": "/start",
+      "median": {
+        "cls": 0,
+        "lcpMs": 300,
+        "inpMs": 4,
+        "fcpMs": 225,
+        "ttfbMs": 100,
+        "fullPageReloads": 0,
+        "duplicateFetches": 0,
+        "flickerEvents": 0,
+        "hydrationWarnings": 0
+      },
+      "flags": {
+        "clsPass": true,
+        "lcpPass": true,
+        "inpPass": true,
+        "reloadPass": true,
+        "dupFetchPass": true,
+        "flickerPass": true,
+        "hydrationPass": true
+      }
+    }
+  ],
+  "worstSurfaceId": "artist-profile",
+  "worstReason": "Artist profile desktop: CLS 0.028>0.02",
+  "source": "Smooth store baseline (PR #26323 isolated preview)"
+}

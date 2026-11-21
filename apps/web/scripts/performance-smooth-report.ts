@@ -10,6 +10,10 @@ import {
 } from './performance-smooth-manifest';
 import { medianNullable, medianNumber } from './performance-smooth-probes';
 import {
+  findBaselineRaises,
+  type CheckedInSmoothBaseline,
+} from './performance-smooth-ratchet';
+import {
   SMOOTH_BASELINE_SCHEMA,
   type SmoothBaselineSummary,
   type SmoothRunSample,
@@ -156,18 +160,30 @@ export function toCheckedInBaseline(baseline: SmoothSurfaceBaseline) {
 
 export function writeSmoothBaselines(
   summary: SmoothBaselineSummary,
-  outDir: string
+  outDir: string,
+  options: {
+    readonly previous?: readonly CheckedInSmoothBaseline[];
+    readonly allowRaise?: boolean;
+  } = {}
 ) {
+  const next = summary.surfaces.map(baseline => toCheckedInBaseline(baseline));
+  const raises = findBaselineRaises({
+    previous: options.previous ?? [],
+    next,
+    allowRaise: options.allowRaise,
+  });
+  if (raises.length > 0) {
+    throw new Error(
+      `Smooth baseline write refused (shrink-only). Re-measure improvements with --write, or pass --allow-raise after an intentional re-baseline:\n- ${raises.join('\n- ')}`
+    );
+  }
   mkdirSync(outDir, { recursive: true });
-  for (const baseline of summary.surfaces) {
+  for (const baseline of next) {
     const path = resolve(
       outDir,
       smoothBaselineFileName(baseline.surfaceId, baseline.platform)
     );
-    writeFileSync(
-      path,
-      `${JSON.stringify(toCheckedInBaseline(baseline), null, 2)}\n`
-    );
+    writeFileSync(path, `${JSON.stringify(baseline, null, 2)}\n`);
   }
   const summaryPath = resolve(outDir, 'summary.json');
   const compactSummary = {
