@@ -22,7 +22,9 @@ describe('ChatPitchCard', () => {
   beforeEach(() => {
     toast.success.mockClear();
     toast.error.mockClear();
-    writeText = vi.fn<(data: string) => Promise<void>>().mockResolvedValue(undefined);
+    writeText = vi
+      .fn<(data: string) => Promise<void>>()
+      .mockResolvedValue(undefined);
   });
 
   // userEvent.setup() installs its own clipboard stub, so override it after.

@@ -119,9 +119,8 @@ describe('PickerRow PlainButton', () => {
         onCommit={vi.fn()}
       />
     );
-    expect(screen.getByRole('option', { name: /Attach Files/ })).toHaveAttribute(
-      'type',
-      'button'
-    );
+    expect(
+      screen.getByRole('option', { name: /Attach Files/ })
+    ).toHaveAttribute('type', 'button');
   });
 });
