@@ -396,6 +396,7 @@ describe('OnboardingShell status', () => {
     builderState.current = {
       artist: null,
       artistConfirmed: false,
+      handleConfirmed: false,
       handle: 'avery',
       socialLinks: ['https://instagram.com/avery'],
     };
