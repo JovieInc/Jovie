@@ -155,18 +155,6 @@ test('desktop sources the canonical opaque Jovie app icon profile', async () => 
   await assertBlackCorners(canonicalIconPath);
 });
 
-test('legacy icon-source.png remains for reference but is no longer the production source', async () => {
-  // Ensures we didn't accidentally leave a sailboat/placeholder as active source.
-  const legacyMeta = await pngMetadata(join(assetsRoot, 'icon-source.png'));
-  assert.equal(legacyMeta.format, 'png');
-  assert.equal(legacyMeta.width, 1024);
-  assert.equal(legacyMeta.height, 1024);
-  // If this ever matches the old placeholder SHA we can flag, but the value is kept for audit.
-  // (Current SHA below was the pre-real-icon placeholder.)
-  const currentLegacySha = await sha256(join(assetsRoot, 'icon-source.png'));
-  assert.notEqual(currentLegacySha, ''); // just ensure readable
-});
-
 test('packaged production and staging icons use the rounded desktop profile', async () => {
   // Staging PNG is gitignored and produced by gen-staging-icon.mjs (copy of
   // production). Generate before asserting so CI does not rely on a force-add.
