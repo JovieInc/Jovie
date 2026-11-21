@@ -30,8 +30,15 @@ async function visibleLoadingMarkers(root: Locator): Promise<string[]> {
     const matches = root.locator(selector);
     const count = await matches.count();
     for (let index = 0; index < count; index += 1) {
-      if (await matches.nth(index).isVisible()) {
-        found.push(selector);
+      const match = matches.nth(index);
+      if (await match.isVisible()) {
+        const owner = await match.evaluate(element => {
+          const host = element.closest('[data-testid]');
+          const id = host?.getAttribute('data-testid') ?? 'no test id';
+          const label = (element.textContent ?? '').replace(/\s+/g, ' ');
+          return `${id}: ${label.trim().slice(0, 60)}`;
+        });
+        found.push(`${selector} in ${owner}`);
         break;
       }
     }
@@ -43,8 +50,20 @@ async function visibleLoadingMarkers(root: Locator): Promise<string[]> {
   return found;
 }
 
+export interface CaptureReadyOptions {
+  /** How long to wait for the capture to settle. */
+  readonly timeout?: number;
+  /**
+   * Ordinary copy on this surface that mentions an error word, such as help
+   * text saying when a feature is unavailable. Keep each pattern as narrow
+   * as the sentence it allows.
+   */
+  readonly allowCopy?: readonly RegExp[];
+}
+
 export async function findCaptureProblems(
-  root: Locator
+  root: Locator,
+  allowCopy: readonly RegExp[] = []
 ): Promise<CaptureProblem[]> {
   const problems: CaptureProblem[] = [];
   for (const selector of await visibleLoadingMarkers(root)) {
@@ -54,7 +73,7 @@ export async function findCaptureProblems(
   // role="alert" alone is not an error: the route announcer and toasts use it
   // for ordinary copy ("Move your music forward."), so it is never a problem
   // by itself.
-  const errorCopy = findErrorCopy(await root.innerText());
+  const errorCopy = findErrorCopy(await root.innerText(), allowCopy);
   if (errorCopy) problems.push({ kind: 'error-copy', detail: errorCopy });
   return problems;
 }
@@ -77,7 +96,7 @@ export function captureGateActive(): boolean {
  */
 export async function expectCaptureReady(
   root: Locator,
-  { timeout = 30_000 }: { readonly timeout?: number } = {}
+  { timeout = 30_000, allowCopy = [] }: CaptureReadyOptions = {}
 ): Promise<void> {
   if (!captureGateActive()) return;
   let problems: CaptureProblem[] = [];
@@ -85,7 +104,7 @@ export async function expectCaptureReady(
     await expect
       .poll(
         async () => {
-          problems = await findCaptureProblems(root);
+          problems = await findCaptureProblems(root, allowCopy);
           return problems.length;
         },
         { timeout, intervals: [250, 500, 1_000] }

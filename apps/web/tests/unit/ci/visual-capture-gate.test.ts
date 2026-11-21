@@ -70,6 +70,26 @@ describe('visual capture gate', () => {
     expect(findErrorCopy('Move your music forward.')).toBeNull();
   });
 
+  it('lets a surface allow one help sentence and still flags the rest', () => {
+    const help =
+      'Add both manually in Stories when native file share is unavailable.';
+    const allow = [/when native file\s+share is unavailable/i];
+    expect(findErrorCopy(help)).not.toBeNull();
+    expect(findErrorCopy(help, allow)).toBeNull();
+    expect(findErrorCopy(`${help} Preview unavailable`, allow)).toContain(
+      'Preview unavailable'
+    );
+  });
+
+  it('stubs the reads that showed error states in admin captures', () => {
+    const source = readFileSync(
+      resolve(e2eDirectory, 'admin-visual-regression.spec.ts'),
+      'utf8'
+    );
+    expect(source).toContain("'**/api/ovie/home/blocker'");
+    expect(source).toContain("'**/api/hud/shipping-state**'");
+  });
+
   it('does not treat a bare role="alert" region as a problem', () => {
     const gate = readFileSync(
       resolve(e2eDirectory, 'utils/visual-capture-ready.ts'),

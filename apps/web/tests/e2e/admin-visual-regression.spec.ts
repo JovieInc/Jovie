@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { unknownProjection } from '@/lib/ovie/shipping-state';
 import {
   ensureSignedInUser,
   getAdminCredentials,
@@ -354,6 +355,14 @@ async function registerAdminVisualStubs(page: import('@playwright/test').Page) {
     )
   );
 
+  // Shipping and Ops read the delivery projection the fleet host publishes.
+  // CI has no fleet host, so the card reads "Disconnected" with source gaps.
+  // Answer one fresh, connected projection, stamped when the page asks so its
+  // relative times stay small and stable.
+  await page.route('**/api/hud/shipping-state**', route =>
+    route.fulfill(jsonResponse(freshShippingProjection()))
+  );
+
   await page.route('**/api/admin/investors/settings', route =>
     route.fulfill(
       jsonResponse({
@@ -407,6 +416,103 @@ async function openedAccordion(
   return section;
 }
 
+const measured = (value: number) =>
+  value === 0
+    ? { state: 'measured-zero', value: 0 }
+    : { state: 'measured-nonzero', value };
+
+/**
+ * A connected `ovie.shipping-state.v1` read. Starts from the contract's own
+ * empty projection, so every source the strict parser needs is present, then
+ * marks it fresh with fixed delivery numbers.
+ */
+function freshShippingProjection() {
+  const now = Date.now();
+  const at = (offsetMs: number) => new Date(now - offsetMs).toISOString();
+  const base = unknownProjection({
+    sequence: 4,
+    observationTimestamp: at(0),
+    emissionTimestamp: at(0),
+    latencyMs: 12,
+    publishing: true,
+    lastError: null,
+  });
+  const sources = Object.fromEntries(
+    Object.entries(base.sources).map(([id, source]) => [
+      id,
+      { ...source, state: 'fresh' },
+    ])
+  );
+  return {
+    ...base,
+    sourceRevision: 'rev-4',
+    freshnessDeadline: new Date(now + 3_600_000).toISOString(),
+    state: 'fresh',
+    sources,
+    delivery: {
+      lanes: {
+        running: measured(7),
+        slots: measured(9),
+        idle: measured(2),
+        pool: measured(186),
+        lastLandingAgeSeconds: measured(85),
+        diskFreePct: 28.4,
+        lanes: [
+          { name: 'codex', running: 4, slots: 4 },
+          { name: 'claude', running: 3, slots: 3 },
+          { name: 'cursor', running: 0, slots: 2 },
+        ],
+        alerts: [],
+        heldByReason: {},
+        failedByReason: {},
+        publishedAt: at(60_000),
+        stale: false,
+      },
+      merges: {
+        since: at(86_400_000),
+        today: measured(42),
+        byRepo: { Jovie: measured(36), 'summer-config': measured(6) },
+        last7Days: measured(280),
+        prior7Days: measured(225),
+      },
+      mergeQueueDepth: measured(2),
+      inFlight: measured(0),
+      certifiedHead: {
+        sha: 'c3e74e00a9d234b8f6a1b2c3d4e5f60718293a4b',
+        certifiedAt: at(1_800_000),
+      },
+      production: {
+        sha: 'ee7401f37e0b324e225751f0d97ce229838ac8b4',
+        version: '26.11.5',
+        deployedAt: at(3_600_000),
+        behindMain: measured(4),
+      },
+      staging: {
+        sha: 'a1b2c3d4e5f60718293a4bc3e74e00a9d234b8f6',
+        version: '26.11.6',
+        deployedAt: at(1_200_000),
+        behindMain: measured(1),
+      },
+      summer: { availability: 'up' },
+    },
+    meanings: {
+      merged: { state: 'measured', value: false },
+      queued: { state: 'measured', value: true },
+      ciGreen: { state: 'measured', value: true },
+      productionVerified: { state: 'measured', value: true },
+      exactLiveBuild: { state: 'measured', value: true },
+    },
+  };
+}
+
+/**
+ * Help copy that names an error word without being an error. Keep each
+ * pattern to the one sentence it allows.
+ */
+const CAPTURE_ALLOWED_COPY: Readonly<Record<string, readonly RegExp[]>> = {
+  'share-studio': [/when native file\s+share is unavailable/i],
+};
+
 test.describe('admin visual regression', () => {
   test.beforeEach(async ({ page }) => {
     test.skip(!hasAdminCredentials(), 'Admin auth not available');
@@ -428,7 +534,9 @@ test.describe('admin visual regression', () => {
         ? await openedAccordion(page, surface.snapshotAccordion)
         : root;
 
-      await expectCaptureReady(locator);
+      await expectCaptureReady(locator, {
+        allowCopy: CAPTURE_ALLOWED_COPY[surface.id],
+      });
       await expect(locator).toHaveScreenshot(
         getAdminDesktopSnapshotName(surface)
       );
@@ -439,7 +547,9 @@ test.describe('admin visual regression', () => {
     test(`${surface.name} mobile`, async ({ page }) => {
       const locator = await openSurface(page, surface, MOBILE_VIEWPORT);
 
-      await expectCaptureReady(locator);
+      await expectCaptureReady(locator, {
+        allowCopy: CAPTURE_ALLOWED_COPY[surface.id],
+      });
       await expect(locator).toHaveScreenshot(
         `${surface.snapshotSlug}-mobile.png`
       );
