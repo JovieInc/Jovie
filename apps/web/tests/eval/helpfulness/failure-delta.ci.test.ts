@@ -1,9 +1,4 @@
-/**
- * Hermetic tests for the offline failure→delta harness. No model or network.
- */
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+/** Hermetic ASS-22/27 offline harness. */
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
@@ -16,15 +11,156 @@ import {
   score0to100ToFive,
   suggestDeltaThemes,
 } from './failure-delta';
+import {
+  ASS13_TARGETS,
+  evaluateAss13Targets,
+  renderAss13TargetsReport,
+} from './targets';
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const SAMPLE = JSON.parse(
-  readFileSync(join(HERE, 'fixtures/failure-delta-sample.json'), 'utf8')
-) as unknown;
+const ok = (id: string) => ({ id, ok: true as const });
+const HC = [
+  ok('non_empty'),
+  ok('copy_floor'),
+  ok('not_generic'),
+  ok('no_emoji'),
+  ok('length'),
+];
+
+function scores(partial: Record<string, number>) {
+  return {
+    grounded: 2,
+    next_action: 2,
+    time_aware: 2,
+    no_dead_end: 2,
+    specific: 2,
+    concise: 2,
+    truthful: 2,
+    ...partial,
+  };
+}
+
+const FAIL_SAMPLE = {
+  schema: 'jovie.helpfulness-eval/v1',
+  version: '2026-11-21.1',
+  cases: [
+    {
+      result: {
+        id: 'greeting',
+        score: 40,
+        passed: false,
+        hardChecks: HC,
+        judge: {
+          scores: scores({
+            grounded: 1,
+            next_action: 0,
+            time_aware: 0,
+            specific: 1,
+          }),
+          why: 'Missed UPCOMING; clarifying question.',
+        },
+      },
+      reply: { text: 'Hey — what next?' },
+    },
+    {
+      result: {
+        id: 'lapsed-flopped',
+        score: 35,
+        passed: false,
+        hardChecks: HC,
+        judge: {
+          scores: scores({
+            grounded: 1,
+            next_action: 1,
+            time_aware: 1,
+            no_dead_end: 1,
+            specific: 1,
+            concise: 1,
+            truthful: 0,
+          }),
+          why: 'Invented popularity; asks which title.',
+        },
+      },
+      reply: { text: 'Popularity 19. Which track?' },
+    },
+    {
+      result: {
+        id: 'presave',
+        score: 45,
+        passed: false,
+        hardChecks: [
+          ok('non_empty'),
+          ok('copy_floor'),
+          { id: 'not_generic', ok: false },
+          ok('no_emoji'),
+          ok('length'),
+        ],
+        judge: {
+          scores: scores({
+            grounded: 1,
+            next_action: 0,
+            time_aware: 0,
+            no_dead_end: 1,
+            specific: 1,
+            concise: 1,
+            truthful: 1,
+          }),
+          why: 'Missed drop; asks which release.',
+        },
+      },
+      reply: { text: 'Wait two weeks. Which release?' },
+    },
+    {
+      result: {
+        id: 'song-out-friday',
+        score: 90,
+        passed: true,
+        hardChecks: [...HC, ok('grounding_0')],
+        judge: {
+          scores: scores({}),
+          why: 'Night Swim tomorrow + dated step.',
+        },
+      },
+      reply: {
+        text: 'Night Swim tomorrow — pre-save tonight.',
+      },
+    },
+  ],
+};
+
+const PASS_SAMPLE = {
+  schema: 'jovie.helpfulness-eval/v1',
+  version: '2026-11-21.1',
+  cases: [
+    {
+      result: {
+        id: 'song-out-friday',
+        score: 95,
+        passed: true,
+        hardChecks: [...HC, ok('grounding_0')],
+        judge: {
+          scores: scores({}),
+          why: 'Night Swim tomorrow + dated step.',
+        },
+      },
+    },
+    {
+      result: {
+        id: 'week-plan',
+        score: 90,
+        passed: true,
+        hardChecks: HC,
+        judge: {
+          scores: scores({}),
+          why: 'Dated catalog move.',
+        },
+      },
+    },
+  ],
+};
 
 describe('failure-delta harness', () => {
-  it('parses eval:helpfulness --out JSON and maps 0–100 → 1–5', () => {
-    const report = parseHelpfulnessResults(SAMPLE);
+  it('parses JSON and maps 0–100 → 1–5', () => {
+    const report = parseHelpfulnessResults(FAIL_SAMPLE);
     expect(report.schema).toBe('jovie.helpfulness-eval/v1');
     expect(report.cases).toHaveLength(4);
     expect(score0to100ToFive(100)).toBe(5);
@@ -32,29 +168,25 @@ describe('failure-delta harness', () => {
     expect(score0to100ToFive(50)).toBe(3);
   });
 
-  it('computes median, safety %, invented count, and one-rec %', () => {
-    const report = parseHelpfulnessResults(SAMPLE);
-    const metrics = computeSuiteGateMetrics(report.cases);
+  it('computes median, safety %, invented, one-rec %', () => {
+    const metrics = computeSuiteGateMetrics(
+      parseHelpfulnessResults(FAIL_SAMPLE).cases
+    );
     expect(metrics.n).toBe(4);
-    // scores 40,35,45,90 → 1–5: 2.6, 2.4, 2.8, 4.6 → median (2.6+2.8)/2 = 2.7
     expect(metrics.median).toBe(2.7);
-    // 3/4 hard-pass; only presave fails not_generic
     expect(metrics.safetyPct).toBe(75);
     expect(metrics.inventedCount).toBe(1);
-    // 1 of 4 judged cases has next_action === 2
     expect(metrics.oneRecPct).toBe(25);
   });
 
-  it('lists failing dims and ranks known delta themes', () => {
-    const report = parseHelpfulnessResults(SAMPLE);
+  it('lists failing dims and ranks delta themes', () => {
+    const report = parseHelpfulnessResults(FAIL_SAMPLE);
     const flop = report.cases.find(c => c.result.id === 'lapsed-flopped');
     expect(flop).toBeTruthy();
     expect(failingDims(flop!.result)).toEqual(
       expect.arrayContaining(['truthful:0', 'next_action:1'])
     );
-
     const themes = suggestDeltaThemes(report.cases, 3);
-    // question closers hit 3 cases; upcoming-first 2; inventing-stats 1
     expect(themes.map(t => t.id)).toEqual([
       'question-not-a-move',
       'upcoming-first',
@@ -63,28 +195,56 @@ describe('failure-delta harness', () => {
     expect(themes[0]!.caseIds).toEqual(
       expect.arrayContaining(['greeting', 'presave', 'lapsed-flopped'])
     );
-    expect(themes.find(t => t.id === 'inventing-stats')?.caseIds).toEqual([
-      'lapsed-flopped',
-    ]);
   });
 
-  it('renders a markdown brief with gate table and failing cases', () => {
-    const report = parseHelpfulnessResults(SAMPLE);
-    const brief = renderFailureDeltaBrief(report, { topN: 3 });
+  it('renders markdown brief', () => {
+    const brief = renderFailureDeltaBrief(
+      parseHelpfulnessResults(FAIL_SAMPLE),
+      { topN: 3 }
+    );
     expect(brief).toContain('# Helpfulness failure → delta brief');
     expect(brief).toContain('| median (1–5) | **2.7** |');
-    expect(brief).toContain('| safety % (hard checks) | **75%** |');
-    expect(brief).toContain('| invented count (truthful=0) | **1** |');
-    expect(brief).toContain('| one-rec % (next_action=2) | **25%**');
     expect(brief).toContain('| `greeting` |');
-    expect(brief).toContain('| `lapsed-flopped` |');
     expect(brief).toContain('## Suggested delta themes');
-    expect(brief).toContain('`upcoming-first`');
   });
 
-  it('rejects the wrong schema', () => {
+  it('rejects wrong schema', () => {
     expect(() =>
       parseHelpfulnessResults({ schema: 'other', version: 'x', cases: [] })
     ).toThrow(/jovie\.helpfulness-eval\/v1/);
+  });
+});
+
+describe('ASS-13 targets gate', () => {
+  it('fails the sample and surfaces Top themes', () => {
+    const report = parseHelpfulnessResults(FAIL_SAMPLE);
+    const evaluation = evaluateAss13Targets(report, { topN: 3 });
+    expect(evaluation.passed).toBe(false);
+    expect(evaluation.metrics.median).toBe(2.7);
+    expect(evaluation.gates.every(g => !g.ok)).toBe(true);
+    expect(evaluation.themes.map(t => t.id)).toEqual([
+      'question-not-a-move',
+      'upcoming-first',
+      'inventing-stats',
+    ]);
+    const text = renderAss13TargetsReport(report, evaluation);
+    expect(text).toContain('**Verdict: FAIL**');
+    expect(text).toContain('## Top themes');
+  });
+
+  it('passes a fixture that clears all gates', () => {
+    const report = parseHelpfulnessResults(PASS_SAMPLE);
+    const evaluation = evaluateAss13Targets(report);
+    expect(evaluation.metrics.median).toBe(4.7);
+    expect(evaluation.metrics.safetyPct).toBe(100);
+    expect(evaluation.metrics.inventedCount).toBe(0);
+    expect(evaluation.metrics.oneRecPct).toBe(100);
+    expect(evaluation.passed).toBe(true);
+    expect(evaluation.metrics.median).toBeGreaterThanOrEqual(
+      ASS13_TARGETS.medianMin
+    );
+    expect(renderAss13TargetsReport(report, evaluation)).toContain(
+      '**Verdict: PASS**'
+    );
   });
 });

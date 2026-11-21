@@ -39,7 +39,6 @@
       "tests/eval/helpfulness/failure-delta.ci.test.ts",
       "tests/eval/helpfulness/helpfulness.ci.test.ts",
       "tests/eval/helpfulness/runner.ci.test.ts",
-      "tests/eval/helpfulness/targets.ci.test.ts",
       "tests/eval/helpfulness/workers-ai.ci.test.ts",
       "tests/unit/chat/onboarding-transcript-quality.eval.test.ts"
     ]
