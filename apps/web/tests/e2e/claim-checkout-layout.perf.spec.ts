@@ -113,6 +113,8 @@ test.describe('Claim checkout layout budget', () => {
       await page.route('**/api/billing/checkout-session**', route =>
         route.fulfill({
           json: {
+            status: 'confirmed',
+            paymentStatus: 'paid',
             plan: 'pro',
             priceId,
             needsProfile: false,
