@@ -42,7 +42,10 @@ async function createFixture(): Promise<ScreenshotCatalogPaths> {
   await mkdir(catalogDirectory, { recursive: true });
   await mkdir(publicExportDirectory, { recursive: true });
   await writeFile(join(catalogDirectory, 'homepage-desktop.png'), image);
-  await writeFile(join(publicExportDirectory, 'homepage.png'), image);
+  await symlink(
+    '../../screenshot-catalog/current/homepage-desktop.png',
+    join(publicExportDirectory, 'homepage.png')
+  );
   await writeFile(
     manifestPath,
     `${JSON.stringify(
@@ -77,24 +80,19 @@ describe('checkScreenshotCatalog', () => {
     );
   });
 
-  it('accepts a public export symlink only when it targets the canonical image', async () => {
+  it('rejects a regular-file public export that copies the catalog bytes', async () => {
     const paths = await createFixture();
     const publicExport = join(paths.publicExportDirectory, 'homepage.png');
     await rm(publicExport);
-    await symlink(
-      '../../screenshot-catalog/current/homepage-desktop.png',
-      publicExport
-    );
+    await writeFile(publicExport, 'canonical-image');
 
-    await expect(checkScreenshotCatalog({ paths, scenarios })).resolves.toEqual(
-      {
-        catalogBytes: 15,
-        catalogFiles: 1,
-        manifestEntries: 1,
-        publicExportBytes: 15,
-        publicExportFiles: 1,
-      }
-    );
+    await expect(
+      checkScreenshotCatalog({ paths, scenarios })
+    ).rejects.toMatchObject({
+      violations: expect.arrayContaining([
+        'homepage-desktop: public export must be a symlink to its canonical catalog image (regular-file copies double the combined-tree byte budget)',
+      ]),
+    } satisfies Pick<ScreenshotCatalogIntegrityError, 'violations'>);
   });
 
   it('rejects a public export symlink to any non-canonical file', async () => {
@@ -123,6 +121,7 @@ describe('checkScreenshotCatalog', () => {
       'temporary'
     );
     await writeFile(join(paths.publicExportDirectory, 'stale.png'), 'stale');
+    await rm(join(paths.publicExportDirectory, 'homepage.png'));
     await writeFile(
       join(paths.publicExportDirectory, 'homepage.png'),
       'different'
@@ -137,7 +136,7 @@ describe('checkScreenshotCatalog', () => {
         'homepage-desktop: manifest title does not match the registry',
         'screenshot-catalog/current contains orphan or temporary file: homepage-desktop.next.png',
         'public/product-screenshots contains orphan or temporary file: stale.png',
-        'homepage-desktop: public export does not match its canonical catalog image',
+        'homepage-desktop: public export must be a symlink to its canonical catalog image (regular-file copies double the combined-tree byte budget)',
       ]),
     } satisfies Pick<ScreenshotCatalogIntegrityError, 'violations'>);
   });
@@ -173,10 +172,7 @@ describe('checkScreenshotCatalog', () => {
       join(paths.catalogDirectory, 'homepage-desktop.png'),
       oversizedImage
     );
-    await writeFile(
-      join(paths.publicExportDirectory, 'homepage.png'),
-      oversizedImage
-    );
+    // Public export stays a symlink to the (now oversized) catalog image.
 
     await expect(
       checkScreenshotCatalog({ paths, scenarios })

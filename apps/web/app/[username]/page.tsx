@@ -68,6 +68,7 @@ import {
 import { opaqueInternalProfileRedirectPath } from '@/lib/profile/opaque-internal-profile-handle';
 import { resolveOpaqueInternalProfileUsername } from '@/lib/profile/opaque-internal-profile-handle.server';
 import { schedulePublicCollaboratorProfileReconciliation } from '@/lib/profile/public-collaborator-reconciliation';
+import { isYoungAudienceProfile } from '@/lib/profile/public-profile-access';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { isUnclaimedStructuredCreditProfile } from '@/lib/profile/unclaimed-artist-profile';
 import { getCachedPublicReleasesForProfile } from '@/lib/releases/public-release-loader';
@@ -288,6 +289,7 @@ async function ArtistPageContent({
     latestRelease,
     pressPhotos,
   } = profileResult;
+  const pixelsAllowed = !isYoungAudienceProfile(profile?.settings);
 
   if (status === 'error') {
     return <PublicProfileErrorState retryHref={`/${username.toLowerCase()}`} />;
@@ -328,14 +330,12 @@ async function ArtistPageContent({
 
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
-  const isClaimed = creatorClerkId !== null;
+  const isClaimed = Boolean(profile.is_claimed);
   const isProofProfile = isProofProfileHandle(artist.handle);
   const proofClaim = resolveProofClaimCta();
   const requiresVerifiedOwnership =
     !isClaimed && isUnclaimedStructuredCreditProfile(profile.settings);
-  // Structured-credit profiles still expose a claim path when an exact
-  // Spotify identity exists. The route only seeds a pending flow; the
-  // onboarding Spotify action must match that exact ID before claiming.
+  // Exact Spotify identity seeds a pending flow; onboarding action verifies match.
   const directClaimSupported = supportsDirectProfileClaim({
     spotifyId: profile.spotify_id,
   });
@@ -344,6 +344,7 @@ async function ArtistPageContent({
       id: profile.id,
       username: artist.handle,
       isClaimed,
+      userId: profile.user_id,
       userClerkId: creatorClerkId,
       spotifyId: profile.spotify_id,
     },
@@ -490,13 +491,10 @@ async function ArtistPageContent({
       {isPublicNoAuthSmoke || isClaimed ? null : (
         <SignupFunnelBeacon surface='profile_claim' trackLanding={false} />
       )}
-      {/* Server-side pixel tracking */}
-      {isPublicNoAuthSmoke ? null : <JoviePixel profileId={profile.id} />}
-      {/* Browser Meta pixel (fbq) — builds the retargeting website custom
-          audience; CAPI alone cannot (JOV-5078). Creator pixel is
-          entitlement-gated in the loader; the Jovie platform pixel is the
-          customer-one retarget path. */}
-      {isPublicNoAuthSmoke ? null : (
+      {isPublicNoAuthSmoke || !pixelsAllowed ? null : (
+        <JoviePixel profileId={profile.id} />
+      )}
+      {isPublicNoAuthSmoke || !pixelsAllowed ? null : (
         <MetaPixel
           pixelIds={[creatorMetaPixelId, env.JOVIE_FACEBOOK_PIXEL_ID].filter(
             (id): id is string => Boolean(id)
@@ -651,8 +649,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   await enforceCanonicalPublicProfileUsername(username);
 
   const profileResult = await getProfileAndLinks(username);
-  const { profile, genres, status, creatorClerkId, latestRelease } =
-    profileResult;
+  const { profile, genres, status, latestRelease } = profileResult;
 
   if (status === 'error') {
     return PROFILE_ERROR_METADATA;
@@ -665,7 +662,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return buildPublicProfileMetadata({
     profile,
     genres,
-    isClaimed: creatorClerkId !== null,
+    isClaimed: Boolean(profile.is_claimed),
     // latestRelease uses the public release-eligibility predicate, so null
     // means the profile has no publicly eligible release.
     hasPublicRelease: latestRelease !== null,

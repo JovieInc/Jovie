@@ -2860,7 +2860,7 @@ function scheduleDesktopAutoUpdate(): void {
   powerMonitor.on('unlock-screen', checkAfterWake);
 }
 
-/** Restart into a downloaded update only overnight, idle, and with no work at risk. */
+/** Restart into a downloaded update when idle with no work at risk. */
 const installDownloadedUpdateIfIdle = singleFlight(async () => {
   if (!updateReadyToInstall || nightlyUpdateLaunch) return;
   const workStateSafe = await allWindowWorkStateSafe();
@@ -3561,12 +3561,13 @@ function getAuthReturnProtocolClientArgs():
     readonly defaultApp?: boolean;
   };
 
+  const devScriptArg = process.argv[1];
   if (
     defaultAppProcess.defaultApp &&
-    process.argv.length >= 2 &&
+    devScriptArg !== undefined &&
     !app.isPackaged
   ) {
-    return [process.execPath, [path.resolve(process.argv[1])]];
+    return [process.execPath, [path.resolve(devScriptArg)]];
   }
   return null;
 }

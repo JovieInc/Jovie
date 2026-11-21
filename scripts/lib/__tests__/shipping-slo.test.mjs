@@ -618,22 +618,27 @@ describe('shipping SLO intake delivery', () => {
     expect((await run(state, 'oct08')).findings[0].issue).toBe('JOV-9001');
     expect(state.issues).toHaveLength(1);
   });
-  it.each(['lookup', 'graphql', 'incomplete'])(
-    'fails visibly without creating on %s lookup',
-    async failure => {
-      const state = makeState();
-      state.failure = failure;
-      expect(await run(state)).toMatchObject({
-        status: 'failed',
-        findings: [
-          { status: 'failed', retryDecision: 'reconcile-before-retry' },
-        ],
-      });
-      expect(state.calls.some(call => call.query.includes('mutation'))).toBe(
-        false
-      );
-    }
-  );
+  it.each([
+    ['lookup', 'owner_lookup_failed'],
+    ['graphql', 'owner_lookup_failed'],
+    ['incomplete', 'open_children_lookup_incomplete'],
+  ])('fails visibly without creating on %s lookup', async (failure, reason) => {
+    const state = makeState();
+    state.failure = failure;
+    expect(await run(state)).toMatchObject({
+      status: 'failed',
+      findings: [
+        {
+          status: 'failed',
+          reason,
+          retryDecision: 'reconcile-before-retry',
+        },
+      ],
+    });
+    expect(state.calls.some(call => call.query.includes('mutation'))).toBe(
+      false
+    );
+  });
   it('missing credentials or owner routing never falls back to GitHub', async () => {
     const state = makeState();
     const receipt = await deliverReport(report(), {
@@ -645,7 +650,7 @@ describe('shipping SLO intake delivery', () => {
     expect(receipt.findings[0].reason).toBe('missing_linear_api_key');
     expect(state.calls).toHaveLength(0);
     state.owner = null;
-    expect((await run(state)).findings[0].reason).toBe('owner_routing_missing');
+    expect((await run(state)).findings[0].reason).toBe('owner_lookup_failed');
     expect(state.issues).toHaveLength(0);
   });
   it.each(['create', 'comment', 'reopen'])(
@@ -669,29 +674,6 @@ describe('shipping SLO intake delivery', () => {
       ).toHaveLength(1);
     }
   );
-  it('keeps all four metric identities and flat growth separate across runs', async () => {
-    const state = makeState();
-    const input = report();
-    input.evaluation.regressions = [
-      'lead_time.devin.p95',
-      'lead_time.codex.p95',
-      'remediation.main_red_to_green.p95',
-      'throughput.verified_per_day',
-    ].map(key => ({ key, baseline: 100, observed: 130, changeFraction: 0.3 }));
-    input.evaluation.flatStall = true;
-    await run(state, 'oct05', input);
-    await run(state, 'oct07', input);
-    await run(state, 'oct07', input);
-    expect(state.issues).toHaveLength(5);
-    expect(state.issues.every(issue => issue.comments.length === 1)).toBe(true);
-    expect(
-      new Set(
-        state.issues.map(
-          issue => issue.description.match(/fingerprint: ([a-f0-9]+)/)[1]
-        )
-      ).size
-    ).toBe(5);
-  });
   it('duplicate canonical candidates fail without mutating either issue', async () => {
     const state = makeState();
     await run(state);
@@ -730,7 +712,7 @@ describe('shipping SLO intake delivery', () => {
     );
     expect(state.issues).toHaveLength(1);
   });
-  it('stops a sweep on a failed observation lookup and does not file later metrics', async () => {
+  it('stops on a failed observation lookup and never opens a second ranked issue', async () => {
     const state = makeState();
     await run(state);
     state.failure = 'comments';
@@ -738,6 +720,7 @@ describe('shipping SLO intake delivery', () => {
     input.evaluation.regressions.push({
       ...input.evaluation.regressions[0],
       key: 'lead_time.codex.p95',
+      changeFraction: 0.9,
     });
     expect((await run(state, 'oct07', input)).findings).toEqual([
       expect.objectContaining({ reason: 'comment_lookup_failed' }),
@@ -750,7 +733,7 @@ describe('shipping SLO intake delivery', () => {
         parseYaml(WORKFLOW)
       );
     const step = workflow.jobs.measure.steps.find(
-      step => step.name === 'File deduped slo-regression issues'
+      step => step.name === 'File ranked slo-regression issue'
     );
     expect(step.env.LINEAR_API_KEY).toBe('${{ secrets.LINEAR_API_KEY }}');
     expect(step.env.GH_TOKEN).toBeUndefined();

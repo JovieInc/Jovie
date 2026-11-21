@@ -70,6 +70,19 @@ describe('Golden Path nightly dispatches and exits (JOV-INV-042)', () => {
     }
   });
 
+  it('runs the manual journey without the unrelated public build or risk classifier', () => {
+    const golden = workflow('ci.yml').jobs['ci-golden-path'];
+    expect(golden.needs).not.toContain('ci-build-public');
+    expect(golden.needs).not.toContain('ci-risk-classifier');
+    expect(golden.if).not.toContain('ci-build-public');
+    expect(golden.if).toContain("needs.ci-path-changes.result == 'success'");
+    expect(golden.if).toContain("needs.neon-db.result == 'success'");
+    expect(golden.if).toContain("needs.neon-db.result == 'failure'");
+    expect(
+      golden.steps.some(s => s.name === 'Build real-Clerk golden-path artifact')
+    ).toBe(true);
+  });
+
   it('reports from the dispatched ci.yml run once the Golden Path job ends', () => {
     expect(reportJob.needs).toEqual(['ci-golden-path']);
     expect(reportJob.if).toContain('always()');

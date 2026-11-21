@@ -3,11 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { OvieHomeCanvas } from './OvieHomeCanvas';
-import {
-  COMPANY_RESPONSES,
-  INBOX,
-  snapshot,
-} from './OvieHomeCanvas.test-fixtures';
+import { COMPANY_RESPONSES, snapshot } from './OvieHomeCanvas.test-fixtures';
 
 vi.mock('@/components/feedback', () => ({
   toast: Object.assign(vi.fn(), {
@@ -53,7 +49,7 @@ describe('OvieHomeCanvas certificate', () => {
 
   beforeEach(() => {
     shipping.data = snapshot();
-    responses = { ...COMPANY_RESPONSES, '/api/ovie/inbox': INBOX };
+    responses = { ...COMPANY_RESPONSES };
     fetchMock.mockReset();
     fetchMock.mockImplementation(async (url: string) =>
       url in responses
@@ -64,58 +60,33 @@ describe('OvieHomeCanvas certificate', () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('is axe-clean while every section is loading', async () => {
+  it('is axe-clean while Story First is loading', async () => {
     shipping.data = undefined;
     fetchMock.mockImplementation(() => new Promise<Response>(() => {}));
     const { container } = renderCanvas();
 
-    expect(screen.queryByText('Vercel on-demand concurrency')).toBeNull();
-    expect(screen.getByTestId('home-loop-pulse')).toBeInTheDocument();
+    expect(screen.getByTestId('story-first-canvas')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 
-  it('is axe-clean with asks, shipping rows and company tiles loaded', async () => {
+  it('is axe-clean with bottleneck, glance, and stages loaded', async () => {
     const { container } = renderCanvas();
 
+    expect(await screen.findByTestId('story-first-bottleneck')).toBeVisible();
+    expect(await screen.findByTestId('story-first-stages')).toBeInTheDocument();
     expect(
-      await screen.findByText('Vercel on-demand concurrency')
-    ).toBeVisible();
-    expect(
-      await screen.findByTestId('home-loop-tile-runway')
-    ).toHaveTextContent('6 days');
-    expect(screen.getByTestId('home-loop-done')).toHaveTextContent('3 merges');
+      await screen.findByTestId('story-first-glance-shipping')
+    ).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 
-  it('is axe-clean with an empty inbox', async () => {
-    responses['/api/ovie/inbox'] = { cases: [], issues: [] };
-    const { container } = renderCanvas();
-
-    expect(
-      await screen.findByText('Nothing needs your decision.')
-    ).toBeVisible();
-    await expectNoA11yViolations(container);
-  });
-
-  it('is axe-clean when decisions cannot load', async () => {
-    delete responses['/api/ovie/inbox'];
-    const { container } = renderCanvas();
-
-    expect(await screen.findByText('Decisions could not load.')).toBeVisible();
-    await expectNoA11yViolations(container);
-  });
-
-  it('is axe-clean when an inbox source is missing', async () => {
-    responses['/api/ovie/inbox'] = {
-      ...INBOX,
-      issues: ['Requested work is unavailable.'],
+  it('is axe-clean when company glance sources fail', async () => {
+    responses = {
+      '/api/ovie/home/blocker': COMPANY_RESPONSES['/api/ovie/home/blocker'],
     };
     const { container } = renderCanvas();
 
-    expect(
-      await screen.findByText('Vercel on-demand concurrency')
-    ).toBeVisible();
-    expect(container).toHaveTextContent(/unavailable|source/i);
+    expect(await screen.findByTestId('story-first-canvas')).toBeVisible();
     await expectNoA11yViolations(container);
   });
 });

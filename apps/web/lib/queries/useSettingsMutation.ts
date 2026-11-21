@@ -33,6 +33,7 @@ export type SettingsUpdateInput = {
       exclude_self_from_analytics?: boolean;
       require_double_opt_in?: boolean;
       searchable?: boolean;
+      youngAudience?: boolean;
     };
   };
 };

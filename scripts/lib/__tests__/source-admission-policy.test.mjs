@@ -52,7 +52,8 @@ test('trusted source-read guards reject a deleted test on an old head and execut
       { mode: 0o755 }
     );
     // This fixture has no launch, profile, art-direction, ICP-language, copy, or oasdiff
-    // inventory, no apps/web/lib/domain/write-registry.json, no typescript (test-hygiene). Isolate those unrelated checkers, as pnpm above
+    // inventory, no anti-slop registry, no apps/web/lib/domain/write-registry.json,
+    // no typescript (test-hygiene). Isolate those unrelated checkers, as pnpm above
     // isolates the other guards, while checking its cwd. The older head
     // deletes scripts/, so the real art-direction, ICP-language, and oasdiff
     // runners are not on that checkout.
@@ -60,7 +61,7 @@ test('trusted source-read guards reject a deleted test on an old head and execut
       join(bin, 'node'),
       `#!/bin/sh
 case "$*" in
-  scripts/artist-launch-contract.mjs*|*scripts/artist-launch-contract.test.mjs|*scripts/artist-profile-conformance.mjs*|*scripts/artist-profile-conformance.test.mjs|*scripts/invariants/art-direction/*|*scripts/invariants/icp-language/*|*scripts/invariants/copy-leak/*|*scripts/invariants/oasdiff-breaking-change.mjs*|*scripts/invariants/oasdiff-breaking-change.test.mjs*|*scripts/domain-write-guard.mjs*|scripts/test-hygiene.mjs*)
+  scripts/artist-launch-contract.mjs*|*scripts/artist-launch-contract.test.mjs|*scripts/artist-profile-conformance.mjs*|*scripts/artist-profile-conformance.test.mjs|*scripts/invariants/art-direction/*|*scripts/invariants/icp-language/*|*scripts/invariants/copy-leak/*|*scripts/invariants/oasdiff-breaking-change.mjs*|*scripts/invariants/oasdiff-breaking-change.test.mjs*|*scripts/domain-write-guard.mjs*|scripts/test-hygiene.mjs*|*scripts/anti-slop/*)
     [ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9
     exit 0 ;;
 esac
@@ -129,6 +130,7 @@ exec "$SOURCE_FIXTURE_NODE" "$@"
     const cleared = invoke();
     assert.equal(cleared.status, 0, cleared.stdout + cleared.stderr);
     assert.match(cleared.stdout, /node-environment-files: exit 0/);
+    assert.match(cleared.stdout, /anti-slop: exit 0/);
     assert.match(cleared.stdout, /gate-weakening-detector: PASS/);
     assert.doesNotMatch(cleared.stdout, /gate-weakening-detector: FAIL/);
     assert.doesNotMatch(cleared.stdout, /detector-deleted /);
@@ -451,16 +453,9 @@ test('source admission loads the actual changelog guard from trusted base when a
   const git = (...args) =>
     execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
   try {
-    for (const file of [
-      'scripts/changelog-source-guard.mjs',
-      'scripts/lib/gh-retry.sh',
-      'scripts/lib/github-rate-limit.mjs',
-      'scripts/lib/daily-changelog-publication.mjs',
-      'scripts/lib/daily-changelog.mjs',
-      'scripts/lib/changelog-filter-rules.mjs',
-    ]) {
-      writeFileSync(join(repo, file), readFileSync(file));
-    }
+    // Match the workflow's scripts archive so new guard dependencies arrive
+    // automatically instead of maintaining a second, incomplete file list.
+    cpSync('scripts', join(repo, 'scripts'), { recursive: true });
     git('init', '--quiet');
     git('config', 'user.name', 'Source guard test');
     git('config', 'user.email', 'source-guard@example.invalid');

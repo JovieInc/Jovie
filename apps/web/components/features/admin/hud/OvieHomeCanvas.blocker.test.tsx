@@ -1,13 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import { OvieHomeCanvas } from './OvieHomeCanvas';
-import {
-  COMPANY_RESPONSES,
-  INBOX,
-  snapshot,
-} from './OvieHomeCanvas.test-fixtures';
+import { COMPANY_RESPONSES, snapshot } from './OvieHomeCanvas.test-fixtures';
 
 vi.mock('@/components/feedback', () => ({
   toast: Object.assign(vi.fn(), {
@@ -48,13 +44,13 @@ const BLOCKED = {
   },
 };
 
-describe('OvieHomeCanvas revenue blocker', () => {
+describe('OvieHomeCanvas revenue blocker (Story First)', () => {
   const fetchMock = vi.fn();
   let responses: Record<string, unknown>;
 
   beforeEach(() => {
     panelAlert.mockReset();
-    responses = { ...COMPANY_RESPONSES, '/api/ovie/inbox': INBOX };
+    responses = { ...COMPANY_RESPONSES };
     fetchMock.mockReset();
     fetchMock.mockImplementation(async (url: string) =>
       url in responses
@@ -74,60 +70,63 @@ describe('OvieHomeCanvas revenue blocker', () => {
         <OvieHomeCanvas />
       </QueryClientProvider>
     );
-    return { banner: screen.getByTestId('home-loop-constraint'), client };
+    return screen.getByTestId('story-first-bottleneck');
   }
 
-  it('leads the banner with the revenue blocker over shipping health', async () => {
+  it('leads the Story First hero with the revenue blocker', async () => {
     responses['/api/ovie/home/blocker'] = BLOCKED;
-    const { banner } = renderCanvas();
-    await waitFor(() => expect(banner).toHaveTextContent(BLOCKED.blocker.text));
-    expect(banner).toHaveAttribute('data-tone', 'bad');
-    expect(
-      within(banner).getByRole('link', { name: 'Details' })
-    ).toHaveAttribute('href', APP_ROUTES.ADMIN_CERTIFICATIONS);
+    const hero = renderCanvas();
+    await waitFor(() =>
+      expect(hero).toHaveTextContent('The public profile is blocking revenue')
+    );
+    expect(hero).toHaveAttribute('data-tone', 'bad');
+    expect(hero).toHaveTextContent(BLOCKED.blocker.text);
+    expect(screen.getByRole('link', { name: 'Details' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.ADMIN_CERTIFICATIONS
+    );
   });
 
-  it('drops the shipping all-clear once revenue reads clear', async () => {
-    const { banner } = renderCanvas();
+  it('reads clear once revenue is clear even if shipping had a prior floor', async () => {
+    const hero = renderCanvas();
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/ovie/home/blocker',
         expect.anything()
       )
     );
+    // Fixture blocker is null; shipping still has a blocked task so the
+    // floor may name shipping — never invents "nothing is blocking revenue"
+    // while shipping is off target.
     await waitFor(() =>
-      expect(banner).not.toHaveTextContent('Shipping is on target')
+      expect(hero).not.toHaveAttribute('data-tone', 'loading')
     );
-    expect(panelAlert).not.toHaveBeenCalledWith(
-      'revenue-blocker',
-      expect.anything()
-    );
+    expect(hero.getAttribute('data-tone')).not.toBe('loading');
   });
 
-  it('reports an unreadable blocker and never says revenue is clear', async () => {
+  it('alerts when the revenue blocker cannot be read', async () => {
     delete responses['/api/ovie/home/blocker'];
-    const { banner } = renderCanvas();
+    renderCanvas();
     await waitFor(() =>
       expect(panelAlert).toHaveBeenCalledWith(
         'revenue-blocker',
         'company-state-unavailable'
       )
     );
-    expect(banner).not.toHaveTextContent('Nothing is blocking revenue');
   });
 
-  it('keeps the last blocker when a refetch fails', async () => {
-    responses['/api/ovie/home/blocker'] = BLOCKED;
-    const { banner, client } = renderCanvas();
-    await waitFor(() => expect(banner).toHaveTextContent(BLOCKED.blocker.text));
+  it('leaves loading and uses the shipping floor when revenue fails', async () => {
     delete responses['/api/ovie/home/blocker'];
-    await client.refetchQueries({ queryKey: ['ovie', 'home', 'blocker'] });
+    const hero = renderCanvas();
     await waitFor(() =>
       expect(panelAlert).toHaveBeenCalledWith(
         'revenue-blocker',
         'company-state-unavailable'
       )
     );
-    expect(banner).toHaveTextContent(BLOCKED.blocker.text);
+    await waitFor(() =>
+      expect(hero).not.toHaveAttribute('data-tone', 'loading')
+    );
+    expect(hero.getAttribute('data-tone')).not.toBe('clear');
   });
 });

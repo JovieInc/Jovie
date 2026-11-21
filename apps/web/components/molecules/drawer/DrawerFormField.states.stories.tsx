@@ -24,7 +24,7 @@ const meta = {
   args: {
     label: 'Profile URL',
     htmlFor: 'profile-url-state',
-    children: <Input id='profile-url-state' defaultValue='jovie.com/tim' />,
+    children: <Input id='profile-url-state' defaultValue='jov.ie/tim' />,
   },
 } satisfies Meta<typeof DrawerFormField>;
 

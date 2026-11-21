@@ -48,10 +48,16 @@ describe('DrawerPropertyRow definition list semantics (JOV-8873)', () => {
   it('renders dt/dd pairs only when definitionList is set', () => {
     const { rerender } = render(
       <dl>
-        <DrawerPropertyRow label='Status' value='Ready' definitionList />
+        <DrawerPropertyRow
+          label='Status'
+          value='Ready'
+          labelClassName='text-xs'
+          definitionList
+        />
       </dl>
     );
     expect(screen.getByText('Status').tagName).toBe('DT');
+    expect(screen.getByText('Status')).toHaveClass('text-xs');
     expect(screen.getByText('Ready').tagName).toBe('DD');
 
     rerender(<DrawerPropertyRow label='Status' value='Ready' />);

@@ -109,7 +109,7 @@ const resolveIdentifier = (
 
 export async function GET() {
   try {
-    const { userId: clerkUserId } = await getCachedAuth();
+    const { userId: clerkUserId } = await getCachedAuth({ session: 'fresh' });
     if (!clerkUserId) {
       return NextResponse.json(
         { error: 'Unauthorized' },

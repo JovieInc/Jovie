@@ -1,6 +1,18 @@
 {
   "$schema": "jovie.surface-ia/v1",
   "_comment": "One canonical shell and IA registry for every Jovie surface (app, Ovie, public profile, smart link, marketing). Human contract: docs/design-system/shell-ia.md. Enforced by JOV-INV-047 (scripts/invariants/shell-ia.mjs). Paths are relative to apps/web. App screen recipes stay in data/appScreens; route scaffolds stay in docs/design-system/app-shell-route-scaffold-matrix.md.",
+  "iaContracts": {
+    "_comment": "Drift W1 documentation pointers — not executable wiring. Profile isomorphism (C2), Audience absorption (C3), settings admission monopoly (C4) live in docs/design-system/shell-ia.md. Home vs Inbox root label (T0.2) is Tim-gated and omitted here.",
+    "profileRepresentation": "docs/design-system/shell-ia.md#c2--profile-representation-isomorphism",
+    "audienceAbsorption": "docs/design-system/shell-ia.md#c3--audience-absorption",
+    "settingsAdmission": "docs/design-system/shell-ia.md#c4--settings-admission-monopoly",
+    "settingsAdmissionSources": [
+      "components/features/dashboard/dashboard-nav/config.ts#userSettingsNavigation",
+      "components/features/dashboard/dashboard-nav/config.ts#artistSettingsNavigation",
+      "components/features/settings/settings-decision-admission.ts"
+    ],
+    "audiencePrimaryDoor": "/app/contacts?tab=audience"
+  },
   "northStar": {
     "source": "https://linear.app/jovie/issue/JOV-9748",
     "statement": "The main content area is a living canvas. Chrome recedes; one motion grammar (circle, composer, voice) carries presence.",

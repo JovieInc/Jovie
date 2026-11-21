@@ -1,12 +1,15 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LinkRow } from '@/app/app/(shell)/links/links-model';
 import {
   RightPanelProvider,
   useRightPanel,
 } from '@/contexts/RightPanelContext';
+import {
+  linksBaseRow,
+  renderLinksWorkspace,
+} from './LinksPageClient.test-utils';
 
 const { copyToClipboardMock } = vi.hoisted(() => ({
   copyToClipboardMock: vi.fn(),
@@ -16,43 +19,18 @@ vi.mock('@/hooks/useClipboard', () => ({
   copyToClipboard: copyToClipboardMock,
 }));
 
+vi.mock('@/components/feedback', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+    warning: vi.fn(),
+    info: vi.fn(),
+  },
+}));
+
 import { LinksPageClient } from '@/app/app/(shell)/links/LinksPageClient';
 
-/**
- * The shell owns the right-rail slot (AppShellFrame renders whatever a route
- * registers through RightPanelProvider). Render the page inside a provider
- * with a visible slot so tests can assert the inspector presents through the
- * canonical entity rail instead of a local aside.
- */
-function RightPanelSlot() {
-  const panel = useRightPanel();
-  return <div data-testid='shell-right-panel-slot'>{panel}</div>;
-}
-
-function renderLinksWorkspace(ui: ReactElement, reactStrictMode = false) {
-  return render(
-    <RightPanelProvider>
-      {ui}
-      <RightPanelSlot />
-    </RightPanelProvider>,
-    { reactStrictMode }
-  );
-}
-
-const baseRow: LinkRow = {
-  id: 'row-1',
-  jovieUrl: 'https://jov.ie/tim/midnight-city',
-  title: 'Midnight City',
-  type: 'Release',
-  destination: 'https://open.spotify.com/album/xyz',
-  status: 'active',
-  clicks: 17,
-  clicksLabel: '7d clicks',
-  campaign: 'Fall Tour',
-  utmSummary: 'qr_code / print',
-  entityHref: '/app/releases/release-9',
-  createdAt: null,
-};
+const baseRow = linksBaseRow;
 
 describe('LinksPageClient', () => {
   beforeEach(() => {
@@ -128,8 +106,6 @@ describe('LinksPageClient', () => {
       'Jovie Link',
     ]);
 
-    // Numeric alignment matches the shared table idiom: right-aligned header
-    // and tabular numerals so digit widths stay stable across rows.
     const clicksHeader = within(table).getByRole('columnheader', {
       name: 'Clicks',
     });
@@ -149,7 +125,6 @@ describe('LinksPageClient', () => {
     const table = screen.getByRole('table');
     expect(table).toHaveAttribute('data-table-row-mode', 'dense');
     const row = screen.getByTestId('links-row-row-1');
-    // Shared row shell owns height, hover and focus states; no local copies.
     expect(row.className).toContain('system-b-table-row-shell');
     expect(row.className).toContain('system-b-table-row-hover');
     expect(row.className).toContain('system-b-table-row-focus-visible');
@@ -209,7 +184,6 @@ describe('LinksPageClient', () => {
       'links-row-row-c',
     ]);
 
-    // Open the first displayed row, then arrow to the second displayed row.
     await user.click(within(bodyRows[0]).getAllByRole('cell')[1]);
     const expectedNext = bodyRows[1];
     bodyRows[0].focus();
@@ -320,8 +294,6 @@ describe('LinksPageClient', () => {
       screen.getByRole('button', { name: 'jov.ie/tim/midnight-city' })
     );
 
-    // Entity-rail parity: the inspector must present through the shell's
-    // registered right-panel slot, not as a local aside next to the table.
     const slot = screen.getByTestId('shell-right-panel-slot');
     expect(within(slot).getByTestId('links-inspector')).toBeInTheDocument();
     expect(
@@ -363,7 +335,6 @@ describe('LinksPageClient', () => {
         reactStrictMode
       );
 
-      // Table row → rail: Enter on the row's action control opens the inspector.
       const rowButton = screen.getByRole('button', {
         name: 'jov.ie/tim/neon-sky',
       });
@@ -372,12 +343,8 @@ describe('LinksPageClient', () => {
 
       const slot = screen.getByTestId('shell-right-panel-slot');
       expect(within(slot).getByTestId('links-inspector')).toBeInTheDocument();
-
-      // Opening the desktop rail preserves focus on the originating row.
       expect(rowButton).toHaveFocus();
 
-      // The shell renders the rail after the route: Tab from the last row
-      // reaches the rail's header actions.
       await user.tab();
       expect(
         within(screen.getByTestId('links-inspector')).getByRole('button', {
@@ -385,8 +352,6 @@ describe('LinksPageClient', () => {
         })
       ).toHaveFocus();
 
-      // Escape → originating row: closing the rail returns focus to the row
-      // control that opened it instead of dropping focus on <body>.
       await user.keyboard('{Escape}');
       expect(screen.queryByTestId('links-inspector')).not.toBeInTheDocument();
       expect(document.activeElement).toBe(rowButton);
@@ -449,5 +414,33 @@ describe('LinksPageClient', () => {
     const inspector = screen.getByTestId('links-inspector');
     expect(inspector).toHaveTextContent('Neon Sky');
     expect(inspector).not.toHaveTextContent('Midnight City');
+  });
+
+  it('keeps the registered inspector element stable across page renders', async () => {
+    const user = userEvent.setup();
+    const panels: unknown[] = [];
+    function PanelProbe() {
+      panels.push(useRightPanel());
+      return null;
+    }
+    const rows = [baseRow];
+    const view = () => (
+      <RightPanelProvider>
+        <LinksPageClient rows={rows} />
+        <PanelProbe />
+      </RightPanelProvider>
+    );
+    const { rerender } = render(view());
+
+    await user.click(screen.getByText('Midnight City'));
+    const openPanel = panels.at(-1);
+    expect(openPanel).not.toBeNull();
+    const rendersWhileOpen = panels.length;
+
+    rerender(view());
+    rerender(view());
+
+    expect(panels.at(-1)).toBe(openPanel);
+    expect(panels.length - rendersWhileOpen).toBe(2);
   });
 });

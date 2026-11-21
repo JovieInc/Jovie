@@ -24,12 +24,8 @@ describe('insights page route contract', () => {
       'utf8'
     );
 
-    // Reuse of the canonical audience workspace navigation primitives —
-    // the same RouteSegmentControl + workspace-navigation options the
-    // Contacts/Audience tab renders — so Contacts/Audience stay reachable
-    // from the insights workspace (dogfood finding, 2026-11-10).
-    expect(source).toContain('getAudienceWorkspaceNavigation');
-    expect(source).toContain('RouteSegmentControl');
-    expect(source).toContain("aria-label='Audience Workspace'");
+    expect(source).toContain('AudienceWorkspaceSwitch');
+    expect(source).not.toContain('AppSegmentControl');
+    expect(source).not.toContain('RouteSegmentControl');
   });
 });

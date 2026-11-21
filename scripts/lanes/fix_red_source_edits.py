@@ -60,7 +60,9 @@ def regenerate_merged_generated(worktree: Path, paths, log, *, resolvers, sh, gu
             return False
     return sh(["git", "add", *generated], cwd=worktree, log=log).returncode == 0
 
-from fix_red_statement_merge import contained_by_main, contained_by_main_file  # noqa: F401
+from fix_red_statement_merge import (  # noqa: F401
+    _key, _statements, contained_by_main, contained_by_main_file,
+)
 from fix_red_diff_edits import (  # noqa: F401
     balance_added_headings, balance_heading_line, snap_added_conservative_spacing, strip_added_legacy_cache_exports,
 )
@@ -68,8 +70,103 @@ from fix_red_conflict_resolvers import (  # noqa: F401
     resolve_additive_certificate_waivers, resolve_additive_node_test_file,
     resolve_additive_node_tests_text, resolve_additive_statement_file,
 )
+from fix_red_pytest_count import resolve_pytest_count_file  # noqa: F401
 from fix_red_liveness_quota import resolve_liveness_quota_text  # noqa: F401
 from screen_debt_merge import resolve_subtractive_screen_debt  # noqa: F401
+
+_DESTRUCTURE_HUNK = re.compile(
+    r"^<<<<<<<[^\n]*\n(?P<ours>.*?)^=======\n(?P<theirs>.*?)^>>>>>>>[^\n]*\n",
+    re.M | re.S)
+_DESTRUCTURE_OPENING = re.compile(
+    r"^(?P<indent>[ \t]*)const \{ (?P<names>[A-Za-z_$][\w$]*(?:, [A-Za-z_$][\w$]*)*) \}"
+    r" = await (?P<expr>[A-Za-z_$][\w$.]*);\n\Z")
+
+
+def _destructure_side(text: str):
+    """First statement is one `const { names } = await expr;` plus additive trailers.
+
+    None for aliases, rest, a changed expression, control flow, or a trailer
+    that rebinds a destructured name.
+    """
+    statements = _statements(text)
+    if not statements:
+        return None
+    opened = _DESTRUCTURE_OPENING.fullmatch(statements[0])
+    if opened is None:
+        return None
+    names = opened["names"].split(", ")
+    if len(names) != len(set(names)):
+        return None
+    trailing: list[str] = []
+    seen: dict[str, str] = {}
+    for statement in statements[1:]:
+        key = _key(statement)
+        if key is None or (key.startswith("bind:") and key[5:] in names):
+            return None
+        prior = seen.get(key)
+        if prior is not None and prior != statement.strip():
+            return None
+        if prior is None:
+            seen[key] = statement.strip()
+            trailing.append(statement)
+    return opened["indent"], names, opened["expr"], trailing, seen
+
+
+def resolve_complementary_destructure_text(text: str) -> str | None:
+    """Union two-way hunks that only add names to the same awaited destructure.
+
+    Main's names stay first, then head-only names. Trailing statements follow
+    the same order. A diff3 hunk, a changed right-hand side, or any other
+    shape stays unresolved.
+    """
+    if "|||||||" in text:
+        return None
+    matches = list(_DESTRUCTURE_HUNK.finditer(text))
+    if not matches or text.count("<<<<<<<") != len(matches):
+        return None
+    pieces: list[str] = []
+    cursor = 0
+    for match in matches:
+        ours = _destructure_side(match["ours"])
+        theirs = _destructure_side(match["theirs"])
+        if ours is None or theirs is None:
+            return None
+        our_indent, our_names, our_expr, our_trailing, our_seen = ours
+        their_indent, their_names, their_expr, their_trailing, their_seen = theirs
+        if our_indent != their_indent or our_expr != their_expr:
+            return None
+        for key, body in our_seen.items():
+            prior = their_seen.get(key)
+            if prior is not None and prior != body:
+                return None
+            if key.startswith("bind:") and key[5:] in their_names:
+                return None
+        for key in their_seen:
+            if key.startswith("bind:") and key[5:] in our_names:
+                return None
+        names = list(dict.fromkeys([*their_names, *our_names]))
+        trail = list(their_trailing)
+        trail.extend(statement for statement in our_trailing
+                     if _key(statement) not in their_seen)
+        block = f"{their_indent}const {{ {', '.join(names)} }} = await {their_expr};\n" + "".join(trail)
+        pieces.append(text[cursor:match.start()])
+        pieces.append(block)
+        cursor = match.end()
+    resolved = "".join(pieces) + text[cursor:]
+    if re.search(r"(?m)^(?:<{7}|>{7}|={7})(?:\n|\Z)", resolved):
+        return None
+    return resolved
+
+
+def resolve_complementary_destructure_file(worktree: Path, rel: str) -> str | None:
+    """Resolve an on-disk two-way destructure conflict in a TypeScript file."""
+    if not re.fullmatch(r".+\.(?:[cm]?tsx?)", rel):
+        return None
+    try:
+        return resolve_complementary_destructure_text((worktree / rel).read_text())
+    except (OSError, UnicodeError):
+        return None
+
 
 # Same argv as lane_runner.WORKTREE_INSTALL. A fresh repair worktree has no
 # node_modules, so the pre-commit hook cannot find lint-staged and the merge
@@ -109,7 +206,7 @@ def commit_open_merge(worktree, paths, sh, log, *, guard=lambda: None) -> bool:
 
 
 def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merge_entries, guard=lambda: None, push: bool = True, stage_choice=None) -> bool:
-    """Union quoted lists, node:test blocks, Vitest statement insertions, waiver rows, dropped screen-debt rows, or split helper imports.
+    """Union quoted lists, node:test blocks, Vitest statement insertions, waiver rows, dropped screen-debt rows, split helper imports, or complementary awaited destructures.
 
     Main's order stays, then head-only lines. A prose hunk or any other shape aborts
     and leaves the PR to the model. The push is a fast-forward of the PR branch.
@@ -148,6 +245,8 @@ def resolve_additive_list_conflict(worktree: Path, branch: str, log, *, sh, merg
                         if candidate is not None:
                             text = candidate
                             extras.update(writes)
+                if text is None and not stage_choice:
+                    text = resolve_complementary_destructure_file(worktree, path)
             except OSError:
                 text = None
             if text is None:

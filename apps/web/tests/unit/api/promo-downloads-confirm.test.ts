@@ -19,6 +19,7 @@ const hoisted = vi.hoisted(() => {
   return {
     requireAuthMock: vi.fn(),
     getSessionContextMock: vi.fn(),
+    entitlementsMock: vi.fn(),
     handleUploadPresignedMock: vi.fn(),
     issueSignedTokenMock: vi.fn(),
     selectMock,
@@ -35,8 +36,8 @@ vi.mock('@vercel/blob/client', () => ({
   handleUploadPresigned: hoisted.handleUploadPresignedMock,
 }));
 
-vi.mock('@vercel/blob', () => ({
-  issueSignedToken: hoisted.issueSignedTokenMock,
+vi.mock('@/lib/blob-presigned', () => ({
+  issueBlobPutUploadToken: hoisted.issueSignedTokenMock,
 }));
 
 vi.mock('@/lib/auth/require-auth', () => ({
@@ -45,6 +46,10 @@ vi.mock('@/lib/auth/require-auth', () => ({
 
 vi.mock('@/lib/auth/session', () => ({
   getSessionContext: hoisted.getSessionContextMock,
+}));
+
+vi.mock('@/lib/entitlements/server', () => ({
+  getCurrentUserEntitlements: hoisted.entitlementsMock,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -59,6 +64,10 @@ vi.mock('@/lib/db/schema/content', () => ({
     id: 'release.id',
     creatorProfileId: 'release.creatorProfileId',
   },
+  discogRecordings: {},
+  discogReleaseTracks: {},
+  recordingArtists: {},
+  releaseArtists: {},
 }));
 
 vi.mock('@/lib/db/schema/promo-downloads', () => ({
@@ -83,12 +92,6 @@ vi.mock('@/lib/audio/blob-verifier', () => ({
       latencyMs: 1,
     });
   }),
-}));
-
-vi.mock('drizzle-orm', () => ({
-  and: vi.fn(),
-  eq: vi.fn(),
-  sql: vi.fn(),
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -123,6 +126,7 @@ describe('promo downloads API', () => {
       user: { isPro: true },
       profile: { id: 'profile_123' },
     });
+    hoisted.entitlementsMock.mockResolvedValue({ isPro: true });
     // The confirm route awaits `.where(...)` directly for the position lookup
     // and `.where(...).limit(1)` for the ownership lookup, so the where result
     // must be both thenable and chainable.
@@ -140,11 +144,16 @@ describe('promo downloads API', () => {
     hoisted.handleUploadPresignedMock.mockResolvedValue({
       type: 'blob.generate-presigned-url',
     });
-    hoisted.issueSignedTokenMock.mockResolvedValue({
-      delegationToken: 'delegation',
-      clientSigningToken: 'signing',
-      validUntil: Date.now() + 60_000,
-    });
+    hoisted.issueSignedTokenMock.mockImplementation(
+      async ({ allowedContentTypes, maximumSizeInBytes }) => ({
+        token: {
+          delegationToken: 'delegation',
+          clientSigningToken: 'signing',
+          validUntil: Date.now() + 60_000,
+        },
+        urlOptions: { allowedContentTypes, maximumSizeInBytes },
+      })
+    );
 
     const { POST } = await import(
       '@/app/api/promo-downloads/upload-token/route'
@@ -249,10 +258,7 @@ describe('promo downloads API', () => {
   });
 
   it('rejects non-Pro creators before inserting', async () => {
-    hoisted.getSessionContextMock.mockResolvedValue({
-      user: { isPro: false },
-      profile: { id: 'profile_123' },
-    });
+    hoisted.entitlementsMock.mockResolvedValue({ isPro: false });
 
     const { POST } = await import('@/app/api/promo-downloads/confirm/route');
     const response = await POST(
@@ -260,6 +266,7 @@ describe('promo downloads API', () => {
     );
 
     expect(response.status).toBe(403);
+    expect(hoisted.entitlementsMock).toHaveBeenCalledOnce();
     expect(hoisted.insertMock).not.toHaveBeenCalled();
   });
 });

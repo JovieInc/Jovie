@@ -33,6 +33,10 @@
     "ci.yml#ci-exact-head-coverage": {
       "pr": "source-validation.yml#coverage",
       "command": "node scripts/check-changed-test-coverage.mjs"
+    },
+    "ci.yml#ci-fast-typecheck": {
+      "pr": "source-validation.yml#unit",
+      "command": "node scripts/ci-fast-lanes.mjs"
     }
   },
   "exemptions": [
@@ -86,14 +90,14 @@
       "expiresOn": "2027-02-09"
     },
     {
-      "job": "ci.yml#ci-fast-typecheck",
+      "job": "ci.yml#ci-fast-remaining",
       "kind": "gap",
-      "reason": "The queue runs the typecheck lane of scripts/ci-fast-lanes.mjs; the PR runs a hand-copied typecheck in Source Validation, so a lane-only failure first shows in the queue.",
+      "reason": "The queue runs the remaining ci-fast lanes (actionlint, incident contract, storybook, playwright guards); the PR runs only a hand-picked subset of them.",
       "createdOn": "2026-11-11",
       "expiresOn": "2027-02-09"
     },
     {
-      "job": "ci.yml#ci-fast-remaining",
+      "job": "ci.yml#ci-fast-remaining-shards",
       "kind": "gap",
       "reason": "The queue runs the remaining ci-fast lanes (actionlint, incident contract, storybook, playwright guards); the PR runs only a hand-picked subset of them.",
       "createdOn": "2026-11-11",
@@ -122,6 +126,13 @@
     },
     {
       "job": "ci.yml#ci-fast-structural-lanes",
+      "kind": "gap",
+      "reason": "Structural lane-runner tests run only in the queue; no PR job runs the same lane commands.",
+      "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-fast-structural-lanes-shards",
       "kind": "gap",
       "reason": "Structural lane-runner tests run only in the queue; no PR job runs the same lane commands.",
       "createdOn": "2026-11-11",
@@ -172,14 +183,14 @@
     {
       "job": "ci.yml#ci-ios",
       "kind": "gap",
-      "reason": "Path-selected iOS unit and coverage run only in the queue; the PR runs only the portable iOS contract.",
+      "reason": "Merge queue drops iOS (hosted macOS pool). Source PRs run the portable iOS contract; path-selected Fast Unit + Coverage runs on queue-proven main via ci-apple-post-queue (and on unproven-main fallback via Path Changes).",
       "createdOn": "2026-11-11",
       "expiresOn": "2027-02-09"
     },
     {
       "job": "ci.yml#ci-macos",
       "kind": "gap",
-      "reason": "Path-selected Mac build and test run only in the queue; no PR job runs them.",
+      "reason": "Merge queue drops Mac (hosted macOS pool). Path-selected Mac build/test runs on queue-proven main via ci-apple-post-queue (and on unproven-main fallback via Path Changes).",
       "createdOn": "2026-11-11",
       "expiresOn": "2027-02-09"
     },

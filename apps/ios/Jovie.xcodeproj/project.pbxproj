@@ -13,6 +13,7 @@
 		A0F507500000000000000002 /* TeleprompterProposal.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000001 /* TeleprompterProposal.swift */; };
 		A0F507500000000000000004 /* TeleprompterCaptureController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000003 /* TeleprompterCaptureController.swift */; };
 		A0F507500000000000000010 /* TeleprompterCaptureOrientation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F50750000000000000000F /* TeleprompterCaptureOrientation.swift */; };
+		A0F507500000000000000012 /* TeleprompterCaptureFileIO.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000011 /* TeleprompterCaptureFileIO.swift */; };
 		A0F507500000000000000006 /* TeleprompterViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000005 /* TeleprompterViewModel.swift */; };
 		A0F507500000000000000008 /* TeleprompterOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000007 /* TeleprompterOverlayView.swift */; };
 		A0J0V3632A00000000000002 /* AppShellTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A00000000000001 /* AppShellTabBar.swift */; };
@@ -51,6 +52,14 @@
 		89B2D98342D65781B5E80A72 /* JovieApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00BCF42EFB99B5DAB4E0F400 /* JovieApp.swift */; };
 		964DEFE0F4D4206832B6888E /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 969DB5F8041C9A004CDB5234 /* RootView.swift */; };
 		A0J0WN39FEED0000000000AB2 /* WhatsNewFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0WN39FEED0000000000AB1 /* WhatsNewFeed.swift */; };
+		A0FV1384502 /* FirstValueLandingPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0FV1384501 /* FirstValueLandingPolicy.swift */; };
+		A0FV1384504 /* AppState+FirstValueLanding.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0FV1384503 /* AppState+FirstValueLanding.swift */; };
+		A0FV1384506 /* FirstValueLandingPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0FV1384505 /* FirstValueLandingPolicyTests.swift */; };
+		A0PI1385802 /* PostIdentityChatMeasurement.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PI1385801 /* PostIdentityChatMeasurement.swift */; };
+		A0PI1385804 /* ChatRepository+PostIdentityMeasurement.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PI1385803 /* ChatRepository+PostIdentityMeasurement.swift */; };
+		A0PI1385806 /* ChatAuthFailure.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PI1385805 /* ChatAuthFailure.swift */; };
+		A0PI1385808 /* AppShellChatUnderlayChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PI1385807 /* AppShellChatUnderlayChrome.swift */; };
+		A0PI1385810 /* PostIdentityChatMeasurementTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0PI1385809 /* PostIdentityChatMeasurementTests.swift */; };
 		1B178328D9174F7D903FA1E3 /* LiveRootContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFE7701B410E4EC0AF199EF8 /* LiveRootContainer.swift */; };
 		36A99669D08546B2A5146BE9 /* UITestHarnessViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15D65C5C4A874DD29736473D /* UITestHarnessViews.swift */; };
 		99FBB80FCDBD4660BE1B0DCC /* MobileChatPlaceholderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25CADBED3F6B431494F2C0DF /* MobileChatPlaceholderView.swift */; };
@@ -91,6 +100,7 @@
 		A0J0V25490000000000000008 /* MobileChatModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V25490000000000000007 /* MobileChatModels.swift */; };
 		A0GH13008000000000000002 /* VoiceCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0GH13008000000000000001 /* VoiceCaptureService.swift */; };
 		A0GH10380000000000000002 /* VoiceCaptureServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0GH10380000000000000001 /* VoiceCaptureServiceTests.swift */; };
+		A0F507500000000000000014 /* TeleprompterCaptureFileIOTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0F507500000000000000013 /* TeleprompterCaptureFileIOTests.swift */; };
 		A0J0V2549000000000000000A /* MobileChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V25490000000000000009 /* MobileChatView.swift */; };
 		687D02CF59BD4E45B18E1015 /* MobileChatMessageViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1798791CB4DC41E4A2599EEF /* MobileChatMessageViews.swift */; };
 		A0J0V36390000000000000002 /* ComposerWorkflowSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V36390000000000000001 /* ComposerWorkflowSheet.swift */; };
@@ -126,6 +136,8 @@
 		E26FB0F0CBAA2DE24B6BC572 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9924B177AFB753A4C23A4098 /* APIClient.swift */; };
 		FE4CE0000000000000000001 /* APIClientSessionFence.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE4CE0000000000000000002 /* APIClientSessionFence.swift */; };
 		FE4CE0000000000000000003 /* APIClientSessionFenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE4CE0000000000000000004 /* APIClientSessionFenceTests.swift */; };
+		FE4CE0000000000000000011 /* APIClient+FencedReads.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE4CE0000000000000000010 /* APIClient+FencedReads.swift */; };
+		FE4CE0000000000000000013 /* NativeSessionRevoker.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE4CE0000000000000000012 /* NativeSessionRevoker.swift */; };
 		49BA0DAF46944303A411D3C0 /* AuthTokenExchange.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBCC1BE3DF9E4B0785CD0D83 /* AuthTokenExchange.swift */; };
 		EBDA8137B767F16402C41C24 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4EAFC467F76300BCFC2659F /* Configuration.swift */; };
 		EE4CBA88057592FAFCD7F926 /* AppStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A93DB506915B418D06E897A4 /* AppStateTests.swift */; };
@@ -169,6 +181,7 @@
 		A0F507500000000000000001 /* TeleprompterProposal.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterProposal.swift; sourceTree = "<group>"; };
 		A0F507500000000000000003 /* TeleprompterCaptureController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterCaptureController.swift; sourceTree = "<group>"; };
 		A0F50750000000000000000F /* TeleprompterCaptureOrientation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterCaptureOrientation.swift; sourceTree = "<group>"; };
+		A0F507500000000000000011 /* TeleprompterCaptureFileIO.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterCaptureFileIO.swift; sourceTree = "<group>"; };
 		A0F507500000000000000005 /* TeleprompterViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterViewModel.swift; sourceTree = "<group>"; };
 		A0F507500000000000000007 /* TeleprompterOverlayView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterOverlayView.swift; sourceTree = "<group>"; };
 		A0J0V3632A00000000000001 /* AppShellTabBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellTabBar.swift; sourceTree = "<group>"; };
@@ -219,6 +232,14 @@
 		969C5D08D3E71A2D9824375A /* Jovie-logo.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; path = "Jovie-logo.png"; sourceTree = "<group>"; };
 		969DB5F8041C9A004CDB5234 /* RootView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		A0J0WN39FEED0000000000AB1 /* WhatsNewFeed.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WhatsNewFeed.swift; sourceTree = "<group>"; };
+		A0FV1384501 /* FirstValueLandingPolicy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FirstValueLandingPolicy.swift; sourceTree = "<group>"; };
+		A0FV1384503 /* AppState+FirstValueLanding.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "AppState+FirstValueLanding.swift"; sourceTree = "<group>"; };
+		A0FV1384505 /* FirstValueLandingPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FirstValueLandingPolicyTests.swift; sourceTree = "<group>"; };
+		A0PI1385801 /* PostIdentityChatMeasurement.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PostIdentityChatMeasurement.swift; sourceTree = "<group>"; };
+		A0PI1385803 /* ChatRepository+PostIdentityMeasurement.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "ChatRepository+PostIdentityMeasurement.swift"; sourceTree = "<group>"; };
+		A0PI1385805 /* ChatAuthFailure.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatAuthFailure.swift; sourceTree = "<group>"; };
+		A0PI1385807 /* AppShellChatUnderlayChrome.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellChatUnderlayChrome.swift; sourceTree = "<group>"; };
+		A0PI1385809 /* PostIdentityChatMeasurementTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PostIdentityChatMeasurementTests.swift; sourceTree = "<group>"; };
 		FFE7701B410E4EC0AF199EF8 /* LiveRootContainer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveRootContainer.swift; sourceTree = "<group>"; };
 		15D65C5C4A874DD29736473D /* UITestHarnessViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UITestHarnessViews.swift; sourceTree = "<group>"; };
 		25CADBED3F6B431494F2C0DF /* MobileChatPlaceholderView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatPlaceholderView.swift; sourceTree = "<group>"; };
@@ -227,6 +248,8 @@
 		9924B177AFB753A4C23A4098 /* APIClient.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		FE4CE0000000000000000002 /* APIClientSessionFence.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClientSessionFence.swift; sourceTree = "<group>"; };
 		FE4CE0000000000000000004 /* APIClientSessionFenceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = APIClientSessionFenceTests.swift; sourceTree = "<group>"; };
+		FE4CE0000000000000000010 /* APIClient+FencedReads.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "APIClient+FencedReads.swift"; sourceTree = "<group>"; };
+		FE4CE0000000000000000012 /* NativeSessionRevoker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NativeSessionRevoker.swift; sourceTree = "<group>"; };
 		FBCC1BE3DF9E4B0785CD0D83 /* AuthTokenExchange.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthTokenExchange.swift; sourceTree = "<group>"; };
 		A87250000000000000000001 /* ChatPresentationMeasurement.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatPresentationMeasurement.swift; sourceTree = "<group>"; };
 		A87250000000000000000002 /* ChatPresentationMonitor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatPresentationMonitor.swift; sourceTree = "<group>"; };
@@ -264,6 +287,7 @@
 		A0J0V25490000000000000007 /* MobileChatModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatModels.swift; sourceTree = "<group>"; };
 		A0GH13008000000000000001 /* VoiceCaptureService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceCaptureService.swift; sourceTree = "<group>"; };
 		A0GH10380000000000000001 /* VoiceCaptureServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceCaptureServiceTests.swift; sourceTree = "<group>"; };
+		A0F507500000000000000013 /* TeleprompterCaptureFileIOTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TeleprompterCaptureFileIOTests.swift; sourceTree = "<group>"; };
 		A0J0V25490000000000000009 /* MobileChatView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatView.swift; sourceTree = "<group>"; };
 		1798791CB4DC41E4A2599EEF /* MobileChatMessageViews.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileChatMessageViews.swift; sourceTree = "<group>"; };
 		A0J0V36390000000000000001 /* ComposerWorkflowSheet.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ComposerWorkflowSheet.swift; sourceTree = "<group>"; };
@@ -451,12 +475,15 @@
 				A0B10F00000000000000000C /* ObservabilityTests.swift */,
 				A0B10F000000000000000036 /* SentryHangTrackingPolicyTests.swift */,
 				A0GH10380000000000000001 /* VoiceCaptureServiceTests.swift */,
+				A0F507500000000000000013 /* TeleprompterCaptureFileIOTests.swift */,
 				448ADF9C21BB11784C6AD119 /* QRCodeRendererTests.swift */,
 				178C37B20F46EAF919EB2031 /* ScreenBrightnessManagerTests.swift */,
 				A0J0V26350000000000000003 /* MobileAuthFinalizationTests.swift */,
 				A0A344000000000000000003 /* AppShellIntentNavigationTests.swift */,
 				A0J0V36330000000000000003 /* AppShellDrawerThreadsFilterTests.swift */,
 				A0GH12170000000000000003 /* AppShellChatFirstTests.swift */,
+				A0FV1384505 /* FirstValueLandingPolicyTests.swift */,
+				A0PI1385809 /* PostIdentityChatMeasurementTests.swift */,
 				A0J0V3632A0000000000000F /* AppShellTabBarTests.swift */,
 				A0J0V58710000000000000001 /* PublicProfileBrowserMediaPolicyTests.swift */,
 				A0J0V36380000000000000008 /* AudienceHighlightsRepositoryTests.swift */,
@@ -495,6 +522,8 @@
 				A0J0V36330000000000000001 /* AppShellLeftDrawer.swift */,
 				A0J0V3632A00000000000001 /* AppShellTabBar.swift */,
 				4C2C97BF3A0B42C58A62529F /* AppShellView.swift */,
+				A0FV1384501 /* FirstValueLandingPolicy.swift */,
+				A0PI1385807 /* AppShellChatUnderlayChrome.swift */,
 				A0J0V3632A00000000000005 /* EntityContextSheet.swift */,
 				A0J0V3632A00000000000003 /* TalkOverlayView.swift */,
 				A0F17E100000000000000003 /* VlogTeleprompterCore.swift */,
@@ -537,6 +566,7 @@
 			children = (
 				A0F507500000000000000001 /* TeleprompterProposal.swift */,
 				A0F507500000000000000003 /* TeleprompterCaptureController.swift */,
+				A0F507500000000000000011 /* TeleprompterCaptureFileIO.swift */,
 				A0F50750000000000000000F /* TeleprompterCaptureOrientation.swift */,
 				A0F507500000000000000005 /* TeleprompterViewModel.swift */,
 				A0F507500000000000000007 /* TeleprompterOverlayView.swift */,
@@ -560,6 +590,7 @@
 			children = (
 				A0J0V36380000000000000005 /* AudienceHighlightsRepository.swift */,
 				9924B177AFB753A4C23A4098 /* APIClient.swift */,
+				FE4CE0000000000000000010 /* APIClient+FencedReads.swift */,
 				A07661000000000000000064 /* NativeAPIContracts.swift */,
 				A07661000000000000000066 /* ChatStateModels.swift */,
 				A07661000000000000000068 /* MobileWorkspaceMode.swift */,
@@ -568,6 +599,8 @@
 				FBCC1BE3DF9E4B0785CD0D83 /* AuthTokenExchange.swift */,
 				A0J0V25490000000000000001 /* ChatCache.swift */,
 				A0J0V25490000000000000003 /* ChatRepository.swift */,
+				A0PI1385803 /* ChatRepository+PostIdentityMeasurement.swift */,
+				A0PI1385805 /* ChatAuthFailure.swift */,
 				918FBCBCF600AA8C10191F60 /* MeCache.swift */,
 				28FBA9F0D12E0BD1CB8B0B09 /* MeRepository.swift */,
 				A0J0V25490000000000000005 /* MobileChatClient.swift */,
@@ -587,6 +620,7 @@
 				10CDA6A50000000000000002 /* MobileHomeDataStore.swift */,
 				A0B10F00000000000000000B /* Observability */,
 				44B3D151E21A49C2876932A8 /* NativeSessionTokenStore.swift */,
+				FE4CE0000000000000000012 /* NativeSessionRevoker.swift */,
 				FE4CE0000000000000000002 /* APIClientSessionFence.swift */,
 				A0J0V26350000000000000001 /* MobileAuthFinalization.swift */,
 				000F426E1AB94DD5401C3341 /* QRCodeRenderer.swift */,
@@ -632,6 +666,7 @@
 				A0B10F000000000000000004 /* Observability.swift */,
 				A0B10F000000000000000003 /* ObservabilityRedactor.swift */,
 				A0B10F000000000000000001 /* ObservabilityTypes.swift */,
+				A0PI1385801 /* PostIdentityChatMeasurement.swift */,
 				A0B10F000000000000000002 /* NoopObservabilityProvider.swift */,
 				A0B10F000000000000000005 /* SentryObservabilityProvider.swift */,
 				A0B10F000000000000000031 /* ObservabilityReportBuilder.swift */,
@@ -681,6 +716,7 @@
 				2EBA07D5CBE04B0BBF053706 /* MobileAuthReturn.swift */,
 				969DB5F8041C9A004CDB5234 /* RootView.swift */,
 				A0J0WN39FEED0000000000AB1 /* WhatsNewFeed.swift */,
+				A0FV1384503 /* AppState+FirstValueLanding.swift */,
 				FFE7701B410E4EC0AF199EF8 /* LiveRootContainer.swift */,
 				15D65C5C4A874DD29736473D /* UITestHarnessViews.swift */,
 			);
@@ -866,6 +902,7 @@
 				A0B10F00000000000000000E /* ObservabilityTests.swift in Sources */,
 				A0B10F000000000000000037 /* SentryHangTrackingPolicyTests.swift in Sources */,
 				A0GH10380000000000000002 /* VoiceCaptureServiceTests.swift in Sources */,
+				A0F507500000000000000014 /* TeleprompterCaptureFileIOTests.swift in Sources */,
 				BD6A822847064E6F3E3E5228 /* QRCodeRendererTests.swift in Sources */,
 				DA762182661489283A851F6B /* ScreenBrightnessManagerTests.swift in Sources */,
 				A0J0V26350000000000000004 /* MobileAuthFinalizationTests.swift in Sources */,
@@ -873,6 +910,8 @@
 				A0A344000000000000000004 /* AppShellIntentNavigationTests.swift in Sources */,
 				A0J0V36330000000000000004 /* AppShellDrawerThreadsFilterTests.swift in Sources */,
 				A0GH12170000000000000004 /* AppShellChatFirstTests.swift in Sources */,
+				A0FV1384506 /* FirstValueLandingPolicyTests.swift in Sources */,
+				A0PI1385810 /* PostIdentityChatMeasurementTests.swift in Sources */,
 				A0J0V3632A00000000000010 /* AppShellTabBarTests.swift in Sources */,
 				A0J0V58710000000000000002 /* PublicProfileBrowserMediaPolicyTests.swift in Sources */,
 				A0J0V36380000000000000009 /* AudienceHighlightsRepositoryTests.swift in Sources */,
@@ -899,6 +938,12 @@
 				61A81E78D0B448B6A68F45AD /* MobileAuthReturn.swift in Sources */,
 				964DEFE0F4D4206832B6888E /* RootView.swift in Sources */,
 				A0J0WN39FEED0000000000AB2 /* WhatsNewFeed.swift in Sources */,
+				A0FV1384502 /* FirstValueLandingPolicy.swift in Sources */,
+				A0FV1384504 /* AppState+FirstValueLanding.swift in Sources */,
+				A0PI1385802 /* PostIdentityChatMeasurement.swift in Sources */,
+				A0PI1385804 /* ChatRepository+PostIdentityMeasurement.swift in Sources */,
+				A0PI1385806 /* ChatAuthFailure.swift in Sources */,
+				A0PI1385808 /* AppShellChatUnderlayChrome.swift in Sources */,
 				1B178328D9174F7D903FA1E3 /* LiveRootContainer.swift in Sources */,
 				36A99669D08546B2A5146BE9 /* UITestHarnessViews.swift in Sources */,
 				A87250000000000000000003 /* ChatPresentationMeasurement.swift in Sources */,
@@ -912,6 +957,7 @@
 				A0B10F000000000000000032 /* MetricKitReporter.swift in Sources */,
 				A0J0V36380000000000000006 /* AudienceHighlightsRepository.swift in Sources */,
 				E26FB0F0CBAA2DE24B6BC572 /* APIClient.swift in Sources */,
+				FE4CE0000000000000000011 /* APIClient+FencedReads.swift in Sources */,
 				A07661000000000000000065 /* NativeAPIContracts.swift in Sources */,
 				A07661000000000000000067 /* ChatStateModels.swift in Sources */,
 				A07661000000000000000069 /* MobileWorkspaceMode.swift in Sources */,
@@ -938,6 +984,7 @@
 				A0GH12706000000000000004 /* MobileActionLoopCalendarResponse.swift in Sources */,
 				10CDA6A50000000000000001 /* MobileHomeDataStore.swift in Sources */,
 				DA0F3A9E1C4B4B149B7D4C21 /* NativeSessionTokenStore.swift in Sources */,
+				FE4CE0000000000000000013 /* NativeSessionRevoker.swift in Sources */,
 				FE4CE0000000000000000001 /* APIClientSessionFence.swift in Sources */,
 				A0J0V26350000000000000002 /* MobileAuthFinalization.swift in Sources */,
 				ADC14533827EFD888D1ED50F /* QRCodeRenderer.swift in Sources */,
@@ -950,6 +997,7 @@
 				A0F17E100000000000000004 /* VlogTeleprompterCore.swift in Sources */,
 				A0F507500000000000000002 /* TeleprompterProposal.swift in Sources */,
 				A0F507500000000000000004 /* TeleprompterCaptureController.swift in Sources */,
+				A0F507500000000000000012 /* TeleprompterCaptureFileIO.swift in Sources */,
 				A0F507500000000000000010 /* TeleprompterCaptureOrientation.swift in Sources */,
 				A0F507500000000000000006 /* TeleprompterViewModel.swift in Sources */,
 				A0F507500000000000000008 /* TeleprompterOverlayView.swift in Sources */,

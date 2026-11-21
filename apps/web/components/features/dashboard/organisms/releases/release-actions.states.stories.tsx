@@ -206,8 +206,10 @@ export const RtlFullMenu: Story = {
   args: { onDelete: () => {}, onChangeStatus: () => {} },
   decorators: [withRtl],
   play: async ({ canvasElement }) => {
+    // The story's own helper renders a named <section>, whose implicit role
+    // is region.
     await expect(
-      within(canvasElement).getByRole('group', { name: 'Release actions' })
+      within(canvasElement).getByRole('region', { name: 'Release actions' })
     ).toBeVisible();
   },
 };

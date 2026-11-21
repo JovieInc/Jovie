@@ -1,9 +1,4 @@
-/**
- * Shared Data Access for Smart Link Pages
- *
- * Fetches creator and content data for the /{username}/{slug} routes.
- * Used by both the main smart link page and the /sounds page.
- */
+/** Shared Data Access for Smart Link Pages (`/{username}/{slug}` and `/sounds`). */
 
 import {
   and,
@@ -43,8 +38,11 @@ import {
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { env } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
+import {
+  isCreatorRowPubliclyVisible,
+  readPublicCreatorVisibilityByUsername,
+} from '@/lib/profile/public-creator-visibility.server';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
-import { shouldHideTestProfileFromDirectUrl } from '@/lib/profile/test-profile-policy';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import { logger } from '@/lib/utils/logger';
 import { shouldBypassPublicProfileQaCache } from '../../_lib/public-profile-qa';
@@ -514,6 +512,7 @@ const fetchCreatorByUsername = async (usernameNormalized: string) => {
       youtubeUrl: creatorProfiles.youtubeUrl,
       musicbrainzId: creatorProfiles.musicbrainzId,
       isClaimed: creatorProfiles.isClaimed,
+      isPublic: creatorProfiles.isPublic,
     };
     const fallbacks: Record<string, unknown> = {};
     optionalColumns.forEach((column, index) => {
@@ -531,35 +530,30 @@ const fetchCreatorByUsername = async (usernameNormalized: string) => {
 
     if (!creator) return null;
 
-    // Test/e2e/golden-path accounts have no public smart-link pages either.
-    if (creator.userId) {
-      const [owner] = await db
-        .select({ email: users.email })
-        .from(users)
-        .where(eq(users.id, creator.userId))
-        .limit(1);
-      if (
-        shouldHideTestProfileFromDirectUrl({
-          handle: creator.usernameNormalized,
-          ownerEmail: owner?.email,
-          settings: creator.settings,
-        })
-      ) {
-        return null;
-      }
+    const ownerEmail = creator.userId
+      ? (
+          await db
+            .select({ email: users.email })
+            .from(users)
+            .where(eq(users.id, creator.userId))
+            .limit(1)
+        )[0]?.email
+      : null;
+    if (
+      !isCreatorRowPubliclyVisible({
+        handle: creator.usernameNormalized,
+        isPublic: creator.isPublic,
+        ownerEmail,
+        settings: creator.settings,
+      })
+    ) {
+      return null;
     }
 
-    // Schema-rollout fallback only: this is not canonical profile state.
-    // Revisit once these columns exist in every environment.
     return { ...fallbacks, ...creator };
   }, `smartLinkCreator(${usernameNormalized})`);
 };
 
-/**
- * Get creator with caching.
- * Uses unstable_cache for cross-request caching with targeted invalidation.
- * Wrapped in React.cache() for per-request deduplication.
- */
 export const getCreatorByUsername = cache(
   async (usernameNormalized: string) => {
     if (
@@ -585,18 +579,23 @@ export const getCreatorByUsername = cache(
     }
 
     try {
-      return await unstable_cache(
-        () => fetchCreatorByUsername(usernameNormalized),
-        [`smartlink-creator-${usernameNormalized}`],
-        {
-          tags: sanitizeCacheTags([
-            'smartlink-creator',
-            `smartlink-creator:${usernameNormalized}`,
-            `profile:${usernameNormalized}`,
-          ]),
-          revalidate: 3600,
-        }
-      )();
+      const [authority, cached] = await Promise.all([
+        readPublicCreatorVisibilityByUsername(usernameNormalized),
+        unstable_cache(
+          () => fetchCreatorByUsername(usernameNormalized),
+          [`smartlink-creator-${usernameNormalized}`],
+          {
+            tags: sanitizeCacheTags([
+              'smartlink-creator',
+              `smartlink-creator:${usernameNormalized}`,
+              `profile:${usernameNormalized}`,
+            ]),
+            revalidate: 3600,
+          }
+        )(),
+      ]);
+      if (!authority || !cached || cached.id !== authority.id) return null;
+      return { ...cached, isClaimed: Boolean(authority.isClaimed) };
     } catch (error) {
       logger.error(
         'Failed to load smart-link creator',
@@ -623,9 +622,7 @@ const PROVIDER_LINK_COLUMNS = {
   externalId: providerLinks.externalId,
 } as const;
 
-/**
- * Fetch content (release or track) by creator and slug.
- */
+/** Fetch content (release or track) by creator and slug. */
 const fetchContentBySlug = async (
   creatorProfileId: string,
   slug: string

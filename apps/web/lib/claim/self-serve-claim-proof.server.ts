@@ -64,6 +64,9 @@ export function prepareSelfServeClaimProof(input: {
   readonly artistName: string | null;
   /** A prebuilt profile claimed by its Spotify match. */
   readonly directClaim: boolean;
+  readonly followers?: number | null;
+  readonly source?: string;
+  readonly now?: Date;
 }): SelfServeClaimProof {
   const { profile } = input;
   const attachesIdentity =
@@ -74,13 +77,18 @@ export function prepareSelfServeClaimProof(input: {
           settings: input.settings,
           spotifyArtistId: input.spotifyArtistId,
           artistName: input.artistName,
-          followers: null,
+          followers: input.followers ?? null,
           proofCode: generateProofCode(),
-          now: new Date(),
+          now: input.now ?? new Date(),
         })
       : null;
   const apply = (settings: Record<string, unknown>) =>
     record ? withClaimVerification(settings, record) : settings;
+  const source =
+    input.source ??
+    (input.directClaim
+      ? 'direct_profile_spotify_match'
+      : 'onboarding_spotify_connect');
 
   return {
     record,
@@ -96,9 +104,7 @@ export function prepareSelfServeClaimProof(input: {
           'claim_private_created',
           {
             profileId: profile.id,
-            source: input.directClaim
-              ? 'direct_profile_spotify_match'
-              : 'onboarding_spotify_connect',
+            source,
             requestedAtMs,
           },
           {

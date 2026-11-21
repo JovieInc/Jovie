@@ -45,6 +45,7 @@ export function certifiedArtifactName(servedSha) {
 // Entry points whose relative-import closure decides a certification.
 export const PRODUCER_ENTRIES = Object.freeze([
   'scripts/prod-cert.mjs',
+  'scripts/golden-path-cert-reuse.mjs',
   'scripts/invariants/pen-golden-path.mjs',
   'scripts/invariants/pen-still-diff.mjs',
   'scripts/lib/golden-path-cert-reuse.mjs',

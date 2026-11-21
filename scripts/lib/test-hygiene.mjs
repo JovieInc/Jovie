@@ -1,7 +1,7 @@
 // Static test-hygiene rules for slop mutation testing can't see (2026-11-15 sweep): a test that can never fail, never runs,
 // or only checks its own mocks still scores as coverage. Pure: path and text in, findings out.
 import ts from 'typescript';
-
+import * as landmines from './test-hygiene-landmines.mjs';
 export const RULES = Object.freeze({
   focused: 'focused test (only modifier, fit, fdescribe) left in',
   skipped:
@@ -21,10 +21,11 @@ export const RULES = Object.freeze({
   'over-mocked':
     'a vi.mock beyond the 8th in one file: the test mostly checks its own mocks',
 });
-
 /** Rules with no baseline: any finding fails. */
-export const ZERO_TOLERANCE = Object.freeze(['focused']);
-
+export const ZERO_TOLERANCE = Object.freeze([
+  'focused',
+  ...landmines.LANDMINE_ZERO_TOLERANCE,
+]);
 const TEST_FNS = new Set(['it', 'test']);
 const SUITE_FNS = new Set(['describe', 'suite']);
 // Members that keep test(...) one test; test.describe, test.step and hooks are not tests of their own.
@@ -412,6 +413,7 @@ export function scanTestFile(file, text, { unit = true } = {}) {
   visit(source);
   for (let n = MOCK_BUDGET + 1; n <= mocks; n++)
     findings.push({ rule: 'over-mocked', line: 1, name: `vi.mock #${n}` });
+  findings.push(...landmines.landmineFindings(file, source, line));
   return findings;
 }
 

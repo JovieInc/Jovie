@@ -82,7 +82,22 @@ export function collect({
       })(),
     }));
 
-  const query = `query($q:String!,$after:String){search(query:$q,type:ISSUE,first:100,after:$after){pageInfo{hasNextPage endCursor}nodes{...on PullRequest{number mergedAt timelineItems(itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT],last:10){totalCount nodes{...on AddedToMergeQueueEvent{createdAt}}}}}}}`;
+  // The earliest ADD is independent of the bounded suffix, even for a PR
+  // that entered the queue more than ten times or before the report window.
+  const query = `query($q:String!,$after:String) {
+    search(query:$q,type:ISSUE,first:100,after:$after) {
+      pageInfo { hasNextPage endCursor }
+      nodes { ... on PullRequest {
+        number baseRefName mergedAt
+        firstAdmission: timelineItems(itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT],first:1) {
+          nodes { ... on AddedToMergeQueueEvent { createdAt } }
+        }
+        timelineItems(itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT],last:10) {
+          totalCount nodes { ... on AddedToMergeQueueEvent { createdAt } }
+        }
+      } }
+    }
+  }`;
   const mergedPrs = [];
   let after = null;
   let mergedComplete = false;
@@ -95,11 +110,39 @@ export function collect({
       `q=repo:${repo} is:pr is:merged merged:>=${since.slice(0, 19)}Z`,
     ];
     if (after) args.push('-f', `after=${after}`);
-    const body = gh(args).data.search;
+    // A partial GraphQL response (including a gh non-zero exit) cannot
+    // certify this cohort. Keep independently collected Actions telemetry.
+    let response;
+    try {
+      response = gh(args);
+    } catch {
+      completeness.mergedPrSearchError = 'request-failed';
+      break;
+    }
+    const body = response?.data?.search;
+    if (
+      response?.errors?.length ||
+      !Array.isArray(body?.nodes) ||
+      body.nodes.some(
+        pr =>
+          !Number.isFinite(Date.parse(pr?.mergedAt)) ||
+          !Array.isArray(pr.timelineItems?.nodes) ||
+          pr.timelineItems.nodes.some(
+            n => !Number.isFinite(Date.parse(n?.createdAt))
+          )
+      ) ||
+      typeof body.pageInfo?.hasNextPage !== 'boolean'
+    ) {
+      completeness.mergedPrSearchError = 'incomplete-response';
+      break;
+    }
     for (const pr of body.nodes) {
       mergedPrs.push({
         number: pr.number,
+        baseRefName: pr.baseRefName,
         mergedAt: pr.mergedAt,
+        firstAdmission: pr.firstAdmission,
+        admissionCount: pr.timelineItems.totalCount,
         enqueuedAt: pr.timelineItems.nodes.map(n => n.createdAt),
         queueEventsComplete:
           Number.isInteger(pr.timelineItems.totalCount) &&
@@ -126,6 +169,9 @@ export function collect({
       prRunsComplete: completeness.pull_request,
       groupRunsComplete: completeness.merge_group,
       mergedPrsComplete: mergedComplete,
+      ...(completeness.mergedPrSearchError && {
+        mergedPrSearchError: completeness.mergedPrSearchError,
+      }),
       jobsComplete: sampledGroupJobs.every(s => s.complete),
       queueEventsComplete: mergedPrs.every(p => p.queueEventsComplete),
     },
@@ -156,6 +202,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       `- merge-group CI p50 ${m(summary.mergeGroupCiSeconds.p50)} p95 ${m(summary.mergeGroupCiSeconds.p95)}`,
       `- PR CI p50 ${m(summary.prCiSeconds.p50)} p95 ${m(summary.prCiSeconds.p95)}`,
       `- queue wait p50 ${m(summary.queueWaitSeconds.p50)} p95 ${m(summary.queueWaitSeconds.p95)}`,
+      `- first native entry to main merge p50 ${m(summary.mainFirstAdmission.firstEntryToMergeSeconds.p50)} p95 ${m(summary.mainFirstAdmission.firstEntryToMergeSeconds.p95)} (n=${summary.mainFirstAdmission.firstEntryToMergeSeconds.n}, merged PRs only)`,
       `- runner-min/merge ${summary.mergeGroupRunnerMinutesPerMerge}`,
       ...summary.criticalPath.map(
         j => `- ${j.name}: p50 ${m(j.p50)} last ${j.lastShare}`

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useLayoutEffect } from 'react';
 import { LISTEN_COOKIE } from '@/constants/app';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import {
@@ -88,13 +88,22 @@ function readListenCookie(): string | undefined {
  * automatic redirect fires at most once per SmartLink per tab session and is
  * suppressed entirely on history traversals, so browser Back always renders
  * the page. Explicit `?dsp=` taps are user intent and always redirect.
+ *
+ * Hop runs in `useLayoutEffect` (before paint) with a fire-and-forget beacon
+ * so preferred-DSP fans never wait on `/api/track` or see a blank pre-hop
+ * beat. Never await tracking on this path.
+ *
+ * Craft lock: this hop is the speed path for remembered preference / `?dsp=`.
+ * It does not replace the DSP dial (`MusicServiceDial` / `ActionDial`). First
+ * visits, Back, same-session revisits, and `noredirect=1` still render the
+ * dial on the smartlink page — never a button wall.
  */
 export function PreferredDspRedirect({
   providerLinks,
   artistHandle,
   tracking,
 }: PreferredDspRedirectProps) {
-  useEffect(() => {
+  useLayoutEffect(() => {
     const searchParams = new URLSearchParams(globalThis.location.search);
     const explicitProvider = searchParams.get('dsp');
     const shouldSkipPreferredRedirect = searchParams.get('noredirect') === '1';
@@ -120,6 +129,7 @@ export function PreferredDspRedirect({
       writeSessionFlag(storageKey);
     }
 
+    // Beacon first (survives unload), then hop — never await the collector.
     if (artistHandle && tracking?.contentId && tracking?.contentType) {
       postJsonBeacon(
         '/api/track',

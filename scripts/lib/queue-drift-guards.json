@@ -70,6 +70,7 @@
       "scripts/invariants/duplicate-literals.baseline.json",
       "scripts/invariants/native-spacing-scale.baseline.json",
       "scripts/invariants/shell-ia.baseline.json",
+      "scripts/invariants/type-safety-ratchet.baseline.json",
       "scripts/shared-ui-visual-arbitrary.baseline.json"
     ]
   },

@@ -184,7 +184,8 @@ export interface AudioFileDescriptor {
  * reimplemented per registry.
  */
 export function normalizeMimeType(mimeType: string): string {
-  return mimeType.trim().toLowerCase().split(';', 1)[0];
+  const [base] = mimeType.trim().toLowerCase().split(';', 1);
+  return base ?? '';
 }
 
 export function extensionFromFileName(fileName: string): string | null {

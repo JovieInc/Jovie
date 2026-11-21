@@ -35,6 +35,7 @@ The harness, not the model, owns:
 | Shell `&&` conflicts: when every hunk is only an `&&` chain, keep base order and append head-only prefixes; `node --test` and vitest paths follow the same rule | `resolve_and_chain_conflict()`, `fix_red_classes.resolve_and_chain_text()` |
 | Quoted-list conflicts: when every hunk is only `'path',` or `"path",` entries, keep main's order and append head-only lines; double-quoted rows are then sorted so JSON path registries stay lexicographic. Any other hunk stays for the model | `resolve_additive_list_conflict()`, `fix_red_classes.resolve_additive_quoted_list_text()` |
 | Identifier-list conflicts: when every hunk is one comma-separated line of slugs, keep main's order and append head-only tokens; any other hunk stays for the model. The repair mutation budget is the class list plus the model dispatch, so a new class still runs | `resolve_identifier_list_conflict()`, `fix_red_classes.merge_additive_identifier_list()`, `conflict_resolvers()` |
+| Awaited destructure conflicts: when every hunk starts with `const { names } = await expr;` for the same expression, keep main's names then head-only names and union the trailing statements. Aliases, a changed expression, or any other hunk stay for the model | `resolve_additive_list_conflict()`, `fix_red_source_edits.resolve_complementary_destructure_text()` |
 | Liveness quota conflicts: when every hunk is the quota-deferral union in `github-json-read.mjs` or `automation-liveness.mjs`, keep the rate-limit classifier short-circuit and the spent-budget deferral. Any other hunk stays for the model | `resolve_additive_list_conflict()`, `fix_red_liveness_quota.resolve_liveness_quota_text()` |
 | Certification JSON conflicts: component waivers that only add rows are written as their union, sorted by component path as the certificate gate requires. Screen debt that only drops rows keeps main's remaining order and drops either side's removals. A changed value stays unresolved | `resolve_additive_list_conflict()`, `resolve_additive_certificate_waivers()`, `resolve_subtractive_screen_debt()` |
 | Slot locks that die with their holder | `Locked` |
@@ -870,11 +871,18 @@ Needs-human, obsolete and ladder-exhausted share one PR comment marked
 Escalating, ladder-exhausted and surfaced PRs count toward the terminal cap (`slots × 4`)
 via `lane-fix-escalating` / `lane-fix-exhausted`.
 
-Non-PR intake from the relay is still a GitHub issue labeled `symphony-remediation` with a
-fingerprint marker (no new Actions secret). After a 30-minute claim window the tick converts
-it to one Linear issue labeled `remediation`, `agent-ready` and `ws:ci` /
-`ws:release-deploy` / `ws:reliability`. `ws:ci` is the first workstream rank, so those
-issues drain first.
+Non-PR intake files one Linear issue immediately (JOV-13077, Tim 2026-11-19: Linear is the
+single source of truth): one issue per fingerprint, labeled `remediation`, `agent-ready` and
+`ws:ci` / `ws:release-deploy` / `ws:reliability`, created through the deterministic-UUID
+fence in `pr_events.ensure_linear_intake`. A recurrence with new evidence updates the same
+issue with one occurrence comment. No GitHub issue is created; when a context has no Linear
+client (the hosted relay before the workflow half exports `LANES_LINEAR_APP_ENV`) the intake
+defers visibly and the next derivation re-files it — never a GitHub fallback. Legacy GitHub
+intake issues (including ones `main-red-remediate.mjs` still files) convert once via
+`convert_intake` after the 30-minute claim window and then close. `ws:ci` is the first
+workstream rank, so those issues drain first. The description header is load-bearing for the dedupe fence: a hand-edited
+intake description makes filing defer fail-closed (`intake-destination-binding-mismatch`)
+instead of re-filing.
 
 ### Label contract (`remediation:<fingerprint>`)
 

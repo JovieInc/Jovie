@@ -19,10 +19,8 @@ import type Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { enqueuePaidWelcomeAfterEntitlement } from '@/lib/email/paid-welcome';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
-import { attributeLeadPaidConversionByAppUserId } from '@/lib/leads/funnel-events';
 import {
   notifySlackCancellation,
   notifySlackUpgrade,
@@ -31,9 +29,12 @@ import { expireReferralOnChurn } from '@/lib/referrals/service';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
-import { admitPaidUser } from '@/lib/waitlist/paid-admission';
 
 import { BaseSubscriptionHandler } from '../base-handler';
+import {
+  canCompleteIdempotentPostEffects,
+  runActiveSubscriptionPostEffects,
+} from '../post-activation';
 import type {
   HandlerResult,
   SupportedEventType,
@@ -107,7 +108,8 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
         return this.handleUpdated(
           subscription,
           stripeEventId,
-          stripeEventTimestamp
+          stripeEventTimestamp,
+          event
         );
 
       case 'customer.subscription.deleted':
@@ -169,8 +171,7 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       eventType: 'subscription_created',
     });
 
-    // Send Slack notification for new subscription (fire-and-forget)
-    if (result.success && result.isActive && result.plan) {
+    if (result.success && !result.skipped && result.isActive && result.plan) {
       if (!result.appUserId) {
         throw new Error('Billing update omitted canonical app user ID');
       }
@@ -181,38 +182,19 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
 
     await invalidateBillingCache(result.appUserId ?? userId);
 
-    if (result.success && result.isActive) {
+    if (canCompleteIdempotentPostEffects(result) && result.isActive) {
       if (!result.appUserId) {
         throw new Error('Billing update omitted canonical app user ID');
       }
-      // Paying admits, including a subscription that turns active after an
-      // incomplete checkout (3DS, delayed payment).
-      await admitPaidUser({ appUserId: result.appUserId, cacheKeys: [userId] });
-      enqueuePaidWelcomeAfterEntitlement({
+      await runActiveSubscriptionPostEffects({
         appUserId: result.appUserId,
-        clerkUserId: userId,
+        userId,
         subscription,
         plan: result.plan,
+        correlation: result.correlation,
+        stripeEventTimestamp,
+        eventName: 'customer.subscription.created',
       });
-      try {
-        await attributeLeadPaidConversionByAppUserId(
-          result.appUserId,
-          subscription.id,
-          result.correlation
-        );
-      } catch (error) {
-        await captureCriticalError(
-          'Lead paid conversion outcome receipt failed',
-          error,
-          {
-            route: '/api/stripe/webhooks',
-            event: 'customer.subscription.created',
-            subscriptionId: subscription.id,
-            userId,
-          }
-        );
-        throw error;
-      }
     }
 
     return result;
@@ -285,8 +267,15 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
   private async handleUpdated(
     subscription: Stripe.Subscription,
     stripeEventId: string,
-    stripeEventTimestamp: Date
+    stripeEventTimestamp: Date,
+    event: Stripe.Event
   ): Promise<HandlerResult> {
+    const priorSubscriptionStatus =
+      event.data.previous_attributes &&
+      typeof event.data.previous_attributes === 'object' &&
+      'status' in event.data.previous_attributes
+        ? String(event.data.previous_attributes.status)
+        : undefined;
     const userId = await this.extractUserId(
       subscription,
       'customer.subscription.updated'
@@ -313,38 +302,20 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
 
     await invalidateBillingCache(result.appUserId ?? userId);
 
-    if (result.success && result.isActive) {
+    if (canCompleteIdempotentPostEffects(result) && result.isActive) {
       if (!result.appUserId) {
         throw new Error('Billing update omitted canonical app user ID');
       }
-      // Paying admits, including a subscription that turns active after an
-      // incomplete checkout (3DS, delayed payment).
-      await admitPaidUser({ appUserId: result.appUserId, cacheKeys: [userId] });
-      enqueuePaidWelcomeAfterEntitlement({
+      await runActiveSubscriptionPostEffects({
         appUserId: result.appUserId,
-        clerkUserId: userId,
+        userId,
         subscription,
         plan: result.plan,
+        correlation: result.correlation,
+        stripeEventTimestamp,
+        eventName: 'customer.subscription.updated',
+        priorSubscriptionStatus,
       });
-      try {
-        await attributeLeadPaidConversionByAppUserId(
-          result.appUserId,
-          subscription.id,
-          result.correlation
-        );
-      } catch (error) {
-        await captureCriticalError(
-          'Lead paid conversion outcome receipt failed',
-          error,
-          {
-            route: '/api/stripe/webhooks',
-            event: 'customer.subscription.updated',
-            subscriptionId: subscription.id,
-            userId,
-          }
-        );
-        throw error;
-      }
     }
 
     return result;
@@ -368,13 +339,14 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       'customer.subscription.deleted'
     );
 
-    // User is no longer pro - subscription has been permanently deleted
     const customerId = getCustomerId(subscription.customer);
     const result = await updateUserBillingStatus({
       clerkUserId: userId,
       isPro: false,
       stripeCustomerId: customerId ?? undefined,
       stripeSubscriptionId: null,
+      expectedSubscriptionId: subscription.id,
+      stripePriceId: null,
       stripeEventId,
       stripeEventTimestamp,
       eventType: 'subscription_deleted',
@@ -398,40 +370,33 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       throw new Error(`Failed to downgrade user: ${result.error}`);
     }
 
-    // Durable churn receipt keyed to the verified Stripe event id. Failure
-    // throws so the webhook stays retryable rather than permanently losing
-    // the churn measurement after entitlement was revoked.
-    const churnDelivery = await trackServerEvent(
-      'subscription_churned',
-      { stripeEventId },
-      undefined,
-      {
-        eventIdentity: `stripe:${stripeEventId}`,
-        occurredAt: stripeEventTimestamp,
-      }
-    );
-    if (!churnDelivery.ok) {
-      throw new Error(
-        `Churn analytics delivery failed: ${churnDelivery.error}`
+    if (canCompleteIdempotentPostEffects(result)) {
+      const churnDelivery = await trackServerEvent(
+        'subscription_churned',
+        { stripeEventId },
+        undefined,
+        {
+          eventIdentity: `stripe:${stripeEventId}`,
+          occurredAt: stripeEventTimestamp,
+        }
       );
-    }
-
-    // Mark referral as churned on cancellation.
-    // Awaited so failures are surfaced instead of silently dropped.
-    // If the user re-subscribes later via a new referral link, a fresh referral is created.
-    try {
-      if (result.appUserId) {
-        await expireReferralOnChurn(result.appUserId);
+      if (!churnDelivery.ok) {
+        throw new Error(
+          `Churn analytics delivery failed: ${churnDelivery.error}`
+        );
       }
-    } catch (error) {
-      // Log but don't fail the webhook — referral churn tracking is secondary
-      logger.warn('Failed to expire referral on subscription deletion', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
+
+      try {
+        if (result.appUserId) {
+          await expireReferralOnChurn(result.appUserId);
+        }
+      } catch (error) {
+        logger.warn('Failed to expire referral on subscription deletion', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
     }
 
-    // Notify founders of the cancellation (fire-and-forget — the alert must
-    // not fail the webhook or block entitlement revocation).
     if (!result.skipped) {
       this.sendCancellationNotification(result.appUserId).catch(err => {
         logger.warn(
@@ -450,28 +415,18 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
     };
   }
 
-  /**
-   * Extract user ID from subscription metadata with fallback to customer lookup.
-   *
-   * @param subscription - The Stripe subscription object
-   * @param eventType - The event type for error context
-   * @returns The Clerk user ID
-   * @throws If user cannot be identified
-   * @private
-   */
   private async extractUserId(
     subscription: Stripe.Subscription,
     eventType: string
   ): Promise<string> {
     let userId: string | undefined = subscription.metadata?.clerk_user_id;
+    const customerId = getCustomerId(subscription.customer);
 
-    // Fallback: Look up user by Stripe customer ID if metadata is missing
-    if (!userId && typeof subscription.customer === 'string') {
+    if (!userId && customerId) {
       await logFallback('No user ID in subscription metadata', {
         event: eventType,
       });
-      userId =
-        (await getUserIdFromStripeCustomer(subscription.customer)) ?? undefined;
+      userId = (await getUserIdFromStripeCustomer(customerId)) ?? undefined;
     }
 
     if (!userId) {

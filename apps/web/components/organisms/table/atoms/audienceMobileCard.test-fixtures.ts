@@ -1,0 +1,26 @@
+import type { AudienceMember } from '@/types';
+
+export const member: AudienceMember = {
+  id: 'member-1',
+  type: 'email',
+  displayName: 'Jamie Rivera',
+  locationLabel: '',
+  geoCity: null,
+  geoCountry: null,
+  visits: 1,
+  engagementScore: 50,
+  intentLevel: 'medium',
+  latestActions: [],
+  referrerHistory: [],
+  utmParams: {},
+  email: 'jamie@example.com',
+  emailVisibleToArtist: true,
+  phone: null,
+  spotifyConnected: false,
+  purchaseCount: 0,
+  tipAmountTotalCents: 0,
+  tipCount: 0,
+  tags: [],
+  deviceType: null,
+  lastSeenAt: null,
+};

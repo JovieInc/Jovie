@@ -59,7 +59,7 @@ async function postHandler(
   }
 
   const { id } = await context.params;
-  const auth = await getCachedAuth();
+  const auth = await getCachedAuth({ session: 'fresh' });
   const item = await recordFeedbackDisposition({
     feedbackItemId: id,
     disposition: parsed.data.disposition,

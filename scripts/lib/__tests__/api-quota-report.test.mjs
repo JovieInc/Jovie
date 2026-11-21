@@ -1,15 +1,19 @@
 import { readFileSync } from 'node:fs';
+
 import { resolve } from 'node:path';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 import {
   jobSeconds,
   parseQuotaNotice,
+  parseTallyNotice,
   percentile,
   projectDrain,
   summarizeHeadroom,
   summarizeQuota,
+  summarizeTally,
 } from '../api-quota-report.mjs';
+import { collectTally } from '../api-quota-tally.mjs';
 
 describe('api quota report', () => {
   it('summarizes hourly headroom with the share of empty samples', () => {
@@ -58,6 +62,7 @@ describe('api quota report', () => {
       )
     ).toEqual({
       bucket: 'github-token',
+      resource: 'core',
       remaining: 0,
       limit: 1000,
       used: 1000,
@@ -223,6 +228,7 @@ describe('quota windows follow the reset epoch, not the clock hour', () => {
   const sample = (secondsBeforeReset, remaining, bucket = 'github-token') => ({
     at: reset - secondsBeforeReset,
     bucket,
+    resource: 'core',
     remaining,
     limit: 5000,
     used: 5000 - remaining,
@@ -271,5 +277,219 @@ describe('quota windows follow the reset epoch, not the clock hour', () => {
         reset + 10
       )
     ).toEqual([]);
+  });
+});
+
+describe('gh call tally', () => {
+  const notice = (workflow, job, calls, githubToken) =>
+    parseTallyNotice(
+      `workflow=${workflow} job=${job} calls=${calls} github_token=${githubToken} other=${calls - githubToken} top=pr view:2,api graphql:1`
+    );
+
+  it('parses the job notice, including workflow names with spaces', () => {
+    expect(notice('Lane Fix Relay', 'relay', 5, 3)).toEqual({
+      workflow: 'Lane Fix Relay',
+      job: 'relay',
+      calls: 5,
+      githubToken: 3,
+      other: 2,
+      top: 'pr view:2,api graphql:1',
+    });
+    expect(parseTallyNotice('bucket=github-token remaining=1')).toBeNull();
+  });
+
+  it('sums github.token calls per workflow and job and ranks the top caller', () => {
+    const rows = summarizeTally(
+      [
+        notice('Lane Fix Relay', 'relay', 6, 4),
+        notice('Lane Fix Relay', 'relay', 4, 2),
+        notice('Fleet Rules Evidence', 'evidence', 2, 1),
+        null,
+      ],
+      2
+    );
+    expect(rows.map(row => row.key)).toEqual([
+      'Lane Fix Relay / relay',
+      'Fleet Rules Evidence / evidence',
+    ]);
+    expect(rows[0]).toMatchObject({
+      runs: 2,
+      calls: 10,
+      githubToken: 6,
+      githubTokenPerRun: 3,
+      githubTokenPerHour: 3,
+    });
+  });
+});
+
+describe('bounded tally collection', () => {
+  const now = 1_800_000_000_000;
+  const notice = {
+    title: 'gh-tally',
+    message:
+      'workflow=Relay job=relay calls=3 github_token=2 other=1 top=api:3',
+  };
+
+  it('stops diagnostic amplification at eight reads and discards partial totals', () => {
+    let reads = 0;
+    const read = path => {
+      reads += 1;
+      if (path.includes('/runs?'))
+        return {
+          workflow_runs: Array.from({ length: 60 }, (_, i) => ({
+            id: i + 1,
+            conclusion: 'success',
+          })),
+        };
+      if (path.includes('/jobs?'))
+        return {
+          jobs: Array.from({ length: 4 }, (_, i) => ({
+            id: i + 1,
+            conclusion: 'success',
+          })),
+        };
+      return [notice];
+    };
+    const result = collectTally(['--max-reads', '8'], read, now);
+    expect(reads).toBe(8);
+    expect(result).toMatchObject({
+      complete: false,
+      reason: 'read-budget',
+      reads: 8,
+      records: [],
+    });
+  });
+
+  it('discards observations after a failed read without reflecting raw provider text', () => {
+    let reads = 0;
+    const result = collectTally(
+      [],
+      path => {
+        reads += 1;
+        if (path.includes('/runs?'))
+          return { workflow_runs: [{ id: 1, conclusion: 'success' }] };
+        if (path.includes('/jobs?'))
+          return {
+            jobs: [
+              { id: 2, conclusion: 'success' },
+              { id: 3, conclusion: 'success' },
+            ],
+          };
+        if (reads === 4) throw new Error('sensitive provider output');
+        return [notice];
+      },
+      now
+    );
+    expect(result).toMatchObject({
+      complete: false,
+      reason: 'read-failed',
+      records: [],
+    });
+    expect(JSON.stringify(result)).not.toContain('sensitive provider output');
+  });
+});
+
+describe('tally completeness', () => {
+  const now = 1_800_000_000_000;
+  const notice = {
+    title: 'gh-tally',
+    message:
+      'workflow=Relay job=relay calls=3 github_token=2 other=1 top=api:3',
+  };
+  it('follows run, job and annotation pages before declaring completeness', () => {
+    const skipped = Array.from({ length: 100 }, (_, i) => ({
+      id: i + 1,
+      conclusion: 'skipped',
+    }));
+    const paths = [];
+    const result = collectTally(
+      [],
+      path => {
+        paths.push(path);
+        if (path.includes('fleet-rules-evidence')) return { workflow_runs: [] };
+        if (path.includes('/runs?'))
+          return {
+            workflow_runs: path.endsWith('page=1')
+              ? skipped
+              : [{ id: 201, conclusion: 'success' }],
+          };
+        if (path.includes('/jobs?'))
+          return {
+            jobs: path.endsWith('page=1')
+              ? skipped
+              : [{ id: 202, conclusion: 'success' }],
+          };
+        return path.endsWith('page=1')
+          ? Array.from({ length: 100 }, () => ({ title: 'other' }))
+          : [notice];
+      },
+      now
+    );
+    expect(result.complete).toBe(true);
+    expect(result.reads).toBe(7);
+    expect(result.records).toEqual([parseTallyNotice(notice.message)]);
+    expect(paths.filter(path => path.endsWith('page=2'))).toHaveLength(3);
+  });
+  it.each([
+    ['--max-reads', '97'],
+    ['--max-reads', '0'],
+    ['--hours', '-1'],
+    ['--max-runs', 'NaN'],
+  ])('rejects invalid options before reading: %s %s', (...args) => {
+    expect(
+      collectTally(
+        args,
+        () => {
+          throw new Error('must not read');
+        },
+        now
+      )
+    ).toMatchObject({ complete: false, reason: 'invalid-options', reads: 0 });
+  });
+  it('marks a run cap incomplete instead of silently selecting a prefix', () => {
+    const result = collectTally(
+      ['--max-runs', '1'],
+      path =>
+        path.includes('/runs?')
+          ? {
+              workflow_runs: [
+                { id: 1, conclusion: 'success' },
+                { id: 2, conclusion: 'success' },
+              ],
+            }
+          : { jobs: [] },
+      now
+    );
+    expect(result).toMatchObject({
+      complete: false,
+      reason: 'run-limit',
+      records: [],
+    });
+  });
+  it('rejects malformed pages and inconsistent tally notices', () => {
+    expect(collectTally([], () => ({}), now)).toMatchObject({
+      complete: false,
+      reason: 'malformed-response',
+    });
+    for (const message of [
+      'bad notice',
+      'workflow=Relay job=relay calls=3 github_token=9 other=1 top=api:3',
+    ]) {
+      const result = collectTally(
+        [],
+        path =>
+          path.includes('/runs?')
+            ? { workflow_runs: [{ id: 1, conclusion: 'success' }] }
+            : path.includes('/jobs?')
+              ? { jobs: [{ id: 2, conclusion: 'success' }] }
+              : [{ title: 'gh-tally', message }],
+        now
+      );
+      expect(result).toMatchObject({
+        complete: false,
+        reason: 'malformed-notice',
+        records: [],
+      });
+    }
   });
 });

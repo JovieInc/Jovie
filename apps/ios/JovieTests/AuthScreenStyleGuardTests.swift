@@ -125,7 +125,7 @@ struct AuthScreenStyleGuardTests {
     #expect(source.contains("static let artist = JovieColor.accentPurple"))
     #expect(source.contains("static let event = JovieColor.accentOrange"))
     // These existing motion contracts are outside the palette slice and remain protected.
-    #expect(source.contains("pressScale: CGFloat = 0.96"))
+    #expect(source.contains("pressScale: CGFloat = 0.98"))
     #expect(source.contains("timingCurve(0.4, 0, 0.2, 1, duration: subtleDuration)"))
     #expect(source.contains("timingCurve(0.22, 1, 0.36, 1, duration: cinematicDuration)"))
   }

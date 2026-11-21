@@ -1,7 +1,7 @@
 {
   "schema": "jovie-model-task-registry/v1",
   "_comment": "Every AI loop/task: type, current model, where it is configured (sourcePath must contain sourceMatch; the radar test fails CI on drift), buying channel, cost per run, quality metric and eval set. Screened by scripts/lanes/model_radar.py. automation = canon/automation-registry.jsonl id. status inactive = still drift-checked, never screened for successors.",
-  "updatedAt": "2026-11-14",
+  "updatedAt": "2026-11-19",
   "channels": {
     "subscription-claude": "Claude Code subscription (claude CLI). Marginal $0 inside the pool.",
     "subscription-codex": "ChatGPT/Codex subscription (codex CLI). Marginal $0 inside the pool.",
@@ -33,7 +33,6 @@
       "candidates": [
         "deepseek/deepseek-v4.1-flash",
         "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
-        "@cf/zai-org/glm-5.3-flash",
         "claude-haiku-5-5",
         "claude-sonnet-5-5",
         "claude-opus-5-5",

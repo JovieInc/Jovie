@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
+import { claimHrefWithAttribution } from '@/lib/claim/attribution';
 import {
   applyPendingClaimCookie,
   writePendingClaimContext,
@@ -13,10 +14,11 @@ import {
 } from '@/lib/leads/funnel-events';
 import { isTokenBackedClaimEligibleIdentity } from '@/lib/profile/public-profile-identity-policy';
 import {
-  allowIfRateLimitBackendDegraded,
   claimTokenAccessLimiter,
   createRateLimitHeaders,
   getClientIP,
+  rateLimitDenialMessage,
+  rateLimitDenialStatus,
 } from '@/lib/rate-limit';
 import { hashClaimToken } from '@/lib/security/claim-token';
 import { getProfileByUsername } from '@/lib/services/profile';
@@ -45,19 +47,22 @@ export async function GET(
   }
 
   // Throttle this unauthenticated entry before any DB work: each hit runs
-  // several profile/lead reads plus lead/cookie writes. A degraded (Redis-down)
-  // backend is treated as advisory so an outage never blocks a legitimate
-  // creator following their claim link.
+  // several profile/lead reads plus lead/cookie writes. Fail closed when Redis
+  // is unavailable so claim entry cannot become an unbounded write surface.
   const clientIp = getClientIP(request);
-  const rateLimit = allowIfRateLimitBackendDegraded(
-    await claimTokenAccessLimiter.limit(clientIp),
-    { route: '/claim/[token]' }
-  );
+  const rateLimit = await claimTokenAccessLimiter.limit(clientIp);
   if (!rateLimit.success) {
-    return new NextResponse('Too many requests', {
-      status: 429,
-      headers: createRateLimitHeaders(rateLimit),
-    });
+    return new NextResponse(
+      rateLimitDenialMessage(
+        rateLimit,
+        'Too many requests',
+        'Claim entry is temporarily unavailable. Please try again later.'
+      ),
+      {
+        status: rateLimitDenialStatus(rateLimit),
+        headers: createRateLimitHeaders(rateLimit),
+      }
+    );
   }
 
   const username = await lookupUsernameByClaimToken(token);
@@ -109,7 +114,12 @@ export async function GET(
       : `/${encodeURIComponent(profile.usernameNormalized)}/claim?token=${encodeURIComponent(token)}&next=auth`;
 
   return applyPendingClaimCookie(
-    NextResponse.redirect(buildAbsoluteUrl(request, destination)),
+    NextResponse.redirect(
+      buildAbsoluteUrl(
+        request,
+        claimHrefWithAttribution(destination, request.nextUrl.searchParams)
+      )
+    ),
     context
   );
 }

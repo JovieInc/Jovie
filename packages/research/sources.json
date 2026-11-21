@@ -44,7 +44,7 @@
       "usdPerCall": 0,
       "creditsPerCall": 2,
       "caps": { "dailyCalls": 40, "monthlyCalls": 400 },
-      "note": "Existing plan: 1000 credits per billing month; search costs 2 credits per 5 results. Cap keeps 20% for crawl jobs."
+      "note": "Requires FIRECRAWL_API_KEY in Doppler. Plan credits: 1000/month; search costs 2 credits per 5 results. Cap keeps 20% for crawl jobs."
     },
     "last30days": {
       "tier": 1,
@@ -81,7 +81,7 @@
         "dailyUsd": 1,
         "monthlyUsd": 15
       },
-      "note": "Existing EXA_API_KEY. Measured $0.007 per auto search with highlights (2026-10-20)."
+      "note": "Requires EXA_API_KEY (Doppler jovie-web + GH repo secret for VOC). Measured $0.007 per auto search with highlights (2026-10-20)."
     },
     "perplexity": {
       "tier": 2,

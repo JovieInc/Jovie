@@ -50,7 +50,10 @@ def gh_shape(args) -> dict:
         has_fields = any(a in WRITE_FLAGS and a not in ("-X", "--method") for a in args)
         effective = method or ("POST" if has_fields else "GET")
         write = effective not in ("GET", "HEAD")
-        if target in ("rate_limit", "/rate_limit") and effective == "GET":
+        if (target in ("rate_limit", "/rate_limit", "https://api.github.com/rate_limit")
+                and effective == "GET" and "--hostname" not in args
+                and not any(re.match(r"^(?:--(?:hostname|method|field|raw-field|input)=|-X.|-[fF].)", a)
+                            for a in args)):
             return {"resource": "core", "write": False, "idempotent": True, "cost": 0}
         return {"resource": "search" if target.lstrip("/").startswith("search/") else "core", "write": write,
                 "idempotent": (not write) or effective in ("PUT", "DELETE")}
@@ -180,6 +183,9 @@ def run_gh(args, priority: str = "default", credential: Optional[str] = None, st
         # Without HTTP evidence, only gh's known transport wording is transient.
         if fail["kind"] == "transient" and status is None and not GH_TRANSIENT.search(stderr):
             fail = failure("client", fail["retryAtMs"])
+        # A primary-free read still obeys the provider's complete secondary window.
+        if shape.get("cost") == 0 and fail["kind"] == "primary":
+            fail = failure("secondary", fail["retryAtMs"])
         observations = parse_budget(spec, headers, at, shape["resource"])
         if code == 0 and shape.get("cost") == 0:
             header_resources = {row["resource"] for row in observations}

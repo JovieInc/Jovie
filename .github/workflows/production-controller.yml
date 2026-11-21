@@ -1705,7 +1705,9 @@ jobs:
   publish-customer-changelog:
     name: Publish verified customer changelog
     needs: [authorize-production, production-verified]
-    if: ${{ needs.production-verified.outputs.verified == 'true' && needs.authorize-production.outputs.run_web == 'true' }}
+    # Optional upstream probes can be skipped even after Production Verified
+    # succeeds. Do not let their skipped status suppress publication.
+    if: ${{ !cancelled() && needs.authorize-production.result == 'success' && needs.production-verified.result == 'success' && needs.production-verified.outputs.verified == 'true' && needs.authorize-production.outputs.run_web == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -1757,7 +1759,7 @@ jobs:
             # 2026-10-25..29). Close it and regenerate: the publisher recollects
             # from the last merged receipt, so nothing is lost.
             age_hours="$(jq -r '((now - (.[0].created_at | fromdateiso8601)) / 3600) | floor' <<<"$open_notes")"
-            in_queue="$(node packages/api-client/cli.ts gh --priority default -- api graphql -f query='query($n:Int!){repository(owner:"JovieInc",name:"Jovie"){pullRequest(number:$n){isInMergeQueue}}}' -F n="$pr" --jq .data.repository.pullRequest.isInMergeQueue)"
+            in_queue="$(node packages/api-client/cli.ts gh --priority default -- api graphql -f query="query(\$n:Int!){repository(owner:\"JovieInc\",name:\"Jovie\"){pullRequest(number:\$n){isInMergeQueue}}}" -F n="$pr" --jq .data.repository.pullRequest.isInMergeQueue)"
             if [ "$in_queue" = true ] || [ "$age_hours" -lt 6 ]; then
               echo "Existing release PR owns publication: #$pr (${age_hours}h old)"
               exit 0

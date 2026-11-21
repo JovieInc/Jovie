@@ -13,11 +13,15 @@
       "GoogleDeepMind",
       "MistralAI",
       "AIatMeta",
+      "cursor_ai",
       "vercel",
       "supabase",
       "Cloudflare",
       "linear",
       "github",
+      "ramp",
+      "higgsfield",
+      "ycombinator",
       "Linktree_",
       "Bandsintown"
     ],
@@ -117,6 +121,13 @@
       "level": 2
     },
     {
+      "id": "cursor-changelog",
+      "name": "Cursor changelog",
+      "category": "platform",
+      "kind": "feed",
+      "url": "https://cursor.com/changelog/rss.xml"
+    },
+    {
       "id": "vercel-changelog",
       "name": "Vercel changelog",
       "category": "platform",
@@ -150,6 +161,27 @@
       "category": "platform",
       "kind": "feed",
       "url": "https://supabase.com/rss.xml"
+    },
+    {
+      "id": "higgsfield-changelog",
+      "name": "Higgsfield changelog",
+      "category": "growth-company",
+      "kind": "feed",
+      "url": "https://higgsfield.ai/creator-hub/changelog/rss.xml"
+    },
+    {
+      "id": "higgsfield-blog",
+      "name": "Higgsfield blog",
+      "category": "growth-company",
+      "kind": "feed",
+      "url": "https://higgsfield.ai/blog/rss.xml"
+    },
+    {
+      "id": "yc-blog",
+      "name": "Y Combinator blog",
+      "category": "growth-company",
+      "kind": "feed",
+      "url": "https://www.ycombinator.com/blog/feed"
     },
     {
       "id": "linktree-blog",

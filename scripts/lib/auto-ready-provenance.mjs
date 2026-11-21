@@ -108,7 +108,18 @@ export function hasExplicitOnGreen(body) {
 
 const SHA_RE = /^[0-9a-f]{40}$/;
 const TRAILER_RE = /^FX-Source-Head:\s*([0-9a-f]{40})\s*$/im;
-export const AUTO_READY_HOLD_LABELS = WRITER_PROMOTION_HOLD_LABELS;
+// JOV-13139: labels that pin a draft the undraft controllers must never ready:
+// a designated outside review is pending (`needs-outside-review`) or the PR
+// must not be readied at all (`do-not-ready`). No machine releaser — a person
+// removes the label when the hold ends.
+export const UNDRAFT_HOLD_LABELS = Object.freeze([
+  'needs-outside-review',
+  'do-not-ready',
+]);
+export const AUTO_READY_HOLD_LABELS = Object.freeze([
+  ...WRITER_PROMOTION_HOLD_LABELS,
+  ...UNDRAFT_HOLD_LABELS,
+]);
 const CONTROLLED_PROOF_TITLE_RE =
   /[\[(](?:canary|controlled-proof|deliberate-red)[\])]/i;
 const CONTROLLED_PROOF_BRANCH_RE =

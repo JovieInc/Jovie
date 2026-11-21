@@ -537,21 +537,24 @@ const MERGE_GROUP_ADMISSION_LANE = new Set([
 const MERGE_GROUP_ADMISSION_WEB_TESTS = [
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
 ];
-// Run 32547855063 spent 3180.55s collecting V8 coverage before this static
-// ownership contract failed. Keep it in the cheap structural selector so
-// coverage-lane drift fails before an expensive changed-surface collection.
+// Run 32547855063 spent 3180.55s on V8 before this static contract failed.
+// Keep ownership drift in the cheap structural selector.
 // Control-plane node:test suites, each with its own per-module coverage gate:
 // [test file, coverage include (null = no coverage gate), thresholds].
 const CI_CONTROL_NODE_COVERAGE_TESTS = [
-  [
-    '.github/scripts/production-continuity.test.mjs',
-    '.github/scripts/production-continuity.mjs',
+  ...['', '-arrival'].map(suffix => [
+    [
+      '.github/scripts/production-continuity.test.mjs',
+      '.github/scripts/production-continuity-arrival.test.mjs',
+      '.github/scripts/production-continuity-limits.test.mjs',
+    ],
+    `.github/scripts/production-continuity${suffix}.mjs`,
     [
       '--test-coverage-lines=95',
       '--test-coverage-branches=90',
       '--test-coverage-functions=90',
     ],
-  ],
+  ]),
   [
     '.github/scripts/production-continuity-dedupe.test.mjs',
     '.github/scripts/production-continuity-dedupe.mjs',
@@ -3332,21 +3335,16 @@ export function buildControlTestCommands() {
             '--experimental-test-coverage',
             `--test-coverage-include=${include}`,
             ...thresholds,
-            file,
+            ...[file].flat(),
           ]
-        : ['--test', file],
+        : ['--test', ...[file].flat()],
     ]),
     ['pnpm', ['run', 'test:rolling-ci-fx:coverage']],
   ];
 }
 
-// The control stages are independent processes, so a bounded pool overlaps
-// the long native-queue Vitest coverage run (the critical path, ~20s) with
-// the ~25s of short, mostly single-threaded stages instead of serializing
-// ~45s of work. Three slots finish the short stages before the long run on a
-// 4-vCPU runner (two slots left them as the tail). Every Vitest coverage
-// stage owns a distinct reports directory so concurrent runs cannot clean
-// each other's coverage temp files.
+// Three control slots on a four-vCPU runner overlap the ~20s native-queue
+// coverage run with ~25s short stages, replacing ~45s serial execution.
 export const CONTROL_TEST_CONCURRENCY = 3;
 
 export async function runControlTestCommands(

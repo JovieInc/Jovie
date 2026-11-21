@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -14,6 +15,7 @@ LANES = Path(__file__).resolve().parents[1] / "lanes"
 sys.path.insert(0, str(LANES))
 import priority_admission as pa  # noqa: E402
 import linear_sync as ls  # noqa: E402
+import execution_attempt as execution  # noqa: E402
 
 NOW = 1793242000.0
 BODY = ("## Problem\n" + "The golden path tests skip themselves so CI is green with the flow untested. " * 4 +
@@ -138,7 +140,72 @@ class ReadinessWithoutLabel(unittest.TestCase):
         self.assertEqual(skipped, {"JOV-2": "label:needs-tim", "JOV-3": "thin-description", "JOV-4": "no-acceptance-criteria"})
 
 
+class ExecutionMirrorTests(unittest.TestCase):
+    def test_remote_terminal_and_completion_fences_are_cached_once_without_remote_writes(self):
+        for completion in (False, True):
+            with self.subTest(completion=completion), tempfile.TemporaryDirectory() as d:
+                candidate = row(1, priority=1)
+                ident = execution.identity('linear-work', {'issue': 'JOV-1', 'outcome': 'draft-pr'},
+                                           {key: candidate[key] for key in ('title', 'description')})
+                local, coord = {'kind': 'local-test'}, {'kind': 'github-status', 'repository': 'JovieInc/Jovie', 'sha': 'a' * 40}
+                policy = dict(attempts=1, concurrency=1, wallSeconds=60, spend=0, mutations=0, leaseSeconds=30)
+                origin = Path(d) / 'origin.jsonl'
+                claimed = execution.claim(origin, ident, {}, policy, {}, 100, coordination=local)
+                execution.finish(origin, ident, claimed['fencingToken'], 'failed_unknown', {}, 101, coordination=local)
+                canonical = execution._rows(origin)
+                if completion:
+                    canonical = [{**ident, 'schema': execution.SCHEMA, 'event': 'completion_fenced'}]
+                mirror = Path(d) / 'runs' / 'execution-attempts.jsonl'
+                with patch.object(execution, '_github_rows', return_value=(canonical, None)), \
+                        patch.object(execution, '_recover_append', return_value=None), \
+                        patch.object(execution, '_github_append') as append:
+                    for _ in range(2):
+                        result = execution.claim(mirror, ident, {}, policy, {}, 102, coordination=coord)
+                        self.assertEqual(result['reason'], 'generation_completion_fenced' if completion else 'generation_terminal')
+                    append.assert_not_called()
+                self.assertEqual(execution._rows(mirror), [canonical[-1]])
+                self.assertEqual(pa.binding_refill.execution_skips(Path(d), [candidate]),
+                                 {'JOV-1': 'execution-generation-terminal'})
+
+    def test_mirror_write_failure_preserves_the_canonical_terminal_result(self):
+        ident = execution.identity('linear-work', {'issue': 'JOV-1', 'outcome': 'draft-pr'}, {})
+        canonical = [{**ident, 'schema': execution.SCHEMA, 'event': 'decision', 'terminalState': 'budget_exhausted'}]
+        with tempfile.TemporaryDirectory() as d, \
+                patch.object(execution, '_github_rows', return_value=(canonical, None)), \
+                patch.object(execution, '_recover_append', return_value=None), \
+                patch.object(execution.execution_mirror, 'file_locked', side_effect=OSError('disk full')):
+            policy = dict(attempts=1, concurrency=1, wallSeconds=60, spend=0, mutations=0, leaseSeconds=30)
+            result = execution.claim(Path(d) / 'mirror.jsonl', ident, {}, policy, {}, 100,
+                                     coordination={'kind': 'github-status'})
+            self.assertEqual(result['reason'], 'generation_terminal')
+            self.assertEqual(result['terminalState'], 'budget_exhausted')
+            self.assertEqual(result['mirrorError'], 'OSError')
+
+
 class RunTests(unittest.TestCase):
+    def test_terminal_generation_never_displaces_work_for_any_priority_route(self):
+        for priority, labels, ranked in ((1, (), False), (3, (), True), (3, ('priority:marketing',), False)):
+            with self.subTest(priority=priority, labels=labels, ranked=ranked), tempfile.TemporaryDirectory() as d:
+                candidate = row(1, priority=priority, labels=labels)
+                host = self.seed(d, [candidate, *[row(100 + i, 'Todo', priority=4) for i in range(40)]])
+                ident = execution.identity('linear-work', {'issue': 'JOV-1', 'outcome': 'draft-pr'},
+                                           {key: candidate[key] for key in ('title', 'description')})
+                path = Path(d) / 'runs' / 'execution-attempts.jsonl'
+                local = {'kind': 'local-test'}
+                policy = dict(attempts=1, concurrency=1, wallSeconds=60, spend=0, mutations=0, leaseSeconds=30)
+                claimed = execution.claim(path, ident, {}, policy, {}, NOW - 10, coordination=local)
+                execution.finish(path, ident, claimed['fencingToken'], 'failed_unknown', {}, NOW - 5, coordination=local)
+                before = path.read_bytes()
+                ranks = {'JOV-1': 1} if ranked else {}
+                with patch.object(pa, 'summer_ranks', return_value=ranks):
+                    for tick in range(3):
+                        receipt = pa.run(FakeLane, host, 'JOV', FakeClient(), now=NOW + tick)
+                        self.assertEqual(receipt['admitted'], [])
+                        self.assertEqual(receipt['displaced'], [])
+                        self.assertEqual(receipt['skipped']['JOV-1'], 'execution-generation-terminal')
+                self.assertFalse(any(entry['op'] == 'move' for entry in ls._read(ls._outbox_path(Path(d)), ls.OUTBOX).get('entries', [])))
+                self.assertEqual(path.read_bytes(), before, 'admission never resets or spends execution budgets')
+
     def seed(self, d, rows):
         state = Path(d)
         path = ls.mirror_path(state, "JOV")

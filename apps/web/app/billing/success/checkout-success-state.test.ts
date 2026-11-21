@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
+import { PROOF_PENDING_TERMS } from '@/lib/claim/proof-terms';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import {
   ARTIST_VISIBILITY_FAN_LIST_UNLOCK,
   getPaidSuccessPrimaryHref,
   getPaidSuccessPrimaryLabel,
+  resolveCheckoutSuccessCopy,
   resolveCheckoutSuccessView,
   shouldCelebratePaidSuccess,
 } from './checkout-success-state';
@@ -50,6 +52,23 @@ describe('resolveCheckoutSuccessView', () => {
     };
     expect(getPaidSuccessPrimaryHref(input)).toBe(APP_ROUTES.START);
     expect(getPaidSuccessPrimaryLabel(input)).toBe('Claim your link');
+  });
+});
+
+describe('resolveCheckoutSuccessCopy', () => {
+  it('does not claim the profile is live on onboarding success when profileLive is not public', () => {
+    const copy = resolveCheckoutSuccessCopy({
+      view: { kind: 'success', plan: 'pro', displayName: 'Pro' },
+      isOnboardingUpgrade: true,
+      proofPending: false,
+      canClaimProfileLive: false,
+      isArtistVisibilitySuccess: true,
+      paidDisplayName: 'Pro',
+      proofPendingTerms: PROOF_PENDING_TERMS,
+      sessionStatus: null,
+    });
+    expect(copy.title).toBe('Your plan is active');
+    expect(copy.title).not.toBe('Your profile is live and upgraded');
   });
 });
 

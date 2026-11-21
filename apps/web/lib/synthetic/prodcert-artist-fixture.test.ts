@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   type ProdcertArtistFixture,
   ProdcertFixtureUnavailableError,
+  resolveExpectedMinCatalogReleases,
   selectUnclaimedCertArtist,
 } from './prodcert-artist-fixture';
 
@@ -133,5 +134,17 @@ describe('admitted canary reserved artist', () => {
       })
     ).rejects.toBeInstanceOf(ProdcertFixtureUnavailableError);
     expect(probed).toEqual([]);
+  });
+});
+
+describe('resolveExpectedMinCatalogReleases', () => {
+  it('defaults to 1 release for standard artist fixtures and allows 0-release debut fixtures', () => {
+    expect(resolveExpectedMinCatalogReleases({})).toBe(1);
+    expect(resolveExpectedMinCatalogReleases({ expectedMinReleases: 0 })).toBe(
+      0
+    );
+    expect(resolveExpectedMinCatalogReleases({ expectedMinReleases: 3 })).toBe(
+      3
+    );
   });
 });

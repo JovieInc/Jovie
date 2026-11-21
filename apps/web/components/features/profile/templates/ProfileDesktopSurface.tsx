@@ -258,7 +258,7 @@ function EmptySurfaceBlock({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className='flex min-h-30 items-center rounded-2xl bg-white/[0.025] px-4 text-sm leading-6 text-white/54'>
+    <div className='flex min-h-14 items-center rounded-2xl bg-white/[0.025] px-4 py-3 text-sm leading-6 text-white/54'>
       {children}
     </div>
   );
@@ -612,7 +612,7 @@ export function ProfileDesktopSurface({
           >
             <div className='space-y-2'>
               {visibleReleases.length > 0 ? (
-                visibleReleases.slice(0, 4).map(release => (
+                visibleReleases.slice(0, 3).map(release => (
                   <a
                     key={release.id}
                     href={
@@ -620,14 +620,14 @@ export function ProfileDesktopSurface({
                         ? `/${artist.handle}/${release.slug}`
                         : undefined
                     }
-                    className='flex items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-3 transition-colors duration-subtle hover:bg-white/[0.04]'
+                    className='flex items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-2 transition-colors duration-subtle hover:bg-white/[0.04]'
                   >
-                    <div className='relative h-14 w-14 overflow-hidden rounded-xl'>
+                    <div className='relative h-11 w-11 overflow-hidden rounded-xl'>
                       <ImageWithFallback
                         src={release.artworkUrl}
                         alt={release.title}
                         fill
-                        sizes='56px'
+                        sizes='44px'
                         className='object-cover'
                         fallbackVariant='release'
                       />
@@ -660,10 +660,10 @@ export function ProfileDesktopSurface({
           >
             <div className='space-y-2'>
               {upcomingTourDates.length > 0 ? (
-                upcomingTourDates.slice(0, 5).map(tourDate => (
+                upcomingTourDates.slice(0, 2).map(tourDate => (
                   <div
                     key={tourDate.id}
-                    className='grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-3'
+                    className='grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-2'
                   >
                     <div className='rounded-xl border border-white/10 bg-white/[0.07] px-2 py-2 text-center'>
                       <div className='text-3xs font-semibold tracking-wide text-white/58'>

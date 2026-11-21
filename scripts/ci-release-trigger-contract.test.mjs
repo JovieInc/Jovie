@@ -22,7 +22,7 @@ function jobBlock(jobId) {
 }
 
 const ciFastTypecheckBlock = jobBlock('ci-fast-typecheck');
-const ciFastRemainingBlock = jobBlock('ci-fast-remaining');
+const ciFastRemainingBlock = jobBlock('ci-fast-remaining-shards');
 const ciFastAggregateBlock = jobBlock('ci-fast');
 
 test('CI prevention verifier runs for every source PR and exact merge-group head', () => {
@@ -52,10 +52,17 @@ test('CI prevention verifier runs for every source PR and exact merge-group head
     /run: node scripts\/ci-release-incident-contract\.mjs/
   );
   assert.match(ciFastRemainingBlock, /run: pnpm ci:incident-contract:validate/);
+  // JOV-12618: PRs path-gate; docs-only merge groups may skip; every other
+  // event (and non-docs merge groups) fail closed with skip=false.
   assert.match(
     ciFastRemainingBlock,
-    /if \[\[ "\$\{\{ github\.event_name \}\}" != "pull_request" \]\]; then\n            echo "skip=false"/
+    /if \[\[ "\$\{\{ github\.event_name \}\}" == "pull_request" \]\]; then/
   );
+  assert.match(
+    ciFastRemainingBlock,
+    /elif \[\[ "\$\{\{ github\.event_name \}\}" == "merge_group" && "\$\{STRUCTURAL_DOCS_ONLY:-\}" == "true" \]\]; then/
+  );
+  assert.match(ciFastRemainingBlock, /echo "skip=false"/);
   assert.match(
     ciFastAggregateBlock,
     /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*ci-fast-structural-lanes,\s*\]/s

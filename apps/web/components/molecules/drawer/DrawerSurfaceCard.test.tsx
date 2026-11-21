@@ -40,6 +40,25 @@ describe('DrawerSurfaceCard', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('merges surface overrides on the rendered element', () => {
+    render(
+      <DrawerSurfaceCard
+        testId='surface'
+        variant='card'
+        className='bg-transparent rounded-none'
+      >
+        Content
+      </DrawerSurfaceCard>
+    );
+    const surface = screen.getByTestId('surface');
+    expect(surface).toHaveClass(
+      'bg-transparent',
+      'rounded-none',
+      'border-subtle'
+    );
+    expect(surface).not.toHaveClass('bg-surface-1', 'rounded-lg');
+  });
+
   it('forwards DOM handlers to the rendered element', async () => {
     const onClick = vi.fn();
     const { container } = render(

@@ -1034,15 +1034,23 @@ jobs:
         env:
           PEN_CLI_KEY: ${{ secrets.PEN_CLI_KEY }}
           PEN_GOLDEN_PATH_FILE_URL: ${{ secrets.PEN_GOLDEN_PATH_FILE_URL }}
-        run: node scripts/invariants/pen-golden-path.mjs --record --out "${RUNNER_TEMP}/pen-golden-path" --base-url https://jov.ie --github-output "$GITHUB_OUTPUT"
-
-      # Only a complete fresh export is saved, under the key it was made from.
-      - name: Save the Golden Path Pen export
-        if: ${{ !cancelled() && steps.pen-export.outputs.export_cacheable == 'true' && steps.pen-export.outputs.cache_key != '' }}
-        uses: ./.github/actions/vendor/actions-cache/save # actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 v6.1.0 (vendored, JOV-8754)
-        with:
-          path: ${{ runner.temp }}/pen-golden-path/png
-          key: ${{ steps.pen-export.outputs.cache_key }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+        run: |
+          set -euo pipefail
+          auth_state="${RUNNER_TEMP}/pen-capture-auth.json"
+          trap 'rm -f "$auth_state"' EXIT
+          state_args=()
+          if [ -n "${DOPPLER_TOKEN:-}" ]; then
+            doppler run --project jovie-web --config prd \
+              --only-secrets=DATABASE_URL \
+              --no-fallback -- env -u DOPPLER_TOKEN \
+                node scripts/invariants/pen-capture-auth.mjs \
+                  --origin https://jov.ie \
+                  --out "$auth_state" ||
+              echo "::warning::Pen capture session not established; auth-required frames will record capture-auth-missing."
+          fi
+          if [ -s "$auth_state" ]; then state_args=(--storage-state "$auth_state"); fi
+          node scripts/invariants/pen-golden-path.mjs --record --out "${RUNNER_TEMP}/pen-golden-path" --base-url https://jov.ie --github-output "$GITHUB_OUTPUT" "${state_args[@]}"
 
       - name: Certify the golden path on production
         id: certify
@@ -1069,15 +1077,13 @@ jobs:
             --steps "$steps_json" \
             --out "${RUNNER_TEMP}/prod-cert-receipts.json" \
             --post --file-issues || status=$?
-          # JOV-12620: a not-certified verdict (exit 1) is already posted to the
-          # ledger, filed in Linear and uploaded below: its own receipt, not a
-          # probe failure. Only smoke, auth and Lighthouse turn this run red; a
-          # crash that records no verdict (exit 2) still fails.
           if [ "$status" -eq 1 ]; then
-            echo "::warning title=Golden path not certified::Receipts recorded; see the job summary and the prod-cert-receipts artifact."
-            { echo "### Golden path not certified (receipt, non-blocking)"; echo "| Surface | Status | Failing |"; echo "|---|---|---|"
-              jq -r '.receipts[] | select(.status != "passed") | "| \(.surface) | \(.status) | \(.blocker // ([.checks[]? | select(.status == "failed") | .id] | join(", "))) |"' "${RUNNER_TEMP}/prod-cert-receipts.json"; } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+            echo "::error title=Golden path not certified::Receipts recorded; see the job summary and the prod-cert-receipts artifact."
+            if [ -s "${RUNNER_TEMP}/prod-cert-receipts.json" ]; then
+              { echo "### Golden path not certified"; echo "| Surface | Status | Failing |"; echo "|---|---|---|"
+                jq -r '.receipts[] | select(.status != "passed") | "| \(.surface) | \(.status) | \(.blocker // ([.checks[]? | select(.status == "failed") | .id] | join(", "))) |"' "${RUNNER_TEMP}/prod-cert-receipts.json"; } >> "$GITHUB_STEP_SUMMARY"
+            fi
+            exit 1
           fi
           exit "$status"
 

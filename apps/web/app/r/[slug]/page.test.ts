@@ -12,9 +12,11 @@ function createQuery(result: unknown[]) {
     limit: (count: number) => Promise<unknown[]>;
   };
   query.limit = vi.fn(async () => result);
+  const whereObj = { where: vi.fn(() => query) };
   return {
     from: vi.fn(() => ({
-      where: vi.fn(() => query),
+      ...whereObj,
+      leftJoin: vi.fn(() => whereObj),
     })),
   };
 }
@@ -72,6 +74,7 @@ describe('legacy release metadata', () => {
           username: handle,
           usernameNormalized: handle,
           avatarUrl: null,
+          isPublic: true,
         },
       ],
       []
@@ -156,6 +159,7 @@ describe('legacy release smart-link slug validation', () => {
           username: 'artisthandle',
           usernameNormalized: 'artisthandle',
           avatarUrl: null,
+          isPublic: true,
         },
       ],
       []

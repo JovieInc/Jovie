@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { useSidebar } from '@/components/organisms/sidebar';
+import { useSidebar } from '@/components/shell/SidebarContext';
 import { APP_ROUTES } from '@/constants/routes';
 import { NAVIGATION_DROP_OFF_MS } from '@/lib/tracking/navigation-telemetry';
 import {
@@ -58,6 +58,19 @@ describe('DashboardNav route warming', () => {
     vi.useRealTimers();
     runtimeUpdateState.available = false;
     resetDashboardNavTestMocks();
+  });
+
+  it('keeps history out of Settings while preserving New Chat on Work', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.SETTINGS);
+    const settings = renderDashboardNav({ renderFn: render });
+    expect(screen.queryByRole('button', { name: 'Chat History' })).toBeNull();
+    settings.unmount();
+    mockUsePathname.mockReturnValue(APP_ROUTES.LIBRARY);
+    renderDashboardNav({ renderFn: render });
+    expect(
+      screen.getByRole('button', { name: 'Chat History' })
+    ).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('link', { name: 'New Chat' })).toBeInTheDocument();
   });
 
   it('leaves home attention to the brand row and retains destinations', () => {

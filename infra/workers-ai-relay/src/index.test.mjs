@@ -7,7 +7,7 @@ import worker, {
   normalizeSse,
 } from './index.ts';
 
-const MODEL = '@cf/zai-org/glm-5.3-flash';
+const MODEL = '@cf/deepseek-ai/deepseek-v4.1-flash-1017';
 const env = (over = {}) => ({
   WORKERS_AI_BEARER: 'secret',
   AI: { run: async () => ({ id: 'x', choices: [] }) },

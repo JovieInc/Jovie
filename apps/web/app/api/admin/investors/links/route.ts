@@ -1,5 +1,6 @@
 import { desc } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAdmin } from '@/lib/admin/middleware';
 import { db } from '@/lib/db';
 import { investorLinks } from '@/lib/db/schema/investors';
@@ -10,6 +11,13 @@ import {
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+/** Schema for the create-investor-link request body. */
+const createInvestorLinkSchema = z.object({
+  label: z.string().trim().min(1),
+  investorName: z.string().optional(),
+  email: z.string().optional(),
+});
 
 /**
  * GET /api/admin/investors/links
@@ -36,13 +44,16 @@ export async function POST(request: Request) {
   const authError = await requireAdmin({ session: 'fresh' });
   if (authError) return authError;
 
-  const body = await request.json();
-  const { label, investorName, email } = body;
-  const trimmedLabel = typeof label === 'string' ? label.trim() : '';
-
-  if (!trimmedLabel) {
-    return NextResponse.json({ error: 'Label is required' }, { status: 400 });
+  const body: unknown = await request.json().catch(() => null);
+  const parsed = createInvestorLinkSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: 'Invalid request body', details: parsed.error.flatten() },
+      { status: 400 }
+    );
   }
+
+  const { label: trimmedLabel, investorName, email } = parsed.data;
 
   const token = generateInvestorClaimToken();
 

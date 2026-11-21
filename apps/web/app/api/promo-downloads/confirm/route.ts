@@ -26,6 +26,7 @@ import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
@@ -186,7 +187,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify user owns this release via their creator profile and has Pro
-    const { user, profile } = await getSessionContext({
+    const entitlements = await getCurrentUserEntitlements();
+    if (!entitlements.isPro) {
+      return NextResponse.json(
+        { error: `${getPlanDisplayName('pro')} plan required` },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const { profile } = await getSessionContext({
       clerkUserId,
       requireUser: true,
       requireProfile: false,
@@ -195,13 +204,6 @@ export async function POST(request: NextRequest) {
     if (!profile) {
       return NextResponse.json(
         { error: 'Creator profile not found' },
-        { status: 403, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    if (!user.isPro) {
-      return NextResponse.json(
-        { error: `${getPlanDisplayName('pro')} plan required` },
         { status: 403, headers: NO_STORE_HEADERS }
       );
     }

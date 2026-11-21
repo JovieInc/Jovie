@@ -331,6 +331,9 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
     outbox = linear_sync.Outboxed(state, client)
     candidates, skipped = admit_candidates(rows, ranks, excluded, lambda row: lane.issue_hits_red_line(binding_refill._issue(lane, row)),
                                            now, pending)
+    execution_held = binding_refill.execution_skips(state, candidates)
+    candidates = [row for row in candidates if row['identifier'] not in execution_held]
+    skipped.update(execution_held)
     for row in list(candidates):  # a live local claim owns the issue; leave it
         if linear_sync.claim_status(state, row["id"]) == "active":
             candidates.remove(row)

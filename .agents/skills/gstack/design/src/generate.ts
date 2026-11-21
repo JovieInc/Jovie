@@ -1,5 +1,9 @@
 /**
  * Generate UI mockups via OpenAI Responses API with image_generation tool.
+ *
+ * Lane: `gstack-design` (agent tooling only). Not product or marketing SoT —
+ * those use marketing-media / merch-graphic / album-art. See
+ * docs/design-system/MEDIA_GENERATION.md (JOV-13852).
  */
 
 import fs from "fs";

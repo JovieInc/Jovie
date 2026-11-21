@@ -35,6 +35,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { reportBlockedRun } from './pen-draft-annotation.mjs';
 import { spliceDraft, trimCanonical } from './pen-trim.mjs';
 
 export { briefTerms, spliceDraft, trimCanonical } from './pen-trim.mjs';
@@ -315,7 +316,7 @@ async function main() {
   if (missing.length) {
     receipt.blocked = `missing ${missing.join(' and ')}`;
     write();
-    console.log(`pen-draft: blocked, ${receipt.blocked}`);
+    reportBlockedRun(receipt.blocked);
     process.exitCode = 1;
     return;
   }
