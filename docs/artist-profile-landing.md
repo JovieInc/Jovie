@@ -32,7 +32,7 @@ mock morphs modes inside the hero; duplicate phones and mid-page bloat are gone.
 
 - Purpose: Prove the core thesis that one profile can serve many moments.
 - User question: What does "adapts" actually mean?
-- Why it exists: This is the strategic center of the page and the cleanest answer to Linktree, Linkfire, Feature.fm, and ToneDen style objections.
+- Why it exists: This is the strategic center of the page and the cleanest answer to static link-page objections.
 - Visual treatment: Pinned phone with a mode rail and concise surrounding copy.
 - Key interaction: Switch between Upcoming Release, Release Day, Touring, and Live Support.
 - Copy goal: Make countdowns, smart routing, local shows, and live support feel inevitable rather than feature-listed.
