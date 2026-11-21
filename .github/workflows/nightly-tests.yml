@@ -331,11 +331,13 @@ jobs:
           REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: node scripts/remediation-signal-intake.mjs
 
-      - name: Upload Test Results on Failure
-        if: ${{ always() && steps.nightly-e2e.outcome == 'failure' && hashFiles('apps/web/test-results/nightly-results.json') != '' }}
+      - name: Upload Playwright flaky JSON status
+        # Upload on green too: Playwright status "flaky" is only visible when
+        # this JSON reaches the flakiness report (JOV-12621).
+        if: ${{ always() && steps.nightly-e2e.outcome != 'skipped' && hashFiles('apps/web/test-results/nightly-results.json') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
-          name: nightly-e2e-results-${{ github.run_id }}
+          name: playwright-e2e-flaky-json-nightly-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/nightly-results.json
           retention-days: 7
 

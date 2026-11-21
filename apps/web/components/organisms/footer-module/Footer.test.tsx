@@ -1,7 +1,9 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { Footer } from './Footer';
 
 vi.mock('next/link', () => ({
@@ -106,5 +108,37 @@ describe('Footer legal link contrast (JOV-8873)', () => {
       expect(link).toHaveClass('opacity-80');
       expect(link).not.toHaveClass('opacity-60');
     }
+  });
+
+  it('moves keyboard focus through the regular footer links and has no axe violations', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<Footer variant='regular' />);
+
+    await user.tab();
+    const firstLink = screen.getAllByRole('link')[0];
+    expect(firstLink).toHaveFocus();
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders caller links in the minimal footer and has no axe violations', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <Footer
+        variant='minimal'
+        links={[{ href: APP_ROUTES.LEGAL_TERMS, label: 'Terms' }]}
+      />
+    );
+
+    const terms = screen.getByRole('link', { name: 'Terms' });
+    await user.hover(terms);
+    expect(terms).toHaveAttribute('href', APP_ROUTES.LEGAL_TERMS);
+    await expectNoA11yViolations(container);
+  });
+
+  it('uses the footer border token for the legal divider', () => {
+    const { container } = render(<Footer variant='regular' />);
+
+    expect(container.innerHTML).toContain('border-subtle');
+    expect(container.innerHTML).not.toContain('border-white/8');
   });
 });

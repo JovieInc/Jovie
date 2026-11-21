@@ -50,6 +50,14 @@ describe('DesktopUpdateModalView', () => {
     expect(props.onDownload).toHaveBeenCalledTimes(1);
   });
 
+  it('writes the notes heading without forced capitals and focuses the primary action', () => {
+    renderView(available, {
+      notes: { summary: 'Ship it', items: ['Faster sync'] },
+    });
+    expect(screen.getByText("What's New")).not.toHaveClass('uppercase');
+    expect(screen.getByRole('button', { name: 'Download' })).toHaveFocus();
+  });
+
   it('links to release notes when none were fetched and dismisses via Later', async () => {
     const props = renderView(available);
     expect(

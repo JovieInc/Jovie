@@ -103,9 +103,17 @@ if (command === 'plan') {
   process.exit(0);
 }
 
+function readOrder(file) {
+  if (!existsSync(file)) {
+    console.error(`no order file at ${file}; run plan first or check the path`);
+    process.exit(2);
+  }
+  return JSON.parse(readFileSync(file, 'utf8'));
+}
+
 if (command === 'verify') {
   const order = values.order
-    ? JSON.parse(readFileSync(values.order, 'utf8'))
+    ? readOrder(values.order)
     : { components: values.component ?? [], skipped: {} };
   if (!order.components?.length) {
     console.error('verify needs --order <file> or --component <path>');
@@ -130,7 +138,7 @@ if (command === 'gate') {
     process.exit(2);
   }
   const only = values.order
-    ? JSON.parse(readFileSync(values.order, 'utf8')).components
+    ? readOrder(values.order).components
     : values.component;
   const { owner } = readCertificationRegistry(root, values.registry);
   const added = newGates(certify(only), gates(), only);
