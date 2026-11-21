@@ -1032,6 +1032,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/design/pen-draft-picture.test.mjs',
   'scripts/design/pen-draft-frames.test.mjs',
   'scripts/design/pen-data-backed-ship.test.mjs',
+  'scripts/design-write-swarm/design-write-swarm.test.mjs',
   'scripts/hostops/pen-files-worker/src/index.test.mjs',
   'scripts/runner-pool-routing.test.mjs',
   'scripts/sentry-build-config.test.mjs',
@@ -3492,7 +3493,6 @@ async function main() {
   writeLaneResults(results, laneGroup, setupError);
 
   if (setupError) process.exit(1);
-
   const failed = results.filter(r => r.status === 'failure');
   if (failed.length > 0) {
     console.error(
