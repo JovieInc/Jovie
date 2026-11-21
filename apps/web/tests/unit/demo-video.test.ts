@@ -1,7 +1,13 @@
+import { statSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const ORIGINAL_DEMO_VIDEO_URL = process.env.DEMO_VIDEO_URL;
 const ORIGINAL_DEMO_VIDEO_POSTER_URL = process.env.DEMO_VIDEO_POSTER_URL;
+const DEMO_VIDEO_FILE = join(
+  process.cwd(),
+  'public/demo/jovie-demo.mp4'
+);
 
 async function loadModule() {
   vi.resetModules();
@@ -68,5 +74,12 @@ describe('demo video helpers', () => {
     expect(
       getDemoVideoDownloadHref('https://cdn.example.com/jovie-demo.mp4')
     ).toBe('/api/demo/download');
+  });
+
+  it('keeps the tracked public demo under the shrink-only byte ratchet', async () => {
+    const { DEMO_VIDEO_MAX_BYTES } = await loadModule();
+    const bytes = statSync(DEMO_VIDEO_FILE).size;
+    expect(bytes).toBeGreaterThan(0);
+    expect(bytes).toBeLessThanOrEqual(DEMO_VIDEO_MAX_BYTES);
   });
 });
