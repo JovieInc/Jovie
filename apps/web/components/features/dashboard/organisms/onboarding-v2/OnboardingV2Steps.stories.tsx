@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { createStepContext } from './fixtures/onboardingV2StepContext';
-import { OnboardingV2StepContent } from './OnboardingV2Steps';
+import {
+  OnboardingV2SpotifySearchField,
+  OnboardingV2StepContent,
+} from './OnboardingV2Steps';
 
 const meta = {
   title: 'Features/Dashboard/Onboarding/OnboardingV2Steps',
@@ -24,4 +27,18 @@ export const Upgrade: Story = {
 
 export const ProfileReady: Story = {
   args: { ctx: createStepContext({ currentStep: 'profile-ready' }) },
+};
+
+export const SearchFieldLoading: Story = {
+  render: () => (
+    <div className='w-96 p-4'>
+      <OnboardingV2SpotifySearchField
+        isLoading
+        onInput={() => {}}
+        onSelectArtist={() => {}}
+        results={[]}
+        value='Avery'
+      />
+    </div>
+  ),
 };
