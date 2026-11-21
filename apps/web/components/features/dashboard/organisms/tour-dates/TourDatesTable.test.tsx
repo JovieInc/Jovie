@@ -1,7 +1,9 @@
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { TourDatesTable } from './TourDatesTable';
 
 const baseTourDate: TourDateViewModel = {
@@ -97,5 +99,86 @@ describe('TourDatesTable', () => {
 
     const past = screen.getByText('Past');
     expect(past.closest('.invisible')).toBeNull();
+  });
+  it('opens a row for editing and stays axe-clean', async () => {
+    const user = userEvent.setup();
+    const onEdit = vi.fn();
+    const { container } = render(
+      <TourDatesTable
+        tourDates={[baseTourDate]}
+        onEdit={onEdit}
+        onDelete={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByText('The Echo'));
+    expect(onEdit).toHaveBeenCalledWith(baseTourDate);
+    await expectNoA11yViolations(container);
+  });
+
+  it('syncs from the header without opening a row', async () => {
+    const user = userEvent.setup();
+    const onSync = vi.fn();
+    const onEdit = vi.fn();
+    const { container } = render(
+      <TourDatesTable
+        tourDates={[baseTourDate]}
+        onEdit={onEdit}
+        onDelete={vi.fn()}
+        onSync={onSync}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Sync' }));
+    expect(onSync).toHaveBeenCalledTimes(1);
+    expect(onEdit).not.toHaveBeenCalled();
+    await expectNoA11yViolations(container);
+  });
+
+  it('disables sync while syncing', () => {
+    render(
+      <TourDatesTable
+        tourDates={[baseTourDate]}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+        onSync={vi.fn()}
+        isSyncing
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Sync' })).toBeDisabled();
+  });
+
+  it('labels each source and links tickets without opening the row', async () => {
+    const user = userEvent.setup();
+    const onEdit = vi.fn();
+    render(
+      <TourDatesTable
+        tourDates={[
+          {
+            ...baseTourDate,
+            provider: 'bandsintown',
+            ticketUrl: 'https://example.com/tickets',
+          },
+          { ...baseTourDate, id: 'td-2', provider: 'songkick' },
+          { ...baseTourDate, id: 'td-3', provider: 'admin_import' },
+        ]}
+        onEdit={onEdit}
+        onDelete={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Bandsintown')).toHaveClass('text-accent-teal');
+    expect(screen.getByText('Songkick')).toHaveClass('text-accent-pink');
+    expect(screen.getByText('Admin Import')).toHaveClass('text-warning-text');
+    await user.click(screen.getByRole('link', { name: /Buy Tickets/ }));
+    expect(onEdit).not.toHaveBeenCalled();
+  });
+
+  it('colors the Admin Import source with the warning text token', () => {
+    renderTable([{ ...baseTourDate, provider: 'admin_import' }]);
+
+    const source = screen.getByText('Admin Import');
+    expect(source).toHaveClass('text-warning-text');
+    expect(source.className).not.toMatch(/amber-\d/);
   });
 });

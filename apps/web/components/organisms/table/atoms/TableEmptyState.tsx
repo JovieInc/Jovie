@@ -29,6 +29,8 @@ type TableEmptyStateActionProps =
 export type TableEmptyStateProps = TableEmptyStateActionProps & {
   /** Main heading text */
   readonly heading: string;
+  /** Heading level so the order stays valid under the page title (default 2) */
+  readonly headingLevel?: 2 | 3 | 4;
   /** Optional description text */
   readonly description?: string;
   /** Optional icon to display */
@@ -50,6 +52,7 @@ export type TableEmptyStateProps = TableEmptyStateActionProps & {
  */
 export function TableEmptyState({
   heading,
+  headingLevel = 2,
   description,
   icon,
   variant,
@@ -73,6 +76,7 @@ export function TableEmptyState({
       <EmptyState
         icon={icon}
         heading={heading}
+        headingLevel={headingLevel}
         description={description}
         variant={variant}
         secondaryAction={secondaryAction}

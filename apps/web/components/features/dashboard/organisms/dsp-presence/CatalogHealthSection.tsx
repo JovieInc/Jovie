@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, ConfirmDialog } from '@jovie/ui';
+import { Button, ConfirmDialog, PlainButton } from '@jovie/ui';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -83,9 +83,9 @@ function CatalogStatusIcon({
   if (isScanning)
     return <Loader2 className='h-3.5 w-3.5 animate-spin text-primary' />;
   if (scanFailed) return <XCircle className='h-3.5 w-3.5 text-destructive' />;
-  if (allClear) return <CheckCircle2 className='h-3.5 w-3.5 text-green-500' />;
+  if (allClear) return <CheckCircle2 className='size-3.5 text-success-text' />;
   if (hasResults)
-    return <AlertTriangle className='h-3.5 w-3.5 text-amber-500' />;
+    return <AlertTriangle className='h-3.5 w-3.5 text-warning-text' />;
   return <ScanSearch className='h-3.5 w-3.5 text-muted-foreground' />;
 }
 
@@ -334,7 +334,7 @@ function CatalogHealthSectionContent({
   return (
     <div className='border-t border-border'>
       {/* Collapsible header */}
-      <button
+      <PlainButton
         type='button'
         onClick={() => setIsOpen(!isOpen)}
         className='flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-accent/50'
@@ -352,7 +352,7 @@ function CatalogHealthSectionContent({
         <ChevronDown
           className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`}
         />
-      </button>
+      </PlainButton>
 
       {/* Collapsible content */}
       {isOpen && (
@@ -482,8 +482,8 @@ function CatalogHealthSectionContent({
             scan?.status === 'completed' &&
             confirmedNotMineCount > 0 &&
             unresolvedNotInCatalog.length === 0 && (
-              <div className='mt-3 rounded-md bg-amber-500/10 p-3'>
-                <p className='text-xs font-medium text-amber-600'>
+              <div className='mt-3 rounded-md bg-warning-subtle p-3'>
+                <p className='text-xs font-medium text-warning-text'>
                   You flagged {confirmedNotMineCount} track
                   {confirmedNotMineCount === 1 ? '' : 's'} as not yours.
                 </p>

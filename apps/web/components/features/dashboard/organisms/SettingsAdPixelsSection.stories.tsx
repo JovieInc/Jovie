@@ -201,3 +201,31 @@ export const ConfiguredLight: Story = {
   ...Configured,
   parameters: { themes: { themeOverride: 'light' } },
 };
+
+export const PermissionDeniedFreePlan: Story = {
+  ...FreePlanGated,
+};
+
+export const PartialDegradedPlatform: Story = {
+  decorators: [
+    Story => (
+      <PixelsStoryShell
+        settings={configuredSettings}
+        health={{
+          ...healthyStatus,
+          platforms: {
+            ...healthyStatus.platforms,
+            google: {
+              status: 'degraded',
+              totalSent: 310,
+              totalFailed: 120,
+              lastSuccessAt: '2026-09-27T00:00:00.000Z',
+            },
+          },
+        }}
+      >
+        <Story />
+      </PixelsStoryShell>
+    ),
+  ],
+};

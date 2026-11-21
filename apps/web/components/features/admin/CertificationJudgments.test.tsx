@@ -277,6 +277,11 @@ describe('CertificationJudgments', () => {
         name: 'Request changes "Flow signup-golden-path"',
       })
     );
+    // The canonical Input atom owns the field surface.
+    expect(
+      screen.getByRole('textbox', { name: 'Note for Request changes' })
+        .className
+    ).toContain('border-subtle');
     fireEvent.change(
       screen.getByRole('textbox', { name: 'Note for Request changes' }),
       {

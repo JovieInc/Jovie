@@ -138,14 +138,6 @@ vi.mock('@/features/dashboard/atoms/DrawerToggleButton', () => ({
   DrawerToggleButton: () => null,
 }));
 
-vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
-  UpdateAvailablePill: () => (
-    <button type='button' data-testid='update-available-pill'>
-      Update
-    </button>
-  ),
-}));
-
 vi.mock('@/components/shell/ArtistProfileRailToggle', () => ({
   ArtistProfileRailToggle: () => null,
 }));

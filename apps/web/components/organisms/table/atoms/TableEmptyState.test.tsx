@@ -109,6 +109,17 @@ describe('TableEmptyState', () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
+  it('renders an h2 by default and honours headingLevel', () => {
+    const { rerender } = render(<TableEmptyState heading='No Rows' />);
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'No Rows' })
+    ).toBeInTheDocument();
+    rerender(<TableEmptyState heading='No Rows' headingLevel={3} />);
+    expect(
+      screen.getByRole('heading', { level: 3, name: 'No Rows' })
+    ).toBeInTheDocument();
+  });
+
   it.each([
     [
       'empty with actions',

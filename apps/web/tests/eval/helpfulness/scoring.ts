@@ -8,12 +8,26 @@ import { DEFAULT_MAX_WORDS, type HelpfulnessCase } from './cases';
 import { deniesVisibleCatalog, fixtureHasCatalog } from './catalog-deny';
 import { runFailThemeChecks, upcomingTitleFromFacts } from './fail-themes';
 import type { EvalFixture } from './fixtures';
+import { isPlanningMenuCloser, runOneRecGapChecks } from './one-rec-gaps';
 import {
   type BehaviorId,
   CASE_PASS_SCORE,
   HARD_FAIL_SCORE_CAP,
   HELPFULNESS_BEHAVIORS,
 } from './spec';
+
+/**
+ * ASS-16 planning / greeting asks that must lead with UPCOMING title + days-left
+ * in the first content sentence. Keep this narrower than "any fixture with an
+ * UPCOMING row" so catalog / fan-reply / collab turns do not false-positive.
+ */
+export const UPCOMING_SENTENCE_DAYS_CASE_IDS: ReadonlySet<string> = new Set([
+  'greeting',
+  'presave',
+  'whats-next-release',
+  'week-plan',
+  'song-out-friday',
+]);
 
 export interface EvalToolCall {
   readonly name: string;
@@ -178,6 +192,37 @@ export function runHardChecks(
       id: theme.id.replaceAll('-', '_'),
       ok: theme.ok,
       detail: theme.detail,
+    });
+  }
+
+  // ASS-75: fold residual #26491 one-rec hermetic detectors into live scoring.
+  // - upcoming-sentence-days: allowlisted planning asks only (not every UPCOMING fixture)
+  // - planning-menu-not-a-move: ban patterns on every turn (same posture as question-not-a-move)
+  // - collab-draft-one: collab case only (positive draft shape)
+  // - do-it-calls-tool: already covered by expected_tool when expectToolsAny is set
+  const oneRecGaps = runOneRecGapChecks(text, {
+    upcomingTitle:
+      upcomingTitle && UPCOMING_SENTENCE_DAYS_CASE_IDS.has(testCase.id)
+        ? upcomingTitle
+        : undefined,
+    requireCollabDraftOne: testCase.id === 'collab',
+  });
+  const oneRecGapIds = new Set(oneRecGaps.map(gap => gap.id));
+  for (const gap of oneRecGaps) {
+    checks.push({
+      id: gap.id.replaceAll('-', '_'),
+      ok: gap.ok,
+      detail: gap.detail,
+    });
+  }
+  if (!oneRecGapIds.has('planning-menu-not-a-move')) {
+    const menuOk = !isPlanningMenuCloser(text);
+    checks.push({
+      id: 'planning_menu_not_a_move',
+      ok: menuOk,
+      detail: menuOk
+        ? undefined
+        : 'matched planning-menu closer (not a dated next move)',
     });
   }
 

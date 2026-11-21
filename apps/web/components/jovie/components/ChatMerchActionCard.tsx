@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, PlainButton } from '@jovie/ui';
 import { Archive, Check, Loader2, Pause, Play, Rocket, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import {
@@ -191,8 +191,7 @@ export function ChatMerchActionCard({
           ) : null}
         </div>
         <div className='shrink-0 flex items-center gap-1.5'>
-          <button
-            type='button'
+          <PlainButton
             onClick={handleConfirm}
             disabled={state === 'confirming'}
             className={cn(
@@ -209,9 +208,8 @@ export function ChatMerchActionCard({
               <ActionIcon className='h-3 w-3' />
             )}
             {config.confirmLabel}
-          </button>
-          <button
-            type='button'
+          </PlainButton>
+          <PlainButton
             onClick={handleDismiss}
             disabled={state === 'confirming'}
             className={cn(
@@ -222,7 +220,7 @@ export function ChatMerchActionCard({
             aria-label='Cancel Action'
           >
             <X className='h-3.5 w-3.5' />
-          </button>
+          </PlainButton>
         </div>
       </div>
     </ChatToolSurface>
