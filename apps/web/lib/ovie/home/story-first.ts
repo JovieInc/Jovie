@@ -109,6 +109,24 @@ function trendFromPoints(points: readonly number[]): StoryFirstSparkTrend {
   return 'flat';
 }
 
+/**
+ * Prefer real series movement. Tone paint is only for missing prior history
+ * that still shows an "alive" delta — otherwise equal endpoints stay flat
+ * (real history, $0 with no label, or any non-alive flat series).
+ */
+function sparkTrendForPulse(
+  points: readonly number[],
+  tone: HomeLoopTone,
+  opts: { readonly hasPriorSeries: boolean; readonly delta: string | null }
+): StoryFirstSparkTrend {
+  const moved = trendFromPoints(points);
+  if (moved !== 'flat') return moved;
+  if (!opts.hasPriorSeries && opts.delta === 'alive') {
+    return glanceTrendFromTone(tone);
+  }
+  return 'flat';
+}
+
 function formatDelta(
   current: number,
   prior: number | null,
@@ -185,45 +203,61 @@ export function buildStoryFirstGlance(input: {
   const usersPoints =
     usersNow !== null && Number.isFinite(usersNow) ? [usersNow, usersNow] : [];
 
+  const shippingTone = merges?.tone ?? 'neutral';
+  const shippingDelta =
+    currentMerges !== null
+      ? formatDelta(currentMerges, priorMerges, 'flat-label')
+      : null;
   const shipping: StoryFirstGlancePulse = {
     key: 'shipping',
     label: 'Shipping · 7D',
     value: merges?.measured ? merges.value : HOME_LOOP_NOT_MEASURED,
-    delta:
-      currentMerges !== null
-        ? formatDelta(currentMerges, priorMerges, 'flat-label')
-        : null,
-    tone: merges?.tone ?? 'neutral',
+    delta: shippingDelta,
+    tone: shippingTone,
     measured: merges?.measured ?? false,
     points: shippingPoints,
-    trend: trendFromPoints(shippingPoints),
+    trend: sparkTrendForPulse(shippingPoints, shippingTone, {
+      hasPriorSeries: priorMerges !== null,
+      delta: shippingDelta,
+    }),
     href: merges?.href ?? APP_ROUTES.ADMIN_SHIPPING,
   };
 
+  const revenueTone = mrr?.tone ?? 'neutral';
+  const revenueDelta =
+    mrrNow !== null ? formatDelta(mrrNow, mrrWas, 'alive') : null;
   const revenue: StoryFirstGlancePulse = {
     key: 'revenue',
     label: 'Revenue',
     value: mrr?.measured ? mrr.value : HOME_LOOP_NOT_MEASURED,
-    delta: mrrNow !== null ? formatDelta(mrrNow, mrrWas, 'alive') : null,
-    tone: mrr?.tone ?? 'neutral',
+    delta: revenueDelta,
+    tone: revenueTone,
     measured: mrr?.measured ?? false,
     points: revenuePoints,
-    trend: trendFromPoints(revenuePoints),
+    trend: sparkTrendForPulse(revenuePoints, revenueTone, {
+      hasPriorSeries: mrrWas !== null,
+      delta: revenueDelta,
+    }),
     href: mrr?.href ?? APP_ROUTES.ADMIN_OPERATIONS,
   };
 
+  const usersTone = users?.tone ?? 'neutral';
+  const usersDelta =
+    usersNow !== null && Number.isFinite(usersNow)
+      ? formatDelta(usersNow, null, 'flat-label')
+      : null;
   const usersPulse: StoryFirstGlancePulse = {
     key: 'users',
     label: 'Users',
     value: users?.measured ? users.value : HOME_LOOP_NOT_MEASURED,
-    delta:
-      usersNow !== null && Number.isFinite(usersNow)
-        ? formatDelta(usersNow, null, 'flat-label')
-        : null,
-    tone: users?.tone ?? 'neutral',
+    delta: usersDelta,
+    tone: usersTone,
     measured: users?.measured ?? false,
     points: usersPoints,
-    trend: trendFromPoints(usersPoints),
+    trend: sparkTrendForPulse(usersPoints, usersTone, {
+      hasPriorSeries: false,
+      delta: usersDelta,
+    }),
     href: users?.href ?? APP_ROUTES.ADMIN_GROWTH,
   };
 
