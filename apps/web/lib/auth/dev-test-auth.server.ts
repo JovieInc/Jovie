@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { makeSignature } from 'better-auth/crypto';
 import { eq, or } from 'drizzle-orm';
 import { cookies, headers } from 'next/headers';
 import { cache } from 'react';
@@ -18,7 +19,10 @@ import {
   isTestAuthBypassEnabled,
   isTrustedTestBypassHostname,
   resolveTestBypassUserId,
+  TEST_AUTH_BYPASS_MODE,
+  TEST_MODE_COOKIE,
   TEST_PERSONA_COOKIE,
+  TEST_USER_ID_COOKIE,
 } from '@/lib/auth/test-mode';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -44,13 +48,92 @@ import {
 import { normalizeEmail } from '@/lib/utils/email';
 import { logger } from '@/lib/utils/logger';
 
-export {
-  buildBetterAuthSessionCookieDescriptor,
-  buildDevTestAuthCookieDescriptors,
-  DEV_TEST_AUTH_COOKIE_NAMES,
-  sanitizeDevTestAuthRedirectPath,
-} from '@/lib/auth/dev-test-auth-cookies.server';
+const DEV_TEST_AUTH_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 12;
 
+export async function buildBetterAuthSessionCookieDescriptor(
+  actor: DevTestAuthActor,
+  secure: boolean
+) {
+  const ctx = await auth.$context;
+  const session = await ctx.internalAdapter.createSession(
+    actor.clerkUserId,
+    false
+  );
+  if (!session?.token) {
+    throw new Error(
+      'Better Auth performance session creation returned no token'
+    );
+  }
+
+  if (actor.isAdmin && typeof session.id === 'string' && session.id) {
+    await seedAdminMfaStepUpBestEffort('session', session.id);
+  }
+
+  const signature = await makeSignature(session.token, ctx.secret);
+  const attributes = ctx.authCookies.sessionToken.attributes;
+  const configuredSameSite =
+    typeof attributes.sameSite === 'string'
+      ? attributes.sameSite.toLowerCase()
+      : 'lax';
+  const sameSite: 'lax' | 'strict' | 'none' =
+    configuredSameSite === 'strict' || configuredSameSite === 'none'
+      ? configuredSameSite
+      : 'lax';
+
+  return {
+    name: ctx.authCookies.sessionToken.name,
+    value: `${session.token}.${signature}`,
+    httpOnly: attributes.httpOnly ?? true,
+    maxAge: ctx.sessionConfig.expiresIn,
+    path: attributes.path ?? '/',
+    sameSite,
+    secure: secure || (attributes.secure ?? false),
+  };
+}
+
+export function buildDevTestAuthCookieDescriptors(
+  actor: DevTestAuthActor,
+  secure: boolean
+) {
+  const baseCookie = {
+    httpOnly: true,
+    maxAge: DEV_TEST_AUTH_COOKIE_MAX_AGE_SECONDS,
+    path: '/',
+    sameSite: 'lax' as const,
+    secure,
+  };
+
+  return [
+    {
+      name: TEST_MODE_COOKIE,
+      value: TEST_AUTH_BYPASS_MODE,
+      ...baseCookie,
+    },
+    {
+      name: TEST_USER_ID_COOKIE,
+      value: actor.clerkUserId,
+      ...baseCookie,
+    },
+    {
+      name: TEST_PERSONA_COOKIE,
+      value: actor.persona,
+      ...baseCookie,
+    },
+  ];
+}
+
+export const DEV_TEST_AUTH_COOKIE_NAMES = [
+  TEST_MODE_COOKIE,
+  TEST_USER_ID_COOKIE,
+  TEST_PERSONA_COOKIE,
+] as const;
+export function sanitizeDevTestAuthRedirectPath(
+  value: string | null | undefined
+): string | null {
+  if (!value) return '/app';
+  if (!value.startsWith('/') || value.startsWith('//')) return null;
+  return value;
+}
 const DEFAULT_CREATOR_EMAIL = DEFAULT_DEV_TEST_AUTH_EMAILS.creator;
 const DEFAULT_CREATOR_USERNAME = 'browse-test-user';
 const DEFAULT_CREATOR_FULL_NAME = 'Browse Test User';
@@ -73,19 +156,16 @@ const DEFAULT_ADMIN_FULL_NAME = 'Browse Admin';
 const DEFAULT_ADMIN_BIO =
   'Stable admin profile for local perf checks and admin-shell QA.';
 const DEFAULT_ADMIN_VENMO = 'browse-admin-user';
-
 interface DevTestAuthAvailability {
   readonly enabled: boolean;
   readonly trustedHost: boolean;
   readonly reason: string | null;
 }
-
 interface DevTestAuthSession extends DevTestAuthActor {
   readonly dbUserId: string;
 }
 
 export type DevTestAuthFixture = 'profiles-final-row';
-
 const PROFILES_FINAL_ROW_FIXTURE_LINKS = [
   ['instagram', 'https://instagram.com/browse-ready-user'],
   ['tiktok', 'https://tiktok.com/@browse-ready-user'],
@@ -98,7 +178,6 @@ const PROFILES_FINAL_ROW_FIXTURE_LINKS = [
   ['twitter', 'https://twitter.com/browse-ready-user'],
   ['spotify', DEFAULT_READY_CREATOR_SPOTIFY_URL],
 ] as const;
-
 interface PersonaSeedConfig {
   readonly persona: DevTestAuthPersona;
   readonly email: string;

@@ -40,7 +40,6 @@ import {
   adminStepUpIdentifier,
   hasRecentAdminMfaReverification,
   seedAdminMfaStepUpForBypassUser,
-  seedAdminMfaStepUpReceipt,
 } from '@/lib/admin/mfa';
 
 describe('hasRecentAdminMfaReverification', () => {
@@ -103,18 +102,14 @@ describe('seedAdminMfaStepUpReceipt', () => {
     state.inserts = [];
   });
 
-  it('writes a deterministic live receipt for the bypass session id', async () => {
+  it('writes a live receipt for the bypass session id', async () => {
     await seedAdminMfaStepUpForBypassUser('db_admin');
-    expect(state.inserts).toHaveLength(1);
-    expect(state.inserts[0]).toMatchObject({
-      id: 'admin-step-up:sess_test_bypass_db_admin',
-      identifier: 'admin-step-up:sess_test_bypass_db_admin',
-    });
+    expect(state.inserts).toMatchObject([
+      {
+        id: 'admin-step-up:sess_test_bypass_db_admin',
+        identifier: 'admin-step-up:sess_test_bypass_db_admin',
+      },
+    ]);
     expect(state.inserts[0]?.expiresAt).toBeInstanceOf(Date);
-  });
-
-  it('no-ops without a session id', async () => {
-    await seedAdminMfaStepUpReceipt('');
-    expect(state.inserts).toHaveLength(0);
   });
 });

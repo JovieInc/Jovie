@@ -5,7 +5,7 @@ export const TEST_MODE_COOKIE = '__e2e_test_mode';
 export const TEST_USER_ID_COOKIE = '__e2e_test_user_id';
 export const TEST_PERSONA_COOKIE = '__e2e_test_persona';
 
-/** Stable session id shape used by `resolveRequestAuth` for test-auth bypass. */
+/** Session id prefix for resolveRequestAuth test-auth bypass. */
 export const TEST_AUTH_BYPASS_SESSION_PREFIX = 'sess_test_bypass_';
 
 export function testAuthBypassSessionId(dbUserId: string): string {

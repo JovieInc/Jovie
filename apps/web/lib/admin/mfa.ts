@@ -5,33 +5,23 @@ import { TEST_AUTH_BYPASS_SESSION_PREFIX } from '@/lib/auth/test-mode-constants'
 import { db } from '@/lib/db';
 import { baVerifications } from '@/lib/db/schema/better-auth';
 import { isVisualCaptureSyntheticAuthEnabled } from '@/lib/e2e/runtime';
-import { adminStepUpIdentifier } from './mfa-constants';
+import { adminStepUpIdentifier } from './mfa-seed';
 
 export {
   ADMIN_STEP_UP_TTL_MS,
   adminStepUpIdentifier,
   PASSKEY_ENROLLMENT_MAX_SESSION_AGE_MS,
-} from './mfa-constants';
-export {
   seedAdminMfaStepUpForBypassUser,
   seedAdminMfaStepUpReceipt,
 } from './mfa-seed';
 
-/**
- * True when this exact Better Auth session was created by a passkey
- * authentication within ADMIN_STEP_UP_TTL_MS (JOV-4806). The receipt is
- * written by the Better Auth after-hook on `/passkey/verify-authentication`.
- * Any read failure fails closed.
- */
+/** True when this session has an unexpired passkey step-up (JOV-4806). Fail closed. */
 export async function hasRecentAdminMfaReverification(
   authResult: { readonly sessionId?: string | null } | null | undefined
 ): Promise<boolean> {
   const sessionId = authResult?.sessionId;
   if (!sessionId) return false;
-  // Secretless PR visual capture has no ba_verifications table (JOV-7126).
-  // Only the producer's own test-auth bypass session id shape is exempt —
-  // production sessions never use this prefix, and normal E2E with a DB
-  // seeds a real receipt instead of taking this branch.
+  // Visual capture has no ba_verifications (JOV-7126); only sess_test_bypass_* exempt.
   if (
     isVisualCaptureSyntheticAuthEnabled() &&
     sessionId.startsWith(TEST_AUTH_BYPASS_SESSION_PREFIX)

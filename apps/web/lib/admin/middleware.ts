@@ -73,9 +73,7 @@ export async function requireAdmin(options?: {
     );
   }
 
-  // Privileged admin mutations (impersonate, set-plan, flags, investors)
-  // require the same passkey step-up as entitlements `isAdmin`. Fail closed
-  // when the receipt is missing, expired, or unreadable.
+  // Same passkey step-up as entitlements `isAdmin`; fail closed.
   if (!(await hasRecentAdminMfaReverification(auth))) {
     captureWarning(
       `[admin/middleware] Admin MFA step-up required for user: ${maskedUserId}`

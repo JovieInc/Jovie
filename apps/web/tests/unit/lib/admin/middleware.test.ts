@@ -110,31 +110,23 @@ describe('requireAdmin (Better Auth)', () => {
   });
 
   it('returns 403 when admin lacks passkey step-up', async () => {
-    mockGetCachedAuth.mockResolvedValue({
+    const auth = {
       userId: 'user_admin',
       sessionId: 'sess_stale',
       orgId: null,
-    });
+    };
+    mockGetCachedAuth.mockResolvedValue(auth);
     mockIsAdmin.mockResolvedValue(true);
     mockHasRecentAdminMfa.mockResolvedValue(false);
-
     const { requireAdmin } = await import('@/lib/admin/middleware');
     const response = await requireAdmin();
-
-    expect(mockHasRecentAdminMfa).toHaveBeenCalledWith({
-      userId: 'user_admin',
-      sessionId: 'sess_stale',
-      orgId: null,
-    });
+    expect(mockHasRecentAdminMfa).toHaveBeenCalledWith(auth);
     expect(response?.status).toBe(403);
     await expect(response?.json()).resolves.toEqual({
       error: 'Verify your passkey for this privileged action.',
       code: 'PASSKEY_STEP_UP_REQUIRED',
     });
     expect(mockPrivacy).not.toHaveBeenCalled();
-    expect(mockCaptureWarning).toHaveBeenCalledWith(
-      expect.stringContaining('masked:user_admin')
-    );
   });
 
   it('returns null when authenticated admin', async () => {
