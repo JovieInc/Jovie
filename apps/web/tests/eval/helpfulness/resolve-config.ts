@@ -1,9 +1,4 @@
-/**
- * Credential + spend guards for the helpfulness live runner.
- * Prefer the Workers AI relay (`WORKERS_AI_TOKEN`) so Cursor agent VMs and CI
- * can score without `CLOUDFLARE_ACCOUNT_ID`.
- */
-
+/** Resolve Workers AI relay config for helpfulness live scoring. */
 import { execFileSync } from 'node:child_process';
 import { WORKERS_AI_RELAY_BASE_URL, type WorkersAiConfig } from './workers-ai';
 

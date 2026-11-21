@@ -1,7 +1,4 @@
-/**
- * Hermetic tests for the helpfulness Workers AI client: relay vs direct URL
- * selection and credential resolution. No network.
- */
+/** Hermetic Workers AI relay config/routing ratchets (ASS-17 path). */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
