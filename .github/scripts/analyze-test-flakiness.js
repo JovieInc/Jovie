@@ -684,7 +684,10 @@ async function analyzeFlakiness(token, owner, repo, options = {}) {
   const unitRuns = [...runs, ...svRuns];
   // SV without unit-flaky-* never ran units — omit from runsAnalyzed.
   const unitFlakeRuns = await runsWithUnitFlakeArtifacts(
-    token, owner, repo, unitRuns
+    token,
+    owner,
+    repo,
+    unitRuns
   );
   const unitStats = await collectCachedUnitRetryFlakes(
     unitFlakeRuns,
