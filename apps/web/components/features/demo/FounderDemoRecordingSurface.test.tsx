@@ -75,12 +75,12 @@ describe('Founder demo reduced motion', () => {
     const user = userEvent.setup();
     const { container } = render(<FounderDemoRecordingSurface />);
 
-    const approve = await screen.findByRole('button', { name: 'Approve drop' });
+    const approve = await screen.findByRole('button', { name: 'Approve Drop' });
     expect(approve.className).not.toContain('bg-white');
     await user.click(approve);
 
     expect(
-      screen.getByRole('button', { name: 'Approve drop' })
+      screen.getByRole('button', { name: 'Approve Drop' })
     ).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });

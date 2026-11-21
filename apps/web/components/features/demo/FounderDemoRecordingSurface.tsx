@@ -310,10 +310,11 @@ function RecordingChatPanel({
             </div>
             <Button
               variant='primary'
-              className='h-8 w-full rounded-md text-xs'
+              size='sm'
+              className='w-full'
               type='button'
             >
-              Approve drop
+              Approve Drop
             </Button>
           </div>
         ) : null}
