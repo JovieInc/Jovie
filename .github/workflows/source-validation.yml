@@ -950,9 +950,11 @@ jobs:
             else
               # Base predates the tools (or paths were removed). Do not hard-fail
               # the unit job — skip the twin until base carries the policy.
-              echo "::warning::MQ parity tools absent on origin/$BASE_REF; typecheck twin skipped."
+              echo "::warning::MQ parity tools absent on origin/$BASE_REF; MQ parity twins skipped."
               mkdir -p "$tool_root/scripts/ci"
-              printf '%s\n' "console.log('typecheck=false')" \
+              printf '%s\n' \
+                "console.log('typecheck=false')" \
+                "console.log('remaining=false')" \
                 >"$tool_root/scripts/ci/mq-parity-scope.mjs"
             fi
           fi
@@ -983,7 +985,7 @@ jobs:
           if [[ "$web$ui$ovie" == 'falsefalsefalse' ]]; then
             echo 'No unit-affecting source changed; non-applicable receipt recorded.'
           fi
-      # JOV-13071 slice: reuse required source runners for the typecheck twin.
+      # JOV-13071 slice: reuse required source runners for MQ parity twins.
       # Combined-head jobs stay intact; no second matrix or pre-push hook.
       - name: Select MQ parity scope
         id: mq-parity
@@ -994,11 +996,20 @@ jobs:
           set -euo pipefail
           node "$MQ_PARITY_TOOLS_ROOT/scripts/ci/mq-parity-scope.mjs" "$BASE_SHA" >> "$GITHUB_OUTPUT"
       - name: Setup Node.js and pnpm
-        if: steps.reuse.outputs.reuse != 'true' && (matrix.shard == '4/4' || steps.scope.outputs.web == 'true' || steps.scope.outputs.ui == 'true' || steps.scope.outputs.ovie == 'true' || steps.mq-parity.outputs.typecheck == 'true')
+        if: steps.reuse.outputs.reuse != 'true' && (matrix.shard == '4/4' || steps.scope.outputs.web == 'true' || steps.scope.outputs.ui == 'true' || steps.scope.outputs.ovie == 'true' || steps.mq-parity.outputs.typecheck == 'true' || steps.mq-parity.outputs.remaining == 'true')
         uses: ./.github/actions/setup-node-pnpm
       - name: Setup Playwright warm path
         if: steps.reuse.outputs.reuse != 'true' && (matrix.shard == '4/4' || steps.scope.outputs.web == 'true')
         uses: ./.github/actions/setup-playwright
+      - name: Run remaining lane parity
+        # Cheap remaining lanes only; structural subsets stay on dedicated
+        # ci-fast-structural-* gaps / deterministic overlaps (Wave 3 slice).
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.remaining == 'true' && matrix.shard == '1/4'
+        env:
+          CI_FAST_LANE_GROUP: remaining
+          CI_FAST_SKIP_STRUCTURAL: 'true'
+          TURBO_SCM_BASE: ${{ steps.scope.outputs.base }}
+        run: node scripts/ci-fast-lanes.mjs
       - name: Run typecheck lane parity
         if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.typecheck == 'true' && matrix.shard == '2/4'
         env:
