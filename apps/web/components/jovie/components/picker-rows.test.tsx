@@ -98,3 +98,30 @@ describe('NavArt icon mapping', () => {
     expect(container.querySelector('svg.lucide-calendar')).not.toBeNull();
   });
 });
+
+describe('PickerRow PlainButton', () => {
+  it('renders the row as a type=button option', () => {
+    render(
+      <PickerRow
+        item={{
+          kind: 'action' as const,
+          action: {
+            id: 'attach-files',
+            label: 'Attach Files',
+            description: 'Drop or browse',
+            icon: Paperclip,
+            onSelect: vi.fn(),
+          },
+        }}
+        index={0}
+        isActive={false}
+        onMouseEnter={vi.fn()}
+        onCommit={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('option', { name: /Attach Files/ })).toHaveAttribute(
+      'type',
+      'button'
+    );
+  });
+});

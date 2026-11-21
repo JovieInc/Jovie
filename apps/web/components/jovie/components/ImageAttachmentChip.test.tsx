@@ -107,3 +107,13 @@ describe('ImageAttachmentChip', () => {
     );
   });
 });
+
+describe('ImageAttachmentChip PlainButton trigger', () => {
+  it('renders the trigger as a type=button', () => {
+    renderChip();
+    expect(screen.getByTestId('image-attachment-chip-trigger')).toHaveAttribute(
+      'type',
+      'button'
+    );
+  });
+});

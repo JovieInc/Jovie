@@ -61,3 +61,11 @@ describe('ChatOpsDataCard', () => {
     expect(screen.getByText(/ubuntu-operational-truth/)).toBeInTheDocument();
   });
 });
+
+describe('ChatOpsDataCard kind label casing', () => {
+  it('renders the kind label in sentence case without forcing uppercase', () => {
+    render(<ChatOpsDataCard card={{ ...card, kind: 'shipping' }} />);
+    const label = screen.getByText('Shipping');
+    expect(label.className).not.toContain('uppercase');
+  });
+});

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
@@ -8,7 +8,7 @@ vi.mock('@/components/feedback', () => ({ toast }));
 
 import { buildCopyMenuItems, CopyableField } from './CopyableField';
 
-function setup(writeText: ReturnType<typeof vi.fn>) {
+function setup(writeText: Mock<(data: string) => Promise<void>>) {
   const user = userEvent.setup();
   vi.spyOn(navigator.clipboard, 'writeText').mockImplementation(writeText);
   return user;
@@ -33,7 +33,9 @@ describe('CopyableField', () => {
   });
 
   it('copies, toasts and flips to the copied icon', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
+    const writeText = vi
+      .fn<(data: string) => Promise<void>>()
+      .mockResolvedValue(undefined);
     const user = setup(writeText);
     const { container } = render(
       <CopyableField value='tim@jovie.com' label='Email' />
@@ -48,7 +50,9 @@ describe('CopyableField', () => {
   });
 
   it('skips the toast when showToast is off', async () => {
-    const user = setup(vi.fn().mockResolvedValue(undefined));
+    const user = setup(
+      vi.fn<(data: string) => Promise<void>>().mockResolvedValue(undefined)
+    );
     render(<CopyableField value='x' label='X' showToast={false} />);
 
     await user.click(screen.getByRole('button'));
@@ -57,7 +61,11 @@ describe('CopyableField', () => {
   });
 
   it('reports a failed copy', async () => {
-    const user = setup(vi.fn().mockRejectedValue(new Error('denied')));
+    const user = setup(
+      vi
+        .fn<(data: string) => Promise<void>>()
+        .mockRejectedValue(new Error('denied'))
+    );
     render(<CopyableField value='x' label='X' />);
 
     await user.click(screen.getByRole('button'));
@@ -77,7 +85,9 @@ describe('CopyableField', () => {
 
   it('builds copy menu items and drops empty values', async () => {
     const user = userEvent.setup();
-    const writeText = vi.fn().mockResolvedValue(undefined);
+    const writeText = vi
+      .fn<(data: string) => Promise<void>>()
+      .mockResolvedValue(undefined);
     vi.spyOn(navigator.clipboard, 'writeText').mockImplementation(writeText);
     const items = buildCopyMenuItems([
       { id: 'email', label: 'Email', value: 'a@b.co' },

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
@@ -17,12 +17,12 @@ const pitches = {
 };
 
 describe('ChatPitchCard', () => {
-  let writeText: ReturnType<typeof vi.fn>;
+  let writeText: Mock<(data: string) => Promise<void>>;
 
   beforeEach(() => {
     toast.success.mockClear();
     toast.error.mockClear();
-    writeText = vi.fn().mockResolvedValue(undefined);
+    writeText = vi.fn<(data: string) => Promise<void>>().mockResolvedValue(undefined);
   });
 
   // userEvent.setup() installs its own clipboard stub, so override it after.
