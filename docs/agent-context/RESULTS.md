@@ -115,7 +115,7 @@ inline, with source hashes matching the frozen v2 files. Existing production
 agent defaults and shared billing settings were preserved. The corrected canary
 passed all 12 cases with no tool calls at $0.70. All three baseline and all three candidate trials completed: **36/36 decisions
 for each variant**, no observed tool calls, all under the $1 per-query cap.
-Hyperagent receipts (archived off-tree) retain the six thread URLs, actual
+[Hyperagent receipts](hyperagent-results.json) retain the six thread URLs, actual
 decisions (deduplicated only after comparing every parsed response), source hashes,
 model/effort, and the Usage breakdowns.
 
