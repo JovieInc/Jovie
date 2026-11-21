@@ -315,9 +315,9 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                     return (
                       <div className='flex min-w-35 items-center justify-end gap-1'>
                         <IconButton
-                          size='xs'
+                          // sm = 14px [&_svg] — matches prior h-3.5 glyphs (xs is 12px).
+                          size='sm'
                           // ghost owns hover:text-primary-token (inline does not).
-                          // No glyph color class — inherit so hover reaches the SVG.
                           variant='ghost'
                           fade='visible'
                           aria-label={`Open ${config.label} in new tab`}
@@ -329,14 +329,10 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                             )
                           }
                         >
-                          <Icon
-                            name='ExternalLink'
-                            className='h-3.5 w-3.5'
-                            aria-hidden='true'
-                          />
+                          <Icon name='ExternalLink' aria-hidden='true' />
                         </IconButton>
                         <IconButton
-                          size='xs'
+                          size='sm'
                           variant='ghost'
                           fade='visible'
                           aria-label={
@@ -349,7 +345,6 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                           <Icon
                             name={isCopied ? 'Check' : 'Copy'}
                             className={cn(
-                              'h-3.5 w-3.5',
                               // Success state only — otherwise inherit ghost hover.
                               isCopied && 'text-success'
                             )}
