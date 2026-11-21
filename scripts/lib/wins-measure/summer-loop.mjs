@@ -158,9 +158,12 @@ export function applySummerVerifyReceipts(wins, runs, opts = {}) {
     }
     const metrics = (win.metrics ?? []).filter(m => m.before !== null);
     if (!metrics.length) {
-      errors.push({
-        reason: `${win.id}: no measurable metrics`,
+      // Mismatch against ledger shape — skip, do not hard-fail. Append-only
+      // runs.jsonl would otherwise exit 1 on every later promote forever.
+      skipped.push({
+        reason: `${win.id}: no measurable metrics (all before null)`,
         run_at: run.run_at,
+        pr_url: run.pr_url,
       });
       continue;
     }

@@ -120,6 +120,39 @@ test('summer verify skips not-yet-deployed and missing after', () => {
   assert.equal(win.receipts.length, 0);
 });
 
+test('summer verify skips wins with only null before metrics (not hard error)', () => {
+  const win = pendingWin({
+    metrics: [
+      {
+        name: 'unverified-probe',
+        unit: 'count',
+        better: 'lower',
+        before: null,
+        after: null,
+        source: 'manual',
+        query: 'eyeball',
+      },
+    ],
+  });
+  const report = applySummerVerifyReceipts(
+    [win],
+    [
+      {
+        run_at: '2026-10-21T06:17:00Z',
+        previous_fix_effect: 'fixed',
+        pr_url: 'https://github.com/JovieInc/Jovie/pull/26001',
+        after: 0,
+        metric: 'unverified-probe',
+      },
+    ]
+  );
+  assert.equal(report.measured.length, 0);
+  assert.equal(report.errors.length, 0);
+  assert.equal(report.skipped.length, 1);
+  assert.match(report.skipped[0].reason, /no measurable metrics/);
+  assert.equal(win.receipts.length, 0);
+});
+
 test('summer verify is idempotent on evidence', () => {
   const win = pendingWin();
   const runs = [
