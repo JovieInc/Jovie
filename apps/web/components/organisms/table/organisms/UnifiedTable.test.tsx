@@ -42,6 +42,17 @@ function table(data: CatalogRow[], emptyState?: ReactNode) {
 }
 
 describe('UnifiedTable states', () => {
+  it('defaults to the canonical dense row mode', () => {
+    render(table(RELEASES));
+    expect(screen.getByRole('table')).toHaveAttribute(
+      'data-table-row-mode',
+      'dense'
+    );
+    expect(
+      screen.getByRole('table').style.getPropertyValue('--table-row-height')
+    ).toBe('32px');
+  });
+
   it('opens a row with missing values on click', async () => {
     const user = userEvent.setup();
     const onRowClick = vi.fn();
