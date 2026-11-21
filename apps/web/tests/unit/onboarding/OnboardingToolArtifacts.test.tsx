@@ -127,7 +127,7 @@ describe('onboarding tool artifacts', () => {
     );
 
     const picker = screen.getByTestId('onboarding-artist-picker');
-    expect(picker).toHaveClass('min-h-44');
+    expect(picker).toHaveClass('min-h-40');
     expect(picker).not.toHaveClass('h-42');
   });
 

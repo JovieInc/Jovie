@@ -191,7 +191,7 @@ export function HeroSpotifyResults({
                   {artist.name}
                 </div>
                 {artist.followers ? (
-                  <div className='text-xs text-tertiary-token'>
+                  <div className='text-xs tabular-nums text-tertiary-token'>
                     {formatFollowers(artist.followers)}
                   </div>
                 ) : null}

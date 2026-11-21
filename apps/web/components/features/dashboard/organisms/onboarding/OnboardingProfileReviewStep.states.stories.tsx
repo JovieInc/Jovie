@@ -44,7 +44,13 @@ export const LoadingEnriching: Story = {
 /** Empty: no bio, genres or photo came back from enrichment. */
 export const EmptyNoEnrichment: Story = {
   args: {
-    enrichedProfile: { name: 'Sasha Waves', followers: 0 },
+    enrichedProfile: {
+      name: 'Sasha Waves',
+      imageUrl: null,
+      bio: null,
+      genres: [],
+      followers: 0,
+    },
     existingAvatarUrl: null,
   },
 };

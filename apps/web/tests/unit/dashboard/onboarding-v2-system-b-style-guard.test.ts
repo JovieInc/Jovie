@@ -7,11 +7,8 @@ const sourceDir = 'components/features/dashboard/organisms/onboarding-v2';
 const sourcePaths = [
   'OnboardingV2Form.tsx',
   'OnboardingV2Panels.tsx',
-  'OnboardingV2EarlySteps.tsx',
   'OnboardingV2DiscoverySteps.tsx',
-  'OnboardingV2ProfileReadyStep.tsx',
-  'OnboardingV2SpotifySearchField.tsx',
-  'OnboardingV2StepContent.tsx',
+  'OnboardingV2Steps.tsx',
 ] as const;
 const sourcePath = `${sourceDir}/OnboardingV2Form.tsx`;
 

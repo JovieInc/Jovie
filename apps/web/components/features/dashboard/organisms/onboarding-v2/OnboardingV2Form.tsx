@@ -12,7 +12,7 @@ import {
 } from '@/features/dashboard/organisms/onboarding-v2/shared/useOnboardingSubmit';
 import { useArtistSearchQuery } from '@/lib/queries';
 import { OnboardingSidebar } from './OnboardingV2Panels';
-import { OnboardingV2StepContent } from './OnboardingV2StepContent';
+import { OnboardingV2StepContent } from './OnboardingV2Steps';
 import {
   type DiscoverySnapshot,
   type LateArrival,
@@ -27,6 +27,17 @@ import { useOnboardingV2Artist } from './useOnboardingV2Artist';
 import { useOnboardingV2Discovery } from './useOnboardingV2Discovery';
 import { useOnboardingV2Profile } from './useOnboardingV2Profile';
 import { useOnboardingV2Url } from './useOnboardingV2Url';
+
+const SIDEBAR_STEPS: ReadonlyArray<Readonly<{ id: StepId; label: string }>> = [
+  { id: 'handle', label: 'Handle' },
+  { id: 'spotify', label: 'Spotify' },
+  { id: 'upgrade', label: 'Plan' },
+  // eslint-disable-next-line @jovie/canonical-ui-label-casing -- DSP is an industry-standard initialism.
+  { id: 'dsp', label: 'DSPs' },
+  { id: 'social', label: 'Social' },
+  { id: 'releases', label: 'Releases' },
+  { id: 'profile-ready', label: 'Finish' },
+];
 
 export function OnboardingV2Form({
   assumeInitialHandleAvailable = false,
@@ -325,6 +336,7 @@ export function OnboardingV2Form({
       stableStageHeight={currentStep === 'handle' ? 'tall' : 'default'}
       sidebar={
         <OnboardingSidebar
+          steps={SIDEBAR_STEPS}
           currentStep={currentStep}
           onBack={
             currentStep === 'spotify' ||

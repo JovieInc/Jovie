@@ -263,8 +263,7 @@ describe('OnboardingToolField production sources', () => {
     'OnboardingToolField.tsx',
     'OnboardingToolArtifacts.tsx',
     'OnboardingSpotifyArtistPickerCard.tsx',
-    'OnboardingHandleCheckCard.tsx',
-    'OnboardingSocialLinkCard.tsx',
+    'OnboardingToolStatusCards.tsx',
   ] as const;
 
   it('keeps production off the retired raw focus recipe', () => {
@@ -290,8 +289,7 @@ describe('OnboardingToolField production sources', () => {
   it('uses one field owner for the three onboarding tool inputs', () => {
     const cards = [
       'OnboardingSpotifyArtistPickerCard.tsx',
-      'OnboardingHandleCheckCard.tsx',
-      'OnboardingSocialLinkCard.tsx',
+      'OnboardingToolStatusCards.tsx',
     ].map(readSource);
     const source = cards.join('\n');
     for (const card of cards) {

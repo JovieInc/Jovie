@@ -334,7 +334,7 @@ export function WaitlistIntakeChat({
         <section className='grid flex-1 gap-6 py-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-stretch'>
           <div className='flex min-h-140 flex-col overflow-hidden rounded-2xl border border-subtle bg-surface-0 shadow-xl'>
             <div className='bg-surface-1 px-4 py-3 sm:px-5'>
-              <h1 className='text-lg font-semibold leading-6 text-primary-token'>
+              <h1 className='text-lg text-balance font-semibold leading-6 text-primary-token'>
                 Request Access
               </h1>
               <p className='mt-1 text-app leading-5 text-secondary-token'>
@@ -426,7 +426,7 @@ export function WaitlistIntakeChat({
           </div>
 
           <aside className='hidden rounded-2xl border border-subtle bg-surface-1 p-4 lg:block'>
-            <h2 className='text-sm font-semibold text-primary-token'>
+            <h2 className='text-sm text-balance font-semibold text-primary-token'>
               Saved Context
             </h2>
             <dl className='mt-4 space-y-3 text-app'>

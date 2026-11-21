@@ -5,7 +5,6 @@ import { cn } from '@/lib/utils';
 import {
   getSidebarStepState,
   normalizeSidebarCurrentStep,
-  SIDEBAR_STEPS,
   type StepId,
 } from './onboardingV2Model';
 
@@ -25,7 +24,7 @@ export function StepFrame({
   return (
     <div className='mx-auto flex w-full max-w-2xl flex-col gap-6'>
       <div className='space-y-3'>
-        <h1 className='text-3xl font-semibold tracking-normal text-primary-token sm:text-4xl'>
+        <h1 className='text-3xl text-balance font-semibold tracking-normal text-primary-token sm:text-4xl'>
           {title}
         </h1>
         {prompt ? (
@@ -139,14 +138,15 @@ export function StepCircleIcon({
 export function OnboardingSidebar({
   currentStep,
   onBack,
+  steps,
 }: Readonly<{
   currentStep: StepId;
   onBack?: () => void;
+  steps: ReadonlyArray<Readonly<{ id: StepId; label: string }>>;
 }>) {
   const displayStep = normalizeSidebarCurrentStep(currentStep);
-  const currentIndex = SIDEBAR_STEPS.findIndex(s => s.id === displayStep);
-  const currentLabel =
-    SIDEBAR_STEPS[currentIndex]?.label ?? SIDEBAR_STEPS[0].label;
+  const currentIndex = steps.findIndex(s => s.id === displayStep);
+  const currentLabel = steps[currentIndex]?.label ?? steps[0].label;
 
   return (
     <nav aria-label='Onboarding Steps'>
@@ -168,10 +168,10 @@ export function OnboardingSidebar({
           {currentLabel}
         </span>
         <span className='text-xs text-tertiary-token'>
-          {currentIndex + 1}/{SIDEBAR_STEPS.length}
+          {currentIndex + 1}/{steps.length}
         </span>
         <div className='flex flex-1 gap-1'>
-          {SIDEBAR_STEPS.map((step, i) => (
+          {steps.map((step, i) => (
             <div
               key={step.id}
               className={cn(
@@ -185,7 +185,7 @@ export function OnboardingSidebar({
 
       {/* Full step list for sm+ screens */}
       <ul className='hidden space-y-1.5 sm:block'>
-        {SIDEBAR_STEPS.map(step => {
+        {steps.map(step => {
           const state = getSidebarStepState(step.id, displayStep);
           const isCurrent = state === 'current';
 

@@ -58,7 +58,7 @@ interface MarketingRenderSurfaceProps {
 
 function RenderShell({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <div className='marketing-rounded-frame relative flex min-h-52 items-center justify-center bg-ink-on-media p-3'>
+    <div className='marketing-rounded-frame relative flex min-h-56 items-center justify-center bg-ink-on-media p-3'>
       {children}
     </div>
   );

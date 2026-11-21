@@ -34,19 +34,6 @@ export const STEP_ORDER: StepId[] = [
   'profile-ready',
 ];
 
-export const SIDEBAR_STEPS: ReadonlyArray<
-  Readonly<{ id: StepId; label: string }>
-> = [
-  { id: 'handle', label: 'Handle' },
-  { id: 'spotify', label: 'Spotify' },
-  { id: 'upgrade', label: 'Plan' },
-  // eslint-disable-next-line @jovie/canonical-ui-label-casing -- DSP is an industry-standard initialism.
-  { id: 'dsp', label: 'DSPs' },
-  { id: 'social', label: 'Social' },
-  { id: 'releases', label: 'Releases' },
-  { id: 'profile-ready', label: 'Finish' },
-];
-
 export interface SelectedArtist {
   id: string;
   imageUrl?: string | null;

@@ -79,15 +79,15 @@ describe('ClaimHandleForm', () => {
     const user = userEvent.setup();
     render(
       <ClaimHandleForm
-        submitTracking={{ eventName: 'claim_submit', section: 'hero' }}
+        submitTracking={{ eventName: 'landing_cta_claim_handle', section: 'final_cta' }}
       />
     );
 
     await user.type(getInput(), 'newartist');
     await user.click(screen.getByRole('button', { name: /^Claim/ }));
 
-    expect(mockTrack).toHaveBeenCalledWith('claim_submit', {
-      section: 'hero',
+    expect(mockTrack).toHaveBeenCalledWith('landing_cta_claim_handle', {
+      section: 'final_cta',
       handle: 'newartist',
     });
     await waitFor(() => expect(mockPush).toHaveBeenCalledTimes(1));

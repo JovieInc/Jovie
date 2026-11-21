@@ -10,10 +10,12 @@ import {
   getSafeSpotifyArtistUrl,
   hostnameFor,
 } from '@/lib/onboarding/tool-artifact-format';
-import { OnboardingHandleCheckCard } from './OnboardingHandleCheckCard';
-import { OnboardingSocialLinkCard } from './OnboardingSocialLinkCard';
 import { OnboardingSpotifyArtistPickerCard } from './OnboardingSpotifyArtistPickerCard';
-import { StatusShell } from './OnboardingToolStatusShell';
+import {
+  OnboardingHandleCheckCard,
+  OnboardingSocialLinkCard,
+  StatusShell,
+} from './OnboardingToolStatusCards';
 import {
   type ArtistConfirmedOutput,
   isFailed,
