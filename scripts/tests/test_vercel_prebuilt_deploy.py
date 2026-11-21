@@ -10,7 +10,6 @@ import pytest
 
 from scripts.tests.staging_controller_contract import assert_staging_controller_contract
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 DEPLOY_SCRIPT = REPO_ROOT / ".github/scripts/vercel-prebuilt-deploy.sh"
@@ -30,10 +29,8 @@ EXPECTED_COMMIT_SHA = "a" * 40
 ACTION_CACHE_RESTORE_V6_1_0_SHA = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
 ACTION_CACHE_SAVE_V6_1_0_SHA = "55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
 
-
 def test_staging_controller_is_independent_and_exact_sha() -> None:
     assert_staging_controller_contract(REPO_ROOT)
-
 
 def test_blocked_fleet_deployment_fails_the_production_controller() -> None:
     """A denied production deploy must fail Authorize fleet deployment state.
@@ -51,7 +48,6 @@ def test_blocked_fleet_deployment_fails_the_production_controller() -> None:
     assert 'consumer" == "deployment" && "$deployment_allowed" != "true"' in wrapper
     assert "Fleet gate blocked production deployment" in wrapper
     assert "fleet-gate.scoped allowed=$scoped_allowed" in wrapper
-
 
 def test_staging_lineage_receipt_accepts_merge_group_provenance(tmp_path: Path) -> None:
     """JOV-7182: release.json provenance is the merge-queue proof run, not the
@@ -102,7 +98,6 @@ def test_staging_lineage_receipt_accepts_merge_group_provenance(tmp_path: Path) 
         "lineage filter must accept merge-group provenance: " + result.stderr
     )
 
-
 def test_production_next_cache_experiment_is_bounded_and_restore_only_by_default() -> None:
     """Keep the production cache experiment narrow enough to be reversible.
 
@@ -152,7 +147,6 @@ def test_production_next_cache_experiment_is_bounded_and_restore_only_by_default
     assert "tar -C apps/web/.next -czf \"$next_cache_probe\" cache" in workflow
     assert "next_cache_archive_bytes" in workflow
     assert "next_cache_save_eligible" in workflow
-
 
 def test_timed_out_prebuilt_with_accepted_url_hands_off_to_health_gate(
     tmp_path: Path,
@@ -212,9 +206,10 @@ echo "https://jovie-timeout-test.vercel.app"
         "deploy_url=https://jovie-incomplete-prebuilt.vercel.app"
     )
     calls = (tmp_path / "vercel-calls").read_text().splitlines()
-    assert len(calls) == 1
-    assert "--prebuilt --archive=tgz" in calls[0]
-
+    deploy_calls = [line for line in calls if "deploy " in line]
+    assert len(deploy_calls) == 1
+    assert "--prebuilt --archive=tgz --no-wait" in deploy_calls[0]
+    assert any("inspect " in line and "--format=json" in line for line in calls)
 
 def test_timed_out_prebuilt_without_accepted_url_falls_back_to_source(
     tmp_path: Path,
@@ -276,19 +271,20 @@ echo "https://jovie-source-fallback.vercel.app"
         "deploy_url=https://jovie-source-fallback.vercel.app"
     )
     calls = (tmp_path / "vercel-calls").read_text().splitlines()
-    assert len(calls) == 2
-    assert "--prebuilt --archive=tgz" in calls[0]
-    assert "--prebuilt" not in calls[1]
-    assert "--build-env VERCEL_GIT_COMMIT_SHA" in calls[1]
-    assert "--env VERCEL_GIT_COMMIT_SHA" in calls[1]
-    assert "--build-env NEXT_PUBLIC_BUILD_SHA" in calls[1]
-    assert "--env NEXT_PUBLIC_BUILD_SHA" in calls[1]
-    assert "VERCEL_GIT_COMMIT_SHA=" not in calls[1]
-    assert "NEXT_PUBLIC_BUILD_SHA=" not in calls[1]
+    deploy_calls = [line for line in calls if "deploy " in line]
+    assert len(deploy_calls) == 2
+    assert "--prebuilt --archive=tgz --no-wait" in deploy_calls[0]
+    assert "--prebuilt" not in deploy_calls[1]
+    assert "--no-wait" in deploy_calls[1]
+    assert "--build-env VERCEL_GIT_COMMIT_SHA" in deploy_calls[1]
+    assert "--env VERCEL_GIT_COMMIT_SHA" in deploy_calls[1]
+    assert "--build-env NEXT_PUBLIC_BUILD_SHA" in deploy_calls[1]
+    assert "--env NEXT_PUBLIC_BUILD_SHA" in deploy_calls[1]
+    assert "VERCEL_GIT_COMMIT_SHA=" not in deploy_calls[1]
+    assert "NEXT_PUBLIC_BUILD_SHA=" not in deploy_calls[1]
     assert (tmp_path / "vercel-env").read_text().strip() == (
         "0123456789abcdef|0123456"
     )
-
 
 def test_failed_prebuilt_with_url_still_falls_back_to_source(tmp_path: Path) -> None:
     bin_dir = tmp_path / "bin"
@@ -340,10 +336,11 @@ echo "https://jovie-source-after-cancel.vercel.app"
         "deploy_url=https://jovie-source-after-cancel.vercel.app"
     )
     calls = (tmp_path / "vercel-calls").read_text().splitlines()
-    assert len(calls) == 2
-    assert "--prebuilt --archive=tgz" in calls[0]
-    assert "--prebuilt" not in calls[1]
-
+    deploy_calls = [line for line in calls if "deploy " in line]
+    assert len(deploy_calls) == 2
+    assert "--prebuilt --archive=tgz --no-wait" in deploy_calls[0]
+    assert "--prebuilt" not in deploy_calls[1]
+    assert any("inspect " in line and "--format=json" in line for line in calls)
 
 def test_prebuilt_failure_does_not_fall_back_to_source_when_disabled(
     tmp_path: Path,
@@ -389,9 +386,9 @@ exit 99
 
     assert result.returncode == 1
     calls = (tmp_path / "vercel-calls").read_text().splitlines()
-    assert len(calls) == 1
-    assert "--prebuilt --archive=tgz" in calls[0]
-
+    deploy_calls = [line for line in calls if "deploy " in line]
+    assert len(deploy_calls) == 1
+    assert "--prebuilt --archive=tgz --no-wait" in deploy_calls[0]
 
 def test_default_attempt_budgets_leave_one_minute_for_step_overhead() -> None:
     script = DEPLOY_SCRIPT.read_text()
@@ -407,7 +404,6 @@ def test_default_attempt_budgets_leave_one_minute_for_step_overhead() -> None:
 
     worst_case_seconds = archive + kill_grace + source + kill_grace
     assert worst_case_seconds <= 9 * 60
-
 
 def test_timed_out_source_with_accepted_url_hands_off_to_health_gate(
     tmp_path: Path,
@@ -463,7 +459,6 @@ sleep 5
         "deploy_url=https://jovie-accepted-test.vercel.app"
     )
 
-
 def test_workflow_waits_for_readiness_and_aliases_only_after_canary() -> None:
     workflow = PRODUCTION_RELEASE_WORKFLOW.read_text()
 
@@ -495,7 +490,6 @@ def test_workflow_waits_for_readiness_and_aliases_only_after_canary() -> None:
     preview_wait_index = source_workflow.index("- name: Wait for PR preview readiness")
     assert preview_deploy_index < preview_wait_index
 
-
 def _pr_preview_readiness_block(workflow: str) -> str:
     """Slice the ci-pr-vercel-preview readiness step, anchored after the step name.
 
@@ -505,7 +499,6 @@ def _pr_preview_readiness_block(workflow: str) -> str:
     start = workflow.index("- name: Wait for PR preview readiness")
     end = workflow.index("- name: Emit preview-env admission receipt", start)
     return workflow[start:end]
-
 
 def test_pr_preview_readiness_requires_terminal_ready_state() -> None:
     workflow = CI_WORKFLOW.read_text()
@@ -519,7 +512,6 @@ def test_pr_preview_readiness_requires_terminal_ready_state() -> None:
     assert "refusing a false-green preview" in readiness
     assert "exit 1" in readiness
     assert "handing off to retrying canary" not in readiness
-
 
 def test_pr_preview_readiness_script_fails_closed_for_every_non_ready_state(
     tmp_path: Path,
@@ -576,7 +568,6 @@ exit "${WAIT_STATUS:-0}"
             result.stderr,
         )
 
-
 def test_staging_job_budget_contains_deploy_and_readiness_steps() -> None:
     workflow = PRODUCTION_RELEASE_WORKFLOW.read_text()
     staging_block = workflow[
@@ -605,7 +596,6 @@ def test_staging_job_budget_contains_deploy_and_readiness_steps() -> None:
         int(deploy_timeout.group(1)) + int(readiness_timeout.group(1)) + 5
     )
 
-
 def _staging_build_step(workflow: str) -> str:
     staging = workflow[
         workflow.index("  deploy-staging:") : workflow.index(
@@ -619,7 +609,6 @@ def _staging_build_step(workflow: str) -> str:
             "- name: Hash fixed staging build subject for isolated attestation"
         )
     ]
-
 
 def test_staging_build_runs_in_job_and_materializes_trace_closure() -> None:
     workflow = PRODUCTION_RELEASE_WORKFLOW.read_text()
@@ -660,7 +649,6 @@ def test_staging_build_runs_in_job_and_materializes_trace_closure() -> None:
     # artifact and repeat the slow server build.
     assert "VERCEL_ENABLE_SOURCE_FALLBACK: 'false'" in deploy_step
 
-
 def test_staging_build_env_is_doppler_scoped_and_clerk_free() -> None:
     """Clerk is retired from the build env (2026-10-29, #23527): turbo hashes NEXT_PUBLIC_*
     into the build task, so per-job Clerk values split the cache key, and nothing in the app
@@ -694,7 +682,6 @@ def test_staging_build_env_is_doppler_scoped_and_clerk_free() -> None:
     # artifact and repeat the slow server build.
     assert "VERCEL_ENABLE_SOURCE_FALLBACK: 'false'" in deploy_step
 
-
 def test_masked_deployment_url_is_encoded_across_job_boundary() -> None:
     workflow = PRODUCTION_RELEASE_WORKFLOW.read_text()
     canary_workflow = CANARY_WORKFLOW.read_text()
@@ -715,7 +702,6 @@ def test_masked_deployment_url_is_encoded_across_job_boundary() -> None:
     assert "DEPLOYMENT_URL_B64: ${{ inputs.deployment_url_b64 }}" in canary_workflow
     assert "base64 --decode" in canary_workflow
 
-
 def test_readiness_gate_hands_active_deployment_to_retrying_canary() -> None:
     workflow = PRODUCTION_RELEASE_WORKFLOW.read_text()
     readiness = workflow[
@@ -729,7 +715,6 @@ def test_readiness_gate_hands_active_deployment_to_retrying_canary() -> None:
     assert "BUILDING|QUEUED|INITIALIZING)" in readiness
     assert "handing off to retrying canary" in readiness
     assert "terminal state" in readiness
-
 
 def _write_fake_promotion_vercel(tmp_path: Path) -> Path:
     fake_vercel = tmp_path / "vercel"
@@ -856,7 +841,6 @@ exit 0
     fake_vercel.chmod(0o755)
     return fake_vercel
 
-
 def _promotion_lineage_remote(tmp_path: Path, mode: str) -> tuple[Path, str, str]:
     """Build a local main the git-only promotion recheck can prove.
 
@@ -901,7 +885,6 @@ def _promotion_lineage_remote(tmp_path: Path, mode: str) -> tuple[Path, str, str
     tip = git("rev-parse", "HEAD")
     expected = tip if mode == "exact" else base
     return src, expected, tip
-
 
 def _run_promotion_controller(
     tmp_path: Path, scenario: str, *, lineage: str = "exact"
@@ -953,7 +936,6 @@ def _run_promotion_controller(
         check=False,
     )
 
-
 def test_promotion_controller_promotes_once_and_requires_terminal_current(
     tmp_path: Path,
 ) -> None:
@@ -963,7 +945,6 @@ def test_promotion_controller_promotes_once_and_requires_terminal_current(
     calls = (tmp_path / "vercel-calls").read_text()
     assert calls.count("promote dpl_target") == 1
     assert "Production Current is terminal on dpl_target" in result.stdout
-
 
 @pytest.mark.parametrize("size", ["small", "large"])
 def test_promotion_controller_keeps_inspect_json_separate_from_cli_diagnostics(
@@ -983,7 +964,6 @@ def test_promotion_controller_keeps_inspect_json_separate_from_cli_diagnostics(
     assert "x" * 64 not in combined
     assert "failure_subtype=" not in (tmp_path / "github-output").read_text()
 
-
 @pytest.mark.parametrize(
     "scenario", ["inspect-stdout-empty", "inspect-stdout-invalid", "inspect-nonzero-json"],
 )
@@ -1001,7 +981,6 @@ def test_promotion_controller_rejects_unproven_inspect_stdout(
     assert "rolling-release fetch" not in calls
     assert "do-not-leak-sensitive-marker" not in result.stdout + result.stderr
 
-
 def test_promotion_controller_accepts_legacy_rollout_json_on_stdout(
     tmp_path: Path,
 ) -> None:
@@ -1010,7 +989,6 @@ def test_promotion_controller_accepts_legacy_rollout_json_on_stdout(
     assert result.returncode == 0, result.stdout + result.stderr
     calls = (tmp_path / "vercel-calls").read_text()
     assert calls.count("promote dpl_target") == 1
-
 
 def test_promotion_controller_observes_nonzero_promote_without_resubmitting(
     tmp_path: Path,
@@ -1022,7 +1000,6 @@ def test_promotion_controller_observes_nonzero_promote_without_resubmitting(
     assert calls.count("promote dpl_target") == 1
     assert "without resubmitting" in result.stderr
 
-
 def test_promotion_controller_observes_automatic_rolling_release(
     tmp_path: Path,
 ) -> None:
@@ -1033,7 +1010,6 @@ def test_promotion_controller_observes_automatic_rolling_release(
     assert "rolling-release complete" not in calls
     assert "observing owned automatic rollout" in result.stdout
     assert "rolling-release abort" not in calls
-
 
 def test_promotion_controller_rejects_foreign_rollout_without_mutation(
     tmp_path: Path,
@@ -1050,7 +1026,6 @@ def test_promotion_controller_rejects_foreign_rollout_without_mutation(
     assert f"promotion_sha={(tmp_path / 'lineage-expected').read_text()}" in outputs
     assert "is_current=" not in outputs
     assert "failure_subtype=production_promotion_foreign_rollout" in outputs
-
 
 def test_promotion_controller_emits_observed_newer_sha_without_mutation(
     tmp_path: Path,
@@ -1069,7 +1044,6 @@ def test_promotion_controller_emits_observed_newer_sha_without_mutation(
     assert f"promotion_sha={expected}" not in outputs
     assert "is_current=" not in outputs
 
-
 def test_promotion_controller_ignores_completed_foreign_rollout_record(
     tmp_path: Path,
 ) -> None:
@@ -1081,7 +1055,6 @@ def test_promotion_controller_ignores_completed_foreign_rollout_record(
     assert "rolling-release complete" not in calls
     assert "rolling-release abort" not in calls
 
-
 def test_promotion_controller_ignores_completed_foreign_rollout_record(
     tmp_path: Path,
 ) -> None:
@@ -1092,7 +1065,6 @@ def test_promotion_controller_ignores_completed_foreign_rollout_record(
     assert calls.count("promote dpl_target") == 1
     assert "rolling-release complete" not in calls
     assert "rolling-release abort" not in calls
-
 
 def test_promotion_controller_aborts_timed_out_owned_rollout_and_stops(
     tmp_path: Path,
@@ -1108,7 +1080,6 @@ def test_promotion_controller_aborts_timed_out_owned_rollout_and_stops(
         "failure_subtype=production_promotion_failed"
     )
 
-
 def test_promotion_controller_fails_closed_on_malformed_preflight(
     tmp_path: Path,
 ) -> None:
@@ -1119,7 +1090,6 @@ def test_promotion_controller_fails_closed_on_malformed_preflight(
         "failure_subtype=production_promotion_state_invalid"
     )
     assert "promote dpl_target" not in (tmp_path / "vercel-calls").read_text()
-
 
 @pytest.mark.parametrize("scenario", ["inspect-error", "inspect-error-stdout"])
 def test_promotion_controller_reports_safe_inspect_failure_reason(
@@ -1132,7 +1102,6 @@ def test_promotion_controller_reports_safe_inspect_failure_reason(
     assert "do-not-leak-sensitive-marker" not in result.stderr
     assert "rolling-release fetch" not in (tmp_path / "vercel-calls").read_text()
     assert "promote dpl_target" not in (tmp_path / "vercel-calls").read_text()
-
 
 def test_promotion_controller_reports_safe_rollout_failure_reason(
     tmp_path: Path,
@@ -1147,7 +1116,6 @@ def test_promotion_controller_reports_safe_rollout_failure_reason(
     assert "do-not-leak-sensitive-marker" not in result.stderr
     assert "promote dpl_target" not in (tmp_path / "vercel-calls").read_text()
 
-
 def test_promotion_controller_reports_safe_malformed_rollout_shape(
     tmp_path: Path,
 ) -> None:
@@ -1157,7 +1125,6 @@ def test_promotion_controller_reports_safe_malformed_rollout_shape(
     assert "Vercel rolling-release fetch returned malformed JSON" in result.stderr
     assert "do-not-leak-sensitive-marker" not in result.stderr
     assert "promote dpl_target" not in (tmp_path / "vercel-calls").read_text()
-
 
 def _write_fake_alias_tools(tmp_path: Path) -> tuple[Path, Path]:
     fake_vercel = tmp_path / "vercel"
@@ -1202,7 +1169,6 @@ printf '{"commitSha":"%s","environment":"%s"}\n%s\n' \
     )
     fake_curl.chmod(0o755)
     return fake_vercel, fake_bin
-
 
 def _run_alias_verifier(
     tmp_path: Path,
@@ -1251,12 +1217,10 @@ def _run_alias_verifier(
         check=False,
     )
 
-
 def _alias_observation_sequence(
     *attempts: tuple[str, ...],
 ) -> str:
     return ",".join(observation for attempt in attempts for observation in attempt)
-
 
 def test_alias_verifier_requires_exact_id_sha_and_all_rolling_routes(
     tmp_path: Path,
@@ -1272,7 +1236,6 @@ def test_alias_verifier_requires_exact_id_sha_and_all_rolling_routes(
     assert "vcrrForceCanary=true" in curl_calls
     assert "x-vercel-protection-bypass" not in curl_calls
 
-
 def test_alias_verifier_rejects_an_abbreviated_nonmatching_prefix(
     tmp_path: Path,
 ) -> None:
@@ -1287,7 +1250,6 @@ def test_alias_verifier_rejects_an_abbreviated_nonmatching_prefix(
         tmp_path / "github-output"
     ).read_text()
 
-
 def test_alias_verifier_accepts_matching_short_sha_from_production_probe(
     tmp_path: Path,
 ) -> None:
@@ -1298,7 +1260,6 @@ def test_alias_verifier_accepts_matching_short_sha_from_production_probe(
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-
 
 def test_alias_verifier_replays_production_transients_with_independent_proof(
     tmp_path: Path,
@@ -1336,7 +1297,6 @@ def test_alias_verifier_replays_production_transients_with_independent_proof(
     assert "attempt 6/15 production-alias/canary" in result.stdout
     assert len((tmp_path / "curl-calls").read_text().splitlines()) == 18
 
-
 def test_alias_verifier_completes_once_every_route_reaches_exact_proof(
     tmp_path: Path,
 ) -> None:
@@ -1359,7 +1319,6 @@ def test_alias_verifier_completes_once_every_route_reaches_exact_proof(
     assert result.returncode == 0, result.stdout + result.stderr
     assert "attempt 3/3 production-alias/plain: HTTP 000" in result.stdout
 
-
 def test_alias_verifier_retries_transport_unknowns_within_each_route_observation(
     tmp_path: Path,
 ) -> None:
@@ -1381,7 +1340,6 @@ def test_alias_verifier_retries_transport_unknowns_within_each_route_observation
     assert "attempt 2/2 production-alias/canary" in result.stdout
     assert len((tmp_path / "curl-calls").read_text().splitlines()) == 8
 
-
 def test_alias_verifier_retries_successful_http_000_within_each_route_observation(
     tmp_path: Path,
 ) -> None:
@@ -1398,7 +1356,6 @@ def test_alias_verifier_retries_successful_http_000_within_each_route_observatio
     assert result.returncode == 0, result.stdout + result.stderr
     assert "transport unknown (HTTP 000), retry 1/1" in result.stdout
     assert len((tmp_path / "curl-calls").read_text().splitlines()) == 4
-
 
 def test_alias_verifier_default_production_release_budget_fits_eight_minutes() -> None:
     verifier = PRODUCTION_ALIAS_SCRIPT.read_text()
@@ -1434,7 +1391,6 @@ def test_alias_verifier_default_production_release_budget_fits_eight_minutes() -
     assert worst_case_seconds == 410
     assert worst_case_seconds < 8 * 60
 
-
 def test_alias_verifier_resets_proof_on_observed_identity_mismatch(
     tmp_path: Path,
 ) -> None:
@@ -1455,7 +1411,6 @@ def test_alias_verifier_resets_proof_on_observed_identity_mismatch(
 
     assert result.returncode == 1
     assert "environment=preview" in result.stdout
-
 
 def test_alias_verifier_preserves_exact_proof_across_transport_unknowns(
     tmp_path: Path,
@@ -1483,7 +1438,6 @@ def test_alias_verifier_preserves_exact_proof_across_transport_unknowns(
     assert "attempt 6/6 production-alias/plain: HTTP 200" in result.stdout
     assert len((tmp_path / "curl-calls").read_text().splitlines()) == 21
 
-
 def test_alias_verifier_unknown_only_window_never_passes(
     tmp_path: Path,
 ) -> None:
@@ -1509,7 +1463,6 @@ def test_alias_verifier_unknown_only_window_never_passes(
         "failure_subtype=production_alias_not_updated"
     )
 
-
 def test_alias_verifier_mixed_route_outcomes_complete_on_exact_proof(
     tmp_path: Path,
 ) -> None:
@@ -1532,7 +1485,6 @@ def test_alias_verifier_mixed_route_outcomes_complete_on_exact_proof(
     assert result.returncode == 0, result.stdout + result.stderr
     assert "outcome=unknown" in result.stdout
     assert "proof=2/2" in result.stdout
-
 
 def test_alias_verifier_replays_run_31440637821_stable_alternation(
     tmp_path: Path,
@@ -1561,7 +1513,6 @@ def test_alias_verifier_replays_run_31440637821_stable_alternation(
     assert fixture["deploymentId"] in result.stdout
     assert fixture["shortSha"] in result.stdout
 
-
 def test_alias_verifier_rejects_stale_sha_even_on_expected_deployment(
     tmp_path: Path,
 ) -> None:
@@ -1579,7 +1530,6 @@ def test_alias_verifier_rejects_stale_sha_even_on_expected_deployment(
     )
     assert len((tmp_path / "curl-calls").read_text().splitlines()) == 3
 
-
 def test_alias_verifier_does_not_retry_wrong_environment_response(
     tmp_path: Path,
 ) -> None:
@@ -1594,7 +1544,6 @@ def test_alias_verifier_does_not_retry_wrong_environment_response(
     assert result.returncode == 1
     assert "environment=preview" in result.stdout
     assert len((tmp_path / "curl-calls").read_text().splitlines()) == 3
-
 
 def test_alias_verifier_does_not_retry_non_transport_http_response(
     tmp_path: Path,
@@ -1611,7 +1560,6 @@ def test_alias_verifier_does_not_retry_non_transport_http_response(
     assert "HTTP 503" in result.stdout
     assert len((tmp_path / "curl-calls").read_text().splitlines()) == 3
 
-
 def test_alias_verifier_rejects_wrong_current_id_even_with_expected_sha(
     tmp_path: Path,
 ) -> None:
@@ -1623,7 +1571,6 @@ def test_alias_verifier_rejects_wrong_current_id_even_with_expected_sha(
     assert (tmp_path / "github-output").read_text().strip() == (
         "failure_subtype=production_alias_not_updated"
     )
-
 
 @pytest.mark.parametrize("provider_output, expected", [
     ("token=synthetic-private-token\n::error::untrusted-provider-command\n"
@@ -1669,7 +1616,6 @@ def test_failed_deploy_emits_bounded_allowlisted_diagnostics_without_secrets(
     assert receipt == {"schema": "jovie-vercel-deploy-failure/v1", "mode": "tgz", "attempt": 1,
                        "exitStatus": 23, "errorCode": code, "asset": asset, "deploymentUrl": url}
     assert not list(tmp_path.glob("jovie-vercel-deploy.*"))
-
 
 def test_failed_deploy_emits_redacted_cli_tail_and_error_annotation(tmp_path: Path) -> None:
     bin_dir = tmp_path / "bin"
@@ -1717,7 +1663,6 @@ def test_failed_deploy_emits_redacted_cli_tail_and_error_annotation(tmp_path: Pa
         "for [redacted]"
     ]
 
-
 def _write_ignore_probe_vercel(bin_dir: Path, prebuilt_exit: int) -> None:
     fake_vercel = bin_dir / "vercel"
     fake_vercel.write_text(
@@ -1733,7 +1678,6 @@ echo "https://jovie-source-probe.vercel.app"
 """
     )
     fake_vercel.chmod(0o755)
-
 
 def _prebuilt_fixture(tmp_path: Path) -> dict[str, str]:
     bin_dir = tmp_path / "bin"
@@ -1757,7 +1701,6 @@ def _prebuilt_fixture(tmp_path: Path) -> dict[str, str]:
         "RUNNER_TEMP": str(tmp_path),
     }
 
-
 def _run_deploy(tmp_path: Path, env: dict[str, str]) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["bash", str(DEPLOY_SCRIPT), "deploy_url", "--yes"],
@@ -1768,7 +1711,6 @@ def _run_deploy(tmp_path: Path, env: dict[str, str]) -> subprocess.CompletedProc
         timeout=15,
         check=False,
     )
-
 
 def test_prebuilt_upload_hides_vercelignore_so_traced_files_are_not_dropped(
     tmp_path: Path,
@@ -1786,11 +1728,12 @@ def test_prebuilt_upload_hides_vercelignore_so_traced_files_are_not_dropped(
 
     assert result.returncode == 0, result.stdout + result.stderr
     calls = (tmp_path / "vercel-calls").read_text().splitlines()
-    assert len(calls) == 1
-    assert calls[0].startswith("hidden deploy --prebuilt --archive=tgz")
+    deploy_calls = [line for line in calls if "deploy " in line]
+    assert len(deploy_calls) == 1
+    assert deploy_calls[0].startswith("hidden deploy --prebuilt --archive=tgz --no-wait")
+    assert any("inspect " in line for line in calls)
     assert (tmp_path / ".vercelignore").read_text() == original
     assert not list(tmp_path.glob("jovie-vercelignore.*"))
-
 
 def test_failed_prebuilt_restores_vercelignore_before_source_fallback(
     tmp_path: Path,
@@ -1803,11 +1746,11 @@ def test_failed_prebuilt_restores_vercelignore_before_source_fallback(
 
     assert result.returncode == 0, result.stdout + result.stderr
     calls = (tmp_path / "vercel-calls").read_text().splitlines()
-    assert len(calls) == 2
-    assert calls[0].startswith("hidden deploy --prebuilt --archive=tgz")
-    assert calls[1].startswith("present deploy --yes")
+    deploy_calls = [line for line in calls if "deploy " in line]
+    assert len(deploy_calls) == 2
+    assert deploy_calls[0].startswith("hidden deploy --prebuilt --archive=tgz --no-wait")
+    assert deploy_calls[1].startswith("present deploy --no-wait")
     assert (tmp_path / ".vercelignore").read_text() == original
-
 
 def test_failed_prebuilt_without_fallback_still_restores_vercelignore(
     tmp_path: Path,
@@ -1820,7 +1763,6 @@ def test_failed_prebuilt_without_fallback_still_restores_vercelignore(
 
     assert result.returncode == 1
     assert (tmp_path / ".vercelignore").read_text() == original
-
 
 @pytest.mark.parametrize(
     ("kind", "secret_path"),
@@ -1858,7 +1800,6 @@ def test_prebuilt_upload_fails_closed_on_credential_bearing_files(
     assert not (tmp_path / "vercel-calls").exists()
     assert (tmp_path / ".vercelignore").exists()
 
-
 def test_env_example_in_trace_is_not_treated_as_a_credential(tmp_path: Path) -> None:
     env = _prebuilt_fixture(tmp_path)
     _write_ignore_probe_vercel(tmp_path / "bin", prebuilt_exit=0)
@@ -1868,7 +1809,6 @@ def test_env_example_in_trace_is_not_treated_as_a_credential(tmp_path: Path) -> 
     result = _run_deploy(tmp_path, env)
 
     assert result.returncode == 0, result.stdout + result.stderr
-
 
 @pytest.mark.parametrize("dangling", [False, True])
 def test_prebuilt_upload_fails_closed_on_file_symlink_trace_targets(
@@ -1901,7 +1841,6 @@ def test_prebuilt_upload_fails_closed_on_file_symlink_trace_targets(
     assert link in result.stderr
     assert not (tmp_path / "vercel-calls").exists()
 
-
 def test_prebuilt_upload_allows_directory_symlink_trace_targets(tmp_path: Path) -> None:
     """pnpm's node_modules layer is traced as directory links in every build,
     including the last successful 56.3.2 deploy; those must still upload."""
@@ -1931,8 +1870,8 @@ def test_prebuilt_upload_allows_directory_symlink_trace_targets(tmp_path: Path) 
 
     assert result.returncode == 0, result.stdout + result.stderr
     calls = (tmp_path / "vercel-calls").read_text().splitlines()
-    assert calls[0].startswith("hidden deploy --prebuilt --archive=tgz")
-
+    deploy_calls = [line for line in calls if "deploy " in line]
+    assert deploy_calls[0].startswith("hidden deploy --prebuilt --archive=tgz --no-wait")
 
 def test_every_prebuilt_build_dereferences_function_trace_links() -> None:
     """Each workflow that feeds vercel-prebuilt-deploy.sh must run the
@@ -1949,7 +1888,6 @@ def test_every_prebuilt_build_dereferences_function_trace_links() -> None:
         materialize = workflow.index(invocation, build)
         assert build < materialize < deploy, workflow_path.name
 
-
 def _write_manifest_probe_vercel(bin_dir: Path, prebuilt_exit: int) -> None:
     fake_vercel = bin_dir / "vercel"
     fake_vercel.write_text(
@@ -1963,7 +1901,6 @@ echo "https://jovie-source-probe.vercel.app"
 """
     )
     fake_vercel.chmod(0o755)
-
 
 def test_tgz_attempt_records_output_manifest_and_extracted_count(tmp_path: Path) -> None:
     """Every tgz attempt leaves a names/sizes/modes manifest of the upload so
@@ -1990,7 +1927,6 @@ def test_tgz_attempt_records_output_manifest_and_extracted_count(tmp_path: Path)
     assert manifest["filePathMap"]["totals"]["files"] == 1
     assert "Vercel output manifest:" not in result.stderr
 
-
 def test_failed_tgz_attempt_prints_compact_manifest_summary(tmp_path: Path) -> None:
     env = {**_prebuilt_fixture(tmp_path), "VERCEL_ENABLE_SOURCE_FALLBACK": "false"}
     env["VERCEL_OUTPUT_MANIFEST_FILE"] = str(tmp_path / "manifest.json")
@@ -2004,7 +1940,6 @@ def test_failed_tgz_attempt_prints_compact_manifest_summary(tmp_path: Path) -> N
     assert len(summaries) == 1, result.stdout + result.stderr
     assert re.search(r"entries=\d+ files=\d+ dirs=\d+ symlinks=0 ", summaries[0])
     assert "tracedUnique=1 tracedFiles=1" in summaries[0]
-
 
 def test_manifest_failure_never_changes_deploy_outcome(tmp_path: Path) -> None:
     env = _prebuilt_fixture(tmp_path)
