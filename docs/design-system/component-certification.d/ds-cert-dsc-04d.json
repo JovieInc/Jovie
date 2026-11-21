@@ -1,0 +1,38 @@
+{
+  "gates": {
+    "apps/web/components/organisms/release-sidebar/TrackSidebar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/molecules/DisplayMenuDropdown.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/CuesPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/organisms/release-sidebar/TrackSidebar.tsx": {
+      "loading": "Playback status comes from the useTrackAudioPlayer hook, not a prop, so a story cannot set it. The detector matched `playbackStatus: 'idle' | 'loading' | 'playing'`.",
+      "error": "Errors surface only as toasts from the audio hook, never as rendered markup a story can show. The detector matched `toast.error('Preview unavailable')`.",
+      "offline": "The component makes no network request itself. The detector matched `toast.error('Failed to copy link')`, a clipboard failure toast."
+    }
+  }
+}
