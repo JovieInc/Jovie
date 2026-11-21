@@ -93,6 +93,11 @@ CHANGELOG_QUOTA_READ = re.compile(r"github-quota-deferred: PR metadata read hit 
 # lines. A branch that already contains main fails update-branch and still
 # reaches a model, which is the only path that may renew a digest the PR owns.
 CENSUS_CERTIFICATION = re.compile(r"source changed; renew certification evidence")
+# A behind branch fails this because its census is not a prefix of main's longer
+# history. Merge main. Do not point the guard at the merge-base and do not
+# rewrite transitions the PR does not own. A branch that already contains main
+# still reaches a model.
+CENSUS_APPEND_ONLY = re.compile(r"Transition history is append-only")
 # Armed spacing ratchet (spacing-scale-ratchet.test.ts). The count grew because a
 # PR added a 10px/14px utility. Snap those added utilities; do not raise the floor.
 SPACING_RATCHET_TEXT = re.compile(
@@ -163,6 +168,7 @@ SIGNATURES = (
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
     ("ui-feel", UI_FEEL_TEXT, UI_FEEL),
     ("heading-balance", HEADING_BALANCE_TEXT, BALANCE_HEADINGS),
+    ("census-history", CENSUS_APPEND_ONLY, SYNC_MAIN),
     ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
     ("design-source-cli", DESIGN_SOURCE_CLI, SYNC_MAIN),
     ("render-mode-snapshot", RENDER_MODE_SNAPSHOT, SYNC_MAIN),

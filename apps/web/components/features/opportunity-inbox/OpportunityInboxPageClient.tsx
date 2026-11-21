@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -68,6 +69,8 @@ export interface OpportunityInboxPageClientProps {
   readonly inbox: OpportunityInboxData;
   readonly profileId?: string | null;
   readonly initialView?: 'needs' | 'done';
+  /** Secondary content follows primary work inside the same scroll surface. */
+  readonly supplementaryContent?: ReactNode;
   readonly connectedDSPs?: readonly AvailableDSP[];
   readonly initialLinks?: readonly ProfileSocialLink[];
 }
@@ -82,6 +85,7 @@ export function OpportunityInboxPageClient({
   inbox,
   profileId = null,
   initialView = 'needs',
+  supplementaryContent,
   connectedDSPs = [],
   initialLinks = [],
 }: OpportunityInboxPageClientProps) {
@@ -705,6 +709,7 @@ export function OpportunityInboxPageClient({
               </section>
             ) : null}
           </div>
+          {supplementaryContent}
         </div>
       </div>
     </PageShell>

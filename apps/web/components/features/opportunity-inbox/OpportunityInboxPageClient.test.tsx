@@ -123,6 +123,12 @@ const HEALTHY_AVAILABILITY = {
   tourDates: 'not_requested',
 } as const;
 
+const EMPTY_INBOX: OpportunityInboxData = {
+  cards: [],
+  emptyActionCards: [],
+  availability: HEALTHY_AVAILABILITY,
+};
+
 const ONE_CARD_INBOX: OpportunityInboxData = {
   cards: [
     {
@@ -1256,16 +1262,26 @@ describe('OpportunityInboxPageClient', () => {
 
 describe('creator-only empty home', () => {
   it('never offers founder capture in the supported creator inbox', () => {
-    render(
-      <OpportunityInboxPageClient
-        inbox={{
-          cards: [],
-          emptyActionCards: [],
-          availability: HEALTHY_AVAILABILITY,
-        }}
-      />
-    );
+    render(<OpportunityInboxPageClient inbox={EMPTY_INBOX} />);
     expect(screen.queryByText('Start A Brain Dump')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Start A Chat' })).toBeVisible();
+  });
+
+  it('keeps a survey after inbox work on Done For You', async () => {
+    const user = userEvent.setup();
+    render(
+      <OpportunityInboxPageClient
+        inbox={EMPTY_INBOX}
+        supplementaryContent={<button type='button'>Survey Fixture</button>}
+      />
+    );
+    const survey = screen.getByRole('button', { name: 'Survey Fixture' });
+    const primary = screen.getByRole('link', { name: 'Start A Chat' });
+    const content = screen.getByTestId('opportunity-inbox-content');
+    expect(content).toContainElement(survey);
+    const after = Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(primary.compareDocumentPosition(survey) & after).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Done For You' }));
+    expect(survey).toBeVisible();
   });
 });

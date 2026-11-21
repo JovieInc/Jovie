@@ -12,7 +12,6 @@ def pr(*names, merge="BLOCKED"):
     return {"mergeStateStatus": merge, "statusCheckRollup": [{"name": n, "conclusion": "FAILURE"} for n in names]
             + [{"name": "PR Ready", "conclusion": "FAILURE"}, {"name": "ok", "conclusion": "SUCCESS"}]}
 
-
 class ClassifyTest(unittest.TestCase):
     def test_signatures_map_to_classes_and_actions(self):
         cases = {
@@ -30,6 +29,7 @@ class ClassifyTest(unittest.TestCase):
             "Error: legacy Cache Components surface grew to 242 (maximum 241):": ("cache-surface", "strip-cache-exports"),
             "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.": ("spacing-scale", "snap-spacing"),
             "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence": ("census-certification", "sync-main"),
+            "Surface census: Transition history is append-only": ("census-history", "sync-main"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "atomic-write"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
             "AssertionError: expected 1": ("other", "agent"),

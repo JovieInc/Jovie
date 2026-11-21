@@ -7,6 +7,7 @@ import {
   DEFAULT_DASHBOARD_DATA,
   withDashboardProviders,
 } from '@/.storybook/dashboard-fixtures';
+import { PmfSurveyCard } from '@/components/features/pmf-survey/PmfSurveyCard';
 import { queryKeys } from '@/lib/queries/keys';
 import { OpportunityInboxPageClient } from './OpportunityInboxPageClient';
 
@@ -190,4 +191,24 @@ export const FirstRun: Story = {
       <OpportunityInboxPageClient {...args} />
     </DashboardStoryProviders>
   ),
+};
+
+// Synthetic callbacks only; these fixtures never invoke survey server actions.
+const surveyFixture = (
+  <PmfSurveyCard
+    onDismiss={async () => ({ ok: true })}
+    onSubmit={async () => ({ ok: false })}
+  />
+);
+
+export const EmptyWithSurvey: Story = {
+  args: { ...Empty.args, supplementaryContent: surveyFixture },
+};
+
+export const WithCardsAndSurvey: Story = {
+  args: { ...WithCards.args, supplementaryContent: surveyFixture },
+};
+
+export const UnavailableWithSurvey: Story = {
+  args: { ...Unavailable.args, supplementaryContent: surveyFixture },
 };

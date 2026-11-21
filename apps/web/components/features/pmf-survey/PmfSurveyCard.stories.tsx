@@ -1,3 +1,4 @@
+import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, fn, userEvent, within } from 'storybook/test';
 import { PmfSurveyCard } from './PmfSurveyCard';
@@ -27,7 +28,23 @@ type Story = StoryObj<typeof meta>;
 
 export const Idle: Story = {};
 
+export const Expanded: Story = { args: { initialExpanded: true } };
+
+export const PartialDraft: Story = {
+  args: { initialExpanded: true },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    const benefit = 'Every release in one link';
+    await userEvent.type(canvas.getByLabelText(/main benefit/), benefit);
+    await userEvent.click(canvas.getByRole('button', { name: 'Hide' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Answer' }));
+    await expect(canvas.getByLabelText(/main benefit/)).toHaveValue(benefit);
+    await expect(args.onSubmit).not.toHaveBeenCalled();
+  },
+};
+
 export const Answered: Story = {
+  args: { initialExpanded: true },
   play: async ({ args, canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(
@@ -51,7 +68,7 @@ export const Answered: Story = {
 export const Pending: Story = { args: { initialState: 'pending' } };
 
 export const SaveFailed: Story = {
-  args: { onSubmit: fn(notSaved) },
+  args: { onSubmit: fn(notSaved), initialExpanded: true },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(

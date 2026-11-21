@@ -137,16 +137,6 @@ export async function OpportunityInboxRoute({
           <PipelineBottleneckBannerLazy isAdmin={isAdmin} />
         </div>
       ) : null}
-      {showPmfSurvey ? (
-        <div className='shrink-0 px-6 pt-3'>
-          <div className='max-w-xl'>
-            <PmfSurveyCard
-              onDismiss={dismissPmfSurvey}
-              onSubmit={submitPmfSurveyAnswer}
-            />
-          </div>
-        </div>
-      ) : null}
       <OpportunityInboxPageClient
         key={`${clerkUserId}:${profileRailSeed.profileId ?? 'no-profile'}`}
         inbox={inbox}
@@ -154,6 +144,14 @@ export async function OpportunityInboxRoute({
         initialView={initialView}
         initialLinks={initialLinks}
         connectedDSPs={connectedDSPs}
+        supplementaryContent={
+          showPmfSurvey ? (
+            <PmfSurveyCard
+              onDismiss={dismissPmfSurvey}
+              onSubmit={submitPmfSurveyAnswer}
+            />
+          ) : null
+        }
       />
     </>
   );
