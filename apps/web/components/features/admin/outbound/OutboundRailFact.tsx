@@ -1,7 +1,7 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { useState } from 'react';
+import { Button, Input } from '@jovie/ui';
+import { useId, useState } from 'react';
 import type {
   ContactEvidenceDecision,
   ContactEvidenceItem,
@@ -27,6 +27,7 @@ export function OutboundRailFact({
   pending,
   onDecision,
 }: OutboundRailFactProps) {
+  const correctionId = useId();
   const [correction, setCorrection] = useState('');
   const [correctionError, setCorrectionError] = useState(false);
   const name = item.key === 'canonical:display-name';
@@ -104,16 +105,18 @@ export function OutboundRailFact({
               void onDecision(item, 'no', correction);
             }}
           >
-            <label className='block text-xs'>
+            <label htmlFor={correctionId} className='block text-xs'>
               Correct {item.label}
-              <input
+              <Input
+                id={correctionId}
+                inputSize='sm'
                 value={correction}
                 onChange={event => {
                   setCorrection(event.target.value);
                   setCorrectionError(false);
                 }}
                 placeholder='Correct value'
-                className='mt-1 h-7 w-full rounded-md border border-strong bg-surface-0 px-2 text-xs text-primary-token'
+                className='mt-1 rounded-md border-strong bg-surface-0 px-2 text-xs'
               />
             </label>
             {correctionError ? (

@@ -1,0 +1,84 @@
+{
+  "gates": {
+    "apps/web/components/features/admin/ScreenshotGallery.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/outbound/OutboundRail.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/outbound/OutboundRailFact.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/outreach/DmQueueCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/wiki/WikiSearchForm.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/alerts/AlertGrowthLanding.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/ask-jovie/AskJovieWidget.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/admin/ScreenshotGallery.tsx": {
+      "loading": "The gallery receives an already-resolved list and has no loading branch. The detector matched loading=lazy on the thumbnail img.",
+      "offline": "The gallery makes no request; images are plain links to already-resolved URLs. The detector matched the loading=lazy attribute."
+    },
+    "apps/web/components/features/admin/outbound/OutboundRailFact.tsx": {
+      "permission-denied": "The fact row takes no role or entitlement; the parent rail decides who reaches it. The detector matched the word role in the group role attribute.",
+      "offline": "The row makes no request itself: it hands decisions to onDecision and shows the parent pending flag (LoadingDecisionPending). The detector matched the pending prop."
+    },
+    "apps/web/components/features/alerts/AlertGrowthLanding.tsx": {
+      "empty": "The landing shows a fixed PROOF_POINTS constant and no data-driven collection that could be empty. The detector matched .map( over that constant.",
+      "permission-denied": "The page is a public fan capture surface with no roles or entitlements. The detector matched the phrase lock it in in the confirmation copy."
+    },
+    "apps/web/components/features/ask-jovie/AskJovieWidget.tsx": {
+      "permission-denied": "The widget is a public profile surface open to every visitor and checks no role or entitlement. The detector matched the role field on chat messages (visitor or jovie)."
+    }
+  }
+}

@@ -374,6 +374,7 @@ describe('OutboundRail', () => {
     const props = renderRail();
     const save = screen.getByRole('button', { name: 'Save Draft' });
     expect(save).toBeDisabled();
+    expect(screen.getByLabelText('Subject')).toHaveClass('rounded-md');
     fireEvent.change(screen.getByLabelText('Subject'), {
       target: { value: 'New subject' },
     });

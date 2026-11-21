@@ -193,6 +193,7 @@ describe('AskJovieWidget', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Send to Test Artist' })
     );
+    expect(screen.getByLabelText('Name (optional)')).toHaveClass('rounded-lg');
     fireEvent.click(screen.getByRole('button', { name: 'Booking' }));
     fireEvent.change(screen.getByPlaceholderText('Name (optional)'), {
       target: { value: 'Pat' },

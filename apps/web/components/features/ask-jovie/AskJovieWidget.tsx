@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { Send, X } from 'lucide-react';
 import {
   type InputHTMLAttributes,
@@ -14,16 +14,15 @@ import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { JovieIcon } from '@/components/atoms/JovieIcon';
 import { FilterChip } from '@/components/molecules/filters';
 import { EntityCard } from '@/components/organisms/entity-card';
-import type {
-  EntityCardModel,
-  EntityKind,
-} from '@/components/organisms/entity-card/types';
+import type { EntityCardModel } from '@/components/organisms/entity-card/types';
 import { track } from '@/lib/analytics';
 import type { AskJovieQuestionIntent } from '@/lib/ask-jovie/answer';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 import { cn } from '@/lib/utils';
 import {
+  CARD_OUTCOMES,
   CATEGORY_LABELS,
+  type CardOutcome,
   type FollowIntent,
   INTENT_LABELS,
   type MessageCategory,
@@ -52,23 +51,6 @@ type ChatMessage = {
 
 type Flow = 'escalate' | FollowIntent;
 
-type CardOutcome =
-  | 'listen'
-  | 'tickets'
-  | 'shop'
-  | 'watch'
-  | 'view'
-  | 'message'
-  | 'subscribe';
-
-const CARD_OUTCOMES: Partial<Record<EntityKind, CardOutcome>> = {
-  music: 'listen',
-  show: 'tickets',
-  merch: 'shop',
-  video: 'watch',
-  alerts: 'subscribe',
-};
-
 function outcomeForMessage(message: ChatMessage): CardOutcome | undefined {
   if (!message.card) return undefined;
   if (message.normalizedIntent === 'business') return 'message';
@@ -79,12 +61,11 @@ function outcomeForMessage(message: ChatMessage): CardOutcome | undefined {
   return CARD_OUTCOMES[message.card.kind];
 }
 
-const INPUT_CLASS =
-  'w-full rounded-lg border border-subtle bg-transparent px-3 py-1.5 text-sm text-primary-token placeholder:text-tertiary-token';
+const INPUT_CLASS = 'rounded-lg bg-transparent px-3 py-1.5 text-sm sm:text-sm';
 const CARD_CLASS = 'space-y-2 rounded-xl border border-subtle p-3';
 
 const Field = (props: InputHTMLAttributes<HTMLInputElement>) => (
-  <input {...props} className={INPUT_CLASS} />
+  <Input aria-label={props.placeholder} {...props} className={INPUT_CLASS} />
 );
 
 function CardAction({
@@ -519,17 +500,19 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
               }
             }}
           >
-            <input
-              ref={composerRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              placeholder={
-                flow === 'escalate'
-                  ? 'Add a message…'
-                  : `Ask about ${artistName}…`
-              }
-              className='min-w-0 flex-1 rounded-full bg-surface-1 px-3 py-2 text-sm text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
-            />
+            <div className='min-w-0 flex-1'>
+              <Input
+                ref={composerRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                placeholder={
+                  flow === 'escalate'
+                    ? 'Add a message…'
+                    : `Ask about ${artistName}…`
+                }
+                className='rounded-full border-transparent bg-surface-1 px-3 py-2 text-sm hover:border-transparent sm:text-sm'
+              />
+            </div>
             <CircleIconButton
               type='submit'
               variant='surface'

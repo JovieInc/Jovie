@@ -1,5 +1,6 @@
 'use client';
 
+import { Input, PlainButton } from '@jovie/ui';
 import { ArrowLeft, X } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -303,7 +304,7 @@ export function AlertGrowthLanding({
                   <label htmlFor={phoneInputId} className='sr-only'>
                     Mobile number
                   </label>
-                  <input
+                  <Input
                     id={phoneInputId}
                     name='phone'
                     type='tel'
@@ -314,7 +315,7 @@ export function AlertGrowthLanding({
                     value={phoneInput}
                     onChange={e => setPhoneInput(e.target.value)}
                     disabled={isPending}
-                    className='border-subtle bg-surface-0 text-primary-token focus-visible:ring-accent h-12 w-full rounded-(--profile-action-radius) border px-3.5 text-base focus:outline-none focus-visible:ring-2'
+                    className='bg-surface-0 h-12 rounded-(--profile-action-radius) px-3.5 text-base sm:h-12 sm:text-base'
                   />
                 </>
               ) : (
@@ -322,7 +323,7 @@ export function AlertGrowthLanding({
                   <label htmlFor={emailInputId} className='sr-only'>
                     Email address
                   </label>
-                  <input
+                  <Input
                     id={emailInputId}
                     name='email'
                     type='email'
@@ -334,19 +335,19 @@ export function AlertGrowthLanding({
                     value={emailInput}
                     onChange={e => setEmailInput(e.target.value)}
                     disabled={isPending}
-                    className='border-subtle bg-surface-0 text-primary-token focus-visible:ring-accent h-12 w-full rounded-(--profile-action-radius) border px-3.5 text-base focus:outline-none focus-visible:ring-2'
+                    className='bg-surface-0 h-12 rounded-(--profile-action-radius) px-3.5 text-base sm:h-12 sm:text-base'
                   />
                 </>
               )}
             </div>
 
-            <button
+            <PlainButton
               type='submit'
               disabled={isPending}
               className='h-12 w-full rounded-(--profile-action-radius) border border-(--linear-btn-primary-border) bg-btn-primary px-4 text-sm font-semibold text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:opacity-60'
             >
               {isPending ? 'Sending…' : 'Get alerts'}
-            </button>
+            </PlainButton>
 
             {submitState.kind === 'error' ? (
               <p
@@ -422,8 +423,7 @@ function ChannelToggle({
   readonly onSelect: () => void;
 }) {
   return (
-    <button
-      type='button'
+    <PlainButton
       aria-pressed={pressed}
       disabled={disabled}
       onClick={onSelect}
@@ -434,7 +434,7 @@ function ChannelToggle({
       }
     >
       {label}
-    </button>
+    </PlainButton>
   );
 }
 
