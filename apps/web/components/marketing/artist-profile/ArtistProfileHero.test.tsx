@@ -27,8 +27,13 @@ import { ArtistProfileHero } from './ArtistProfileHero';
 import storyMeta from './ArtistProfileHero.stories';
 
 describe('ArtistProfileHero', () => {
-  it('renders the canonical hero with headline, claim CTA, and product stage', () => {
-    render(<ArtistProfileHero hero={ARTIST_PROFILE_COPY.hero} />);
+  it('renders the left-aligned hero with homepage CTA and one mode-morphing mock', () => {
+    render(
+      <ArtistProfileHero
+        hero={ARTIST_PROFILE_COPY.hero}
+        adaptive={ARTIST_PROFILE_COPY.adaptive}
+      />
+    );
 
     expect(
       screen.getByRole('heading', {
@@ -40,7 +45,7 @@ describe('ArtistProfileHero', () => {
       screen.getByRole('link', {
         name: ARTIST_PROFILE_COPY.hero.ctaLabel,
       })
-    ).toBeInTheDocument();
+    ).toHaveAttribute('data-testid', 'homepage-primary-cta');
     // Secondary CTA stays sentence case (JOV-14240).
     expect(
       screen.getByRole('link', {
@@ -51,24 +56,25 @@ describe('ArtistProfileHero', () => {
     const productStage = screen.getByTestId('artist-profile-hero-product');
     expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
       'data-marketing-variant',
-      'centered-phone'
+      'left-phone'
     );
     expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
       'data-marketing-owner',
       'apps/web/components/marketing/MarketingPosterHero.tsx'
     );
     expect(productStage).toHaveClass('ap-hero__product-stage');
+    expect(
+      screen.getByTestId('artist-profile-section-adaptive')
+    ).toBeInTheDocument();
     expect(productStage.querySelector('img')).toBeInTheDocument();
-    expect(productStage.querySelector('img')?.getAttribute('alt')).toMatch(
-      /Demo/i
-    );
-    expect(productStage.querySelector('img')?.getAttribute('sizes')).toBe(
-      '(min-width: 768px) 19rem, (min-width: 440px) 17.5rem, 74vw'
-    );
+    expect(
+      screen.getByRole('tablist', { name: 'Profile Modes' })
+    ).toBeVisible();
   });
 
   it('keeps the adjacent Storybook receipt bound to the production fixture', () => {
     expect(storyMeta.component).toBe(ArtistProfileHero);
     expect(storyMeta.args?.hero).toBe(ARTIST_PROFILE_COPY.hero);
+    expect(storyMeta.args?.adaptive).toBe(ARTIST_PROFILE_COPY.adaptive);
   });
 });

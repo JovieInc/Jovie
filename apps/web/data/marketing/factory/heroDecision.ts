@@ -132,8 +132,9 @@ export interface HeroCodeBinding {
 export const HERO_CODE_BINDING_BY_VARIANT = {
   'split-link-claim': {
     component: 'components/marketing/MarketingHero',
-    sectionVariantId: 'split-claim-card',
-    implementation: "shell variant='split' with a claim card beside the copy",
+    sectionVariantId: 'left-phone',
+    implementation:
+      'left-aligned split hero with one mode-morphing phone (JOV-14242)',
   },
   'left-content': {
     component: 'components/marketing/MarketingHero',
@@ -174,9 +175,12 @@ export const HERO_CODE_BINDING_BY_VARIANT = {
  * converge on a locked variant; the list only shrinks.
  */
 export const UNLOCKED_HERO_CODE_VARIANTS = [
-  'centered-handle-claim',
+  // centered-handle-claim retired from unlocked (unused in route manifest).
   'centered-phone',
   'centered-none',
+  // Freed when split-link-claim locked to left-phone (JOV-14242). /pay and
+  // /product still bind this until they converge on the locked claim hero.
+  'split-claim-card',
 ] as const;
 
 export function heroVariantForCodeVariant(

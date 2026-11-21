@@ -429,9 +429,10 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   hero: {
     eyebrow: '',
-    headline: 'The link your music deserves.',
-    subhead:
-      'Your music, artist bio, and social links in one free profile. Review the details, then share your Jovie link.',
+    // Two short beats, ≥2 words each — taste ratchet rejects a one-word last line.
+    // Avoid new ICP "music" debt; artists page may shrink existing ids only.
+    headline: 'One link.\nAlways ready.',
+    subhead: 'Bio, socials, and your next release in one free profile.',
     ctaLabel: 'Claim your profile',
     secondaryCtaLabel: 'See how it adapts',
     signature: 'jov.ie/you',
