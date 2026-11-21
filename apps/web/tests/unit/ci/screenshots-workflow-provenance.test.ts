@@ -204,98 +204,96 @@ describe('Product Screenshots provenance', () => {
     ).toBe(false);
   });
 
-  it.skipIf(!gh)(
-    'binds each proof to the exact producer job or refuses to emit',
-    async () => {
-      for (const proof of screenProofs) {
-        const root = tempRoot('jovie-screen-proof-bind-');
-        const bin = join(root, 'bin');
-        mkdirSync(bin);
-        writeFileSync(
-          join(bin, 'node'),
-          `#!/bin/sh
+  it.skipIf(!gh).each(screenProofs)(
+    'binds $label proof to the exact producer job or refuses to emit',
+    async proof => {
+      const root = tempRoot('jovie-screen-proof-bind-');
+      const bin = join(root, 'bin');
+      mkdirSync(bin);
+      writeFileSync(
+        join(bin, 'node'),
+        `#!/bin/sh
 if [ "$1" = scripts/invariants/screen-proof-emit.mjs ]; then
   printf '%s\\n' "$@" > "${root}/emit-args"
 else
   exec "${process.execPath}" "$@"
 fi
 `,
-          { mode: 0o755 }
-        );
-        // Exercise the real resolver and gh transport without waiting out
-        // the production read-after-write budget for terminal fixtures.
-        writeFileSync(join(bin, 'sleep'), '#!/bin/sh\nexit 0\n', {
-          mode: 0o755,
+        { mode: 0o755 }
+      );
+      // Exercise the real resolver and gh transport without waiting out
+      // the production read-after-write budget for terminal fixtures.
+      writeFileSync(join(bin, 'sleep'), '#!/bin/sh\nexit 0\n', {
+        mode: 0o755,
+      });
+      const run = (payloads: unknown[][], status = 200) => {
+        let reads = 0;
+        return runWithRealGh({
+          script: `cd '${repoRoot}'\n${String(proof.bind?.run)}`,
+          env: {
+            // Caller PATH overrides the harness default, so the resolved
+            // real gh dir must lead any host gh shims still on PATH.
+            PATH: `${bin}${delimiter}${dirname(String(gh))}${delimiter}${process.env.PATH ?? ''}`,
+            GITHUB_REPOSITORY: 'JovieInc/Jovie',
+            GITHUB_RUN_ID: '900',
+            GITHUB_RUN_ATTEMPT: '2',
+            GITHUB_SHA: 'a'.repeat(40),
+            GITHUB_SERVER_URL: 'https://github.com',
+            GITHUB_WORKSPACE: root,
+            JOVIE_API_STATE_DIR: root,
+          },
+          route: path =>
+            path ===
+            'repos/JovieInc/Jovie/actions/runs/900/attempts/2/jobs?per_page=100'
+              ? {
+                  status,
+                  body: {
+                    jobs: payloads[Math.min(reads++, payloads.length - 1)],
+                  },
+                }
+              : null,
         });
-        const run = (payloads: unknown[][], status = 200) => {
-          let reads = 0;
-          return runWithRealGh({
-            script: `cd '${repoRoot}'\n${String(proof.bind?.run)}`,
-            env: {
-              // Caller PATH overrides the harness default, so the resolved
-              // real gh dir must lead any host gh shims still on PATH.
-              PATH: `${bin}${delimiter}${dirname(String(gh))}${delimiter}${process.env.PATH ?? ''}`,
-              GITHUB_REPOSITORY: 'JovieInc/Jovie',
-              GITHUB_RUN_ID: '900',
-              GITHUB_RUN_ATTEMPT: '2',
-              GITHUB_SHA: 'a'.repeat(40),
-              GITHUB_SERVER_URL: 'https://github.com',
-              GITHUB_WORKSPACE: root,
-              JOVIE_API_STATE_DIR: root,
-            },
-            route: path =>
-              path ===
-              'repos/JovieInc/Jovie/actions/runs/900/attempts/2/jobs?per_page=100'
-                ? {
-                    status,
-                    body: {
-                      jobs: payloads[Math.min(reads++, payloads.length - 1)],
-                    },
-                  }
-                : null,
-          });
-        };
+      };
 
-        const missing = await run([[{ id: 5, name: 'Certify Screenshots' }]]);
-        expect(missing.code, proof.label).toBe(1);
-        expect(existsSync(join(root, 'emit-args')), proof.label).toBe(false);
+      const missing = await run([[{ id: 5, name: 'Certify Screenshots' }]]);
+      expect(missing.code, proof.label).toBe(1);
+      expect(existsSync(join(root, 'emit-args')), proof.label).toBe(false);
 
-        const unknown = await run([[{ id: 7, name: 'unknown-job' }]]);
-        expect(unknown.code, proof.label).toBe(1);
-        expect(existsSync(join(root, 'emit-args')), proof.label).toBe(false);
+      const unknown = await run([[{ id: 7, name: 'unknown-job' }]]);
+      expect(unknown.code, proof.label).toBe(1);
+      expect(existsSync(join(root, 'emit-args')), proof.label).toBe(false);
 
-        const ambiguous = await run([
-          [
-            { id: 77, name: String(generate.name) },
-            { id: 78, name: String(generate.name) },
-          ],
-        ]);
-        expect(ambiguous.code, proof.label).toBe(1);
-        expect(existsSync(join(root, 'emit-args')), proof.label).toBe(false);
+      const ambiguous = await run([
+        [
+          { id: 77, name: String(generate.name) },
+          { id: 78, name: String(generate.name) },
+        ],
+      ]);
+      expect(ambiguous.code, proof.label).toBe(1);
+      expect(existsSync(join(root, 'emit-args')), proof.label).toBe(false);
 
-        const denied = await run([[]], 403);
-        expect(denied.code, proof.label).toBe(1);
-        expect(existsSync(join(root, 'emit-args')), proof.label).toBe(false);
+      const denied = await run([[]], 403);
+      expect(denied.code, proof.label).toBe(1);
+      expect(existsSync(join(root, 'emit-args')), proof.label).toBe(false);
 
-        const bound = await run([
-          [{ id: 7, name: 'unknown-job' }],
-          [
-            { id: 5, name: 'Certify Screenshots' },
-            { id: 77, name: String(generate.name) },
-          ],
-        ]);
-        expect(bound.code, `${proof.label}: ${bound.stderr}`).toBe(0);
-        expect(bound.requests, proof.label).toHaveLength(2);
-        const args = readFileSync(join(root, 'emit-args'), 'utf8').split('\n');
-        expect(args).toEqual(
-          expect.arrayContaining([
-            `--screen=${proof.screenId}`,
-            '--producer-job-id=77',
-            '--producer-run-id=900',
-            '--producer-run-attempt=2',
-          ])
-        );
-      }
+      const bound = await run([
+        [{ id: 7, name: 'unknown-job' }],
+        [
+          { id: 5, name: 'Certify Screenshots' },
+          { id: 77, name: String(generate.name) },
+        ],
+      ]);
+      expect(bound.code, `${proof.label}: ${bound.stderr}`).toBe(0);
+      expect(bound.requests, proof.label).toHaveLength(2);
+      const args = readFileSync(join(root, 'emit-args'), 'utf8').split('\n');
+      expect(args).toEqual(
+        expect.arrayContaining([
+          `--screen=${proof.screenId}`,
+          '--producer-job-id=77',
+          '--producer-run-id=900',
+          '--producer-run-attempt=2',
+        ])
+      );
     },
     // Real gh requests cover missing, placeholder, ambiguous and resolved rows.
     60_000
