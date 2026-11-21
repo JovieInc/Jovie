@@ -5,7 +5,11 @@ import { TransitionPanel } from './transition-panel';
 const meta = {
   title: 'UI/TransitionPanel',
   component: TransitionPanel,
-  parameters: { layout: 'centered' },
+  parameters: {
+    layout: 'centered',
+    // Nested variant keys; stories exercise activeIndex + children instead.
+    jovie: { uncoveredProps: ['enter', 'center', 'exit'] },
+  },
 } satisfies Meta<typeof TransitionPanel>;
 
 export default meta;
