@@ -148,6 +148,65 @@ test('an unreadable Source Validation run list never blocks the CI report', asyn
   }
 });
 
+// JOV-12621 follow-up / Sentry LOW on #26281: docs-only or label-reuse Source
+// Validation runs upload no unit-flaky-* artifact and must not inflate the
+// runsAnalyzed denominator (which dilutes retryRate / severity).
+test('Source Validation runs without a unit-flaky artifact are excluded from runsAnalyzed', async t => {
+  const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sv-no-artifact-'));
+  t.mock.method(console, 'warn', () => {});
+  flakiness.setRunEvidenceCacheDir(cacheDir);
+  const routes = p => {
+    if (p.includes('/actions/workflows/ci.yml/runs?'))
+      return { body: { workflow_runs: [{ id: 50, run_attempt: 1 }] } };
+    if (p.includes('/actions/workflows/source-validation.yml/runs?'))
+      return {
+        body: {
+          workflow_runs: [
+            { id: 51, run_attempt: 1, event: 'pull_request' },
+            { id: 52, run_attempt: 1, event: 'pull_request' },
+          ],
+        },
+      };
+    if (p.includes('/runs/51/artifacts'))
+      return { body: { artifacts: [{ name: 'unit-flaky-51-1-0' }] } };
+    // Run 52: completed Source Validation with no unit-flaky upload.
+    return { body: p.includes('/jobs') ? { jobs: [] } : { artifacts: [] } };
+  };
+  const downloads = [];
+  const download = (runId, _repo, dest) => {
+    downloads.push(runId);
+    const artifact = path.join(dest, 'unit-flaky-51-1-0');
+    fs.mkdirSync(artifact, { recursive: true });
+    fs.writeFileSync(
+      path.join(artifact, 'test-report.1-4.flaky.json'),
+      JSON.stringify({
+        schemaVersion: 2,
+        flaky: [{ file: 'apps/web/b.test.ts', name: 'flakes', retryCount: 1 }],
+      })
+    );
+    return true;
+  };
+  try {
+    const result = await withFakeGitHub(routes, () =>
+      flakiness.analyzeFlakiness('t', 'JovieInc', 'Jovie', { download })
+    );
+    assert.deepEqual(downloads, [51]);
+    // 1 CI + 1 SV-with-artifact. The no-artifact SV run (52) stays out.
+    assert.equal(result.unitRunsAnalyzed, 2);
+    assert.equal(result.sourceValidationRunsAnalyzed, 2);
+    const flaky = flakiness.calculateUnitRetryFlakes(
+      result.unitStats,
+      result.unitRunsAnalyzed
+    );
+    assert.equal(flaky.length, 1);
+    assert.equal(flaky[0].runs, 1);
+    assert.equal(flaky[0].retryRate, '50.0');
+  } finally {
+    flakiness.setRunEvidenceCacheDir('');
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+  }
+});
+
 // Playwright's JUnit reporter writes <flakyFailure> only with includeRetries
 // (PLAYWRIGHT_JUNIT_INCLUDE_RETRIES); by default a retried pass is a plain
 // passing <testcase>. Its JSON reporter always records status "flaky".
