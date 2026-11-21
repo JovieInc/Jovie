@@ -173,9 +173,7 @@ enum JovieFont {
 
 enum JovieActionButtonMetrics {
   // BEGIN GENERATED NATIVE ACTION BUTTON
-  /// Source: ACTION_BUTTON_VISIBLE_HEIGHT_PX
   static let height: CGFloat = 28
-  /// Source: ACTION_BUTTON_MOBILE_HIT_TARGET_PX
   static let hitTarget: CGFloat = 44
   // END GENERATED NATIVE ACTION BUTTON
   static let labelWeight = JovieFont.actionLabelWeight
@@ -294,9 +292,8 @@ extension View {
 }
 
 struct JoviePillButtonStyle: ButtonStyle {
-  /// Projects `JovieActionButtonMetrics.height` (web KEEP 28).
-  static let visibleHeight = JovieActionButtonMetrics.height
-  /// Projects `JovieActionButtonMetrics.hitTarget` (web KEEP 44). Frame after paint.
+  static let visibleHeight = JovieActionButtonMetrics.height // KEEP 28
+  /// Hit frame applied after paint (KEEP 44).
   static let minimumHitHeight = JovieActionButtonMetrics.hitTarget
   static let hitInset = JovieSpacing.small
   static let pressedOpacity: Double = 0.8

@@ -38,9 +38,7 @@ test('projection binds height/hitTarget to KEEP', () => {
   for (const s of [
     ACTION_BUTTON_START,
     ACTION_BUTTON_END,
-    '/// Source: ACTION_BUTTON_VISIBLE_HEIGHT_PX',
     'static let height: CGFloat = 28',
-    '/// Source: ACTION_BUTTON_MOBILE_HIT_TARGET_PX',
     'static let hitTarget: CGFloat = 44',
   ])
     assert.ok(out.includes(s));
