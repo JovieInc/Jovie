@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { ChevronRight, Lock } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
@@ -146,7 +147,7 @@ export function AiCrawlerIntelligenceCard({
   }
 
   return (
-    <button
+    <PlainButton
       type='button'
       onClick={handleOpen}
       className={cn(
@@ -165,6 +166,6 @@ export function AiCrawlerIntelligenceCard({
         className='h-4 w-4 shrink-0 text-tertiary-token'
         aria-hidden='true'
       />
-    </button>
+    </PlainButton>
   );
 }
