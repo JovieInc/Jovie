@@ -2456,9 +2456,13 @@ ${selectedGateScript}`,
     expect(cache).toContain('Package.resolved');
     expect(cache).toContain('restore-keys:');
 
-    // Only remote caching is conditional on runner ownership. Both runner
-    // classes must resolve dependencies and execute their selected test gate.
-    expect(resolvePackages).not.toMatch(/^\s+if:/m);
+    // Remote cache restore stays github-hosted only. Resolve skips only on a
+    // full primary-key hit (cache-hit=true). Partial restore-keys hits and
+    // self-hosted runners (cache step skipped → empty output) still resolve.
+    expect(cache).toContain('id: swiftpm-cache');
+    expect(resolvePackages).toContain(
+      "if: ${{ steps.swiftpm-cache.outputs.cache-hit != 'true' }}"
+    );
     expect(fastGate).toContain('if: ${{ !inputs.full-regression }}');
     expect(fastGate).toContain('bash apps/ios/scripts/run-unit-tests.sh');
     expect(fastGate).toContain('bash apps/ios/scripts/check_coverage.sh');
