@@ -5,6 +5,7 @@
 
 import { lintVoice } from '@/lib/chat/voice-lint';
 import { DEFAULT_MAX_WORDS, type HelpfulnessCase } from './cases';
+import { runFailThemeChecks, upcomingTitleFromFacts } from './fail-themes';
 import type { EvalFixture } from './fixtures';
 import {
   type BehaviorId,
@@ -33,6 +34,14 @@ export interface HardCheckResult {
   readonly id: string;
   readonly ok: boolean;
   readonly detail?: string;
+}
+
+/** Optional case context for theme hard checks (UPCOMING-first). */
+export interface HardCheckContext {
+  /** Fixture/judge facts; an UPCOMING row enables upcoming-first. */
+  readonly facts?: readonly string[];
+  /** Explicit upcoming title; wins over facts parsing. */
+  readonly upcomingTitle?: string;
 }
 
 /**
@@ -69,7 +78,8 @@ export function countWords(text: string): number {
 
 export function runHardChecks(
   testCase: HelpfulnessCase,
-  reply: EvalReply
+  reply: EvalReply,
+  context?: HardCheckContext
 ): HardCheckResult[] {
   const text = reply.text;
   const toolText = reply.toolCalls
@@ -155,7 +165,31 @@ export function runHardChecks(
     });
   }
 
+  // ASS-25/ASS-29 fail themes: inventing-stats + question-not-a-move always;
+  // upcoming-first only when case context has an UPCOMING title.
+  const upcomingTitle =
+    context?.upcomingTitle ??
+    (context?.facts ? upcomingTitleFromFacts(context.facts) : undefined);
+  for (const theme of runFailThemeChecks(text, {
+    upcoming: upcomingTitle ? { upcomingTitle } : undefined,
+  })) {
+    checks.push({
+      id: theme.id.replaceAll('-', '_'),
+      ok: theme.ok,
+      detail: theme.detail,
+    });
+  }
+
   return checks;
+}
+
+/** Live-runner helper: UPCOMING title comes from fixture facts. */
+export function runHardChecksForFixture(
+  testCase: HelpfulnessCase,
+  reply: EvalReply,
+  fixture: Pick<EvalFixture, 'facts'>
+): HardCheckResult[] {
+  return runHardChecks(testCase, reply, { facts: fixture.facts });
 }
 
 export type JudgeScores = Partial<Record<BehaviorId, 0 | 1 | 2 | null>>;
