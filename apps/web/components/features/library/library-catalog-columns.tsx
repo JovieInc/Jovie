@@ -439,21 +439,18 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
   libraryCatalogColumnHelper.display({
     id: 'type',
     header: 'Type',
+    // Not fluid-cell: Title absorbs spare width; Type stays readable (JOV-7752).
     cell: ({ row }) => (
       <span
         title={formatLibraryItemType(row.original)}
-        className='system-b-library-meta-text system-b-library-fluid-cell block truncate text-tertiary-token'
+        className='system-b-library-meta-text block truncate whitespace-nowrap text-tertiary-token'
       >
         {formatLibraryItemType(row.original)}
       </span>
     ),
-    size: 120,
+    size: 112,
     minSize: 96,
-    meta: {
-      className: 'pl-2 pr-3',
-      priority: 6,
-      minWidth: 120,
-    },
+    meta: { className: 'pl-2 pr-3', priority: 6, minWidth: 112 },
   }),
   libraryCatalogColumnHelper.display({
     id: 'bpm',

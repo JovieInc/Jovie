@@ -55,7 +55,7 @@ enum ObservabilityReportBuilder {
       release: sanitizedLine(release),
       environment: sanitizedLine(environment),
       stacktrace: sanitizedStacktrace(stacktrace),
-      occurredAt: ISO8601DateFormatter().string(from: occurredAt),
+      occurredAt: occurredAt.ISO8601Format(),
       sampled: sampled
     )
   }
