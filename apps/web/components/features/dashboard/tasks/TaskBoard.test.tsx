@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { TaskBoardResult, TaskStatus } from '@/lib/tasks/types';
+import type { TaskBoardResult, TaskStatus, TaskView } from '@/lib/tasks/types';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { getTaskBoardGridTemplate, TaskBoard } from './TaskBoard';
 
 const visibleStatuses: TaskStatus[] = ['backlog', 'todo', 'in_progress'];
@@ -72,5 +74,78 @@ describe('JOV-5466 token retire', () => {
   it('does not keep retired --linear-app-* tokens', () => {
     const source = readFileSync(resolve(__dirname, './TaskBoard.tsx'), 'utf8');
     expect(source).not.toMatch(/--linear-app-/);
+  });
+});
+
+const task: TaskView = {
+  id: 'task-1',
+  taskNumber: 12,
+  creatorProfileId: 'profile-1',
+  title: 'Upload final master',
+  description: null,
+  status: 'todo',
+  priority: 'high',
+  assigneeKind: 'human',
+  assigneeUserId: null,
+  agentType: null,
+  agentStatus: 'idle',
+  agentInput: null,
+  agentOutput: null,
+  agentError: null,
+  dueAt: null,
+  releaseId: 'release-1',
+  releaseTitle: 'QA Release',
+  parentTaskId: null,
+  category: 'distribution',
+  scheduledFor: null,
+  startedAt: null,
+  completedAt: null,
+  position: 0,
+  sourceTemplateId: null,
+  metadata: null,
+  createdAt: new Date('2026-04-01T00:00:00.000Z'),
+  updatedAt: new Date('2026-04-01T00:00:00.000Z'),
+};
+
+describe('TaskBoard interactions', () => {
+  it('opens a task card and creates a task from a column', async () => {
+    const user = userEvent.setup();
+    const onOpenTask = vi.fn();
+    const onCreateTask = vi.fn();
+    const board: TaskBoardResult = {
+      totalCount: 1,
+      columns: [
+        { status: 'todo', tasks: [task], totalCount: 1, nextCursor: null },
+      ],
+    };
+    const { container } = render(
+      <TaskBoard
+        {...boardProps}
+        board={board}
+        isLoading={false}
+        onOpenTask={onOpenTask}
+        onCreateTask={onCreateTask}
+      />
+    );
+
+    await user.click(screen.getByTestId('task-board-card-task-1'));
+    expect(onOpenTask).toHaveBeenCalledWith(task);
+
+    await user.click(
+      screen.getAllByRole('button', { name: /Create .* task/ })[0]
+    );
+    expect(onCreateTask).toHaveBeenCalled();
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders the empty and loading boards axe-clean', async () => {
+    const empty = render(<TaskBoard {...boardProps} isLoading={false} />);
+    expect(screen.getByTestId('tasks-board')).toBeInTheDocument();
+    await expectNoA11yViolations(empty.container);
+    empty.unmount();
+
+    const loading = render(<TaskBoard {...boardProps} isLoading />);
+    expect(screen.getByTestId('tasks-board-skeleton')).toBeInTheDocument();
+    await expectNoA11yViolations(loading.container);
   });
 });

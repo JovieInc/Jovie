@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { useEffect, useMemo, useState, useTransition } from 'react';
 
 interface MetadataAgentProvider {
@@ -397,8 +398,7 @@ export function MetadataAgentPanel({
 
       {storageAvailable ? (
         <div className='mt-4 flex flex-wrap gap-2'>
-          <button
-            type='button'
+          <PlainButton
             onClick={() => {
               void handlePrepare();
             }}
@@ -406,12 +406,11 @@ export function MetadataAgentPanel({
             className='rounded-md border border-(--linear-btn-primary-border) bg-btn-primary px-3 py-2 text-sm font-medium text-btn-primary-foreground shadow-button-inset transition-colors duration-subtle hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover disabled:cursor-not-allowed disabled:opacity-60'
           >
             {latestRequest ? 'Rebuild Package' : 'Prepare Package'}
-          </button>
+          </PlainButton>
 
           {latestRequest?.status === 'awaiting_approval' &&
           !hasBlockingFields ? (
-            <button
-              type='button'
+            <PlainButton
               onClick={() => {
                 void handleApproveSend();
               }}
@@ -419,12 +418,11 @@ export function MetadataAgentPanel({
               className='rounded-md border border-subtle px-3 py-2 text-sm font-medium text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
             >
               Approve And Send
-            </button>
+            </PlainButton>
           ) : null}
 
           {latestRequest && openIssues.length > 0 ? (
-            <button
-              type='button'
+            <PlainButton
               onClick={() => {
                 void handleDraftCorrection();
               }}
@@ -432,7 +430,7 @@ export function MetadataAgentPanel({
               className='rounded-md border border-subtle px-3 py-2 text-sm font-medium text-primary-token disabled:cursor-not-allowed disabled:opacity-60'
             >
               Draft Correction
-            </button>
+            </PlainButton>
           ) : null}
         </div>
       ) : null}

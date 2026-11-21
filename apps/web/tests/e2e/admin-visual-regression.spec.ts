@@ -12,6 +12,7 @@ import {
   getAdminDesktopSnapshotName,
   getAdminSurfaceSelector,
 } from './utils/admin-surface-manifest';
+import { freshShippingProjection } from './utils/admin-visual-shipping-fixture';
 import { expectCaptureReady } from './utils/visual-capture-ready';
 
 const DESKTOP_VIEWPORT = { width: 1440, height: 1100 } as const;
@@ -354,6 +355,14 @@ async function registerAdminVisualStubs(page: import('@playwright/test').Page) {
     )
   );
 
+  // Shipping and Ops read the delivery projection the fleet host publishes.
+  // CI has no fleet host, so the card reads "Disconnected" with source gaps.
+  // Answer one fresh, connected projection, stamped when the page asks so its
+  // relative times stay small and stable.
+  await page.route('**/api/hud/shipping-state**', route =>
+    route.fulfill(jsonResponse(freshShippingProjection()))
+  );
+
   await page.route('**/api/admin/investors/settings', route =>
     route.fulfill(
       jsonResponse({
@@ -407,6 +416,14 @@ async function openedAccordion(
   return section;
 }
 
+/**
+ * Help copy that names an error word without being an error. Keep each
+ * pattern to the one sentence it allows.
+ */
+const CAPTURE_ALLOWED_COPY: Readonly<Record<string, readonly RegExp[]>> = {
+  'share-studio': [/when native file\s+share is unavailable/i],
+};
+
 test.describe('admin visual regression', () => {
   test.beforeEach(async ({ page }) => {
     test.skip(!hasAdminCredentials(), 'Admin auth not available');
@@ -428,7 +445,9 @@ test.describe('admin visual regression', () => {
         ? await openedAccordion(page, surface.snapshotAccordion)
         : root;
 
-      await expectCaptureReady(locator);
+      await expectCaptureReady(locator, {
+        allowCopy: CAPTURE_ALLOWED_COPY[surface.id],
+      });
       await expect(locator).toHaveScreenshot(
         getAdminDesktopSnapshotName(surface)
       );
@@ -439,7 +458,9 @@ test.describe('admin visual regression', () => {
     test(`${surface.name} mobile`, async ({ page }) => {
       const locator = await openSurface(page, surface, MOBILE_VIEWPORT);
 
-      await expectCaptureReady(locator);
+      await expectCaptureReady(locator, {
+        allowCopy: CAPTURE_ALLOWED_COPY[surface.id],
+      });
       await expect(locator).toHaveScreenshot(
         `${surface.snapshotSlug}-mobile.png`
       );
