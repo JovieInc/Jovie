@@ -85,7 +85,7 @@ function CatalogStatusIcon({
   if (scanFailed) return <XCircle className='h-3.5 w-3.5 text-destructive' />;
   if (allClear) return <CheckCircle2 className='h-3.5 w-3.5 text-green-500' />;
   if (hasResults)
-    return <AlertTriangle className='h-3.5 w-3.5 text-amber-500' />;
+    return <AlertTriangle className='h-3.5 w-3.5 text-warning-text' />;
   return <ScanSearch className='h-3.5 w-3.5 text-muted-foreground' />;
 }
 
@@ -482,8 +482,8 @@ function CatalogHealthSectionContent({
             scan?.status === 'completed' &&
             confirmedNotMineCount > 0 &&
             unresolvedNotInCatalog.length === 0 && (
-              <div className='mt-3 rounded-md bg-amber-500/10 p-3'>
-                <p className='text-xs font-medium text-amber-600'>
+              <div className='mt-3 rounded-md bg-warning-subtle p-3'>
+                <p className='text-xs font-medium text-warning-text'>
                   You flagged {confirmedNotMineCount} track
                   {confirmedNotMineCount === 1 ? '' : 's'} as not yours.
                 </p>

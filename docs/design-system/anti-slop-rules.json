@@ -910,6 +910,38 @@
       }
     },
     {
+      "id": "ASR-041",
+      "title": "Dashboard color semantics",
+      "statement": "In dashboards, accent marks only the primary action, selection, focus and links; status colors mark only status; a delta is colored by sentiment (its direction combined with the metric's polarity) through apps/web/lib/design/metric-tone.ts; data series stay neutral.",
+      "rationale": "An up arrow is good news only when higher is better. A green drop or a red flat line teaches people to distrust the screen, and accent on data competes with the one action that matters.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-11-21",
+        "ref": "make sure accent colors are used corectly in dashbaords"
+      },
+      "scope": ["app"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/anti-slop/run.mjs validate",
+        "evidence": [
+          "scripts/anti-slop/lib.mjs",
+          "scripts/anti-slop/anti-slop.test.mjs",
+          "apps/web/lib/design/metric-tone.ts",
+          "apps/web/lib/design/metric-tone.test.ts"
+        ],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'anti-slop'",
+            "commandIncludes": "anti-slop/run.mjs validate"
+          }
+        ],
+        "coverageNote": "Dashboard TS/TSX (home-loop, admin, dashboard, link-analytics, opportunity-inbox, Sparkline, PerformanceCard, ContentMetric*, hud and shell admin, dashboard and insights routes) plus system-b-app.css. Line patterns: direction-keyed sentiment maps, data-direction color selectors, hsl(var(--color-*)), accent chart strokes, fixed accent or status classes on metric icons and values, raw status palette, neon status text. Exact-line, shrink-only baseline."
+      }
+    },
+    {
       "id": "ASR-036",
       "title": "Spell the brand right",
       "statement": "The brand is Jovie and the domain is jov.ie. Flag Jovy, Jovee, Jovei, Jovvie, Jovies, J0vie, jovie.com or jovie.io, and wrong casing in prose. Real names such as Bon Jovi are preserved. Jovi is otherwise allowed only where the occurrence names the agent (Summer Jovi, Jovi coach, Jovi Technology Inc). jovie.com in copy is correct only when it disambiguates the unrelated childcare company.",
