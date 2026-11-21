@@ -69,7 +69,7 @@ function considerMax(current: number | undefined, next: number): number {
  * Infer painted optical size from Tailwind `size-*` / `h-*` / `w-*` classes
  * when callers omit the Lucide `size` prop (common Icon pattern).
  * Supports formula spacing (`size-14` → 56), fractions (`h-3.5`), and
- * arbitrary values (`h-[28px]`, `size-[1.5rem]`). Returns the largest match.
+ * arbitrary bracket px/rem utilities. Returns the largest match.
  */
 export function opticalSizeFromClassName(
   className: string | undefined
