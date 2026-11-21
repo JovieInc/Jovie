@@ -46,7 +46,7 @@ export function EntityThreadGlyph({
           onOpen();
         }}
         aria-label='Open Running Chat'
-        className='shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-accent-text/85 hover:text-accent-text hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle'
+        className='relative before:absolute before:left-1/2 before:top-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 shrink-0 inline-flex items-center justify-center h-5 w-5 rounded text-accent-text/85 hover:text-accent-text hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle'
       >
         <span className='relative inline-grid place-items-center h-3 w-3'>
           <span
