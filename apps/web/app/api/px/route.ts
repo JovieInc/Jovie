@@ -144,7 +144,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // TRK-6: young-audience profiles never accept ad-pixel beacons.
     if (isYoungAudienceProfile(profile.settings)) {
       return NextResponse.json(
         { success: true, suppressed: 'young_audience' },

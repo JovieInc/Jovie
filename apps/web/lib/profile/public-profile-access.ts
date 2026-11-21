@@ -6,7 +6,7 @@ export function isProfileSearchable(settings: unknown): boolean {
   return (settings as Record<string, unknown>).searchable === true;
 }
 
-/** TRK-6: explicit `youngAudience: true` only; missing/malformed → not young. */
+/** TRK-6: only explicit youngAudience:true. */
 export function isYoungAudienceProfile(settings: unknown): boolean {
   if (settings === undefined || settings === null) return false;
   if (typeof settings !== 'object' || Array.isArray(settings)) return false;
@@ -16,19 +16,4 @@ export function isYoungAudienceProfile(settings: unknown): boolean {
 /** Canonical booleans plus known legacy Neon true encodings; never arbitrary truthiness. */
 export function isPublicProfilePublished(value: unknown): boolean {
   return value === true || value === 1 || value === 't';
-}
-
-/** Hard-expire public cache when visibility, search, or young-audience changes. */
-export function isPrivacyAffectingProfileUpdate(updates: {
-  readonly isPublic?: unknown;
-  readonly settings?: {
-    readonly searchable?: unknown;
-    readonly youngAudience?: unknown;
-  } | null;
-}): boolean {
-  return (
-    updates.isPublic !== undefined ||
-    updates.settings?.searchable !== undefined ||
-    updates.settings?.youngAudience !== undefined
-  );
 }

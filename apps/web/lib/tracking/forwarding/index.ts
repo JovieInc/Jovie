@@ -33,10 +33,7 @@ import {
   normalizeEvent,
   type PlatformConfig,
 } from './types';
-import {
-  markEventSkipped,
-  skipForwardingForYoungAudience,
-} from './young-audience-gate';
+import { profileHasYoungAudienceSuppress } from './young-audience-suppress';
 
 export type {
   ForwardingResult,
@@ -171,9 +168,24 @@ function getJoviePixelConfigs(): {
   };
 }
 
-/**
- * Forward event to Jovie's own pixels
- */
+async function markEventSkipped(
+  eventId: string,
+  reason: string
+): Promise<void> {
+  const skippedStatus: PixelForwardingStatus = {
+    skipped: {
+      status: 'skipped',
+      sentAt: new Date().toISOString(),
+      error: reason,
+    },
+  };
+
+  await db
+    .update(pixelEvents)
+    .set({ forwardingStatus: skippedStatus })
+    .where(eq(pixelEvents.id, eventId));
+}
+
 async function forwardToJoviePixels(
   normalizedEvent: ReturnType<typeof normalizeEvent>,
   alreadySent?: Set<string>
@@ -306,8 +318,8 @@ export async function forwardEvent(
     await markEventSkipped(event.id, 'consent_not_given');
     return [];
   }
-
-  if (await skipForwardingForYoungAudience(event.id, event.profileId)) {
+  if (await profileHasYoungAudienceSuppress(event.profileId)) {
+    await markEventSkipped(event.id, 'young_audience');
     return [];
   }
 

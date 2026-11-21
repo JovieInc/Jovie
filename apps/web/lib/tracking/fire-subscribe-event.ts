@@ -17,7 +17,7 @@ import { logger } from '@/lib/utils/logger';
 import { decryptPII } from '@/lib/utils/pii-encryption';
 import { forwardToFacebook } from './forwarding/facebook';
 import type { NormalizedEvent, PlatformConfig } from './forwarding/types';
-import { profileHasYoungAudienceSuppress } from './forwarding/young-audience-gate';
+import { profileHasYoungAudienceSuppress } from './forwarding/young-audience-suppress';
 
 interface FireSubscribeEventOptions {
   creatorProfileId: string;
@@ -48,7 +48,6 @@ export async function fireSubscribeCAPIEvent(
   opts: FireSubscribeEventOptions
 ): Promise<void> {
   try {
-    // TRK-6: young-audience profiles must not receive CAPI Subscribe either.
     if (await profileHasYoungAudienceSuppress(opts.creatorProfileId)) {
       logger.info('[CAPI Subscribe] Suppressed for young-audience profile', {
         profileId: opts.creatorProfileId,

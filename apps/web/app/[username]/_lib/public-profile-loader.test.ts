@@ -234,22 +234,6 @@ describe('public profile loading boundaries', () => {
     expect(result).toMatchObject({ status: 'ok', creatorMetaPixelId: null });
     expect(mocks.warn).toHaveBeenCalled();
   });
-
-  it('suppresses creator Meta pixels when the profile is marked young-audience', async () => {
-    mocks.profile.mockResolvedValue({
-      ...profile(),
-      userPlan: 'pro',
-      settings: { youngAudience: true },
-    });
-    mocks.pixel.mockResolvedValueOnce([{ facebookPixelId: '999' }]);
-    const result = await getProfileAndLinks('testartist');
-    expect(result).toMatchObject({
-      status: 'ok',
-      youngAudience: true,
-      creatorMetaPixelId: null,
-    });
-    expect(mocks.pixel).not.toHaveBeenCalled();
-  });
 });
 
 describe('per-request public authority', () => {

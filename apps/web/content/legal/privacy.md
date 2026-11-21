@@ -1,6 +1,6 @@
 ## Privacy Policy
 
-_Last updated: November 2026_
+_Last updated: October 2026_
 
 This policy applies to {{LEGAL_ENTITY_NAME}} ("Jovie", "we", "us").
 
@@ -13,8 +13,6 @@ Jovie exists so you can share your story with confidence. That means keeping you
 ### Age Requirement
 
 Jovie is not intended for children under 13 years of age. We do not knowingly collect personal information from children under 13. If we discover that a child under 13 has provided us with personal information, we will promptly delete it. If you believe a child under 13 has provided us with personal information, please contact privacy@jov.ie.
-
-Creators can mark a profile for a young audience; that setting turns off advertising pixels and retargeting on the profile.
 
 ### Account Information
 

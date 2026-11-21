@@ -72,17 +72,14 @@ describe('fireSubscribeCAPIEvent', () => {
     mockEnv.JOVIE_FACEBOOK_ACCESS_TOKEN = undefined;
   });
 
-  it('skips all CAPI forwarding for young-audience profiles', async () => {
+  it('skips CAPI for young-audience profiles', async () => {
     mockDbResult = [{ settings: { youngAudience: true } }];
     mockEnv.JOVIE_FACEBOOK_PIXEL_ID = 'jovie-fb-pixel';
     mockEnv.JOVIE_FACEBOOK_ACCESS_TOKEN = 'jovie-fb-token';
-
     await fireSubscribeCAPIEvent({
       creatorProfileId: 'prof-1',
       email: 'fan@test.com',
-      sourceUrl: 'https://jov.ie/artist',
     });
-
     expect(mockForwardToFacebook).not.toHaveBeenCalled();
   });
 

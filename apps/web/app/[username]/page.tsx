@@ -68,6 +68,7 @@ import {
 import { opaqueInternalProfileRedirectPath } from '@/lib/profile/opaque-internal-profile-handle';
 import { resolveOpaqueInternalProfileUsername } from '@/lib/profile/opaque-internal-profile-handle.server';
 import { schedulePublicCollaboratorProfileReconciliation } from '@/lib/profile/public-collaborator-reconciliation';
+import { isYoungAudienceProfile } from '@/lib/profile/public-profile-access';
 import { isShopEnabled } from '@/lib/profile/shop-settings';
 import { isUnclaimedStructuredCreditProfile } from '@/lib/profile/unclaimed-artist-profile';
 import { getCachedPublicReleasesForProfile } from '@/lib/releases/public-release-loader';
@@ -285,11 +286,10 @@ async function ArtistPageContent({
     creatorIsPro,
     creatorClerkId,
     creatorMetaPixelId,
-    youngAudience,
     latestRelease,
     pressPhotos,
   } = profileResult;
-  const pixelsAllowed = !youngAudience; // TRK-6 young-audience suppress
+  const pixelsAllowed = !isYoungAudienceProfile(profile?.settings);
 
   if (status === 'error') {
     return <PublicProfileErrorState retryHref={`/${username.toLowerCase()}`} />;

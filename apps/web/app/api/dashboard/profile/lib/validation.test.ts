@@ -57,19 +57,6 @@ describe('owner searchability choice validation', () => {
     }
   );
 
-  it('accepts youngAudience booleans and rejects malformed values', () => {
-    for (const youngAudience of [true, false]) {
-      expect(
-        ProfileUpdateSchema.parse({ settings: { youngAudience } }).settings
-      ).toEqual({ youngAudience });
-    }
-    for (const youngAudience of [null, 'true', 1, [], {}]) {
-      expect(
-        ProfileUpdateSchema.safeParse({ settings: { youngAudience } }).success
-      ).toBe(false);
-    }
-  });
-
   it('does not insert a discovery choice when saving unrelated profile settings', () => {
     const parsed = ProfileUpdateSchema.parse({
       settings: { marketing_emails: false },

@@ -78,7 +78,6 @@ const NOT_FOUND_RESULT: PublicProfileLoaderResult = {
   creatorIsPro: false,
   creatorClerkId: null,
   creatorMetaPixelId: null,
-  youngAudience: false,
   genres: null,
   latestRelease: null,
   pressPhotos: [],
