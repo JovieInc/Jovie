@@ -29,9 +29,14 @@ export interface OneRecGapCheck {
   readonly detail?: string;
 }
 
-/** Relative-time cues that prove the opener used days-left, not a bare date. */
+/**
+ * Relative-time cues that prove the opener used days-left, not a bare calendar
+ * date. Includes bare "Friday" (and "this Friday") so quality-bar openers like
+ * "Night Swim is out Friday" fail-close only when the title or cue is missing —
+ * not when the weekday is named without the word "this".
+ */
 export const DAYS_LEFT_CUE_PATTERN =
-  /\b(?:tomorrow|today|tonight|in\s+\d+\s+days?|this\s+friday|\d+\s+days?\s+(?:left|out|away))\b/i;
+  /\b(?:tomorrow|today|tonight|in\s+\d+\s+days?|in\s+(?:a\s+)?(?:couple|few|two|three|four|five|six|seven)\s+days?|(?:this\s+)?friday|\d+\s+days?\s+(?:left|out|away))\b/i;
 
 /**
  * Planning menus that score next_action ≤1 even when an UPCOMING title appears.

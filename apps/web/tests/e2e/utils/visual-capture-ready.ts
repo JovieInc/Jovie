@@ -6,7 +6,7 @@ import { findErrorCopy } from './visual-capture-copy';
  * committed a loading skeleton as `admin-home` and then the "Revenue state
  * unavailable" error card. Call it before every `toHaveScreenshot` in a suite
  * that refreshes baselines: it waits for placeholders to settle, then fails
- * the test if the capture would show a skeleton, a busy region or an error.
+ * the test if the capture would show a skeleton, a busy region or error copy.
  * A failed test publishes no baselines, so the bad capture is never adopted.
  */
 
@@ -20,7 +20,7 @@ export const LOADING_SELECTORS = [
 ] as const;
 
 export interface CaptureProblem {
-  readonly kind: 'loading' | 'error-copy' | 'alert';
+  readonly kind: 'loading' | 'error-copy';
   readonly detail: string;
 }
 
@@ -30,8 +30,15 @@ async function visibleLoadingMarkers(root: Locator): Promise<string[]> {
     const matches = root.locator(selector);
     const count = await matches.count();
     for (let index = 0; index < count; index += 1) {
-      if (await matches.nth(index).isVisible()) {
-        found.push(selector);
+      const match = matches.nth(index);
+      if (await match.isVisible()) {
+        const owner = await match.evaluate(element => {
+          const host = element.closest('[data-testid]');
+          const id = host?.getAttribute('data-testid') ?? 'no test id';
+          const label = (element.textContent ?? '').replace(/\s+/g, ' ');
+          return `${id}: ${label.trim().slice(0, 60)}`;
+        });
+        found.push(`${selector} in ${owner}`);
         break;
       }
     }
@@ -43,23 +50,31 @@ async function visibleLoadingMarkers(root: Locator): Promise<string[]> {
   return found;
 }
 
+export interface CaptureReadyOptions {
+  /** How long to wait for the capture to settle. */
+  readonly timeout?: number;
+  /**
+   * Ordinary copy on this surface that mentions an error word, such as help
+   * text saying when a feature is unavailable. Keep each pattern as narrow
+   * as the sentence it allows.
+   */
+  readonly allowCopy?: readonly RegExp[];
+}
+
 export async function findCaptureProblems(
-  root: Locator
+  root: Locator,
+  allowCopy: readonly RegExp[] = []
 ): Promise<CaptureProblem[]> {
   const problems: CaptureProblem[] = [];
   for (const selector of await visibleLoadingMarkers(root)) {
     problems.push({ kind: 'loading', detail: selector });
   }
-  const errorCopy = findErrorCopy(await root.innerText());
+  // Error copy is read from the rendered text, alerts included. A visible
+  // role="alert" alone is not an error: the route announcer and toasts use it
+  // for ordinary copy ("Move your music forward."), so it is never a problem
+  // by itself.
+  const errorCopy = findErrorCopy(await root.innerText(), allowCopy);
   if (errorCopy) problems.push({ kind: 'error-copy', detail: errorCopy });
-  const alerts = root.locator('[role="alert"]');
-  const alertCount = await alerts.count();
-  for (let index = 0; index < alertCount; index += 1) {
-    const alert = alerts.nth(index);
-    if (!(await alert.isVisible())) continue;
-    const text = (await alert.innerText()).trim();
-    if (text) problems.push({ kind: 'alert', detail: text.slice(0, 120) });
-  }
   return problems;
 }
 
@@ -81,7 +96,7 @@ export function captureGateActive(): boolean {
  */
 export async function expectCaptureReady(
   root: Locator,
-  { timeout = 30_000 }: { readonly timeout?: number } = {}
+  { timeout = 30_000, allowCopy = [] }: CaptureReadyOptions = {}
 ): Promise<void> {
   if (!captureGateActive()) return;
   let problems: CaptureProblem[] = [];
@@ -89,7 +104,7 @@ export async function expectCaptureReady(
     await expect
       .poll(
         async () => {
-          problems = await findCaptureProblems(root);
+          problems = await findCaptureProblems(root, allowCopy);
           return problems.length;
         },
         { timeout, intervals: [250, 500, 1_000] }
