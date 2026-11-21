@@ -6428,77 +6428,77 @@
   color: var(--color-text-primary-token);
 }
 
-.system-b-dsp-service-icon[data-dsp-icon='spotify'] {
+.system-b-dsp-service-icon[data-dsp-icon="spotify"] {
   color: var(--color-brand-spotify);
 }
 
-.system-b-dsp-service-icon[data-dsp-icon='apple_music'] {
+.system-b-dsp-service-icon[data-dsp-icon="apple_music"] {
   color: var(--color-brand-apple);
 }
 
-.system-b-dsp-service-icon[data-dsp-icon='youtube'],
-.system-b-dsp-service-icon[data-dsp-icon='youtube_music'] {
+.system-b-dsp-service-icon[data-dsp-icon="youtube"],
+.system-b-dsp-service-icon[data-dsp-icon="youtube_music"] {
   color: var(--color-brand-youtube);
 }
 
-.system-b-dsp-service-icon[data-dsp-icon='soundcloud'] {
+.system-b-dsp-service-icon[data-dsp-icon="soundcloud"] {
   color: var(--color-brand-soundcloud);
 }
 
-.system-b-dsp-service-icon[data-dsp-icon='deezer'] {
+.system-b-dsp-service-icon[data-dsp-icon="deezer"] {
   color: var(--color-brand-deezer);
 }
 
-.system-b-dsp-service-icon[data-dsp-icon='amazon_music'] {
+.system-b-dsp-service-icon[data-dsp-icon="amazon_music"] {
   color: var(--color-brand-amazon);
 }
 
-.system-b-dsp-service-icon[data-dsp-icon='bandcamp'] {
+.system-b-dsp-service-icon[data-dsp-icon="bandcamp"] {
   color: var(--color-brand-bandcamp);
 }
 
-.system-b-dsp-service-icon[data-dsp-icon='qq_music'] {
+.system-b-dsp-service-icon[data-dsp-icon="qq_music"] {
   color: var(--color-brand-qq-music);
 }
 
-.system-b-dsp-service-icon[data-dsp-icon='netease'] {
+.system-b-dsp-service-icon[data-dsp-icon="netease"] {
   color: var(--color-brand-netease);
 }
 
-.system-b-dsp-service-icon[data-dsp-icon='beatport'] {
+.system-b-dsp-service-icon[data-dsp-icon="beatport"] {
   color: var(--color-brand-beatport);
 }
 
-.system-b-dsp-service-icon[data-dsp-icon='pandora'] {
+.system-b-dsp-service-icon[data-dsp-icon="pandora"] {
   color: var(--color-brand-pandora);
 }
 
-.system-b-dsp-service-icon[data-dsp-icon='napster'] {
+.system-b-dsp-service-icon[data-dsp-icon="napster"] {
   color: var(--color-brand-napster);
 }
 
-.system-b-dsp-service-icon[data-dsp-icon='audiomack'] {
+.system-b-dsp-service-icon[data-dsp-icon="audiomack"] {
   color: var(--color-brand-audiomack);
 }
 
-.system-b-dsp-service-icon[data-dsp-icon='qobuz'] {
+.system-b-dsp-service-icon[data-dsp-icon="qobuz"] {
   color: var(--color-brand-qobuz);
 }
 
-.system-b-dsp-service-icon[data-dsp-icon='anghami'] {
+.system-b-dsp-service-icon[data-dsp-icon="anghami"] {
   color: var(--color-brand-anghami);
 }
 
-.system-b-dsp-service-icon[data-dsp-icon='boomplay'] {
+.system-b-dsp-service-icon[data-dsp-icon="boomplay"] {
   color: var(--color-brand-boomplay);
 }
 
-.system-b-dsp-service-icon[data-dsp-icon='iheartradio'] {
+.system-b-dsp-service-icon[data-dsp-icon="iheartradio"] {
   color: var(--color-brand-iheartradio);
 }
 
-.system-b-dsp-service-icon[data-dsp-icon='tidal'],
-.system-b-dsp-service-icon[data-dsp-icon='tiktok'] {
+.system-b-dsp-service-icon[data-dsp-icon="tidal"],
+.system-b-dsp-service-icon[data-dsp-icon="tiktok"] {
   color: var(--color-text-primary-token);
 }
 
