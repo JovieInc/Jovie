@@ -138,7 +138,7 @@ describe('Footer legal link contrast (JOV-8873)', () => {
   it('uses the footer border token for the legal divider', () => {
     const { container } = render(<Footer variant='regular' />);
 
-    expect(container.innerHTML).toContain('border-(--linear-border-footer)');
+    expect(container.innerHTML).toContain('border-subtle');
     expect(container.innerHTML).not.toContain('border-white/8');
   });
 });
