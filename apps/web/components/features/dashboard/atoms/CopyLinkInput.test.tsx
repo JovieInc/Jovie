@@ -21,7 +21,8 @@ describe('CopyLinkInput', () => {
     const input = screen.getByRole('textbox', { name: 'URL To Copy' });
     expect(input).toHaveValue('https://jov.ie/tim');
     expect(input).toHaveAttribute('readonly');
-    expect(input).toHaveClass('system-b-copy-link-input', 'h-9', 'sm:h-9');
+    expect(input).toHaveClass('system-b-copy-link-input');
+    expect(input).toHaveAttribute('data-size', 'md');
     await expectNoA11yViolations(container);
   });
 
@@ -68,7 +69,7 @@ describe('CopyLinkInput', () => {
       <CopyLinkInput url='https://jov.ie/tim' stopPropagation size='sm' />
     );
     const input = screen.getByRole('textbox') as HTMLInputElement;
-    expect(input).toHaveClass('h-7', 'sm:h-7');
+    expect(input).toHaveAttribute('data-size', 'sm');
     await user.click(input);
     document.body.removeEventListener('click', bodyClick);
     expect(input.selectionStart).toBe(0);

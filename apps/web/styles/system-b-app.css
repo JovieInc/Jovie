@@ -3217,6 +3217,13 @@
 }
 
 .system-b-copy-link-input {
+  border-width: 1px;
+  border-radius: 9999px;
+  padding: 0.375rem 2.25rem 0.375rem 0.625rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  cursor: text;
+  text-overflow: ellipsis;
+  outline: none;
   border-color: var(--system-b-app-frame-seam);
   background: var(--system-b-bg-surface-0);
   color: var(--color-text-secondary-token);
@@ -3225,6 +3232,14 @@
     border-color var(--duration-fast) var(--ease-subtle),
     color var(--duration-fast) var(--ease-subtle),
     box-shadow var(--duration-fast) var(--ease-subtle);
+}
+
+.system-b-copy-link-input[data-size="sm"] {
+  height: 1.75rem;
+}
+
+.system-b-copy-link-input[data-size="md"] {
+  height: 2.25rem;
 }
 
 .system-b-copy-link-input:focus-visible {

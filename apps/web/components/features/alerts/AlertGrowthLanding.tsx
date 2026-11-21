@@ -315,7 +315,6 @@ export function AlertGrowthLanding({
                     value={phoneInput}
                     onChange={e => setPhoneInput(e.target.value)}
                     disabled={isPending}
-                    className='bg-surface-0 h-12 rounded-(--profile-action-radius) px-3.5 text-base sm:h-12 sm:text-base'
                   />
                 </>
               ) : (
@@ -335,7 +334,6 @@ export function AlertGrowthLanding({
                     value={emailInput}
                     onChange={e => setEmailInput(e.target.value)}
                     disabled={isPending}
-                    className='bg-surface-0 h-12 rounded-(--profile-action-radius) px-3.5 text-base sm:h-12 sm:text-base'
                   />
                 </>
               )}

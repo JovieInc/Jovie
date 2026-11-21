@@ -59,7 +59,7 @@ describe('OutboundRail certificate', () => {
       view(props({ error: 'You are offline. Your draft was not saved.' }))
     );
     expect(screen.getByRole('textbox', { name: 'Subject' })).toHaveClass(
-      'rounded-md'
+      'bg-surface-1'
     );
     expect(screen.getByText(/You are offline/)).toBeInTheDocument();
     await expectNoA11yViolations(container);

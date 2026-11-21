@@ -121,7 +121,7 @@ describe('OutboundRailFact', () => {
     expect(onDecision).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Correct Display name')).toHaveValue('');
     expect(screen.getByLabelText('Correct Display name')).toHaveClass(
-      'rounded-md'
+      'bg-surface-1'
     );
     fireEvent.change(screen.getByLabelText('Correct Display name'), {
       target: { value: 'Ada Artist' },

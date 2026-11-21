@@ -3,7 +3,7 @@
 import { Button, Input } from '@jovie/ui';
 import { Send, X } from 'lucide-react';
 import {
-  type InputHTMLAttributes,
+  type ComponentProps,
   type ReactNode,
   useCallback,
   useEffect,
@@ -61,11 +61,10 @@ function outcomeForMessage(message: ChatMessage): CardOutcome | undefined {
   return CARD_OUTCOMES[message.card.kind];
 }
 
-const INPUT_CLASS = 'rounded-lg bg-transparent px-3 py-1.5 text-sm sm:text-sm';
 const CARD_CLASS = 'space-y-2 rounded-xl border border-subtle p-3';
 
-const Field = (props: InputHTMLAttributes<HTMLInputElement>) => (
-  <Input aria-label={props.placeholder} {...props} className={INPUT_CLASS} />
+const Field = (props: ComponentProps<typeof Input>) => (
+  <Input aria-label={props.placeholder} {...props} />
 );
 
 function CardAction({
@@ -510,7 +509,6 @@ export function AskJovieWidget({ username, artistName }: AskJovieWidgetProps) {
                     ? 'Add a message…'
                     : `Ask about ${artistName}…`
                 }
-                className='rounded-full border-transparent bg-surface-1 px-3 py-2 text-sm hover:border-transparent sm:text-sm'
               />
             </div>
             <CircleIconButton

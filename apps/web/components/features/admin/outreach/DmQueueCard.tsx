@@ -90,7 +90,6 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
           value={lead.dmCopy}
           rows={4}
           resizable={false}
-          className='rounded-lg bg-surface-0 px-3 py-2 text-xs text-secondary-token'
         />
       )}
 

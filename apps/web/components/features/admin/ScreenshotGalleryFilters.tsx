@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { PlainButton } from '@jovie/ui';
 import {
   CANONICAL_SURFACES,
   type CanonicalSurfaceId,
@@ -57,19 +57,17 @@ export function FilterChip({
   onSelect: () => void;
 }>) {
   return (
-    <Button
+    <PlainButton
       type='button'
-      variant='ghost'
-      size='sm'
       onClick={onSelect}
       aria-pressed={pressed}
-      className={`h-auto rounded-full border px-3 py-1.5 text-xs ${
+      className={`rounded-full border px-3 py-1.5 text-xs ${
         pressed
           ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
           : `border-subtle ${idleTone} text-secondary-token`
       }`}
     >
       {label}
-    </Button>
+    </PlainButton>
   );
 }

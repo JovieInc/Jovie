@@ -116,7 +116,7 @@ export function OutboundRailFact({
                   setCorrectionError(false);
                 }}
                 placeholder='Correct value'
-                className='mt-1 rounded-md border-strong bg-surface-0 px-2 text-xs'
+                className='mt-1'
               />
             </label>
             {correctionError ? (

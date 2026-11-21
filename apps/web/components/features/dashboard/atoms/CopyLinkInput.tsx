@@ -114,14 +114,8 @@ export function CopyLinkInput({
         onClick={handleInputClick}
         aria-label='URL To Copy'
         data-copied={isCopied ? 'true' : undefined}
-        className={cn(
-          'system-b-copy-link-input rounded-full border px-2.5 py-1.5 pr-9',
-          'truncate font-mono text-app sm:text-app',
-          'cursor-text focus-visible:outline-none',
-          size === 'sm' && 'h-7 sm:h-7',
-          size === 'md' && 'h-9 sm:h-9',
-          inputClassName
-        )}
+        data-size={size}
+        className={cn('system-b-copy-link-input', inputClassName)}
       />
       <Button
         type='button'

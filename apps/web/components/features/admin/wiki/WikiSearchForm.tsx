@@ -13,7 +13,6 @@ export function WikiSearchForm({ initialQuery }: Props) {
         aria-label='Search wiki'
         defaultValue={initialQuery || ''}
         placeholder='Search wiki...'
-        className='rounded-lg px-4 shadow-sm'
       />
     </form>
   );

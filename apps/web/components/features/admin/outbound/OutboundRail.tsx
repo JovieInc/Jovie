@@ -167,7 +167,6 @@ function MessageSection({
             inputSize='sm'
             value={subject}
             onChange={event => setSubject(event.target.value)}
-            className='rounded-md border-strong bg-surface-0 px-2 text-xs'
           />
         ) : null}
         <Textarea
