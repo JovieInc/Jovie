@@ -13,9 +13,9 @@ describe('ButtonsPage showcase', () => {
       </TooltipProvider>
     );
 
-    const tableRowStack = screen.getByText('IconButton (table row)').closest(
-      'div'
-    );
+    const tableRowStack = screen
+      .getByText('IconButton (table row)')
+      .closest('div');
     expect(tableRowStack).not.toBeNull();
     const stack = within(tableRowStack as HTMLElement);
     expect(stack.getByRole('button', { name: 'Settings' })).toBeInTheDocument();
