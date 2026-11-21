@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { Check, Loader2, X } from 'lucide-react';
 import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
@@ -51,7 +52,7 @@ export function SocialLinkSuggestionRows({
                 </p>
               </div>
               <div className='flex items-center gap-1.5 shrink-0'>
-                <button
+                <PlainButton
                   type='button'
                   onClick={() => onConfirm(suggestion)}
                   disabled={isActioning}
@@ -67,7 +68,7 @@ export function SocialLinkSuggestionRows({
                     <Check className='h-3 w-3' />
                   )}
                   Add
-                </button>
+                </PlainButton>
                 <InlineIconButton
                   onClick={() => onDismiss(suggestion)}
                   disabled={isActioning}

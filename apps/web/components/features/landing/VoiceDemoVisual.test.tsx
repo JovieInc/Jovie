@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { VoiceDemoVisual } from './VoiceDemoVisual';
 
 const PLAY_LABEL = 'Play 4s sample (your voice)';
@@ -50,5 +51,14 @@ describe('VoiceDemoVisual', () => {
     render(<VoiceDemoVisual className='custom-demo' />);
 
     expect(screen.getByTestId('voice-demo-visual')).toHaveClass('custom-demo');
+  });
+
+  it('has no axe violations idle or playing', async () => {
+    const { container } = render(<VoiceDemoVisual />);
+    await expectNoA11yViolations(container);
+
+    fireEvent.click(screen.getByRole('button', { name: PLAY_LABEL }));
+    expect(screen.getByTestId('voice-demo-transcript')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 });

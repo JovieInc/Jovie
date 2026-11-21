@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { AlertTriangle, ChevronRight, Plus } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -106,7 +107,7 @@ export function DemoReleasesPanel({
           <div key={group.status}>
             {/* Group header */}
             <div className='sticky top-0 z-10 flex h-8 items-center gap-1 border-b border-(--app-shell-frame-seam) bg-surface-0 px-4'>
-              <button
+              <PlainButton
                 type='button'
                 onClick={() => toggleGroup(group.status)}
                 className='flex min-w-0 flex-1 items-center gap-2 text-xs text-tertiary-token [font-weight:var(--font-weight-medium)]'
@@ -120,21 +121,21 @@ export function DemoReleasesPanel({
                 />
                 <DemoStatusIcon status={group.status} />
                 {WARNING_STATUSES.has(group.status) && (
-                  <AlertTriangle className='size-3 text-yellow-500/80' />
+                  <AlertTriangle className='size-3 text-warning/80' />
                 )}
                 <span className='sr-only'>Toggle releases section:</span>{' '}
                 <span className='truncate'>{STATUS_LABEL[group.status]}</span>
                 <span className='text-2xs text-quaternary-token'>
                   {group.releases.length}
                 </span>
-              </button>
-              <button
+              </PlainButton>
+              <PlainButton
                 type='button'
                 className='flex size-6 items-center justify-center rounded-full text-tertiary-token'
                 aria-label={`Add ${STATUS_LABEL[group.status]} release`}
               >
                 <Plus className='size-3.5' />
-              </button>
+              </PlainButton>
             </div>
 
             {/* Rows */}
