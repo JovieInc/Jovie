@@ -25,7 +25,7 @@ function quotaDeferred(message = 'primary after 1 attempt(s)') {
   const error = /** @type {QuotaError} */ (new Error(message));
   error.status = 75;
   error.stderr =
-    '::warning::github-quota-deferred: gh api repos/JovieInc/Jovie/actions/workflows/test-coverage-audit.yml/runs?branch=main&status=success&per_page=1 primary after 1 attempt(s) until 2026-11-19T19:52:53.000Z; not a verdict on this change.\n';
+    '::warning::github-quota-deferred: GET repos/JovieInc/Jovie/actions/workflows/test-coverage-audit.yml/runs?branch=main&status=success&per_page=1 primary after 1 attempt(s) until 2026-11-19T19:52:53.000Z; not a verdict on this change.\n';
   return error;
 }
 
@@ -384,7 +384,7 @@ test('a GitHub quota deferral is not a verdict and does not replace the baseline
 
   const markerOnly = () => {
     throw new Error(
-      'github-quota-deferred: gh api primary after 1 attempt(s); not a verdict on this change.'
+      'github-quota-deferred: primary after 1 attempt(s); not a verdict on this change.'
     );
   };
   const exitCodeOnly = () => {
