@@ -103,14 +103,11 @@ describe('surface elevation guardrails', () => {
       '--linear-border-focus: rgba(17, 175, 255, 0.72);'
     );
     expect(designSystem).toContain('--focus-ring-width: 1px;');
-    // One keyboard-only outline (styles/focus.css), not a global halo.
     expect(focusCanon).toMatch(
       /\):focus-visible\s*{\s*outline: var\(--focus-outline-width\) solid var\(--focus-outline-color\) !important;/
     );
-    expect(designSystem).not.toMatch(
-      /:where\(:focus-visible\)\s*{[^}]*box-shadow:\s*0 0 0/
-    );
-    // Text fields hug their own border instead of drawing a second box.
+    const halo = /:where\(:focus-visible\)\s*{[^}]*box-shadow:\s*0 0 0/;
+    expect(designSystem).not.toMatch(halo);
     expect(focusCanon).toMatch(
       /textarea,[\s\S]*\[role="textbox"\][\s\S]*\):focus-visible\s*{\s*outline-offset: -1px !important;/
     );
