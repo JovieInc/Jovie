@@ -515,7 +515,7 @@ export function AgentOsRunsPanel({
         actions={
           <div className='flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:justify-end'>
             {status}
-            <div className='inline-flex rounded-lg border border-subtle bg-surface-1 p-0.5'>
+            <div className='inline-flex rounded-lg bg-surface-1 p-0.5'>
               <ViewModeButton
                 mode='board'
                 activeMode={viewMode}

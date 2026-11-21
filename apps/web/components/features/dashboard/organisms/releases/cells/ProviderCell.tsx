@@ -1,6 +1,7 @@
 'use client';
 
 // @coverage-via apps/web/tests/components/dashboard/organisms/releases/cells/ProviderCell.interaction.test.tsx
+import { IconButton } from '@jovie/ui';
 import {
   type MouseEvent,
   memo,
@@ -9,9 +10,9 @@ import {
   useRef,
   useState,
 } from 'react';
+
 import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { Icon } from '@/components/atoms/Icon';
-import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -42,28 +43,27 @@ function ProviderActionButtons({
         'inline-flex h-7 gap-1 rounded-full px-1.5 py-0 text-secondary-token'
       )}
     >
-      <DrawerInlineIconButton
+      <IconButton
+        size='sm'
+        variant='inline'
         title='Open'
         aria-label='Open'
         onClick={event => {
           event.stopPropagation();
           globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
         }}
-        className='p-1 text-secondary-token'
       >
         <Icon name='ExternalLink' className='h-3.5 w-3.5' aria-hidden='true' />
         <span className='sr-only'>Open</span>
-      </DrawerInlineIconButton>
-      <DrawerInlineIconButton
+      </IconButton>
+      <IconButton
+        size='sm'
+        variant='inline'
         title={isCopied ? 'Copied' : 'Copy'}
         aria-label={isCopied ? 'Copied' : 'Copy'}
         data-testid={testId}
         data-url={provider.path ? `${getBaseUrl()}${provider.path}` : undefined}
         onClick={onCopyClick}
-        className={cn(
-          'p-1 text-secondary-token',
-          isCopied && 'text-success hover:text-success'
-        )}
       >
         <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
           <Icon
@@ -75,14 +75,15 @@ function ProviderActionButtons({
           />
           <Icon
             name='Check'
-            className={`absolute h-3.5 w-3.5 transition-opacity duration-subtle ${
-              isCopied ? 'opacity-100' : 'opacity-0'
-            }`}
+            className={cn(
+              'absolute h-3.5 w-3.5 transition-opacity duration-subtle',
+              isCopied ? 'opacity-100 text-success' : 'opacity-0'
+            )}
             aria-hidden='true'
           />
         </span>
         <span className='sr-only'>{isCopied ? 'Copied' : 'Copy'}</span>
-      </DrawerInlineIconButton>
+      </IconButton>
     </div>
   );
 }

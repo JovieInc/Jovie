@@ -1,13 +1,13 @@
 'use client';
 
 import {
+  IconButton,
   PlainButton,
   Switch,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@jovie/ui';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 import { MoonIcon, SunIcon } from './ThemeIcons';
 import {
@@ -142,13 +142,15 @@ function ThemeToggleButton({
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <AppIconButton
+          <IconButton
+            variant='control'
             ariaLabel={tooltipText}
             disabled={isUpdating}
             onClick={onToggle}
+            size='sm'
           >
             <ThemeIcon className='h-4 w-4 text-secondary-token' />
-          </AppIconButton>
+          </IconButton>
         </TooltipTrigger>
         <TooltipContent side='right'>{tooltipText}</TooltipContent>
       </Tooltip>

@@ -66,13 +66,13 @@ const BLOG_CONTENT_GATE_RECEIPT = {
 const BLOG_CONTENT_PATH =
   /^(apps\/web\/content\/blog\/[a-z0-9]+(?:-[a-z0-9]+)*\.md|apps\/web\/public\/images\/blog\/(?:[a-z0-9]+(?:-[a-z0-9]+)*\/)*[a-z0-9]+(?:-[a-z0-9]+)*\.(?:avif|jpe?g|png|webp))$/;
 
-// JOV-12618: apps/web Markdown no build, test or deploy reads is docs (content/
-// is site copy). Docs-only (gates the merge-group structural skip) never counts
-// .github/ or copy that apps/web/scripts/stage-runtime-data.mjs ships.
+// JOV-12618/JOV-14231: apps/web Markdown outside content/ is docs. Docs-only
+// skips .github/ and stage-runtime identity/funnel-judge Markdown; FEATURE_REGISTRY
+// + certification stay documentationOnly (FEATURE_REGISTRY still structural-asserted).
 const WEB_DOCS =
   /^apps\/web\/(?!(?:content|lib|prompts|plugins|public|runtime-data|app|components|tests)\/)(?:[^./][^/]*\/)*[^/]+\.md$/;
 const DOC_PATH =
-  /^(?!\.github\/|docs\/(?:FEATURE_REGISTRY\.md$|certification\/)|apps\/eve-pilot\/identities\/|scripts\/funnel-judge\/).*\.md$/;
+  /^(?!\.github\/|apps\/eve-pilot\/identities\/|scripts\/funnel-judge\/).*\.md$/;
 const isDocPath = item =>
   item.affectedProducts.length === 0 && DOC_PATH.test(item.path);
 const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([

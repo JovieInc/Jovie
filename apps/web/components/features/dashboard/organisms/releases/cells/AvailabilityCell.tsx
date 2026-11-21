@@ -2,7 +2,13 @@
 
 // @coverage-via apps/web/components/features/dashboard/organisms/releases/cells/AvailabilityCell.test.tsx
 
-import { Input, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
+import {
+  IconButton,
+  Input,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@jovie/ui';
 import {
   type FormEvent,
   memo,
@@ -15,10 +21,7 @@ import {
 import { Icon } from '@/components/atoms/Icon';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { CompactLinkRail } from '@/components/molecules/CompactLinkRail';
-import {
-  DrawerButton,
-  DrawerInlineIconButton,
-} from '@/components/molecules/drawer';
+import { DrawerButton } from '@/components/molecules/drawer';
 import { PROVIDER_DOMAINS } from '@/lib/discography/provider-domains';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
@@ -311,7 +314,12 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                   if (provider?.url) {
                     return (
                       <div className='flex min-w-35 items-center justify-end gap-1'>
-                        <DrawerInlineIconButton
+                        <IconButton
+                          // sm = 14px [&_svg] — matches prior h-3.5 glyphs (xs is 12px).
+                          size='sm'
+                          // ghost owns hover:text-primary-token (inline does not).
+                          variant='ghost'
+                          fade='visible'
                           aria-label={`Open ${config.label} in new tab`}
                           onClick={() =>
                             globalThis.open(
@@ -320,32 +328,29 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                               'noopener,noreferrer'
                             )
                           }
-                          className='rounded-full p-1 text-tertiary-token hover:bg-surface-1 hover:text-primary-token'
                         >
-                          <Icon
-                            name='ExternalLink'
-                            className='h-3.5 w-3.5'
-                            aria-hidden='true'
-                          />
-                        </DrawerInlineIconButton>
-                        <DrawerInlineIconButton
+                          <Icon name='ExternalLink' aria-hidden='true' />
+                        </IconButton>
+                        <IconButton
+                          size='sm'
+                          variant='ghost'
+                          fade='visible'
                           aria-label={
                             isCopied
                               ? `Copied ${config.label} link`
                               : `Copy ${config.label} link`
                           }
                           onClick={createCopyHandler(providerKey, testId)}
-                          className={cn(
-                            'rounded-full p-1.5 text-tertiary-token transition-[background-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-ring',
-                            isCopied && 'text-success'
-                          )}
                         >
                           <Icon
                             name={isCopied ? 'Check' : 'Copy'}
-                            className='h-3.5 w-3.5'
+                            className={cn(
+                              // Success state only — otherwise inherit ghost hover.
+                              isCopied && 'text-success'
+                            )}
                             aria-hidden='true'
                           />
-                        </DrawerInlineIconButton>
+                        </IconButton>
                       </div>
                     );
                   }

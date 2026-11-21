@@ -90,6 +90,11 @@ export async function buildTree(inventory = INVENTORY) {
   await cp(here, join(root, 'scripts/product-crawl'), { recursive: true });
   await mkdir(join(root, 'docs/product/generated'), { recursive: true });
   await mkdir(join(root, 'apps/web/scripts'), { recursive: true });
+  await mkdir(join(root, 'scripts/lib'), { recursive: true });
+  await cp(
+    join(here, '../lib/postdeploy-probe-admission.mjs'),
+    join(root, 'scripts/lib/postdeploy-probe-admission.mjs')
+  );
   for (const file of [
     'vercel-protected-origin.cjs',
     'vercel-surface-verifier.cjs',

@@ -200,7 +200,7 @@ export function PlanComparisonSection({
                       key={feature.label}
                       className='flex items-start gap-2.5 text-app'
                     >
-                      <Check className='mt-0.5 h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-400' />
+                      <Check className='mt-0.5 h-4 w-4 shrink-0 text-success' />
                       <span className='text-secondary-token'>
                         {feature.label}
                         {'detail' in feature && feature.detail && (
