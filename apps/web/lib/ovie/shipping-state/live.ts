@@ -4,7 +4,6 @@ import {
   type DeliveryFlow,
   type DeliveryLane,
   type DeliveryLanes,
-  type DeliveryMergedPullRequest,
   type DeliveryMergeRepo,
   type DeployHealth,
   type DeployHealthRepo,
@@ -20,6 +19,7 @@ import {
   type StageSummary,
 } from './contract';
 import { parseTimestamp, sanitizeOpaqueIdentifier } from './envelope';
+import { recentMerged } from './recent-merged';
 import {
   type AuthorityRead,
   type AuthorityReader,
@@ -61,15 +61,8 @@ export const SOURCE_CACHE_TTL_MS = {
 const FAILED_READ_CACHE_TTL_MS = 5_000;
 const PUBLIC_SOURCE_TIMEOUT_MS = 3_000;
 const GITHUB_TIMEOUT_MS = 2_500;
-/** Search with `mergeable` computes merge state per PR; it runs ~2.5s. */
+/** Lane search (mergeable) and the six aliased merge-count searches both outrun the 2.5s read. */
 const LANE_SEARCH_TIMEOUT_MS = 6_000;
-/**
- * Six aliased searches in one request (org + three repos + two 7-day
- * windows) take longer than the 2.5s single-read budget, so under the default
- * it timed out on every read and Home's 7-day count never measured. Stays
- * under the 7.5s per-source read ceiling.
- */
-const MERGES_TIMEOUT_MS = 6_000;
 const LANES_STATUS_SCHEMA = 'symphony-lanes-status/v1';
 const DAY_MS = 24 * 60 * 60_000;
 
@@ -1353,40 +1346,6 @@ export async function readLanePullRequests(io: LiveIo): Promise<AuthorityRead> {
   }
 }
 
-/** Merged PRs from the org search, newest first; malformed nodes drop. */
-function recentMerged(
-  data: Record<string, unknown>
-): DeliveryMergedPullRequest[] {
-  const search = data.org;
-  if (!isRecord(search) || !Array.isArray(search.nodes)) return [];
-  return search.nodes
-    .flatMap(node => {
-      if (!isRecord(node) || !isRecord(node.repository)) return [];
-      const mergedAt = parseTimestamp(node.mergedAt);
-      const url = typeof node.url === 'string' ? node.url : '';
-      const title =
-        typeof node.title === 'string'
-          ? node.title.replace(/\s+/g, ' ').trim().slice(0, 200)
-          : '';
-      const repo = sanitizeOpaqueIdentifier(
-        String(node.repository.name ?? ''),
-        100
-      );
-      if (
-        !mergedAt ||
-        !title ||
-        !repo ||
-        !url.startsWith('https://github.com/') ||
-        !Number.isSafeInteger(node.number) ||
-        Number(node.number) <= 0
-      )
-        return [];
-      return [{ repo, number: Number(node.number), title, url, mergedAt }];
-    })
-    .sort((a, b) => Date.parse(b.mergedAt) - Date.parse(a.mergedAt))
-    .slice(0, 12);
-}
-
 export function issueCount(data: Record<string, unknown>, alias: string) {
   const search = data[alias];
   return isRecord(search) &&
@@ -1424,7 +1383,7 @@ export async function readMerges(io: LiveIo): Promise<AuthorityRead> {
         last7: `org:${owner} ${merged} merged:>=${weekAgo}`,
         prior7: `org:${owner} ${merged} merged:${twoWeeksAgo}..${weekAgo}`,
       },
-      MERGES_TIMEOUT_MS
+      LANE_SEARCH_TIMEOUT_MS
     );
     if (isAuthorityRead(data)) return data;
     const today = issueCount(data, 'org');

@@ -126,7 +126,7 @@ function GlancePulse({
     return (
       <a
         href={pulse.href}
-        className='block rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/55'
+        className='block rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-current'
       >
         {body}
       </a>

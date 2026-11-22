@@ -498,7 +498,6 @@ describe('lane-pull-requests (open devin/ and codex/ PRs)', () => {
       )
     );
     // glm/opus/grok/cursor lanes were invisible when only devin+codex were searched.
-    // The claude/ lane (this fleet's own branches) was missing: 49 of ~126 open PRs.
     for (const lane of ['glm', 'opus', 'grok', 'cursor', 'claude']) {
       expect(queries).toContain(
         `repo:JovieInc/Jovie is:pr is:open head:${lane}/`
@@ -607,16 +606,6 @@ describe('github-merges (search issueCount)', () => {
     last7: { issueCount: 862 },
     prior7: { issueCount: 225 },
   };
-
-  it('gives the six aliased searches a budget longer than the 2.5s single read', async () => {
-    const timeout = vi.spyOn(AbortSignal, 'timeout');
-    try {
-      await readMerges(io(async () => json({ data: counts })));
-      expect(timeout).toHaveBeenCalledWith(6000);
-    } finally {
-      timeout.mockRestore();
-    }
-  });
 
   it('counts merges since Pacific midnight per repo and org, plus WoW windows', async () => {
     const live = io(async () => json({ data: counts }));

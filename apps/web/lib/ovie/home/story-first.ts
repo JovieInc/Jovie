@@ -38,7 +38,7 @@ export interface StoryFirstGlancePulse {
   readonly tone: HomeLoopTone;
   readonly measured: boolean;
   /** Why the value is not measured, in plain words; null when measured. */
-  readonly reason: string | null;
+  readonly reason?: string | null;
   readonly points: readonly number[];
   readonly trend: StoryFirstSparkTrend;
   readonly href: string | null;
