@@ -154,6 +154,8 @@ describe('passing controls: concrete language survives', () => {
     'color: #1a1a1a; border: 1px solid #1f2937;',
     'Release-week FOMO is real.',
     'One adaptive premium profile for every fan.',
+    // Pitch grill token (PITCH_GRILL_PROCEDURE); not artist-facing shouting.
+    'Confirm that, edit it, or reply UNKNOWN and I will move to the next field.',
   ])('%s', text => {
     expect(blocks(text)).toEqual([]);
   });
