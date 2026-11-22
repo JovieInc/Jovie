@@ -344,6 +344,7 @@ process.exit(17);
           GIT_AUTHOR_EMAIL: 't@example.com',
           GIT_COMMITTER_NAME: 't',
           GIT_COMMITTER_EMAIL: 't@example.com',
+          GIT_LFS_SKIP_SMUDGE: '1',
         },
       });
     try {
@@ -415,9 +416,21 @@ describe('Git LFS blobs in the tracked-bytes budget', () => {
 
   it('counts pointers at their blob size and rejects a plain blob', () => {
     const dir = mkdtempSync(join(tmpdir(), 'lfs-blobs-'));
-    // Blobs are written with --no-filters, so the test needs no git-lfs.
+    // Blobs are written with --no-filters, so the test needs no git-lfs. A
+    // runner with git-lfs installed globally would still smudge the fake
+    // pointers on checkout, so the lfs filter is switched off here.
+    const noLfs = [
+      '-c',
+      'filter.lfs.process=',
+      '-c',
+      'filter.lfs.smudge=cat',
+      '-c',
+      'filter.lfs.clean=cat',
+      '-c',
+      'filter.lfs.required=false',
+    ];
     const git = (args, input) =>
-      execFileSync('git', ['-C', dir, ...args], {
+      execFileSync('git', ['-C', dir, ...noLfs, ...args], {
         encoding: 'utf8',
         input,
         env: {
