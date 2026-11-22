@@ -389,6 +389,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       { name: 'id', description: 'Existing view id to publish a new version' },
     ],
     readOnly: false,
+    operator: true,
     run: async (input, options) => {
       const published = await publishView(
         {

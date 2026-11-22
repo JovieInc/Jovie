@@ -32,7 +32,6 @@ import {
   resolveLatestCertifiedProofBrief,
 } from '@/lib/proof-briefs/resolve';
 import { renderProofBriefText } from '@/lib/proof-briefs/text';
-import { PublishViewError, publishView } from '@/lib/views/service.server';
 import { getPage, putPage, searchPages } from '@/lib/wiki/gbrain-client';
 import { CreateWorkflowCaptureRequestSchema } from '@/lib/workflow-capture/contract';
 import {
@@ -59,6 +58,7 @@ import {
   stringOpt,
 } from './handoff';
 import { getInvariantStewardship } from './invariant-stewardship';
+import { PUBLISH_VIEW_INPUT_SCHEMA, publishViewForOwner } from './publish-view';
 import { newRecordId, type OperatingStore } from './store';
 import {
   INITIATIVE_CONFIDENCE,
@@ -195,18 +195,7 @@ function toolInputSchema(name: OvieMcpToolName): Record<string, unknown> {
       },
     };
   }
-  if (name === 'publish_view') {
-    return {
-      type: 'object',
-      additionalProperties: false,
-      required: ['spec'],
-      properties: {
-        spec: { type: 'object' },
-        view_id: { type: 'string', format: 'uuid' },
-        created_by: { type: 'string', minLength: 1, maxLength: 80 },
-      },
-    };
-  }
+  if (name === 'publish_view') return PUBLISH_VIEW_INPUT_SCHEMA;
   if (name === 'request_workflow_capture') {
     return {
       type: 'object',
@@ -608,35 +597,15 @@ function principalUserId(principal: OvieMcpPrincipal): string {
   return userId;
 }
 
-const APP_USER_ID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 async function publishViewTool(
   principal: OvieMcpPrincipal,
   args: Record<string, unknown>
 ) {
-  const ownerUserId = principalUserId(principal);
-  if (!APP_USER_ID_PATTERN.test(ownerUserId))
-    throw new OvieMcpInputError('authenticated app user subject is required');
-  const viewId = stringOpt(args.view_id)?.trim();
-  if (viewId && !APP_USER_ID_PATTERN.test(viewId))
-    throw new OvieMcpInputError('view not found');
-  try {
-    const published = await publishView({
-      ownerUserId,
-      viewId: viewId || undefined,
-      spec: args.spec,
-      createdBy: stringOpt(args.created_by)?.trim().slice(0, 80) || 'agent',
-    });
-    return { id: published.id, version: published.version, url: published.url };
-  } catch (error) {
-    if (error instanceof PublishViewError) {
-      throw new OvieMcpInputError(
-        error.code === 'view_not_found' ? 'view not found' : 'invalid view spec'
-      );
-    }
-    throw error;
-  }
+  return publishViewForOwner(principalUserId(principal), {
+    spec: args.spec,
+    viewId: stringOpt(args.view_id),
+    createdBy: stringOpt(args.created_by),
+  });
 }
 
 async function requestWorkflowCapture(

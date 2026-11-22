@@ -13,10 +13,10 @@ export function ViewShell({
   signedIn,
 }: Readonly<{ view: ShellView; signedIn: boolean }>) {
   return (
-    <div className='flex min-h-dvh bg-(--linear-bg-page) text-primary-token'>
+    <div className='flex min-h-dvh bg-base text-primary-token'>
       <ViewAnalytics signedIn={signedIn} />
-      <nav
-        aria-label='Dashboard'
+      <div
+        aria-hidden='true'
         className='hidden w-14 shrink-0 border-r border-subtle bg-surface-0 md:block'
       />
       <div className='flex min-w-0 flex-1 flex-col'>

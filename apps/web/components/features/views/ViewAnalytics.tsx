@@ -15,7 +15,7 @@ export function ViewAnalytics({ signedIn }: Readonly<{ signedIn: boolean }>) {
 
 export function ViewSignupCard() {
   return (
-    <aside
+    <section
       data-testid='view-signup-card'
       className='flex flex-wrap items-center justify-between gap-3 rounded-lg border border-subtle bg-surface-1 p-4'
     >
@@ -35,6 +35,6 @@ export function ViewSignupCard() {
           </Link>
         </Button>
       </div>
-    </aside>
+    </section>
   );
 }

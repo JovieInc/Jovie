@@ -4,9 +4,6 @@ import { ViewShell } from '@/components/features/views/ViewShell';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import { getSharedView } from '@/lib/views/service.server';
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
-
 interface SharedViewPageProps {
   readonly params: Promise<{ token: string }>;
 }
