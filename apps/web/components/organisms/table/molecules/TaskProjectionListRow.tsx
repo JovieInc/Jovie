@@ -2,7 +2,11 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { ShellListRowFrame } from '../atoms/ShellListRowFrame';
+import {
+  contentRowType,
+  ShellListRowFrame,
+  type ShellListRowInteraction,
+} from '../atoms/ShellListRowFrame';
 
 export interface TaskProjectionListRowProps {
   readonly testId: string;
@@ -13,6 +17,11 @@ export interface TaskProjectionListRowProps {
   readonly metadata: ReactNode;
   readonly actionSlot?: ReactNode;
   readonly isSelected?: boolean;
+  /**
+   * `none` (default) when a table wrapper already paints hover/selected (Tasks).
+   * `self` when the row stands alone (Fleet) so it paints its own states.
+   */
+  readonly interaction?: Extract<ShellListRowInteraction, 'self' | 'none'>;
   readonly opacity?: 'full' | 'muted' | 'quiet';
 }
 
@@ -26,15 +35,19 @@ export function TaskProjectionListRow({
   metadata,
   actionSlot,
   isSelected = false,
+  interaction = 'none',
   opacity = 'full',
 }: Readonly<TaskProjectionListRowProps>) {
   return (
     <ShellListRowFrame
       data-testid={testId}
       isSelected={isSelected}
-      interaction='none'
+      interaction={interaction}
+      density='standard'
       className={cn(
-        'group/row flex h-full w-full items-center gap-2 px-3 py-1 transition-opacity duration-subtle ease-subtle',
+        // py-0: the 44px minimum sets the height and items-center centers the two
+        // lines, so a standalone row matches a 44px table row exactly.
+        'group/row flex h-full w-full items-center gap-2 px-3 py-0 transition-opacity duration-subtle ease-subtle',
         // 90 keeps muted-row secondary text >= 4.5:1 on the light canvas;
         // 75 composited it to 3.56:1 (axe color-contrast).
         opacity === 'muted' && !isSelected && 'opacity-90',
@@ -47,7 +60,8 @@ export function TaskProjectionListRow({
           <div className='flex min-w-0 items-center gap-1.5'>
             <p
               className={cn(
-                'min-w-0 truncate text-app font-semibold leading-tight text-primary-token',
+                'min-w-0 truncate',
+                contentRowType.title,
                 titleClassName
               )}
             >

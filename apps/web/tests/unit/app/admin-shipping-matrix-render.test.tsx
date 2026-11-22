@@ -425,4 +425,26 @@ describe('ShippingMatrix rendering (JOV-6893)', () => {
       )
     ).toBeInTheDocument();
   });
+
+  it('renders rows on the canonical content-row recipe with a leading attention dot', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        projection([
+          task(7, { title: 'Blocked release', workflowState: 'blocked' }),
+          task(8, { title: 'Verified release', workflowState: 'merged' }),
+        ])
+      )
+    );
+
+    renderMatrix();
+
+    const blocked = await screen.findByTestId('shipping-row-JOV-7');
+    expect(blocked).toHaveClass('min-h-11', 'system-b-table-row-hover');
+    expect(blocked.className).not.toMatch(/border-(t|l)|bg-error/);
+    expect(
+      blocked.querySelector('[data-attention-dot="blocked"]')
+    ).not.toBeNull();
+    const quiet = screen.getByTestId('shipping-row-JOV-8');
+    expect(quiet.querySelector('[data-attention-dot]')).toBeNull();
+  });
 });

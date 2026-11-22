@@ -4,10 +4,12 @@ import type { KeyboardEvent } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
+  contentRowType,
   getShellListRowFrameClassName,
   ShellListRowButton,
   ShellListRowDisclosureIcon,
   ShellListRowFrame,
+  shellListRowClasses,
 } from './ShellListRowFrame';
 
 describe('ShellListRowFrame', () => {
@@ -156,5 +158,18 @@ describe('ShellListRowFrame', () => {
 
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
     await expectNoA11yViolations(container);
+  });
+
+  it('shares frame tokens with native table rows through shellListRowClasses', () => {
+    const idle = shellListRowClasses();
+    expect(idle).toContain('min-h-11');
+    expect(idle).toContain('system-b-table-row-hover');
+    expect(idle).not.toMatch(/border-(t|b)\b|hover:bg-/);
+    const selected = shellListRowClasses({ isSelected: true });
+    expect(selected).toContain('system-b-table-row-selected');
+    expect(selected).not.toContain('system-b-table-row-hover');
+    expect(shellListRowClasses({ density: 'dense' })).toContain('min-h-8');
+    expect(contentRowType.title).toContain('font-medium');
+    expect(contentRowType.icon).toBe('size-4');
   });
 });

@@ -47,4 +47,24 @@ describe('TaskProjectionListRow', () => {
     );
     expect(mutedSelected.firstChild).not.toHaveClass('opacity-75');
   });
+
+  it('defers states to the table by default and paints its own when interactive', () => {
+    const { container: inTable } = render(
+      <TaskProjectionListRow {...baseProps} />
+    );
+    expect(inTable.firstChild).toHaveClass('min-h-11');
+    expect(inTable.firstChild).not.toHaveClass('system-b-table-row-hover');
+
+    const { container: standalone } = render(
+      <TaskProjectionListRow {...baseProps} interaction='self' />
+    );
+    expect(standalone.firstChild).toHaveClass('system-b-table-row-hover');
+
+    const { container: selected } = render(
+      <TaskProjectionListRow {...baseProps} interaction='self' isSelected />
+    );
+    expect(selected.firstChild).toHaveClass('system-b-table-row-selected');
+    expect(selected.firstChild).not.toHaveClass('system-b-table-row-hover');
+    expect(screen.getAllByText(baseProps.title)[0]).toHaveClass('font-medium');
+  });
 });

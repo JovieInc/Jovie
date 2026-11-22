@@ -202,6 +202,8 @@ jobs:
           # Storybook iframe screenshots independent of the app server.
           - { suite: storybook-elevation, spec: storybook-elevation.spec.ts, server: storybook, update: 'true', persona: admin }
           - { suite: storybook-chat-history-switcher, spec: storybook-chat-history-switcher.spec.ts, server: storybook, update: 'true', persona: admin }
+          # Content rows: Fleet, Shipping and Tasks share one row recipe.
+          - { suite: storybook-content-rows, spec: storybook-content-rows.spec.ts, server: storybook, update: 'true', persona: admin }
     env:
       REFRESH_MODE: 'true'
       SNAPSHOT_DIR: apps/web/tests/e2e/__snapshots__

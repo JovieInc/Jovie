@@ -1,4 +1,5 @@
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { shellListRowClasses } from '@/components/organisms/table/atoms/ShellListRowFrame';
 import { formatUsd } from '@/lib/admin/format';
 import {
   formatObservedAt,
@@ -219,7 +220,7 @@ export function RevenueLiftDashboardView({
               {data.interpretationTable.map(row => (
                 <tr
                   key={row.id}
-                  className='border-b border-subtle last:border-0'
+                  className={shellListRowClasses({ interactive: false })}
                   data-testid={`revenue-lift-map-${row.id}`}
                 >
                   <td className='px-3 py-2 align-top font-medium text-primary-token'>
@@ -351,7 +352,7 @@ export function RevenueLiftDashboardView({
                 data.cohorts.rows.map(row => (
                   <tr
                     key={row.userId}
-                    className='border-b border-subtle last:border-0'
+                    className={shellListRowClasses({ interactive: false })}
                   >
                     <td className='px-3 py-2 font-mono text-xs text-primary-token'>
                       {row.userId.slice(0, 12)}…
@@ -440,7 +441,7 @@ export function RevenueLiftDashboardView({
                 data.agents.map(agent => (
                   <tr
                     key={agent.agent}
-                    className='border-b border-subtle last:border-0'
+                    className={shellListRowClasses({ interactive: false })}
                     data-testid={`revenue-lift-agent-${agent.agent}`}
                   >
                     <td className='px-3 py-2 font-medium text-primary-token'>

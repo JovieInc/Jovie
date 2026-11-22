@@ -4,6 +4,7 @@ import { Button, LoadingSkeleton } from '@jovie/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
+import { shellListRowClasses } from '@/components/organisms/table/atoms/ShellListRowFrame';
 import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 import {
   SHIPPING_STATE_REFETCH_MS,
@@ -112,7 +113,7 @@ export function ShippingStatistics() {
                     <th
                       key={label}
                       scope='col'
-                      className='p-2 whitespace-nowrap'
+                      className='px-3 py-1.5 whitespace-nowrap'
                     >
                       {label}
                     </th>
@@ -122,11 +123,17 @@ export function ShippingStatistics() {
             </thead>
             <tbody>
               {rows.map(row => (
-                <tr key={row.label} className='border-t border-subtle'>
-                  <th scope='row' className='p-2 font-medium whitespace-nowrap'>
+                <tr
+                  key={row.label}
+                  className={shellListRowClasses({ interactive: false })}
+                >
+                  <th
+                    scope='row'
+                    className='px-3 py-1.5 font-medium whitespace-nowrap'
+                  >
                     {row.label}
                   </th>
-                  <td className='p-2'>
+                  <td className='px-3 py-1.5'>
                     {query.isPending ? (
                       <LoadingSkeleton
                         height='h-4'
@@ -139,8 +146,8 @@ export function ShippingStatistics() {
                       (row.value ?? 'UNKNOWN')
                     )}
                   </td>
-                  <td className='p-2'>{row.source}</td>
-                  <td className='p-2'>
+                  <td className='px-3 py-1.5'>{row.source}</td>
+                  <td className='px-3 py-1.5'>
                     {query.isPending ? (
                       <LoadingSkeleton
                         height='h-4'
@@ -151,7 +158,7 @@ export function ShippingStatistics() {
                       row.state
                     )}
                   </td>
-                  <td className='p-2'>
+                  <td className='px-3 py-1.5'>
                     {query.isPending ? (
                       <LoadingSkeleton
                         height='h-4'

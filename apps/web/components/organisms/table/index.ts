@@ -93,10 +93,12 @@ export type {
   ShellListRowInteraction,
 } from './atoms/ShellListRowFrame';
 export {
+  contentRowType,
   getShellListRowFrameClassName,
   ShellListRowButton,
   ShellListRowDisclosureIcon,
   ShellListRowFrame,
+  shellListRowClasses,
 } from './atoms/ShellListRowFrame';
 export { SkeletonCell } from './atoms/SkeletonCell';
 export { SkeletonRow } from './atoms/SkeletonRow';

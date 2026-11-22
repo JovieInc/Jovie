@@ -13,6 +13,7 @@ import { RotateCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
+import { shellListRowClasses } from '@/components/organisms/table/atoms/ShellListRowFrame';
 import type { FlagEnvTier } from '@/lib/flags/env-tier';
 import {
   FlagChangeConfirmDialog,
@@ -223,7 +224,7 @@ export function FeatureFlagAuditSection({
               {filtered.map(event => (
                 <tr
                   key={event.id}
-                  className='border-subtle border-b last:border-0'
+                  className={shellListRowClasses({ interactive: false })}
                   data-testid={`audit-event-${event.id}`}
                 >
                   <td className='whitespace-nowrap px-3 py-2 text-secondary-token'>
