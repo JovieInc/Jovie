@@ -96,8 +96,12 @@ describe('UnifiedSidebar header', () => {
     });
 
     expect(
-      screen.getByRole('button', { name: 'Ask Jovie' })
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: 'Ask Jovie' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open Chat' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.CHAT
+    );
     expect(
       screen.queryByRole('link', { name: 'New Chat' })
     ).not.toBeInTheDocument();
@@ -235,8 +239,12 @@ describe('UnifiedSidebar header', () => {
       screen.queryByRole('button', { name: /Switch Workspace:/ })
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Ask Jovie' })
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: 'Ask Jovie' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open Chat' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.CHAT
+    );
   });
 
   it('shows OV as the active admin workspace without changing header height', () => {
@@ -253,16 +261,66 @@ describe('UnifiedSidebar header', () => {
     expect(container.querySelector('[data-brand-variant="ov"]')).not.toBeNull();
   });
 
-  it('keeps the static OV mark at nav-icon scale with no footer duplicate', () => {
+  it('draws the OV O once, in the footer, with no header glyph', () => {
     const { container } = renderUnifiedSidebar({
       pathname: APP_ROUTES.OV,
       section: 'ov',
       variant: 'ov',
     });
 
+    expect(
+      container.querySelectorAll('[data-sidebar="header"] [data-brand-variant]')
+    ).toHaveLength(0);
     const marks = container.querySelectorAll('[data-brand-variant="ov"]');
     expect(marks).toHaveLength(1);
-    expect(marks[0]).toHaveAttribute('data-brand-mark-size', '16');
-    expect(marks[0]?.closest('[data-sidebar="header"]')).not.toBeNull();
+    expect(marks[0]?.closest('[data-sidebar="footer"]')).not.toBeNull();
+    expect(marks[0]?.closest('[data-sidebar-o-presence]')).not.toBeNull();
+  });
+
+  describe.each([
+    ['customer', { pathname: APP_ROUTES.DASHBOARD, section: 'dashboard' }],
+    ['demo', { pathname: '/demo', section: 'dashboard' }],
+    ['library', { pathname: APP_ROUTES.LIBRARY, section: 'library' }],
+    ['settings', { pathname: APP_ROUTES.SETTINGS, section: 'settings' }],
+    ['admin workspaces', { pathname: APP_ROUTES.DASHBOARD, isAdmin: true }],
+    ['ov', { pathname: APP_ROUTES.OV, section: 'ov', variant: 'ov' }],
+  ] as const)('one O per sidebar: %s skin', (_skin, options) => {
+    it('has exactly one O glyph, docked in the footer and hidden from assistive tech', () => {
+      const { container } = renderUnifiedSidebar({ ...options });
+
+      const presences = container.querySelectorAll('[data-sidebar-o-presence]');
+      expect(presences).toHaveLength(1);
+      expect(presences[0]?.closest('[data-sidebar="footer"]')).not.toBeNull();
+      expect(
+        presences[0]?.querySelectorAll('[data-brand-variant]')
+      ).toHaveLength(1);
+      expect(
+        presences[0]
+          ?.querySelector('[data-brand-variant]')
+          ?.closest('[aria-hidden="true"]')
+      ).not.toBeNull();
+      expect(
+        container.querySelectorAll(
+          '[data-sidebar="header"] [data-brand-variant]'
+        )
+      ).toHaveLength(0);
+      expect(
+        screen.queryByRole('button', { name: 'Ask Jovie' })
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it('keeps only the collapse control in the icon rail header', () => {
+    electronRuntimeMock.isElectronRuntime = false;
+    const { container } = renderUnifiedSidebar({
+      pathname: APP_ROUTES.DASHBOARD,
+      section: 'dashboard',
+    });
+
+    // UnifiedSidebar.css removes this slot from the collapsed rail.
+    expect(container.querySelector('[data-sidebar-brand-slot]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-sidebar-brand-row] [data-brand-variant]')
+    ).toBeNull();
   });
 });

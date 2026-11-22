@@ -79,16 +79,23 @@ export function userButtonMock() {
   };
 }
 
-export function sidebarDockBridgeMock() {
+// Footer only, like the real bridge: the dock cards and the O. The real O is
+// rendered so tests can assert where it sits and that there is exactly one.
+export async function sidebarDockBridgeMock() {
+  const { SidebarOPresence } = await import(
+    '@/components/shell/SidebarOPresence'
+  );
   return {
     SidebarDockBridge: (props: {
       readonly collapsed: boolean;
       readonly userState?: { readonly hasClaimedHandle: boolean };
-      readonly children: (status: undefined) => React.ReactNode;
+      readonly oHref?: string;
+      readonly variant?: 'jovie' | 'ov';
     }) => {
       nowPlayingBridgePropsMock({
         collapsed: props.collapsed,
         userState: props.userState,
+        oHref: props.oHref,
       });
       return (
         <>
@@ -99,7 +106,7 @@ export function sidebarDockBridgeMock() {
             <div data-testid='sidebar-whats-new' />
             <div data-testid='sidebar-now-playing-bridge' />
           </div>
-          {props.children(undefined)}
+          <SidebarOPresence href={props.oHref} variant={props.variant} />
         </>
       );
     },
