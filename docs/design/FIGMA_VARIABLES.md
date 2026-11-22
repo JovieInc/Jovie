@@ -58,7 +58,7 @@ Tokens board), then commit it. Shape:
 ```json
 {
   "$schema": "jovie-figma-variables-snapshot/v1",
-  "fileKey": "9EtbM0FIxqViEJkLJy10qD",
+  "figmaFile": "https://www.figma.com/design/9EtbM0FIxqViEJkLJy10qD",
   "capturedAt": "<ISO time>",
   "modes": ["dark"],
   "variables": {

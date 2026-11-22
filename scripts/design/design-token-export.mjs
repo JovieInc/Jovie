@@ -405,7 +405,7 @@ export function flatExport() {
  */
 export function compareSnapshot(snapshot, flat) {
   const vars = snapshot?.variables ?? {};
-  if (!snapshot?.fileKey || Object.keys(vars).length === 0) {
+  if (!snapshot?.figmaFile || Object.keys(vars).length === 0) {
     return { status: 'no-snapshot', findings: [], warnings: [] };
   }
   /** @type {string[]} */

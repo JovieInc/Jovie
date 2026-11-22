@@ -117,13 +117,19 @@ test('deliberate red: an off-palette color fails the palette cap', () => {
 });
 
 test('Figma snapshot: empty passes as "no snapshot yet"', () => {
-  const empty = { fileKey: '9EtbM0FIxqViEJkLJy10qD', variables: {} };
+  const empty = {
+    figmaFile: 'https://www.figma.com/design/9EtbM0FIxqViEJkLJy10qD',
+    variables: {},
+  };
   assert.equal(compareSnapshot(empty, flatExport()).status, 'no-snapshot');
 });
 
 test('committed Figma snapshot matches the code export in the modes it holds', () => {
   const snapshot = JSON.parse(readFileSync(SNAPSHOT_PATH, 'utf8'));
-  assert.equal(snapshot.fileKey, '9EtbM0FIxqViEJkLJy10qD');
+  assert.equal(
+    snapshot.figmaFile,
+    'https://www.figma.com/design/9EtbM0FIxqViEJkLJy10qD'
+  );
   assert.equal(Object.keys(snapshot.variables).length, 40);
   const result = compareSnapshot(snapshot, flatExport());
   assert.deepEqual(result.findings, []);
@@ -133,7 +139,7 @@ test('committed Figma snapshot matches the code export in the modes it holds', (
 
 test('Figma snapshot: matching passes, drift fails (deliberate red)', () => {
   const flat = flatExport();
-  const snapshot = { fileKey: 'abc', variables: structuredClone(flat) };
+  const snapshot = { figmaFile: 'abc', variables: structuredClone(flat) };
   assert.equal(compareSnapshot(snapshot, flat).status, 'in-sync');
 
   snapshot.variables['surface/canvas'].values.dark = '#ff0000';
@@ -147,7 +153,7 @@ test('Figma snapshot: matching passes, drift fails (deliberate red)', () => {
   assert.equal(findings.length, 2);
   assert.ok(warnings.some(w => w.includes('text/primary')));
   const dark = {
-    fileKey: 'abc',
+    figmaFile: 'abc',
     modes: ['dark'],
     variables: structuredClone(flat),
   };
