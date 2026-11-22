@@ -2472,6 +2472,7 @@ describe('source-read guard selection', () => {
       'capacity-forecast',
       'native-design-system',
       'artist-launch-contract',
+      'outcome-coverage',
       'privacy-input-route-trackers',
       'privacy-compliance',
       'artist-profile-conformance',
@@ -2567,6 +2568,19 @@ describe('source-read guard selection', () => {
         expect(guard.command).toContain('node scripts/artist-');
         expect(
           readFileSync(join(REPO_ROOT, `scripts/${guard.id}.test.mjs`), 'utf8')
+        ).toContain("from 'node:test'");
+        continue;
+      }
+      if (guard.id === 'outcome-coverage') {
+        expect(guard.prOnly).toBe(false);
+        expect(guard.command).toContain(
+          'node scripts/outcome-coverage.mjs --check'
+        );
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'scripts/outcome-coverage.test.mjs'),
+            'utf8'
+          )
         ).toContain("from 'node:test'");
         continue;
       }
