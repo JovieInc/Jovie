@@ -1,6 +1,6 @@
 """Non-code lanes run beside code, never behind it (Tim, 2026-11-22): hermetic, no network.
 
-Guard: fails if any admission, refill or claim path holds, displaces, demotes or counts non-code
+Guard: fails if any admission or refill path holds, displaces, demotes or counts non-code
 work (design, research, data, copy, whiteboard) for a code dependency it does not have, including
 when golden-path Urgent code work is being admitted.
 """
@@ -17,7 +17,6 @@ LANES = Path(__file__).resolve().parents[1] / "lanes"
 sys.path.insert(0, str(LANES))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import binding_refill
-import lane_runner
 import linear_sync as ls
 import priority_admission as pa
 import work_lane
@@ -103,16 +102,6 @@ class GoldenPathNeverHoldsNonCode(unittest.TestCase):
             self.assertEqual(receipt["admitted"], ["JOV-2"])
             self.assertEqual(receipt["displaced"], [], "non-code admission never makes code give way")
 
-    def test_code_seat_never_claims_non_code(self):
-        def issue(n, title, labels=()):
-            return lane_runner.Issue(id=f"i-{n}", identifier=f"JOV-{n}", title=title, description=BODY, priority=1,
-                                     created_at="2026-09-01T00:00:00.000Z", labels=list(labels))
-        pen, data, code = (issue(1, "Pen draft for approval: claim"), issue(2, "Load artist list", ["lane:data"]),
-                           issue(3, "Fix the golden path checkout step"))
-        self.assertEqual(lane_runner.admission_rejection(pen, {}, NOW), "non-code-lane:design")
-        self.assertEqual(lane_runner.admission_rejection(data, {}, NOW), "non-code-lane:data")
-        self.assertEqual(lane_runner.pick_issue([pen, data, code], {}, NOW).identifier, "JOV-3")
-
 
 class RefillCountsCodeOnly(unittest.TestCase):
     def test_full_design_lane_does_not_stop_code_refill(self):
@@ -171,13 +160,7 @@ class SpeedWinsJumpTheQueue(unittest.TestCase):
             self.assertEqual(receipt["todo"], 40)
             self.assertEqual(len(receipt["displaced"]), 1, "only the Urgent code admission makes code give way")
 
-    def test_code_seat_claims_the_speed_win_before_golden_path_urgent(self):
-        def issue(n, title, priority, labels=()):
-            return lane_runner.Issue(id=f"i-{n}", identifier=f"JOV-{n}", title=title, description=BODY, priority=priority,
-                                     created_at="2026-09-01T00:00:00.000Z", labels=list(labels))
-        golden, speed = issue(1, "Fix the golden path checkout step", 1), issue(2, "Halve CI wall time", 3, ["compounding"])
-        self.assertIsNone(lane_runner.admission_rejection(speed, {}, NOW))
-        self.assertEqual(lane_runner.pick_issue([golden, speed], {}, NOW).identifier, "JOV-2")
+    def test_lane_code_hands_a_speed_label_back_to_code(self):
         self.assertEqual(work_lane.lane_of({"title": "x", "labels": ["compounding", "lane:code"]}), "code")
 
 

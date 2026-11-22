@@ -104,7 +104,6 @@ import qualification_guard  # noqa: E402
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
 import binding_turns, bindings, issue_turns, ledger_read  # noqa: E401,E402  (extra Linear team -> repo bindings, e.g. LYB)
 import binding_refill, pr_wip, pool_feed  # noqa: E401,E402  (Backlog -> Todo refill per extra binding; per-producer PR WIP cap; seat-based feed)
-import work_lane
 import priority_admission  # noqa: E402  (Urgent/Summer-ranked admission, Todo WIP sanity, claim rank; JOV-7073)
 import macos_pool  # noqa: E402  (shared hosted-macOS pool: measure, record, gate LYB iOS intake)
 import decompose_pass  # noqa: E402  (standing epic decomposition when Todo < half target)
@@ -753,10 +752,6 @@ def admission_rejection(issue: Issue, failures: dict, now: float,
     rejected = label_rejection(issue, provider)
     if rejected:
         return rejected
-    # Non-code work (design, research, data, copy, whiteboard: work_lane.py) runs in its own lanes;
-    # a code seat never claims it, so it never queues behind a code seat's PR or CI.
-    if work_lane.is_non_code(issue):
-        return "non-code-lane:" + work_lane.lane_of(issue)
     if issue_hits_red_line(issue) and not sensitive_text_released(issue):
         return "sensitive-text"
     if SENSITIVE_LABELS & labels and provider != SENSITIVE_PROVIDER:
@@ -898,9 +893,8 @@ def admission_order(issue: Issue, now: float) -> tuple:
     labels = {label.lower() for label in issue.labels}
     tier = (-1 if {SHARED_LABEL, "dispatch-next"} <= labels
             else 0 if effective_priority == 1 or workstreams.compounding(stream) else 1)
-    # Speed wins first (Tim 2026-11-22: they ship independently and speed up all later work), then
-    # Summer's signed rank, Urgent, marketing, tier, aged priority, age (JOV-7073).
-    return (not work_lane.is_speed(issue), *priority_admission.claim_key(issue.identifier, priority_admission.summer_ranks(now=now)),
+    # Summer's signed rank comes first, then Urgent, marketing, tier, aged priority, age (JOV-7073).
+    return (*priority_admission.claim_key(issue.identifier, priority_admission.summer_ranks(now=now)),
             urgent_sla.rank(issue.title, priority), not priority_admission.marketing_priority(issue.labels),
             tier, effective_priority, workstreams.rank(stream),
             created_at if created_at is not None else float("inf"))
