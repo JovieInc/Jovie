@@ -47,6 +47,19 @@ export const METRIC_DEFS = Object.freeze([
   },
   { key: 'throughput.merges_per_day', unit: 'per_day', direction: 'higher' },
   { key: 'throughput.verified_per_day', unit: 'per_day', direction: 'higher' },
+  // DORA keys (scripts/lib/shipping-slo-dora.mjs has the exact definitions).
+  // Lead time for changes is production_lag.merged_to_verified.p95 above.
+  {
+    key: 'dora.deploy_frequency.per_day',
+    unit: 'per_day',
+    direction: 'higher',
+  },
+  { key: 'dora.change_failure_rate', unit: 'ratio', direction: 'lower' },
+  {
+    key: 'dora.failed_deployment_recovery.p95',
+    unit: 'seconds',
+    direction: 'lower',
+  },
 ]);
 
 export const defFor = key => METRIC_DEFS.find(d => d.key === key);

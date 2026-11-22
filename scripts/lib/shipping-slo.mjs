@@ -36,6 +36,17 @@ export {
   validateBaseline,
   WINDOW_DAYS,
 } from './shipping-slo-baseline.mjs';
+export {
+  attributeReverts,
+  blockedPromotions,
+  doraGistBlock,
+  doraMetrics,
+  FAILURE_WINDOW_MS,
+  flattenDora,
+  lanesFlowBlock,
+  productionPromotions,
+  revertedPrNumber,
+} from './shipping-slo-dora.mjs';
 
 import { computePercentile } from './ci-duration-ratchet.mjs';
 
