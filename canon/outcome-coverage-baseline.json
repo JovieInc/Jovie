@@ -42,35 +42,5 @@
     "tsc-cache-warm.yml",
     "visual-a11y.yml"
   ],
-  "uncovered": [
-    "artifact-freshness.yml",
-    "ci-duration-ratchet.yml",
-    "deepsec-native.yml",
-    "dependabot-pin-sync.yml",
-    "deprecation-intake.yml",
-    "doc-gardening-agent.yml",
-    "golden-path-nightly.yml",
-    "hermes-cli-worker.yml",
-    "interaction-latency-audit.yml",
-    "legacy-human-hold-scrub.yml",
-    "m2-revenue-path-canary.yml",
-    "merge-queue-ruleset-verify.yml",
-    "node-runtime-freshness.yml",
-    "npm-publish.yml",
-    "observability-issue.yml",
-    "pen-draft-publish.yml",
-    "pr-conflict-handler.yml",
-    "pr-remediation-swarm.yml",
-    "public-benchmark.yml",
-    "remediation-sweep.yml",
-    "rolling-ci-dispatch.yml",
-    "safe-pr-remediation.yml",
-    "security-advisory-loop.yml",
-    "shipping-slo.yml",
-    "sonarcloud.yml",
-    "stale-branch-sweep.yml",
-    "storybook-host.yml",
-    "synthetic-monitoring.yml",
-    "voc-mine.yml"
-  ]
+  "uncovered": []
 }
