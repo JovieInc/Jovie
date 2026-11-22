@@ -72,7 +72,7 @@ describe('AuthLoader', () => {
   });
 
   describe('muted mark (ovie-o-presence slice 2)', () => {
-    it('draws exactly one decorative static BrandLogo in the muted value', () => {
+    it('draws exactly one decorative static O in the muted value', () => {
       const { container } = render(<AuthLoader />);
       const marks = container.querySelectorAll('[data-brand-variant]');
 

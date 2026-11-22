@@ -1,7 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BrandLogo } from '@/components/atoms/BrandLogo';
+import {
+  BRAND_MARK_MUTED_CLASS,
+  JOVIE_PATH,
+  JOVIE_VIEWBOX,
+} from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
 
 // Delay before showing loading message (milliseconds)
@@ -42,13 +46,31 @@ export function AuthLoader() {
       data-testid='auth-loader'
     >
       <div className='flex flex-col items-center gap-3' aria-hidden='true'>
-        <BrandLogo
-          size='control'
-          tone='muted'
-          aria-hidden
-          className='motion-safe:animate-spin'
+        {/* The bare O path, not BrandLogo: BrandLogo's per-size masters
+            would add about 1 KB of initial JS to every route that loads
+            this loader. */}
+        <span
+          className={cn(
+            'inline-flex shrink-0 motion-safe:animate-spin',
+            BRAND_MARK_MUTED_CLASS
+          )}
           style={LOADING_TURN_STYLE}
-        />
+          aria-hidden='true'
+          data-brand-variant='jovie'
+          data-brand-mark-size='24'
+        >
+          <svg
+            xmlns='http://www.w3.org/2000/svg'
+            viewBox={`0 0 ${JOVIE_VIEWBOX.width} ${JOVIE_VIEWBOX.height}`}
+            width={24}
+            height={24}
+            fill='currentColor'
+            shapeRendering='geometricPrecision'
+            aria-hidden='true'
+          >
+            <path d={JOVIE_PATH} />
+          </svg>
+        </span>
         <p
           className={cn(
             'text-xs text-tertiary-token transition-opacity duration-subtle',
