@@ -586,7 +586,7 @@ describe('ChatInput', () => {
     );
   });
 
-  it('renders the larger hero composer geometry for the empty state', () => {
+  it('renders the hero pill for the empty state (narrow widths: narrow-pill test)', () => {
     fastRender(
       withProviders(
         <ChatInput

@@ -5,9 +5,9 @@ import {
   handleCronEvidencePost,
   jsonResponse,
 } from '@/lib/cron/evidence-route';
+import { surfaceCertifications } from '@/lib/ovie/certifications/prod-golden-path-carry';
 import {
   certifiedProdGoldenPathSurfaces,
-  PROD_GOLDEN_PATH_CERTIFICATION_MAX_AGE_MS,
   PROD_GOLDEN_PATH_RECEIPT_SCHEMA,
   PROD_GOLDEN_PATH_STATUSES,
   PROD_GOLDEN_PATH_SURFACE_IDS,
@@ -37,13 +37,14 @@ const MAX_BODY_BYTES = 4 * 1024 * 1024;
 const text = z.string().min(1).max(2_000);
 const iso = z.string().datetime({ offset: true });
 const status = z.enum(PROD_GOLDEN_PATH_STATUSES);
+const sha = z.string().regex(/^[0-9a-f]{40}$/u);
 
 const receiptSchema = z
   .object({
     schema: z.literal(PROD_GOLDEN_PATH_RECEIPT_SCHEMA),
     surface: z.enum(PROD_GOLDEN_PATH_SURFACE_IDS as [string, ...string[]]),
     status,
-    sha: z.string().regex(/^[0-9a-f]{40}$/u),
+    sha,
     deploymentId: z.string().max(200).nullable(),
     startedAt: iso,
     endedAt: iso,
@@ -99,6 +100,16 @@ const receiptSchema = z
       })
       .strict()
       .nullish(),
+    // JOV-14402: a carried receipt names the run that exercised the step;
+    // the ledger checks it is a pass for another SHA.
+    carriedFrom: z
+      .object({
+        sha,
+        endedAt: iso,
+        runUrl: z.string().url().max(500).nullable(),
+      })
+      .strict()
+      .nullish(),
   })
   .strict();
 
@@ -146,9 +157,12 @@ export const PROD_GOLDEN_PATH_CERTIFIED_SCHEMA =
   'jovie.prod-golden-path-certified/v1' as const;
 
 /**
- * Which golden-path surfaces hold a current production certification. Read by
- * the production alias perf gate (production-release.yml) so it blocks only
- * on certified pages. Cron-secret authenticated, like the write path.
+ * Which golden-path surfaces hold a production certification for the release
+ * the ledger speaks for (servedSha: its newest receipt's SHA). Read by the
+ * production alias perf gate (production-release.yml) so it blocks only on
+ * certified pages, and by the post-deploy carry decision
+ * (scripts/golden-path-cert-reuse.mjs) per surface. JOV-14402: no time
+ * window. Cron-secret authenticated, like the write path.
  */
 export async function GET(request: Request): Promise<NextResponse> {
   const authError = verifyCronRequest(request, { route: ROUTE });
@@ -159,8 +173,8 @@ export async function GET(request: Request): Promise<NextResponse> {
       {
         schema: PROD_GOLDEN_PATH_CERTIFIED_SCHEMA,
         ledger: ledger ? 'present' : 'missing',
-        maxAgeMs: PROD_GOLDEN_PATH_CERTIFICATION_MAX_AGE_MS,
         certifiedSurfaces: certifiedProdGoldenPathSurfaces(ledger),
+        ...surfaceCertifications(ledger, PROD_GOLDEN_PATH_SURFACE_IDS),
         generatedAt: new Date().toISOString(),
       },
       200

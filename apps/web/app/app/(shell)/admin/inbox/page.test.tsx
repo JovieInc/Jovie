@@ -36,6 +36,21 @@ describe('guarded Ovie inbox destination', () => {
     ).toBeInTheDocument();
   });
 
+  it('opens the review canvas from the review item case id alone', async () => {
+    const { default: InboxPage } = await import('./page');
+    render(
+      await InboxPage({
+        searchParams: Promise.resolve({ case: 'pilot-synthetic-photo' }),
+      })
+    );
+    expect(
+      screen.getByTestId('review-inbox-pilot-workbench')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('existing-unified-inbox')
+    ).not.toBeInTheDocument();
+  });
+
   it('renders the existing inbox after the current admin and privacy guard', async () => {
     const { default: InboxPage } = await import('./page');
     render(await InboxPage({ searchParams: Promise.resolve({}) }));
