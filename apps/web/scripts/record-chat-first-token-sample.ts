@@ -1,8 +1,9 @@
 #!/usr/bin/env tsx
-/** ASS-28 TTFT record/soft-skip CLI. */
+/** ASS-28/ASS-86 TTFT record, live probe, or soft-skip CLI. */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runLiveChatFirstTokenProbe } from '../lib/eval/chat-first-token-live-probe';
 import {
   buildRecordedChatFirstTokenSample,
   buildUnrunChatFirstTokenSample,
@@ -60,10 +61,13 @@ export function parseInjectedSamples(
   return parts;
 }
 
-export function main(
+export async function main(
   argv: readonly string[] = process.argv.slice(2),
-  env: Readonly<Record<string, string | undefined>> = process.env
-): number {
+  env: Readonly<Record<string, string | undefined>> = process.env,
+  deps: {
+    readonly probe?: typeof runLiveChatFirstTokenProbe;
+  } = {}
+): Promise<number> {
   const { outPath, mode } = parseArgs(argv);
   const token = env.WORKERS_AI_TOKEN?.trim() ?? '';
   const injected = parseInjectedSamples(env.ASSISTANTS_CHAT_TTFT_SAMPLES_MS);
@@ -80,10 +84,21 @@ export function main(
     );
     process.stdout.write('::notice::WORKERS_AI_TOKEN missing; soft-skipped.\n');
   } else {
-    sample = buildUnrunChatFirstTokenSample(
-      'Token present but live TTFT probe not enrolled; soft-skip.'
-    );
-    process.stdout.write('::notice::TTFT probe not ready; soft-skipped.\n');
+    const probe = deps.probe ?? runLiveChatFirstTokenProbe;
+    const outcome = await probe({
+      token,
+      baseUrl: env.WORKERS_AI_BASE_URL,
+    });
+    sample = outcome.sample;
+    if (!outcome.ok) {
+      process.stdout.write(
+        `::notice::Live TTFT probe soft-skipped (${sample.notes ?? 'unrun'}).\n`
+      );
+    } else {
+      process.stdout.write(
+        `::notice::Live TTFT probe recorded p50=${String(sample.p50Ms)}ms.\n`
+      );
+    }
   }
   mkdirSync(path.dirname(outPath), { recursive: true });
   writeFileSync(outPath, serializeChatFirstTokenSample(sample), 'utf8');
@@ -103,5 +118,15 @@ export function main(
 }
 
 if (process.argv[1]?.endsWith('record-chat-first-token-sample.ts')) {
-  process.exitCode = main();
+  void main().then(
+    code => {
+      process.exitCode = code;
+    },
+    error => {
+      process.stderr.write(
+        `::error::${error instanceof Error ? error.message : String(error)}\n`
+      );
+      process.exitCode = 1;
+    }
+  );
 }
