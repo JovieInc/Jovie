@@ -21,6 +21,10 @@ on:
 concurrency:
   group: production-synthetic-monitoring
   cancel-in-progress: false
+  # The default queue keeps one pending run and cancels the previous one.
+  # A 00:17 or 12:17 slot that is still waiting for a runner disappears when
+  # the next schedule arrives (JOV-6813). Let the delayed slot stay queued.
+  queue: max
 
 jobs:
   synthetic-test:
