@@ -14,7 +14,7 @@ interface SaveViewResponse {
   readonly created: boolean;
 }
 
-export function SaveViewButton({
+export function SaveViewAction({
   token,
   viewerOwnsView,
 }: Readonly<{ token: string; viewerOwnsView: boolean }>) {

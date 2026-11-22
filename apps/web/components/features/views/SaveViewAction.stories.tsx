@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { SaveViewButton } from './SaveViewButton';
+import { SaveViewAction } from './SaveViewAction';
 
 const meta = {
-  title: 'Features/Views/SaveViewButton',
-  component: SaveViewButton,
+  title: 'Features/Views/SaveViewAction',
+  component: SaveViewAction,
   tags: ['autodocs'],
   args: { token: 'a'.repeat(32), viewerOwnsView: false },
-} satisfies Meta<typeof SaveViewButton>;
+} satisfies Meta<typeof SaveViewAction>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

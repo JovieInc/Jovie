@@ -879,18 +879,18 @@
       "evidence": "Reconciled after main during PR #25263 conflict repair; originally registered 2026-11-13T00:00:00Z. JOV-12407 adds the missing tip checkout return page. Local missing/invalid session route checks and mocked payment-state tests passed; no production or real-payment certification."
     },
     {
-      "source": "apps/web/app/app/(shell)/dashboards/page.tsx",
-      "from": null,
-      "to": "holdout",
-      "at": "2026-11-22T08:30:00Z",
-      "evidence": "Saved shared views list (shared views save slice, ad-hoc, no Linear issue); source registration only, not rendered certification."
-    },
-    {
       "source": "apps/web/app/v/[token]/page.tsx",
       "from": null,
       "to": "holdout",
       "at": "2026-11-22T06:50:00Z",
       "evidence": "Shared agent-published view page (shared views v1, ad-hoc, no Linear issue) joins the shared-link entrypoints; source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/app/(shell)/dashboards/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-11-22T08:30:00Z",
+      "evidence": "Saved shared views list (shared views save slice, ad-hoc, no Linear issue); source registration only, not rendered certification."
     }
   ]
 }

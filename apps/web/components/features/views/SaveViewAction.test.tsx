@@ -8,11 +8,11 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 vi.mock('@/lib/analytics', () => ({ track }));
 vi.mock('@/lib/queries/fetch', () => ({ fetchWithTimeout: fetchMock }));
 
-import { SaveViewButton } from './SaveViewButton';
+import { SaveViewAction } from './SaveViewAction';
 
 const TOKEN = 'a'.repeat(32);
 
-describe('SaveViewButton', () => {
+describe('SaveViewAction', () => {
   beforeEach(() => {
     track.mockClear();
     push.mockClear();
@@ -21,7 +21,7 @@ describe('SaveViewButton', () => {
 
   it('saves, tracks and routes to the saved copy', async () => {
     fetchMock.mockResolvedValue({ token: 'n'.repeat(32), created: false });
-    render(<SaveViewButton token={TOKEN} viewerOwnsView={false} />);
+    render(<SaveViewAction token={TOKEN} viewerOwnsView={false} />);
     fireEvent.click(screen.getByRole('button', { name: 'Save as dashboard' }));
     expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled();
     await waitFor(() =>
@@ -32,7 +32,7 @@ describe('SaveViewButton', () => {
 
   it('shows an inline error and re-enables on failure', async () => {
     fetchMock.mockRejectedValue(new Error('boom'));
-    render(<SaveViewButton token={TOKEN} viewerOwnsView={false} />);
+    render(<SaveViewAction token={TOKEN} viewerOwnsView={false} />);
     fireEvent.click(screen.getByRole('button', { name: 'Save as dashboard' }));
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(
@@ -41,7 +41,7 @@ describe('SaveViewButton', () => {
   });
 
   it('links to dashboards when the viewer owns the view', () => {
-    render(<SaveViewButton token={TOKEN} viewerOwnsView />);
+    render(<SaveViewAction token={TOKEN} viewerOwnsView />);
     expect(
       screen.getByRole('link', { name: 'In your dashboards' })
     ).toHaveAttribute('href', '/app/dashboards');

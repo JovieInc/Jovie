@@ -83,7 +83,7 @@
     "/app/dashboard/release-plan": 735,
     "/app/settings/billing": 734,
     "/app/chats": 731,
-    "/app/dashboards": 1150,
+    "/app/dashboards": 900,
     "/app/lyrics/[trackId]": 731,
     "/app/settings/payments": 731,
     "/app/settings/usage": 730,

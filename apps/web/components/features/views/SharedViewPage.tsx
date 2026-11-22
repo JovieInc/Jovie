@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { LogoLink } from '@/components/atoms/LogoLink';
 import { APP_ROUTES } from '@/constants/routes';
 import type { SharedView } from '@/lib/views/service.server';
-import { SaveViewButton } from './SaveViewButton';
+import { SaveViewAction } from './SaveViewAction';
 import { ViewAnalytics, ViewSignupCard } from './ViewAnalytics';
 import { ViewRenderer } from './ViewRenderer';
 
@@ -40,7 +40,7 @@ export function SharedViewPage({
             </p>
           </div>
           {signedIn ? (
-            <SaveViewButton token={token} viewerOwnsView={viewerOwnsView} />
+            <SaveViewAction token={token} viewerOwnsView={viewerOwnsView} />
           ) : (
             <Link
               href={APP_ROUTES.SIGNIN}
