@@ -232,9 +232,7 @@ function MenuItemLink({
         aria-hidden='true'
       />
       <span className='flex-1'>{item.label}</span>
-      {item.badge !== undefined && item.badge > 0 && (
-        <Badge count={item.badge} />
-      )}
+      {!!item.badge && <Badge count={item.badge} />}
     </Link>
   );
 }

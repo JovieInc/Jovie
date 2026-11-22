@@ -550,16 +550,7 @@ export function HeaderNav({
       {renderNavLinks(leadingMarketingLinks)}
       {isMarketingGlass
         ? resolvedFlyoutEntries.map(entry => {
-            if (entry.kind === 'link') {
-              return (
-                <HeaderNavLink
-                  key={entry.id}
-                  href={entry.href}
-                  label={entry.label}
-                  className={navLinkClass}
-                />
-              );
-            }
+            if (entry.kind === 'link') return renderNavLinks([entry]);
             const { menu } = entry;
             const open = openFlyoutId === menu.id;
 
