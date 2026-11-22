@@ -58,6 +58,11 @@ function issueDescription(finding, report) {
   ].join('\n');
 }
 
+/**
+ * @param {{ upserts: Array<{ key: string, title: string, detail: string, evidence?: unknown }>, resolves: string[] }} plan
+ * @param {{ checkedAt?: string }} report
+ * @param {{ runId?: string, fetchImpl?: typeof fetch }} [options]
+ */
 export async function applyChatOutcomePlan(
   plan,
   report,
@@ -122,6 +127,9 @@ export function summarize(report, plan) {
   return lines.join('\n');
 }
 
+/**
+ * @param {{ env?: Record<string, string | undefined>, fetchImpl?: typeof fetch }} [options]
+ */
 export async function runChatOutcomeIntake({
   env = process.env,
   fetchImpl,
