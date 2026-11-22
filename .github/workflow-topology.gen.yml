@@ -485,8 +485,8 @@ nodes:
     triggeringStateTransition:
       - repository_dispatch
       - workflow_dispatch
-    terminalReceipt: job:notify
-    jobCount: 3
+    terminalReceipt: job:report-outcome
+    jobCount: 4
   - name: Eve Pilot
     path: .github/workflows/eve-pilot.yml
     active: true
@@ -1431,8 +1431,8 @@ nodes:
     triggeringStateTransition:
       - push
       - workflow_dispatch
-    terminalReceipt: job:certify
-    jobCount: 3
+    terminalReceipt: job:report-outcome
+    jobCount: 4
   - name: Security Advisory Loop (Summer owned)
     path: .github/workflows/security-advisory-loop.yml
     active: true
@@ -1662,8 +1662,8 @@ nodes:
     triggeringStateTransition:
       - repository_dispatch
       - workflow_dispatch
-    terminalReceipt: job:audit
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: Test Flakiness Report
     path: .github/workflows/test-flakiness-report.yml
     active: true
@@ -1758,8 +1758,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:report-scheduled-failure
-    jobCount: 8
+    terminalReceipt: job:report-outcome
+    jobCount: 9
   - name: VOC Mine
     path: .github/workflows/voc-mine.yml
     active: true
