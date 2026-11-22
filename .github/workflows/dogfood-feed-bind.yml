@@ -1,0 +1,126 @@
+name: Dogfood Feed Bind
+# accountable-writer: Summer
+# necessary-trust-boundary: workflow_dispatch only on main; writes solely to
+#   ovie_operating_kv key jovie:certification:v1:dogfood-receipts via existing
+#   CAS helpers and Doppler jovie-web/prd DATABASE_URL. No deploy, alias,
+#   marker, merge, or GitHub mutation. Does not use CRON_SECRET and does not
+#   change metrics route auth. Not a postdeploy-probes observer step.
+# removal-trigger: Fold into Production Controller evidence packets once they
+#   emit dogfood-feed bindings after each landed production generation.
+#
+# JOV-7200 / VER-5: one-shot production public-profile dogfood feed bind.
+# Observes the live origin, persists source=production binding + truthful
+# receipt (never the synthetic fixture capability receipt).
+
+on:
+  workflow_dispatch:
+    inputs:
+      origin:
+        description: Production origin to observe and bind (must serve environment=production)
+        required: true
+        type: string
+        default: https://jov.ie
+      path:
+        description: Public profile path to observe
+        required: true
+        type: string
+        default: /tim
+      dry_run:
+        description: Observe and print plan only (no DATABASE_URL write)
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dogfood-feed-bind
+  cancel-in-progress: false
+
+jobs:
+  bind:
+    name: Observe and bind public-profile dogfood feed
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-doppler
+
+      - name: Resolve served production identity
+        id: build
+        env:
+          ORIGIN: ${{ inputs.origin }}
+        run: |
+          set -euo pipefail
+          info="$(curl -fsS --max-time 30 "$ORIGIN/api/health/build-info")"
+          echo "$info" | tee "$RUNNER_TEMP/build-info.json"
+          sha="$(jq -r '.commitSha' "$RUNNER_TEMP/build-info.json")"
+          dpl="$(jq -r '.deploymentId' "$RUNNER_TEMP/build-info.json")"
+          env_name="$(jq -r '.environment // empty' "$RUNNER_TEMP/build-info.json")"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+          test -n "$dpl"
+          test "$env_name" = "production"
+          {
+            echo "commit_sha=$sha"
+            echo "deployment_id=$dpl"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Dry-run observe (no write)
+        if: ${{ inputs.dry_run }}
+        env:
+          ORIGIN: ${{ inputs.origin }}
+          PROFILE_PATH: ${{ inputs.path }}
+          EXPECTED_SHA: ${{ steps.build.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          pnpm --filter=@jovie/web exec tsx scripts/bind-public-profile-dogfood-feed.ts \
+            --origin "$ORIGIN" \
+            --observe \
+            --path "$PROFILE_PATH" \
+            --expected-sha "$EXPECTED_SHA" \
+            --write-observation "$RUNNER_TEMP/public-profile-dogfood-observation.json" \
+            --write-result "$RUNNER_TEMP/public-profile-dogfood-bind.json"
+
+      - name: Observe and persist dogfood feed bind
+        if: ${{ !inputs.dry_run }}
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          ORIGIN: ${{ inputs.origin }}
+          PROFILE_PATH: ${{ inputs.path }}
+          EXPECTED_SHA: ${{ steps.build.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          doppler run --project jovie-web --config prd \
+            --only-secrets=DATABASE_URL \
+            --no-fallback -- env -u DOPPLER_TOKEN \
+              pnpm --filter=@jovie/web exec tsx scripts/bind-public-profile-dogfood-feed.ts \
+                --origin "$ORIGIN" \
+                --observe \
+                --path "$PROFILE_PATH" \
+                --expected-sha "$EXPECTED_SHA" \
+                --write-observation "$RUNNER_TEMP/public-profile-dogfood-observation.json" \
+                --write-result "$RUNNER_TEMP/public-profile-dogfood-bind.json" \
+                --apply
+          echo "### Public-profile dogfood feed bind (JOV-7200)" >> "$GITHUB_STEP_SUMMARY"
+          jq -r '"- commitSha: `\(.binding.commitSha // "n/a")`\n- deploymentId: `\(.binding.deploymentId // "n/a")`\n- receiptId: `\(.receiptId // "n/a")`\n- bind: \(.bindResult.status // "n/a")\n- receipt: \(.receiptResult.status // "n/a")\n- receiptOutcome: \(.receiptOutcome // "n/a")\n- provesOutcome: \(.provesOutcome // "n/a")\n- dogfoodFeed.status: \(.feed.status // "n/a")\n- dogfoodFeed.receiptCount: \(.feed.receiptCount // "n/a")"' \
+            "$RUNNER_TEMP/public-profile-dogfood-bind.json" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload dogfood feed bind evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: public-profile-dogfood-feed-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/build-info.json
+            ${{ runner.temp }}/public-profile-dogfood-observation.json
+            ${{ runner.temp }}/public-profile-dogfood-bind.json
+          retention-days: 30
+          if-no-files-found: ignore

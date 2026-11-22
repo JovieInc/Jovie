@@ -10,7 +10,11 @@
  *   pnpm --filter=@jovie/web exec tsx scripts/bind-public-profile-dogfood-feed.ts \
  *     --origin https://jov.ie --observe --path /tim
  *
- * Apply on authorized runner (postdeploy golden-path-cert):
+ * Apply via .github/workflows/dogfood-feed-bind.yml (workflow_dispatch on main)
+ * or an authorized runner with Doppler jovie-web/prd DATABASE_URL. Never via
+ * postdeploy-probes.yml (production observer; no mutation). Never ingest the
+ * synthetic public-profile fixture capability receipt.
+ *
  *   doppler run --project jovie-web --config prd --only-secrets=DATABASE_URL --no-fallback -- \
  *     pnpm --filter=@jovie/web exec tsx scripts/bind-public-profile-dogfood-feed.ts \
  *       --origin https://jov.ie --observe --path /tim --apply
@@ -274,6 +278,33 @@ async function main(): Promise<number> {
     );
   }
 
+  // Refuse synthetic fixture capability observation shapes (placeholder
+  // artifact refs from buildPublicProfileCapabilityReceipt). Live VER-5
+  // binds only genuine observed receipts from --observe or an equivalent
+  // probe file whose evidence refs come from the live HTTP probe.
+  const fixtureArtifactRefs = new Set([
+    'artifact:public-profile/identity-readback',
+    'artifact:public-profile/listen-destination',
+    'artifact:public-profile/nearby-consent',
+    'artifact:public-profile/scripted-click-trace',
+  ]);
+  const observationRefs = observation.criterionAssessment.flatMap(
+    item => item.evidenceRefs
+  );
+  if (observationRefs.some(ref => fixtureArtifactRefs.has(ref))) {
+    process.stderr.write(
+      `${JSON.stringify(
+        {
+          error: 'refusing_synthetic_fixture_receipt',
+          hint: 'Use --observe for a genuine production probe; do not ingest buildPublicProfileCapabilityReceipt / seedPublicProfileDogfoodFixture',
+        },
+        null,
+        2
+      )}\n`
+    );
+    return 2;
+  }
+
   const live = await fetchBuildInfo(values.origin!);
   if (
     live.commitSha !== observation.buildInfo.commitSha ||
@@ -368,7 +399,11 @@ async function main(): Promise<number> {
   };
 
   if (!values.apply) {
-    process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
+    const serialized = `${JSON.stringify(plan, null, 2)}\n`;
+    process.stdout.write(serialized);
+    if (values['write-result']) {
+      writeFileSync(values['write-result'], serialized);
+    }
     process.stdout.write(
       'dry-run complete; pass --apply with DATABASE_URL to persist\n'
     );
