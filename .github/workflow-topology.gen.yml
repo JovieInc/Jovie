@@ -437,6 +437,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:invariant-stewardship
     jobCount: 2
+  - name: Design reference intake
+    path: .github/workflows/design-reference-intake.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:intake
+    jobCount: 1
   - name: desktop-dogfood
     path: .github/workflows/desktop-dogfood.yml
     active: true

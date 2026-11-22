@@ -43,6 +43,7 @@
     "deprecation-intake.yml": {"runsPerMergedPr":0,"triggers":["push","workflow_dispatch"]},
     "design-gate.yml": {"runsPerMergedPr":0.2,"triggers":["pull_request:edited","pull_request:opened","pull_request:reopened","pull_request:synchronize"]},
     "design-governance.yml": {"runsPerMergedPr":0.5,"triggers":["pull_request","push","repository_dispatch:founder-decision-recorded","repository_dispatch:invariant-enforcement-failed","workflow_dispatch"]},
+    "design-reference-intake.yml": {"runsPerMergedPr":0,"triggers":["schedule","workflow_dispatch"]},
     "desktop-dogfood.yml": {"runsPerMergedPr":0.9,"triggers":["workflow_dispatch","workflow_run:CI"]},
     "desktop-release.yml": {"runsPerMergedPr":0.9,"triggers":["workflow_dispatch","workflow_run:Production Controller"]},
     "doc-gardening-agent.yml": {"runsPerMergedPr":0,"triggers":["push","workflow_dispatch"]},

@@ -60,3 +60,15 @@ known site only re-enters when its fold changed enough to be a redesign):
 pnpm --filter web design-refs scout --limit 10 [--dry]
 pnpm --filter web design-refs directions
 ```
+
+Scheduled intake (all six surfaces, desktop 1440 + mobile 390, dark mode
+first; pixels stay in `~/.cache/jovie/design-refs`). Spend cap and scheduler
+gate live in `intake-config.json`. Cron wiring is in
+`.github/workflows/design-reference-intake.yml`; production schedules stay off
+until `DESIGN_REFS_SCHEDULED_ENABLED=1` after Tim approves the cap in writing.
+
+```bash
+pnpm --filter web design-refs intake --dry
+pnpm --filter web design-refs intake --surface homepage
+pnpm --filter web design-refs intake --staging   # staging.jov.ie only, never prod
+```

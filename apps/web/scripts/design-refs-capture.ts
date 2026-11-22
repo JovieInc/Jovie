@@ -15,6 +15,12 @@ import {
 import type { DesignReferenceMedia } from '@/lib/agent-os/design-reference-corpus/types';
 
 export const FOLD = { width: 1440, height: 900 } as const;
+export const FOLD_MOBILE = { width: 390, height: 844 } as const;
+
+export interface CaptureViewport {
+  readonly width: number;
+  readonly height: number;
+}
 
 // Node's 250ms happy-eyeballs window drops IPv4 on a loaded machine with no
 // IPv6 route, so robots.txt fetches failed closed.
@@ -26,7 +32,10 @@ export interface Captured {
   readonly title: string;
 }
 
-export type CaptureUrl = (url: URL) => Promise<Captured>;
+export type CaptureUrl = (
+  url: URL,
+  viewport?: CaptureViewport
+) => Promise<Captured>;
 
 export const BOT_CHALLENGE =
   /just a moment|verify you are human|performing security verification|checking your browser|access denied/iu;
@@ -41,19 +50,25 @@ const CONSENT_HIDE_CSS = `${[
   '[id*="consent" i]',
 ].join(',')}{display:none!important}`;
 
-export function toFoldJpeg(input: Buffer): Promise<Buffer> {
+export function toFoldJpeg(
+  input: Buffer,
+  viewport: CaptureViewport = FOLD
+): Promise<Buffer> {
   return sharp(input)
-    .resize({ width: FOLD.width, withoutEnlargement: true })
+    .resize({ width: viewport.width, withoutEnlargement: true })
     .jpeg({ quality: 80 })
     .toBuffer();
 }
 
-async function captureFold(url: URL): Promise<Captured> {
+async function captureFold(
+  url: URL,
+  viewport: CaptureViewport = FOLD
+): Promise<Captured> {
   const { chromium } = await import('playwright');
   const browser = await chromium.launch();
   try {
     const context = await browser.newContext({
-      viewport: FOLD,
+      viewport,
       deviceScaleFactor: 1,
       colorScheme: 'dark',
       reducedMotion: 'reduce',
@@ -74,7 +89,7 @@ async function captureFold(url: URL): Promise<Captured> {
     // Hide consent overlays rather than answering them on the site's behalf.
     await page.addStyleTag({ content: CONSENT_HIDE_CSS });
     const png = await page.screenshot({ type: 'png' });
-    return { jpeg: await toFoldJpeg(png), via: 'playwright', title };
+    return { jpeg: await toFoldJpeg(png, viewport), via: 'playwright', title };
   } finally {
     await browser.close();
   }
@@ -82,9 +97,12 @@ async function captureFold(url: URL): Promise<Captured> {
 
 export function createUrlCapture(
   fetcher: typeof fetch = fetch,
-  fold: CaptureUrl = captureFold
+  fold: (
+    url: URL,
+    viewport?: CaptureViewport
+  ) => Promise<Captured> = captureFold
 ): CaptureUrl {
-  return async url => {
+  return async (url, viewport = FOLD) => {
     const permission = await checkCapturePermission(url, fetcher);
     if (!permission.allowed) {
       throw new Error(`capture refused: ${permission.reason}`);
@@ -97,11 +115,14 @@ export function createUrlCapture(
       () => null
     );
     if (!head?.headers.get('content-type')?.startsWith('image/')) {
-      return fold(url);
+      return fold(url, viewport);
     }
     const response = await fetcher(url, init);
     return {
-      jpeg: await toFoldJpeg(Buffer.from(await response.arrayBuffer())),
+      jpeg: await toFoldJpeg(
+        Buffer.from(await response.arrayBuffer()),
+        viewport
+      ),
       via: 'image-fetch',
       title: basename(url.pathname),
     };
