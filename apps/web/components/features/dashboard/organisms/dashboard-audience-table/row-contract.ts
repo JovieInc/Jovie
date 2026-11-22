@@ -12,8 +12,8 @@ export const AUDIENCE_STATE_TONES: Record<
   AudienceDisplayState,
   StatusCellTone
 > = {
-  high: 'positive',
-  rising: 'attention',
+  high: 'info',
+  rising: 'ultra',
   dormant: 'neutral',
   subscriber: 'info',
 };

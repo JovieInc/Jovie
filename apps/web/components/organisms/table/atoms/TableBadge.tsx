@@ -1,9 +1,9 @@
 import { Badge } from '@jovie/ui';
-import { cn } from '../table.styles';
 
-/** Table label pills are hairline-outlined, unfilled, and at most 20px tall. */
-const HAIRLINE_PILL =
-  'h-5 border-(--color-border-default) bg-transparent leading-4';
+/**
+ * Table label pills use the approved `outline` Badge variant (hairline,
+ * unfilled). Size `sm` keeps them to one 20px text line; no restyling.
+ */
 
 export interface TableBadgeProps
   extends Readonly<{
@@ -22,8 +22,9 @@ export function TableBadge({
   return (
     <Badge
       size={size}
-      variant={variant}
-      className={cn(HAIRLINE_PILL, className)}
+      variant='outline'
+      data-table-badge={variant}
+      className={className}
     >
       {children}
     </Badge>
