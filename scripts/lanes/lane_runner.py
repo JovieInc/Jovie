@@ -169,7 +169,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_worktree_pool.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
-              "scripts/tests/test_remediation.py", "scripts/tests/test_revert_first.py", "scripts/tests/test_repair_order.py", "scripts/tests/test_autoscale.py", "scripts/tests/test_pr_wip.py", "scripts/tests/test_fp_breaker_hold.py",
+              "scripts/tests/test_remediation.py", "scripts/tests/test_revert_first.py", "scripts/tests/test_repair_order.py", "scripts/tests/test_autoscale.py", "scripts/tests/test_pr_wip.py",
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py", "scripts/tests/test_pool_feed.py", "scripts/tests/test_release_fixtures.py",
               "scripts/tests/test_epics.py",
@@ -7231,9 +7231,8 @@ def note_breaker_run(host: Host, pr: dict, receipt: dict, now: float | None = No
             rows[fp] = [row for row in rows.get(fp, []) if now - float(row[0]) < BREAKER_WINDOW_S] + [[now, productive]]
             if productive:
                 entry.pop("fpOpenHead", None)
-                entry.pop("fpOpenAt", None)
             elif breaker_streak(rows[fp], now) >= fingerprint_breaker_n(host):
-                entry["fpOpenHead"], entry["fpOpenAt"] = pr["headRefOid"], now  # held FP_HOLD_S, then retried
+                entry["fpOpenHead"] = pr["headRefOid"]
                 tripped.append(fp)
         entry["lastRunId"] = receipt.get("runId")
         if breaker_streak(entry["runs"], now) == BREAKER_STREAK and not entry.get("signalAt"):

@@ -1553,10 +1553,10 @@ FP_HOLD_S = int(os.environ.get("LANES_FP_BREAKER_HOLD_S", str(BREAKER_WINDOW_S))
 
 
 def fp_hold_open(entry: dict, head: str | None, now: float) -> bool:
-    """The fingerprint hold on `head` is live. A legacy hold without `fpOpenAt` is already past
-    its window (it predates the stamp), so it releases."""
-    at = entry.get("fpOpenAt")
-    return bool(head) and entry.get("fpOpenHead") == head and type(at) in (int, float) and 0 <= now - at < FP_HOLD_S
+    """The fingerprint hold on `head` is live. The hold starts at the run that tripped it, the
+    entry's last run (a held head gets no further runs), and ends FP_HOLD_S later."""
+    runs = [float(row[0]) for row in entry.get("runs", []) if isinstance(row, (list, tuple)) and row]
+    return bool(head) and entry.get("fpOpenHead") == head and bool(runs) and 0 <= now - max(runs) < FP_HOLD_S
 
 
 def pr_breaker_open(host, number: int, now: float, head: str | None = None) -> bool:
