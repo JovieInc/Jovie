@@ -326,7 +326,7 @@ export function ProfileDrawerShell({
             </div>
           ) : null}
           <div
-            className='max-h-112 overflow-y-auto overscroll-contain px-0.5'
+            className='max-h-96 overflow-y-auto overscroll-contain px-0.5'
             data-testid='profile-popover-body'
           >
             {children}
