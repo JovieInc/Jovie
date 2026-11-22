@@ -1,7 +1,6 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import type { ReactNode } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { Sparkline } from '@/components/shell/Sparkline';
 import {
@@ -32,14 +31,15 @@ const DELTA_TONE: Record<string, string> = {
 const META_LABEL = 'text-2xs font-medium tracking-wide text-tertiary-token';
 
 /**
- * Melt: opacity + lift + soft blur (cinematic). Reduced motion keeps a
- * short opacity-only fade so intent still reads without thrash.
+ * Reserved heights. Every late-loading region has the same fixed height in its
+ * placeholder and its loaded state, so data arriving (or a poll refreshing)
+ * never moves anything below it. Ovie Home only moves when Tim acts.
  */
-const BOARD_MELT =
-  'pointer-events-none -translate-y-1 opacity-40 blur-sm ' +
-  'motion-reduce:translate-y-0 motion-reduce:blur-none motion-reduce:opacity-50';
-
-const BOARD_IDLE = 'translate-y-0 opacity-100 blur-none';
+export const HERO_MIN_H = 'min-h-32';
+export const HERO_TITLE_H = 'min-h-9 sm:min-h-10';
+export const HERO_BODY_H = 'min-h-5 sm:min-h-6';
+export const GLANCE_VALUE_H = 'h-9';
+export const STAGES_MIN_H = 'min-h-20';
 
 /** Color the delta by its own direction, not by target attainment. */
 export function deltaToneKey(
@@ -58,10 +58,6 @@ export interface StoryFirstCanvasProps {
   readonly glance: readonly StoryFirstGlancePulse[];
   readonly stages: readonly StoryFirstStageBucket[];
   readonly inFlightHref?: string;
-  /** Start typing → board melts; composer stays docked below. */
-  readonly melting?: boolean;
-  /** Generated Summer answer when a turn is present. */
-  readonly answer?: ReactNode;
   readonly glanceLoading?: boolean;
   /** Shipping stage read — error must not look like an empty pipeline. */
   readonly stagesStatus?: HomeLoopSectionStatus;
@@ -83,12 +79,14 @@ function GlancePulse({
     >
       <span className={META_LABEL}>{pulse.label}</span>
       {loading ? (
-        <LoadingSkeleton height='h-8' width='w-20' />
+        <div className={cn('flex items-center', GLANCE_VALUE_H)}>
+          <LoadingSkeleton height='h-8' width='w-20' />
+        </div>
       ) : (
-        <div className='flex items-baseline gap-2'>
+        <div className={cn('flex items-baseline gap-2', GLANCE_VALUE_H)}>
           <span
             className={cn(
-              'text-3xl font-semibold tracking-tight tabular-nums',
+              'text-3xl leading-9 font-semibold tracking-tight tabular-nums',
               pulse.measured ? 'text-primary-token' : 'text-tertiary-token'
             )}
           >
@@ -140,7 +138,7 @@ function BottleneckHero({
   return (
     <section
       aria-label='Bottleneck'
-      className='flex min-w-0 flex-1 flex-col gap-3'
+      className={cn('flex min-w-0 flex-1 flex-col gap-3', HERO_MIN_H)}
       data-testid='story-first-bottleneck'
       data-tone={story.tone}
     >
@@ -153,15 +151,29 @@ function BottleneckHero({
       </div>
       {story.tone === 'loading' ? (
         <>
-          <LoadingSkeleton height='h-10' width='w-3/4' />
-          <LoadingSkeleton height='h-4' width='w-1/2' />
+          <div className={cn('flex items-center', HERO_TITLE_H)}>
+            <LoadingSkeleton height='h-8' width='w-3/4' />
+          </div>
+          <div className={cn('flex items-center', HERO_BODY_H)}>
+            <LoadingSkeleton height='h-4' width='w-1/2' />
+          </div>
         </>
       ) : (
         <>
-          <h1 className='text-balance text-3xl font-semibold tracking-tight text-primary-token sm:text-4xl'>
+          <h1
+            className={cn(
+              'text-balance text-3xl font-semibold tracking-tight text-primary-token sm:text-4xl',
+              HERO_TITLE_H
+            )}
+          >
             {story.title}
           </h1>
-          <p className='max-w-prose text-sm text-pretty text-secondary-token sm:text-base'>
+          <p
+            className={cn(
+              'max-w-prose text-sm text-pretty text-secondary-token sm:text-base',
+              HERO_BODY_H
+            )}
+          >
             {story.body}
           </p>
           {story.moving || story.needs || story.since || story.detailsHref ? (
@@ -246,11 +258,16 @@ function StageBuckets({
         ) : null}
       </div>
       {status === 'loading' ? (
-        <LoadingSkeleton height='h-16' width='w-full' />
+        <div className={cn('flex items-center', STAGES_MIN_H)}>
+          <LoadingSkeleton height='h-16' width='w-full' />
+        </div>
       ) : status === 'error' ? (
         <div
           role='alert'
-          className='flex flex-wrap items-center gap-3 border-y border-subtle py-2 text-xs text-secondary-token'
+          className={cn(
+            'flex flex-wrap items-center gap-3 border-y border-subtle py-2 text-xs text-secondary-token',
+            STAGES_MIN_H
+          )}
           data-testid='story-first-stages-error'
         >
           <span>Shipping stages could not load.</span>
@@ -267,7 +284,9 @@ function StageBuckets({
           ) : null}
         </div>
       ) : (
-        <ol className='grid grid-cols-2 gap-0 sm:grid-cols-4'>
+        <ol
+          className={cn('grid grid-cols-2 gap-0 sm:grid-cols-4', STAGES_MIN_H)}
+        >
           {stages.map((bucket, index) => (
             <li
               key={bucket.stage}
@@ -308,43 +327,27 @@ function StageBuckets({
 
 /**
  * Story First flat Home: bottleneck owns the fold, three glance pulses as a
- * quiet right rail, stage buckets + one highlight, no card chrome. Typing in
- * the docked composer melts the board (composer stays).
+ * quiet right rail, stage buckets + one highlight, no card chrome. Static by
+ * design: typing never blurs or moves it, and a turn hands off to the chat
+ * transcript instead of animating this board.
  */
 export function StoryFirstCanvas({
   bottleneck,
   glance,
   stages,
   inFlightHref,
-  melting = false,
-  answer,
   glanceLoading = false,
   stagesStatus = 'ready',
   onRetryStages,
 }: StoryFirstCanvasProps) {
-  const boardReady = bottleneck.tone !== 'loading';
-
   return (
     <div
       className='@container flex w-full flex-col gap-10 lg:h-full lg:min-h-0'
       data-testid='story-first-canvas'
-      data-melting={melting ? 'true' : 'false'}
     >
       <div
-        className={cn(
-          // Melt uses three compositor-safe channels: opacity, translate, blur.
-          // Loading → ready softens via the same opacity transition (no enter
-          // keyframes — polls must not re-fire motion or thrash layout).
-          // `transition` covers opacity/transform/filter without arbitrary props.
-          'flex min-h-0 flex-1 flex-col gap-10 transition duration-cinematic ease-cinematic',
-          melting ? BOARD_MELT : BOARD_IDLE,
-          !boardReady && !melting && 'opacity-90'
-        )}
+        className='flex min-h-0 flex-1 flex-col gap-10'
         data-testid='story-first-board'
-        aria-hidden={melting || undefined}
-        // Drop links from tab order while the board melts (aria-hidden alone
-        // does not).
-        inert={melting || undefined}
       >
         <div className='flex flex-col gap-10 lg:flex-row lg:items-start lg:gap-12'>
           <BottleneckHero story={bottleneck} />
@@ -369,19 +372,6 @@ export function StoryFirstCanvas({
           onRetry={onRetryStages}
         />
       </div>
-      {answer ? (
-        <div
-          className={cn(
-            'max-h-1/2 shrink-0 overflow-y-auto transition duration-cinematic ease-cinematic',
-            melting
-              ? 'translate-y-0 opacity-100'
-              : 'translate-y-1 opacity-90 motion-reduce:translate-y-0'
-          )}
-          data-testid='story-first-answer'
-        >
-          {answer}
-        </div>
-      ) : null}
     </div>
   );
 }

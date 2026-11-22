@@ -88,10 +88,6 @@ describe('StoryFirstCanvas', () => {
         inFlightHref='/app/ov/shipping'
       />
     );
-    expect(screen.getByTestId('story-first-canvas')).toHaveAttribute(
-      'data-melting',
-      'false'
-    );
     expect(screen.getByTestId('story-first-bottleneck')).toHaveTextContent(
       'Nothing is blocking revenue'
     );
@@ -132,31 +128,18 @@ describe('StoryFirstCanvas', () => {
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
-  it('melts the board without removing the canvas shell', () => {
+  it('never blurs, lifts, fades or hides the board', () => {
     render(
       <StoryFirstCanvas
         bottleneck={bottleneck}
         glance={glance}
         stages={stages}
-        melting
-        answer={
-          <div data-testid='fixture-answer'>Why is checkout blocked?</div>
-        }
       />
     );
-    expect(screen.getByTestId('story-first-canvas')).toHaveAttribute(
-      'data-melting',
-      'true'
-    );
     const board = screen.getByTestId('story-first-board');
-    expect(board).toHaveAttribute('aria-hidden', 'true');
-    expect(board).toHaveAttribute('inert');
-    // Opacity + lift + blur; reduced-motion clears translate/blur only.
-    expect(board.className).toMatch(/opacity-40/);
-    expect(board.className).toMatch(/-translate-y-1/);
-    expect(board.className).toMatch(/blur-sm/);
-    expect(board.className).toMatch(/ease-cinematic/);
-    expect(screen.getByTestId('fixture-answer')).toBeVisible();
+    expect(board).not.toHaveAttribute('aria-hidden');
+    expect(board).not.toHaveAttribute('inert');
+    expect(board.className).not.toMatch(/blur|opacity|translate|transition/);
   });
 
   it('uses pulse sparklines without area fill chrome on the glance rail', () => {
@@ -176,8 +159,8 @@ describe('StoryFirstCanvas', () => {
     ).toHaveLength(0);
   });
 
-  it('is axe-clean in clear and melting states', async () => {
-    const clear = render(
+  it('is axe-clean', async () => {
+    const view = render(
       <StoryFirstCanvas
         bottleneck={bottleneck}
         glance={glance}
@@ -185,18 +168,7 @@ describe('StoryFirstCanvas', () => {
         inFlightHref='/app/ov/shipping'
       />
     );
-    await expectNoA11yViolations(clear.container);
-    clear.unmount();
-
-    const melt = render(
-      <StoryFirstCanvas
-        bottleneck={bottleneck}
-        glance={glance}
-        stages={stages}
-        melting
-      />
-    );
-    await expectNoA11yViolations(melt.container);
+    await expectNoA11yViolations(view.container);
   });
 });
 
