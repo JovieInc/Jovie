@@ -14,8 +14,6 @@ import type { AudienceMember } from '@/types';
 import { DashboardAudienceTableUnified } from './DashboardAudienceTableUnified';
 import { DEFAULT_AUDIENCE_FILTERS } from './types';
 
-// Analytics has its own query contract; this test exercises table/export binding.
-
 function renderWithProviders(ui: ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
