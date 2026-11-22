@@ -187,13 +187,19 @@ describe('one-rec gaps: promise-draft-not-a-move (ASS-100)', () => {
     ).toBe(false);
   });
 
-  it('passes a Night Swim ad-copy / outreach draft that holds for yes', () => {
+  it('passes a Night Swim ad-copy / outreach draft through live hard checks', () => {
+    const outreach = HELPFULNESS_CASES.find(
+      x => x.id === 'specialist-outreach'
+    );
+    if (!outreach) throw new Error('missing specialist-outreach');
     const text =
-      'Night Swim Meta primary (~$50 hold): "Out Friday. Pre-save Night Swim on my page before it drops." One draft, no spend until you confirm.';
+      'Ambient Evening pitch for Night Swim (held): "Night Swim lands Friday, downtempo fit for your list. jov.ie/lunawaves." One email, no send until yes.';
     expect(isPromiseOnlyDraft(text)).toBe(false);
-    expect(
-      runOneRecGapChecks(text, { requireDraftAskNow: true }).every(c => c.ok)
-    ).toBe(true);
+    const checks = runHardChecks(outreach, { text, toolCalls: [] });
+    expect(checks.find(x => x.id === 'promise_draft_not_a_move')?.ok).toBe(
+      true
+    );
+    expect(checks.find(x => x.id === 'grounding_0')?.ok).toBe(true);
   });
 
   it('hard-fails promise_draft_not_a_move on ad-copy + specialist-outreach live stubs', () => {
