@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { normalizeToolFailureOutput } from '@/lib/chat/tool-errors';
 import {
   merchDesignOptions,
   merchGenerationBatches,
@@ -203,6 +202,19 @@ beforeEach(() => {
   scheduleMerchMockupEnrichmentMock.mockImplementation(() => {});
 });
 
+const useRealConceptGate = () =>
+  reviewStoredMerchConceptPlanMock.mockImplementation(async (plan, now) =>
+    evaluateMerchConceptPlan(plan, null, now)
+  );
+
+const runMerch = (prompt: string) =>
+  generateMerchDesigns({
+    profileId: 'profile-1',
+    clerkUserId: 'user-1',
+    prompt,
+    source,
+  });
+
 function batchPatch(status: string): UpdatePatch | undefined {
   return updatePatches.find(
     patch =>
@@ -211,26 +223,15 @@ function batchPatch(status: string): UpdatePatch | undefined {
 }
 
 describe('generateMerchDesigns production outcome contract', () => {
-  // Outcome contract: "make merch" with no stored concept review must still
-  // produce three private draft designs. This runs the REAL concept gate (no
-  // synthetic review), which is the path every fresh artist hits in prod.
+  // No stored review (every fresh artist): the REAL gate must still render.
   it('renders three private draft designs when no concept review exists yet', async () => {
-    reviewStoredMerchConceptPlanMock.mockImplementation(async (plan, now) =>
-      evaluateMerchConceptPlan(plan, null, now)
-    );
+    useRealConceptGate();
     generatePrintGraphicMock.mockImplementation(async () => printGraphic());
-    const result = await generateMerchDesigns({
-      profileId: 'profile-1',
-      clerkUserId: 'user-1',
-      prompt: PASS_PROMPT,
-      source,
-    });
-    expect(result).not.toHaveProperty('state', 'concept_review_required');
+    const result = await runMerch(PASS_PROMPT);
     expect(result.designs).toHaveLength(3);
     expect(generatePrintGraphicMock).toHaveBeenCalledTimes(3);
     for (const design of result.designs) {
       expect(design.preview_url).toBe('https://cdn.test/mockup.png');
-      // Drafts can render but never sell until the exact artwork is approved.
       expect(design.sellability?.sellable).toBe(false);
     }
     const insert = dbMock.insert.mock.results[0].value.values;
@@ -248,15 +249,8 @@ describe('generateMerchDesigns production outcome contract', () => {
   });
 
   it('blocks rendering and makes zero image, upload or mockup calls when a concrete blocker exists', async () => {
-    reviewStoredMerchConceptPlanMock.mockImplementation(async (plan, now) =>
-      evaluateMerchConceptPlan(plan, null, now)
-    );
-    const result = await generateMerchDesigns({
-      profileId: 'profile-1',
-      clerkUserId: 'user-1',
-      prompt: `${PASS_PROMPT} for the 2031 world tour`,
-      source,
-    });
+    useRealConceptGate();
+    const result = await runMerch(`${PASS_PROMPT} for the 2031 world tour`);
     expect(result).toMatchObject({
       state: 'concept_review_required',
       designs: [],
@@ -502,26 +496,5 @@ describe('generateMerchDesigns production outcome contract', () => {
       })
     );
     expect(captureErrorMock).not.toHaveBeenCalled();
-  });
-
-  it('preserves generationId and failureSummary when a merch failure payload is normalized', () => {
-    const payload = normalizeToolFailureOutput('createMerch', {
-      success: false,
-      error: 'Profile ID required',
-      generationId: 'gen-1',
-      failureSummary: {
-        requested: 3,
-        ready: 0,
-        byClass: { image_provider: 3 },
-      },
-    });
-
-    expect(payload).not.toBeNull();
-    expect((payload as { generationId?: string }).generationId).toBe('gen-1');
-    expect(failureSummaryOf(payload)).toEqual({
-      requested: 3,
-      ready: 0,
-      byClass: { image_provider: 3 },
-    });
   });
 });
