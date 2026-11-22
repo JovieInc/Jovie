@@ -1989,7 +1989,7 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
 
   /* Linear card shadow — ring border + soft depth (the signature look) */
   --shadow-card:
-    oklch(80% 0 283) 0px 0px 0px 1px,
+    rgba(0, 0, 0, 0.07) 0px 0px 0px 1px,
     oklch(0% 0 0 / 2.2%) 0px 3px 6px -2px,
     oklch(0% 0 0 / 4.4%) 0px 1px 1px 0px;
   --shadow-card-elevated:

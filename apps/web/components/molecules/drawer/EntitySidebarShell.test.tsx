@@ -67,6 +67,8 @@ describe('EntitySidebarShell', () => {
     );
     const band = container.querySelector('[data-entity-sidebar-header-band]');
     expect(band).toHaveClass('pb-px', 'bg-transparent');
+    // -mx-px cancels the card's 1px border so header text lines up with body.
+    expect(band).toHaveClass('-mx-px');
     expect(band?.className).not.toMatch(/(^|\s)border(-|\s|$)/);
     expect(band).toContainElement(screen.getByRole('tablist'));
   });

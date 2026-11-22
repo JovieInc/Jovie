@@ -124,7 +124,7 @@ export function ChatPresenceArtifactCard({
           </dl>
         ) : null}
         {draftText ? (
-          <div className='rounded-md bg-surface-0 p-3 text-sm text-primary-token'>
+          <div className='rounded-md p-3 text-sm text-primary-token'>
             <p className='whitespace-pre-wrap'>{draftText}</p>
           </div>
         ) : null}

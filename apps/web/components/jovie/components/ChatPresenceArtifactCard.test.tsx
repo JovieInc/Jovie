@@ -94,6 +94,11 @@ describe('ChatPresenceArtifactCard', () => {
       />
     );
 
+    // The draft sits flat on the card, not in a recessed well.
+    const draft = screen.getByText('My new single is out now.');
+    expect(draft.parentElement).toHaveClass('rounded-md', 'p-3');
+    expect(draft.parentElement).not.toHaveClass('bg-surface-0');
+
     const link = screen.getByRole('link', { name: 'Open Link' });
     expect(link).toHaveAttribute('href', 'https://jov.ie/midnight-drive');
     expect(link).toHaveAttribute('target', '_blank');

@@ -1089,7 +1089,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               maxHeight: 'min(42vh, 280px)',
             }}
             className={cn(
-              'system-b-chat-composer-surface overflow-hidden outline-none ring-0 focus-within:outline-none',
+              'system-b-chat-composer-surface focus-glow-breathe overflow-hidden outline-none ring-0 focus-within:outline-none',
               showEntitySurface && !isStacked ? 'flex' : 'flex flex-col'
             )}
           >

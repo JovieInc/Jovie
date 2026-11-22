@@ -14,7 +14,8 @@ describe('ContentChartState', () => {
 
     const status = screen.getByRole('status');
     expect(status).toHaveAttribute('aria-busy', 'true');
-    expect(status).toHaveClass('h-50', 'bg-surface-0');
+    expect(status).toHaveClass('h-50');
+    expect(status).not.toHaveClass('bg-surface-0');
     expect(screen.getByTestId('chart-loading')).toBe(status);
     expect(screen.getByText('Loading revenue chart')).toHaveClass('sr-only');
   });
@@ -29,10 +30,8 @@ describe('ContentChartState', () => {
       />
     );
 
-    expect(screen.getByTestId('chart-empty')).toHaveClass(
-      'h-64',
-      'bg-surface-0'
-    );
+    expect(screen.getByTestId('chart-empty')).toHaveClass('h-64');
+    expect(screen.getByTestId('chart-empty')).not.toHaveClass('bg-surface-0');
     expect(screen.getByRole('status')).toHaveAttribute('data-state', 'empty');
     expect(screen.getByRole('status')).toHaveClass('mx-auto', 'text-center');
     expect(screen.getByText('No usage data')).toBeInTheDocument();

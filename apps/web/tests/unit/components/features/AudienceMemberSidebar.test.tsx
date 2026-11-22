@@ -155,11 +155,13 @@ describe('AudienceMemberSidebar', () => {
     expect(screen.getByTestId('audience-member-header-card')).toHaveClass(
       'grid',
       'grid-cols-[auto_minmax(0,1fr)_auto]',
-      'px-3',
       'pt-3',
       'items-center'
     );
+    // EntitySidebarShell's header slot owns the px-3 inset; padding it again
+    // here would push the header past the body text.
     expect(screen.getByTestId('audience-member-header-card')).not.toHaveClass(
+      'px-3',
       'px-2',
       'py-2'
     );

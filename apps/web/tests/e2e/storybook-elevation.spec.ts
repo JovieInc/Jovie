@@ -29,12 +29,12 @@ const STORIES = [
     name: 'card-on-shell-canvas',
   },
   {
-    id: 'design-system-elevation-matrix--well-on-shell-canvas',
-    name: 'well-on-shell-canvas',
+    id: 'design-system-elevation-matrix--content-on-shell-canvas',
+    name: 'content-on-shell-canvas',
   },
   {
-    id: 'design-system-elevation-matrix--well-inside-card',
-    name: 'well-inside-card',
+    id: 'design-system-elevation-matrix--content-inside-card',
+    name: 'content-inside-card',
   },
   {
     id: 'design-system-elevation-matrix--drawer-card-on-shell',
