@@ -7825,7 +7825,27 @@ jobs:
           fi
 
           cd "$GITHUB_WORKSPACE"
-          BASE_URL=http://localhost:3250 E2E_SKIP_WEB_SERVER=1 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter @jovie/web run test:e2e:golden-path:ci
+          # Journey suite only (claim + home-welcome + golden-path). Its exit
+          # becomes JOURNEY_OUTCOME for auth/billing evidence. Layout/visual
+          # surface specs run after and never rewrite that exit or the report.
+          # Disable -e around the journey invoke so a red suite still lets us
+          # capture JOURNEY_EXIT and run surfaces without aborting early.
+          set +e
+          BASE_URL=http://localhost:3250 E2E_SKIP_WEB_SERVER=1 \
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+            pnpm --filter @jovie/web run test:e2e:golden-path:ci
+          JOURNEY_EXIT=$?
+          # Unset the journey report path so surfaces cannot overwrite it.
+          unset JOURNEY_EVIDENCE_REPORT
+          BASE_URL=http://localhost:3250 E2E_SKIP_WEB_SERVER=1 \
+            node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+            pnpm --filter @jovie/web run test:e2e:golden-path:surfaces
+          SURFACES_EXIT=$?
+          set -e
+          if [ "$SURFACES_EXIT" -ne 0 ]; then
+            echo "::warning::Golden Path surface checks failed (layout/visual); journey exit=$JOURNEY_EXIT surfaces exit=$SURFACES_EXIT"
+          fi
+          exit "$JOURNEY_EXIT"
         env:
           # JOV-5489: deterministic keyframes (PNG evidence; video is refused by
           # the artifact secret guard) and a reviewer-only gateway key
@@ -7895,6 +7915,8 @@ jobs:
       # from the Playwright report of THIS run, so a skipped, mocked or red
       # journey is recorded as such. Named by exact SHA so the production
       # workflow can fetch it for the candidate.
+      # JOURNEY_OUTCOME is claim/welcome/golden-path only — surface layout
+      # failures inside the same step never rewrite that exit (JOURNEY_EXIT).
       - name: Emit journey evidence (jovie.journey-evidence/v1)
         if: ${{ always() }}
         env:
