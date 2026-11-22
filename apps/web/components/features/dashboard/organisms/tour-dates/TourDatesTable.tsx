@@ -211,7 +211,7 @@ const ActionsHeader = memo(function ActionsHeader({
           disabled={isSyncing}
           variant='ghost'
           size='sm'
-          className='h-8 gap-1 rounded-md px-2.5 text-app text-secondary-token hover:bg-surface-0 hover:text-primary-token'
+          className='h-7 gap-1 rounded-full px-2.5 text-app text-secondary-token hover:bg-surface-0 hover:text-primary-token'
         >
           <Icon
             name='RefreshCw'
