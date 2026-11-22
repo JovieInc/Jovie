@@ -13,12 +13,14 @@ function Harness({
   enabled = true,
   previewTrigger,
   enterIntentMs,
+  occupied = false,
 }: {
   side: 'left' | 'right';
   resetKey?: string;
   enabled?: boolean;
   previewTrigger?: boolean;
   enterIntentMs?: number;
+  occupied?: boolean;
 }) {
   const [pinned, setPinned] = useState(false);
   const { isPreview, isFloating, dismissPreview } = useRailPreview({
@@ -50,6 +52,11 @@ function Harness({
         data-pinned={pinned}
       >
         <button type='button'>Rail action</button>
+        {occupied ? (
+          <aside data-testid='app-shell-right-rail'>
+            <div data-rail-context-occupied='true'>Release context</div>
+          </aside>
+        ) : null}
       </div>
       <button type='button' data-testid='outside'>
         Outside
@@ -59,6 +66,43 @@ function Harness({
 }
 
 afterEach(() => vi.useRealTimers());
+
+describe('occupied right context rail', () => {
+  it.each(['hover', 'focus'] as const)(
+    'blocks automatic profile preview from %s but preserves explicit pin',
+    intent => {
+      render(<Harness side='right' occupied />);
+      const trigger = screen.getByTestId('trigger');
+      const rail = screen.getByTestId('rail');
+      if (intent === 'hover') fireEvent.pointerOver(trigger);
+      else act(() => trigger.focus());
+      expect(rail).toHaveAttribute('data-preview', 'false');
+      expect(rail).toHaveAttribute('data-floating', 'false');
+
+      fireEvent.pointerOver(screen.getByText('Release context'));
+      expect(rail).toHaveAttribute('data-preview', 'false');
+      fireEvent.click(trigger);
+      expect(rail).toHaveAttribute('data-pinned', 'true');
+      expect(rail).toHaveAttribute('data-floating', 'false');
+    }
+  );
+
+  it('rechecks the slot when queued hover intent expires', () => {
+    vi.useFakeTimers();
+    const advance = SHELL_RAIL_PREVIEW_INTENT_MS;
+    const { rerender } = render(
+      <Harness side='right' enterIntentMs={advance} />
+    );
+    fireEvent.pointerOver(screen.getByTestId('trigger'));
+    rerender(<Harness side='right' enterIntentMs={advance} occupied />);
+    act(() => vi.advanceTimersByTime(advance));
+    expect(screen.getByTestId('rail')).toHaveAttribute('data-preview', 'false');
+    expect(screen.getByTestId('rail')).toHaveAttribute(
+      'data-floating',
+      'false'
+    );
+  });
+});
 
 describe.each(['left', 'right'] as const)(
   '%s shared transient rail owner',
