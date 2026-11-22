@@ -52,8 +52,7 @@ describe('production controller health missing-marker page (JOV-8157)', () => {
       );
     expect(releaseStartedMatch).not.toBeNull();
     const filter = releaseStartedMatch?.[1] ?? 'false';
-    const jobs = (name: string) =>
-      JSON.stringify({ jobs: [{ name }] });
+    const jobs = (name: string) => JSON.stringify({ jobs: [{ name }] });
     expect(
       spawnSync('jq', ['-e', filter], {
         encoding: 'utf8',
