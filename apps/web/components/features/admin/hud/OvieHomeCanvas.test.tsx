@@ -343,6 +343,32 @@ describe('OvieHomeCanvas Story First flat', () => {
     );
   });
 
+  it('shows no Moving work when no in-flight row works on the revenue blocker', async () => {
+    companyResponses['/api/ovie/home/blocker'] = {
+      generatedAt: '2026-11-08T23:00:00.000Z',
+      blocker: {
+        schema: 'jovie.company-blocker/v1',
+        id: 'certification:checkout_payment_entitlement',
+        kind: 'certification',
+        step: 'checkout_payment_entitlement',
+        tone: 'warn',
+        text: "Checkout isn't fully measured yet, so we can't confirm anyone can pay",
+        detailsHref: APP_ROUTES.ADMIN_CERTIFICATIONS,
+        since: null,
+        nextAction: null,
+        observedAt: '2026-11-08T23:00:00.000Z',
+      },
+    };
+    renderCanvas();
+    const hero = await screen.findByTestId('story-first-bottleneck');
+    await vi.waitFor(() =>
+      expect(hero).toHaveTextContent("we can't confirm anyone can pay")
+    );
+    // The lead shipping row (JOV-1 "Blocked task") isn't checkout work.
+    expect(hero).not.toHaveTextContent('Moving');
+    expect(hero).not.toHaveTextContent('Blocked task');
+  });
+
   it('does not invent a company metric wall when sources are empty', async () => {
     companyResponses = {
       '/api/hud/metrics': { overview: { financialDataAvailable: false } },
