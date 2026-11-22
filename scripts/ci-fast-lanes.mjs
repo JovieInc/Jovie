@@ -1297,7 +1297,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-sibling-burn-contract.test.mjs',
   'scripts/lib/__tests__/gh-api-hold-retry.test.mjs',
   'scripts/lib/__tests__/prod-cert.test.mjs',
-  'scripts/lib/__tests__/prod-cert-skew.test.mjs',
+  'scripts/lib/__tests__/prod-cert-skew.test.mjs scripts/lib/__tests__/prod-cert-carry.test.mjs',
   'scripts/lib/__tests__/prod-cone-cases.test.mjs scripts/lib/__tests__/prod-cone-scoreboard-clobber.test.mjs',
   'scripts/lib/__tests__/cert-bottleneck.test.mjs',
   'scripts/lib/__tests__/self-hosted-workspace-reset-contract.test.mjs',
