@@ -108,12 +108,14 @@ jobs:
         run: |
           set -euo pipefail
           test -n "${DOPPLER_TOKEN:-}"
+          # Repo-pinned tsx compiles -e as CJS; top-level await fails. Use a
+          # promise chain (not top-level await) under react-server conditions.
           doppler run --project jovie-web --config prd \
             --only-secrets=DATABASE_URL \
             --no-fallback -- env -u DOPPLER_TOKEN \
               pnpm --filter=@jovie/web exec \
                 env NODE_OPTIONS=--conditions=react-server \
-                tsx -e "await import('@/lib/ovie/mcp/postgres-backend.ts')"
+                tsx -e "void import('@/lib/ovie/mcp/postgres-backend.ts').then((m)=>{if(typeof m.postgresRecordBackend!=='function')process.exit(1);console.log('postgres-backend-import-ok')}).catch((e)=>{console.error(e);process.exit(1)})"
 
       - name: Dry-run observe (no write)
         if: ${{ inputs.dry_run }}
@@ -125,7 +127,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$ARTIFACT_DIR"
-          pnpm --filter=@jovie/web dogfood:bind-public-profile -- \
+          # No standalone `--` after the script name: pnpm 9.15.9 forwards it
+          # literally and node:util parseArgs rejects `--origin` as positional.
+          pnpm --filter=@jovie/web dogfood:bind-public-profile \
             --origin "$ORIGIN" \
             --observe \
             --path "$PROFILE_PATH" \
@@ -149,7 +153,7 @@ jobs:
           doppler run --project jovie-web --config prd \
             --only-secrets=DATABASE_URL \
             --no-fallback -- env -u DOPPLER_TOKEN \
-              pnpm --filter=@jovie/web dogfood:bind-public-profile -- \
+              pnpm --filter=@jovie/web dogfood:bind-public-profile \
                 --origin "$ORIGIN" \
                 --observe \
                 --path "$PROFILE_PATH" \
