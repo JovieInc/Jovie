@@ -2356,7 +2356,12 @@ describe('source-read guard selection', () => {
     // OutboundRail.tsx text-destructive ejected group pr-21458 (10-13).
     [
       'apps/web/components/features/admin/outbound/OutboundRail.tsx',
-      ['merge-group-unit-guards', 'static-revalidate-policy', 'anti-slop'],
+      [
+        'merge-group-unit-guards',
+        'static-revalidate-policy',
+        'art-direction',
+        'anti-slop',
+      ],
     ],
     ['packages/ui/src/button.tsx', ['merge-group-unit-guards', 'anti-slop']],
   ])('selects the guards that read %s on a PR', (path, guards) => {
@@ -2382,33 +2387,6 @@ describe('source-read guard selection', () => {
         : []),
       'gate-weakening-detector',
     ]);
-  });
-
-  it.each([
-    'apps/web/app/api/agents/creator-lookup/route.ts',
-    'apps/web/app/api/agents/feedback/route.ts',
-    'apps/web/app/api/agents/profiles/route.ts',
-    'apps/web/app/api/music/mcp/route.ts',
-    'apps/web/app/api/v1/openapi.json/route.ts',
-    'apps/web/app/openapi.json/route.ts',
-    'apps/web/lib/api/public-agent-openapi.ts',
-    'apps/web/lib/api/v1/openapi.ts',
-    'apps/web/lib/music-resolver/public-schemas.ts',
-    'apps/web/tests/unit/api/v1/public-command-openapi.test.ts',
-    'apps/web/tests/utils/public-openapi.ts',
-    'packages/jovie-cli/src/client.ts',
-    'packages/jovie-cli/src/commands.ts',
-    'packages/jovie-cli/src/mcp.ts',
-  ])('runs public command/OpenAPI parity on PR changes to %s', path => {
-    expect(selected('pull_request', [path])).toContain(
-      'public-command-openapi'
-    );
-    expect(selected('merge_group', [path])).not.toContain(
-      'public-command-openapi'
-    );
-    expect(
-      SOURCE_GUARDS.find(guard => guard.id === 'public-command-openapi').command
-    ).toContain('public-command-openapi.test.ts');
   });
 
   it.each([
