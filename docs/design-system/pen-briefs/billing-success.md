@@ -6,7 +6,7 @@ model: claude-opus-5-5
 ---
 Design the screen a buyer sees right after paying for Jovie Pro, desktop 1440 wide and mobile 390 wide, dark mode first.
 
-The headline reads "You're on Pro: unlocked". Under it, the two or three things they can do now, each one tap away, and one primary button into their dashboard. Show their profile link with a copy action so they can share it immediately. No receipt table; Stripe emails the receipt.
+The headline reads just "You're on Pro" (Tim, 2026-11-22). Under it, the two or three things they can do now, each one tap away, and one primary button into their dashboard. Show their profile link with a copy action so they can share it immediately. No receipt table; Stripe emails the receipt.
 
 Give the page one focal point (Tim, 2026-11-22: "page needs more focus"). A single centered column about 480 wide holds, in this order: a small Pro mark, the headline, one line of secondary copy, the "Go to dashboard" primary button, then the profile link row (a read-only field with a copy button beside it). The two or three next steps sit below that as quiet secondary rows in muted ink, clearly lower in the hierarchy than the primary button. Nothing else competes for the eye: no side panels, no second card, no stats.
 
