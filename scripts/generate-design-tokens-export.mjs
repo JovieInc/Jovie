@@ -191,6 +191,16 @@ export function generate(
         dimension(v),
       ])
     ),
+    // Grid tokens for the DataGrid. row-default and row-comfortable reuse the
+    // existing size.row.compact (40) and size.row.list (44) row modes by alias.
+    grid: {
+      'row-compact': dimension(36),
+      'row-default': { $value: '{size.row.compact}', $type: 'dimension' },
+      'row-comfortable': { $value: '{size.row.list}', $type: 'dimension' },
+      'cell-padding-x': dimension(12),
+      avatar: dimension(24),
+      'status-dot': dimension(8),
+    },
     size: {
       headerHeight: dimension(tableSizes.headerHeight),
       ...Object.fromEntries(

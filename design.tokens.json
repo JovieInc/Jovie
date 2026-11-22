@@ -343,6 +343,32 @@
       "$type": "dimension"
     }
   },
+  "grid": {
+    "row-compact": {
+      "$value": "36px",
+      "$type": "dimension"
+    },
+    "row-default": {
+      "$value": "{size.row.compact}",
+      "$type": "dimension"
+    },
+    "row-comfortable": {
+      "$value": "{size.row.list}",
+      "$type": "dimension"
+    },
+    "cell-padding-x": {
+      "$value": "12px",
+      "$type": "dimension"
+    },
+    "avatar": {
+      "$value": "24px",
+      "$type": "dimension"
+    },
+    "status-dot": {
+      "$value": "8px",
+      "$type": "dimension"
+    }
+  },
   "size": {
     "headerHeight": {
       "$value": "32px",
