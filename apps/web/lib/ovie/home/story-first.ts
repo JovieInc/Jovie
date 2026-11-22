@@ -309,6 +309,51 @@ function shortTitle(blocker: CompanyBlocker): string {
   return `${stepLabel(blocker.step)} is blocking revenue`;
 }
 
+const CHECKOUT_WORK =
+  /checkout|billing|payment|stripe|pricing|entitlement|paywall/i;
+const ENTRY_WORK = /homepage|landing|entry/i;
+const ONBOARDING_WORK = /onboarding|sign.?up|sign.?in|\bauth|claim/i;
+const ACTIVATION_WORK = /activation|dashboard|first.?use/i;
+
+/** Words a shipping row's title uses when it works on a blocker step. */
+const BLOCKER_WORK: Readonly<Record<CompanyBlocker['step'], RegExp>> = {
+  public_profile: /profile/i,
+  homepage_entry: ENTRY_WORK,
+  onboarding_auth_claim: ONBOARDING_WORK,
+  checkout_payment_entitlement: CHECKOUT_WORK,
+  activation_dashboard: ACTIVATION_WORK,
+  visits: ENTRY_WORK,
+  eligible_entries: ENTRY_WORK,
+  onboarding_starts: ONBOARDING_WORK,
+  account_creation: ONBOARDING_WORK,
+  claim_shown: /claim/i,
+  claim_attempted: /claim/i,
+  claim_completed: /claim/i,
+  checkout_shown: CHECKOUT_WORK,
+  checkout_started: CHECKOUT_WORK,
+  paid: CHECKOUT_WORK,
+  activated: ACTIVATION_WORK,
+};
+
+/**
+ * The in-flight row that works on this blocker, in shipping order. The lead
+ * shipping row is not "moving" a blocker it has nothing to do with (Tim,
+ * 2026-11-22: checkout's card linked a lanes issue), so no match means no
+ * Moving line rather than an unrelated one.
+ */
+export function movingForBlocker(
+  rows: readonly HomeLoopRow<OvieShipStage>[],
+  step: CompanyBlocker['step']
+): StoryFirstStageHighlight | null {
+  const pattern = BLOCKER_WORK[step];
+  const row = rows.find(
+    item => !item.complete && pattern.test(`${item.identifier} ${item.title}`)
+  );
+  return row
+    ? { identifier: row.identifier, title: row.title, href: row.url }
+    : null;
+}
+
 /**
  * One bottleneck story for the flat hero. Revenue blocker wins; shipping
  * constraint is the floor when revenue is clear (same as homeConstraint).
@@ -322,6 +367,8 @@ export function buildStoryFirstBottleneck(input: {
   readonly revenueFailed?: boolean;
   readonly constraint: HomeLoopConstraint | null;
   readonly highlight: StoryFirstStageHighlight | null;
+  /** Shipping rows; when given, a revenue blocker's Moving line is the row working on it. */
+  readonly rows?: readonly HomeLoopRow<OvieShipStage>[];
   readonly clearTitle?: string;
   readonly clearBody?: string;
 }): StoryFirstBottleneck {
@@ -339,6 +386,9 @@ export function buildStoryFirstBottleneck(input: {
   }
 
   if (input.revenue) {
+    const moving = input.rows
+      ? movingForBlocker(input.rows, input.revenue.step)
+      : input.highlight;
     const since =
       input.revenue.since != null
         ? new Date(input.revenue.since).toLocaleDateString('en-US', {
@@ -352,13 +402,10 @@ export function buildStoryFirstBottleneck(input: {
       eyebrow: `Bottleneck · ${stepLabel(input.revenue.step)}`,
       title: shortTitle(input.revenue),
       body: input.revenue.text,
-      moving: input.highlight
+      moving: moving
         ? {
-            label: issueLabel(
-              input.highlight.identifier,
-              input.highlight.title
-            ),
-            href: input.highlight.href,
+            label: issueLabel(moving.identifier, moving.title),
+            href: moving.href,
           }
         : null,
       needs: input.revenue.nextAction,
