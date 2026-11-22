@@ -242,6 +242,10 @@ describe('ChatHistorySwitcher', () => {
       .getAllByTestId('chat-history-row')
       .find(row => row.textContent?.startsWith('Tour Budget'));
     expect(tourRow).toHaveAttribute('data-unread', 'true');
+    // A quiet 4px dot at 70% accent, not the old loud 6px solid one.
+    const dot = within(tourRow!).getByTestId('chat-history-unread-dot');
+    expect(dot).toHaveClass('size-1', 'bg-accent/70');
+    expect(dot).not.toHaveClass('size-1.5', 'bg-accent');
 
     await user.click(
       within(reopened).getByRole('menuitem', { name: 'Tour Budget 3d' })

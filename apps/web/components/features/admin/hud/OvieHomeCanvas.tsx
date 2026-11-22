@@ -235,8 +235,9 @@ export function OvieHomeCanvas() {
         revenueFailed,
         constraint,
         highlight,
+        rows: home?.rows ?? [],
       }),
-    [revenueData, revenueRead, revenueFailed, constraint, highlight]
+    [revenueData, revenueRead, revenueFailed, constraint, highlight, home]
   );
   const glance = useMemo(
     () =>

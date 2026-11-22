@@ -70,4 +70,20 @@ describe('TaskListRow', () => {
     render(<TaskListRow task={task} hideTitle onOpenRelease={vi.fn()} />);
     expect(screen.queryByText(task.title)).toBeNull();
   });
+
+  it('shows identifierLabel in place of the J-number and keeps J-number by default', () => {
+    const { unmount } = render(
+      <TaskListRow
+        task={task}
+        identifierLabel='JOV-123'
+        onOpenRelease={vi.fn()}
+      />
+    );
+    expect(screen.getByText('JOV-123')).toBeInTheDocument();
+    expect(screen.queryByText('J-12')).toBeNull();
+    unmount();
+
+    render(<TaskListRow task={task} onOpenRelease={vi.fn()} />);
+    expect(screen.getByText('J-12')).toBeInTheDocument();
+  });
 });

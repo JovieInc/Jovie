@@ -4,7 +4,10 @@ import {
   REVIEW_INBOX_DECISION_CONTRACT,
   REVIEW_INBOX_PILOT_TENANT,
 } from '@/lib/ovie/review-inbox/contract';
-import { createPilotReviewCase } from '@/lib/ovie/review-inbox/pilot-fixture';
+import {
+  createPilotReviewCase,
+  PILOT_V1_DIGEST,
+} from '@/lib/ovie/review-inbox/pilot-fixture';
 import { GET, POST } from './route';
 
 const mocks = vi.hoisted(() => ({
@@ -14,7 +17,9 @@ const mocks = vi.hoisted(() => ({
   pilotCase: vi.fn(),
   applyDecision: vi.fn(),
   receiptForAction: vi.fn(),
+  auth: vi.fn(),
 }));
+vi.mock('@/lib/auth/cached', () => ({ getFreshAuth: mocks.auth }));
 vi.mock('@/lib/ovie/mcp/principal', () => ({
   resolveOviePrincipal: mocks.principal,
 }));
@@ -22,10 +27,12 @@ vi.mock('@/lib/ovie/inbox.server', () => ({ readOvieInbox: mocks.read }));
 vi.mock('@/lib/ovie/privacy-lock/access', () => ({
   getOvieOperatorEntitlements: mocks.entitlements,
 }));
-vi.mock('@/lib/ovie/review-inbox/pilot-ledger', () => ({
-  readReviewInboxPilotCase: mocks.pilotCase,
-  applyReviewInboxDecision: mocks.applyDecision,
-  reviewInboxPilotReceiptForAction: mocks.receiptForAction,
+vi.mock('@/lib/ovie/review-inbox/store.server', () => ({
+  reviewInboxLedger: {
+    readCase: mocks.pilotCase,
+    apply: mocks.applyDecision,
+    receiptFor: mocks.receiptForAction,
+  },
 }));
 const request = () => new Request('https://example.com/api/ovie/inbox');
 const pilotRequest = () =>
@@ -38,9 +45,10 @@ beforeEach(() => {
     isAuthenticated: true,
     isAdmin: true,
   });
-  mocks.pilotCase.mockReturnValue(createPilotReviewCase());
-  mocks.receiptForAction.mockReturnValue(null);
-  mocks.applyDecision.mockReturnValue({
+  mocks.auth.mockResolvedValue({ userId: 'user_founder', sessionId: 's1' });
+  mocks.pilotCase.mockResolvedValue(createPilotReviewCase());
+  mocks.receiptForAction.mockResolvedValue(null);
+  mocks.applyDecision.mockResolvedValue({
     ok: true,
     receipt: { ack: true },
   });
@@ -68,6 +76,16 @@ describe('Ovie Inbox read access', () => {
     expect(result.status).toBe(200);
     expect(await result.json()).toEqual({ case: createPilotReviewCase() });
     expect(mocks.read).not.toHaveBeenCalled();
+    expect(mocks.pilotCase).toHaveBeenCalledWith({
+      tenant: REVIEW_INBOX_PILOT_TENANT,
+      principalId: 'user_founder',
+      caseId: REVIEW_INBOX_PILOT_TENANT,
+    });
+  });
+
+  it('fails closed when the durable review store is unavailable', async () => {
+    mocks.pilotCase.mockRejectedValueOnce(new Error('kv down'));
+    expect((await GET(pilotRequest())).status).toBe(503);
   });
 
   it('rejects pilot reads without operator session', async () => {
@@ -107,5 +125,74 @@ describe('Ovie review inbox pilot decisions', () => {
       })
     );
     expect(response.status).toBe(403);
+  });
+
+  it('saves drawn strokes under the signed-in operator, not an impersonated user', async () => {
+    mocks.auth.mockResolvedValue({
+      userId: 'user_customer',
+      actorUserId: 'user_founder',
+      sessionId: 's1',
+    });
+    const decision = {
+      contract: REVIEW_INBOX_DECISION_CONTRACT,
+      tenant: REVIEW_INBOX_PILOT_TENANT,
+      caseId: REVIEW_INBOX_PILOT_TENANT,
+      revision: 'v1',
+      command: 'request_changes',
+      actionId: 'draw-1',
+      strokes: [
+        {
+          id: 's1',
+          assetDigest: PILOT_V1_DIGEST,
+          revision: 'v1',
+          points: [
+            [0.1, 0.1],
+            [0.2, 0.2],
+          ],
+        },
+      ],
+    };
+    const response = await POST(
+      new NextRequest('https://example.com/api/ovie/inbox', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(decision),
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(mocks.applyDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ principalId: 'user_founder' }),
+      expect.objectContaining({ strokes: decision.strokes })
+    );
+  });
+
+  it('rejects strokes with out-of-range points before touching the store', async () => {
+    const response = await POST(
+      new NextRequest('https://example.com/api/ovie/inbox', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          contract: REVIEW_INBOX_DECISION_CONTRACT,
+          tenant: REVIEW_INBOX_PILOT_TENANT,
+          caseId: REVIEW_INBOX_PILOT_TENANT,
+          revision: 'v1',
+          command: 'request_changes',
+          actionId: 'draw-2',
+          strokes: [
+            {
+              id: 's1',
+              assetDigest: PILOT_V1_DIGEST,
+              revision: 'v1',
+              points: [
+                [0.1, 0.1],
+                [1.4, 0.2],
+              ],
+            },
+          ],
+        }),
+      })
+    );
+    expect(response.status).toBe(400);
+    expect(mocks.applyDecision).not.toHaveBeenCalled();
   });
 });

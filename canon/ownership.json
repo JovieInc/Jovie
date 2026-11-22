@@ -150,6 +150,7 @@
     {"id": "workflow:vercel-preview-cleanup", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/vercel-preview-cleanup.yml"},
     {"id": "workflow:visual-a11y", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/visual-a11y.yml"},
     {"id": "workflow:visual-regression", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/visual-regression.yml"},
+    {"id": "workflow:storybook-host", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/storybook-host.yml", "note": "Team-only static Storybook deploy on merges to main."},
     {"id": "workflow:voc-mine", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/voc-mine.yml", "note": "Workflow header names TimWhite as accountable writer; the routine owner is the agent role here."},
     {"id": "workflow:gbrain-compounding", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/gbrain-compounding.yml", "note": "workflow_dispatch verify of health-digest → durable-claims; live schedule is Hermes/Gem host after gbrain-health-summary."},
     {"id": "ci-lane:harness:ci-path-changes", "kind": "ci-lane", "owner": "gem-ci-repair", "status": "active", "ref": ".github/ci-harness/manifest.json#ci-path-changes", "repair": "Lane Fix Relay labels the PR's writer lane; lane-level breakage is gem-ci-repair's (remediation:<lane>).", "note": "Path Changes"},
