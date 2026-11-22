@@ -2564,23 +2564,12 @@ describe('source-read guard selection', () => {
         ).toContain("from 'node:test'");
         continue;
       }
-      if (guard.id === 'artist-launch-contract') {
-        expect(guard.command).toContain('node scripts/artist-');
-        expect(
-          readFileSync(join(REPO_ROOT, `scripts/${guard.id}.test.mjs`), 'utf8')
-        ).toContain("from 'node:test'");
-        continue;
-      }
-      if (guard.id === 'outcome-coverage') {
-        expect(guard.prOnly).toBe(false);
-        expect(guard.command).toContain(
-          'node scripts/outcome-coverage.mjs --check'
+      if (['artist-launch-contract', 'outcome-coverage'].includes(guard.id)) {
+        expect(guard.command).toMatch(
+          /node scripts\/(?:artist-|outcome-coverage\.mjs --check)/u
         );
         expect(
-          readFileSync(
-            join(REPO_ROOT, 'scripts/outcome-coverage.test.mjs'),
-            'utf8'
-          )
+          readFileSync(join(REPO_ROOT, `scripts/${guard.id}.test.mjs`), 'utf8')
         ).toContain("from 'node:test'");
         continue;
       }

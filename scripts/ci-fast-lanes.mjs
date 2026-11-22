@@ -382,7 +382,7 @@ export const SOURCE_GUARDS = Object.freeze([
     // JOV-14474: every chat tool and core mutation names an outcome check.
     id: 'outcome-coverage',
     command:
-      'git fetch -q --no-tags --depth=1 origin "${GITHUB_BASE_REF:-main}" 2>/dev/null || true; node scripts/outcome-coverage.mjs --check && node --test --test-isolation=none scripts/outcome-coverage.test.mjs',
+      'git fetch -q --no-tags --depth=1 origin "${GITHUB_BASE_REF:-main}" 2>/dev/null || true; node scripts/outcome-coverage.mjs --check && node --test scripts/outcome-coverage.test.mjs',
     inputs:
       /^(?:apps\/web\/lib\/chat\/chat-tool-inventory\.ts$|docs\/product\/(?:outcome-coverage\.json$|generated\/artist-launch-inventory\.json$)|scripts\/outcome-coverage|scripts\/ci-fast-lanes\.mjs$)/u,
     prOnly: false,
