@@ -1,3 +1,4 @@
+import { APICallError } from 'ai';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -201,6 +202,59 @@ describe('insufficient-funds presentation', () => {
       expect(
         getPreferredErrorMessage(error, type, extractErrorMetadata(error))
       ).toBe('Jovie AI is currently unavailable. Please try again later.');
+    }
+  );
+});
+
+describe('Summer founder identity errors from /api/chat', () => {
+  it('falls back to the generic sentence when the body has no message', () => {
+    const err = new Error(
+      JSON.stringify({
+        error: 'Founder Summer identity is not configured',
+        requestId: 'req_summer',
+      })
+    );
+    const type = getErrorType(err);
+
+    expect(getPreferredErrorMessage(err, type, extractErrorMetadata(err))).toBe(
+      getUserFriendlyMessage(type)
+    );
+  });
+
+  it.each([
+    [
+      'Founder Summer identity is not configured',
+      'SUMMER_FOUNDER_IDENTITY_UNCONFIGURED',
+      "Summer isn't connected on this environment yet.",
+    ],
+    [
+      'Founder Summer access required',
+      'SUMMER_FOUNDER_ACCESS_REQUIRED',
+      "This account isn't Summer's founder account.",
+    ],
+  ])(
+    'shows the route sentence instead of the generic fallback for %s',
+    (error, errorCode, message) => {
+      // DefaultChatTransport throws an APICallError whose message is the
+      // non-2xx response body.
+      const responseBody = JSON.stringify({
+        error,
+        errorCode,
+        message,
+        requestId: 'req_summer',
+      });
+      const err = new APICallError({
+        message: responseBody,
+        url: '/api/chat',
+        requestBodyValues: undefined,
+        statusCode: errorCode.endsWith('UNCONFIGURED') ? 503 : 403,
+        responseBody,
+      });
+      const type = getErrorType(err);
+      const metadata = extractErrorMetadata(err);
+
+      expect(metadata).toMatchObject({ errorCode, requestId: 'req_summer' });
+      expect(getPreferredErrorMessage(err, type, metadata)).toBe(message);
     }
   );
 });
