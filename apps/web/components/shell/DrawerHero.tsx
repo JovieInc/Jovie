@@ -2,7 +2,7 @@
 
 import { MoreHorizontal } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { PlayGlyph } from '@/components/atoms/PlayGlyph';
+import { PlayIcon } from '@/components/atoms/PlayIcon';
 import {
   STABLE_HEADER_LINE_CLAMP_CLASSNAME,
   STABLE_HEADER_TITLE_HEIGHT_CLASSNAME,
@@ -96,7 +96,7 @@ function DrawerHeroArtworkSlot({
         className='absolute inset-0 grid place-items-center bg-black/45 opacity-0 group-hover/art:opacity-100 transition-opacity duration-subtle ease-subtle'
       >
         <span className='h-8 w-8 rounded-full bg-white dark:bg-surface-1 text-black dark:text-white grid place-items-center'>
-          <PlayGlyph size={16} strokeWidth={2.5} fill='currentColor' />
+          <PlayIcon size={16} strokeWidth={2.5} fill='currentColor' />
         </span>
       </span>
     </button>

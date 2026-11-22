@@ -274,14 +274,14 @@ describe('SidebarBottomNowPlaying', () => {
 });
 
 describe('SidebarBottomNowPlaying play glyph', () => {
-  it('draws the play triangle through PlayGlyph (JOV-12568)', () => {
+  it('draws the play triangle through PlayIcon (JOV-12568)', () => {
     const source = readFileSync(
       resolve(__dirname, './SidebarBottomNowPlaying.tsx'),
       'utf8'
     );
 
-    expect(source).toContain('<PlayGlyph');
-    expect(source).toContain("from '@/components/atoms/PlayGlyph'");
+    expect(source).toContain('<PlayIcon');
+    expect(source).toContain("from '@/components/atoms/PlayIcon'");
     expect(source).not.toContain('translate-x-px');
   });
 });

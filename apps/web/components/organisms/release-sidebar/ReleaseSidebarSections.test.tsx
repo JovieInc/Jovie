@@ -493,7 +493,7 @@ describe('ReleaseSidebarSections', () => {
   });
 });
 
-it('draws the play triangle through PlayGlyph (JOV-12568)', () => {
+it('draws the play triangle through PlayIcon (JOV-12568)', () => {
   const src = readFileSync(resolve(__dirname, './ReleaseSidebarSections.tsx'));
-  expect(String(src)).toMatch(/^(?![\s\S]*translate-x-px)[\s\S]*<PlayGlyph/);
+  expect(String(src)).toMatch(/^(?![\s\S]*translate-x-px)[\s\S]*<PlayIcon/);
 });

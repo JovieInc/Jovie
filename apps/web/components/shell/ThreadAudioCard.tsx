@@ -1,7 +1,7 @@
 'use client';
 
 import { AudioLines } from 'lucide-react';
-import { PlayGlyph } from '@/components/atoms/PlayGlyph';
+import { PlayIcon } from '@/components/atoms/PlayIcon';
 
 export interface ThreadAudioCardProps {
   readonly title: string;
@@ -46,7 +46,7 @@ export function ThreadAudioCard({
         className='system-b-thread-audio-play'
         aria-label='Play In Global Player'
       >
-        <PlayGlyph size={12} strokeWidth={2.5} fill='currentColor' />
+        <PlayIcon size={12} strokeWidth={2.5} fill='currentColor' />
       </button>
     </div>
   );

@@ -12,7 +12,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { PlayGlyph } from '@/components/atoms/PlayGlyph';
+import { PlayIcon } from '@/components/atoms/PlayIcon';
 import {
   pausePlaybackForInterruption,
   resumePlaybackAfterInterruption,
@@ -409,7 +409,7 @@ export function AudioWaveformEditor({
           {isPlaying ? (
             <Pause className='h-3.5 w-3.5' strokeWidth={2.5} />
           ) : (
-            <PlayGlyph size={14} strokeWidth={2.5} />
+            <PlayIcon size={14} strokeWidth={2.5} />
           )}
         </button>
         <div className='min-w-0 text-right text-2xs text-tertiary-token tabular-nums'>

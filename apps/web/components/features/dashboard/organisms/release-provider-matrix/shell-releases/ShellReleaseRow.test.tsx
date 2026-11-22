@@ -147,7 +147,7 @@ describe('ShellReleaseRow optical fixes (JOV-12568)', () => {
     expect(source).toMatch(/<Clock\s+className='h-3\.5 w-3\.5'/);
     expect(source).toContain("<Lock className='h-3.5 w-3.5'");
     expect(source).toContain("<ExternalLink className='h-3.5 w-3.5'");
-    expect(source).toContain('<PlayGlyph');
+    expect(source).toContain('<PlayIcon');
     expect(source).toContain(
       "<span className='min-w-0 truncate'>{release.title}</span>"
     );

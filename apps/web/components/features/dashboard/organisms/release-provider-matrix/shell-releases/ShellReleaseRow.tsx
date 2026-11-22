@@ -16,7 +16,7 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { PlayGlyph } from '@/components/atoms/PlayGlyph';
+import { PlayIcon } from '@/components/atoms/PlayIcon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 import { toast } from '@/components/feedback';
@@ -183,7 +183,7 @@ const ArtworkCell = memo(function ArtworkCell({
               aria-hidden='true'
             />
           ) : (
-            <PlayGlyph
+            <PlayIcon
               size={14}
               strokeWidth={2.5}
               fill='currentColor'

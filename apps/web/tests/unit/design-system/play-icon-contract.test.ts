@@ -11,7 +11,7 @@ const WEB_ROOT = join(
 );
 
 const ROOTS = ['components', join('app', 'app')];
-const OWNER = 'components/atoms/PlayGlyph.tsx';
+const OWNER = 'components/atoms/PlayIcon.tsx';
 // TrackSidebar.tsx is open in #24746; convert its play glyph once it merges.
 const ALLOW = new Set([
   'components/organisms/release-sidebar/TrackSidebar.tsx',
@@ -36,7 +36,7 @@ function walk(dir: string, out: string[]) {
 }
 
 describe('play glyph contract (JOV-12568)', () => {
-  it('keeps the play triangle optical offset inside PlayGlyph only', () => {
+  it('keeps the play triangle optical offset inside PlayIcon only', () => {
     const offenders = ROOTS.flatMap(root => walk(join(WEB_ROOT, root), []))
       .map(path => relative(WEB_ROOT, path).split('\\').join('/'))
       .filter(path => path !== OWNER && !ALLOW.has(path))

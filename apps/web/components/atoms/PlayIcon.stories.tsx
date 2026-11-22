@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Pause } from 'lucide-react';
-import { PlayGlyph, type PlayGlyphSize } from './PlayGlyph';
+import { PlayIcon, type PlayIconSize } from './PlayIcon';
 
-const SIZES: readonly PlayGlyphSize[] = [12, 14, 16];
-const PAUSE_SIZE: Record<PlayGlyphSize, string> = {
+const SIZES: readonly PlayIconSize[] = [12, 14, 16];
+const PAUSE_SIZE: Record<PlayIconSize, string> = {
   12: 'h-3 w-3',
   14: 'h-3.5 w-3.5',
   16: 'h-4 w-4',
@@ -14,10 +14,10 @@ const PAUSE_SIZE: Record<PlayGlyphSize, string> = {
  * a pause glyph of the same size beside it for comparison.
  */
 const meta = {
-  title: 'Atoms/PlayGlyph',
-  component: PlayGlyph,
+  title: 'Atoms/PlayIcon',
+  component: PlayIcon,
   parameters: { layout: 'centered' },
-} satisfies Meta<typeof PlayGlyph>;
+} satisfies Meta<typeof PlayIcon>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -28,10 +28,10 @@ export const Sizes: Story = {
       {SIZES.map(size => (
         <div key={size} className='flex items-center gap-3'>
           <span className='grid h-7 w-7 place-items-center rounded-full bg-surface-1'>
-            <PlayGlyph size={size} fill='currentColor' />
+            <PlayIcon size={size} fill='currentColor' />
           </span>
           <span className='grid h-10 w-10 place-items-center rounded-full bg-surface-1'>
-            <PlayGlyph size={size} fill='currentColor' />
+            <PlayIcon size={size} fill='currentColor' />
           </span>
           <span className='grid h-7 w-7 place-items-center rounded-full bg-surface-1'>
             <Pause

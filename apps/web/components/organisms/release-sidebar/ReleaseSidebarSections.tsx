@@ -17,7 +17,7 @@ import {
 import type { ComponentType, ReactNode } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
-import { PlayGlyph } from '@/components/atoms/PlayGlyph';
+import { PlayIcon } from '@/components/atoms/PlayIcon';
 import { CreditList } from '@/components/molecules/CreditList';
 import {
   DrawerAsyncToggle,
@@ -340,7 +340,7 @@ export function ReleaseEntityHeader({
                 {isPlaying ? (
                   <Pause className='h-4 w-4 text-on-media drop-shadow-sm' />
                 ) : (
-                  <PlayGlyph
+                  <PlayIcon
                     size={16}
                     className='text-on-media drop-shadow-sm'
                   />

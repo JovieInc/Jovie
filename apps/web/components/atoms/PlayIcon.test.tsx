@@ -1,11 +1,11 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
-import { PlayGlyph } from './PlayGlyph';
+import { PlayIcon } from './PlayIcon';
 
-describe('PlayGlyph', () => {
+describe('PlayIcon', () => {
   it('owns the 1px optical offset', () => {
-    const { container } = render(<PlayGlyph />);
+    const { container } = render(<PlayIcon />);
     const svg = container.querySelector('svg');
     expect(svg).not.toBeNull();
     expect(svg).toHaveClass('h-3.5', 'w-3.5', 'translate-x-px');
@@ -17,13 +17,13 @@ describe('PlayGlyph', () => {
     [14, ['h-3.5', 'w-3.5']],
     [16, ['h-4', 'w-4']],
   ] as const)('sizes %spx with %s', (size, classes) => {
-    const { container } = render(<PlayGlyph size={size} />);
+    const { container } = render(<PlayIcon size={size} />);
     expect(container.querySelector('svg')).toHaveClass(...classes);
   });
 
   it('passes className, strokeWidth and fill through', () => {
     const { container } = render(
-      <PlayGlyph
+      <PlayIcon
         size={12}
         className='text-tooltip-foreground'
         strokeWidth={2.5}
@@ -41,7 +41,7 @@ describe('PlayGlyph', () => {
     async size => {
       const { container } = render(
         <button type='button' aria-label='Play'>
-          <PlayGlyph size={size} />
+          <PlayIcon size={size} />
         </button>
       );
       await expectNoA11yViolations(container);

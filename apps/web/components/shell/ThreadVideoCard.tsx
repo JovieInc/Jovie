@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { Maximize2, Mic2 } from 'lucide-react';
-import { PlayGlyph } from '@/components/atoms/PlayGlyph';
+import { PlayIcon } from '@/components/atoms/PlayIcon';
 import { cn } from '@/lib/utils';
 import { ThreadCardIconBtn } from './ThreadCardIconBtn';
 
@@ -70,7 +70,7 @@ export function ThreadVideoCard({
             )}
           >
             <span data-interactive={onPlay ? 'true' : 'false'}>
-              <PlayGlyph size={16} strokeWidth={2.5} fill='currentColor' />
+              <PlayIcon size={16} strokeWidth={2.5} fill='currentColor' />
             </span>
           </Button>
         </span>

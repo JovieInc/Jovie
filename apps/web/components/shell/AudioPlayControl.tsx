@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui/atoms/button';
 import { Pause } from 'lucide-react';
-import { PlayGlyph } from '@/components/atoms/PlayGlyph';
+import { PlayIcon } from '@/components/atoms/PlayIcon';
 import { cn } from '@/lib/utils';
 
 const PLAY_CONTROL_SIZE = {
@@ -50,7 +50,7 @@ export function AudioPlayButton({
       {isPlaying ? (
         <Pause className='h-3.5 w-3.5' strokeWidth={2.5} fill='currentColor' />
       ) : (
-        <PlayGlyph size={14} strokeWidth={2.5} fill='currentColor' />
+        <PlayIcon size={14} strokeWidth={2.5} fill='currentColor' />
       )}
     </Button>
   );

@@ -8,7 +8,7 @@ import {
   ARTWORK_FIT_CLASSNAME,
   ArtworkFrame,
 } from '@/components/atoms/ArtworkFrame';
-import { PlayGlyph } from '@/components/atoms/PlayGlyph';
+import { PlayIcon } from '@/components/atoms/PlayIcon';
 import { cn } from '@/lib/utils';
 import type { NowPlayingTrack } from './SidebarNowPlaying';
 import { Tooltip } from './Tooltip';
@@ -130,7 +130,7 @@ export const SidebarBottomNowPlaying = React.memo(
                   fill='currentColor'
                 />
               ) : (
-                <PlayGlyph
+                <PlayIcon
                   size={12}
                   aria-hidden='true'
                   className='relative text-tooltip-foreground'
