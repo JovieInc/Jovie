@@ -61,7 +61,7 @@ describe('deterministic /app/chat prompt contract (ASS-9 + ASS-16)', () => {
     ],
     [
       'requiresShortDefaultPlans',
-      'Default advice and launch plans stay under 120 words',
+      'Default advice and launch plans stay short',
     ],
     [
       'requiresRefuseThenDraftHold',
