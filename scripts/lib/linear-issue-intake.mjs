@@ -146,6 +146,9 @@ export async function listLinearIssueComments({
 
 const REMEDIATION_KEY_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const labelCache = new Map();
+// binding_refill.ACCEPTANCE: admission promotes from Backlog only with acceptance criteria.
+const ACCEPTANCE =
+  /acceptance|accept\b|\bverif(?:y|ication)\b|required outcome|definition of done|\bdone bar\b|(?:^|\n)#+[ \t]*done\b/i;
 
 // Linear rejects issue-label names longer than 80 characters with a GraphQL
 // error. Every existing remediation label is at most 80; the time-bomb label
@@ -376,10 +379,13 @@ export async function upsertLinearIssueByTitleFingerprint({
     ? reopenTerminal !== false
     : reopenTerminal === true;
   const footer = `Fingerprint: remediation:${bareRemediationKey(labelSource)}`;
-  const descriptionBody =
+  const body =
     stableLabel && !String(description ?? '').includes(footer)
       ? `${description}\n\n${footer}`
       : description;
+  const descriptionBody = ACCEPTANCE.test(String(body ?? ''))
+    ? body
+    : `${body}\n\n## Definition of done\n- \`${labelName}\` is green on main: the check that filed this issue passes again with no retry.\n- Verify: the next scheduled run of that check is green, which also closes this issue.`;
   const found = await linearGraphql(
     {
       query: `

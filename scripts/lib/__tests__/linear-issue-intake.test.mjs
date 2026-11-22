@@ -173,13 +173,13 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
         fetchImpl,
         reopenTerminal,
       });
-    await expect(upsert('new occurrence', true)).resolves.toMatchObject({
+    await expect(upsert('verify: re-red', true)).resolves.toMatchObject({
       ok: true,
       reopened: true,
     });
     expect(
       JSON.parse(String(fetchImpl.mock.calls[1][1].body)).variables.input
-    ).toEqual({ description: 'new occurrence', stateId: 'backlog-state' });
+    ).toEqual({ description: 'verify: re-red', stateId: 'backlog-state' });
     states = [];
     await expect(upsert('missing backlog', true)).resolves.toEqual({
       ok: false,
@@ -187,13 +187,13 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
     });
     expect(fetchImpl).toHaveBeenCalledTimes(3);
     states = [{ id: 'backlog-state', name: 'Queued', type: 'backlog' }];
-    await expect(upsert('terminal remains closed')).resolves.toMatchObject({
+    await expect(upsert('closed; verify')).resolves.toMatchObject({
       ok: true,
       reopened: false,
     });
     expect(
       JSON.parse(String(fetchImpl.mock.calls.at(-1)[1].body)).variables.input
-    ).toEqual({ description: 'terminal remains closed' });
+    ).toEqual({ description: 'closed; verify' });
   });
 
   function linearFetch(routes) {
@@ -260,7 +260,7 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
       upsertLinearIssueByTitleFingerprint({
         fingerprint,
         title: done.title,
-        description: 'still red',
+        description: 'still red, verify',
         createStateName: 'Todo',
         reopenTerminal: true,
         apiKey: 'lin-key',
@@ -270,7 +270,7 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
     expect(
       JSON.parse(String(byTitle.mock.calls[1][1].body)).variables.input
     ).toEqual({
-      description: 'still red',
+      description: 'still red, verify',
       stateId: 'backlog-state',
       labelIds: ['label-other', 'label-1'],
     });

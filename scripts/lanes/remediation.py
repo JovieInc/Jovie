@@ -1074,6 +1074,9 @@ def intake_body(event: dict) -> str:
         f"Subject: `{event.get('subject')}`",
         f"Evidence: {evidence.get('url') or 'n/a'}",
         str(evidence.get("excerpt") or "")[:1500],
+        # Acceptance criteria: priority admission promotes this from Backlog only when it has some.
+        "## Definition of done",
+        f"- `{event.get('fingerprint')}` is green on main: the check that raised it passes again. Verify on its next run.",
         f"<!-- {INTAKE_LABEL} fingerprint={event.get('fingerprint')} -->",
     ])
 

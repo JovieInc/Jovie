@@ -105,7 +105,9 @@ SUB_LANE_CEILING_PER_DEPTH = 4  # a sub-lane's Todo above 4 x its depth is over 
 SUB_LANE_RULES = (
     (ACTIVATION, frozenset({"lane:activation", "golden-path", "area:auth", "ws:security-auth", "ws:chat-agent"}),
      ("remediation:claim-checkout",), ("P0 QA: waitlist-signup-to-waitlisted", "[board:goal-rev-")),
-    (REMEDIATION, frozenset({"lane:remediation", "ci-nightly", "flaky", "prod-error", "symphony-remediation"}),
+    # Bare `remediation` is the lanes' own intake label (remediation.REMEDIATION_LABEL), filed with `ws:ci`.
+    (REMEDIATION, frozenset({"lane:remediation", "remediation", "ci-nightly", "flaky", "prod-error",
+                             "symphony-remediation"}),
      ("remediation:", "sentry:"),
      ("[ci] ", "[sentry] ", "[Sentry ", "[prod-errors] ", "Symphony doctor: ", "[board:", "[model-budget] ",
       "PAGE: ", "Time bomb: ")),

@@ -6,6 +6,10 @@ in one sub-lane displaces work in another.
 """
 from __future__ import annotations
 
+import json
+import os
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -17,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import binding_refill
 import linear_sync as ls
 import priority_admission as pa
+import remediation
 import work_lane as wl
 from test_priority_admission import NOW, FakeClient, FakeLane, row
 from test_work_lane import moves, seed
@@ -186,6 +191,56 @@ class SubLaneMeasure(unittest.TestCase):
             view = wl.view(d)
             self.assertEqual(view["JOV"]["codeSubLanes"]["product"]["queued"], 1)
             self.assertEqual(set(view["JOV"]["lanes"]), set(wl.LANES))
+
+
+
+ROOT = Path(__file__).resolve().parents[2]
+# The shared JS filer helper with a stub Linear: prints the description it would create.
+FILE_JS = """
+const { upsertLinearIssueByTitleFingerprint } = await import(process.argv[1]);
+let description = null;
+const reply = data => new Response(JSON.stringify({ data }));
+const fetchImpl = async (_url, init) => {
+  const { query, variables } = JSON.parse(String(init.body));
+  if (query.includes('FindIssueByFingerprint'))
+    return reply({ team: { states: { nodes: [{ id: 'b', name: 'Backlog', type: 'backlog' }] }, labels: { nodes: [] } },
+                   issues: { nodes: [] } });
+  if (query.includes('FindIssueByRemediationLabel')) return reply({ issues: { nodes: [] } });
+  if (query.includes('issueLabelCreate')) return reply({ issueLabelCreate: { success: true, issueLabel: { id: 'l' } } });
+  description = variables.description;
+  return reply({ issueCreate: { success: true, issue: { id: 'n', identifier: 'JOV-1', url: 'u' } } });
+};
+await upsertLinearIssueByTitleFingerprint({ fingerprint: 'ci-red-main-abc', labelKey: 'ci-red-main',
+  title: '[ci] main is red (ci-red-main-abc)', description: 'Run 12 failed.', createStateName: 'Todo',
+  priority: 1, apiKey: 'k', fetchImpl });
+process.stdout.write(JSON.stringify(description));
+"""
+
+
+class FiledRemediationIsAdmissible(unittest.TestCase):
+    """Filers write Backlog, so what they file must pass admission's readiness check or it never runs."""
+
+    def admissible(self, title, description, labels):
+        backlog = dict(row(1, priority=1, labels=labels), title=title, description=description)
+        self.assertIsNone(binding_refill.skip_reason(backlog, {"JOV-1"}, frozenset()), description)
+        got, _ = pa.admit_candidates([backlog], {}, now=NOW)
+        self.assertEqual([r["identifier"] for r in got], ["JOV-1"], "Urgent remediation is admitted from Backlog")
+        self.assertEqual(wl.code_sub_lane(backlog), "remediation")
+
+    def test_lanes_remediation_intake_body(self):
+        plan = remediation.linear_intake_plan({"source": "ci", "fingerprint": "abc123", "ws": "ci", "subject": "main",
+                                               "evidence": {"url": "https://example.invalid/run/1"}})
+        self.assertIn("## Definition of done", plan["description"])
+        self.admissible(plan["title"], plan["description"], plan["labels"])
+
+    @unittest.skipUnless(shutil.which("node"), "node unavailable")
+    def test_shared_js_filer_helper(self):
+        with tempfile.TemporaryDirectory() as d:
+            out = subprocess.run(["node", "--input-type=module", "-e", FILE_JS,
+                                  (ROOT / "scripts/lib/linear-issue-intake.mjs").as_uri()],
+                                 capture_output=True, text=True, timeout=60, check=False, env={**os.environ, "LINEAR_COOLDOWN_STATE_DIR": d})
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.admissible("[ci] main is red (ci-red-main-abc)", json.loads(out.stdout), ["remediation:ci-red-main"])
 
 
 if __name__ == "__main__":
