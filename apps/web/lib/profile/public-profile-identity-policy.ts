@@ -13,7 +13,6 @@
  */
 
 import { ADMITTED_CANARY_FIXTURE } from '@/lib/synthetic/admitted-canary-fixture';
-import { CRAWL_CONTENT_FIXTURE } from '@/lib/synthetic/crawl-content-fixture';
 
 export type PublicProfileIdentityExclusionReason =
   | 'claim_flow_fixture'
@@ -51,7 +50,9 @@ const EXCLUDED_HANDLES_BY_REASON = {
   capture_profile_fixture: ['unfazed'],
   // The product crawl's hidden demo artist: the only owner of a public promo
   // download, merch card and asset share, created only by its reconciler.
-  crawl_content_fixture: [CRAWL_CONTENT_FIXTURE.handle],
+  // A literal, not an import: this policy ships to the browser, and
+  // crawl-content-fixture.test.ts pins it to the fixture spec's handle.
+  crawl_content_fixture: ['jovie-crawl-fixture'],
   qa_auth_fixture: [
     'authiosprod',
     'authiosstaging',
