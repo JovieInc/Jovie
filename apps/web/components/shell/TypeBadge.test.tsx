@@ -11,7 +11,8 @@ describe('TypeBadge', () => {
       render(<TypeBadge label={authoredLabel} />);
       const label = screen.getByText(authoredLabel);
       expect(label).toBeInTheDocument();
-      expect(label).toHaveClass('capitalize', 'tracking-normal', 'h-4');
+      expect(label).toHaveClass('capitalize', 'tracking-normal', 'h-5');
+      expect(label).not.toHaveClass('h-4');
       expect(label).not.toHaveClass('uppercase');
       expect(label.className).not.toMatch(/tracking-\[/);
     }
