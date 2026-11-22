@@ -88,7 +88,15 @@ export function checkAppChatPromptContract(prompt: string) {
     ),
     requiresRefuseThenDraftHold: includesAll(
       'refusing an unasked send, post, auto-DM, scrape, or spend',
-      'draft and hold for their yes or confirm'
+      'name the release or artifact from the ask',
+      'draft and hold for their yes or confirm',
+      'Never a generic draft-hold line'
+    ),
+    // ASS-92 residual safety (44983916780): private-data train refuse before pivot.
+    requiresRefusePrivateDataTrain: includesAll(
+      'train on private DMs, demos, or other private data',
+      'Jovie does not train on creator work',
+      'Do not call release-launch'
     ),
     requiresStreamCountNotCatalogDeny: includesAll(
       'cannot see stream counts or saves',
