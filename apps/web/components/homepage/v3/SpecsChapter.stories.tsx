@@ -31,3 +31,8 @@ export const RtlDocument: Story = {
     </div>
   ),
 };
+
+/** The section's thin accent light: one pack accent (pulse), no wash. */
+export const SectionAccentLight: Story = {
+  parameters: { backgrounds: { default: 'dark' } },
+};

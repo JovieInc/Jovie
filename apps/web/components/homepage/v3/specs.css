@@ -90,8 +90,7 @@
 }
 
 .hv3-meter i[data-on="true"] {
-  background: var(--hv3-ion);
-  box-shadow: 0 0 0.75rem var(--hv3-ion-glow);
+  background: var(--hv3-accent);
 }
 
 .hv3-moments {
@@ -138,8 +137,9 @@
 
 .hv3-glow {
   position: absolute;
+  border: 1px solid color-mix(in srgb, var(--hv3-accent) 24%, transparent);
   border-radius: 50%;
-  filter: blur(3.125rem);
+  pointer-events: none;
 }
 
 .hv3-glow--palette {
@@ -147,11 +147,6 @@
   left: 7.5rem;
   width: 35rem;
   height: 21.25rem;
-  background: radial-gradient(
-    closest-side,
-    color-mix(in srgb, var(--hv3-ion) 22%, transparent),
-    transparent
-  );
 }
 
 .hv3-glow--insp {
@@ -159,11 +154,7 @@
   left: 2.5rem;
   width: 32.5rem;
   height: 26.25rem;
-  background: radial-gradient(
-    closest-side,
-    color-mix(in srgb, var(--hv3-ion) 16%, transparent),
-    transparent
-  );
+  border-color: color-mix(in srgb, var(--hv3-accent) 16%, transparent);
 }
 
 .hv3-rig--moment {
@@ -189,8 +180,4 @@
   top: -1.125rem;
   left: calc(50% - 88.75rem);
   opacity: 0.9;
-}
-
-.hv3-footer .hv3-orbit__light {
-  opacity: 0.5;
 }
