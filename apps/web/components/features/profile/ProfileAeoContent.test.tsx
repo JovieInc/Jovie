@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import type { ProfileAeoContent as ProfileAeoContentModel } from '@/lib/profile/aeo-content';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
@@ -81,6 +82,15 @@ describe('ProfileAeoContent', () => {
 
     expect(screen.queryByRole('heading', { name: 'Tim White FAQ' })).toBeNull();
     expect(screen.queryByText('Where is Tim White based?')).toBeNull();
+  });
+
+  it('keeps the FAQ source link keyboard reachable', async () => {
+    render(<ProfileAeoContent content={baseContent} />);
+
+    await userEvent.tab();
+    expect(
+      screen.getByRole('link', { name: 'Source: Jovie profile' })
+    ).toHaveFocus();
   });
 
   it('omits the facts list when there are no facts', () => {
