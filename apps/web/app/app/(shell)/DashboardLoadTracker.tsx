@@ -6,10 +6,6 @@ import {
   consumeSignupFirstValue,
   peekSignupFirstValuePending,
 } from '@/lib/analytics/signup-funnel-client';
-import {
-  isHardShellLoad,
-  watchFirstDashboardReady,
-} from '@/lib/monitoring/first-dashboard-ready';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 
 // One first-dashboard sample per document: the shell remounting after a
@@ -49,18 +45,30 @@ export function DashboardLoadTracker({
 
     const firstMountInDocument = !firstDashboardProbeStarted;
     firstDashboardProbeStarted = true;
-    if (
-      !isHardShellLoad({
-        firstMountInDocument,
-        navigationType: readNavigationType(),
+    const navigationType = readNavigationType();
+    const hydratedAt = globalThis.performance?.now?.() ?? 0;
+
+    // The probe loads after hydration so it adds nothing to any route's
+    // initial JS; the clock still starts at the document's time origin.
+    let cancelled = false;
+    let stop: (() => void) | undefined;
+    import('@/lib/monitoring/first-dashboard-ready')
+      .then(({ isHardShellLoad, watchFirstDashboardReady }) => {
+        if (
+          cancelled ||
+          !isHardShellLoad({ firstMountInDocument, navigationType })
+        ) {
+          return;
+        }
+        stop = watchFirstDashboardReady({ hydratedAt, newAccount });
       })
-    ) {
-      return;
-    }
-    return watchFirstDashboardReady({
-      hydratedAt: globalThis.performance?.now?.() ?? 0,
-      newAccount,
-    });
+      .catch(() => {
+        // A failed probe chunk costs one sample, never the shell.
+      });
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
   }, []);
 
   useEffect(() => {

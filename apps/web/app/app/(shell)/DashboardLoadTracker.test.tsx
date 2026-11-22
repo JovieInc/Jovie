@@ -100,12 +100,14 @@ describe('DashboardLoadTracker', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('starts the first-dashboard probe once per hard load', () => {
+  it('starts the first-dashboard probe once per hard load', async () => {
     mocks.peekSignupFirstValuePending.mockReturnValue(true);
     const { rerender, unmount } = render(
       <DashboardLoadTracker pathname='/app' userId='user-1' />
     );
-    expect(mocks.watchFirstDashboardReady).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() =>
+      expect(mocks.watchFirstDashboardReady).toHaveBeenCalledTimes(1)
+    );
     expect(mocks.watchFirstDashboardReady).toHaveBeenCalledWith(
       expect.objectContaining({ newAccount: true })
     );
@@ -117,14 +119,16 @@ describe('DashboardLoadTracker', () => {
     rerender(<DashboardLoadTracker pathname='/app/chat' userId='user-1' />);
     unmount();
     render(<DashboardLoadTracker pathname='/app' userId='user-1' />);
+    await vi.dynamicImportSettled();
     expect(mocks.watchFirstDashboardReady).toHaveBeenCalledTimes(1);
   });
 
-  it('skips the probe on a reload or back-forward load', () => {
+  it('skips the probe on a reload or back-forward load', async () => {
     vi.spyOn(performance, 'getEntriesByType').mockReturnValue([
       { type: 'reload' } as unknown as PerformanceNavigationTiming,
     ]);
     render(<DashboardLoadTracker pathname='/app' userId='user-1' />);
+    await vi.dynamicImportSettled();
     expect(mocks.watchFirstDashboardReady).not.toHaveBeenCalled();
   });
 });
