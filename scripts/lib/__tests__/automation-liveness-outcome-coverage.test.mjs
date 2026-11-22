@@ -5,6 +5,7 @@ import {
   checkOutcomeCoverage,
   outcomeFingerprint,
   readOutcomeBaseline,
+  readSweptList,
   reportsOutcome,
   scanOutcomeCoverage,
   unattendedTriggers,
@@ -39,11 +40,25 @@ describe('outcome coverage gate (nothing fails without a repair or a success)', 
     expect(baseline).toEqual([...new Set(baseline)].sort());
   });
 
+  it('every swept workflow is a real unattended workflow and not also a gap', () => {
+    const swept = readSweptList(repoRoot);
+    expect(swept).toEqual([...new Set(swept)].sort());
+    const unattended = new Set(
+      scanOutcomeCoverage(repoRoot, []).map(r => r.file)
+    );
+    expect(swept.filter(file => !unattended.has(file))).toEqual([]);
+    expect(swept.filter(file => baseline.includes(file))).toEqual([]);
+    expect(swept).not.toContain('automation-liveness.yml');
+  });
+
   it('the wired lanes that were failing silently now report', () => {
     const covered = new Set(rows.filter(r => r.covered).map(r => r.file));
     for (const file of [
+      'automation-liveness.yml',
       'e2e-full-matrix.yml',
+      'main-red-eject.yml',
       'nightly-tests.yml',
+      'summer-pr-no-stall.yml',
       'node-runtime-compatibility.yml',
       'screenshots.yml',
       'test-coverage-audit.yml',
