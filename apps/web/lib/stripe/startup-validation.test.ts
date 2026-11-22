@@ -114,6 +114,55 @@ describe('Artist Visibility billing startup contract', () => {
     }
   );
 
+  it('offers the live Artist Presence price when a live key is paired with the test-account price', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_live_fixture');
+    vi.stubEnv(
+      'STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY',
+      'price_1USkjzASl9B9udHvEYkZLYZp'
+    );
+    const { validateStripeBillingConfig } = await import(
+      './startup-validation'
+    );
+    const { getActivePriceIds, getPriceMappingDetails } = await import(
+      './config'
+    );
+
+    expect(validateStripeBillingConfig()).toEqual({
+      healthy: true,
+      issues: [],
+    });
+    expect(getActivePriceIds()).toEqual(['price_1USkk3AAI1NrDqJSrdoP9BdJ']);
+    expect(
+      getPriceMappingDetails('price_1USkk3AAI1NrDqJSrdoP9BdJ')
+    ).toMatchObject({
+      plan: 'pro',
+      amount: 1200,
+      currency: 'usd',
+      interval: 'month',
+    });
+    expect(getActivePriceIds()).not.toContain('price_1UFL1xAAI1NrDqJS0eIWHFMn');
+    expect(Sentry.captureMessage).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining('price_1USkjzASl9B9udHvEYkZLYZp')
+    );
+  });
+
+  it('still fails closed when a live key has no Artist Presence price', async () => {
+    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_live_fixture');
+    vi.stubEnv('STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY', undefined);
+    const { validateStripeBillingConfig } = await import(
+      './startup-validation'
+    );
+    const { getActivePriceIds } = await import('./config');
+    const result = validateStripeBillingConfig();
+    expect(result.healthy).toBe(false);
+    expect(getActivePriceIds()).toEqual([]);
+    expect(result.issues[0]).toContain(
+      'STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY'
+    );
+  });
+
   it('still reports missing Stripe credentials when the offer price is configured', async () => {
     vi.stubEnv('STRIPE_SECRET_KEY', undefined);
     vi.stubEnv('STRIPE_WEBHOOK_SECRET', undefined);
