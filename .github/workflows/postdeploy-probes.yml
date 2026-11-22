@@ -746,6 +746,10 @@ jobs:
             exit 0
           fi
           PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
+          [[ "$PRODUCTION_BASE_URL" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]] || {
+            echo "::error::Exact production deployment URL is missing or invalid."
+            exit 1
+          }
           cd apps/web
           # Stripe TEST fixtures match claim-checkout-dogfood.yml (not Doppler):
           # price + test account are public fixtures; keys come from GH secrets.
@@ -754,6 +758,9 @@ jobs:
             --only-secrets=CRON_SECRET,DATABASE_URL \
             --no-fallback -- env -u DOPPLER_TOKEN \
               CI=true BASE_URL="$PRODUCTION_BASE_URL" PLAYWRIGHT_TEST_BASE_URL="$PRODUCTION_BASE_URL" E2E_SKIP_WEB_SERVER=1 \
+              EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$PRODUCTION_BASE_URL" \
+              EXPECTED_VERCEL_ENVIRONMENT=production \
+              PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
               STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
               STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \
               STRIPE_TEST_ACCOUNT_ID=acct_1T1DV0ASl9B9udHv \
