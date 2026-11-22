@@ -16,12 +16,12 @@ from types import SimpleNamespace
 LANES = Path(__file__).resolve().parents[1] / "lanes"
 sys.path.insert(0, str(LANES))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import binding_refill  # noqa: E402
-import lane_runner  # noqa: E402
-import linear_sync as ls  # noqa: E402
-import priority_admission as pa  # noqa: E402
-import work_lane  # noqa: E402
-from test_priority_admission import BODY, NOW, FakeClient, FakeLane, row  # noqa: E402
+import binding_refill
+import lane_runner
+import linear_sync as ls
+import priority_admission as pa
+import work_lane
+from test_priority_admission import BODY, NOW, FakeClient, FakeLane, row
 
 STALE = "2026-10-01T00:00:00.000Z"
 

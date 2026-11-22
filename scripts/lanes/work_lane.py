@@ -23,7 +23,10 @@ them, and that rank already scores time saved across every later run (improvemen
 """
 from __future__ import annotations
 
+import json
 import re
+from datetime import datetime
+from pathlib import Path
 
 CODE = "code"
 SPEED = "speed"
@@ -118,7 +121,6 @@ METRICS_FILE = "lane-metrics.json"
 
 def _epoch(stamp):
     try:
-        from datetime import datetime
         return datetime.fromisoformat(str(stamp).replace("Z", "+00:00")).timestamp()
     except (TypeError, ValueError):
         return None
@@ -170,8 +172,6 @@ def measure(rows, now: float, previous: dict | None = None) -> tuple[dict, dict]
 
 def view(state) -> dict:
     """The newest per-lane measure for each team, as the doctor publishes it: {team: {at, lanes}}."""
-    from pathlib import Path
-    import json
     out = {}
     for path in sorted((Path(state) / "lanes").glob(f"*-{METRICS_FILE}")):
         try:
