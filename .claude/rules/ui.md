@@ -308,6 +308,20 @@ saturated but refined, never primary-colored or cartoonish.
 9. The focus/link ion never rotates. CTAs stay neutral high-contrast pills.
    Color never carries status alone.
 
+10. **Marketing images are recolored for harmony.** Every image on a
+    marketing page is recolored for color harmony, photographically: hue-versus-
+    hue precision sliders, or AI image generation recreating it under these
+    color rules. Never by sloppy editing: no LUT thrown on and called done, no
+    blanket filter, and no CSS `filter`, `hue-rotate` or blend recolor on the
+    page. `docs/design-system/marketing-image-grading.json` lists every
+    marketing raster with its status, method, who graded it and when; a new
+    image must be listed and arrive graded.
+11. **Nothing escapes.** These rules cover every rendered surface: app,
+    marketing, emails, OG and share images, Storybook, the Figma variables
+    snapshot (colors must be pack or neutral) and the other apps. The gate
+    lists the surfaces it cannot reach and why (native apps, video frames,
+    runtime-computed colors).
+
 **Enforcement.** `scripts/invariants/art-direction/accent-pack.mjs`, run by
 `pnpm invariants:check` and the art-direction lane, with a shrink-only baseline
 in `accent-pack.baseline.json` and thresholds in `accent-pack-config.mjs`:
