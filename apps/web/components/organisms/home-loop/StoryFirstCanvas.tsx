@@ -4,10 +4,11 @@ import { Button } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { Sparkline } from '@/components/shell/Sparkline';
-import type {
-  StoryFirstBottleneck,
-  StoryFirstGlancePulse,
-  StoryFirstStageBucket,
+import {
+  type StoryFirstBottleneck,
+  type StoryFirstGlancePulse,
+  type StoryFirstStageBucket,
+  stripIssueId,
 } from '@/lib/ovie/home/story-first';
 import { cn } from '@/lib/utils';
 import type { HomeLoopSectionStatus } from './HomeLoopSection';
@@ -26,6 +27,31 @@ const DELTA_TONE: Record<string, string> = {
   bad: 'text-error',
   neutral: 'text-tertiary-token',
 };
+
+/** Editorial meta labels — flat board, no card chrome (no CSS uppercase; ASR-022). */
+const META_LABEL = 'text-2xs font-medium tracking-wide text-tertiary-token';
+
+/**
+ * Melt: opacity + lift + soft blur (cinematic). Reduced motion keeps a
+ * short opacity-only fade so intent still reads without thrash.
+ */
+const BOARD_MELT =
+  'pointer-events-none -translate-y-1 opacity-40 blur-sm ' +
+  'motion-reduce:translate-y-0 motion-reduce:blur-none motion-reduce:opacity-50';
+
+const BOARD_IDLE = 'translate-y-0 opacity-100 blur-none';
+
+/** Color the delta by its own direction, not by target attainment. */
+export function deltaToneKey(
+  delta: string,
+  fallback: StoryFirstGlancePulse['tone']
+): string {
+  const trimmed = delta.trim();
+  if (/^[-−]\d/.test(trimmed)) return 'bad';
+  if (/^\+\d/.test(trimmed)) return 'good';
+  if (/^[-−+]?0+(\.0+)?$/.test(trimmed) || trimmed === 'flat') return 'neutral';
+  return fallback;
+}
 
 export interface StoryFirstCanvasProps {
   readonly bottleneck: StoryFirstBottleneck;
@@ -51,13 +77,11 @@ function GlancePulse({
 }>) {
   const body = (
     <div
-      className='flex flex-col gap-1.5 py-2'
+      className='flex flex-col gap-1.5 py-3'
       data-testid={`story-first-glance-${pulse.key}`}
       data-tone={pulse.tone}
     >
-      <span className='text-2xs font-medium tracking-wide text-tertiary-token'>
-        {pulse.label}
-      </span>
+      <span className={META_LABEL}>{pulse.label}</span>
       {loading ? (
         <LoadingSkeleton height='h-8' width='w-20' />
       ) : (
@@ -74,7 +98,8 @@ function GlancePulse({
             <span
               className={cn(
                 'text-xs font-medium tabular-nums',
-                DELTA_TONE[pulse.tone] ?? DELTA_TONE.neutral
+                DELTA_TONE[deltaToneKey(pulse.delta, pulse.tone)] ??
+                  DELTA_TONE.neutral
               )}
             >
               {pulse.delta}
@@ -82,15 +107,16 @@ function GlancePulse({
           ) : null}
         </div>
       )}
-      {pulse.points.length >= 2 ? (
+      {pulse.points.length >= 3 ? (
         <Sparkline
           points={pulse.points}
           trend={pulse.trend}
+          variant='pulse'
           ariaLabel={`${pulse.label} trend`}
-          className='h-8 w-full'
+          className='mt-0.5 h-7 w-full'
         />
       ) : (
-        <div className='h-8' aria-hidden='true' />
+        <div className='h-7' aria-hidden='true' />
       )}
     </div>
   );
@@ -123,9 +149,7 @@ function BottleneckHero({
           aria-hidden='true'
           className={cn('size-1.5 rounded-full', TONE_DOT[story.tone])}
         />
-        <span className='text-2xs font-medium tracking-wide text-tertiary-token'>
-          {story.eyebrow}
-        </span>
+        <span className={META_LABEL}>{story.eyebrow}</span>
       </div>
       {story.tone === 'loading' ? (
         <>
@@ -146,7 +170,7 @@ function BottleneckHero({
                 <dl className='flex flex-wrap gap-x-5 gap-y-2'>
                   {story.moving ? (
                     <div className='flex gap-1.5'>
-                      <dt className='font-medium tracking-wide'>Moving</dt>
+                      <dt className={META_LABEL}>Moving</dt>
                       <dd>
                         {story.moving.href ? (
                           <a
@@ -163,13 +187,13 @@ function BottleneckHero({
                   ) : null}
                   {story.needs ? (
                     <div className='flex gap-1.5'>
-                      <dt className='font-medium tracking-wide'>Needs</dt>
+                      <dt className={META_LABEL}>Needs</dt>
                       <dd className='text-secondary-token'>{story.needs}</dd>
                     </div>
                   ) : null}
                   {story.since ? (
                     <div className='flex gap-1.5'>
-                      <dt className='font-medium tracking-wide'>Since</dt>
+                      <dt className={META_LABEL}>Since</dt>
                       <dd>{story.since}</dd>
                     </div>
                   ) : null}
@@ -210,9 +234,7 @@ function StageBuckets({
       data-status={status}
     >
       <div className='flex items-baseline justify-between gap-3'>
-        <h2 className='text-balance text-2xs font-medium tracking-wide text-tertiary-token'>
-          In Flight
-        </h2>
+        <h2 className={cn(META_LABEL, 'text-balance')}>In Flight</h2>
         {href ? (
           <a
             href={href}
@@ -228,7 +250,7 @@ function StageBuckets({
       ) : status === 'error' ? (
         <div
           role='alert'
-          className='flex flex-wrap items-center gap-3 border border-subtle px-3 py-2 text-xs text-secondary-token'
+          className='flex flex-wrap items-center gap-3 border-y border-subtle py-2 text-xs text-secondary-token'
           data-testid='story-first-stages-error'
         >
           <span>Shipping stages could not load.</span>
@@ -256,9 +278,7 @@ function StageBuckets({
               data-testid={`story-first-stage-${bucket.stage}`}
               data-highlighted={bucket.highlight ? 'true' : 'false'}
             >
-              <span className='text-2xs text-tertiary-token'>
-                {bucket.label}
-              </span>
+              <span className={META_LABEL}>{bucket.label}</span>
               <span
                 className={cn(
                   'text-2xl font-semibold tabular-nums tracking-tight',
@@ -269,7 +289,11 @@ function StageBuckets({
               </span>
               {bucket.highlight ? (
                 <span className='truncate text-2xs text-accent'>
-                  {bucket.highlight.identifier} {bucket.highlight.title}
+                  {bucket.highlight.identifier}{' '}
+                  {stripIssueId(
+                    bucket.highlight.identifier,
+                    bucket.highlight.title
+                  )}
                 </span>
               ) : (
                 <span className='h-4' aria-hidden='true' />
@@ -298,17 +322,23 @@ export function StoryFirstCanvas({
   stagesStatus = 'ready',
   onRetryStages,
 }: StoryFirstCanvasProps) {
+  const boardReady = bottleneck.tone !== 'loading';
+
   return (
     <div
-      className='@container flex w-full flex-col gap-8 lg:h-full lg:min-h-0'
+      className='@container flex w-full flex-col gap-10 lg:h-full lg:min-h-0'
       data-testid='story-first-canvas'
       data-melting={melting ? 'true' : 'false'}
     >
       <div
         className={cn(
-          'flex min-h-0 flex-1 flex-col gap-8 transition-opacity duration-cinematic ease-out',
-          melting &&
-            'pointer-events-none opacity-40 blur-sm motion-reduce:blur-none'
+          // Melt uses three compositor-safe channels: opacity, translate, blur.
+          // Loading → ready softens via the same opacity transition (no enter
+          // keyframes — polls must not re-fire motion or thrash layout).
+          // `transition` covers opacity/transform/filter without arbitrary props.
+          'flex min-h-0 flex-1 flex-col gap-10 transition duration-cinematic ease-cinematic',
+          melting ? BOARD_MELT : BOARD_IDLE,
+          !boardReady && !melting && 'opacity-90'
         )}
         data-testid='story-first-board'
         aria-hidden={melting || undefined}
@@ -316,7 +346,7 @@ export function StoryFirstCanvas({
         // does not).
         inert={melting || undefined}
       >
-        <div className='flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-12'>
+        <div className='flex flex-col gap-10 lg:flex-row lg:items-start lg:gap-12'>
           <BottleneckHero story={bottleneck} />
           <aside
             aria-label='Glance'
@@ -342,8 +372,10 @@ export function StoryFirstCanvas({
       {answer ? (
         <div
           className={cn(
-            'max-h-1/2 shrink-0 overflow-y-auto transition-opacity duration-cinematic',
-            melting ? 'opacity-100' : 'opacity-90'
+            'max-h-1/2 shrink-0 overflow-y-auto transition duration-cinematic ease-cinematic',
+            melting
+              ? 'translate-y-0 opacity-100'
+              : 'translate-y-1 opacity-90 motion-reduce:translate-y-0'
           )}
           data-testid='story-first-answer'
         >

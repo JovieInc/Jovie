@@ -1,0 +1,192 @@
+{
+  "gates": {
+    "apps/web/components/features/admin/ImpersonationBanner.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/ScreenshotGallery.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/SendInviteDialog.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/leads/LeadGtmInsights.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/admin/table/TableRowActions.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/atoms/PlatformPill.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/dashboard-pay/DashboardPay.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/UniversalLinkInputPlatformSelector.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/UniversalLinkInputUrlMode.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/artist-search-mode/UniversalLinkInputArtistSearchMode.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/universal-link-input/MultiLinkPasteDialog.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/molecules/universal-link-input/UniversalLinkInput.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/DashboardFeedbackModal.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/artist-selection-form/ArtistSelectionForm.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dsp-matches/ConfirmMatchDialog.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dsp-presence/AddPlatformDialog.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/links/YouTubeCrossCategoryPrompt.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/listen-now-form/ListenNowForm.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/admin/table/TableRowActions.tsx": {
+      "long-content": "The component renders three icon buttons and no text content; labels are fixed strings from props that cannot grow. The detector matched the words label and title in aria and title attributes.",
+      "offline": "The component never fetches: it only calls the onRefreshIngest and onToggleVerification callbacks its parent owns, and shows the parent's loading status. Offline handling belongs to the parent row."
+    },
+    "apps/web/components/features/dashboard/molecules/UniversalLinkInputPlatformSelector.tsx": {
+      "empty": "Both menu lists come from fixed constants in universalLinkInput.constants.ts (ARTIST_SEARCH_PLATFORMS and PLATFORM_OPTIONS), so there is no data set that can be empty. The detector matched the .map calls over those constants.",
+      "long-content": "Every label is a fixed platform name from universalLinkInput.constants.ts and the trigger is an icon-only button, so no user-supplied text can overflow."
+    },
+    "apps/web/components/features/dashboard/molecules/artist-search-mode/UniversalLinkInputArtistSearchMode.tsx": {
+      "permission-denied": "Searching public Spotify artists needs no permission, so there is no permission-denied state to show."
+    },
+    "apps/web/components/features/dashboard/molecules/universal-link-input/UniversalLinkInput.tsx": {
+      "error": "Invalid pasted text simply stays in the field with the submit button disabled; there is no error surface or server round trip to render (the artist-search error state is covered in UniversalLinkInputArtistSearchMode stories).",
+      "permission-denied": "The input has no gated action. The microphone permission error is a transient panel that needs a real getUserMedia rejection, which Storybook cannot trigger; the panel itself is the permission-error story of UniversalLinkInputUrlMode and the rejection path is asserted in tests/components/dashboard/UniversalLinkInput.voice-recording.test.tsx."
+    },
+    "apps/web/components/features/dashboard/organisms/dsp-presence/AddPlatformDialog.tsx": {
+      "loading": "Pending is only entered through the addManualDspMatch server action, which Storybook does not run; the pending label and disabled submit are asserted in AddPlatformDialog.test.tsx by awaiting the action.",
+      "error": "The inline error appears only after the addManualDspMatch server action resolves with a failure or throws, which Storybook does not run; both paths are asserted in AddPlatformDialog.test.tsx.",
+      "offline": "Offline is the same thrown-action path as error: addManualDspMatch rejects and the dialog shows its fixed could-not-be-added message, asserted in AddPlatformDialog.test.tsx.",
+      "permission-denied": "The dialog has no gated action: any signed-in artist can link a platform, and authorization lives in the addManualDspMatch server action. The detector matched role='alert' on the inline error, which is the error state."
+    },
+    "apps/web/components/features/dashboard/organisms/listen-now-form/ListenNowForm.tsx": {
+      "permission-denied": "The form has no gated action: any signed-in artist can save music links, and authorization lives in the profile and social-link mutations the hook calls."
+    }
+  }
+}

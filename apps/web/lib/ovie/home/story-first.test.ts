@@ -8,6 +8,8 @@ import {
   buildStoryFirstBottleneck,
   buildStoryFirstGlance,
   buildStoryFirstStages,
+  issueLabel,
+  stripIssueId,
 } from './story-first';
 
 function count(value: number) {
@@ -191,6 +193,55 @@ describe('buildStoryFirstBottleneck', () => {
     });
   });
 
+  it('links only shipping work on the blocker as Moving', () => {
+    const row = (identifier: string, title: string, complete = false) => ({
+      id: identifier,
+      identifier,
+      title,
+      url: null,
+      stage: 'building' as const,
+      stageIndex: 1,
+      complete,
+      attention: null,
+      updatedAt: null,
+    });
+    const lanes = row(
+      'JOV-10172',
+      'feat(lanes): gem-default worktree hosts, fallback cap'
+    );
+    const unrelated = buildStoryFirstBottleneck({
+      revenue: checkout,
+      revenueRead: true,
+      constraint: null,
+      highlight: {
+        identifier: lanes.identifier,
+        title: lanes.title,
+        href: null,
+      },
+      rows: [lanes],
+    });
+    expect(unrelated.moving).toBeNull();
+    const related = buildStoryFirstBottleneck({
+      revenue: checkout,
+      revenueRead: true,
+      constraint: null,
+      highlight: {
+        identifier: lanes.identifier,
+        title: lanes.title,
+        href: null,
+      },
+      rows: [
+        lanes,
+        row('JOV-1', 'Stripe checkout copy', true),
+        row('JOV-2', 'fix(billing): success page receipt'),
+      ],
+    });
+    expect(related.moving).toEqual({
+      label: 'JOV-2 · fix(billing): success page receipt',
+      href: null,
+    });
+  });
+
   it('keeps funnel title distinct from the measured body', () => {
     const funnel: CompanyBlocker = {
       schema: 'jovie.company-blocker/v1',
@@ -334,5 +385,18 @@ describe('buildStoryFirstStages', () => {
     expect(
       buckets.find(b => b.stage === 'merging')?.highlight?.identifier
     ).toBe('JOV-9');
+  });
+});
+
+describe('issue id de-duplication', () => {
+  it('strips a trailing (ID) that repeats the identifier', () => {
+    expect(
+      issueLabel('JOV-10172', 'feat(lanes): split lanes (JOV-10172)')
+    ).toBe('JOV-10172 · feat(lanes): split lanes');
+  });
+
+  it('strips a leading "ID: " and leaves other titles alone', () => {
+    expect(stripIssueId('JOV-1', 'JOV-1: fix it')).toBe('fix it');
+    expect(stripIssueId('JOV-1', 'fix it (JOV-2)')).toBe('fix it (JOV-2)');
   });
 });

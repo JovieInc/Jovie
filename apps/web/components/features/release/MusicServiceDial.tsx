@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
-import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
+import { DSP_LOGO_CONFIG, DspServiceIcon } from '@/components/atoms/DspLogo';
 import { LISTEN_COOKIE } from '@/constants/app';
 import type { ProviderKey } from '@/lib/discography/types';
 import { appendUTMParamsToUrl, type PartialUTMParams } from '@/lib/utm';
@@ -56,10 +56,12 @@ export function MusicServiceDial({
   const [selectedKey, setSelectedKey] = useState<ProviderKey | null>(
     fallbackKey
   );
+  const [preferredKey, setPreferredKey] = useState<ProviderKey | null>(null);
 
   useLayoutEffect(() => {
     const preferred = readPreferredProvider();
     const available = providers.find(provider => provider.key === preferred);
+    setPreferredKey(available?.key ?? null);
     setSelectedKey(available?.key ?? fallbackKey);
   }, [providers, fallbackKey]);
 
@@ -71,16 +73,9 @@ export function MusicServiceDial({
           id: provider.key,
           label: logo?.name ?? provider.label,
           href: appendUTMParamsToUrl(provider.url, utmParams),
+          // Same DSP_LOGO_CONFIG glyph as SmartLinkProviderButton / listen rows.
           icon: logo?.iconPath ? (
-            <svg
-              viewBox='0 0 24 24'
-              fill='currentColor'
-              className='h-5 w-5 shrink-0'
-              style={{ color: logo.color }}
-              aria-hidden='true'
-            >
-              <path d={logo.iconPath} />
-            </svg>
+            <DspServiceIcon provider={provider.key} />
           ) : undefined,
         };
       }),
@@ -92,6 +87,7 @@ export function MusicServiceDial({
       const provider = providers.find(candidate => candidate.key === key);
       if (!provider) return;
       setSelectedKey(provider.key);
+      setPreferredKey(provider.key);
       rememberProvider(provider.key);
     },
     [providers]
@@ -101,6 +97,7 @@ export function MusicServiceDial({
     (key: string) => {
       const provider = providers.find(candidate => candidate.key === key);
       if (!provider) return;
+      setPreferredKey(provider.key);
       rememberProvider(provider.key);
       onStream(provider.key);
     },
@@ -113,6 +110,7 @@ export function MusicServiceDial({
     <ActionDial
       options={options}
       selectedId={selectedKey}
+      preferredId={preferredKey}
       onSelect={handleSelect}
       onActivate={handleStream}
       actionLabel='Stream Now'

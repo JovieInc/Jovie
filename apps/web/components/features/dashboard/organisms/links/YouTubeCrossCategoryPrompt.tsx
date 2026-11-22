@@ -53,11 +53,14 @@ export interface YouTubeCrossCategoryPromptProps {
 }
 
 /**
- * YouTubeCrossCategoryPrompt - Prompt dialog for adding YouTube to multiple sections.
+ * YouTubeCrossCategoryPrompt - Inline prompt for adding YouTube to multiple sections.
  *
  * YouTube is unique in that it can exist in both the Social and Music Service sections.
  * When a user already has YouTube in one section and tries to add it again,
  * this prompt asks if they want to add it to the other section as well.
+ *
+ * It is a labelled region, not a modal dialog: it never traps focus or
+ * blocks the page.
  *
  * Features:
  * - Animated entry/exit using CSS transitions (no motion library)
@@ -143,9 +146,8 @@ export const YouTubeCrossCategoryPrompt = React.memo(
 
     return (
       <div style={transitionStyle}>
-        <dialog
-          open
-          className={`m-0 flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface-1 p-3 text-app ${className ?? ''}`}
+        <section
+          className={`flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface-1 p-3 text-app ${className ?? ''}`}
           aria-labelledby='yt-cross-category-prompt-title'
           data-testid='youtube-cross-category-prompt'
         >
@@ -164,7 +166,7 @@ export const YouTubeCrossCategoryPrompt = React.memo(
               Cancel
             </Button>
           </div>
-        </dialog>
+        </section>
       </div>
     );
   }

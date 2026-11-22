@@ -82,11 +82,11 @@ function MarketingTerminalCtaAction({
 const styles = {
   cinematic: {
     section:
-      'homepage-story-final-cta marketing-terminal-cta--cinematic relative isolate overflow-hidden bg-black dark:bg-black',
+      'homepage-story-final-cta marketing-terminal-cta--cinematic relative isolate overflow-hidden bg-ink-on-media',
     content: 'homepage-final-cta-copy mx-auto',
     title:
       'text-balance text-[clamp(2rem,3.4vw,3rem)] font-bold leading-[1.05] tracking-[-0.025em] text-(--color-text-tooltip)',
-    body: 'mx-auto max-w-[36rem] text-balance text-lg leading-[1.45] text-white/[0.58]',
+    body: 'mx-auto max-w-[36rem] text-balance text-lg leading-[1.45] text-on-media/[0.58]',
     actions: 'mt-2 flex flex-wrap items-center justify-center gap-3',
     primary: 'homepage-final-cta-action',
   },
@@ -106,12 +106,12 @@ const styles = {
   },
   standard: {
     section:
-      'relative isolate overflow-hidden bg-black py-[clamp(5rem,9vw,8rem)] text-(--color-text-tooltip) dark:bg-black',
+      'relative isolate overflow-hidden bg-ink-on-media py-[clamp(5rem,9vw,8rem)] text-(--color-text-tooltip)',
     content:
       'public-container relative z-[2] flex flex-col items-center text-center',
     title:
       'font-display max-w-[20ch] text-balance text-[clamp(2rem,3.4vw,3rem)] font-bold leading-[1.05] tracking-[-0.025em] text-(--color-text-tooltip)',
-    body: 'mt-3 max-w-[44rem] text-balance text-lg leading-[1.45] text-white/[0.5]',
+    body: 'mt-3 max-w-[44rem] text-balance text-lg leading-[1.45] text-on-media/[0.5]',
     actions: 'mt-7 flex flex-wrap items-center justify-center gap-3',
     primary: undefined,
   },

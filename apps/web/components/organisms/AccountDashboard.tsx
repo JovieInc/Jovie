@@ -30,9 +30,9 @@ export function AccountDashboard() {
               <CreditCard className='h-7 w-7 text-(--accent-analytics)' />
             </div>
             <div className='ml-4'>
-              <h3 className='text-mid font-semibold text-primary-token'>
+              <h2 className='text-balance text-mid font-semibold text-primary-token'>
                 Billing & Subscription
-              </h3>
+              </h2>
               <p className='text-app text-secondary-token'>
                 Manage your subscription and payment methods
               </p>
@@ -52,9 +52,9 @@ export function AccountDashboard() {
               <User className='h-7 w-7 text-(--accent-speed)' />
             </div>
             <div className='ml-4'>
-              <h3 className='text-mid font-semibold text-primary-token'>
+              <h2 className='text-balance text-mid font-semibold text-primary-token'>
                 Creator Profile
-              </h3>
+              </h2>
               <p className='text-app text-secondary-token'>
                 Update your public profile and links
               </p>
@@ -74,9 +74,9 @@ export function AccountDashboard() {
               <Settings className='h-7 w-7 text-(--accent-conv)' />
             </div>
             <div className='ml-4'>
-              <h3 className='text-mid font-semibold text-primary-token'>
+              <h2 className='text-balance text-mid font-semibold text-primary-token'>
                 General Settings
-              </h3>
+              </h2>
               <p className='text-app text-secondary-token'>
                 Configure app preferences and notifications
               </p>
@@ -99,17 +99,17 @@ export function AccountDashboard() {
         />
         <div className='space-y-4 px-5 py-4'>
           <div>
-            <h4 className='text-app font-caption text-primary-token'>
+            <h2 className='text-balance text-app font-caption text-primary-token'>
               Account Status
-            </h4>
+            </h2>
             <p className='text-app text-secondary-token'>
               Your account is active and in good standing
             </p>
           </div>
           <div>
-            <h4 className='text-app font-caption text-primary-token'>
+            <h2 className='text-balance text-app font-caption text-primary-token'>
               Data & Privacy
-            </h4>
+            </h2>
             <p className='text-app text-secondary-token'>
               We protect your data according to our privacy policy
             </p>

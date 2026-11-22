@@ -14,6 +14,7 @@ import {
   type HomeLoopTone,
 } from '@/lib/home-loop/contract';
 import type { DeliverySummary } from '@/lib/ovie/shipping-state/contract';
+import { movingForBlocker } from './blocker-work';
 import type { CompanyBlocker } from './company-blocker';
 import type { OvieCompanyTile } from './company-tiles';
 import {
@@ -97,6 +98,22 @@ const STEP_EYEBROW: Readonly<Record<string, string>> = {
   checkout_payment_entitlement: 'Checkout',
   activation_dashboard: 'Activation',
 };
+
+/** Drop a trailing " (ID)" or leading "ID: " when it repeats the identifier. */
+export function stripIssueId(identifier: string, title: string): string {
+  const id = identifier.trim();
+  if (!id) return title;
+  const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const stripped = title
+    .replace(new RegExp(`\\s*\\(${escaped}\\)\\s*$`, 'i'), '')
+    .replace(new RegExp(`^${escaped}:\\s*`, 'i'), '')
+    .trim();
+  return stripped || title;
+}
+
+export function issueLabel(identifier: string, title: string): string {
+  return `${identifier} · ${stripIssueId(identifier, title)}`;
+}
 
 function trendFromPoints(points: readonly number[]): StoryFirstSparkTrend {
   const first = points.at(0);
@@ -306,6 +323,8 @@ export function buildStoryFirstBottleneck(input: {
   readonly revenueFailed?: boolean;
   readonly constraint: HomeLoopConstraint | null;
   readonly highlight: StoryFirstStageHighlight | null;
+  /** Shipping rows; when given, a revenue blocker's Moving line is the row working on it. */
+  readonly rows?: readonly HomeLoopRow<OvieShipStage>[];
   readonly clearTitle?: string;
   readonly clearBody?: string;
 }): StoryFirstBottleneck {
@@ -323,6 +342,9 @@ export function buildStoryFirstBottleneck(input: {
   }
 
   if (input.revenue) {
+    const moving = input.rows
+      ? movingForBlocker(input.rows, input.revenue.step)
+      : input.highlight;
     const since =
       input.revenue.since != null
         ? new Date(input.revenue.since).toLocaleDateString('en-US', {
@@ -336,10 +358,10 @@ export function buildStoryFirstBottleneck(input: {
       eyebrow: `Bottleneck · ${stepLabel(input.revenue.step)}`,
       title: shortTitle(input.revenue),
       body: input.revenue.text,
-      moving: input.highlight
+      moving: moving
         ? {
-            label: `${input.highlight.identifier} · ${input.highlight.title}`,
-            href: input.highlight.href,
+            label: issueLabel(moving.identifier, moving.title),
+            href: moving.href,
           }
         : null,
       needs: input.revenue.nextAction,
@@ -358,7 +380,10 @@ export function buildStoryFirstBottleneck(input: {
         : 'Revenue is clear; shipping needs attention.',
       moving: input.highlight
         ? {
-            label: `${input.highlight.identifier} · ${input.highlight.title}`,
+            label: issueLabel(
+              input.highlight.identifier,
+              input.highlight.title
+            ),
             href: input.highlight.href,
           }
         : null,
@@ -376,7 +401,10 @@ export function buildStoryFirstBottleneck(input: {
       body: 'Company state could not be read. Retry or check Summer.',
       moving: input.highlight
         ? {
-            label: `${input.highlight.identifier} · ${input.highlight.title}`,
+            label: issueLabel(
+              input.highlight.identifier,
+              input.highlight.title
+            ),
             href: input.highlight.href,
           }
         : null,
@@ -395,7 +423,7 @@ export function buildStoryFirstBottleneck(input: {
       'The cone is clear. Shipping stays the quiet pulse — act only when a stage heats up.',
     moving: input.highlight
       ? {
-          label: `${input.highlight.identifier} · ${input.highlight.title}`,
+          label: issueLabel(input.highlight.identifier, input.highlight.title),
           href: input.highlight.href,
         }
       : null,

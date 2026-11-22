@@ -1,9 +1,9 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { AlertTriangle, ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { ShellListRowFrame } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
@@ -60,6 +60,7 @@ function JudgmentRow({
   const [armedKind, setArmedKind] =
     useState<OvieCertificationDecisionKind | null>(null);
   const [note, setNote] = useState('');
+  const noteId = useId();
 
   const evidenceDigest =
     row?.decision.evidenceDigest ?? item.decisionEvidenceDigest;
@@ -157,12 +158,14 @@ function JudgmentRow({
           </div>
           {armedKind ? (
             <div className='space-y-1.5'>
-              <label className='block'>
+              <label htmlFor={noteId} className='block'>
                 <span className='sr-only'>
                   Note for {DECISION_LABELS[armedKind]}
                 </span>
-                <input
+                <Input
+                  id={noteId}
                   type='text'
+                  inputSize='sm'
                   value={note}
                   disabled={pendingKind !== null}
                   onChange={event => setNote(event.target.value)}
@@ -171,7 +174,6 @@ function JudgmentRow({
                       ? 'What should change? (required)'
                       : 'Why reject? (optional)'
                   }
-                  className='w-full rounded-lg border border-(--app-shell-border) bg-surface-1 px-3 py-1.5 text-xs text-primary-token outline-none placeholder:text-tertiary-token focus-visible:ring-2 focus-visible:ring-ring'
                 />
               </label>
               <div className='flex items-center gap-2'>

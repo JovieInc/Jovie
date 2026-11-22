@@ -187,27 +187,11 @@ html[data-desktop-runtime="electron"]
   background: transparent;
 }
 
-/* JOV-8941: Electron's native window owns the right and bottom edge. Keep
-   the shared browser shell inset everywhere else, but let the main panel meet
-   the window frame instead of reading as a floating card on those edges.
-   Scoped to lg: the browser shell's gutter, radius, and panel card styling
-   only exist at >=1024px, so the flush override must not invent panel
-   treatment (e.g. a top-left radius) on compact Electron windows. */
-@media (min-width: 1024px) {
-  html[data-desktop-runtime="electron"]
-    [data-app-shell-body="true"][data-electron-top-gap-owner="titlebar"] {
-    padding-right: 0;
-    padding-bottom: 0;
-  }
-
-  html[data-desktop-runtime="electron"]
-    [data-app-shell-main-column="true"]
-    > #main-content {
-    border-right: 0;
-    border-bottom: 0;
-    border-radius: var(--app-shell-radius) 0 0 0;
-  }
-}
+/* JOV-8974: the main panel keeps the same shell gutter on the right and
+   bottom as on the top and left, in Electron and in the browser. The earlier
+   JOV-8941 flush override (padding-right/bottom: 0 and a squared panel
+   edge) is gone: it left the panel running to the window's bottom edge and
+   the composer hugging it. */
 
 /* JOV-7207: reserve only the window controls' overlap into the header row,
    measured in the header's own coordinate system. The header already begins
@@ -1557,17 +1541,18 @@ body {
 }
 
 /* ============================================
-   SCROLL-REVEAL (marketing motion system, JOV-7757)
+   SCROLL-REVEAL (marketing motion system, JOV-14244)
    `.reveal-on-scroll` fades in with a short rise as it enters the viewport.
 
-   1. Browsers with scroll-driven animations (Chrome 115+, Safari 26+) run it
-      on the compositor from CSS alone: no JS, no observer, and content that
-      is already in view at load is simply visible. The range is a fixed
-      distance past the viewport edge so tall sections are never half-faded.
-   2. Elsewhere ScrollRevealInit adds `.reveal-js` and toggles `.revealed`
-      with an IntersectionObserver. Without JS, content stays visible.
-   3. Reduced motion keeps the opacity change and drops the movement.
-   `data-delay="80|160|240"` staggers siblings in both paths.
+   1. Browsers with scroll-driven animations run it on the compositor from
+      CSS alone: no JS, no observer. Content already in view at load is
+      simply visible. The range is a fixed distance past the viewport edge
+      so tall sections are never half-faded.
+   2. Without `animation-timeline: view()`, content stays fully visible
+      immediately (static fallback). No IntersectionObserver path.
+   3. Reduced motion cancels the timeline and shows content at full opacity
+      immediately (static fallback).
+   `data-delay="80|160|240"` staggers siblings via --reveal-offset.
    ============================================ */
 
 .reveal-on-scroll {
@@ -1594,12 +1579,6 @@ body {
   }
 }
 
-@keyframes reveal-fade {
-  from {
-    opacity: 0.01;
-  }
-}
-
 @supports (animation-timeline: view()) {
   .reveal-on-scroll {
     animation: reveal-rise linear both;
@@ -1610,43 +1589,48 @@ body {
 
   @media (prefers-reduced-motion: reduce) {
     .reveal-on-scroll {
-      animation-name: reveal-fade;
-    }
-  }
-}
-
-@supports not (animation-timeline: view()) {
-  .reveal-js .reveal-on-scroll {
-    opacity: 0;
-    transform: translateY(var(--reveal-distance));
-    transition:
-      opacity var(--duration-cinematic) var(--ease-out),
-      transform var(--duration-cinematic) var(--ease-out);
-  }
-
-  .reveal-js .reveal-on-scroll.revealed {
-    opacity: 1;
-    transform: none;
-  }
-
-  .reveal-on-scroll[data-delay="80"] {
-    transition-delay: calc(var(--stagger-block) * 1);
-  }
-  .reveal-on-scroll[data-delay="160"] {
-    transition-delay: calc(var(--stagger-block) * 2);
-  }
-  .reveal-on-scroll[data-delay="240"] {
-    transition-delay: calc(var(--stagger-block) * 3);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .reveal-js .reveal-on-scroll {
+      animation: none;
       opacity: 1;
       transform: none;
-      transition: none;
     }
   }
 }
+
+/* ============================================
+   ROUTE VIEW TRANSITIONS (JOV-14244)
+   Quiet morph / crossfade for persistent chrome, avatar, cover, titles.
+   Uses System B cinematic tokens only. Reduced motion kills the group.
+   ============================================ */
+
+::view-transition-group(.jovie-morph) {
+  animation-duration: var(--duration-cinematic);
+  animation-timing-function: var(--ease-cinematic);
+}
+
+::view-transition-old(.jovie-crossfade),
+::view-transition-new(.jovie-crossfade) {
+  animation-duration: var(--duration-subtle);
+  animation-timing-function: var(--ease-out);
+}
+
+::view-transition-group(site-header),
+::view-transition-old(site-header),
+::view-transition-new(site-header) {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* Native popover entry for marketing glass flyouts lives in HeaderNav.css
+   (scoped to that owner’s flyout panel). A root `[popover]` rule here
+   regressed /start LCP under the signed-in Lighthouse relative gate
+   (JOV-14244 / merge-group-breaker). */
 
 /* scrollbar-hide - MIGRATED TO PLUGIN
    Now in lib/tailwind/utilities-plugin.js */
@@ -2126,6 +2110,9 @@ body {
     border-color: var(--linear-border-focus);
     background: var(--color-bg-surface-0);
   }
+  .composite-field:has(:is(input, textarea, select)[aria-invalid="true"]) {
+    border-color: color-mix(in oklab, var(--color-error) 60%, transparent);
+  }
   .composite-field:has(:is(input, textarea, select):focus-visible) {
     --tw-ring-color: var(--color-focus-ring);
     --tw-ring-offset-color: var(--color-bg-page);
@@ -2139,6 +2126,30 @@ body {
   .composite-field :is(input, textarea, select):is(:focus, :focus-visible) {
     outline: none;
     box-shadow: none;
+  }
+  /* HostDrawnInput, HostDrawnSelect and HostDrawnTextarea (packages/ui/atoms/
+     host-drawn-field) paint nothing inside a CompositeField: the host sets
+     type and colour on a plain element around the field, the control
+     inherits them, and the container draws the surface and the focus ring.
+     Zero specificity, so a host stylesheet still wins where it draws more. */
+  :where(.composite-field)
+    :where(:is(input, textarea, select)[data-host-drawn]) {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+  }
+  :where(.composite-field)
+    :where(:is(input, textarea)[data-host-drawn])::placeholder {
+    color: var(--color-text-tertiary-token);
+    opacity: 1;
+  }
+  :where(.composite-field) :where(textarea[data-host-drawn]) {
+    resize: none;
   }
 }
 

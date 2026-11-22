@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { Check, Loader2, Trash2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
@@ -140,8 +141,7 @@ export function ChatLinkRemovalCard({
           )}
         </div>
         <div className='shrink-0 flex items-center gap-1.5'>
-          <button
-            type='button'
+          <PlainButton
             onClick={handleRemove}
             disabled={state === 'removing'}
             className={cn(
@@ -156,9 +156,8 @@ export function ChatLinkRemovalCard({
               <Trash2 className='h-3 w-3' />
             )}
             Remove
-          </button>
-          <button
-            type='button'
+          </PlainButton>
+          <PlainButton
             onClick={handleDismiss}
             disabled={state === 'removing'}
             className={cn(
@@ -169,7 +168,7 @@ export function ChatLinkRemovalCard({
             aria-label='Cancel Removal'
           >
             <X className='h-3.5 w-3.5' />
-          </button>
+          </PlainButton>
         </div>
       </div>
     </ChatToolSurface>

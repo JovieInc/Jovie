@@ -12,11 +12,16 @@ import {
   ensureUserIsFree,
   expireRunOwnedTestCheckoutSession,
   getBillingStatus,
-  getStripeContextOrSkip,
+  getRequiredStripeTestContext,
   materializeTestCheckoutCompletion,
   postStripeWebhook,
+  vercelProtectionBypassHeaders,
 } from './helpers/stripe-helpers';
-import { certStep, certStepBlocked } from './utils/prod-cert-steps';
+import {
+  certStep,
+  certStepBlocked,
+  recordCertCapabilities,
+} from './utils/prod-cert-steps';
 import {
   prepareProductionAuthEmailForm,
   waitForProductionDashboardContent,
@@ -42,10 +47,29 @@ import { waitForProductionAuthOtp } from './utils/production-auth-otp';
  *   - every JOV-6920 cone case is recorded as a prod-cert step (cone-*
  *     check ids) and the canary is reset again in teardown.
  *
- * Test mode only: getStripeContextOrSkip fails closed on a live key,
- * another account, or a price that is not the $12 fixture. No live charges,
- * no real artist profile is ever touched.
+ * Test mode only: getRequiredStripeTestContext fails closed on a live key,
+ * another account, or a price that is not the $12 fixture. Missing Stripe
+ * TEST custody records cone-* as blocked (never Playwright-skip soft-green).
+ * No live charges; no real artist profile is ever touched.
  */
+
+recordCertCapabilities({
+  checkout: [
+    'cone-checkout-success-truthful',
+    'cone-checkout-cancel-truthful',
+    'cone-checkout-failure-truthful',
+    'cone-checkout-payment-is-authority',
+    'cone-checkout-entitlement-agrees',
+    'cone-checkout-retry-idempotent',
+  ],
+  onboarding: [
+    'cone-activation-immediate-value',
+    'cone-activation-visible-path',
+    'cone-activation-no-dead-end',
+    'cone-activation-continue-without-rescue',
+  ],
+});
+
 test.describe('Canary claim checkout producer (Stripe test mode)', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
   test.describe.configure({ mode: 'serial' });
@@ -65,26 +89,17 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
   test('reset → claim → test-mode payment → activation → reset', async ({
     page,
   }, testInfo) => {
-    const { stripeClient, priceId } = await getStripeContextOrSkip();
     const origin = requireOrigin(testInfo.project.use.baseURL);
     const tag = runTag();
 
-    // The walk cannot even start without the reset secrets: record the
-    // blocked steps so the cert shows the exact unblock, then fail — the
-    // producer must never be silently absent (a skipped walk is exactly the
-    // false-green the scoreboard exists to prevent).
-    if (!canaryResetConfigured()) {
+    const blockConeWalk = (detail: string) => {
       for (const id of [
         'cone-checkout-success-truthful',
         'cone-checkout-payment-is-authority',
         'cone-checkout-entitlement-agrees',
         'cone-checkout-retry-idempotent',
       ]) {
-        certStepBlocked(
-          'checkout',
-          id,
-          'CRON_SECRET/SYNTHETIC_PASSAGE_KEY are not provided to this run (canary reset unconfigured)'
-        );
+        certStepBlocked('checkout', id, detail);
       }
       for (const id of [
         'cone-activation-immediate-value',
@@ -92,12 +107,34 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
         'cone-activation-no-dead-end',
         'cone-activation-continue-without-rescue',
       ]) {
-        certStepBlocked(
-          'onboarding',
-          id,
-          'CRON_SECRET/SYNTHETIC_PASSAGE_KEY are not provided to this run (canary reset unconfigured)'
-        );
+        certStepBlocked('onboarding', id, detail);
       }
+    };
+
+    // Fail closed — never Playwright-skip. A skipped walk only writes
+    // recordCertCapabilities mapping and looks like a false green on the
+    // scoreboard (postdeploy 44941778256: empty STRIPE_* → 1 skipped).
+    let stripeClient: Awaited<
+      ReturnType<typeof getRequiredStripeTestContext>
+    >['stripeClient'];
+    let priceId: string;
+    try {
+      ({ stripeClient, priceId } = await getRequiredStripeTestContext());
+    } catch (error) {
+      blockConeWalk(
+        `Stripe TEST custody unavailable: ${String(error)} (need Preview – jovie STRIPE_SECRET_KEY/STRIPE_WEBHOOK_SECRET + pinned $12 fixtures)`
+      );
+      throw error;
+    }
+
+    // The walk cannot even start without the reset secrets: record the
+    // blocked steps so the cert shows the exact unblock, then fail — the
+    // producer must never be silently absent (a skipped walk is exactly the
+    // false-green the scoreboard exists to prevent).
+    if (!canaryResetConfigured()) {
+      blockConeWalk(
+        'CRON_SECRET/SYNTHETIC_PASSAGE_KEY are not provided to this run (canary reset unconfigured)'
+      );
       throw new Error(
         'Canary reset secrets (CRON_SECRET/SYNTHETIC_PASSAGE_KEY) are not provided to this run; the JOV-9826 checkout walk cannot run'
       );
@@ -146,9 +183,16 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
         'checkout',
         'cone-checkout-launches-owned-context',
         async () => {
-          const start = await page.request.get('/claim/start?new=1', {
-            maxRedirects: 0,
-          });
+          // Use the live page origin (often jov.ie after OTP), not Playwright
+          // baseURL pinned to the protected exact deployment URL.
+          const liveOrigin = new URL(page.url()).origin;
+          const start = await page.request.get(
+            `${liveOrigin}/claim/start?new=1`,
+            {
+              maxRedirects: 0,
+              headers: vercelProtectionBypassHeaders(),
+            }
+          );
           expect(start.status()).toBe(307);
           const cookies = await page.context().cookies();
           expect(cookies.find(c => c.name === 'jv_claim_flow')?.value).toBe(

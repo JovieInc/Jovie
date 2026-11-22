@@ -467,6 +467,9 @@ describe('merge_group workflow contract', () => {
     expect(admission).toContain(
       "pr_number: ${{ steps.admission.outputs.pr_number || '' }}"
     );
+    expect(admission).toContain(
+      "source_head_sha: ${{ steps.admission.outputs.source_head_sha || '' }}"
+    );
     expect(admission).toContain('pull-requests: read');
     expect(admission).toContain('ref: main');
     expect(admission).toContain('node "$policy" --print-contract-version');
@@ -479,6 +482,7 @@ describe('merge_group workflow contract', () => {
     );
     expect(admission).toContain('echo "pr_number=${BASH_REMATCH[1]}"');
     expect(admission).toContain('echo "synthetic_head_sha=$GITHUB_SHA"');
+    expect(admission).toContain("echo 'source_head_sha='");
     expect(admission).toContain(
       "echo 'current_queue_state=LEGACY_EXACT_REF_BOOTSTRAP'"
     );
@@ -585,10 +589,25 @@ describe('merge_group workflow contract', () => {
       expect(job, jobId).toContain(
         "needs.ci-merge-group-admission.outputs.admitted == 'true'"
       );
+      // JOV-12618 remainder: same-tree typecheck/lint reuse (JOV-13081).
+      expect(job, jobId).toContain('Decide typecheck/lint reuse');
+      expect(job, jobId).toContain(
+        'node scripts/lib/merge-group-typecheck-lint-reuse.mjs'
+      );
+      expect(job, jobId).toContain(
+        'needs.ci-merge-group-admission.outputs.source_head_sha'
+      );
     }
+
+    const typecheck = getJobBlock(CI_WORKFLOW, 'ci-fast-typecheck');
+    expect(typecheck).toContain("steps.reuse.outputs.reuse != 'true'");
+    expect(typecheck).toContain(
+      'Validate CI/release incident prevention contract'
+    );
 
     const remaining = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining-shards');
     expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
+    expect(remaining).toContain('CI_FAST_SKIP_LANE_IDS:');
     expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
     // JOV-12618: PRs path-gate; docs-only merge groups may skip; else skip=false.
     expect(remaining).toContain('github.event_name }}" == "pull_request"');
@@ -2445,11 +2464,11 @@ ${selectedGateScript}`,
     const fastGate = getStepBlock(iosGate, 'Run fast unit and coverage gate');
     const fullGate = getStepBlock(iosGate, 'Run full simulator regression');
 
-    // actions/cache saves in its post step too. Gating the action itself keeps
-    // both remote restore and upload off persistent runners, while hosted VMs
-    // still receive the lockfile- and toolchain-scoped package cache.
+    // Restore + explicit save (not actions/cache post) keeps remote I/O off
+    // persistent runners while still warming hosted primary keys after a
+    // successful resolve even when a later step fails (JOV-14016).
     expect(cache).toContain("if: ${{ runner.environment == 'github-hosted' }}");
-    expect(cache).toContain('uses: actions/cache@');
+    expect(cache).toContain('uses: actions/cache/restore@');
     expect(cache).toContain('.build/ios-ci/SourcePackages');
     expect(cache).toContain('~/Library/Caches/org.swift.swiftpm');
     expect(cache).toContain('steps.xcode-version.outputs.cache_key');
@@ -2463,6 +2482,15 @@ ${selectedGateScript}`,
     expect(resolvePackages).toContain(
       "if: ${{ steps.swiftpm-cache.outputs.cache-hit != 'true' }}"
     );
+    expect(resolvePackages).toContain('id: swiftpm-resolve');
+    const savePackages = getStepBlock(iosGate, 'Save Swift package cache');
+    expect(savePackages).toContain('uses: actions/cache/save@');
+    expect(savePackages).toContain(
+      "steps.swiftpm-resolve.outcome == 'success'"
+    );
+    const receipt = getStepBlock(iosGate, 'Record SwiftPM cache receipt');
+    expect(receipt).toContain('ios-ci-swiftpm-cache-receipt.mjs');
+    expect(receipt).toContain('SWIFTPM_CACHE_HIT');
     expect(fastGate).toContain('if: ${{ !inputs.full-regression }}');
     expect(fastGate).toContain('bash apps/ios/scripts/run-unit-tests.sh');
     expect(fastGate).toContain('bash apps/ios/scripts/check_coverage.sh');
@@ -2888,7 +2916,26 @@ ${selectedGateScript}`,
       'group: production-mutation'
     );
     expect(POSTDEPLOY_PROBES_WORKFLOW).not.toContain('secrets: inherit');
-    expect(POSTDEPLOY_PROBES_WORKFLOW).not.toContain('environment:');
+    // JOV-9826: auth-smoke alone binds Preview – jovie so Stripe TEST keys
+    // resolve (repo-level secrets are empty). Every other probe job stays
+    // environment-free so read-only evidence never waits on env protection.
+    const authSmoke = getJobBlock(POSTDEPLOY_PROBES_WORKFLOW, 'auth-smoke');
+    expect(authSmoke).toMatch(/^\s+environment:\s+Preview – jovie\s*$/m);
+    for (const jobId of [
+      'resolve-target',
+      'smoke',
+      'lighthouse',
+      'golden-path-cert',
+      'golden-path-cert-reused',
+      'product-crawl',
+      'product-crawl-merge',
+      'remediation',
+      'notify-failure',
+    ]) {
+      const job = getJobBlock(POSTDEPLOY_PROBES_WORKFLOW, jobId);
+      if (!job) continue;
+      expect(job, jobId).not.toMatch(/^\s+environment:/m);
+    }
 
     const resolve = getJobBlock(POSTDEPLOY_PROBES_WORKFLOW, 'resolve-target');
     expect(resolve).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);

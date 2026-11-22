@@ -1,5 +1,4 @@
 'use client';
-// @coverage-via apps/web/tests/unit/components/admin/AdminUsersTableUnified.test.tsx
 
 import {
   AlertDialog,
@@ -12,6 +11,7 @@ import {
   AlertDialogTitle,
   Badge,
   Button,
+  Checkbox,
   Textarea,
 } from '@jovie/ui';
 import { Copy, Users } from 'lucide-react';
@@ -100,12 +100,15 @@ function AdminUserMobileCard({
       className='overflow-hidden bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_96%,transparent)] p-0'
     >
       <div className='flex items-start justify-between gap-3 px-3 py-2'>
-        <label className='flex min-w-0 flex-1 cursor-pointer items-start gap-3'>
-          <input
-            type='checkbox'
+        <label
+          htmlFor={`select-user-${user.id}`}
+          className='flex min-w-0 flex-1 cursor-pointer items-start gap-3'
+        >
+          <Checkbox
+            id={`select-user-${user.id}`}
             checked={isSelected}
-            onChange={() => onToggleSelect(user.id)}
-            className='mt-0.5 h-4 w-4 rounded border-(--linear-border-strong) bg-surface-0 text-(--color-accent-purple-text) focus-visible:ring-1 focus-visible:ring-ring'
+            onCheckedChange={() => onToggleSelect(user.id)}
+            className='mt-0.5'
             aria-label={`Select ${user.name ?? user.email ?? 'user'}`}
           />
           <div className='min-w-0'>
@@ -471,7 +474,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         size: 56,
       }),
 
-      // Name column
       columnHelper.accessor('name', {
         id: 'name',
         header: 'Name',
@@ -479,7 +481,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         size: 260,
       }),
 
-      // Jovie Username column
       columnHelper.display({
         id: 'username',
         header: 'Jovie Username',
@@ -487,7 +488,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         size: 180,
       }),
 
-      // Sign up (Created) column
       columnHelper.accessor('createdAt', {
         id: 'created',
         header: 'Sign Up',

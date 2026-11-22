@@ -21,6 +21,10 @@ on:
 concurrency:
   group: production-synthetic-monitoring
   cancel-in-progress: false
+  # The default queue keeps one pending run and cancels the previous one.
+  # A 00:17 or 12:17 slot that is still waiting for a runner disappears when
+  # the next schedule arrives (JOV-6813). Let the delayed slot stay queued.
+  queue: max
 
 jobs:
   synthetic-test:
@@ -617,6 +621,48 @@ jobs:
             -H "Authorization: Bearer ${CRON_SECRET}" https://jov.ie/api/billing/health > "$RUNNER_TEMP/billing-health.json"
           BILLING_HEALTH_JSON="$(cat "$RUNNER_TEMP/billing-health.json")" \
             node scripts/billing-sync-intake.mjs
+
+  dogfood-truth:
+    # JOV-7140 dogfood loop: the design partner's own account against Apple
+    # Music and the catalog cycle. Red keys land in Todo for Symphony; the
+    # next day's run is the verification that resolves them.
+    name: Dogfood account truth
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '47 7 * * *' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Install Doppler CLI
+        uses: ./.github/actions/setup-doppler
+      - name: Resolve CRON_SECRET
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: node .github/scripts/resolve-synthetic-secrets.mjs --name CRON_SECRET
+      - name: Check the account and file or resolve findings
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET missing from GitHub secrets and Doppler jovie-web/prd"
+            exit 1
+          fi
+          curl --silent --show-error --fail --connect-timeout 10 --max-time 60 \
+            -H "Authorization: Bearer ${CRON_SECRET}" https://jov.ie/api/cron/dogfood-truth > "$RUNNER_TEMP/dogfood-truth.json"
+          cat "$RUNNER_TEMP/dogfood-truth.json"; echo
+          DOGFOOD_TRUTH_JSON="$(cat "$RUNNER_TEMP/dogfood-truth.json")" \
+            node scripts/dogfood-truth-intake.mjs
 
   docs-deploy-jovie:
     name: jovie-docs deploy signal

@@ -149,6 +149,14 @@ describe('HeaderNav states', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     const flyout = container.querySelector('#marketing-header-flyout-product');
     expect(flyout).not.toBeNull();
+    expect(flyout).toHaveClass('marketing-glass-header__flyout--open');
+    // Native popover path (JOV-14244) when the runtime exposes showPopover.
+    if (
+      typeof HTMLElement !== 'undefined' &&
+      'showPopover' in HTMLElement.prototype
+    ) {
+      expect(flyout).toHaveAttribute('popover', 'manual');
+    }
     expect(
       within(flyout as HTMLElement).getByRole('link', { name: /Pricing/ })
     ).toHaveAttribute('href', '/pricing');
@@ -156,6 +164,7 @@ describe('HeaderNav states', () => {
 
     await user.keyboard('{Escape}');
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(flyout).not.toHaveClass('marketing-glass-header__flyout--open');
     expect(trigger).toHaveFocus();
   });
 

@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { SIDEBAR_SECTION_RHYTHM, SidebarSection } from './SidebarSection';
 
@@ -102,5 +103,22 @@ describe('SidebarSection', () => {
       </SidebarSection>
     );
     expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'true');
+  });
+});
+
+describe('SidebarSection PlainButton header', () => {
+  it('is a type=button header that toggles on userEvent.click', async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
+    render(
+      <SidebarSection name='Releases' open onToggle={onToggle} itemCount={0}>
+        <span />
+      </SidebarSection>
+    );
+    const header = screen.getByRole('button', { name: /Releases/ });
+    expect(header).toHaveAttribute('type', 'button');
+    expect(header).toHaveAttribute('aria-expanded', 'true');
+    await user.click(header);
+    expect(onToggle).toHaveBeenCalledOnce();
   });
 });

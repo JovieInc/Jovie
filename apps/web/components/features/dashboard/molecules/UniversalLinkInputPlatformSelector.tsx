@@ -4,6 +4,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  PlainButton,
 } from '@jovie/ui';
 import { Plus, Search } from 'lucide-react';
 
@@ -11,6 +12,7 @@ import {
   getPlatformIconMetadata,
   SocialIcon,
 } from '@/components/atoms/SocialIcon';
+import { NEUTRAL_BRAND_FALLBACK_HEX } from '@/constants/platforms/brand-colors';
 import { getContrastTextOnBrand } from '@/lib/utils/color';
 
 import {
@@ -20,10 +22,15 @@ import {
 } from './universalLinkInput.constants';
 import { type CursorPosition } from './useInputFocusController';
 
+function brandHexFor(icon: string): string {
+  const meta = getPlatformIconMetadata(icon);
+  return `#${meta?.hex || NEUTRAL_BRAND_FALLBACK_HEX}`;
+}
+
+type PlatformOption = (typeof PLATFORM_OPTIONS)[number];
+
 interface PlatformSelectorProps {
-  readonly onPlatformSelect: (
-    platform: (typeof PLATFORM_OPTIONS)[number]
-  ) => void;
+  readonly onPlatformSelect: (option: PlatformOption) => void;
   readonly onArtistSearchSelect: (provider: ArtistSearchProvider) => void;
   readonly onRestoreFocus: (cursor?: CursorPosition) => void;
   readonly disabled?: boolean;
@@ -37,33 +44,29 @@ export function UniversalLinkInputPlatformSelector({
 }: PlatformSelectorProps) {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type='button'
+      <DropdownMenuTrigger asChild disabled={disabled}>
+        <PlainButton
           disabled={disabled}
           className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-2 text-secondary-token transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:z-10 disabled:cursor-not-allowed disabled:opacity-60'
-          aria-label='Add link from platform'
+          aria-label='Add Link From Platform'
         >
           <Plus className='h-4 w-4' aria-hidden='true' />
-        </button>
+        </PlainButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align='start'
-        className='max-h-80 overflow-y-auto'
         onCloseAutoFocus={event => {
           event.preventDefault();
           onRestoreFocus('end');
         }}
       >
         {ARTIST_SEARCH_PLATFORMS.map(platform => {
-          const meta = getPlatformIconMetadata(platform.icon);
-          const hex = meta?.hex ? `#${meta.hex}` : '#6b7280';
+          const hex = brandHexFor(platform.icon);
 
           return (
             <DropdownMenuItem
               key={platform.id}
               onSelect={() => onArtistSearchSelect(platform.provider)}
-              className='flex min-h-11 items-center gap-2.5 cursor-pointer py-2 text-sm'
             >
               <div
                 className='flex items-center justify-center h-7 w-7 rounded-lg sm:h-5 sm:w-5 sm:rounded'
@@ -86,13 +89,11 @@ export function UniversalLinkInputPlatformSelector({
         <DropdownMenuSeparator />
 
         {PLATFORM_OPTIONS.map(platform => {
-          const meta = getPlatformIconMetadata(platform.icon);
-          const hex = meta?.hex ? `#${meta.hex}` : '#6b7280';
+          const hex = brandHexFor(platform.icon);
           return (
             <DropdownMenuItem
               key={platform.id}
               onSelect={() => onPlatformSelect(platform)}
-              className='flex min-h-11 items-center gap-2.5 cursor-pointer py-2 text-sm'
             >
               <div
                 className='flex items-center justify-center h-7 w-7 rounded-lg sm:h-5 sm:w-5 sm:rounded'

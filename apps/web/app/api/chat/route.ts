@@ -184,6 +184,7 @@ import {
   authorizeFounderSummerUser,
   founderPrincipalHash,
 } from '@/lib/ovie/summer-founder-auth';
+import { FOUNDER_SUMMER_DENIAL } from '@/lib/ovie/summer-founder-denial';
 import { fetchSummerShadow } from '@/lib/ovie/summer-shadow-client';
 import { createSummerAssistantStreamResponse } from '@/lib/ovie/summer-stream';
 import {
@@ -1959,16 +1960,16 @@ export async function POST(req: Request) {
   if (summerTransportRequested) {
     const founderAuthorization = authorizeFounderSummerUser(userId);
     if (founderAuthorization !== 'authorized') {
+      const denial = FOUNDER_SUMMER_DENIAL[founderAuthorization];
       return NextResponse.json(
         {
-          error:
-            founderAuthorization === 'unconfigured'
-              ? 'Founder Summer identity is not configured'
-              : 'Founder Summer access required',
+          error: denial.error,
+          errorCode: denial.errorCode,
+          message: denial.message,
           requestId,
         },
         {
-          status: founderAuthorization === 'unconfigured' ? 503 : 403,
+          status: denial.status,
           headers: { ...corsHeaders, 'x-request-id': requestId },
         }
       );
@@ -2732,8 +2733,13 @@ export async function POST(req: Request) {
         // A violation swaps in a safe fallback and logs the rules that fired.
         const gatedReply = gateAssistantReply(assistantText, artistContext);
         if (gatedReply.violations.length > 0) {
+          const emptyReply = gatedReply.violations.some(
+            violation => violation.rule === 'empty-reply'
+          );
           logger.warn(
-            'Assistant reply failed copy floor; persisting fallback',
+            emptyReply
+              ? 'Assistant reply was blank; persisting draft-hold fallback'
+              : 'Assistant reply failed copy floor; persisting fallback',
             {
               requestId,
               turnId: reservedTurn.turnId,
@@ -2745,16 +2751,8 @@ export async function POST(req: Request) {
           parts: responseMessage.parts,
           isAborted,
         });
-        if (
-          !isAborted &&
-          !assistantText.trim() &&
-          (!toolCalls || toolCalls.length === 0)
-        ) {
-          await persistStreamFailure(
-            new Error('Model turn produced no text or tool calls')
-          );
-          return;
-        }
+        // ASS-95: blank artist-facing text (with or without tools) persists the
+        // gated draft-hold fallback instead of an empty bubble or stream failure.
         await persistTerminalAssistantMessage({
           conversationId: reservedTurn.conversationId,
           turnId: reservedTurn.turnId,

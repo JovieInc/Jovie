@@ -1108,6 +1108,11 @@ describe('deploy workflow Vercel env resolution', () => {
         fakeVercel,
         `#!/usr/bin/env bash
 set -euo pipefail
+# Post-upload settle calls inspect; capture deploy argv only.
+if [[ " $* " == *" inspect "* ]]; then
+  printf '%s\\n' '{"readyState":"READY","id":"dpl_argv"}'
+  exit 0
+fi
 printf '%s\\0' "$@" > "$ARGV_CAPTURE"
 printf 'raw-cli-output:%s\\n' "$VERCEL_TOKEN"
 printf 'https://jovie-argv-contract-jovie.vercel.app\\n'

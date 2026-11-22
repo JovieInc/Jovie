@@ -2,15 +2,9 @@
 
 // @coverage-via apps/web/tests/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow.test.tsx
 
+import { PlainButton } from '@jovie/ui';
 import { QueryClientContext } from '@tanstack/react-query';
-import {
-  Clock,
-  ExternalLink,
-  Lock,
-  MoreHorizontal,
-  Pause,
-  Play,
-} from 'lucide-react';
+import { Clock, ExternalLink, Lock, Pause, Play } from 'lucide-react';
 import Link from 'next/link';
 import {
   type ComponentPropsWithoutRef,
@@ -29,6 +23,7 @@ import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useT
 import {
   contextualAction,
   ShellListRowFrame,
+  TableRowOverflowTrigger,
 } from '@/components/organisms/table';
 import { AgentPulse } from '@/components/shell/AgentPulse';
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
@@ -161,8 +156,7 @@ const ArtworkCell = memo(function ArtworkCell({
       />
       {isSyncing ? <AgentPulse className='rounded-sm' /> : null}
       {hasPreview ? (
-        <button
-          type='button'
+        <PlainButton
           onClick={handleTogglePlayback}
           onKeyDown={e => e.stopPropagation()}
           aria-label={
@@ -173,8 +167,8 @@ const ArtworkCell = memo(function ArtworkCell({
           className={cn(
             // Always renders white-on-black scrim in both themes — pair the
             // light/dark utilities so the play glyph stays legible on the
-            // `bg-black/50` overlay (satisfies no-hardcoded-theme-colors).
-            'absolute inset-0 grid place-items-center rounded-sm bg-black/50 text-white dark:text-white transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/55',
+            // `bg-ink-on-media/50` overlay (satisfies no-hardcoded-theme-colors).
+            'absolute inset-0 grid place-items-center rounded-sm bg-ink-on-media/50 text-on-media transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/55',
             isTrackPlaying
               ? 'opacity-100'
               : 'opacity-0 group-hover/row:opacity-100'
@@ -195,7 +189,7 @@ const ArtworkCell = memo(function ArtworkCell({
               aria-hidden='true'
             />
           )}
-        </button>
+        </PlainButton>
       ) : null}
     </div>
   );
@@ -494,15 +488,9 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
             open={actionsOpen}
             onOpenChange={setActionsOpen}
           >
-            <button
-              type='button'
-              onClick={e => e.stopPropagation()}
-              onKeyDown={e => e.stopPropagation()}
-              aria-label={`Release actions for ${release.title}`}
-              className='grid h-7 w-7 shrink-0 place-items-center rounded-md text-quaternary-token transition-[opacity,color,background-color] duration-subtle ease-subtle hover:bg-surface-2/70 hover:text-primary-token'
-            >
-              <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
-            </button>
+            <TableRowOverflowTrigger
+              ariaLabel={`Release actions for ${release.title}`}
+            />
           </TableActionMenu>
         </div>
       ) : null}

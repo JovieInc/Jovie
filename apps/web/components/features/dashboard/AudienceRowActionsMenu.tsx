@@ -5,11 +5,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  IconButton,
 } from '@jovie/ui';
 import { Copy, MoreHorizontal } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
-import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
@@ -66,7 +66,9 @@ export function AudienceRowActionsMenu({
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange} modal={modal}>
       <DropdownMenuTrigger asChild>
-        <AppIconButton
+        <IconButton
+          size='sm'
+          variant='control'
           inert={open}
           ariaLabel='Open audience row actions'
           onClick={event => event.stopPropagation()}
@@ -75,7 +77,7 @@ export function AudienceRowActionsMenu({
           }
         >
           <MoreHorizontal className='h-4 w-4' />
-        </AppIconButton>
+        </IconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align='end'

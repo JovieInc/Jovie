@@ -90,7 +90,7 @@ describe('FounderFunnelBand', () => {
     expect(screen.getByText('Biggest drop-off · −60')).toBeInTheDocument();
     expect(
       screen.getByRole('link', {
-        name: '40 Accounts created; inspect underlying entities',
+        name: /^Accounts created 40 .*; inspect underlying entities$/,
       })
     ).toHaveAttribute(
       'href',

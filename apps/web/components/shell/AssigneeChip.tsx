@@ -61,7 +61,7 @@ export function AssigneeChip({
           size='compact'
           tone='auto'
           rounded={false}
-          className='text-cyan-400'
+          className='text-accent'
           aria-hidden
         />
         {expanded && label}

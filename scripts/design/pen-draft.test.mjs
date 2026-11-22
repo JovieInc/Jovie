@@ -25,30 +25,14 @@ import {
 } from './pen-draft.mjs';
 
 test('every checked-in brief parses and names a unique frame', () => {
-  for (const b of loadBriefs())
-    assert.ok(b.context.length, `${b.file} names the screens it builds on`);
   const briefs = loadBriefs();
-  assert.deepEqual(
-    briefs.map(b => b.frame),
-    [
-      'audience-analytics',
-      'billing-success',
-      'chat-history-switcher-states',
-      'chat-history-switcher',
-      'claim',
-      'empty-states',
-      'homepage',
-      'insights-empty',
-      'insights',
-      'page-skeletons-2',
-      'page-skeletons-3',
-      'page-skeletons',
-      'profile-analytics-card',
-      'request-access',
-      'tour-dates-connect',
-      'workspace-table',
-    ]
-  );
+  for (const b of briefs) {
+    assert.ok(b.context.length, `${b.file} names the screens it builds on`);
+    assert.equal(basename(b.file, '.md'), b.frame, `${b.file} names its frame`);
+  }
+  const frames = briefs.map(b => b.frame);
+  assert.equal(new Set(frames).size, frames.length, 'frame names are unique');
+  assert.ok(frames.includes('workspace-table-states'));
   for (const b of briefs) assert.ok(b.prompt.length > 100, b.frame);
 });
 
@@ -393,7 +377,7 @@ test('a drafter change, a manual run or --only picks the right frames', () => {
   ];
   assert.deepEqual(
     planFrames({ briefs, changed: ['scripts/design/pen-draft.mjs'] }),
-    ['claim', 'homepage']
+    ['claim']
   );
   assert.deepEqual(planFrames({ briefs }), ['claim', 'homepage']);
   assert.deepEqual(planFrames({ briefs, only: ['homepage'] }), ['homepage']);

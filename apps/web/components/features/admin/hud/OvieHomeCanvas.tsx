@@ -2,18 +2,12 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { ChatOpsDataCard } from '@/components/jovie/components/ChatOpsDataCard';
 import type { HomeCanvasState } from '@/components/jovie/types';
 import {
-  HomeLoopAnswerPanel,
   type HomeLoopSectionStatus,
   StoryFirstCanvas,
 } from '@/components/organisms/home-loop';
 import { APP_ROUTES } from '@/constants/routes';
-import {
-  buildCanvasTurns,
-  partitionCanvasCards,
-} from '@/lib/ovie/home/canvas-turns';
 import {
   type CompanyBlocker,
   homeConstraint,
@@ -35,7 +29,6 @@ import {
 } from '@/lib/ovie/home/story-first';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
 import type { HudMetrics } from '@/types/hud';
-import { useCanvasHistory } from './useCanvasHistory';
 import { useHudShippingStateQuery } from './useHudShippingStateQuery';
 import { useOvieHomeReadyTiming } from './useOvieHomeReadyTiming';
 
@@ -108,7 +101,8 @@ interface OvieHomeBlockerResponse {
  * three glance pulses as a right rail, stage buckets + one highlight, docked
  * composer with melt-to-chat on typing. Shipping from `ovie.shipping-state.v1`;
  * revenue blocker from company-state. Needs You and the metric wall stay off
- * the first fold (Inbox / Shipping own them).
+ * the first fold (Inbox / Shipping own them). Answers never render on Home:
+ * once a turn starts the chat takes over the surface (Tim 2026-11-22).
  */
 export interface OvieHomeCanvasProps {
   /** Shell chat state; absent when Home renders outside the composer slot. */
@@ -247,8 +241,9 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
         revenueFailed,
         constraint,
         highlight,
+        rows: home?.rows ?? [],
       }),
-    [revenueData, revenueRead, revenueFailed, constraint, highlight]
+    [revenueData, revenueRead, revenueFailed, constraint, highlight, home]
   );
   const glance = useMemo(
     () =>
@@ -260,45 +255,6 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     [snapshot, company.data, home]
   );
 
-  const turns = useMemo(
-    () => buildCanvasTurns(chat?.messages ?? [], chat?.isStreaming ?? false),
-    [chat?.messages, chat?.isStreaming]
-  );
-  const history = useCanvasHistory(turns.length);
-  const turn = history.index >= 0 ? turns[history.index] : undefined;
-  const generated = turn ? partitionCanvasCards(turn.cards) : null;
-  const answerPanel = turn ? (
-    <HomeLoopAnswerPanel
-      prompt={turn.prompt}
-      reply={turn.reply}
-      pending={turn.pending}
-      position={history.index + 1}
-      total={turns.length}
-      onBack={history.back}
-      onForward={history.forward}
-      onHome={history.home}
-      onOpenTranscript={() => chat?.onOpenTranscript()}
-    >
-      {generated?.answer.length
-        ? generated.answer.map((card, index) => (
-            <ChatOpsDataCard
-              // Cards are positional within one immutable turn.
-              key={`${turn.id}:${card.kind}:${card.title}:${index}`}
-              card={card}
-            />
-          ))
-        : null}
-      {generated?.inFlight.length
-        ? generated.inFlight.map((card, index) => (
-            <ChatOpsDataCard
-              key={`${turn.id}:flight:${card.kind}:${card.title}:${index}`}
-              card={card}
-            />
-          ))
-        : null}
-    </HomeLoopAnswerPanel>
-  ) : null;
-
   const melting = Boolean(chat?.composerHasIntent || chat?.isStreaming);
 
   return (
@@ -308,7 +264,6 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       stages={buckets}
       inFlightHref={APP_ROUTES.ADMIN_SHIPPING}
       melting={melting}
-      answer={answerPanel}
       glanceLoading={company.isPending || loopStatus === 'loading'}
       stagesStatus={loopStatus}
       onRetryStages={() => void shipping.refetch()}

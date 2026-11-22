@@ -8,13 +8,19 @@
  * All model calls go to Cloudflare Workers AI (startup credits). The AI
  * Gateway is never used: Gateway cash is reserved for production traffic.
  *
- *   CLOUDFLARE_ACCOUNT_ID=... pnpm --filter @jovie/web eval:helpfulness -- \
+ * Preferred (Cursor agent VM / CI — no Cloudflare account id):
+ *   WORKERS_AI_TOKEN=... pnpm --filter @jovie/web eval:helpfulness -- \
+ *     --judge cheap --subset ci --out .eval-results/jovie-helpfulness/ci.json
+ *
+ * Direct Workers AI API (local Doppler / wrangler):
+ *   CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... \
+ *     pnpm --filter @jovie/web eval:helpfulness -- \
  *     --judge strong --out .eval-results/jovie-helpfulness/latest.json
  *
  * Flags:
  *   --judge strong | cheap | none | <@cf model>  (default cheap)
  *   --model <@cf model>                         subject (default glm-5.3)
- *   --subset ci                                 7-case subset
+ *   --subset ci                                 cheap CI live subset
  *   --case <id>                                 one case (repeatable)
  *   --out <path>                                JSON report path
  *   --concurrency <n>                           default 3
@@ -34,10 +40,7 @@ import {
   joinSystemPromptParts,
 } from '@/lib/chat/system-prompt';
 import { resolveChatToolStepLimit } from '@/lib/chat/tool-step-limit';
-import {
-  ASSISTANT_REPLY_FALLBACK,
-  gateAssistantReply,
-} from '@/lib/chat/voice-lint';
+import { surfaceCompletedAssistantReply } from '@/lib/chat/voice-lint';
 import { HELPFULNESS_CASES, type HelpfulnessCase } from './cases';
 import { buildEvalToolSpecs } from './eval-tools';
 import { buildFixture } from './fixtures';
@@ -47,6 +50,7 @@ import {
   parseHistory,
   renderMetricPage,
 } from './publish';
+import { assertNoGatewaySpend, resolveWorkersAiConfig } from './resolve-config';
 import {
   buildJudgePrompt,
   type CaseResult,
@@ -55,7 +59,7 @@ import {
   type JudgeVerdict,
   judgeScore,
   parseJudgeVerdict,
-  runHardChecks,
+  runHardChecksForFixture,
   scoreCase,
   summarize,
 } from './scoring';
@@ -65,12 +69,14 @@ import {
   WORKERS_AI_CHEAP_JUDGE,
   WORKERS_AI_STRONG_JUDGE,
   WORKERS_AI_SUBJECT_MODEL,
-  type WorkersAiConfig,
+  withCheapJudgeFallback,
   workersAiChat,
 } from './workers-ai';
 
+export { assertNoGatewaySpend, resolveWorkersAiConfig } from './resolve-config';
+
 /** Hard cap on cases per run so a loop can never fan out unbounded spend. */
-export const MAX_CASES_PER_RUN = 30;
+export const MAX_CASES_PER_RUN = 120;
 
 interface Args {
   judge: string;
@@ -110,60 +116,6 @@ function parseArgs(argv: string[]): Args {
     i += 1;
   }
   return args;
-}
-
-/**
- * Gateway guard: this runner has no Gateway path. A Gateway key in the
- * environment is refused unless the operator explicitly opted in, so a
- * future edit cannot silently start spending Gateway cash.
- */
-export function assertNoGatewaySpend(
-  env: NodeJS.ProcessEnv,
-  allowGatewaySpend: boolean
-): void {
-  if (allowGatewaySpend) return;
-  const gatewayVars = Object.keys(env).filter(
-    key => /GATEWAY.*(KEY|TOKEN)/i.test(key) && Boolean(env[key])
-  );
-  if (gatewayVars.length > 0) {
-    throw new Error(
-      `Refusing to run with AI Gateway credentials present (${gatewayVars.join(', ')}). Unset them or pass --allow-gateway-spend.`
-    );
-  }
-}
-
-/** wrangler OAuth tokens live about an hour; refresh well before that. */
-const WRANGLER_TOKEN_TTL_MS = 20 * 60_000;
-
-function resolveWorkersAiConfig(): WorkersAiConfig {
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
-  if (!accountId) throw new Error('CLOUDFLARE_ACCOUNT_ID is required.');
-  const fixed = process.env.CLOUDFLARE_API_TOKEN ?? '';
-  if (fixed) return { accountId, token: () => fixed };
-  let cached = '';
-  let fetchedAt = 0;
-  const token = () => {
-    if (!cached || Date.now() - fetchedAt > WRANGLER_TOKEN_TTL_MS) {
-      cached =
-        execFileSync('npx', ['-y', 'wrangler@4', 'auth', 'token'], {
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'ignore'],
-        })
-          .trim()
-          .split('\n')
-          .at(-1)
-          ?.trim() ?? '';
-      fetchedAt = Date.now();
-    }
-    if (!cached) {
-      throw new Error(
-        'CLOUDFLARE_API_TOKEN is required (or run `wrangler login` on this host).'
-      );
-    }
-    return cached;
-  };
-  token();
-  return { accountId, token };
 }
 
 const PRO_ACCOUNT = {
@@ -270,15 +222,15 @@ async function askJovie(
     }
   }
 
-  // Mirror the production persist gate (app/api/chat/route.ts onFinish).
-  const gated = gateAssistantReply(text);
-  const persistedAsFallback =
-    text.trim().length > 0 && gated.text === ASSISTANT_REPLY_FALLBACK;
+  // Mirror production: blank model text surfaces the draft-hold fallback so
+  // live CI-subset never scores tool-only / silent-refuse as reply.text ''.
+  // Copy-floor swaps keep raw text + persistedAsFallback (JOV-6616).
+  const surfaced = surfaceCompletedAssistantReply(text);
   return {
     reply: {
-      text: persistedAsFallback ? text : gated.text,
+      text: surfaced.text,
       toolCalls,
-      persistedAsFallback,
+      persistedAsFallback: surfaced.persistedAsFallback,
     },
     usage,
     ms: Date.now() - started,
@@ -301,12 +253,23 @@ async function judge(
   prompt: string
 ): Promise<JudgeVerdict | null> {
   if (!model) return null;
-  const result = await chat({
+  // Prefer gpt-oss; one-shot deepseek-v4.1-flash when live relay allowlist
+  // still rejects it (ASS-88 / undeployed ASS-17).
+  const result = await withCheapJudgeFallback(
     model,
-    messages: [{ role: 'user', content: prompt }],
-    // Reasoning judges spend most of the budget thinking before the JSON.
-    maxTokens: 16_000,
-  });
+    m =>
+      chat({
+        model: m,
+        messages: [{ role: 'user', content: prompt }],
+        // Reasoning judges spend most of the budget thinking before the JSON.
+        maxTokens: 16_000,
+      }),
+    fallback => {
+      process.stderr.write(
+        `cheap judge allowlist miss for ${model}; falling back to ${fallback}\n`
+      );
+    }
+  );
   const verdict = parseJudgeVerdict(result.message.content ?? '');
   if (!verdict) {
     throw new Error(
@@ -453,8 +416,8 @@ async function main(): Promise<void> {
   const rows = await mapLimit(cases, args.concurrency, async testCase => {
     try {
       const turn = await askJovie(chat, testCase, now, args.model);
-      const hardChecks = runHardChecks(testCase, turn.reply);
       const fixture = buildFixture(testCase.fixture, now);
+      const hardChecks = runHardChecksForFixture(testCase, turn.reply, fixture);
       const verdict = await judge(
         chat,
         judgeId,

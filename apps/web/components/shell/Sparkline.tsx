@@ -1,8 +1,16 @@
 'use client';
 
 import { type MouseEvent as ReactMouseEvent, useRef } from 'react';
+import {
+  DELTA_FILL,
+  DELTA_STROKE,
+  deltaSentiment,
+  type MetricPolarity,
+} from '@/lib/design/metric-tone';
 
 export type SparklineTrend = 'up' | 'down' | 'flat';
+
+export type SparklineVariant = 'area' | 'pulse';
 
 export interface SparklineProps {
   /**
@@ -12,6 +20,16 @@ export interface SparklineProps {
   readonly points: readonly number[];
   /** Tone palette — tints the line, fill, and hover playhead. */
   readonly trend: SparklineTrend;
+  /**
+   * Whether a rise is good news (ASR-041). The line is green only when it
+   * moves the good way. Defaults to higher-is-better.
+   */
+  readonly polarity?: MetricPolarity;
+  /**
+   * `area` (default): filled track under the line.
+   * `pulse`: line-only glance chart — no fill panel (Story First flat rail).
+   */
+  readonly variant?: SparklineVariant;
   /** Index of the currently hovered point, or null when none. */
   readonly hoverIdx?: number | null;
   /** Called as the cursor moves over the chart; null on leave. */
@@ -24,19 +42,8 @@ export interface SparklineProps {
 const VIEWBOX_W = 340;
 const VIEWBOX_H = 120;
 
-// Status TEXT tokens, not the neon accent fills: --color-accent-green is
-// about 1.3:1 on white cards, while the -text tokens hold contrast in light
-// and dark, so the line clears 3:1 for graphics in both modes.
-const STROKE_BY_TREND: Record<SparklineTrend, string> = {
-  up: 'var(--color-success-text)',
-  down: 'var(--color-error-text)',
-  flat: 'var(--color-text-tertiary-token)',
-};
-const FILL_BY_TREND: Record<SparklineTrend, string> = {
-  up: 'color-mix(in oklab, var(--color-success-text) 12%, transparent)',
-  down: 'color-mix(in oklab, var(--color-error-text) 12%, transparent)',
-  flat: 'color-mix(in oklab, var(--color-text-tertiary-token) 8%, transparent)',
-};
+// Colors come from the shared delta sentiment maps, which use the status
+// TEXT tokens (not the neon fills) so the line clears 3:1 in both modes.
 const PLAYHEAD_STROKE = 'var(--color-border-strong)';
 const POINT_OUTLINE = 'var(--color-bg-base)';
 
@@ -63,6 +70,8 @@ const POINT_OUTLINE = 'var(--color-bg-base)';
 export function Sparkline({
   points,
   trend,
+  polarity = 'higher-is-better',
+  variant = 'area',
   hoverIdx,
   onHover,
   ariaLabel = 'Trend over time',
@@ -71,9 +80,12 @@ export function Sparkline({
   const max = Math.max(...points, 1);
   const min = Math.min(...points, 0);
   const range = max - min || 1;
+  // Pulse charts keep vertical padding so a flat series is not a hard edge.
+  const padY = variant === 'pulse' ? VIEWBOX_H * 0.18 : 0;
   const xFor = (i: number) =>
     points.length <= 1 ? VIEWBOX_W / 2 : (i / (points.length - 1)) * VIEWBOX_W;
-  const yFor = (v: number) => VIEWBOX_H - ((v - min) / range) * VIEWBOX_H;
+  const yFor = (v: number) =>
+    VIEWBOX_H - padY - ((v - min) / range) * (VIEWBOX_H - padY * 2);
   const path = points
     .map(
       (p, i) =>
@@ -81,8 +93,10 @@ export function Sparkline({
     )
     .join(' ');
   const fillPath = `${path} L ${VIEWBOX_W} ${VIEWBOX_H} L 0 ${VIEWBOX_H} Z`;
-  const stroke = STROKE_BY_TREND[trend];
-  const fill = FILL_BY_TREND[trend];
+  const sentiment = deltaSentiment(trend, polarity);
+  const stroke = DELTA_STROKE[sentiment];
+  const fill = DELTA_FILL[sentiment];
+  const strokeWidth = variant === 'pulse' ? 2 : 1.5;
   const svgRef = useRef<SVGSVGElement>(null);
 
   function handleMove(e: ReactMouseEvent<SVGSVGElement>) {
@@ -119,8 +133,17 @@ export function Sparkline({
       onMouseLeave={() => onHover?.(null)}
     >
       <title>{ariaLabel}</title>
-      <path d={fillPath} fill={fill} />
-      <path d={path} fill='none' stroke={stroke} strokeWidth={1.5} />
+      {variant === 'area' ? <path d={fillPath} fill={fill} /> : null}
+      <path
+        d={path}
+        fill='none'
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        strokeLinecap='round'
+        strokeLinejoin='round'
+        vectorEffect='non-scaling-stroke'
+        data-sparkline-variant={variant}
+      />
       {playheadX != null && playheadY != null && (
         <>
           <line

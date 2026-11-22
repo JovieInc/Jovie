@@ -100,23 +100,16 @@ describe('runProductionCertification', () => {
   });
 
   it('turns browser steps into passed checks and keeps a failed step failed', async () => {
+    const passed = (surface, id) => ({
+      surface,
+      id,
+      status: 'passed',
+      startedAt: T,
+      endedAt: T,
+      summary: 'ok',
+    });
     const steps = [
-      {
-        surface: 'onboarding',
-        id: 'dashboard-first-value',
-        status: 'passed',
-        startedAt: T,
-        endedAt: T,
-        summary: 'ok',
-      },
-      {
-        surface: 'onboarding',
-        id: 'fresh-user-onboarding-first-value',
-        status: 'passed',
-        startedAt: T,
-        endedAt: T,
-        summary: 'ok',
-      },
+      ...EXPECTED_BROWSER_CHECKS.onboarding.map(id => passed('onboarding', id)),
       {
         surface: 'checkout',
         id: 'checkout-entry-renders',
@@ -278,35 +271,43 @@ describe('JOV-9822 retries, full green and the overall verdict', () => {
     expect(receipts.find(r => r.surface === 'chat').status).toBe('failed');
   });
 
-  it('certifies only when all eight surfaces pass on the served sha within 24h', async () => {
+  it('certifies only when all eight surfaces pass on the served sha, with no age limit (JOV-14402)', async () => {
     const { receipts } = await runProductionCertification({
       fetchImpl: fakeFetch(),
       authStatus: 'passed',
       steps: allPassedSteps,
     });
     expect(receipts.every(r => r.status === 'passed')).toBe(true);
-    const now = Date.parse(receipts[0].endedAt);
-    expect(
-      certificationVerdict(receipts, { servedSha: SHA, nowMs: now })
-    ).toEqual({
+    expect(certificationVerdict(receipts, { servedSha: SHA })).toEqual({
       certified: true,
       servedSha: SHA,
       notGreen: [],
     });
     const other = 'b'.repeat(40);
     expect(
-      certificationVerdict(receipts, { servedSha: other, nowMs: now }).notGreen
+      certificationVerdict(receipts, { servedSha: other }).notGreen
     ).toHaveLength(8);
+    // A certification belongs to its release: a pass from long ago on the
+    // served SHA still certifies it. No clock is read at all.
+    const old = receipts.map(r => ({
+      ...r,
+      startedAt: '2025-01-01T00:00:00.000Z',
+      endedAt: '2025-01-01T00:00:01.000Z',
+    }));
+    expect(certificationVerdict(old, { servedSha: SHA }).certified).toBe(true);
     expect(
-      certificationVerdict(receipts, {
-        servedSha: SHA,
-        nowMs: now + 25 * 60 * 60 * 1000,
-      }).certified
-    ).toBe(false);
-    expect(
-      certificationVerdict(receipts.slice(1), { servedSha: SHA, nowMs: now })
-        .notGreen
+      certificationVerdict(receipts.slice(1), { servedSha: SHA }).notGreen
     ).toEqual([{ surface: 'landing', why: 'no receipt' }]);
+  });
+
+  it('certifies only the steps it is asked to (JOV-14402 carry)', async () => {
+    const { receipts } = await runProductionCertification({
+      fetchImpl: fakeFetch(),
+      authStatus: 'passed',
+      steps: allPassedSteps,
+      surfaces: ['chat', 'landing'],
+    });
+    expect(receipts.map(r => r.surface)).toEqual(['landing', 'chat']);
   });
 
   it('requires the /start preview and the smartlink capture from the browser run', async () => {

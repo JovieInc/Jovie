@@ -10,16 +10,27 @@ import {
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { test } from 'node:test';
+import {
+  decodePng,
+  encodePng,
+  fillRect,
+  solidImage,
+} from '../invariants/pen-still-diff-lib.mjs';
 import { PEN_CLI_VERSION } from './pen-draft.mjs';
 import {
   draftedFrameNode,
+  MAX_CLEAR_SHARE,
   PICTURE_PREFIX,
   parsePicture,
+  pictureProblem,
   pictureProgram,
   pictureScale,
   planFrames,
   renderDrafts,
 } from './pen-draft-picture.mjs';
+
+/** An opaque picture whose size says which export it was. */
+const opaque = (w, h) => encodePng(solidImage(w, h, [3, 4, 6, 255]));
 
 /** A draft: the canonical frames plus the new top-level frame. */
 const draftDoc = (frame, id = 'drafted') => ({
@@ -56,7 +67,7 @@ const fetchCanonical = async () => ({
  * A fake Pen CLI: reads the program, "exports" the node it names, and prints
  * what the real editor would. `bounds` gives each node's size.
  */
-function fakePen({ bounds = {}, fail = [] } = {}) {
+function fakePen({ bounds = {}, fail = [], clear = [] } = {}) {
   const sessions = [];
   const run = (cmd, args, opts) => {
     const pen = args[args.indexOf('--in') + 1];
@@ -83,7 +94,12 @@ function fakePen({ bounds = {}, fail = [] } = {}) {
       name = doc.children.find(child => child.id === id)?.name,
     } = bounds[id] ?? {};
     const scale = pictureScale(w, h);
-    writeFileSync(join(pngDir, `${id}.png`), `png of ${id} at ${scale}`);
+    writeFileSync(
+      join(pngDir, `${id}.png`),
+      clear.includes(id)
+        ? encodePng(solidImage(8, 4, [0, 0, 0, 0]))
+        : opaque(Math.max(1, Math.round(w * scale) % 97), 3)
+    );
     return `noise\n${PICTURE_PREFIX}${JSON.stringify({ id, name, w, h, scale })}\nbye\n`;
   };
   return { run, sessions };
@@ -215,8 +231,8 @@ test('each draft with a .pen gets a picture of its frame alone', async () => {
   );
 
   assert.equal(
-    readFileSync(join(dir, 'pen-draft-claim/claim.frame.png'), 'utf8'),
-    'png of claim-node at 1'
+    decodePng(readFileSync(join(dir, 'pen-draft-claim/claim.frame.png'))).width,
+    1440 % 97
   );
   assert.deepEqual(sidecar(dir, 'claim'), {
     schema: 'jovie.pen-draft-picture/v1',
@@ -226,8 +242,9 @@ test('each draft with a .pen gets a picture of its frame alone', async () => {
     scale: 1,
   });
   assert.equal(
-    readFileSync(join(dir, 'pen-draft-insights/insights.frame.png'), 'utf8'),
-    'png of insights-node at 0.6'
+    decodePng(readFileSync(join(dir, 'pen-draft-insights/insights.frame.png')))
+      .width,
+    Math.round(6000 * 0.6) % 97
   );
   assert.equal(sidecar(dir, 'insights').scale, 0.6);
   // The draft's own export and .pen are left as they were.
@@ -325,4 +342,59 @@ test('without the Pen secrets every draft is marked failed and Pen is never run'
     []
   );
   assert.equal(basename(dir).startsWith('pen-draft-picture-'), true);
+});
+
+test('clear gutters between variants pass; a baked checkerboard fails', () => {
+  // Desktop and mobile variants with a clear gutter between them, as the
+  // homepage draft exports (about 4% of it is that gutter).
+  const variants = solidImage(200, 60, [3, 4, 6, 255]);
+  fillRect(variants, 120, 0, 12, 60, [0, 0, 0, 0]);
+  assert.equal(pictureProblem(encodePng(variants)), null);
+
+  // A section with no fill: Pen exports a dark checkerboard of opaque
+  // 5px tiles, as the What's New card did in audience-analytics.
+  const card = solidImage(200, 60, [3, 4, 6, 255]);
+  for (let y = 10; y < 40; y++)
+    for (let x = 20; x < 120; x++) {
+      const light = (Math.floor(x / 5) + Math.floor(y / 5)) % 2;
+      fillRect(card, x, y, 1, 1, light ? [20, 20, 20, 255] : [3, 3, 3, 255]);
+    }
+  assert.match(
+    pictureProblem(encodePng(card)),
+    /^the frame shows a see-through checkerboard near x 2\d, y 10: a section there has no fill$/
+  );
+
+  // One striped line, like a dashed divider, is not a checkerboard.
+  const divider = solidImage(200, 60, [3, 4, 6, 255]);
+  for (let x = 20; x < 120; x += 10)
+    fillRect(divider, x, 30, 5, 1, [40, 40, 40, 255]);
+  assert.equal(pictureProblem(encodePng(divider)), null);
+});
+
+test('a see-through picture never goes to review: it fails its frame', async () => {
+  // Rounded outer corners pass; a frame with no background does not.
+  const cornered = solidImage(100, 100, [3, 4, 6, 255]);
+  for (const p of [0, 1, 100, 9999]) cornered.data[p * 4 + 3] = 0;
+  assert.equal(pictureProblem(encodePng(cornered)), null);
+  assert.equal(
+    pictureProblem(encodePng(solidImage(10, 10, [0, 0, 0, 0]))),
+    'the frame has no background: 100% of the picture is see-through'
+  );
+  assert.match(pictureProblem(Buffer.from('not a png')), /not a readable PNG/);
+  assert.ok(MAX_CLEAR_SHARE < 0.05);
+
+  const dir = artifacts({
+    'pen-draft-claim': {
+      'claim.pen': JSON.stringify(draftDoc('claim', 'claim-node')),
+    },
+  });
+  const pen = fakePen({ clear: ['claim-node'] });
+  assert.deepEqual(await render(dir, pen), [
+    {
+      frame: 'claim',
+      ok: false,
+      error: 'the frame has no background: 100% of the picture is see-through',
+    },
+  ]);
+  assert.equal(existsSync(join(dir, 'pen-draft-claim/claim.frame.png')), false);
 });

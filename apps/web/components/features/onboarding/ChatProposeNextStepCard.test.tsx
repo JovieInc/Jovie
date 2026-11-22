@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
@@ -68,11 +69,52 @@ describe('ChatProposeNextStepCard states', () => {
     expect(
       screen.getByRole('heading', { name: 'Claim @timwhite' })
     ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('onboarding-post-keep-enrichment')
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('signup-surface')).toBeInTheDocument();
     expect(trackMock).toHaveBeenCalledWith(
       ONBOARDING_FUNNEL_EVENTS.QUALIFIED,
       expect.objectContaining({ surface: 'start_chat' })
     );
     await expectNoA11yViolations(container);
+  });
+
+  it('keeps enrichment chips subordinate and local-only under auth', async () => {
+    const user = userEvent.setup();
+    render(
+      <ChatProposeNextStepCard
+        payload={payload('instant_access')}
+        claimHandle='timwhite'
+      />
+    );
+
+    expect(screen.getByTestId('signup-surface')).toBeInTheDocument();
+    expect(
+      screen.getByText(/optional — does not change signup/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('onboarding-attach-account')
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId('onboarding-enrichment-social-chip'));
+    await user.click(
+      screen.getByTestId('onboarding-enrichment-social-instagram')
+    );
+    expect(
+      screen.getByTestId('onboarding-enrichment-social-chip')
+    ).toHaveTextContent('Instagram / TikTok Noted');
+
+    await user.click(screen.getByTestId('onboarding-enrichment-audience-chip'));
+    await user.click(
+      screen.getByTestId('onboarding-enrichment-audience-5k_to_50k')
+    );
+    expect(
+      screen.getByTestId('onboarding-enrichment-audience-chip')
+    ).toHaveTextContent('Audience Noted');
+
+    // Primary auth surface remains after optional notes.
+    expect(screen.getByTestId('signup-surface')).toBeInTheDocument();
   });
 
   it('keeps the instant-access copy when the auth surface cannot render', async () => {

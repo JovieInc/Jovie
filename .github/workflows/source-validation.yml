@@ -203,8 +203,18 @@ jobs:
               | select(.conclusion == "success") | .id' <<<"$runs" 2>/dev/null || true)"
           fi
           if [[ "$proof" =~ ^[1-9][0-9]*$ ]]; then
-            reuse=true
-            echo "::notice::Metadata-only edit at $HEAD_SHA reuses Source Validation run $proof."
+            # Fail closed: the prior green run must include successful unit 4/4
+            # (merged source guards). An incomplete or unreadable inventory keeps
+            # the expensive shard live instead of synthesizing a skip.
+            guard_job="$(node .source-validation-client/packages/api-client/cli.ts gh --priority default -- api "repos/$REPOSITORY/actions/runs/$proof/jobs?per_page=100" --jq '
+              [.jobs[] | select(.name == "Affected Unit Tests (4/4)")]
+              | first | .conclusion // empty' 2>/dev/null || true)"
+            if [[ "$guard_job" == success ]]; then
+              reuse=true
+              echo "::notice::Metadata-only edit at $HEAD_SHA reuses Source Validation run $proof (including unit 4/4)."
+            else
+              echo "::notice::Exact-head proof $proof lacks a successful unit 4/4 conclusion ($guard_job); running full validation."
+            fi
           fi
           printf 'reuse=%s\nproof_run=%s\n' "$reuse" "$proof" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -901,7 +911,10 @@ jobs:
       - *quota-runtime
       - *proof-reuse
       - name: Checkout exact source head for unit and merged guard proofs
-        if: steps.reuse.outputs.reuse != 'true' || matrix.shard == '4/4'
+        # Label/body metadata edits reuse the exact-head proof for every unit
+        # shard, including 4/4's merged source guards (CI-28 / JOV-12616 slice 5).
+        # Fail closed when reuse is false: checkout and qualify normally.
+        if: steps.reuse.outputs.reuse != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -909,7 +922,7 @@ jobs:
           filter: blob:none
           persist-credentials: false
       - name: Fetch head and base history only
-        if: steps.reuse.outputs.reuse != 'true' || matrix.shard == '4/4'
+        if: steps.reuse.outputs.reuse != 'true'
         shell: bash
         env:
           BASE_REF: ${{ github.base_ref }}
@@ -937,9 +950,11 @@ jobs:
             else
               # Base predates the tools (or paths were removed). Do not hard-fail
               # the unit job — skip the twin until base carries the policy.
-              echo "::warning::MQ parity tools absent on origin/$BASE_REF; typecheck twin skipped."
+              echo "::warning::MQ parity tools absent on origin/$BASE_REF; MQ parity twins skipped."
               mkdir -p "$tool_root/scripts/ci"
-              printf '%s\n' "console.log('typecheck=false')" \
+              printf '%s\n' \
+                "console.log('typecheck=false')" \
+                "console.log('remaining=false')" \
                 >"$tool_root/scripts/ci/mq-parity-scope.mjs"
             fi
           fi
@@ -970,7 +985,7 @@ jobs:
           if [[ "$web$ui$ovie" == 'falsefalsefalse' ]]; then
             echo 'No unit-affecting source changed; non-applicable receipt recorded.'
           fi
-      # JOV-13071 slice: reuse required source runners for the typecheck twin.
+      # JOV-13071 slice: reuse required source runners for MQ parity twins.
       # Combined-head jobs stay intact; no second matrix or pre-push hook.
       - name: Select MQ parity scope
         id: mq-parity
@@ -981,11 +996,20 @@ jobs:
           set -euo pipefail
           node "$MQ_PARITY_TOOLS_ROOT/scripts/ci/mq-parity-scope.mjs" "$BASE_SHA" >> "$GITHUB_OUTPUT"
       - name: Setup Node.js and pnpm
-        if: matrix.shard == '4/4' || (steps.reuse.outputs.reuse != 'true' && (steps.scope.outputs.web == 'true' || steps.scope.outputs.ui == 'true' || steps.scope.outputs.ovie == 'true' || steps.mq-parity.outputs.typecheck == 'true'))
+        if: steps.reuse.outputs.reuse != 'true' && (matrix.shard == '4/4' || steps.scope.outputs.web == 'true' || steps.scope.outputs.ui == 'true' || steps.scope.outputs.ovie == 'true' || steps.mq-parity.outputs.typecheck == 'true' || steps.mq-parity.outputs.remaining == 'true')
         uses: ./.github/actions/setup-node-pnpm
       - name: Setup Playwright warm path
-        if: matrix.shard == '4/4' || (steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true')
+        if: steps.reuse.outputs.reuse != 'true' && (matrix.shard == '4/4' || steps.scope.outputs.web == 'true')
         uses: ./.github/actions/setup-playwright
+      - name: Run remaining lane parity
+        # Cheap remaining lanes only; structural subsets stay on dedicated
+        # ci-fast-structural-* gaps / deterministic overlaps (Wave 3 slice).
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.remaining == 'true' && matrix.shard == '1/4'
+        env:
+          CI_FAST_LANE_GROUP: remaining
+          CI_FAST_SKIP_STRUCTURAL: 'true'
+          TURBO_SCM_BASE: ${{ steps.scope.outputs.base }}
+        run: node scripts/ci-fast-lanes.mjs
       - name: Run typecheck lane parity
         if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.typecheck == 'true' && matrix.shard == '2/4'
         env:
@@ -1043,7 +1067,7 @@ jobs:
       # Source guards inspect the merged tree. Its dependency/runtime generation
       # must travel with it; the later source-head steps keep their original proof.
       - name: Prepare merged source guard generation
-        if: matrix.shard == '4/4'
+        if: matrix.shard == '4/4' && steps.reuse.outputs.reuse != 'true'
         id: source_guard_merge
         shell: bash
         env:
@@ -1088,19 +1112,19 @@ jobs:
       # Local post actions reload their metadata after source restoration.
       # Retain only this generation's action closure until job cleanup.
       - name: Preserve merged action generation
-        if: matrix.shard == '4/4' && (steps.source_guard_merge.outputs.dependency_changed == 'true')
+        if: matrix.shard == '4/4' && steps.reuse.outputs.reuse != 'true' && (steps.source_guard_merge.outputs.dependency_changed == 'true')
         id: source_guard_actions
         run: node scripts/lib/source-guard-action-snapshot.mjs
       - name: Setup merged source dependencies
-        if: matrix.shard == '4/4' && (steps.source_guard_merge.outputs.dependency_changed == 'true')
+        if: matrix.shard == '4/4' && steps.reuse.outputs.reuse != 'true' && (steps.source_guard_merge.outputs.dependency_changed == 'true')
         id: source_merge_dependencies
         uses: ./tmp/source-guard-actions/setup-node-pnpm
       - name: Setup merged source browsers
-        if: matrix.shard == '4/4' && (steps.source_guard_merge.outputs.dependency_changed == 'true')
+        if: matrix.shard == '4/4' && steps.reuse.outputs.reuse != 'true' && (steps.source_guard_merge.outputs.dependency_changed == 'true')
         id: source_merge_browsers
         uses: ./tmp/source-guard-actions/setup-playwright
       - name: Validate disk-read source contracts from trusted base
-        if: matrix.shard == '4/4'
+        if: matrix.shard == '4/4' && steps.reuse.outputs.reuse != 'true'
         shell: bash
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}

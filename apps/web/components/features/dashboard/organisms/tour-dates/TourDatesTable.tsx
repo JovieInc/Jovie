@@ -167,16 +167,16 @@ const PROVIDER_CONFIG: Record<
 > = {
   bandsintown: {
     label: 'Bandsintown',
-    className: 'text-teal-600 dark:text-teal-400',
+    className: 'text-accent-teal',
   },
   songkick: {
     label: 'Songkick',
-    className: 'text-pink-600 dark:text-pink-400',
+    className: 'text-accent-pink',
   },
   manual: { label: 'Manual', className: 'text-tertiary-token' },
   admin_import: {
     label: 'Admin Import',
-    className: 'text-amber-600 dark:text-amber-400',
+    className: 'text-warning-text',
   },
 };
 
@@ -201,6 +201,7 @@ const ActionsHeader = memo(function ActionsHeader({
 }) {
   return (
     <div className='flex items-center justify-end gap-2'>
+      <span className='sr-only'>Actions</span>
       {onSync && (
         <Button
           onClick={event => {

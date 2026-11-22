@@ -16,12 +16,14 @@ import { createPublicReleasesTag } from '@/lib/cache/tags';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { dspCatalogScans } from '@/lib/db/schema/dsp-catalog-scan';
+import { libraryAssetApprovalStatuses } from '@/lib/db/schema/library';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getBoundAppleMusicArtistId } from '@/lib/dsp-enrichment/apple-music-target';
 import {
   getArtistAlbums,
   isAppleMusicAvailable,
 } from '@/lib/dsp-enrichment/providers/apple-music';
+import { ensureImportedReleasePublishedByDefault } from '@/lib/library/approval-status.server';
 import { logger } from '@/lib/utils/logger';
 import {
   type AppleCatalogAlbum,
@@ -52,7 +54,10 @@ export interface AppleImportResult {
   error?: string;
 }
 
-async function loadLibrary(dbConn: DbOrTransaction, creatorProfileId: string) {
+export async function loadLibrary(
+  dbConn: DbOrTransaction,
+  creatorProfileId: string
+) {
   // Archived rows stay in the match set. Omitting them inserts a second,
   // active copy of a release the artist already removed.
   const releases = await dbConn
@@ -60,6 +65,8 @@ async function loadLibrary(dbConn: DbOrTransaction, creatorProfileId: string) {
       id: discogReleases.id,
       title: discogReleases.title,
       upc: discogReleases.upc,
+      status: discogReleases.status,
+      deletedAt: discogReleases.deletedAt,
     })
     .from(discogReleases)
     .where(eq(discogReleases.creatorProfileId, creatorProfileId));
@@ -88,8 +95,11 @@ async function loadLibrary(dbConn: DbOrTransaction, creatorProfileId: string) {
     ]);
   }
   return releases.map(r => ({
+    id: r.id,
     title: r.title,
     upc: r.upc,
+    status: r.status,
+    archived: r.deletedAt !== null,
     appleAlbumIds: idsByRelease.get(r.id) ?? [],
   }));
 }
@@ -140,6 +150,13 @@ async function insertAppleRelease(
     sourceType: 'ingested',
     isPrimary: false,
     metadata: { providerExternalId: album.id },
+  });
+  // Same default as Spotify import: a provider-authoritative release is
+  // published on first import. Without the row the public profile filters it
+  // out, so Apple-only releases reached the Library but never the profile.
+  await ensureImportedReleasePublishedByDefault({
+    creatorProfileId,
+    releaseId: release.id,
   });
 }
 
@@ -221,6 +238,13 @@ export async function importMissingAppleMusicReleases(
       } catch {
         // Outside a request scope (scripts/tests); TTL refresh covers it.
       }
+      const { syncProfileCoverAccentThemeBestEffort } = await import(
+        '@/lib/profile/sync-cover-accent.server'
+      );
+      await syncProfileCoverAccentThemeBestEffort(
+        creatorProfileId,
+        'apple_music_import'
+      );
     }
   } catch (error) {
     result = {
@@ -270,13 +294,42 @@ export async function findProfilesDueForAppleImport(
   return rows.map(r => r.id);
 }
 
+/**
+ * Publish Apple-imported releases that predate the publish-on-import default.
+ * Only rows with no approval row at all: a row means the artist (or a sync)
+ * already chose, and that choice stays.
+ */
+export async function publishUnapprovedAppleImports(): Promise<number> {
+  const result = await db.execute(drizzleSql`
+    INSERT INTO ${libraryAssetApprovalStatuses}
+      (creator_profile_id, asset_id, item_kind, approval_status, profile_visibility)
+    SELECT r.creator_profile_id, r.id::text, 'release', 'approved', 'visible'
+    FROM ${discogReleases} r
+    WHERE r.metadata ->> 'importedFrom' = ${PROVIDER_ID}
+      AND NOT EXISTS (
+        SELECT 1 FROM ${libraryAssetApprovalStatuses} a
+        WHERE a.creator_profile_id = r.creator_profile_id
+          AND a.asset_id = r.id::text
+      )
+    ON CONFLICT (creator_profile_id, asset_id) DO NOTHING
+  `);
+  return Number((result as { rowCount?: number | null }).rowCount ?? 0);
+}
+
 export async function sweepAppleMusicCatalogCompletenessForCron(): Promise<{
   profilesChecked: number;
   releasesImported: number;
+  releasesPublished: number;
   failed: number;
 }> {
+  const releasesPublished = await publishUnapprovedAppleImports();
   if (!isAppleMusicAvailable())
-    return { profilesChecked: 0, releasesImported: 0, failed: 0 };
+    return {
+      profilesChecked: 0,
+      releasesImported: 0,
+      releasesPublished,
+      failed: 0,
+    };
   const profileIds = await findProfilesDueForAppleImport();
   let releasesImported = 0;
   let failed = 0;
@@ -285,5 +338,10 @@ export async function sweepAppleMusicCatalogCompletenessForCron(): Promise<{
     releasesImported += result.imported.length;
     if (result.status === 'failed') failed += 1;
   }
-  return { profilesChecked: profileIds.length, releasesImported, failed };
+  return {
+    profilesChecked: profileIds.length,
+    releasesImported,
+    releasesPublished,
+    failed,
+  };
 }

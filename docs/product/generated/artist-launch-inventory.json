@@ -2417,6 +2417,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/cron/dogfood-truth/route.ts",
+      "kind": "handler",
+      "route": "/api/cron/dogfood-truth",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/cron/frequent/route.ts",
       "kind": "handler",
       "route": "/api/cron/frequent",
@@ -4244,7 +4252,7 @@
       "source": "apps/web/app/api/ovie/inbox/route.ts",
       "kind": "handler",
       "route": "/api/ovie/inbox",
-      "methods": ["GET"],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },

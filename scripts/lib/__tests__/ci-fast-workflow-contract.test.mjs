@@ -367,29 +367,11 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('partitions the structural pytest suite into exactly complementary shards', () => {
-    // The original single invocation ran these files once; the shards must
-    // select the identical files with complementary -k expressions so every
-    // collected test runs in exactly one shard (never zero, never twice).
-    expect(STRUCTURAL_PYTEST_FILES).toEqual([
-      'scripts/prod-errors/test_claim_parking.py',
-      'scripts/prod-errors/test_prod_errors.py',
-      'scripts/tests/test_noabandon_route.py',
-      'scripts/tests/test_gh_retry.py',
-      'scripts/tests/test_noabandon_invariant.py',
-      'scripts/tests/test_noabandon_adapters.py',
-      'scripts/tests/test_vercel_prebuilt_deploy.py',
-      'scripts/tests/test_brand_scrub.py',
-      'scripts/tests/test_agent_workflow_hygiene.py',
-      'scripts/tests/test_fleet_audit.py',
-      'scripts/tests/test_runner_routing.py',
-      'scripts/tests/test_signal_watch.py',
-      'scripts/tests/test_x_grok.py',
-      'scripts/tests/test_pr_remediation_swarm.py',
-      'scripts/tests/test_codex_launcher.py',
-      'scripts/tests/test_loose_exec_guard.py',
-      'scripts/tests/test_noabandon_ledger.py',
-      'scripts/tests/test_poll_loop_guard.py',
-    ]);
+    // File list lock lives in ci-structural-pytest-files.mjs; shards must
+    // select that identical pool with complementary -k expressions.
+    expect(STRUCTURAL_PYTEST_FILES).toContain(
+      'scripts/tests/test_vercel_blocked_breaker.py'
+    );
     const shards = STRUCTURAL_PYTEST_SHARD_COMMANDS.map(command => {
       const [, keyword, files] = /-k "([^"]+)" (.+)$/u.exec(command) ?? [];
       return { command, keyword, files: files?.split(' ') };
@@ -601,17 +583,19 @@ describe('ci-fast bounded parallel workflow', () => {
   it('runs the scanner-heavy invariant suites outside the V8-coverage node --test batch', () => {
     // Coverage instrumentation made these in-process scanners several times
     // slower (latency: 18s -> 118s locally) while contributing nothing to the
-    // batch's --test-coverage-include files. Each must still run exactly once.
+    // batch's --test-coverage-include files. Each must still run exactly once,
+    // in its own segment so PR path-gates can skip screen-cert without dropping
+    // latency-sensitive.
     const segments = PACKAGE_JSON.scripts['invariants:check'].split(' && ');
     const latency = 'scripts/invariants/latency-sensitive-execution.test.mjs';
     const screenCertification =
       'scripts/invariants/screen-certification.test.mjs';
-    for (const suite of [latency, screenCertification]) {
-      const running = segments.filter(segment => segment.includes(suite));
-      expect(running).toEqual([
-        `node --test ${screenCertification} ${latency}`,
-      ]);
-    }
+    expect(
+      segments.filter(segment => segment.includes(screenCertification))
+    ).toEqual([`node --test ${screenCertification}`]);
+    expect(segments.filter(segment => segment.includes(latency))).toEqual([
+      `node --test ${latency}`,
+    ]);
     const coverageBatch = segments.find(segment =>
       segment.includes(
         '--test-coverage-include=scripts/backlog-orchestrator/reconcile.mjs'
@@ -1274,17 +1258,21 @@ describe('ci-fast bounded parallel workflow', () => {
     const typecheck = jobBlock('ci-fast-typecheck', 'ci-fast-remaining');
 
     expect(typecheck).toContain('filter: blob:none');
+    // JOV-12618: same-tree reuse can skip hydration on merge_group; otherwise
+    // the path receipt still controls PR hydration.
     expect(typecheck).toMatch(
-      /uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+if: >-\n\s+github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'/
+      /uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+if: >-\n\s+\(github\.event_name != 'merge_group' \|\| steps\.reuse\.outputs\.reuse != 'true'\) &&\n\s+\(github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'\)/
     );
     expect(typecheck).toContain(
       'CI_FAST_RUN_JOVIE_TYPECHECK: ${{ needs.ci-path-changes.outputs.run_jovie_typecheck }}'
     );
-    // The lane runner remains unconditional so the required job still emits a
-    // lane receipt; it consumes the same path receipt that controls hydration.
+    // Lane runner skips when same-tree reuse fires; otherwise it still emits a
+    // lane receipt from the path-gated typecheck group.
     expect(typecheck).toMatch(
-      /- name: Run ci-fast lanes\n\s+id: lanes\n(?!\s+if:)/
+      /- name: Run ci-fast lanes\n\s+id: lanes\n\s+if: >-\n\s+github\.event_name != 'merge_group' \|\| steps\.reuse\.outputs\.reuse != 'true'/
     );
+    expect(typecheck).toContain('Decide typecheck/lint reuse');
+    expect(typecheck).toContain('Record reused typecheck lanes');
     expect(typecheck).not.toContain('CI_FAST_PRESELECTED_SKIP');
     expect(typecheck).toMatch(
       /name: Validate CI\/release incident prevention contract[\s\S]*?run: node scripts\/ci-release-incident-contract\.mjs/
@@ -1625,7 +1613,7 @@ describe('ci-fast bounded parallel workflow', () => {
     // fallback (tsc re-verifies every input hash, so older state is safe).
     expect(restore).toContain('id: web-tsbuildinfo');
     expect(restore).toMatch(
-      /if: >-\n\s+github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'/
+      /if: >-\n\s+\(github\.event_name != 'merge_group' \|\| steps\.reuse\.outputs\.reuse != 'true'\) &&\n\s+\(github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'\)/
     );
     expect(restore).toContain(`uses: actions/cache/restore@${cacheSha}`);
     expect(restore).toContain('path: apps/web/.cache/tsbuildinfo*\n');

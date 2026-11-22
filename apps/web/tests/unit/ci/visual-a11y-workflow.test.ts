@@ -398,7 +398,8 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
       getScreenshotArguments(visualRegressionSpec).filter(argument =>
         /signin|signup|route\.slice/.test(argument)
       )
-    ).toEqual(['`${route.slice(1)}-dark.png`']);
+    ).toEqual([]);
+    expect(visualRegressionSpec).not.toContain('auth pages dark-mode');
     expect(visualRegressionSpec).toContain(
       "test.describe('JOV-2081: Viewport matrix — /sign-up'"
     );

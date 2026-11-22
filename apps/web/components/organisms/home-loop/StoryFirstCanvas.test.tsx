@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type {
   StoryFirstBottleneck,
@@ -27,7 +28,8 @@ const glance: readonly StoryFirstGlancePulse[] = [
     delta: '+3',
     tone: 'good',
     measured: true,
-    points: [11, 14],
+    // ≥3 points required to paint a sparkline (#26311).
+    points: [11, 12, 14],
     trend: 'up',
     href: '/app/ov/shipping',
   },
@@ -38,7 +40,7 @@ const glance: readonly StoryFirstGlancePulse[] = [
     delta: 'alive',
     tone: 'good',
     measured: true,
-    points: [12, 12.4],
+    points: [11.8, 12, 12.4],
     trend: 'up',
     href: '/app/ov/ops',
   },
@@ -49,7 +51,7 @@ const glance: readonly StoryFirstGlancePulse[] = [
     delta: '+18',
     tone: 'good',
     measured: true,
-    points: [230, 248],
+    points: [230, 240, 248],
     trend: 'up',
     href: '/app/ov/growth',
   },
@@ -105,13 +107,18 @@ describe('StoryFirstCanvas', () => {
     ).toHaveAttribute('href', '/app/ov/shipping');
   });
 
-  it('shows a stages error with retry instead of zero counts', () => {
+  it('shows a stages error with retry instead of zero counts', async () => {
+    const user = userEvent.setup();
     const onRetry = vi.fn();
     render(
       <StoryFirstCanvas
         bottleneck={bottleneck}
         glance={glance}
-        stages={stages.map(stage => ({ ...stage, count: 0, highlight: null }))}
+        stages={stages.map(stage => ({
+          ...stage,
+          count: 0,
+          highlight: null,
+        }))}
         stagesStatus='error'
         onRetryStages={onRetry}
       />
@@ -121,7 +128,7 @@ describe('StoryFirstCanvas', () => {
       'error'
     );
     expect(screen.queryByTestId('story-first-stage-building')).toBeNull();
-    screen.getByRole('button', { name: 'Try again' }).click();
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
@@ -141,12 +148,32 @@ describe('StoryFirstCanvas', () => {
       'data-melting',
       'true'
     );
-    expect(screen.getByTestId('story-first-board')).toHaveAttribute(
-      'aria-hidden',
-      'true'
-    );
-    expect(screen.getByTestId('story-first-board')).toHaveAttribute('inert');
+    const board = screen.getByTestId('story-first-board');
+    expect(board).toHaveAttribute('aria-hidden', 'true');
+    expect(board).toHaveAttribute('inert');
+    // Opacity + lift + blur; reduced-motion clears translate/blur only.
+    expect(board.className).toMatch(/opacity-40/);
+    expect(board.className).toMatch(/-translate-y-1/);
+    expect(board.className).toMatch(/blur-sm/);
+    expect(board.className).toMatch(/ease-cinematic/);
     expect(screen.getByTestId('fixture-answer')).toBeVisible();
+  });
+
+  it('uses pulse sparklines without area fill chrome on the glance rail', () => {
+    const { container } = render(
+      <StoryFirstCanvas
+        bottleneck={bottleneck}
+        glance={glance}
+        stages={stages}
+      />
+    );
+    const pulseLines = container.querySelectorAll(
+      'path[data-sparkline-variant="pulse"]'
+    );
+    expect(pulseLines.length).toBe(3);
+    expect(
+      container.querySelectorAll('path[fill]:not([fill="none"])')
+    ).toHaveLength(0);
   });
 
   it('is axe-clean in clear and melting states', async () => {
@@ -170,5 +197,22 @@ describe('StoryFirstCanvas', () => {
       />
     );
     await expectNoA11yViolations(melt.container);
+  });
+});
+
+describe('StoryFirstCanvas shipping delta', () => {
+  it('colors a negative delta as an error even when the pulse tone is good', () => {
+    render(
+      <StoryFirstCanvas
+        bottleneck={bottleneck}
+        glance={[
+          { ...glance[0], delta: '-16', tone: 'good', points: [30, 14] },
+        ]}
+        stages={[]}
+      />
+    );
+    expect(screen.getByText('-16')).toHaveClass('text-error');
+    expect(screen.getByText('-16')).not.toHaveClass('text-success');
+    expect(screen.queryByLabelText('Shipping · 7d trend')).toBeNull();
   });
 });

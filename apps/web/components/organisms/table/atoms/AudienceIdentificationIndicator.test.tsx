@@ -46,3 +46,34 @@ describe('AudienceIdentificationIndicator', () => {
     expect(screen.getByText('Anonymous')).toBeInTheDocument();
   });
 });
+
+describe('AudienceIdentificationIndicator tokens', () => {
+  it('uses the success token for identified and the warning token for partial, with no palette classes', () => {
+    const identified = render(
+      <AudienceIdentificationIndicator
+        type='customer'
+        hasEmail
+        hasPhone={false}
+        spotifyConnected={false}
+      />
+    );
+    expect(identified.container.querySelector('svg')).toHaveClass(
+      'text-success'
+    );
+    expect(screen.getByText('Identified')).toHaveClass('text-success-text');
+    expect(identified.container.innerHTML).not.toMatch(/emerald|amber/);
+    identified.unmount();
+
+    const partial = render(
+      <AudienceIdentificationIndicator
+        type='sms'
+        hasEmail={false}
+        hasPhone
+        spotifyConnected={false}
+      />
+    );
+    expect(partial.container.querySelector('svg')).toHaveClass('text-warning');
+    expect(screen.getByText('Partial')).toHaveClass('text-warning-text');
+    expect(partial.container.innerHTML).not.toMatch(/emerald|amber/);
+  });
+});

@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { DemoPublicProfileSurface } from './DemoPublicProfileSurface';
 
 describe('DemoPublicProfileSurface', () => {
@@ -24,5 +25,11 @@ describe('DemoPublicProfileSurface', () => {
       `/${INTERNAL_DJ_DEMO_PERSONA.profile.handle}/${release.slug}`
     );
     expect(screen.queryByTestId('profile-home-carousel')).toBeNull();
+  });
+
+  it('renders the demo profile with an authored accent and no a11y violations', async () => {
+    const { container } = render(<DemoPublicProfileSurface />);
+
+    await expectNoA11yViolations(container);
   });
 });

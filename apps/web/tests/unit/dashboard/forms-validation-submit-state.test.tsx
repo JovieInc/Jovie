@@ -1,3 +1,4 @@
+// Drift T2.1: IconButton alias retirement — callsite migration coverage.
 import { render, screen } from '@testing-library/react';
 import type { FormEvent, ImgHTMLAttributes } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -222,6 +223,25 @@ describe('dashboard form validation consolidation', () => {
     const removeButton = screen.getByLabelText(/^Remove /);
     expect(removeButton.className).toContain('hover:text-error');
     expect(removeButton.className).not.toMatch(/\bred-\d/);
+  });
+
+  it('marks a connected artist with the success text token', () => {
+    mockMusicLinksFormState.connectedDspInfo = {
+      spotify: {
+        artistName: 'Test Artist',
+        artistImageUrl: null,
+        externalUrl: null,
+      },
+    };
+
+    const { container } = render(
+      <DashboardListenNowForm artist={artist} onUpdate={vi.fn()} />
+    );
+    mockMusicLinksFormState.connectedDspInfo = {};
+
+    const check = screen.getByText('Test Artist').nextElementSibling;
+    expect(check).toBe(container.querySelector('svg.text-success-text'));
+    expect(check?.getAttribute('class')).not.toMatch(/green-\d/);
   });
 
   it('renders legacy ListenNowForm submit progress through Button loading', () => {

@@ -6,6 +6,7 @@ import {
   CommonDropdown,
   Input,
   Spinner as LoadingSpinner,
+  PlainButton,
 } from '@jovie/ui';
 import { Plus, Trash2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
@@ -14,40 +15,12 @@ import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';
 import { PLATFORM_OPTIONS } from '@/features/dashboard/molecules/universalLinkInput.constants';
-import { ensureContrast, hexToRgb, isBrandDark } from '@/lib/utils/color';
+import { getChipSafeIconColor } from '@/lib/utils/color';
 import { SocialLinkSuggestionRows } from './SocialLinkSuggestionRows';
 import type { SocialsFormProps } from './types';
 import { useSocialLinkSuggestions } from './useSocialLinkSuggestions';
 import { PRIMARY_DSP_IDS, useSocialsForm } from './useSocialsForm';
 import { VerificationModal } from './VerificationModal';
-
-/** Alpha value for the hex suffix `15` used in chip backgrounds (0x15/255 ≈ 8.2%). */
-const CHIP_BG_ALPHA = 0x15 / 255;
-
-/**
- * Get icon color that meets WCAG 3:1 against the effective chip background.
- * Unlike getContrastSafeIconColor (which checks against the surface), this accounts
- * for the tinted chip background that shifts contrast for bright brands.
- */
-function getChipSafeIconColor(brandHex: string, isDark: boolean): string {
-  if (isDark && isBrandDark(brandHex)) return '#ffffff';
-
-  const surfaceHex = isDark ? '#101216' : '#fcfcfc';
-  const brand = hexToRgb(brandHex);
-  const surface = hexToRgb(surfaceHex);
-  const r = Math.round(
-    brand.r * CHIP_BG_ALPHA + surface.r * (1 - CHIP_BG_ALPHA)
-  );
-  const g = Math.round(
-    brand.g * CHIP_BG_ALPHA + surface.g * (1 - CHIP_BG_ALPHA)
-  );
-  const b = Math.round(
-    brand.b * CHIP_BG_ALPHA + surface.b * (1 - CHIP_BG_ALPHA)
-  );
-  const effectiveBg = `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
-
-  return ensureContrast(brandHex, effectiveBg);
-}
 
 const SOCIALS_FORM_LOADING_KEYS = [
   'socials-form-loading-1',
@@ -334,8 +307,8 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
                   items={platformItemsByIndex[index] ?? []}
                   align='start'
                   trigger={
-                    <button
-                      type='button'
+                    <PlainButton
+                      aria-label={`Select platform for link ${index + 1}`}
                       className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors hover:brightness-125 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-interactive'
                       style={{
                         backgroundColor: PLATFORM_METADATA_MAP[link.platform]
@@ -354,7 +327,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
                         className='h-4 w-4'
                         aria-hidden
                       />
-                    </button>
+                    </PlainButton>
                   }
                   aria-label={`Select platform for link ${index + 1}`}
                 />

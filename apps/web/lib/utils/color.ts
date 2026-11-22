@@ -199,3 +199,34 @@ export function hexToRgba(hex: string, alpha: number): string {
   const { r, g, b } = hexToRgb(hex);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
+
+/** Alpha value for the hex suffix `15` used in chip backgrounds (0x15/255 ≈ 8.2%). */
+const CHIP_BG_ALPHA = 0x15 / 255;
+
+/**
+ * Get icon color that meets WCAG 3:1 against the effective chip background.
+ * Unlike getContrastSafeIconColor (which checks against the surface), this accounts
+ * for the tinted chip background that shifts contrast for bright brands.
+ */
+export function getChipSafeIconColor(
+  brandHex: string,
+  isDark: boolean
+): string {
+  if (isDark && isBrandDark(brandHex)) return '#ffffff';
+
+  const surfaceHex = isDark ? '#101216' : '#fcfcfc';
+  const brand = hexToRgb(brandHex);
+  const surface = hexToRgb(surfaceHex);
+  const r = Math.round(
+    brand.r * CHIP_BG_ALPHA + surface.r * (1 - CHIP_BG_ALPHA)
+  );
+  const g = Math.round(
+    brand.g * CHIP_BG_ALPHA + surface.g * (1 - CHIP_BG_ALPHA)
+  );
+  const b = Math.round(
+    brand.b * CHIP_BG_ALPHA + surface.b * (1 - CHIP_BG_ALPHA)
+  );
+  const effectiveBg = `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+
+  return ensureContrast(brandHex, effectiveBg);
+}

@@ -1349,11 +1349,13 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
   it('locks Presence controls to 32px desktop geometry with the 44px hit target on mobile only', () => {
     renderWorkspace(data);
 
-    // Row overflow action: 44px mobile target, 32px visible on desktop.
+    // Row overflow: shared TableRowOverflowTrigger = IconButton sm (KEEP 28)
+    // with the base Button 44px hit target (taste decisions 5 + 8).
     const rowAction = screen.getByRole('button', {
       name: 'Actions for Spotify',
     });
-    expect(rowAction).toHaveClass('h-11', 'w-11', 'sm:h-8', 'sm:w-8');
+    expect(rowAction).toHaveClass('h-7', 'w-7');
+    expect(rowAction.className).toMatch(/before:h-11/);
     expect(rowAction.className).not.toContain('sm:h-7');
 
     // Status pill renders at the locked 32px minimum.

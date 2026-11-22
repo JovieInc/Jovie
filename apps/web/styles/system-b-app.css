@@ -59,6 +59,10 @@
    SYSTEM B ONBOARDING V2 PRIMITIVES
    ============================================ */
 
+:where(.system-b-onboarding-frame) {
+  color-scheme: dark;
+}
+
 :where(.system-b-onboarding-flat-panel) {
   border-bottom: 1px solid
     color-mix(in oklab, var(--system-b-app-frame-seam) 72%, transparent);
@@ -132,6 +136,134 @@
   font-size: var(--text-sm);
   font-weight: var(--font-weight-semibold);
   line-height: 1.4;
+}
+
+/* Quiet /start step rail (JOV-14243). Active label readable; done contracts. */
+:where(.system-b-onboarding-step-rail) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+  padding-bottom: var(--space-2);
+}
+
+:where(.system-b-onboarding-step-rail-list) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+:where(.system-b-onboarding-step-rail-item[data-status="upcoming"])
+  .system-b-onboarding-step-rail-label {
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+:where(.system-b-onboarding-step-rail-item[data-status="done"])
+  .system-b-onboarding-step-rail-label {
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+:where(.system-b-onboarding-step-rail-item[data-status="active"])
+  .system-b-onboarding-step-rail-label {
+  color: var(--color-text-primary-token);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+}
+
+:where(.system-b-onboarding-step-rail-hint) {
+  margin: 0;
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+/* 390 peek strip above the keyboard: fixed height, never pushes inputs. */
+:where(.system-b-onboarding-profile-peek) {
+  max-height: 2.75rem;
+  overflow: hidden;
+}
+
+:where(.system-b-onboarding-profile-peek-inner) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+  padding: var(--space-1) var(--space-1-5);
+  border: 1px solid
+    color-mix(in oklab, var(--app-shell-border) 70%, transparent);
+  border-radius: var(--radius-xl);
+  background: color-mix(
+    in oklab,
+    var(--app-shell-content-surface) 92%,
+    transparent
+  );
+}
+
+:where(.system-b-onboarding-profile-peek-avatar) {
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  object-fit: cover;
+}
+
+:where(.system-b-onboarding-profile-peek-avatar-empty) {
+  background: var(--color-bg-surface-2);
+  border: 1px solid var(--color-border-subtle);
+}
+
+:where(.system-b-onboarding-profile-peek-copy) {
+  flex: 1;
+  min-width: 0;
+}
+
+:where(.system-b-onboarding-profile-peek-name) {
+  margin: 0;
+  color: var(--color-text-primary-token);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+}
+
+:where(.system-b-onboarding-profile-peek-handle) {
+  margin: 0;
+  color: var(--color-text-secondary-token);
+  font-size: var(--text-2xs);
+  line-height: 1.2;
+}
+
+:where(.system-b-onboarding-profile-peek-badge) {
+  flex-shrink: 0;
+  color: var(--color-text-tertiary-token);
+  font-size: var(--text-2xs);
+  font-weight: var(--font-weight-medium);
+}
+
+/* JOV-7771: the whole composer and the intro heading stay on screen at any
+   text size. The step rail and the peek strip are extras, so they give their
+   room back when the /start column is short in rem: a 390x615 phone with
+   32px root text is only 19.2rem tall, and the rail alone pushed the send
+   button 45px past the fold. The column is a size container (its height
+   comes from the shell, never from its content); rem in a container query
+   follows the root font size, which a media query cannot see. 24rem keeps
+   both extras at 16px and 24px text and on tall phones with 32px text. */
+.system-b-onboarding-session {
+  container: onboarding-session / size;
+}
+
+@container onboarding-session (height < 24rem) {
+  .system-b-onboarding-step-rail,
+  .system-b-onboarding-profile-peek {
+    display: none;
+  }
 }
 
 /* JOV-12045: the side rail's phone preview must fit the rail at rest. The
@@ -1115,8 +1247,11 @@
   min-width: 154px;
 }
 
-/* System B Library route primitives */
-:where(.system-b-library-artwork-shell),
+/* System B Library route primitives.
+   ArtworkFrame owns release-art shape (thumbnail → 2px / rounded-xs).
+   Do not assign border-radius on `.system-b-library-artwork-shell` —
+   unlayered route CSS beats layered Tailwind utilities and was rounding
+   24px table thumbs to --radius-md (JOV-7752 / JOV-5455). */
 :where(.system-b-library-status-pill),
 :where(.system-b-library-count-pill),
 :where(.system-b-library-filter-row),
@@ -2844,13 +2979,14 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Green/red carry semantic meaning here: measured lift vs measured drop. */
-:where(.system-b-opportunity-inbox-report-delta[data-direction="up"]) {
-  color: var(--color-accent-green);
+/* Green/red carry sentiment (ASR-041): direction combined with the metric's
+   polarity, in the -text tokens that hold contrast in light and dark. */
+:where(.system-b-opportunity-inbox-report-delta[data-sentiment="positive"]) {
+  color: var(--color-success-text);
 }
 
-:where(.system-b-opportunity-inbox-report-delta[data-direction="down"]) {
-  color: var(--color-accent-red);
+:where(.system-b-opportunity-inbox-report-delta[data-sentiment="negative"]) {
+  color: var(--color-error-text);
 }
 
 :where(.system-b-opportunity-inbox-report-delta-icon) {
@@ -2929,15 +3065,15 @@
 }
 
 :where(
-  .system-b-opportunity-inbox-report-breakdown-delta[data-direction="up"]
+  .system-b-opportunity-inbox-report-breakdown-delta[data-sentiment="positive"]
 ) {
-  color: var(--color-accent-green);
+  color: var(--color-success-text);
 }
 
 :where(
-  .system-b-opportunity-inbox-report-breakdown-delta[data-direction="down"]
+  .system-b-opportunity-inbox-report-breakdown-delta[data-sentiment="negative"]
 ) {
-  color: var(--color-accent-red);
+  color: var(--color-error-text);
 }
 
 :where(.system-b-chat-generation-artifact-surface) {
@@ -3308,7 +3444,10 @@
 }
 
 :where(.system-b-chat-composer-thread-scroll-padding) {
-  padding-bottom: var(--system-b-chat-composer-thread-scroll-padding);
+  padding-bottom: calc(
+    var(--system-b-chat-composer-thread-scroll-padding) +
+    var(--chat-composer-dock-extra, 0px)
+  );
 }
 
 :where(.system-b-chat-composer-surface) {
@@ -6418,6 +6557,85 @@
   font-weight: var(--font-weight-semibold);
   line-height: 1;
   white-space: nowrap;
+}
+
+/* Icon-only DSP glyphs: brand color via named primitive, not style={}. */
+.system-b-dsp-service-icon {
+  color: var(--color-text-primary-token);
+}
+
+.system-b-dsp-service-icon[data-dsp-icon="spotify"] {
+  color: var(--color-brand-spotify);
+}
+
+.system-b-dsp-service-icon[data-dsp-icon="apple_music"] {
+  color: var(--color-brand-apple);
+}
+
+.system-b-dsp-service-icon[data-dsp-icon="youtube"],
+.system-b-dsp-service-icon[data-dsp-icon="youtube_music"] {
+  color: var(--color-brand-youtube);
+}
+
+.system-b-dsp-service-icon[data-dsp-icon="soundcloud"] {
+  color: var(--color-brand-soundcloud);
+}
+
+.system-b-dsp-service-icon[data-dsp-icon="deezer"] {
+  color: var(--color-brand-deezer);
+}
+
+.system-b-dsp-service-icon[data-dsp-icon="amazon_music"] {
+  color: var(--color-brand-amazon);
+}
+
+.system-b-dsp-service-icon[data-dsp-icon="bandcamp"] {
+  color: var(--color-brand-bandcamp);
+}
+
+.system-b-dsp-service-icon[data-dsp-icon="qq_music"] {
+  color: var(--color-brand-qq-music);
+}
+
+.system-b-dsp-service-icon[data-dsp-icon="netease"] {
+  color: var(--color-brand-netease);
+}
+
+.system-b-dsp-service-icon[data-dsp-icon="beatport"] {
+  color: var(--color-brand-beatport);
+}
+
+.system-b-dsp-service-icon[data-dsp-icon="pandora"] {
+  color: var(--color-brand-pandora);
+}
+
+.system-b-dsp-service-icon[data-dsp-icon="napster"] {
+  color: var(--color-brand-napster);
+}
+
+.system-b-dsp-service-icon[data-dsp-icon="audiomack"] {
+  color: var(--color-brand-audiomack);
+}
+
+.system-b-dsp-service-icon[data-dsp-icon="qobuz"] {
+  color: var(--color-brand-qobuz);
+}
+
+.system-b-dsp-service-icon[data-dsp-icon="anghami"] {
+  color: var(--color-brand-anghami);
+}
+
+.system-b-dsp-service-icon[data-dsp-icon="boomplay"] {
+  color: var(--color-brand-boomplay);
+}
+
+.system-b-dsp-service-icon[data-dsp-icon="iheartradio"] {
+  color: var(--color-brand-iheartradio);
+}
+
+.system-b-dsp-service-icon[data-dsp-icon="tidal"],
+.system-b-dsp-service-icon[data-dsp-icon="tiktok"] {
+  color: var(--color-text-primary-token);
 }
 
 .system-b-dsp-avatar-stack-popover {

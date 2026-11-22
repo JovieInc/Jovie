@@ -120,7 +120,9 @@ describe('routeOnboardingTurn', () => {
     expect(routed.kind).toBe('script');
     if (routed.kind !== 'script') return;
     expect(routed.classification).toBeNull();
-    expect(routed.turn.line.stepId).toBe('get_artist');
+    // JOV-14240: None of These advances to handle, not another picker turn.
+    expect(routed.turn.line.stepId).toBe('handle');
+    expect(routed.turn.guardedStep).toBe('handle');
   });
 
   it('meets the server-side latency budget with no model on the path', async () => {

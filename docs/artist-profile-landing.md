@@ -6,16 +6,15 @@ This page sells Jovie Artist Profiles as the single music-native link that adapt
 
 ## Locked Section Order
 
-1. Hero
-2. Adaptive Thesis + Mode Switcher
-3. Outcomes Carousel
-4. Capture Every Fan
-5. Opinionated by Design
-6. Feature / Spec Wall
-7. How It Works
-8. Social Proof
-9. FAQ
-10. Final CTA
+JOV-14242 cut the page onto the homepage system (six sections). One profile
+mock morphs modes inside the hero; duplicate phones and mid-page bloat are gone.
+
+1. Hero + Adaptive Mode Switcher (left-aligned, homepage primary CTA)
+2. Outcomes Carousel
+3. Capture Every Listener
+4. How It Works
+5. Live Artist Sites (shipped-sites showcase)
+6. Final CTA
 
 ## Section Spec
 
@@ -33,7 +32,7 @@ This page sells Jovie Artist Profiles as the single music-native link that adapt
 
 - Purpose: Prove the core thesis that one profile can serve many moments.
 - User question: What does "adapts" actually mean?
-- Why it exists: This is the strategic center of the page and the cleanest answer to Linktree, Linkfire, Feature.fm, and ToneDen style objections.
+- Why it exists: This is the strategic center of the page and the cleanest answer to static link-page objections.
 - Visual treatment: Pinned phone with a mode rail and concise surrounding copy.
 - Key interaction: Switch between Upcoming Release, Release Day, Touring, and Live Support.
 - Copy goal: Make countdowns, smart routing, local shows, and live support feel inevitable rather than feature-listed.

@@ -129,6 +129,8 @@ jobs:
     if: needs.gate.outputs.due == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      missed_slot: ${{ steps.synthetic-heartbeat.outputs.missed_slot }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -261,3 +263,35 @@ jobs:
         with:
           path: .liveness-marker
           key: automation-liveness-ran-${{ needs.gate.outputs.bucket }}
+
+  # JOV-6813: GitHub drops the 00:17 and 12:17 crons before a run exists, so
+  # the six-hour canary goes quiet for about twelve hours and this dead-man
+  # reopens. One dispatch per gap, only after the heartbeat reports a missed
+  # slot. The dispatch does not turn this check green; the next observation
+  # counts the resulting run. No SYNTHETIC_CANARY_DISPATCH flag.
+  synthetic-canary-catchup:
+    name: Catch up missed synthetic canary
+    needs: liveness
+    if: ${{ always() && needs.liveness.outputs.missed_slot == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Dispatch one synthetic canary for the missed slot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/synthetic-canary-catchup.mjs

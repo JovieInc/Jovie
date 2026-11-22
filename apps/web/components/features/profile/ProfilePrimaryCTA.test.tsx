@@ -1,8 +1,10 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ProfilePrimaryCTA } from './ProfilePrimaryCTA';
 import { PROFILE_STORY_ARTIST } from './profile-story-fixture';
+import { LISTEN_VIEW_DSPS } from './views/listen-view-state-fixtures';
 
 vi.mock('next/link', () => ({
   __esModule: true,
@@ -22,8 +24,10 @@ vi.mock('next/link', () => ({
   ),
 }));
 
+const breakpoint = vi.hoisted(() => ({ isMobile: false }));
+
 vi.mock('@/hooks/useBreakpoint', () => ({
-  useBreakpointDown: () => false,
+  useBreakpointDown: () => breakpoint.isMobile,
 }));
 
 vi.mock(
@@ -54,7 +58,8 @@ vi.mock(
 );
 
 vi.mock('./ListenDrawer', () => ({
-  ListenDrawer: () => null,
+  ListenDrawer: ({ open }: { readonly open: boolean }) =>
+    open ? <div data-testid='listen-drawer' /> : null,
 }));
 
 describe('ProfilePrimaryCTA', () => {
@@ -78,5 +83,33 @@ describe('ProfilePrimaryCTA', () => {
       'before:min-w-11'
     );
     expect(listenCta).not.toHaveClass('before:h-11');
+  });
+
+  it('opens the listen drawer from the mobile PlainButton, which is type=button', async () => {
+    breakpoint.isMobile = true;
+    try {
+      const user = userEvent.setup();
+      render(
+        <ProfilePrimaryCTA
+          artist={PROFILE_STORY_ARTIST}
+          socialLinks={[]}
+          spotifyPreferred={false}
+          showCapture={false}
+          mergedDSPs={LISTEN_VIEW_DSPS}
+        />
+      );
+
+      const trigger = screen.getByRole('button', {
+        name: 'Open music streaming links',
+      });
+      expect(trigger).toHaveAttribute('type', 'button');
+      expect(screen.queryByTestId('listen-drawer')).not.toBeInTheDocument();
+
+      await user.click(trigger);
+
+      expect(screen.getByTestId('listen-drawer')).toBeInTheDocument();
+    } finally {
+      breakpoint.isMobile = false;
+    }
   });
 });

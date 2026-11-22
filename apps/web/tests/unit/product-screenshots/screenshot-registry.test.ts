@@ -113,17 +113,21 @@ describe('screenshot registry', () => {
     }
   });
 
-  it('registers the product truth section screenshot scenario', () => {
-    const scenario = SCREENSHOT_SCENARIOS.find(
-      currentScenario =>
-        currentScenario.id === 'artist-profile-spec-wall-section-desktop'
-    );
-
-    expect(scenario?.title).toBe('Artist Profile Product Truth Section');
-    expect(scenario?.route).toBe('/artist-profiles');
-    expect(scenario?.captureSelector).toBe(
-      '[data-testid="artist-profile-section-spec-wall"]'
-    );
+  it('drops the cut product-truth section screenshot from the live page order', () => {
+    // JOV-14242 removed annotated-truth / spec-wall from the six-section LP.
+    expect(
+      ARTIST_PROFILE_SECTION_SCREENSHOT_ORDER.some(
+        section =>
+          section.screenshotScenarioId ===
+          'artist-profile-spec-wall-section-desktop'
+      )
+    ).toBe(false);
+    expect(
+      SCREENSHOT_SCENARIOS.find(
+        currentScenario =>
+          currentScenario.id === 'artist-profile-spec-wall-section-desktop'
+      )
+    ).toBeUndefined();
   });
 
   it('uses Tim White profile screenshots as the artist mode source of truth', () => {
@@ -217,11 +221,9 @@ describe('screenshot registry', () => {
       'utf8'
     );
 
-    expect(cardSource).toContain(
-      "dataTestId='profile-primary-tab-events-empty'"
-    );
+    expect(cardSource).toContain('return null');
     expect(waitTargets.get('tim-white-profile-events-empty-mobile')).toBe(
-      '[data-testid="profile-primary-tab-events-empty"]'
+      '[data-testid="demo-showcase-tim-white-profile"]'
     );
   });
 

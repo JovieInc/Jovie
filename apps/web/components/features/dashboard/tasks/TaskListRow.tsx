@@ -1,7 +1,7 @@
 'use client';
 
 // @coverage-via apps/web/tests/unit/dashboard/TaskListRow.test.tsx
-import { UserAvatar } from '@jovie/ui';
+import { PlainButton, UserAvatar } from '@jovie/ui';
 import { Layers, Sparkles, Tag } from 'lucide-react';
 import { memo, type ReactNode } from 'react';
 import { TaskProjectionListRow } from '@/components/organisms/table';
@@ -31,6 +31,8 @@ interface TaskListRowProps {
   readonly hideTitle?: boolean;
   /** Hide when the detail pane already shows the due state. */
   readonly hideDue?: boolean;
+  /** Replaces the default `J-{taskNumber}` label, e.g. a Linear `JOV-123`. */
+  readonly identifierLabel?: string;
 }
 
 function TaskStageGlyph({ task }: Readonly<{ task: TaskView }>) {
@@ -157,6 +159,7 @@ export const TaskListRow = memo(function TaskListRow({
   showAssignee = true,
   hideTitle = false,
   hideDue = false,
+  identifierLabel,
 }: Readonly<TaskListRowProps>) {
   const stage = getTaskStageVisual(task.status, task.agentStatus);
   const isDone = task.status === 'done';
@@ -203,7 +206,7 @@ export const TaskListRow = memo(function TaskListRow({
             {stage.label}
           </span>
           <span className='shrink-0 truncate font-semibold text-tertiary-token'>
-            J-{task.taskNumber}
+            {identifierLabel ?? `J-${task.taskNumber}`}
           </span>
           {categoryLabel ? (
             <div className='min-w-0 max-w-full overflow-hidden text-left'>
@@ -219,7 +222,7 @@ export const TaskListRow = memo(function TaskListRow({
             </div>
           ) : null}
           {task.releaseTitle ? (
-            <button
+            <PlainButton
               type='button'
               onClick={event => {
                 event.stopPropagation();
@@ -230,7 +233,7 @@ export const TaskListRow = memo(function TaskListRow({
             >
               <Layers className='h-3 w-3 shrink-0 text-tertiary-token' />
               <span className='min-w-0 truncate'>{task.releaseTitle}</span>
-            </button>
+            </PlainButton>
           ) : null}
         </div>
       }

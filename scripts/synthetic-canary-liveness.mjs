@@ -250,7 +250,7 @@ export async function main({
   if (env.GITHUB_OUTPUT) {
     appendFileSync(
       env.GITHUB_OUTPUT,
-      `test_status=${status}\nfailed_tests=JOV-6813 dead-man: ${checked.reason}\nrun_url=${checked.runUrl}\n`
+      `test_status=${status}\nfailed_tests=JOV-6813 dead-man: ${checked.reason}\nrun_url=${checked.runUrl}\nmissed_slot=${checked.missedSlot ? 'true' : 'false'}\n`
     );
   }
   if (env.GITHUB_STEP_SUMMARY) {

@@ -105,6 +105,24 @@ describe('POST /api/internal/ovie/golden-path-evidence', () => {
     expect(recordMock).not.toHaveBeenCalled();
   });
 
+  it('accepts a carried receipt naming the run it came from (JOV-14402)', async () => {
+    recordMock.mockResolvedValue({ recorded: ['landing'], stale: [] });
+    const carriedFrom = {
+      sha: 'a'.repeat(40),
+      endedAt: T0,
+      runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+    };
+    const response = await post({ receipts: [receipt({ carriedFrom })] });
+    expect(response.status).toBe(200);
+    expect(recordMock.mock.calls[0][0].receipts[0].carriedFrom).toEqual(
+      carriedFrom
+    );
+    const bad = await post({
+      receipts: [receipt({ carriedFrom: { ...carriedFrom, extra: 1 } })],
+    });
+    expect(bad.status).toBe(400);
+  });
+
   it('maps a persistence rejection to 422', async () => {
     recordMock.mockRejectedValue(new ProdGoldenPathPersistenceError('bad'));
     expect((await post({ receipts: [receipt()] })).status).toBe(422);
@@ -223,6 +241,56 @@ describe('GET /api/internal/ovie/golden-path-evidence (certified surfaces)', () 
     const body = await response.json();
     expect(body.ledger).toBe('present');
     expect(body.certifiedSurfaces).toEqual(['public-profile']);
+    expect(body).not.toHaveProperty('maxAgeMs');
+  });
+
+  it('returns the served SHA and each surface certified SHA for carry decisions (JOV-14402)', async () => {
+    const OLD = 'a'.repeat(40);
+    readMock.mockResolvedValue({
+      schemaVersion: 1,
+      contract: 'jovie.prod-golden-path-ledger/v1',
+      updatedAt: T1,
+      surfaces: {
+        landing: {
+          latest: receipt(),
+          lastPassedSha: SHA,
+          lastPassed: {
+            sha: SHA,
+            endedAt: T1,
+            runUrl: null,
+            carriedFrom: null,
+          },
+          history: [],
+        },
+        chat: {
+          latest: receipt({
+            surface: 'chat',
+            sha: OLD,
+            startedAt: '2026-10-27T20:00:00.000Z',
+            endedAt: '2026-10-27T20:00:05.000Z',
+          }),
+          lastPassedSha: OLD,
+          history: [],
+        },
+      },
+    });
+    const body = await (await get()).json();
+    expect(body.servedSha).toBe(SHA);
+    expect(body.certifiedSurfaces).toEqual(['landing']);
+    expect(body.surfaces.landing).toMatchObject({
+      certifiedSha: SHA,
+      certified: true,
+    });
+    expect(body.surfaces.chat).toMatchObject({
+      certifiedSha: OLD,
+      certified: false,
+      lastPassed: { sha: OLD, endedAt: '2026-10-27T20:00:05.000Z' },
+    });
+    expect(body.surfaces.checkout).toEqual({
+      certifiedSha: null,
+      certified: false,
+      lastPassed: null,
+    });
   });
 
   it('answers 503 when the ledger cannot be read', async () => {

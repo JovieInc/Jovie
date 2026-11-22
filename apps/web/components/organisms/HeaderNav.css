@@ -221,6 +221,88 @@
     opacity var(--duration-subtle) var(--ease-subtle),
     transform var(--duration-subtle) var(--ease-subtle),
     visibility var(--duration-subtle) var(--ease-subtle);
+  transform-origin: top center;
+}
+
+/* Native popover top-layer: keep the panel when closed via UA display:none. */
+.marketing-glass-header__flyout:not(:popover-open):not(
+  .marketing-glass-header__flyout--open
+) {
+  pointer-events: none;
+}
+
+.marketing-glass-header__flyout:popover-open,
+.marketing-glass-header__flyout--open {
+  pointer-events: auto;
+  opacity: 1;
+  transform: translate(-50%, 0);
+  visibility: visible;
+}
+
+@supports (position-area: bottom) {
+  .marketing-glass-header__flyout:not(
+    .marketing-glass-header__flyout--compact
+  ) {
+    position: absolute;
+    position-area: block-end span-all;
+    top: auto;
+    left: auto;
+    margin: 0.38rem 0 0;
+    transform: translateY(-0.35rem);
+  }
+
+  .marketing-glass-header__flyout:not(
+    .marketing-glass-header__flyout--compact
+  ):popover-open,
+  .marketing-glass-header__flyout:not(
+    .marketing-glass-header__flyout--compact
+  ).marketing-glass-header__flyout--open {
+    transform: none;
+  }
+}
+
+@supports (transition-behavior: allow-discrete) {
+  .marketing-glass-header__flyout[popover] {
+    transition:
+      opacity var(--duration-subtle) var(--ease-out),
+      transform var(--duration-subtle) var(--ease-out),
+      overlay var(--duration-subtle) var(--ease-out) allow-discrete,
+      display var(--duration-subtle) var(--ease-out) allow-discrete;
+  }
+
+  @starting-style {
+    .marketing-glass-header__flyout:popover-open {
+      opacity: 0;
+      transform: translate(-50%, -0.35rem);
+    }
+
+    .marketing-glass-header__flyout--compact:popover-open {
+      transform: translate(
+        calc(-1 * var(--space-4)),
+        calc(-1 * var(--space-1-5, 0.375rem))
+      );
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .marketing-glass-header__flyout[popover] {
+      transition: none;
+    }
+
+    @starting-style {
+      .marketing-glass-header__flyout:popover-open {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+
+      .marketing-glass-header__flyout--compact:popover-open {
+        transform: translate(
+          calc(-1 * var(--space-4)),
+          calc(-1 * var(--space-1-5, 0.375rem))
+        );
+      }
+    }
+  }
 }
 
 .marketing-glass-header__flyout::before {
@@ -228,13 +310,6 @@
   inset: -0.8rem 0 auto;
   height: 0.9rem;
   content: "";
-}
-
-.marketing-glass-header__flyout--open {
-  pointer-events: auto;
-  opacity: 1;
-  transform: translate(-50%, 0);
-  visibility: visible;
 }
 
 .marketing-glass-header__flyout-inner {
