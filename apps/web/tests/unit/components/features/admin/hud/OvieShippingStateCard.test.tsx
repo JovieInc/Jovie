@@ -198,6 +198,21 @@ const projection = {
   lastError: null,
   state: 'fresh',
   publishing: true,
+  latencyMs: 12,
+  retrying: { state: 'measured-zero', value: 0 },
+  terminalFailures: { state: 'measured-zero', value: 0 },
+  capacityAvailable: { state: 'measured-nonzero', value: 1 },
+  operationalTasks: {
+    canonicalSource: 'linear',
+    cacheMode: 'local-reconciled',
+    syncState: 'fresh',
+    sourceId: 'lane-pull-requests',
+    observedAt: new Date(NOW).toISOString(),
+    lastSyncedAt: new Date(NOW).toISOString(),
+    freshnessDeadline: new Date(NOW + 8_000).toISOString(),
+    tasks: [],
+    deltas: [],
+  },
   sources: {
     'lane-pull-requests': {
       counts: { running: { state: 'measured-zero', value: 0 } },

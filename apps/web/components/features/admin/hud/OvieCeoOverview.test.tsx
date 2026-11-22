@@ -1,6 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type { HudMetrics } from '@/types/hud';
 import { OvieCeoOverview } from './OvieCeoOverview';
@@ -38,6 +37,10 @@ function buildMetrics(stripeState = 'ok'): HudMetrics {
 }
 
 describe('OvieCeoOverview certificate', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('renders the company metrics axe-clean', async () => {
     const { container } = render(<OvieCeoOverview metrics={buildMetrics()} />);
     expect(screen.getByTestId('ovie-ceo-overview')).toBeVisible();
@@ -45,18 +48,27 @@ describe('OvieCeoOverview certificate', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('offers Retry for an unavailable metric and calls onRetry', async () => {
+  it('forwards Retry for a stale visible metric', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-22T18:00:00.000Z'));
     const onRetry = vi.fn();
-    const { container } = render(
-      <OvieCeoOverview
-        metrics={buildMetrics('unavailable')}
-        onRetry={onRetry}
-      />
-    );
-    const retry = screen.getAllByRole('button', { name: 'Retry' });
-    await userEvent.click(retry[0]);
+    const at = '2026-08-22T18:00:00.000Z';
+    const base = buildMetrics();
+    const metrics = {
+      ...base,
+      generatedAtIso: at,
+      sources: {
+        ...base.sources,
+        stripe: { ...base.sources.stripe, fetchedAtIso: at },
+        mercury: { ...base.sources.mercury, fetchedAtIso: at },
+      },
+    } as HudMetrics;
+    render(<OvieCeoOverview metrics={metrics} onRetry={onRetry} />);
+    act(() => {
+      vi.advanceTimersByTime(6 * 60 * 1000);
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(onRetry).toHaveBeenCalledOnce();
-    await expectNoA11yViolations(container);
   });
 
   it('omits Retry when no handler is provided', () => {

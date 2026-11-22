@@ -156,9 +156,13 @@ describe('OvieHomeCanvas Story First flat', () => {
     );
     expect(bottleneck).toHaveTextContent('Shipping off target');
 
-    expect(screen.getByTestId('story-first-glance-shipping')).toBeVisible();
-    expect(screen.getByTestId('story-first-glance-revenue')).toBeVisible();
-    expect(screen.getByTestId('story-first-glance-users')).toBeVisible();
+    expect(
+      await screen.findByTestId('story-first-glance-shipping')
+    ).toBeVisible();
+    expect(
+      await screen.findByTestId('story-first-glance-revenue')
+    ).toBeVisible();
+    expect(await screen.findByTestId('story-first-glance-users')).toBeVisible();
 
     expect(screen.getByTestId('story-first-stages')).toBeVisible();
     expect(screen.getByTestId('story-first-stage-investigating')).toBeVisible();
@@ -254,6 +258,8 @@ describe('OvieHomeCanvas Story First flat', () => {
         operationalTasks: {
           ...base.operationalTasks,
           syncState: 'syncing',
+          observedAt: null,
+          lastSyncedAt: null,
           tasks: [],
         },
       };

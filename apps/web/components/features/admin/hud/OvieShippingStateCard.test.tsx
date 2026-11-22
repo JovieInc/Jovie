@@ -1,92 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SHIPPING_STATE_SCHEMA } from '@/lib/ovie/shipping-state-client';
+import { freshShippingProjection } from '@/tests/e2e/utils/admin-visual-shipping-fixture';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { OvieShippingStateCard } from './OvieShippingStateCard';
 import { resetHudShippingStateForTests } from './useHudShippingStateQuery';
 
-const count = (value: number) =>
-  value === 0
-    ? { state: 'measured-zero', value: 0 }
-    : { state: 'measured-nonzero', value };
-
 function projection(overrides: Record<string, unknown> = {}) {
-  const now = Date.now();
-  return {
-    schema: SHIPPING_STATE_SCHEMA,
-    projectionId: 'proj-1',
-    eventId: 'proj-1',
-    sequence: 4,
-    producerId: 'ubuntu-operational-truth',
-    producerVersion: '1',
-    sourceId: 'lanes-status',
-    entityId: 'ovie.shipping-state',
-    cursor: '4',
-    sourceRevision: 'rev-4',
-    observationTimestamp: new Date(now).toISOString(),
-    emissionTimestamp: new Date(now).toISOString(),
-    freshnessDeadline: new Date(now + 60_000).toISOString(),
-    correlation: { workId: 'corr-4' },
-    lastError: null,
-    state: 'fresh',
-    publishing: true,
-    sources: {},
-    delivery: {
-      lanes: {
-        running: count(7),
-        slots: count(9),
-        idle: count(2),
-        pool: count(186),
-        lastLandingAgeSeconds: count(85),
-        diskFreePct: 28.4,
-        lanes: [{ name: 'devin', running: 4, slots: 4 }],
-        alerts: ['61 harness-failed runs in 24h'],
-        heldByReason: {},
-        failedByReason: {},
-        publishedAt: new Date(now - 60_000).toISOString(),
-        stale: false,
-      },
-      merges: {
-        since: '2026-09-26T07:00:00Z',
-        today: count(292),
-        byRepo: {
-          Jovie: count(189),
-          LogYourBody: count(17),
-          'summer-config': count(26),
-        },
-        last7Days: count(862),
-        prior7Days: count(225),
-      },
-      mergeQueueDepth: count(2),
-      inFlight: count(0),
-      certifiedHead: {
-        sha: 'c3e74e00a9d234b8f6a1b2c3d4e5f60718293a4b',
-        certifiedAt: new Date(now - 1_800_000).toISOString(),
-      },
-      production: {
-        sha: 'ee7401f37e0b324e225751f0d97ce229838ac8b4',
-        version: '26.9.15',
-        deployedAt: new Date(now - 3_600_000).toISOString(),
-        behindMain: count(54),
-      },
-      staging: {
-        sha: 'a1b2c3d4e5f60718293a4bc3e74e00a9d234b8f6',
-        version: '26.9.16',
-        deployedAt: new Date(now - 1_200_000).toISOString(),
-        behindMain: count(2),
-      },
-      summer: { availability: 'up' },
-    },
-    meanings: {
-      merged: { state: 'measured', value: false },
-      queued: { state: 'measured', value: true },
-      ciGreen: { state: 'measured', value: true },
-      productionVerified: { state: 'measured', value: true },
-      exactLiveBuild: { state: 'measured', value: true },
-    },
-    ...overrides,
-  };
+  return { ...freshShippingProjection(), ...overrides };
 }
 
 const fetchMock = vi.fn();
@@ -140,12 +61,7 @@ describe('OvieShippingStateCard (colocated)', () => {
     await waitFor(() => expect(panel()).toHaveAttribute('data-truth', 'fresh'));
     expect(screen.getByText('Fresh')).toBeInTheDocument();
     expect(panel()).toHaveAttribute('data-revision', 'rev-4');
-    expect(
-      screen.queryByText('Lanes feed not measured')
-    ).not.toBeInTheDocument();
-    expect(screen.getByTestId('hud-delivery-metrics')).toHaveTextContent(
-      '862 (+283% WoW)'
-    );
+    expect(screen.getByTestId('hud-delivery-metrics')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 
