@@ -107,7 +107,7 @@ export function getShellListRowFrameClassName({
         : '';
 
   return cn(
-    'relative min-w-0 rounded-md border border-transparent outline-none',
+    'relative min-w-0 rounded-md border-y border-transparent outline-none',
     rowState.base,
     chrome === 'shell' && 'system-b-table-row-shell',
     shellListRowDensityClassName[density],

@@ -1198,7 +1198,7 @@ describe('TasksPageClient', () => {
     );
     expect(screen.getByTestId('tasks-table')).toHaveAttribute(
       'data-container-class-name',
-      'h-full overflow-y-auto overflow-x-hidden px-2.5 pb-2 pt-0.5'
+      'h-full overflow-y-auto overflow-x-hidden pb-2 pt-0.5'
     );
   });
 

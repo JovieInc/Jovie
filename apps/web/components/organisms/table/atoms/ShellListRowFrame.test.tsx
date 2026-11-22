@@ -24,6 +24,14 @@ describe('ShellListRowFrame', () => {
     expect(className).toContain('cursor-pointer');
   });
 
+  it('adds no side border, so a row inset of px-3 puts content on the 12px seam', () => {
+    const className = getShellListRowFrameClassName({});
+
+    expect(className).toContain('border-y');
+    expect(className).toContain('border-transparent');
+    expect(className).not.toMatch(/(?<![\w-])border(?![\w-])/);
+  });
+
   it('defaults to plain chrome and caller-owned density for embedded rows', () => {
     const className = getShellListRowFrameClassName({});
 
