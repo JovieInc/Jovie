@@ -48,6 +48,8 @@ vi.mock('@/features/admin/layout/AdminDetailRail', () => ({
 type Feed = ShippingCockpitProjection['operationalTasks'];
 type FeedTask = Feed['tasks'][number];
 
+// A fixed clock keeps the rows' relative times stable across runs.
+const FIXED_NOW = '2026-04-01T12:00:00.000Z';
 const SHA = 'ee7401f37e0b324e225751f0d97ce229838ac8b4';
 
 function feedTask(overrides: Partial<FeedTask> = {}): FeedTask {
@@ -61,13 +63,13 @@ function feedTask(overrides: Partial<FeedTask> = {}): FeedTask {
     attempt: null,
     retryAt: null,
     sourceRevision: SHA,
-    updatedAt: new Date().toISOString(),
+    updatedAt: FIXED_NOW,
     ...overrides,
   };
 }
 
 function projection(tasks: FeedTask[]): ShippingCockpitProjection {
-  const timestamp = new Date().toISOString();
+  const timestamp = FIXED_NOW;
   const base = unknownProjection({
     sequence: 1,
     observationTimestamp: timestamp,
