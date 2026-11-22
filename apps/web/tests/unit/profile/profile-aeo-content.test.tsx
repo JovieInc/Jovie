@@ -1,9 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cleanup, render, screen } from '@testing-library/react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
 import { projectStructuredReleaseCollaborators } from '@/lib/discography/artist-queries/artist-search';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import {
@@ -714,28 +712,18 @@ describe('Profile AEO content', () => {
     expect(second.faqs).toHaveLength(0);
   });
 
-  it('renders visible FAQ and source links into static HTML', () => {
+  it('emits the sourced FAQs as FAQPage JSON-LD (nothing renders below the footer)', () => {
     const content = buildContent();
+    const jsonLd = buildProfileAeoFaqStructuredData(content);
 
-    render(<ProfileAeoContent content={content} />);
-
-    expect(screen.getByTestId('profile-aeo-content')).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'About DJ Test' })
-    ).toBeVisible();
-    expect(screen.getByText('Where is DJ Test from?')).toBeVisible();
-    const releaseSource = screen.getByRole('link', {
-      name: 'Source: Jovie release page',
-    });
-    expect(releaseSource).toHaveAttribute('href', '/dj-test/neon-circuit');
-
-    const html = renderToStaticMarkup(<ProfileAeoContent content={content} />);
-    expect(html).toContain('data-testid="profile-aeo-content"');
-    expect(html).toContain('Where can I buy DJ Test merch?');
-    expect(html).toContain('Source: Official merch card');
-    expect(
-      screen.getByRole('link', { name: 'Guest Vocalist' })
-    ).toHaveAttribute('href', '/guestvocalist');
+    expect(jsonLd['@type']).toBe('FAQPage');
+    const names = jsonLd.mainEntity.map(question => question.name);
+    expect(names).toContain('Where is DJ Test from?');
+    expect(names).toContain('Where can I buy DJ Test merch?');
+    expect(jsonLd.mainEntity).toHaveLength(content.faqs.length);
+    for (const question of jsonLd.mainEntity) {
+      expect(question.acceptedAnswer.text.length).toBeGreaterThan(0);
+    }
   });
 
   it('links entity mentions in the description while keeping plain-text paragraphs', () => {
@@ -782,24 +770,28 @@ describe('Profile AEO content', () => {
       href: '/guestvocalist',
     });
 
-    render(<ProfileAeoContent content={content} />);
-
-    // The release title appears in both the tagline and the generated
-    // latest-release sentence — every mention is linked.
-    const releaseLinks = screen.getAllByRole('link', { name: 'Neon Circuit' });
-    expect(releaseLinks.length).toBeGreaterThan(0);
-    for (const link of releaseLinks) {
-      expect(link).toHaveAttribute('href', '/dj-test/neon-circuit');
-      expect(link).toHaveAttribute('data-entity-kind', 'release');
+    // Every release-title mention is linked, in the tagline and in the
+    // generated latest-release sentence alike.
+    const mentions = content.descriptionSegments.flat();
+    const releaseMentions = mentions.filter(
+      segment => segment.text === 'Neon Circuit'
+    );
+    expect(releaseMentions.length).toBeGreaterThan(0);
+    for (const segment of releaseMentions) {
+      expect(segment).toMatchObject({
+        type: 'release',
+        href: '/dj-test/neon-circuit',
+      });
     }
-
-    const artistLinks = screen.getAllByRole('link', {
-      name: 'Guest Vocalist',
-    });
-    expect(artistLinks.length).toBeGreaterThan(0);
-    for (const link of artistLinks) {
-      expect(link).toHaveAttribute('href', '/guestvocalist');
-      expect(link).toHaveAttribute('data-entity-kind', 'artist');
+    const artistMentions = mentions.filter(
+      segment => segment.text === 'Guest Vocalist'
+    );
+    expect(artistMentions.length).toBeGreaterThan(0);
+    for (const segment of artistMentions) {
+      expect(segment).toMatchObject({
+        type: 'artist',
+        href: '/guestvocalist',
+      });
     }
   });
 
@@ -956,17 +948,19 @@ describe('Profile AEO content', () => {
       now,
     });
 
-    render(<ProfileAeoContent content={content} />);
-    expect(screen.getByTestId('profile-aeo-content')).toHaveTextContent(
-      'Credit Only Artist'
-    );
+    const segments = content.descriptionSegments.flat();
+    expect(content.description.join(' ')).toContain('Credit Only Artist');
     expect(
-      screen.queryByRole('link', { name: 'Credit Only Artist' })
-    ).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Quiet Signal' })).toHaveAttribute(
-      'href',
-      '/dj-test/quiet-signal'
-    );
+      segments.some(
+        segment =>
+          segment.text === 'Credit Only Artist' && segment.type !== 'text'
+      )
+    ).toBe(false);
+    expect(segments).toContainEqual({
+      type: 'release',
+      text: 'Quiet Signal',
+      href: '/dj-test/quiet-signal',
+    });
   });
 
   it('defaults to plain-text segments when no entity context is provided', () => {

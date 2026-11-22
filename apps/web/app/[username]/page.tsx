@@ -16,7 +16,6 @@ import { UnfazedProfileClient } from '@/components/features/profile/UnfazedProfi
 import { BASE_URL } from '@/constants/app';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { assertLiveProfileRoute } from '@/features/profile/live-profile-lock';
-import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
 // Artist-paid audience data (view, pixels, funnel) must fire right after
 // hydration with no idle or interaction gate, so these stay in the entry
 // bundle; only heavy, non-revenue islands are lazy (JOV-10246).
@@ -559,7 +558,6 @@ async function ArtistPageContent({
         catalogLoadFailed={catalogLoadFailed}
         merchCards={merchCards}
       />
-      <ProfileAeoContent content={aeoContent} />
       {isPublicNoAuthSmoke ? null : (
         <>
           <DesktopQrOverlayClient handle={artist.handle} />

@@ -202,9 +202,6 @@ vi.mock('@/components/features/ask-jovie/AskJovieWidget', () => ({
 vi.mock('@/features/tracking/SignupFunnelBeacon', () => ({
   SignupFunnelBeacon: () => createElement('noscript', null, 'signup-beacon'),
 }));
-vi.mock('@/features/profile/ProfileAeoContent', () => ({
-  ProfileAeoContent: () => createElement('noscript', null, 'aeo-content'),
-}));
 vi.mock('@/app/[username]/_components/PublicClaimBanner', () => ({
   PublicClaimBanner: () => createElement('noscript', null, 'claim-banner'),
 }));
