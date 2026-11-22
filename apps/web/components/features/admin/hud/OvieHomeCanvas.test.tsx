@@ -1,9 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { HomeCanvasState } from '@/components/jovie/types';
 import { APP_ROUTES } from '@/constants/routes';
-import { SUMMER_OPS_CARD_SCHEMA } from '@/lib/ovie/ops-card';
 import { emptyDeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import { OvieHomeCanvas } from './OvieHomeCanvas';
 import { COMPANY_RESPONSES, snapshot } from './OvieHomeCanvas.test-fixtures';
@@ -42,83 +40,15 @@ vi.mock('./useHudShippingStateQuery', () => ({
       : { isPending: true, isFetching: true, refetch: shipping.refetch },
 }));
 
-function renderCanvas(chat?: HomeCanvasState) {
+function renderCanvas() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  const view = render(
+  return render(
     <QueryClientProvider client={client}>
-      <OvieHomeCanvas chat={chat} />
+      <OvieHomeCanvas />
     </QueryClientProvider>
   );
-  return {
-    ...view,
-    rerenderChat: (next: HomeCanvasState) =>
-      view.rerender(
-        <QueryClientProvider client={client}>
-          <OvieHomeCanvas chat={next} />
-        </QueryClientProvider>
-      ),
-  };
-}
-
-function renderThenAsk(chat: HomeCanvasState) {
-  const view = renderCanvas({ ...chat, messages: [] });
-  view.rerenderChat(chat);
-  return view;
-}
-
-function opsCard(kind: 'shipping' | 'revenue', title: string) {
-  return {
-    card: {
-      schema: SUMMER_OPS_CARD_SCHEMA,
-      kind,
-      title,
-      state: 'fresh',
-      observedAt: '2026-10-20T18:00:00.000Z',
-      facts: [{ label: 'Value', value: '12' }],
-    },
-  };
-}
-
-function chatState(overrides: Partial<HomeCanvasState> = {}): HomeCanvasState {
-  return {
-    isStreaming: false,
-    onOpenTranscript: vi.fn(),
-    composerHasIntent: false,
-    messages: [
-      { id: 'u1', role: 'user', parts: [{ type: 'text', text: 'Revenue?' }] },
-      {
-        id: 'a1',
-        role: 'assistant',
-        parts: [
-          { type: 'text', text: 'MRR is up.' },
-          {
-            type: 'tool-summerOpsData',
-            toolCallId: 't1',
-            state: 'output-available',
-            input: {},
-            output: opsCard('revenue', 'Monthly Revenue'),
-          },
-        ],
-      },
-      { id: 'u2', role: 'user', parts: [{ type: 'text', text: 'Shipping?' }] },
-      {
-        id: 'a2',
-        role: 'assistant',
-        parts: [
-          {
-            type: 'tool-summerOpsData',
-            toolCallId: 't2',
-            state: 'output-available',
-            input: {},
-            output: opsCard('shipping', 'Shipping Now'),
-          },
-        ],
-      },
-    ],
-    ...overrides,
-  };
 }
 
 describe('OvieHomeCanvas Story First flat', () => {
@@ -148,7 +78,6 @@ describe('OvieHomeCanvas Story First flat', () => {
     renderCanvas();
     const canvas = await screen.findByTestId('story-first-canvas');
     expect(canvas).toBeVisible();
-    expect(canvas).toHaveAttribute('data-melting', 'false');
 
     const bottleneck = await screen.findByTestId('story-first-bottleneck');
     await vi.waitFor(() =>
@@ -186,36 +115,6 @@ describe('OvieHomeCanvas Story First flat', () => {
     expect(
       screen.getByTestId('story-first-stage-investigating')
     ).toHaveTextContent('Blocked task');
-  });
-
-  it('melts the board when the composer carries intent', async () => {
-    renderCanvas(chatState({ composerHasIntent: true, messages: [] }));
-    const canvas = await screen.findByTestId('story-first-canvas');
-    expect(canvas).toHaveAttribute('data-melting', 'true');
-    expect(screen.getByTestId('story-first-board')).toHaveAttribute(
-      'aria-hidden',
-      'true'
-    );
-  });
-
-  it('melts while a turn is streaming', async () => {
-    renderCanvas(
-      chatState({
-        isStreaming: true,
-        composerHasIntent: false,
-        messages: [
-          {
-            id: 'u1',
-            role: 'user',
-            parts: [{ type: 'text', text: 'Status?' }],
-          },
-        ],
-      })
-    );
-    expect(await screen.findByTestId('story-first-canvas')).toHaveAttribute(
-      'data-melting',
-      'true'
-    );
   });
 
   it('shows loading stages while shipping state has not arrived', () => {
@@ -291,18 +190,12 @@ describe('OvieHomeCanvas Story First flat', () => {
     ).toHaveTextContent('Blocked task');
   });
 
-  it('opens on the Story First board, not an earlier conversation', async () => {
-    renderCanvas(chatState());
-    await screen.findByTestId('story-first-canvas');
-    expect(screen.queryByTestId('home-loop-answer')).toBeNull();
-  });
-
-  it('never renders chat turns on Home, so a reply never floats under the board', async () => {
-    renderThenAsk(chatState({ isStreaming: true }));
-    await screen.findByTestId('story-first-canvas');
-    expect(screen.queryByTestId('home-loop-answer')).toBeNull();
-    expect(screen.queryByTestId('story-first-answer')).toBeNull();
-    expect(screen.queryByText('2 of 2')).toBeNull();
+  it('keeps the board crisp and interactive (no melt, no inert)', async () => {
+    renderCanvas();
+    const board = await screen.findByTestId('story-first-board');
+    expect(board).not.toHaveAttribute('inert');
+    expect(board).not.toHaveAttribute('aria-hidden');
+    expect(board.className).not.toMatch(/blur|opacity|translate/);
   });
 
   it('does not invent a company metric wall when sources are empty', async () => {
