@@ -43,6 +43,15 @@ on:
           left out: they change only through approved_homepage_baselines.
         type: boolean
         default: false
+      lfs_upload_glob:
+        description: >-
+          Upload the files on main that match this glob (for example
+          apps/web/tests/e2e/__snapshots__/**/*.png) as Git LFS objects, and
+          render nothing. Run it before pushing a forward LFS conversion from a
+          host that cannot reach the LFS upload API: GitHub refuses a push whose
+          pointers name objects it lacks.
+        type: string
+        default: ''
       baseline_specs:
         description: >-
           With commit_branch_baselines: the specs whose baselines to commit,
@@ -61,7 +70,7 @@ concurrency:
 jobs:
   visual-baseline-setup:
     name: Visual Regression (Neon seed + build)
-    if: ${{ !inputs.approved_homepage_baselines }}
+    if: ${{ !inputs.approved_homepage_baselines && inputs.lfs_upload_glob == '' }}
     environment: Preview – jovie
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -163,7 +172,7 @@ jobs:
     needs: [visual-baseline-setup]
     # Storybook suites need neither the seed nor the build, so they still
     # run (and refresh) when setup fails; app suites then fail at download.
-    if: ${{ !cancelled() && !inputs.approved_homepage_baselines }}
+    if: ${{ !cancelled() && !inputs.approved_homepage_baselines && inputs.lfs_upload_glob == '' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -586,7 +595,7 @@ jobs:
   cleanup-neon:
     name: Visual Regression (Neon cleanup)
     needs: [visual-baseline-setup, visual-regression]
-    if: ${{ always() && !inputs.approved_homepage_baselines }}
+    if: ${{ always() && !inputs.approved_homepage_baselines && inputs.lfs_upload_glob == '' }}
     environment: Preview – jovie
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -775,6 +784,62 @@ jobs:
           # Plain fast-forward push: never force, so a newer branch commit wins.
           git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
 
+
+  upload-lfs-objects:
+    # A forward conversion to Git LFS (git add --renormalize) changes no file
+    # bytes, so each object is main's plain blob of the same path. This job
+    # uploads those blobs, so a host that cannot reach the LFS upload API can
+    # still push the pointers. It writes nothing to the repository.
+    name: Visual Regression (upload Git LFS objects)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.lfs_upload_glob != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Upload main's matching files as Git LFS objects
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LFS_GLOB: ${{ inputs.lfs_upload_glob }}
+        run: |
+          set -euo pipefail
+          if ! [[ "$LFS_GLOB" =~ ^[A-Za-z0-9_.*/-]+$ ]] || [[ "$LFS_GLOB" == *..* ]]; then
+            echo "::error::lfs_upload_glob must be a repository path glob (got '$LFS_GLOB')."
+            exit 1
+          fi
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+          git lfs install --local --skip-smudge --skip-repo
+          objects="$(git rev-parse --git-common-dir)/lfs/objects"
+          oids=()
+          while IFS= read -r -d '' entry; do
+            path="${entry#*$'\t'}"
+            # [[ == ]] lets * match /, so ** spans directories.
+            # shellcheck disable=SC2053
+            [[ "$path" == $LFS_GLOB ]] || continue
+            tmp="$RUNNER_TEMP/lfs-object"
+            git cat-file blob "origin/main:$path" > "$tmp"
+            oid="$(sha256sum "$tmp" | cut -d' ' -f1)"
+            object="$objects/${oid:0:2}/${oid:2:2}/$oid"
+            mkdir -p "$(dirname "$object")"
+            mv "$tmp" "$object"
+            oids+=("$oid")
+          done < <(git ls-tree -r -z origin/main)
+          echo "${#oids[@]} files on main match $LFS_GLOB."
+          if (( ${#oids[@]} == 0 )); then
+            echo "::error::No file on main matches $LFS_GLOB."
+            exit 1
+          fi
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" lfs push --object-id origin "${oids[@]}"
+          {
+            echo "### Git LFS upload"
+            echo "Uploaded ${#oids[@]} objects for files on main matching \`$LFS_GLOB\`."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   report-scheduled-failure:
     # Nothing fails silently (docs/design-system/GOVERNANCE.md): a red scheduled

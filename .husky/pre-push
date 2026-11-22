@@ -21,6 +21,9 @@ push_refs="$(cat)"
 # Visual-test baselines are Git LFS files (.gitattributes). This hook replaces
 # the one `git lfs install` would write, so it uploads their objects before the
 # push; without git-lfs a push would leave pointers to objects GitHub lacks.
+# A host that cannot reach the LFS upload API first dispatches
+# visual-regression.yml with lfs_upload_glob (main's files become LFS objects),
+# then pushes a forward conversion with GIT_LFS_SKIP_PUSH=1.
 if command -v git-lfs >/dev/null 2>&1; then
   if [ -n "$push_refs" ]; then
     printf '%s\n' "$push_refs" | git lfs pre-push "$@"
