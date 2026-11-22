@@ -128,7 +128,6 @@
     "components/features/pmf-survey/PmfSurveyCard.test.tsx": 1499,
     "components/features/presence/PresenceStatusParts.test.tsx": 1834,
     "components/features/pricing/PricingComparisonChart.test.tsx": 1452,
-    "components/features/profile/ProfileAboutShare.test.tsx": 2376,
     "components/features/profile/PublicProfileFixture.certificate.test.tsx": 2600,
     "components/features/profile/StaticArtistPage.certificate.test.tsx": 2207,
     "components/features/profile/StaticListenInterface.test.tsx": 1434,

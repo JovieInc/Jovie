@@ -143,30 +143,6 @@
     "status.error": {
       "$value": "#f72a36",
       "$type": "color"
-    },
-    "feature.analytics": {
-      "$value": "#11afff",
-      "$type": "color"
-    },
-    "feature.conversion": {
-      "$value": "#8e56f5",
-      "$type": "color"
-    },
-    "feature.beauty": {
-      "$value": "#f52bb5",
-      "$type": "color"
-    },
-    "feature.links": {
-      "$value": "#3ffa8b",
-      "$type": "color"
-    },
-    "feature.speed": {
-      "$value": "#3ffa8b",
-      "$type": "color"
-    },
-    "feature.pro": {
-      "$value": "#ff7800",
-      "$type": "color"
     }
   }
 }

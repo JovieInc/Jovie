@@ -154,11 +154,12 @@ def child_description(epic, child: dict, lane_name: str) -> str:
 
 
 def create_child(linear, detail: dict, epic, child: dict, lane_name: str, priority: int) -> dict:
-    """issueCreate with readback: the created issue must be in Todo under this epic."""
-    todo = next((state["id"] for state in detail["team"]["states"]["nodes"] if state["name"] == "Todo"), None)
-    if todo is None:
-        raise RuntimeError("linear: team has no Todo state")
-    payload = {"teamId": detail["team"]["id"], "stateId": todo, "parentId": epic.id, "title": child["title"],
+    """issueCreate with readback: the created issue must be in Backlog under this epic. Priority admission and
+    the sub-lane refill are the only Backlog -> Todo writers, so a child takes a seat in its own code sub-lane."""
+    backlog = next((state["id"] for state in detail["team"]["states"]["nodes"] if state["name"] == "Backlog"), None)
+    if backlog is None:
+        raise RuntimeError("linear: team has no Backlog state")
+    payload = {"teamId": detail["team"]["id"], "stateId": backlog, "parentId": epic.id, "title": child["title"],
                "description": child_description(epic, child, lane_name)}
     if priority:
         payload["priority"] = priority
@@ -166,7 +167,7 @@ def create_child(linear, detail: dict, epic, child: dict, lane_name: str, priori
     created = (data.get("issueCreate") or {}) if isinstance(data, dict) else {}
     issue = created.get("issue") or {}
     if (created.get("success") is not True or (issue.get("parent") or {}).get("id") != epic.id
-            or (issue.get("state") or {}).get("id") != todo or not issue.get("identifier")):
+            or (issue.get("state") or {}).get("id") != backlog or not issue.get("identifier")):
         raise RuntimeError("linear: child issue readback mismatch")
     return issue
 

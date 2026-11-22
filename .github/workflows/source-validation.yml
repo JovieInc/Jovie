@@ -1018,6 +1018,26 @@ jobs:
           CI_FAST_SKIP_STRUCTURAL: 'true'
           TURBO_SCM_BASE: ${{ steps.scope.outputs.base }}
         run: node scripts/ci-fast-lanes.mjs
+      # The parity group overlaps three web tsc programs (~5.6 GB each cold)
+      # on one 16 GB hosted runner. Started cold, runners were stopped
+      # mid-typecheck ("The runner has received a shutdown signal", exit 143),
+      # which fits memory exhaustion. Read the same main-scoped incremental
+      # state the source job restores above (written by tsc-cache-warm.yml):
+      # warm tsc needs far less memory and time. Read-only, so no PR-scoped
+      # cache entries; tsc re-hashes every input, so it cannot replay a pass.
+      - name: Resolve parity tsc cache hour
+        id: parity-tsc-cache-hour
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.typecheck == 'true' && matrix.shard == '2/4'
+        run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
+      - name: Restore web tsc incremental state for typecheck parity
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.typecheck == 'true' && matrix.shard == '2/4'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.cache/tsbuildinfo*
+          key: jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json', 'apps/web/tsconfig.stories.json') }}-h${{ steps.parity-tsc-cache-hour.outputs.hour }}
+          restore-keys: |
+            jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json', 'apps/web/tsconfig.stories.json') }}-
+            jovie-web-tsbuildinfo-v2-${{ runner.os }}-
       - name: Run typecheck lane parity
         if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.typecheck == 'true' && matrix.shard == '2/4'
         env:
