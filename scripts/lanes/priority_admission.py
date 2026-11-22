@@ -12,7 +12,11 @@ waiting a median 25 days, Urgent work and Summer's portfolio picks never reached
    per tick.
 2. WIP sanity: when Todo exceeds a ceiling, stale (> 7 days untouched) P3/P4 Todo items go
    back to Backlog in bounded batches, so Todo means "next up".
-3. Summer rank intake: `summer.portfolio-rank/v1` envelopes, Ed25519-signed by Summer, are
+3. Non-code lanes (Tim, 2026-11-22): design, research, data, copy and whiteboard work
+   (`work_lane.py`) is never counted toward the code Todo target or ceiling, never displaced or
+   demoted to make room for code, golden-path Urgent included, and its own admission displaces
+   nothing. Code priority orders code work only.
+4. Summer rank intake: `summer.portfolio-rank/v1` envelopes, Ed25519-signed by Summer, are
    verified against a pinned public key and stored as `summer-portfolio/rank.verified.json`.
    `lane_runner.admission_order` claims by that rank first, then priority, then age.
 
@@ -36,6 +40,7 @@ import backlog_rank
 import binding_refill
 import linear_sync
 import urgent_sla
+import work_lane
 
 sys.dont_write_bytecode = True
 
@@ -200,8 +205,10 @@ def marketing_priority(labels) -> bool:
 
 
 def protected(row: dict, ranks: dict[str, int]) -> bool:
+    """Never displaced or demoted. Speed and non-code work hold their own lanes, not a code slot."""
     labels = {str(label).lower() for label in row.get("labels") or ()}
-    return row.get("priority") == 1 or row.get("identifier") in ranks or bool(labels & PROTECT_LABELS)
+    return (row.get("priority") == 1 or row.get("identifier") in ranks or bool(labels & PROTECT_LABELS)
+            or work_lane.own_lane(row))
 
 
 def admit_candidates(rows: list[dict], ranks: dict[str, int], excluded=(), red_line=lambda row: False,
@@ -216,14 +223,15 @@ def admit_candidates(rows: list[dict], ranks: dict[str, int], excluded=(), red_l
     for row in rows:
         if row.get("state") != "Backlog" or pending.get(row["id"]) == "Todo":
             continue
-        if row.get("priority") != 1 and row["identifier"] not in ranks and not marketing_priority(row.get("labels")):
+        if (row.get("priority") != 1 and row["identifier"] not in ranks and not marketing_priority(row.get("labels"))
+                and not work_lane.is_speed(row)):
             continue
         reason = binding_refill.skip_reason(row, open_ids, excluded, red_line)
         if reason:
             skipped[row["identifier"]] = reason
         else:
             found.append(row)
-    found.sort(key=lambda row: (*claim_key(row["identifier"], ranks), row.get("priority") != 1,
+    found.sort(key=lambda row: (not work_lane.is_speed(row), *claim_key(row["identifier"], ranks), row.get("priority") != 1,
                                 not marketing_priority(row.get("labels")),
                                 -backlog_rank.score(row, now), row.get("createdAt") or ""))
     return found, skipped
@@ -325,9 +333,13 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
         return _finish(state, team, receipt, now)
     rows = list((mirror.get("issues") or {}).values())
     pending = linear_sync._pending_moves(state)
-    todo = linear_sync.todo(state, team)
+    all_todo = linear_sync.todo(state, team)
+    # Only ordinary code counts toward the code target and ceiling; speed and non-code lanes hold their own depth.
+    todo = work_lane.code_only(all_todo)
+    non_code_todo = [row for row in all_todo if work_lane.own_lane(row)]
     goal = binding_refill.target(state, floor)
-    receipt.update(todo=len(todo), target=goal, ceiling=ceiling(goal))
+    receipt.update(todo=len(todo), target=goal, ceiling=ceiling(goal),
+                   nonCodeTodo={lane: len(rows) for lane, rows in work_lane.by_lane(non_code_todo).items()})
     outbox = linear_sync.Outboxed(state, client)
     candidates, skipped = admit_candidates(rows, ranks, excluded, lambda row: lane.issue_hits_red_line(binding_refill._issue(lane, row)),
                                            now, pending)
@@ -351,9 +363,12 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
             receipt["skipped"][row["identifier"]] = "live-state-changed"
     victims = displacement_order(live_todo, ranks, now)
     for row in admitted:
-        why = "Summer portfolio rank %s" % ranks[row["identifier"]] if row["identifier"] in ranks else ("Urgent (P1)" if row.get("priority") == 1 else MARKETING_LABEL)
+        why = ("speed win" if work_lane.is_speed(row) else "Summer portfolio rank %s" % ranks[row["identifier"]]
+               if row["identifier"] in ranks else ("Urgent (P1)" if row.get("priority") == 1 else MARKETING_LABEL))
         displaced = None
-        if len(live_todo) >= goal and len(receipt["displaced"]) < MAX_DISPLACE_PER_TICK and victims:
+        non_code = work_lane.own_lane(row)
+        # A speed or non-code admission takes no code slot, so it never makes code give way.
+        if not non_code and len(live_todo) >= goal and len(receipt["displaced"]) < MAX_DISPLACE_PER_TICK and victims:
             displaced = victims.pop(0)
             while displaced is not None and _live_state(client, displaced["id"]) != "Todo":
                 displaced = victims.pop(0) if victims else None
@@ -373,8 +388,8 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
         # "Label at admission" is read by Summer's quality check (labelled vs unlabelled revert/fail rate).
         outbox.comment(row["id"], f"Priority admission: promoted to Todo regardless of target ({why}; Todo was {len(todo)} of {goal}"
                                   + (f"; displaced {displaced['identifier']}" if displaced else "")
-                                  + f"). Claim order: Summer rank, Urgent, marketing, then priority and age. Label at admission: {'present' if labelled else 'none'}.")
-        live_todo.append(row)
+                                  + f"). Claim order: speed wins, Summer rank, Urgent, marketing, then priority and age. Label at admission: {'present' if labelled else 'none'}.")
+        (non_code_todo if non_code else live_todo).append(row)
         receipt["admitted"].append(row["identifier"])
         if not labelled:  # measured: admission no longer needs the retired agent-ready label
             receipt["admittedUnlabelled"].append(row["identifier"])
@@ -383,7 +398,8 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
                                                   "marketing": marketing_priority(row.get("labels")),
                                                   "backlogAgeS": round(now - (_epoch(row.get("createdAt")) or now)),
                                                   "displaced": displaced["identifier"] if displaced else None})
-    receipt["urgentSla"] = urgent_sla.record(state, team, live_todo, now)
+    receipt["urgentSla"] = urgent_sla.record(state, team, live_todo + non_code_todo, now)
+    receipt["lanes"] = _lane_metrics(state, team, rows, now)
     excess = len(live_todo) - ceiling(goal)
     if excess > 0:
         for row in stale_demotions(live_todo, ranks, now, min(excess, MAX_DEMOTE_PER_TICK)):
@@ -395,6 +411,25 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
             _log(state, "todo-demotions.jsonl", {"id": row["identifier"], "at": now, "priority": row.get("priority"),
                                                  "updatedAt": row.get("updatedAt")})
     return _finish(state, team, receipt, now)
+
+
+def _lane_metrics(state: Path, team: str, rows: list[dict], now: float) -> dict:
+    """Per-lane throughput, queue age and blocked count (work_lane.measure), so a stuck lane,
+    code or not, shows up in the receipt on its own. A metrics failure never blocks admission."""
+    path = Path(state) / "lanes" / f"{team}-{work_lane.METRICS_FILE}"
+    try:
+        previous = json.loads(path.read_text())
+    except (OSError, ValueError):
+        previous = None
+    try:
+        metrics, snapshot = work_lane.measure(rows, now, previous)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(snapshot, sort_keys=True))
+        tmp.replace(path)
+        return metrics
+    except Exception as error:  # noqa: BLE001
+        return {"error": type(error).__name__}
 
 
 def _finish(state: Path, team: str, receipt: dict, now: float) -> dict:
