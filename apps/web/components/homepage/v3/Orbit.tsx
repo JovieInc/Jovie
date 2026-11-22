@@ -21,7 +21,7 @@ export interface OrbitProps {
    * The ring's one accent from the ZiaWI pack, or neutral for grey light.
    * Omitted, it takes the section's `data-accent`.
    */
-  readonly accent?: 'ion' | 'ultra' | 'pulse' | 'orange' | 'neutral';
+  readonly accent?: 'ion' | 'ultra' | 'pulse' | 'neutral';
   readonly className?: string;
 }
 

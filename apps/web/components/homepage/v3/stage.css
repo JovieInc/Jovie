@@ -21,8 +21,8 @@
   --hv3-b1: var(--color-border-subtle);
   --hv3-b2: var(--color-border-default);
   --hv3-b3: var(--color-border-strong);
-  /* The section's one accent, from the ZiaWI pack (ion, ultra, pulse,
-     orange). Light only: hairlines, rings and small points. */
+  /* The section's one accent, from the ZiaWI pack (ion, ultra, pulse).
+     Light only: hairlines, rings and small points. */
   --hv3-accent: var(--color-accent);
   --hv3-selected: var(--color-bg-selected);
   --hv3-accent-glow: color-mix(in srgb, var(--hv3-accent) 12%, transparent);
@@ -80,9 +80,15 @@
   --hv3-accent: var(--color-accent-pink);
 }
 
-.hv3[data-accent="orange"],
-.hv3-orbit[data-accent="orange"] {
-  --hv3-accent: var(--color-accent-orange);
+/* Sections that share one component file take their accent here, keyed by
+   section, so each stays one pack accent (hero and claim are ion, the
+   default). Profile pulse, releases ultra, specs pulse. */
+.hv3[data-pen-section="profile"] {
+  --hv3-accent: var(--color-accent-pink);
+}
+
+.hv3[data-pen-section="releases"] {
+  --hv3-accent: var(--color-accent-purple);
 }
 
 /* Neutral: the light is grey, for the footer. */

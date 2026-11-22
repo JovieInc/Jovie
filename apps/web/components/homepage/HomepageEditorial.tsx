@@ -194,7 +194,6 @@ export function HomepageProfileChapter({
       data-pen-section='profile'
       data-testid='marketing-section-feature-split'
       data-marketing-variant='phone-right'
-      data-accent='orange'
       data-marketing-owner={OWNER}
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.featureSplit}
       className='hv3 hv3-chapter hv3-profile'
@@ -260,7 +259,6 @@ export function HomepageReleasesChapter({
       data-pen-section='releases'
       data-testid='marketing-section-product-gallery'
       data-marketing-variant='release-rail'
-      data-accent='ultra'
       data-marketing-owner={OWNER}
       data-pen-contract={
         MARKETING_PEN_CONTRACT_IDS.section.productGalleryReleaseRail
@@ -416,7 +414,6 @@ export function HomepageInviteClose({
       data-pen-section='invite'
       data-testid='marketing-section-cta'
       data-marketing-variant='final-single-claim'
-      data-accent='ion'
       data-marketing-owner={OWNER}
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.cta}
       className='hv3 hv3-chapter hv3-invite'
