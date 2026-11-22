@@ -1589,6 +1589,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:sweep
     jobCount: 1
+  - name: Storybook Host
+    path: .github/workflows/storybook-host.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:deploy
+    jobCount: 1
   - name: Summer Eve identity check
     path: .github/workflows/summer-eve-pin.yml
     active: true
