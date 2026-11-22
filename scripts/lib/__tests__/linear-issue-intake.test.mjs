@@ -224,7 +224,7 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
     expect(remediationKey(exact)).toBe(exact);
   });
 
-  it('reopens after Done and re-files the same remediation label', async () => {
+  it('reopens after Done into Backlog and re-files the remediation label', async () => {
     const labelName = remediationKey(fingerprint);
     expect(remediationKey(labelName)).toBe(labelName);
     const team = {
@@ -271,7 +271,7 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
       JSON.parse(String(byTitle.mock.calls[1][1].body)).variables.input
     ).toEqual({
       description: 'still red',
-      stateId: 'todo-state',
+      stateId: 'backlog-state',
       labelIds: ['label-other', 'label-1'],
     });
     const fp = 'remediation:flaky-test-filing';

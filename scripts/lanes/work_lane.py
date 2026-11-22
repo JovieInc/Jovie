@@ -13,13 +13,21 @@ code work only.
 Classification is explicit, never inferred from loose wording: a `lane:<name>` label, the Pen
 draft workflow's own `pen-draft` labels, or the exact title prefix of a generated Pen draft. When
 both a non-code signal and `lane:code` are present, `lane:code` wins, so a mislabelled item can be
-handed back to code in one label.
+handed back to code in one label. A `lane:<sub-lane>` label (below) hands it back the same way.
 
 Speed wins (Tim, 2026-11-22: "speed wins jump can ship independly and speed up subsequent work") are
 code, but they hold their own lane too: a `lane:speed`, `speed-win` or `compounding` label admits
 them to Todo like Urgent, outside the code target, never displaced or demoted, and code seats claim
 them before any other code, golden path included. Within the lane, Summer's portfolio rank orders
 them, and that rank already scores time saved across every later run (improvement-portfolio).
+
+Code sub-lanes (2026-11-22): JOV Todo held 468 issues against a code target of 6, most of them auto-filed
+remediation, so one class of work starved the rest. Ordinary code is split into sub-lanes, each with its own
+Todo depth: activation, remediation, small, infra, product (`code_sub_lane`). Each counts only its own Todo,
+and displacement, WIP demotion and Urgent admission stay inside one sub-lane, so an Urgent remediation can
+only push out another remediation item. A `lane:<sub-lane>` label picks the sub-lane outright; otherwise the
+first rule that matches wins (exact labels, label prefixes, then exact title prefixes), and product takes the
+rest.
 """
 from __future__ import annotations
 
@@ -64,7 +72,7 @@ def _title(row) -> str:
 def lane_of(row) -> str:
     """`code`, or the non-code lane this row (a mirror dict or an Issue) belongs to."""
     labels = _labels(row)
-    if "lane:code" in labels:
+    if "lane:code" in labels or labels & SUB_LANE_LABELS:
         return CODE
     if labels & SPEED_LABELS:
         return SPEED
@@ -79,6 +87,68 @@ def lane_of(row) -> str:
         if pattern.search(title):
             return lane
     return CODE
+
+
+# ------------------------------------------------------------------ code sub-lanes
+
+ACTIVATION, REMEDIATION, SMALL, INFRA, PRODUCT = "activation", "remediation", "small", "infra", "product"
+SUB_LANES = (ACTIVATION, REMEDIATION, SMALL, INFRA, PRODUCT)
+SUB_LANE_LABELS = frozenset(f"lane:{sub}" for sub in SUB_LANES)
+# Todo depth each sub-lane holds. Product also takes whatever room the binding's own code target (two per
+# seat, or its floor) leaves once the other sub-lanes are counted, so a team with only product work keeps
+# its old depth.
+SUB_LANE_DEPTH = {ACTIVATION: 3, REMEDIATION: 3, SMALL: 2, INFRA: 2, PRODUCT: 2}
+# Activation (the golden path) always keeps a seat: it fills first and nothing outside it displaces it.
+SUB_LANE_MIN_SEATS = {ACTIVATION: 1}
+SUB_LANE_CEILING_PER_DEPTH = 4  # a sub-lane's Todo above 4 x its depth is over WIP
+# (sub-lane, exact labels, label prefixes, title prefixes); first match wins, product is the rest.
+SUB_LANE_RULES = (
+    (ACTIVATION, frozenset({"lane:activation", "golden-path", "area:auth", "ws:security-auth", "ws:chat-agent"}),
+     ("remediation:claim-checkout",), ("P0 QA: waitlist-signup-to-waitlisted", "[board:goal-rev-")),
+    (REMEDIATION, frozenset({"lane:remediation", "ci-nightly", "flaky", "prod-error", "symphony-remediation"}),
+     ("remediation:", "sentry:"),
+     ("[ci] ", "[sentry] ", "[Sentry ", "[prod-errors] ", "Symphony doctor: ", "[board:", "[model-budget] ",
+      "PAGE: ", "Time bomb: ")),
+    (SMALL, frozenset({"lane:small", "size:xs", "polish", "gap-sweep"}), ("batch:",), ()),
+    (INFRA, frozenset({"lane:infra", "fleet", "symphony", "ws:symphony-throughput", "ws:ovie-ops", "area:ops",
+                       "area:infra", "infra", "ws:ci", "agent-improvement", "commissioning", "machine-gap", "codex",
+                       "devin", "hyperagent", "factory"}), (), ()),
+)
+
+
+def code_sub_lane(row) -> str:
+    """The code sub-lane of an ordinary code row: its `lane:<sub-lane>` label, else the first rule that
+    matches, else product."""
+    labels = _labels(row)
+    for sub in SUB_LANES:
+        if f"lane:{sub}" in labels:
+            return sub
+    title = _title(row).lstrip()
+    for sub, exact, prefixes, titles in SUB_LANE_RULES:
+        if labels & exact or any(label.startswith(prefixes) for label in labels) or title.startswith(titles):
+            return sub
+    return PRODUCT
+
+
+def by_sub_lane(rows) -> dict[str, list]:
+    """Ordinary code rows keyed by sub-lane (speed and non-code rows hold their own lanes and are left out)."""
+    out: dict[str, list] = {sub: [] for sub in SUB_LANES}
+    for row in code_only(rows):
+        out[code_sub_lane(row)].append(row)
+    return out
+
+
+def sub_lane_depths(goal: int = 0, todo: dict | None = None) -> dict[str, int]:
+    """Todo depth per sub-lane. Product also takes the room the binding's code target `goal` leaves after
+    the other sub-lanes' Todo (each counted up to its own depth), so no sub-lane ever borrows another's."""
+    depths = dict(SUB_LANE_DEPTH)
+    held = sum(min(len((todo or {}).get(sub) or ()), depth) for sub, depth in depths.items() if sub != PRODUCT)
+    depths[PRODUCT] = max(depths[PRODUCT], int(goal or 0) - held)
+    return depths
+
+
+def sub_lane_ceiling(depth: int) -> int:
+    return SUB_LANE_CEILING_PER_DEPTH * max(1, depth)
 
 
 def is_non_code(row) -> bool:
@@ -134,39 +204,47 @@ def _blocked(row) -> bool:
     return bool(_labels(row) & BLOCK_LABELS)
 
 
+def _measure_group(members: list, before: dict, open_ids: set, now: float, previous_at) -> tuple[dict, dict]:
+    """One lane's (or sub-lane's) metrics and the snapshot that the next measure diffs against."""
+    queued = [r for r in members if str(r.get("state") or "").lower() in QUEUED_STATES]
+    started = [r for r in members if r.get("stateType") in STARTED_TYPES]
+    blocked = [r for r in queued + started if _blocked(r)]
+    ages = sorted(now - e for e in (_epoch(r.get("updatedAt")) for r in queued) if e is not None)
+    queued_ids = {r.get("identifier") for r in queued}
+    started_ids = {r.get("identifier") for r in started}
+    exits = len([i for i in before.get("queued", []) if i not in queued_ids])
+    done = len([i for i in before.get("started", []) if i not in open_ids])
+    last_exit = now if (exits or done) else float(before.get("lastExitAt") or previous_at or now)
+    stuck = bool(queued) and not started and now - last_exit >= STUCK_AFTER_S
+    metric = {"queued": len(queued), "started": len(started), "blocked": len(blocked),
+              "oldestQueuedH": _hours(ages[-1]) if ages else 0.0,
+              "p50QueuedH": _hours(ages[len(ages) // 2]) if ages else 0.0,
+              "leftQueueSinceLast": exits, "finishedSinceLast": done,
+              "hoursSinceLastExit": _hours(now - last_exit), "stuck": stuck}
+    return metric, {"queued": sorted(queued_ids)[:500], "started": sorted(started_ids)[:500], "lastExitAt": last_exit}
+
+
 def measure(rows, now: float, previous: dict | None = None) -> tuple[dict, dict]:
     """Per lane: queued, started, blocked, queue age (untouched hours, oldest and p50), exits since the
     previous measure (throughput) and `stuck` when work waits, none is started and none left for a day.
+    The same numbers per code sub-lane go in the snapshot's `codeSubLanes` block (the lane keys stay as
+    they were for the doctor feed).
 
     `rows` are open mirror rows (closed issues leave the mirror, so an id that drops out of the open
     set, or a queued id now started, is an exit). Returns (metrics, snapshot to pass next time)."""
     previous = previous or {}
-    prev_lanes = previous.get("lanes") or {}
-    metrics, snapshot = {}, {"at": now, "lanes": {}}
+    metrics, subs = {}, {}
+    snapshot = {"at": now, "lanes": {}, "subLanes": {}, "metrics": metrics, "codeSubLanes": subs}
     grouped: dict[str, list] = {lane: [] for lane in LANES}
     for row in rows:
         grouped[lane_of(row)].append(row)
     open_ids = {row.get("identifier") for row in rows}
     for lane, members in grouped.items():
-        queued = [r for r in members if str(r.get("state") or "").lower() in QUEUED_STATES]
-        started = [r for r in members if r.get("stateType") in STARTED_TYPES]
-        blocked = [r for r in queued + started if _blocked(r)]
-        ages = sorted(now - e for e in (_epoch(r.get("updatedAt")) for r in queued) if e is not None)
-        before = prev_lanes.get(lane) or {}
-        queued_ids = {r.get("identifier") for r in queued}
-        started_ids = {r.get("identifier") for r in started}
-        exits = len([i for i in before.get("queued", []) if i not in queued_ids])
-        done = len([i for i in before.get("started", []) if i not in open_ids])
-        last_exit = now if (exits or done) else float(before.get("lastExitAt") or previous.get("at") or now)
-        stuck = bool(queued) and not started and now - last_exit >= STUCK_AFTER_S
-        metrics[lane] = {"queued": len(queued), "started": len(started), "blocked": len(blocked),
-                         "oldestQueuedH": _hours(ages[-1]) if ages else 0.0,
-                         "p50QueuedH": _hours(ages[len(ages) // 2]) if ages else 0.0,
-                         "leftQueueSinceLast": exits, "finishedSinceLast": done,
-                         "hoursSinceLastExit": _hours(now - last_exit), "stuck": stuck}
-        snapshot.setdefault("metrics", metrics)
-        snapshot["lanes"][lane] = {"queued": sorted(queued_ids)[:500], "started": sorted(started_ids)[:500],
-                                   "lastExitAt": last_exit}
+        before = (previous.get("lanes") or {}).get(lane) or {}
+        metrics[lane], snapshot["lanes"][lane] = _measure_group(members, before, open_ids, now, previous.get("at"))
+    for sub, members in by_sub_lane(rows).items():
+        before = (previous.get("subLanes") or {}).get(sub) or {}
+        subs[sub], snapshot["subLanes"][sub] = _measure_group(members, before, open_ids, now, previous.get("at"))
     return metrics, snapshot
 
 
@@ -178,12 +256,14 @@ def view(state) -> dict:
             data = json.loads(path.read_text())
         except (OSError, ValueError):
             continue
-        out[path.name[: -len(METRICS_FILE) - 1]] = {"at": data.get("at"), "lanes": data.get("metrics") or {}}
+        out[path.name[: -len(METRICS_FILE) - 1]] = {"at": data.get("at"), "lanes": data.get("metrics") or {},
+                                                    "codeSubLanes": data.get("codeSubLanes") or {}}
     return out
 
 
 def alerts(view_: dict) -> dict[str, str]:
-    """`lane-stuck:<team>:<lane>` for each lane with waiting work, nothing started and no exit for a day."""
+    """`lane-stuck:<team>:<lane>` for each lane with waiting work, nothing started and no exit for a day.
+    Code sub-lanes are reported in the view, not alerted: each doctor alert files a Linear issue."""
     found = {}
     for team, data in (view_ or {}).items():
         for lane, m in (data.get("lanes") or {}).items():

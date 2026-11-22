@@ -1644,9 +1644,9 @@ def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, no
                 row["running"] = False
                 events[fingerprint] = row
                 continue
-            todo = row.get("todoStateId") or _state_id(canonical, "Todo")
-            if todo and _note(row, f"reopen:{opener.get('id')}"):
-                reopens.append({"id": canonical.get("id"), "stateId": todo})
+            backlog = _state_id(canonical, "Backlog")  # admission alone writes Backlog -> Todo
+            if backlog and _note(row, f"reopen:{opener.get('id')}"):
+                reopens.append({"id": canonical.get("id"), "stateId": backlog})
                 comments.append({
                     "id": canonical.get("id"),
                     "body": (f"Symphony remediation: `{LABEL_PREFIX}{fingerprint}` recurred. "

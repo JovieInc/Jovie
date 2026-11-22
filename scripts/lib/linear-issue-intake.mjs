@@ -345,8 +345,8 @@ export async function upsertLinearIssueByTitleFingerprint({
   title,
   description,
   priority = 1,
-  // Optional state name (e.g. 'Todo') resolved from the team's workflow so a
-  // newly created issue can skip the default intake state (JOV-5966).
+  // Optional state name resolved from the team's workflow (JOV-5966). 'Todo'
+  // files into Backlog: admission is the only Backlog -> Todo writer.
   createStateName = null,
   // Optional label ids applied only when a new issue is created.
   createLabelIds = [],
@@ -470,12 +470,17 @@ export async function upsertLinearIssueByTitleFingerprint({
     labelId = ensured.id;
   }
 
+  const states = found.data?.team?.states?.nodes ?? [];
+  const backlogState =
+    states.find(state => state?.name === 'Backlog') ??
+    states.find(state => state?.type === 'backlog');
   if (!match) {
-    const states = found.data?.team?.states?.nodes ?? [];
-    const createStateId = createStateName
-      ? (states.find(state => state?.name === createStateName)?.id ?? null)
-      : null;
-    if (createStateName && !createStateId) {
+    // 'Todo' files into Backlog (or the team default when it has none).
+    const todo = createStateName === 'Todo';
+    const createStateId = todo
+      ? (backlogState?.id ?? null)
+      : (states.find(state => state?.name === createStateName)?.id ?? null);
+    if (createStateName && !todo && !createStateId) {
       return { ok: false, reason: 'linear_create_state_missing' };
     }
     const createIds = [
@@ -534,26 +539,12 @@ export async function upsertLinearIssueByTitleFingerprint({
   }
 
   const terminal = ['completed', 'canceled'].includes(match.state?.type);
-  const states = found.data?.team?.states?.nodes ?? [];
-  const backlogState =
-    states.find(state => state?.name === 'Backlog') ??
-    states.find(state => state?.type === 'backlog');
-  const todoState =
-    states.find(state => state?.name === 'Todo') ??
-    states.find(state => state?.type === 'unstarted');
   if (terminal && shouldReopen && !backlogState)
     return { ok: false, reason: 'linear_backlog_state_missing' };
   const existingLabelNodes = match.labels?.nodes;
   const input = {
     description: descriptionBody,
-    ...(terminal && shouldReopen
-      ? {
-          stateId:
-            createStateName === 'Todo' && todoState
-              ? todoState.id
-              : backlogState.id,
-        }
-      : {}),
+    ...(terminal && shouldReopen ? { stateId: backlogState.id } : {}),
     ...((labelId || keepLabelIds.length > 0) &&
     Array.isArray(existingLabelNodes)
       ? {
