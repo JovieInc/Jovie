@@ -13,6 +13,7 @@ import {
   useState,
 } from 'react';
 import { Drawer } from 'vaul';
+import { Popover, PopoverAnchor, PopoverContent } from '@jovie/ui';
 import type { ProfileSurfacePresentation } from '@/features/profile/contracts';
 import { useModalFocusBoundary } from '@/lib/a11y/modal-focus-boundary';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
@@ -46,6 +47,12 @@ interface ProfileDrawerShellProps {
    * a short task sheet ends on its own edge instead of the screen's.
    */
   readonly floating?: boolean;
+  /**
+   * Desktop / pointer-fine presentation: render a compact popover anchored to
+   * this element instead of a bottom sheet. Mobile callers omit it and keep the
+   * sheet. Resolved lazily (`current` is read when the popover opens).
+   */
+  readonly anchorRef?: React.RefObject<HTMLElement | null>;
 }
 
 export function ProfileDrawerShell({
@@ -62,6 +69,7 @@ export function ProfileDrawerShell({
   presentation = 'standalone',
   centerTitle = false,
   floating = false,
+  anchorRef,
 }: ProfileDrawerShellProps) {
   const titleId = useId();
   const [modalNode, attachModalRef] = useState<HTMLElement | null>(null);
@@ -95,6 +103,10 @@ export function ProfileDrawerShell({
     },
     [open, restoreOpenerFocus]
   );
+  const restoreAnchorFocus = useCallback(() => {
+    const anchor = anchorRef?.current;
+    if (anchor?.isConnected) anchor.focus({ preventScroll: true });
+  }, [anchorRef]);
   const subtitleId = useId();
   const accessibleDescriptionId = useId();
   const accessibleDescription = subtitle ?? 'Profile menu and actions.';
@@ -257,6 +269,73 @@ export function ProfileDrawerShell({
   );
 
   const body = <div className={bodyClasses}>{children}</div>;
+
+  if (anchorRef) {
+    const showHeader = isSecondaryHeader || isDirectHeader;
+    return (
+      <Popover open={open} onOpenChange={onOpenChange}>
+        <PopoverAnchor virtualRef={anchorRef as React.RefObject<HTMLElement>} />
+        <PopoverContent
+          align='end'
+          side='bottom'
+          sideOffset={8}
+          size='bare'
+          testId={dataTestId}
+          aria-labelledby={titleId}
+          className='w-[min(20rem,calc(100vw-2rem))] max-w-80 rounded-2xl border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] p-1.5 text-primary-token'
+          onCloseAutoFocus={event => {
+            event.preventDefault();
+            restoreAnchorFocus();
+          }}
+          onInteractOutside={event => {
+            // The trigger toggles the popover itself; closing here first would
+            // make its click reopen it.
+            const target = event.target;
+            if (target instanceof Node && anchorRef.current?.contains(target)) {
+              event.preventDefault();
+            }
+          }}
+        >
+          <span id={titleId} className='sr-only'>
+            {title}
+          </span>
+          {showHeader ? (
+            <div
+              className='flex items-center gap-1 px-1 pb-1.5 pt-0.5'
+              data-testid='profile-popover-header'
+            >
+              {isSecondaryHeader ? (
+                <button
+                  type='button'
+                  onClick={onBack}
+                  className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-colors duration-subtle hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+                  aria-label='Back'
+                  data-testid='profile-drawer-back-button'
+                >
+                  <ChevronLeft className='h-4 w-4' />
+                </button>
+              ) : null}
+              <p
+                aria-hidden='true'
+                className={cn(
+                  'truncate text-sm font-semibold tracking-[-0.01em] text-primary-token',
+                  !isSecondaryHeader && 'pl-2.5'
+                )}
+              >
+                {title}
+              </p>
+            </div>
+          ) : null}
+          <div
+            className='max-h-[min(28rem,var(--radix-popover-content-available-height))] overflow-y-auto overscroll-contain px-0.5'
+            data-testid='profile-popover-body'
+          >
+            {children}
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  }
 
   if (presentation === 'embedded') {
     if (!open) {

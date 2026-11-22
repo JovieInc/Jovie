@@ -8,7 +8,6 @@ import {
   ChevronRight,
   House,
   type LucideIcon,
-  Mail,
   MapPin,
   MoreHorizontal,
   Music2,
@@ -16,7 +15,13 @@ import {
   UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
@@ -146,6 +151,8 @@ interface ProfileDesktopSurfaceProps {
    *  mobile so cold desktop loads paint the real composition (JOV-6452). While
    *  hidden, portaled overlays (modal drawer, auto-open alerts) stay closed. */
   readonly overlaysEnabled?: boolean;
+  /** Shared with the credits popover so both anchor to the Menu button. */
+  readonly menuButtonRef?: React.RefObject<HTMLButtonElement | null>;
   /** JOV-8777: free public profiles carry the Jovie mark; opt-outs suppress it. */
   readonly hideJovieBranding?: boolean;
 }
@@ -216,6 +223,7 @@ function DesktopSurfaceCard({
   children,
   className,
   testId,
+  flat = false,
 }: Readonly<{
   title: string;
   actionLabel?: string;
@@ -223,11 +231,16 @@ function DesktopSurfaceCard({
   children: React.ReactNode;
   className?: string;
   testId?: string;
+  /** No surface: the content carries its own rows (no extra carding). */
+  flat?: boolean;
 }>) {
   return (
     <section
       className={cn(
-        'min-w-0 rounded-2xl border border-white/6 bg-white/[0.025] p-5',
+        'min-w-0',
+        flat
+          ? 'px-1'
+          : 'rounded-2xl border border-white/6 bg-white/[0.025] p-5',
         className
       )}
       data-testid={testId}
@@ -306,6 +319,7 @@ export function ProfileDesktopSurface({
   onReady,
   onOpenReleaseCredits,
   overlaysEnabled = true,
+  menuButtonRef: menuButtonRefProp,
   hideJovieBranding = false,
 }: ProfileDesktopSurfaceProps) {
   const [isHydrated, setIsHydrated] = useState(false);
@@ -402,6 +416,24 @@ export function ProfileDesktopSurface({
     hasPlayableDestinations: mergedDSPs.length > 0,
     catalogLoadFailed,
   });
+  // Overlays are compact popovers anchored to whichever control opened them
+  // (Menu, Pay row); they fall back to the Menu button.
+  const ownMenuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const menuButtonRef = menuButtonRefProp ?? ownMenuButtonRef;
+  const lastTriggerRef = useRef<HTMLElement | null>(null);
+  const anchorRef = useMemo<React.RefObject<HTMLElement | null>>(
+    () => ({
+      get current() {
+        const trigger = lastTriggerRef.current;
+        return trigger?.isConnected ? trigger : menuButtonRef.current;
+      },
+    }),
+    [menuButtonRef]
+  );
+  const openDrawerFrom = (trigger: HTMLElement, view: DrawerView) => {
+    lastTriggerRef.current = trigger;
+    onDrawerViewChange(view);
+  };
   const shareContext = useMemo(
     () =>
       buildProfileShareContext({
@@ -609,6 +641,7 @@ export function ProfileDesktopSurface({
           data-testid='profile-desktop-secondary-grid'
         >
           <DesktopSurfaceCard
+            flat
             title='Selected work'
             actionLabel={
               musicSurface.kind === 'catalog' ? 'View all' : undefined
@@ -662,6 +695,7 @@ export function ProfileDesktopSurface({
 
           {hasEventsDestination ? (
             <DesktopSurfaceCard
+              flat
               title='Events'
               actionLabel='View Events'
               onAction={() => onModeSelect('tour')}
@@ -716,88 +750,80 @@ export function ProfileDesktopSurface({
         )}
         data-testid='profile-desktop-side-rail'
       >
-        <DesktopSurfaceCard
-          title='Get updates'
-          testId='profile-desktop-alerts-card'
-          className={showUpdatesSideRailCard ? undefined : 'hidden'}
+        <div
+          className={cn(
+            'min-w-0 divide-y divide-white/8',
+            showUpdatesSideRailCard ? undefined : 'hidden'
+          )}
+          data-testid='profile-desktop-alerts-card'
         >
-          <div className='space-y-4'>
+          <button
+            type='button'
+            onClick={() => onModeSelect('subscribe')}
+            data-testid={
+              isSubscribed
+                ? 'profile-desktop-manage-updates'
+                : 'profile-desktop-get-updates'
+            }
+            className='group flex min-h-14 w-full items-center justify-between gap-4 rounded-xl px-1 py-3 text-left transition-colors duration-subtle hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+          >
+            <span className='min-w-0'>
+              <span className='block truncate text-mid font-semibold tracking-[-0.015em] text-white dark:text-white'>
+                {isSubscribed ? 'Updates on' : 'Get updates'}
+              </span>
+              <span className='block truncate text-xs leading-5 text-white/48'>
+                {isSubscribed
+                  ? 'Manage what you hear about.'
+                  : 'New music, shows, and merch.'}
+              </span>
+            </span>
+            <ChevronRight
+              className='size-4 shrink-0 text-white/40 transition-colors duration-subtle group-hover:text-white/70'
+              aria-hidden='true'
+            />
+          </button>
+
+          {showArtistEmailRow ? (
+            <div className='flex items-center justify-between gap-4 px-1 py-3'>
+              <div className='min-w-0'>
+                <p className='text-sm font-medium tracking-[-0.015em] text-white/84'>
+                  Artist Emails
+                </p>
+                <p className='text-xs leading-5 text-white/48'>
+                  Occasional emails from {artist.name}.
+                </p>
+              </div>
+              <Switch
+                checked={isSubscribed}
+                onCheckedChange={() => onModeSelect('subscribe')}
+                aria-label='Artist Emails'
+                className='data-[state=checked]:bg-white/36 data-[state=unchecked]:bg-white/14'
+              />
+            </div>
+          ) : null}
+        </div>
+        {hasTip ? (
+          <div data-testid='profile-desktop-payments-card'>
             <button
               type='button'
-              onClick={() => onModeSelect('subscribe')}
-              data-testid={
-                isSubscribed
-                  ? 'profile-desktop-manage-updates'
-                  : 'profile-desktop-get-updates'
-              }
-              className='flex min-h-15 w-full items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.035] px-4 text-left transition-colors duration-subtle hover:bg-white/[0.055]'
+              onClick={event => openDrawerFrom(event.currentTarget, 'pay')}
+              data-testid='profile-desktop-open-payments'
+              className='group flex min-h-14 w-full items-center justify-between gap-4 rounded-xl px-1 py-3 text-left transition-colors duration-subtle hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
             >
               <span className='min-w-0'>
                 <span className='block truncate text-mid font-semibold tracking-[-0.015em] text-white dark:text-white'>
-                  {isSubscribed ? 'Updates on' : 'Get updates'}
+                  Pay {artist.name}
                 </span>
                 <span className='block truncate text-xs leading-5 text-white/48'>
-                  {isSubscribed
-                    ? 'Manage what you hear about.'
-                    : 'New music, shows, and merch.'}
+                  Send support directly.
                 </span>
               </span>
-              <span className='inline-flex h-8 shrink-0 items-center rounded-full bg-white dark:bg-white px-3 text-xs font-semibold text-black dark:text-black'>
-                {isSubscribed ? 'Manage' : 'Get updates'}
-              </span>
+              <ChevronRight
+                className='size-4 shrink-0 text-white/40 transition-colors duration-subtle group-hover:text-white/70'
+                aria-hidden='true'
+              />
             </button>
-
-            {showArtistEmailRow ? (
-              <>
-                <div className='h-px bg-white/8' />
-                <div className='space-y-3'>
-                  <div className='space-y-1'>
-                    <p className='text-app font-semibold tracking-tight text-white/44'>
-                      Sent by {artist.name}
-                    </p>
-                    <p className='text-sm leading-5 text-white/58'>
-                      Share your email with {artist.name} for occasional artist
-                      emails.
-                    </p>
-                  </div>
-                  <div className='flex items-center justify-between gap-4'>
-                    <div className='flex items-center gap-3'>
-                      <Mail className='size-4 text-white/62' />
-                      <span className='text-sm font-medium tracking-[-0.015em] text-white/84'>
-                        Artist Emails
-                      </span>
-                    </div>
-                    <Switch
-                      checked={isSubscribed}
-                      onCheckedChange={() => onModeSelect('subscribe')}
-                      aria-label='Artist Emails'
-                      className='data-[state=checked]:bg-white/36 data-[state=unchecked]:bg-white/14'
-                    />
-                  </div>
-                </div>
-              </>
-            ) : null}
           </div>
-        </DesktopSurfaceCard>
-        {hasTip ? (
-          <DesktopSurfaceCard
-            title='Payments'
-            testId='profile-desktop-payments-card'
-          >
-            <div className='space-y-4'>
-              <p className='text-sm leading-5 text-white/48'>
-                Pay {artist.name} directly.
-              </p>
-              <button
-                type='button'
-                onClick={() => onDrawerViewChange('pay')}
-                data-testid='profile-desktop-open-payments'
-                className='inline-flex h-8 items-center rounded-full bg-white px-3 text-xs font-semibold text-black dark:bg-white dark:text-black'
-              >
-                Open payments
-              </button>
-            </div>
-          </DesktopSurfaceCard>
         ) : null}
       </div>
     </div>
@@ -840,7 +866,7 @@ export function ProfileDesktopSurface({
         >
           <button
             type='button'
-            onClick={() => onDrawerViewChange('pay')}
+            onClick={event => openDrawerFrom(event.currentTarget, 'pay')}
             className='inline-flex h-12 items-center rounded-full border border-white/12 px-4 text-sm font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
           >
             Pay {artist.name}
@@ -987,8 +1013,9 @@ export function ProfileDesktopSurface({
       </DesktopSurfaceCard>
     ) : activePrimaryTab === 'about' ? (
       <DesktopSurfaceCard
+        flat
         title='About'
-        className='flex-1'
+        className='max-w-2xl'
         testId='profile-primary-tab-about'
       >
         <AboutSection
@@ -1021,16 +1048,6 @@ export function ProfileDesktopSurface({
           data-testid='profile-desktop-top-chrome'
         >
           <div className='flex min-w-0 items-center gap-2'>
-            {onOpenReleaseCredits ? (
-              <button
-                type='button'
-                data-testid='profile-release-credits'
-                onClick={onOpenReleaseCredits}
-                className='inline-flex min-h-11 items-center rounded-full border border-white/16 bg-white px-4 text-sm font-semibold text-black dark:bg-white dark:text-black'
-              >
-                Release credits
-              </button>
-            ) : null}
             {onBack ? (
               /* D9kdx "Back + nav": the back slot stays reserved so the
                  pill nav never shifts between modes (the mode-history
@@ -1089,7 +1106,17 @@ export function ProfileDesktopSurface({
 
           <button
             type='button'
-            onClick={onOpenMenu}
+            ref={menuButtonRef}
+            onClick={() => {
+              if (drawerOpen) {
+                onDrawerOpenChange(false);
+                return;
+              }
+              lastTriggerRef.current = menuButtonRef.current;
+              onOpenMenu();
+            }}
+            aria-haspopup='menu'
+            aria-expanded={drawerOpen && overlaysEnabled}
             className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-black/28 text-white dark:text-white backdrop-blur-xl transition-colors duration-subtle hover:bg-black/44'
             aria-label='Menu'
           >
@@ -1167,6 +1194,7 @@ export function ProfileDesktopSurface({
           releases={visibleReleases}
           onOpenReleaseCredits={onOpenReleaseCredits}
           presentation={presentation}
+          anchorRef={anchorRef}
         />
       </div>
     </div>

@@ -86,6 +86,8 @@ interface ProfileUnifiedDrawerProps {
   readonly hasReleases: boolean;
   readonly releases?: readonly PublicRelease[];
   readonly presentation?: ProfileSurfacePresentation;
+  /** Desktop: anchor a compact popover to this element instead of a sheet. */
+  readonly anchorRef?: React.RefObject<HTMLElement | null>;
   readonly onOpenReleaseCredits?: () => void;
 }
 
@@ -242,6 +244,7 @@ export function ProfileUnifiedDrawer({
   releases = [],
   onOpenReleaseCredits,
   presentation = 'standalone',
+  anchorRef,
 }: ProfileUnifiedDrawerProps) {
   const visibleReleases = useMemo(
     () => releases.filter(r => Boolean(r.slug)),
@@ -371,6 +374,7 @@ export function ProfileUnifiedDrawer({
       floating={isDirectShare}
       dataTestId='profile-menu-drawer'
       presentation={presentation}
+      anchorRef={anchorRef}
       centerTitle={renderedView === 'pay'}
     >
       <AnimatePresence mode='wait' initial={false}>

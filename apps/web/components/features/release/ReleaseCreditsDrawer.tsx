@@ -10,6 +10,7 @@ interface ReleaseCreditsDrawerProps {
   readonly onOpenChange: (open: boolean) => void;
   readonly credits?: SmartLinkCreditGroup[];
   readonly presentation?: ProfileSurfacePresentation;
+  readonly anchorRef?: React.RefObject<HTMLElement | null>;
 }
 
 function toSentenceCase(str: string): string {
@@ -21,6 +22,7 @@ export function ReleaseCreditsDrawer({
   onOpenChange,
   credits,
   presentation,
+  anchorRef,
 }: ReleaseCreditsDrawerProps) {
   const visibleCredits =
     credits?.filter(group => group.entries.length > 0) ?? [];
@@ -33,6 +35,8 @@ export function ReleaseCreditsDrawer({
       onOpenChange={onOpenChange}
       title='Credits'
       presentation={presentation}
+      anchorRef={anchorRef}
+      navigationLevel={anchorRef ? 'direct' : undefined}
     >
       <div className='space-y-5'>
         {visibleCredits.map(group => (
