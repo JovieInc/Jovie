@@ -1095,7 +1095,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:notify-failure
-    jobCount: 10
+    jobCount: 9
   - name: PR Conflict Handler
     path: .github/workflows/pr-conflict-handler.yml
     active: false
