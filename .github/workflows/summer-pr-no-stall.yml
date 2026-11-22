@@ -113,7 +113,7 @@ jobs:
       # Old-PR rule (Tim 2026-11-22, JOV-INV-011 v5): one last repair try at 7 days, close at 10.
       - name: Generate Jovie Bot token for the old-PR rule
         id: age-token
-        if: github.event_name == 'push' || github.event.inputs.apply != 'false'
+        if: ${{ !cancelled() && (github.event_name == 'push' || github.event.inputs.apply != 'false') }}
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
@@ -122,7 +122,7 @@ jobs:
       # github-token-budget: 0 calls/run - the old-PR rule uses the Jovie Bot token: 2 list pages,
       # then at most 3 calls per last try (5) and 1 per close (15)
       - name: Apply the old-PR rule (bounded)
-        if: github.event_name == 'push' || github.event.inputs.apply != 'false'
+        if: ${{ !cancelled() && (github.event_name == 'push' || github.event.inputs.apply != 'false') }}
         env:
           GH_TOKEN: ${{ steps.age-token.outputs.token }}
           GH_REPO: ${{ github.repository }}

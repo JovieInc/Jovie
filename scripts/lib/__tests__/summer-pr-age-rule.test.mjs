@@ -175,6 +175,7 @@ describe('Linear back to Backlog', () => {
 });
 
 describe('old-PR rule apply', () => {
+  /** @param {(args: string[]) => boolean} [fail] */
   function fakeGh(fail = () => false) {
     const calls = [];
     const run = (_bin, args) => {

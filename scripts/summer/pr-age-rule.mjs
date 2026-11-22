@@ -37,6 +37,7 @@ export function producerOf(branch) {
   return ref.includes('/') ? ref.split('/', 1)[0].toLowerCase() : '(none)';
 }
 
+/** @param {string} [path] */
 export function readPolicy(path = POLICY_PATH) {
   return JSON.parse(readFileSync(path, 'utf8'));
 }
@@ -94,7 +95,10 @@ export function closeComment(pr, rule, linearNote) {
   ].join('\n\n');
 }
 
-function gh(args, run = spawnSync) {
+/** @typedef {(bin: string, args: string[], options?: object) => {status: number | null, stdout?: string, stderr?: string}} RunCommand */
+
+/** @param {string[]} args @param {RunCommand} [run] */
+function gh(args, run = /** @type {RunCommand} */ (spawnSync)) {
   const done = run('gh', args, {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -106,7 +110,8 @@ function gh(args, run = spawnSync) {
   };
 }
 
-export function listOpenPrs(repo, run = spawnSync) {
+/** @param {string} repo @param {RunCommand} [run] */
+export function listOpenPrs(repo, run = /** @type {RunCommand} */ (spawnSync)) {
   const listed = gh(
     [
       'api',
@@ -125,7 +130,10 @@ export function listOpenPrs(repo, run = spawnSync) {
     .map(line => JSON.parse(line));
 }
 
-/** Move the PR's Linear issue to Backlog unless it is already done or canceled. */
+/**
+ * Move the PR's Linear issue to Backlog unless it is already done or canceled.
+ * @param {{identifier: string, apiKey?: string, fetchImpl?: typeof fetch}} input
+ */
 export async function moveIssueToBacklog({
   identifier,
   apiKey,
@@ -162,9 +170,19 @@ export async function moveIssueToBacklog({
     : { ok: false, action: 'backlog-update-failed' };
 }
 
+/**
+ * @param {{tries: any[], closes: any[]}} plan
+ * @param {{repo: string, rule: any, apiKey?: string, run?: RunCommand, fetchImpl?: typeof fetch}} options
+ */
 export async function applyAgeRule(
   plan,
-  { repo, rule, apiKey, run = spawnSync, fetchImpl = fetch }
+  {
+    repo,
+    rule,
+    apiKey,
+    run = /** @type {RunCommand} */ (spawnSync),
+    fetchImpl = fetch,
+  }
 ) {
   const out = { tried: [], closed: [], failed: [] };
   for (const pr of plan.tries) {
