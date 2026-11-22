@@ -1,6 +1,6 @@
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# capability-gap: soft-skips without WORKERS_AI_TOKEN or when live relay probe fails safely; inject ASSISTANTS_CHAT_TTFT_SAMPLES_MS for harness-only CI.
+# capability-gap: soft-skips without WORKERS_AI_TOKEN or when live relay probe fails safely; inject ASSISTANTS_CHAT_TTFT_SAMPLES_MS for harness-only CI. Live path sets reasoning_effort=none + max_tokens headroom so DeepSeek default high-reasoning cannot starve content (ASS-94).
 # removal-trigger: Remove when Assistants lane owns scheduled live TTFT for the test account.
 name: Chat first-token sample
 on:

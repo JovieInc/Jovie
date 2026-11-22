@@ -17,3 +17,6 @@ export const NEUTRAL_BRAND_FALLBACK_HEX = '6b7280';
 
 /** Bare hex (no leading #) used for on-brand white icon contrast checks. */
 export const ON_BRAND_WHITE_HEX = 'ffffff';
+
+/** Bandsintown is an integration, not a selectable link platform. */
+export const BANDSINTOWN_BRAND_COLOR = '00B4B3';

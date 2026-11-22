@@ -4252,7 +4252,7 @@
       "source": "apps/web/app/api/ovie/inbox/route.ts",
       "kind": "handler",
       "route": "/api/ovie/inbox",
-      "methods": ["GET"],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },

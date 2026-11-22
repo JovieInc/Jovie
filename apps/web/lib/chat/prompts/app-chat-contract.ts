@@ -22,16 +22,32 @@ export function checkAppChatPromptContract(prompt: string) {
       'never "here are some tips"',
       'never a "let me know" closer'
     ),
+    forbidsPermissionToPlanCloser: includesAll(
+      'Commit the next move in this turn',
+      'Never close with permission-to-plan',
+      'say the word'
+    ),
     forbidsInventedAccountStats: includesAll(
       'Never invent account stats',
       'streams, followers, popularity, saves, playlist adds',
       'say you cannot see it',
       'Never invent the missing figure'
     ),
+    forbidsInventedAccountFacts: includesAll(
+      'Never invent Spotify algorithm',
+      'Do not claim Jovie creates or hosts a DSP pre-save',
+      'Never invent CPC',
+      'Never invent studio lore'
+    ),
     requiresDraftHoldOutbound: includesAll(
       'Draft every outbound artifact',
       "Hold for the artist's one-tap yes",
       'Never send, post, schedule, pitch live, or spend money'
+    ),
+    requiresDraftClearAskNow: includesAll(
+      'When the artist clearly asks for a draft',
+      'draft it now from visible catalog facts',
+      'Do not grill for a positioning line'
     ),
     keepsGroundingToPromptOrTools: includesAll(
       'must come from this prompt or from a tool result in this turn',
@@ -41,7 +57,7 @@ export function checkAppChatPromptContract(prompt: string) {
       'first content sentence',
       'name that release and the days left',
       'Never invent lead-time rules',
-      'pre-save can go up today'
+      'a release or pre-save link can go on the Jovie profile today'
     ),
     requiresDatedMoveOrToolCall: includesAll(
       'clarifying question is allowed only when a required tool field is truly missing',

@@ -122,6 +122,45 @@ describe('hard checks', () => {
     expect(scoreCase(lapsed.id, checks, null).passed).toBe(false);
   });
 
+  it('hard-fails inventing-account-facts on ASS-90 live algorithm invent', () => {
+    if (!songOutFriday) throw new Error('missing case');
+    const checks = runHardChecks(songOutFriday, {
+      text: "Night Swim is out Friday. Point Instagram at the pre-save because that pushes Spotify's algorithm.",
+      toolCalls: [],
+    });
+    expect(checks.find(c => c.id === 'inventing_account_facts')?.ok).toBe(
+      false
+    );
+    expect(scoreCase(songOutFriday.id, checks, null).passed).toBe(false);
+  });
+
+  it('hard-fails ASS-91 permission-to-plan and draft-intake shapes', () => {
+    const whatsNext = HELPFULNESS_CASES.find(
+      c => c.id === 'whats-next-release'
+    );
+    const outreach = HELPFULNESS_CASES.find(
+      c => c.id === 'specialist-outreach'
+    );
+    if (!whatsNext || !outreach) throw new Error('missing ASS-91 cases');
+    const planChecks = runHardChecks(whatsNext, {
+      text: "Night Swim is out Friday, five days out. Let me build the five-day launch plan. Say the word and I'll start.",
+      toolCalls: [],
+    });
+    expect(planChecks.find(c => c.id === 'planning_menu_not_a_move')?.ok).toBe(
+      false
+    );
+    expect(scoreCase(whatsNext.id, planChecks, null).passed).toBe(false);
+
+    const intakeChecks = runHardChecks(outreach, {
+      text: 'Checklist is missing a few facts and I take them one at a time. First: why does Night Swim exist? Confirm that or send your own version.',
+      toolCalls: [],
+    });
+    expect(intakeChecks.find(c => c.id === 'question_not_a_move')?.ok).toBe(
+      false
+    );
+    expect(scoreCase(outreach.id, intakeChecks, null).passed).toBe(false);
+  });
+
   it('hard-fails question-not-a-move (one-rec) on clarifying closers', () => {
     if (!songOutFriday) throw new Error('missing case');
     for (const id of ['greeting', 'followup-do-it', 'collab'] as const) {

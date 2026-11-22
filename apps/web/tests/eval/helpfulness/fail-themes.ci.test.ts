@@ -12,6 +12,7 @@ import calibration from './calibration.json';
 import {
   checkFailThemePromptContract,
   inventsPopularityOrStreams,
+  inventsUnsupportedAccountFacts,
   namesUpcomingFirst,
   runFailThemeChecks,
   upcomingTitleFromFacts,
@@ -101,6 +102,14 @@ describe('fail themes: question-not-a-move', () => {
     }
   });
 
+  it('fails the ASS-91 specialist-outreach intake grill', () => {
+    const text =
+      'I can draft the curator pitch today, but the checklist is missing a few facts and I take them one at a time. First: why does Night Swim exist, in 1 or 2 sentences? Confirm that or send your own version.';
+    expect(
+      runFailThemeChecks(text).find(c => c.id === 'question-not-a-move')?.ok
+    ).toBe(false);
+  });
+
   it('passes a dated move that does not end on a pick-menu question', () => {
     const text =
       'Night Swim is out Friday. Draft the curator pitch today and hold it for your one-tap yes before send.';
@@ -125,6 +134,47 @@ describe('fail themes: inventing-stats', () => {
     expect(inventsPopularityOrStreams(text)).toBe(false);
     expect(
       runFailThemeChecks(text).find(c => c.id === 'inventing-stats')?.ok
+    ).toBe(true);
+  });
+});
+
+describe('fail themes: inventing-account-facts (ASS-90 live truthful=0)', () => {
+  it.each([
+    [
+      'song-out-friday',
+      'Pre-save goes live on your Jovie profile link today. Post Night Swim out Friday.',
+    ],
+    [
+      'more-listeners',
+      "Point Instagram at Night Swim today, because pre-saves stacked before release day are what push Spotify's algorithm to test the track.",
+    ],
+    [
+      'greeting',
+      "get the Night Swim pre-save live on your Jovie profile today, because every early save builds day-one momentum with Spotify's algorithms.",
+    ],
+    [
+      'lapsed-flopped',
+      'The problem is four months of silence since it came out, and Signal Fires never got a real push. Story: five songs in a freezing Leeds practice room.',
+    ],
+    [
+      'ad-copy-presave-budget',
+      '$35 on Meta, where pre-save clicks run cheapest. $15 on TikTok.',
+    ],
+  ] as const)('fails the %s live invent shape', (_id, text) => {
+    expect(inventsUnsupportedAccountFacts(text)).toBe(true);
+    expect(
+      runFailThemeChecks(text).find(c => c.id === 'inventing-account-facts')?.ok
+    ).toBe(false);
+  });
+
+  it('passes grounded link-on-profile advice without algorithm or lore claims', () => {
+    const text =
+      'Night Swim is out Friday, in 2 days. Put the pre-save at the top of jov.ie/lunawaves today and swap your Instagram bio to it.';
+    expect(inventsUnsupportedAccountFacts(text)).toBe(false);
+    expect(
+      runFailThemeChecks(text, {
+        upcoming: { upcomingTitle: 'Night Swim' },
+      }).every(c => c.ok)
     ).toBe(true);
   });
 });
@@ -185,6 +235,9 @@ describe('fail themes: prompt contract (main + ASS-16 compatible)', () => {
         'end with exactly one next step',
         'exactly one next move plus the reason',
         'clarifying question is allowed only',
+        'never close with permission-to-plan',
+        'commit the next move in this turn',
+        'do not grill for a positioning line',
       ],
     ],
     [
@@ -194,6 +247,15 @@ describe('fail themes: prompt contract (main + ASS-16 compatible)', () => {
         'never invent the missing figure',
         'never mention a popularity score',
         'popularity',
+      ],
+    ],
+    [
+      'inventingAccountFacts',
+      [
+        'never invent spotify algorithm',
+        'do not claim jovie creates or hosts a dsp pre-save',
+        'never invent cpc',
+        'never invent studio lore',
       ],
     ],
   ] as const)('fails when %s coverage is stripped', (fact, needles) => {

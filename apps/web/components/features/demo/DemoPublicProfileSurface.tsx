@@ -4,12 +4,19 @@ import { INTERNAL_DJ_DEMO_PERSONA } from '@/lib/demo-personas';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import { DemoClientProviders } from './DemoClientProviders';
 
+/** Extracted accent for the demo artist avatar, as authored [r, g, b]. */
+const DEMO_PUBLIC_ACCENT_RGB = [207, 130, 76] as const;
+
+function rgbToHex(rgb: readonly number[]) {
+  return `#${rgb.map(channel => channel.toString(16).padStart(2, '0')).join('')}`;
+}
+
 const DEMO_PUBLIC_PROFILE = buildDemoProfile();
 const DEMO_PUBLIC_THEME = {
   ...DEMO_PUBLIC_PROFILE.theme,
   profileAccent: {
     version: 1 as const,
-    primaryHex: '#cf824c',
+    primaryHex: rgbToHex(DEMO_PUBLIC_ACCENT_RGB),
     sourceUrl:
       DEMO_PUBLIC_PROFILE.avatarUrl ??
       INTERNAL_DJ_DEMO_PERSONA.profile.avatarSrc ??
