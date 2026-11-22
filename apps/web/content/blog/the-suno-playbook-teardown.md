@@ -30,4 +30,4 @@ If nobody responds, change one thing before making more music: who you share it 
 
 Check whether your specific track has commercial permission. [Suno's distribution guide](https://help.suno.com/en/articles/2410177) warns against assuming a later subscription licenses a track made on the free plan. [Suno also distinguishes commercial use from copyright protection](https://help.suno.com/en/articles/9601665). Check the rights to any lyrics or samples you used and your distributor's rules.
 
-Skip paid services promising guaranteed streams or playlist placements. [Spotify says those offers violate its rules](https://support.spotify.com/us/artists/article/third-party-services-that-guarantee-streams/). The point of the test is to find out whether real listeners want more, not to make a dashboard number move.
+Avoid services that sell plays or charge to get your song onto a playlist. [Spotify explains why it prohibits those offers](https://artists.spotify.com/artificial-streaming). The point of the test is to find out whether real listeners want more, not to make a dashboard number move.

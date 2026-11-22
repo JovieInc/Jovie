@@ -31,7 +31,7 @@ describe('blog post: the-suno-playbook-teardown', () => {
     expect(content).toContain('](https://help.suno.com/en/articles/2410177)');
     expect(content).toContain('](https://help.suno.com/en/articles/9601665)');
     expect(content).toContain(
-      '](https://support.spotify.com/us/artists/article/third-party-services-that-guarantee-streams/)'
+      '](https://artists.spotify.com/artificial-streaming)'
     );
   });
 });
