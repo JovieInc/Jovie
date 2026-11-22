@@ -63,20 +63,21 @@ async function main(): Promise<number> {
     },
   });
 
-  if (!values.observe && !values.observation) {
+  const observationPath = values.observation;
+  if (!values.observe && observationPath === undefined) {
     process.stderr.write('Provide --observe or --observation <file>\n');
     return 64;
   }
 
-  const origin = canonicalizeOrigin(values.origin!);
-  const path = assertSameOriginProfilePath(values.path!);
+  const origin = canonicalizeOrigin(values.origin ?? ALLOWED_ORIGIN);
+  const path = assertSameOriginProfilePath(values.path ?? '/tim');
   const artifactDir =
     values['artifact-dir'] ??
     join(process.cwd(), '.cache', 'public-profile-dogfood-artifacts');
 
   const observation = values.observe
     ? await observePublicProfile({ origin, path, artifactDir })
-    : parseObservation(JSON.parse(readFileSync(values.observation!, 'utf8')));
+    : parseObservation(JSON.parse(readFileSync(observationPath, 'utf8')));
 
   if (values['write-observation']) {
     writeFileSync(
