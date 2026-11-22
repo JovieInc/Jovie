@@ -496,8 +496,8 @@ nodes:
     triggeringStateTransition:
       - repository_dispatch
       - workflow_dispatch
-    terminalReceipt: job:notify
-    jobCount: 3
+    terminalReceipt: job:report-outcome
+    jobCount: 4
   - name: Eve Pilot
     path: .github/workflows/eve-pilot.yml
     active: true
@@ -969,8 +969,8 @@ nodes:
     triggeringStateTransition:
       - repository_dispatch
       - workflow_dispatch
-    terminalReceipt: job:notify
-    jobCount: 4
+    terminalReceipt: job:report-outcome
+    jobCount: 5
   - name: Node Runtime Compatibility
     path: .github/workflows/node-runtime-compatibility.yml
     active: true
@@ -981,8 +981,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:promotion-readiness
-    jobCount: 3
+    terminalReceipt: job:report-outcome
+    jobCount: 4
   - name: Node Runtime Freshness
     path: .github/workflows/node-runtime-freshness.yml
     active: true
@@ -1453,8 +1453,8 @@ nodes:
     triggeringStateTransition:
       - push
       - workflow_dispatch
-    terminalReceipt: job:certify
-    jobCount: 3
+    terminalReceipt: job:report-outcome
+    jobCount: 4
   - name: Security Advisory Loop (Summer owned)
     path: .github/workflows/security-advisory-loop.yml
     active: true
@@ -1684,8 +1684,8 @@ nodes:
     triggeringStateTransition:
       - repository_dispatch
       - workflow_dispatch
-    terminalReceipt: job:audit
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: Test Flakiness Report
     path: .github/workflows/test-flakiness-report.yml
     active: true
@@ -1781,7 +1781,7 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:report-scheduled-failure
-    jobCount: 8
+    jobCount: 9
   - name: VOC Mine
     path: .github/workflows/voc-mine.yml
     active: true
@@ -1804,8 +1804,8 @@ nodes:
     triggeringStateTransition:
       - repository_dispatch
       - workflow_dispatch
-    terminalReceipt: job:remeasure
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: Wins Ledger
     path: .github/workflows/wins-ledger.yml
     active: true
