@@ -33,6 +33,79 @@ export const ACCEPTED_SCHEMA = 'pen-accepted/v1';
 export const GOLDEN_PATH_MANIFEST = 'docs/pen-stills/golden-path/manifest.json';
 // The repo is close to its size budget; one frame should be well under this.
 export const MAX_ACCEPTED_BYTES = 3 * 1024 * 1024;
+
+const BIOME_LINE_WIDTH = 80;
+
+/**
+ * Serialise `value` the way biome formats JSON with this repo's settings
+ * (2-space indent, lineWidth 80, `expand: "auto"`) so a written file already
+ * passes `biome check`. Non-empty objects are always expanded; arrays stay on
+ * one line when they fit (trailing comma included), else one element per line.
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function formatBiomeJson(value) {
+  return `${biomeFormat(value, 0, 0, 0)}\n`;
+}
+
+/** Flat form of an array subtree, or null when it contains a non-empty object. */
+function flatForm(v) {
+  if (Array.isArray(v)) {
+    const parts = v.map(flatForm);
+    return parts.includes(null) ? null : `[${parts.join(', ')}]`;
+  }
+  if (v && typeof v === 'object')
+    return Object.keys(v).length === 0 ? '{}' : null;
+  return JSON.stringify(v);
+}
+
+/** @param {unknown} v @param {number} depth @param {number} col columns already used on this line @param {number} tail columns after the value (comma) */
+function biomeFormat(v, depth, col, tail) {
+  const pad = '  '.repeat(depth + 1);
+  const close = '  '.repeat(depth);
+  if (Array.isArray(v)) {
+    const flat = flatForm(v);
+    if (flat !== null && col + flat.length + tail <= BIOME_LINE_WIDTH)
+      return flat;
+    if (v.length > 1 && v.every(n => typeof n === 'number')) {
+      // biome fills arrays of numbers: as many per line as fit.
+      const lines = [];
+      let line = pad;
+      v.forEach((n, i) => {
+        const piece = `${JSON.stringify(n)}${i < v.length - 1 ? ',' : ''}`;
+        if (line === pad) line += piece;
+        else if (line.length + 1 + piece.length <= BIOME_LINE_WIDTH)
+          line += ` ${piece}`;
+        else {
+          lines.push(line);
+          line = pad + piece;
+        }
+      });
+      lines.push(line);
+      return `[\n${lines.join('\n')}\n${close}]`;
+    }
+    const items = v.map((item, i) => {
+      const t = i < v.length - 1 ? 1 : 0;
+      return pad + biomeFormat(item, depth + 1, pad.length, t);
+    });
+    return `[\n${items.join(',\n')}\n${close}]`;
+  }
+  if (v && typeof v === 'object') {
+    const keys = Object.keys(v);
+    if (keys.length === 0) return '{}';
+    const props = keys.map((k, i) => {
+      const prefix = `${JSON.stringify(k)}: `;
+      const t = i < keys.length - 1 ? 1 : 0;
+      return (
+        pad +
+        prefix +
+        biomeFormat(v[k], depth + 1, pad.length + prefix.length, t)
+      );
+    });
+    return `{\n${props.join(',\n')}\n${close}}`;
+  }
+  return JSON.stringify(v);
+}
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 function walk(node, visit) {
@@ -212,7 +285,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     source: values.source,
     canonical: JSON.parse(readFileSync(values.canonical, 'utf8')),
   });
-  const body = `${JSON.stringify(record)}\n`;
+  const body = formatBiomeJson(record);
   if (Buffer.byteLength(body) > MAX_ACCEPTED_BYTES)
     throw new Error(
       `accepted ${values.frame} is ${Buffer.byteLength(body)} bytes, over ${MAX_ACCEPTED_BYTES}`
