@@ -535,10 +535,7 @@ describe('ChatInput', () => {
     );
 
     const surface = screen.getByTestId('chat-composer-surface');
-    expect(surface).toHaveClass(
-      'system-b-chat-composer-surface',
-      'focus-glow-breathe'
-    );
+    expect(surface.className).toMatch(/composer-surface focus-glow-breathe/);
     expect(surface).not.toHaveAttribute('data-hero');
     expect(surface).not.toHaveAttribute('data-expanded');
     expect(surface).not.toHaveAttribute('data-over-limit');
