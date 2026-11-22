@@ -155,8 +155,7 @@ export interface BottomTabBarProps {
   readonly activeTab: ProfilePrimaryTab;
 
   /**
-   * Retained for API compatibility. Events stays visible so Wave 1 can own
-   * empty-vs-no-surface copy without compact hiding the destination.
+   * When false, Events is omitted from the compact nav (JOV-14241).
    */
   readonly hasTourDates: boolean;
 
@@ -197,7 +196,7 @@ export interface BottomTabBarProps {
  */
 export function BottomTabBar({
   activeTab,
-  hasTourDates: _hasTourDates,
+  hasTourDates,
   showAlerts: _showAlerts = true,
   isMenuOpen = false,
   onTabSelect,
@@ -205,7 +204,9 @@ export function BottomTabBar({
   className,
   aboveNav,
 }: BottomTabBarProps) {
-  const visibleTabs = getPermittedPublicProfileNavigation();
+  const visibleTabs = getPermittedPublicProfileNavigation().filter(
+    tab => tab.id !== 'tour' || hasTourDates
+  );
   const columnCount = visibleTabs.length;
   const reducedMotion = useReducedMotion();
   const navRef = useRef<HTMLElement>(null);
