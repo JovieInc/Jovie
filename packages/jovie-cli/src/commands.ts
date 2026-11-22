@@ -23,6 +23,7 @@ import {
   shareProfile,
   startUpgrade,
 } from './golden-path.js';
+import { publishView } from './views-client.js';
 
 export interface CommandInput {
   readonly arg?: string;
@@ -376,6 +377,30 @@ export const COMMANDS: readonly CommandSpec[] = [
     flags: DRAFT_FLAGS,
     readOnly: true,
     run: (input, options) => startUpgrade(draftRef(input.flags ?? {}), options),
+  },
+  {
+    path: ['view', 'publish'],
+    tool: 'publish_view',
+    summary:
+      'Publish a jovie.view.v1 JSON spec (stat, sparkline, table, text and sandboxed html blocks) and print the share link that opens it in the dashboard. Needs JOVIE_OVIE_TOKEN in the environment. Pass --id to publish a new version of an existing view.',
+    flags: [
+      { name: 'file', description: 'Path to a JSON spec file (CLI only)' },
+      { name: 'spec', description: 'The JSON spec inline' },
+      { name: 'id', description: 'Existing view id to publish a new version' },
+    ],
+    readOnly: false,
+    run: async (input, options) => {
+      const published = await publishView(
+        {
+          file: input.flags?.file,
+          spec: input.flags?.spec,
+          id: input.flags?.id,
+          channel: input.meta?.channel ?? 'cli',
+        },
+        options
+      );
+      return input.json ? published : published.url;
+    },
   },
   {
     path: ['report', 'feedback'],
