@@ -1,0 +1,315 @@
+{
+  "schema": "jovie.outcome-coverage/v1",
+  "checkedBy": "node scripts/outcome-coverage.mjs --check",
+  "rule": "Every chat tool and every core-surface mutation belongs to one action here. An action proves itself with an outcome check: a test that performs it as a test account and asserts the real result exists (a row, an API read-back, the public profile). Asserting on reply wording, visuals or a mocked tool does not count. An action with no check sits in gaps, which can only shrink: a new action, or a tool added to a gap action, needs its check in the same PR.",
+  "issue": "JOV-14474",
+  "runs": {
+    "pr": "PR CI",
+    "merge": "merge queue or dispatch",
+    "nightly": "daily, local build on a Neon branch",
+    "prod-postdeploy": "production, after every deploy and 12-hourly (postdeploy-probes.yml)"
+  },
+  "actions": [
+    {
+      "id": "signup",
+      "label": "Sign up with an email code",
+      "core": true,
+      "entryPoints": ["apps/web/app/auth/start/route.ts#POST"],
+      "chatTools": [],
+      "checks": [
+        {
+          "file": "apps/web/tests/e2e/golden-path.spec.ts",
+          "test": "completes one identity from provider recovery through revoked return",
+          "runs": "nightly"
+        },
+        {
+          "file": "apps/web/tests/e2e/smoke-prod-auth.spec.ts",
+          "test": "new user signs up with an email code",
+          "runs": "prod-postdeploy"
+        }
+      ]
+    },
+    {
+      "id": "password-reset",
+      "label": "Reset a password",
+      "core": false,
+      "entryPoints": ["apps/web/app/api/auth/reset/route.ts#POST"],
+      "chatTools": [],
+      "checks": [],
+      "gap": "Recovery path: no outcome check."
+    },
+    {
+      "id": "onboarding",
+      "label": "Finish onboarding with a claimed handle",
+      "core": true,
+      "entryPoints": ["apps/web/app/api/onboarding/claim/route.ts#POST"],
+      "chatTools": [],
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/onboarding-completion.test.ts",
+          "test": "creates a claimed public profile, sets activeProfileId, and records ownership",
+          "runs": "merge"
+        },
+        {
+          "file": "apps/web/tests/e2e/golden-path.spec.ts",
+          "test": "completes one identity from provider recovery through revoked return",
+          "runs": "nightly"
+        }
+      ],
+      "note": "Production only checks that a first reply appears, not that a handle is claimed."
+    },
+    {
+      "id": "claim-checkout",
+      "label": "Pay and become Pro",
+      "core": true,
+      "entryPoints": ["apps/web/app/api/stripe/webhooks/route.ts#POST"],
+      "chatTools": [],
+      "checks": [
+        {
+          "file": "apps/web/tests/e2e/canary-claim-checkout.spec.ts",
+          "test": "reset → claim → test-mode payment → activation → reset",
+          "runs": "prod-postdeploy"
+        }
+      ]
+    },
+    {
+      "id": "billing-portal",
+      "label": "Open the billing portal",
+      "core": true,
+      "entryPoints": ["apps/web/app/api/stripe/portal/route.ts#POST"],
+      "chatTools": [],
+      "checks": [
+        {
+          "file": "apps/web/tests/e2e/golden-path.spec.ts",
+          "test": "completes one identity from provider recovery through revoked return",
+          "runs": "nightly"
+        }
+      ]
+    },
+    {
+      "id": "profile-edit",
+      "label": "Edit profile basics in the dashboard",
+      "core": true,
+      "entryPoints": [
+        "apps/web/app/api/dashboard/profile/route.ts#PUT",
+        "apps/web/app/app/(shell)/dashboard/actions/creator-profile.ts#updateCreatorProfile",
+        "apps/web/app/app/(shell)/dashboard/actions/creator-profile.ts#publishProfileBasics"
+      ],
+      "chatTools": [],
+      "checks": [
+        {
+          "file": "apps/web/tests/e2e/smoke-prod-auth.spec.ts",
+          "test": "profile-edit-save-readback",
+          "runs": "prod-postdeploy"
+        }
+      ],
+      "note": "Bio only: display name and avatar are unchecked."
+    },
+    {
+      "id": "profile-switch",
+      "label": "Switch the active profile",
+      "core": false,
+      "entryPoints": [
+        "apps/web/app/api/dashboard/profile/switch/route.ts#POST",
+        "apps/web/app/app/(shell)/dashboard/actions/switch-profile.ts#switchActiveProfile"
+      ],
+      "chatTools": [],
+      "checks": [],
+      "gap": "Multi-profile owners only."
+    },
+    {
+      "id": "links",
+      "label": "Add or remove profile links in the dashboard",
+      "core": true,
+      "entryPoints": [
+        "apps/web/app/api/dashboard/social-links/route.ts#POST",
+        "apps/web/app/api/dashboard/social-links/route.ts#PUT",
+        "apps/web/app/api/dashboard/social-links/route.ts#PATCH",
+        "apps/web/app/api/dashboard/social-links/route.ts#DELETE",
+        "apps/web/app/app/(shell)/dashboard/actions/social-links.ts#getProfileSocialLinks"
+      ],
+      "chatTools": [],
+      "checks": [
+        {
+          "file": "apps/web/tests/e2e/smoke-prod-auth.spec.ts",
+          "test": "profile-links-save-readback",
+          "runs": "prod-postdeploy"
+        }
+      ],
+      "note": "Reads the stored link back through the API; the public render of links is not asserted."
+    },
+    {
+      "id": "release-create",
+      "label": "Create a release and its smart link",
+      "core": true,
+      "entryPoints": [
+        "apps/web/app/app/(shell)/dashboard/releases/actions.ts#createRelease"
+      ],
+      "chatTools": [],
+      "checks": [],
+      "gap": "Slice 2: create a release as a test account, follow its smart link, delete it."
+    },
+    {
+      "id": "account-email",
+      "label": "Change the account email",
+      "core": false,
+      "entryPoints": ["apps/web/app/api/account/email/route.ts#POST"],
+      "chatTools": [],
+      "checks": [],
+      "gap": "No outcome check."
+    },
+    {
+      "id": "notification-preferences",
+      "label": "Change notification preferences",
+      "core": false,
+      "entryPoints": [
+        "apps/web/app/api/notifications/preferences/route.ts#PATCH"
+      ],
+      "chatTools": [],
+      "checks": [],
+      "gap": "No outcome check."
+    },
+    {
+      "id": "account-delete",
+      "label": "Delete or export the account",
+      "core": true,
+      "entryPoints": ["apps/web/app/api/account/delete/route.ts#POST"],
+      "chatTools": [],
+      "checks": [],
+      "gap": "Unit tests only. Needs a throwaway test account per run."
+    },
+    {
+      "id": "fan-capture",
+      "label": "A fan subscribes on the public profile",
+      "core": true,
+      "entryPoints": ["apps/web/app/api/audience/opt-in/route.ts#POST"],
+      "chatTools": [],
+      "checks": [
+        {
+          "file": "apps/web/tests/e2e/profile-fan-capture-golden-path.spec.ts",
+          "test": "mobile: SMS subscribe persists notification row",
+          "runs": "nightly"
+        }
+      ],
+      "note": "Runs only in the daily full matrix; nothing checks it on production."
+    },
+    {
+      "id": "chat-merch",
+      "label": "Chat: make merch",
+      "core": true,
+      "entryPoints": [],
+      "chatTools": [
+        "findMerchSources",
+        "createMerch",
+        "previewMerchOptions",
+        "selectMerchDesign",
+        "createMerchAlternativeItem"
+      ],
+      "checks": [],
+      "gap": "Only the passive daily chat judge (lib/eval/turn-outcome.ts). Needs a test-account run that asserts three designs exist."
+    },
+    {
+      "id": "chat-merch-manage",
+      "label": "Chat: publish, edit, pause or remove merch",
+      "core": true,
+      "entryPoints": [],
+      "chatTools": [
+        "updateMerchCard",
+        "publishMerchCard",
+        "pauseMerchCard",
+        "unpauseMerchCard",
+        "deleteOrArchiveMerchCard",
+        "reorderMerchCards",
+        "optimizeMerchCards"
+      ],
+      "checks": [],
+      "gap": "Unit tests only."
+    },
+    {
+      "id": "chat-profile-edit",
+      "label": "Chat: write a bio or edit the profile",
+      "core": true,
+      "entryPoints": [],
+      "chatTools": [
+        "proposeProfileEdit",
+        "writeWorldClassBio",
+        "importBioFromUrl",
+        "inspectPressSource",
+        "proposeAvatarUpload"
+      ],
+      "checks": [],
+      "gap": "Unit tests only."
+    },
+    {
+      "id": "chat-links",
+      "label": "Chat: add or remove a link",
+      "core": true,
+      "entryPoints": [],
+      "chatTools": ["proposeSocialLink", "proposeSocialLinkRemoval"],
+      "checks": [],
+      "gap": "Schema tests only."
+    },
+    {
+      "id": "chat-release",
+      "label": "Chat: set up a release or pitch it",
+      "core": true,
+      "entryPoints": [],
+      "chatTools": ["createRelease", "generateReleasePitch"],
+      "checks": [],
+      "gap": "Schema tests only; the pitch spec asserts a reply appears."
+    },
+    {
+      "id": "chat-task",
+      "label": "Chat: create a task",
+      "core": true,
+      "entryPoints": [],
+      "chatTools": ["manageTasks"],
+      "checks": [],
+      "gap": "Unit test with createTask mocked."
+    },
+    {
+      "id": "chat-creative",
+      "label": "Chat: album art, retouch, promo and canvas",
+      "core": true,
+      "entryPoints": [],
+      "chatTools": [
+        "generateAlbumArt",
+        "retouchImage",
+        "voicePromo",
+        "formatLyrics",
+        "checkCanvasStatus",
+        "markCanvasUploaded",
+        "proposeVideoRecording"
+      ],
+      "checks": [],
+      "gap": "Schema tests only."
+    },
+    {
+      "id": "chat-account",
+      "label": "Chat: account status, usage and billing portal",
+      "core": false,
+      "entryPoints": [],
+      "chatTools": ["showAccountStatus", "showUsage", "openBillingPortal"],
+      "checks": [],
+      "gap": "Unit tests only."
+    },
+    {
+      "id": "chat-insights",
+      "label": "Chat: insights, sales and payouts",
+      "core": false,
+      "entryPoints": [],
+      "chatTools": ["showTopInsights", "showMerchSales", "showArtistPayouts"],
+      "checks": [],
+      "gap": "Read-only; schema tests only."
+    },
+    {
+      "id": "chat-feedback",
+      "label": "Chat: feedback, skills and capability requests",
+      "core": false,
+      "entryPoints": [],
+      "chatTools": ["submitFeedback", "requestCapability", "useSkill"],
+      "checks": [],
+      "gap": "Unit tests only."
+    }
+  ]
+}
