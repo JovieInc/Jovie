@@ -70,7 +70,7 @@ describe('canonical Link primitive migrations (JOV-3574)', () => {
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
     expect(link).toHaveAttribute('rel', expect.stringContaining('noreferrer'));
-    expect(link).toHaveClass('text-white/70');
+    expect(link).toHaveClass('text-on-media/70');
   });
 
   it('FooterLink light tone keeps its token palette', () => {

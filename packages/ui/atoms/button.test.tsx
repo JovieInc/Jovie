@@ -14,10 +14,7 @@ import {
 
 function readButtonSources(): string {
   const root = process.cwd();
-  return [
-    readFileSync(path.join(root, 'atoms/button.tsx'), 'utf8'),
-    readFileSync(path.join(root, 'atoms/button-styles.ts'), 'utf8'),
-  ].join('\n');
+  return readFileSync(path.join(root, 'atoms/button.tsx'), 'utf8');
 }
 
 describe('Button', () => {
