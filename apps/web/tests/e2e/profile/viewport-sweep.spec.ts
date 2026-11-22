@@ -35,8 +35,8 @@ import {
 } from '../../product-screenshots/route-dom-certification-support';
 import { getOverflowingElements } from '../utils/mobile-overflow';
 import { installPublicRouteMocks } from '../utils/public-surface-helpers';
+import { auditCoverAccentLine } from '../utils/viewport-sweep-accent-audit';
 import {
-  auditCoverAccentLine,
   auditViewport,
   settleViewport,
   type ViewportSweepViolation,
@@ -93,7 +93,11 @@ async function shot(
   });
 }
 
-function format(label: string, violations: readonly ViewportSweepViolation[]) {
+type SweepFinding = Pick<ViewportSweepViolation, 'detail'> & {
+  readonly code: string;
+};
+
+function format(label: string, violations: readonly SweepFinding[]) {
   return violations.length === 0
     ? ''
     : `${label}\n${violations.map(v => `  [${v.code}] ${v.detail}`).join('\n')}`;
@@ -103,7 +107,7 @@ function format(label: string, violations: readonly ViewportSweepViolation[]) {
 function createCollector() {
   const failures: string[] = [];
   return {
-    add(label: string, violations: readonly ViewportSweepViolation[]) {
+    add(label: string, violations: readonly SweepFinding[]) {
       const text = format(label, violations);
       if (text) failures.push(text);
     },
