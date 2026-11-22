@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HomeCanvasState } from '@/components/jovie/types';
 import { APP_ROUTES } from '@/constants/routes';
@@ -297,50 +297,12 @@ describe('OvieHomeCanvas Story First flat', () => {
     expect(screen.queryByTestId('home-loop-answer')).toBeNull();
   });
 
-  it('renders the latest turn in place and restores earlier canvas states', async () => {
-    const chat = chatState();
-    renderThenAsk(chat);
+  it('never renders chat turns on Home, so a reply never floats under the board', async () => {
+    renderThenAsk(chatState({ isStreaming: true }));
     await screen.findByTestId('story-first-canvas');
-
-    const answer = screen.getByTestId('home-loop-answer');
-    // Story First melt keeps the answer editorial (no card chrome).
-    expect(answer).toHaveAttribute('data-surface', 'flat');
-    expect(answer).toHaveTextContent('Shipping?');
-    expect(answer).toHaveTextContent('2 of 2');
-    expect(answer).toHaveTextContent('Shipping Now');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Previous Answer' }));
-    expect(screen.getByTestId('home-loop-answer')).toHaveTextContent(
-      'MRR is up.'
-    );
-    expect(screen.getByTestId('home-loop-answer')).toHaveTextContent(
-      'Monthly Revenue'
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open Conversation' }));
-    expect(chat.onOpenTranscript).toHaveBeenCalledOnce();
-
-    fireEvent.click(screen.getByTestId('home-loop-answer-home'));
     expect(screen.queryByTestId('home-loop-answer')).toBeNull();
-  });
-
-  it('reserves the answer slot while a reply streams', async () => {
-    renderThenAsk(
-      chatState({
-        isStreaming: true,
-        messages: [
-          {
-            id: 'u1',
-            role: 'user',
-            parts: [{ type: 'text', text: 'Status?' }],
-          },
-        ],
-      })
-    );
-    expect(await screen.findByTestId('home-loop-answer')).toHaveAttribute(
-      'data-state',
-      'pending'
-    );
+    expect(screen.queryByTestId('story-first-answer')).toBeNull();
+    expect(screen.queryByText('2 of 2')).toBeNull();
   });
 
   it('does not invent a company metric wall when sources are empty', async () => {
