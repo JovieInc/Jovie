@@ -116,6 +116,8 @@ function toLinkInput(link: StoredLink, sortOrder: number) {
   };
 }
 
+const MARKER_PREFIX = 'https://example.com/jovie-prodcert-';
+
 /**
  * Add a link, read the stored row back, remove it, and read back that it is
  * gone. PUT replaces the profile's non-ingested links, so the canary's own
@@ -130,10 +132,14 @@ export async function saveLinkAndReadBack(options: {
 }): Promise<string> {
   const { request, origin, tag } = options;
   const { id: profileId } = await readOwnedProfile(request, origin);
+  // A marker left by a run whose restore failed is dropped here, so the next
+  // run heals the canary instead of keeping it as one of its own links.
   const own = (await readLinks(request, origin, profileId)).filter(
-    link => (link.sourceType ?? 'manual') !== 'ingested'
+    link =>
+      (link.sourceType ?? 'manual') !== 'ingested' &&
+      !link.url.startsWith(MARKER_PREFIX)
   );
-  const marker = `https://example.com/jovie-prodcert-${tag}`;
+  const marker = `${MARKER_PREFIX}${tag}`;
   const put = (links: ReturnType<typeof toLinkInput>[]) =>
     request.put(`${origin}/api/dashboard/social-links`, {
       data: { profileId, links },
@@ -163,7 +169,11 @@ export async function saveLinkAndReadBack(options: {
       'Removed link must be gone'
     ).toBe(false);
     expect(
-      after.filter(link => (link.sourceType ?? 'manual') !== 'ingested').length,
+      after.filter(
+        link =>
+          (link.sourceType ?? 'manual') !== 'ingested' &&
+          !link.url.startsWith(MARKER_PREFIX)
+      ).length,
       "The canary's own links must be back"
     ).toBe(own.length);
     return marker;
