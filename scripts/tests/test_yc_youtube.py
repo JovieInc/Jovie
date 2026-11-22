@@ -77,6 +77,24 @@ class CatalogTest(unittest.TestCase):
         self.assertNotIn("secret-key", json.dumps(state))
 
 
+    def test_without_a_key_the_public_playlist_page_lists_the_newest_uploads(self):
+        data = {"contents": {"twoColumnBrowseResultsRenderer": {"tabs": [{"tabRenderer": {"content": {"items": [
+            {"playlistVideoRenderer": {"videoId": "n1", "title": {"runs": [{"text": "Lightcone: "}, {"text": "AI agents"}]}}},
+            {"playlistVideoRenderer": {"videoId": "n2", "title": {"simpleText": "Startup School: launch"}}},
+            {"playlistVideoRenderer": {"videoId": "n1", "title": {"simpleText": "dupe"}}}]}}}]}}}
+        page = f"<script>var ytInitialData = {json.dumps(data)};</script>"
+        url = f"https://www.youtube.com/playlist?list={yt.UPLOADS_PLAYLIST}"
+        previous = {"videos": [{"id": "old", "title": "Older upload"}], "fetchedAt": 0}
+        videos, state = yt.refresh_catalog(previous, Fetch({url: page}), yt.CATALOG_TTL_S + 1, None,
+                                           lambda *_: True, {})
+        self.assertEqual([(video["id"], video["title"]) for video in videos],
+                         [("old", "Older upload"), ("n1", "Lightcone: AI agents"), ("n2", "Startup School: launch")])
+        self.assertEqual(state["status"], "keyless-newest-100")
+        denied = Fetch({})
+        _, state = yt.refresh_catalog({}, denied, 1.0, None, lambda *_: False, {})
+        self.assertEqual((state["status"], denied.calls), ("needs-key: playlist page robots-denied", []))
+
+
 class CaptionTest(unittest.TestCase):
     source = yt.feed_entry("abc123", "YC talk", "Y Combinator", None, None, "", ["startup-operations"])
 

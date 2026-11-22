@@ -1156,6 +1156,8 @@ INSTALL_LAG_ALERT_S = 90 * 60
 # or backing off the cause is a defect, not a wait, so it is critical and owned (2026-10-26 to 10-29:
 # Gem sat three days on one release while `install-lag` stayed a degraded alert nobody acted on).
 INSTALL_LAG_P0_S = 2 * 3600
+# The YC corpus refresh is daily; three days without a finished run is a broken loop (JOV-14457).
+YC_CORPUS_STALE_S = 3 * 24 * 3600
 
 
 def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
@@ -1164,6 +1166,14 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     tick = obs.get("tick") or {}
     if tick.get("error"):
         alerts["tick-error"] = f"last dispatch tick failed: {tick['error'][:140]}"
+    yc, yc_last = tick.get("ycCorpus") or {}, (tick.get("ycCorpus") or {}).get("lastRun") or {}
+    yc_broken = [failure for failure in yc_last.get("failures") or []  # page fetch misses retry next run
+                 if failure.startswith(("discovery:", "spawn:")) or "gbrain" in failure]
+    yc_age = age_s(yc_last.get("at"), obs["now"]) if yc.get("status") in {"current", "scheduled"} else None
+    if tick.get("ycCorpusError") or yc_broken or (yc_age or 0) > YC_CORPUS_STALE_S:
+        alerts["yc-corpus-refresh"] = ("YC knowledge refresh into GBrain is failing: " +
+                                       (tick.get("ycCorpusError") or "; ".join(yc_broken) or
+                                        f"last run {int(yc_age // 3600)}h ago"))[:200]
     if tick.get("uncleanPreviousRun"):
         # A run-intent marker survived its own tick: that tick was killed (crash, SIGKILL,
         # power loss). Its bounded recovery already refunded stranded fix-attempt charges.
@@ -1553,6 +1563,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "delivery-stalled": "investigate-repair-and-verify-native-delivery",
         "remediation-delivery": "repair-and-read-back-existing-event-delivery",
         "install-lag-refused": "repair-updater-refusal-and-install-current-main",
+        "yc-corpus-refresh": "repair-yc-corpus-refresh-and-verify-gbrain-read-back",
     }
     resources = {
         "linear-down": ["linear", "pool"],
@@ -1563,6 +1574,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "no-landing": ["shipping-throughput"],
         "delivery-stalled": ["local-useful-execution", "native-merge", "deployed-verification"],
         "bottleneck:merge-queue": ["merge-queue", "lane-slots"],
+        "yc-corpus-refresh": ["yc-corpus", "gbrain"],
     }
     for key, evidence in alerts.items():
         old = prior.get(key) or {}

@@ -362,7 +362,9 @@ def refresh(state_path: Path, limit: int = DEFAULT_LIMIT, fetch=fetch_url, put=g
     canonical = state.setdefault("canonical", {})
     failures: list[str] = []
     changed = unchanged = skipped = 0
-    videos, state["youtubeCatalog"] = yc_youtube.refresh_catalog(state.get("youtubeCatalog", {}), fetch, now, youtube_key)
+    robots: dict = {}
+    videos, state["youtubeCatalog"] = yc_youtube.refresh_catalog(state.get("youtubeCatalog", {}), fetch, now,
+                                                                  youtube_key, allowed, robots)
     try:
         candidates = discover(fetch, failures, videos)
     except Exception as error:
@@ -378,7 +380,6 @@ def refresh(state_path: Path, limit: int = DEFAULT_LIMIT, fetch=fetch_url, put=g
     captions_left, captions_denied = yc_youtube.CAPTION_BUDGET, False
     candidates.sort(key=lambda item: (item["url"] not in stale, documents.get(item["url"], {}).get("checkedAt", ""),
                                       item["priority"], item["url"]))
-    robots: dict = {}
     for candidate in candidates[:max(1, yc_transcript.effective_limit(limit, len(stale | unseen)))]:
         url = candidate["url"]
         previous = documents.get(url, {})

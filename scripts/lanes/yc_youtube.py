@@ -61,13 +61,59 @@ def feed_entry(video_id: str, title: str, author: str, published: str | None, up
             "relatedUrls": [], "tags": tags}
 
 
-def refresh_catalog(previous: dict, fetch, now: float, key: str | None = None) -> tuple[list[dict], dict]:
-    """Every public upload, re-listed at most weekly. A failure keeps the last good list visible."""
+def playlist_page_videos(document: str) -> list[dict]:
+    """Uploads listed on the public playlist page (about the newest 100), from its ytInitialData."""
+    start = document.find("ytInitialData")
+    start = document.find("{", start) if start >= 0 else -1
+    try:
+        data = json.JSONDecoder().raw_decode(document[start:])[0] if start >= 0 else {}
+    except ValueError:
+        return []
+    found, stack = {}, [data]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, list):
+            stack.extend(reversed(node))
+        elif isinstance(node, dict):
+            row = node.get("playlistVideoRenderer")
+            if isinstance(row, dict) and row.get("videoId"):
+                title = row.get("title") or {}
+                text = title.get("simpleText") or "".join(run.get("text", "") for run in title.get("runs") or [])
+                found.setdefault(row["videoId"], {"id": row["videoId"], "title": text, "publishedAt": None, "description": ""})
+            else:
+                stack.extend(reversed(list(node.values())))
+    return list(found.values())
+
+
+def keyless_catalog(previous: dict, fetch, now: float, allowed, robots: dict) -> tuple[list[dict], dict]:
+    url = f"https://www.youtube.com/playlist?list={UPLOADS_PLAYLIST}"
+    try:
+        if not allowed(url, robots, fetch):
+            return previous.get("videos", []), {**previous, "status": "needs-key: playlist page robots-denied", "checkedAt": now}
+        page = fetch(url, {"Accept-Language": "en-US,en;q=0.9"})
+        listed = playlist_page_videos(page["body"]) if page["status"] == 200 else []
+    except Exception as error:
+        return previous.get("videos", []), {**previous, "status": f"failed: {type(error).__name__}", "checkedAt": now}
+    if not listed:
+        return previous.get("videos", []), {**previous, "status": "needs-key: playlist page listed nothing", "checkedAt": now}
+    merged = {video["id"]: video for video in [*previous.get("videos", []), *listed]}
+    return list(merged.values()), {"status": "keyless-newest-100", "fetchedAt": now, "checkedAt": now,
+                                   "count": len(merged), "videos": list(merged.values())}
+
+
+def refresh_catalog(previous: dict, fetch, now: float, key: str | None = None, allowed=None,
+                    robots: dict | None = None) -> tuple[list[dict], dict]:
+    """Every public upload, re-listed at most weekly. A failure keeps the last good list visible.
+
+    Without a Data API key, the public playlist page gives the newest ~100 uploads; older ones
+    load only through YouTube's internal browse API, which robots.txt closes to crawlers."""
     videos = previous.get("videos", [])
     if videos and now - float(previous.get("fetchedAt", 0)) < CATALOG_TTL_S:
         return videos, previous
     if not key:
-        return videos, {**previous, "status": "needs-key", "checkedAt": now}
+        if allowed is None:
+            return videos, {**previous, "status": "needs-key", "checkedAt": now}
+        return keyless_catalog(previous, fetch, now, allowed, robots if robots is not None else {})
     listed, token = [], ""
     try:
         for _ in range(MAX_PAGES):
