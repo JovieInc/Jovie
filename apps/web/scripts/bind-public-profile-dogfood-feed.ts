@@ -3,27 +3,23 @@
  * JOV-7200 / VER-5 — bind public-profile dogfood feed to a served deploy.
  *
  * Default is dry-run (no DB writes). Apply requires DATABASE_URL (Doppler
- * jovie-web/prd — same as scripts/db/prod-read.mjs). No HTTP bind route;
- * uses existing CAS helpers against ovie_operating_kv.
+ * jovie-web/prd) under NODE_OPTIONS=--conditions=react-server (see package.json
+ * dogfood:bind-public-profile). Never via postdeploy-probes.yml. Never ingest
+ * the synthetic public-profile fixture capability receipt.
  *
- * Dry-run observe:
- *   pnpm --filter=@jovie/web exec tsx scripts/bind-public-profile-dogfood-feed.ts \
- *     --origin https://jov.ie --observe --path /tim
- *
- * Apply via .github/workflows/dogfood-feed-bind.yml (workflow_dispatch on main)
- * or an authorized runner with Doppler jovie-web/prd DATABASE_URL. Never via
- * postdeploy-probes.yml (production observer; no mutation). Never ingest the
- * synthetic public-profile fixture capability receipt.
- *
- *   doppler run --project jovie-web --config prd --only-secrets=DATABASE_URL --no-fallback -- \
- *     pnpm --filter=@jovie/web exec tsx scripts/bind-public-profile-dogfood-feed.ts \
- *       --origin https://jov.ie --observe --path /tim --apply
+ * This HTTP probe is agent_on_behalf / cli / regression / scripted. It does
+ * not certify capability; checks stay unverified and goalCompletion is
+ * not_completed until a real browser mission runs.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import {
+  type DogfoodReceipt,
   dogfoodReceiptFromOutcomeMission,
   dogfoodReceiptProvesOutcome,
+  validateDogfoodReceipt,
 } from '@/lib/agent-os/dogfood-receipt';
 import { getCanonicalSurface } from '@/lib/canonical-surfaces';
 import {
@@ -37,19 +33,34 @@ import {
 import { PUBLIC_PROFILE_DOGFOOD_SUBJECT_ID } from '@/lib/ovie/certifications/public-profile-dogfood-fixture';
 
 const COMMIT_SHA = /^[0-9a-f]{40}$/i;
+const ALLOWED_ORIGIN = 'https://jov.ie';
+const PROFILE_PATH = /^\/[A-Za-z0-9._~-]+$/;
+const FIXTURE_ARTIFACT_REFS = new Set([
+  'artifact:public-profile/identity-readback',
+  'artifact:public-profile/listen-destination',
+  'artifact:public-profile/nearby-consent',
+  'artifact:public-profile/scripted-click-trace',
+]);
 
-type CriterionStatus = 'passed' | 'failed' | 'blocked' | 'skipped';
+export type CriterionStatus = 'passed' | 'failed' | 'unverified';
+export type GoalCompletion = 'completed' | 'partial' | 'not_completed';
 
-interface ObservationFile {
+export interface ObservationFile {
   readonly observedAtStarted: string;
   readonly observedAtCompleted: string;
   readonly origin: string;
   readonly path: string;
   readonly httpStatus: number;
+  readonly htmlSha256: string;
+  readonly htmlBytes: number;
+  readonly artifactRefs: {
+    readonly profileHtml: string;
+    readonly buildInfo: string;
+  };
   readonly buildInfo: {
     readonly commitSha: string;
     readonly deploymentId: string;
-    readonly environment?: string;
+    readonly environment: string;
   };
   readonly criterionAssessment: ReadonlyArray<{
     readonly criterion: string;
@@ -57,21 +68,82 @@ interface ObservationFile {
     readonly evidenceRefs: readonly string[];
     readonly notes?: string;
   }>;
-  readonly goalCompletion: 'completed' | 'partial' | 'failed' | 'abandoned';
+  readonly goalCompletion: GoalCompletion;
   readonly correctness: 'correct' | 'incorrect' | 'unverified';
   readonly method: 'goal_driven' | 'scripted';
   readonly purpose: 'capability' | 'regression';
+  readonly probe: {
+    readonly kind: 'agent_on_behalf';
+    readonly driver: 'cli';
+    readonly executed: readonly string[];
+    readonly unexecuted: readonly string[];
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function parseObservation(raw: unknown): ObservationFile {
+export function canonicalizeOrigin(raw: string): string {
+  const trimmed = raw.trim().replace(/\/+$/, '');
+  if (trimmed !== ALLOWED_ORIGIN) {
+    throw new Error(
+      `origin must canonicalize to ${ALLOWED_ORIGIN}; got ${JSON.stringify(raw)}`
+    );
+  }
+  return ALLOWED_ORIGIN;
+}
+
+export function assertSameOriginProfilePath(path: string): string {
+  const value = path.trim();
+  if (
+    value.startsWith('http://') ||
+    value.startsWith('https://') ||
+    value.startsWith('//') ||
+    value.includes('://')
+  ) {
+    throw new Error(
+      `path must be a same-origin relative profile path; got ${JSON.stringify(path)}`
+    );
+  }
+  if (!PROFILE_PATH.test(value)) {
+    throw new Error(
+      `path must match ${PROFILE_PATH}; got ${JSON.stringify(path)}`
+    );
+  }
+  return value;
+}
+
+export function requireProductionEnvironment(
+  environment: unknown
+): asserts environment is string {
+  if (environment !== 'production') {
+    throw new Error(
+      `refusing non-production or absent environment label: ${JSON.stringify(environment)}`
+    );
+  }
+}
+
+function isoTimestamp(value: unknown, field: string): string {
+  if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) {
+    throw new Error(`${field} must be an ISO timestamp`);
+  }
+  return value;
+}
+
+export function parseObservation(raw: unknown): ObservationFile {
   if (!isRecord(raw)) throw new Error('observation must be an object');
   if (!isRecord(raw.buildInfo)) throw new Error('observation.buildInfo required');
+  if (!isRecord(raw.artifactRefs)) {
+    throw new Error('observation.artifactRefs required');
+  }
+  if (!isRecord(raw.probe)) throw new Error('observation.probe required');
+
+  const origin = canonicalizeOrigin(String(raw.origin ?? ''));
+  const path = assertSameOriginProfilePath(String(raw.path ?? ''));
   const commitSha = raw.buildInfo.commitSha;
   const deploymentId = raw.buildInfo.deploymentId;
+  requireProductionEnvironment(raw.buildInfo.environment);
   if (typeof commitSha !== 'string' || !COMMIT_SHA.test(commitSha)) {
     throw new Error('observation.buildInfo.commitSha must be a 40-char SHA');
   }
@@ -84,17 +156,114 @@ function parseObservation(raw: unknown): ObservationFile {
   ) {
     throw new Error('observation.criterionAssessment required');
   }
-  return raw as unknown as ObservationFile;
+  for (const item of raw.criterionAssessment) {
+    if (!isRecord(item)) throw new Error('criterionAssessment item invalid');
+    if (
+      item.status !== 'passed' &&
+      item.status !== 'failed' &&
+      item.status !== 'unverified'
+    ) {
+      throw new Error(`criterion status must be passed|failed|unverified`);
+    }
+    if (!Array.isArray(item.evidenceRefs) || item.evidenceRefs.length === 0) {
+      throw new Error('criterion evidenceRefs required');
+    }
+  }
+  if (
+    raw.goalCompletion !== 'completed' &&
+    raw.goalCompletion !== 'partial' &&
+    raw.goalCompletion !== 'not_completed'
+  ) {
+    throw new Error('goalCompletion must be completed|partial|not_completed');
+  }
+  if (
+    raw.correctness !== 'correct' &&
+    raw.correctness !== 'incorrect' &&
+    raw.correctness !== 'unverified'
+  ) {
+    throw new Error('correctness must be correct|incorrect|unverified');
+  }
+  if (raw.method !== 'scripted' && raw.method !== 'goal_driven') {
+    throw new Error('method must be scripted|goal_driven');
+  }
+  if (raw.purpose !== 'regression' && raw.purpose !== 'capability') {
+    throw new Error('purpose must be regression|capability');
+  }
+  if (typeof raw.htmlSha256 !== 'string' || raw.htmlSha256.length < 16) {
+    throw new Error('observation.htmlSha256 required');
+  }
+  if (typeof raw.htmlBytes !== 'number' || raw.htmlBytes < 0) {
+    throw new Error('observation.htmlBytes required');
+  }
+  if (
+    typeof raw.artifactRefs.profileHtml !== 'string' ||
+    typeof raw.artifactRefs.buildInfo !== 'string'
+  ) {
+    throw new Error('observation.artifactRefs paths required');
+  }
+  if (raw.probe.kind !== 'agent_on_behalf' || raw.probe.driver !== 'cli') {
+    throw new Error('HTTP probe must declare agent_on_behalf/cli');
+  }
+  if (
+    !Array.isArray(raw.probe.executed) ||
+    !Array.isArray(raw.probe.unexecuted)
+  ) {
+    throw new Error('observation.probe executed/unexecuted required');
+  }
+
+  const refs = raw.criterionAssessment.flatMap(item => {
+    const record = item as Record<string, unknown>;
+    return Array.isArray(record.evidenceRefs)
+      ? (record.evidenceRefs as string[])
+      : [];
+  });
+  if (refs.some(ref => FIXTURE_ARTIFACT_REFS.has(ref))) {
+    throw new Error('refusing_synthetic_fixture_receipt');
+  }
+
+  return {
+    observedAtStarted: isoTimestamp(raw.observedAtStarted, 'observedAtStarted'),
+    observedAtCompleted: isoTimestamp(
+      raw.observedAtCompleted,
+      'observedAtCompleted'
+    ),
+    origin,
+    path,
+    httpStatus: Number(raw.httpStatus),
+    htmlSha256: raw.htmlSha256,
+    htmlBytes: raw.htmlBytes,
+    artifactRefs: {
+      profileHtml: raw.artifactRefs.profileHtml,
+      buildInfo: raw.artifactRefs.buildInfo,
+    },
+    buildInfo: {
+      commitSha,
+      deploymentId,
+      environment: 'production',
+    },
+    criterionAssessment: raw.criterionAssessment as ObservationFile['criterionAssessment'],
+    goalCompletion: raw.goalCompletion,
+    correctness: raw.correctness,
+    method: raw.method,
+    purpose: raw.purpose,
+    probe: {
+      kind: 'agent_on_behalf',
+      driver: 'cli',
+      executed: [...raw.probe.executed].map(String),
+      unexecuted: [...raw.probe.unexecuted].map(String),
+    },
+  };
 }
 
-async function fetchBuildInfo(origin: string): Promise<{
+export async function fetchBuildInfo(origin: string): Promise<{
   readonly commitSha: string;
   readonly deploymentId: string;
-  readonly environment?: string;
+  readonly environment: string;
 }> {
-  const response = await fetch(new URL('/api/health/build-info', origin));
+  const canonical = canonicalizeOrigin(origin);
+  const response = await fetch(new URL('/api/health/build-info', canonical));
   if (!response.ok) {
-    throw new Error(`build-info HTTP ${response.status} from ${origin}`);
+    throw new Error(`build-info HTTP ${response.status} from ${canonical}`);
   }
   const body = (await response.json()) as Record<string, unknown>;
   if (typeof body.commitSha !== 'string' || !COMMIT_SHA.test(body.commitSha)) {
@@ -103,105 +272,122 @@ async function fetchBuildInfo(origin: string): Promise<{
   if (typeof body.deploymentId !== 'string' || body.deploymentId.trim() === '') {
     throw new Error('build-info.deploymentId invalid');
   }
+  requireProductionEnvironment(body.environment);
   return {
     commitSha: body.commitSha,
     deploymentId: body.deploymentId,
-    environment:
-      typeof body.environment === 'string' ? body.environment : undefined,
+    environment: 'production',
   };
 }
 
-function countMatches(html: string, pattern: RegExp): number {
-  return (html.match(pattern) ?? []).length;
+function runIdFromTimestamps(started: string, completed: string): string {
+  return createHash('sha256')
+    .update(`${started}|${completed}`)
+    .digest('hex')
+    .slice(0, 16);
 }
 
-async function observePublicProfile(input: {
+export async function observePublicProfile(input: {
   readonly origin: string;
   readonly path: string;
+  readonly artifactDir: string;
 }): Promise<ObservationFile> {
+  const origin = canonicalizeOrigin(input.origin);
+  const path = assertSameOriginProfilePath(input.path);
   const started = new Date().toISOString();
-  const buildInfo = await fetchBuildInfo(input.origin);
-  const profileUrl = new URL(input.path, input.origin);
+  const buildInfo = await fetchBuildInfo(origin);
+  const profileUrl = new URL(path, origin);
   const response = await fetch(profileUrl);
   const html = await response.text();
   const completed = new Date().toISOString();
+  const runId = runIdFromTimestamps(started, completed);
+  const htmlSha256 = createHash('sha256').update(html).digest('hex');
 
-  const identityHits = countMatches(html, /artist|profile|@|display.?name/gi);
-  const listenHits = countMatches(
-    html,
-    /spotify|listen|apple music|tidal|soundcloud|youtube/gi
+  mkdirSync(input.artifactDir, { recursive: true });
+  const profileHtmlPath = join(
+    input.artifactDir,
+    `profile-${runId}.html`
   );
-  const nearbyHits = countMatches(
-    html,
-    /nearby|notify|alert|concert|tour|notification/gi
-  );
+  const buildInfoPath = join(input.artifactDir, `build-info-${runId}.json`);
+  writeFileSync(profileHtmlPath, html);
+  writeFileSync(`${buildInfoPath}`, `${JSON.stringify(buildInfo, null, 2)}\n`);
 
-  // Nearby consent persistence requires an interactive write; anonymous HTML
-  // alone never proves it. Identity/listen can pass on markup presence only
-  // when the page actually loads.
-  const identityStatus: CriterionStatus =
-    response.ok && identityHits > 0 ? 'passed' : 'failed';
-  const listenStatus: CriterionStatus =
-    response.ok && listenHits > 0 ? 'passed' : 'failed';
-  const nearbyStatus: CriterionStatus = 'failed';
+  const profileRef = `artifact:public-profile/http-probe/${runId}/profile.html#sha256:${htmlSha256}`;
+  const buildRef = `artifact:public-profile/http-probe/${runId}/build-info.json`;
 
-  const passedCount = [identityStatus, listenStatus, nearbyStatus].filter(
-    status => status === 'passed'
+  // Word counts are diagnostic only — never enough to mark criteria passed.
+  const identityHits = (html.match(/artist|profile|@|display.?name/gi) ?? [])
+    .length;
+  const listenHits = (
+    html.match(/spotify|listen|apple music|tidal|soundcloud|youtube/gi) ?? []
   ).length;
+  const nearbyHits = (
+    html.match(/nearby|notify|alert|concert|tour|notification/gi) ?? []
+  ).length;
+
+  const criteria = getCanonicalSurface('public-profile').outcomeMission.outcome
+    .successCriteria;
+  const notes = [
+    `Anonymous GET ${profileUrl} HTTP ${response.status}; identity markup hits=${identityHits} (not a pass)`,
+    `Listen markup hits=${listenHits}; destination click not executed`,
+    `Nearby markup hits=${nearbyHits}; consent persistence not executed`,
+  ];
 
   return {
     observedAtStarted: started,
     observedAtCompleted: completed,
-    origin: input.origin,
-    path: input.path,
+    origin,
+    path,
     httpStatus: response.status,
+    htmlSha256,
+    htmlBytes: Buffer.byteLength(html),
+    artifactRefs: {
+      profileHtml: profileHtmlPath,
+      buildInfo: buildInfoPath,
+    },
     buildInfo,
-    criterionAssessment: [
-      {
-        criterion: 'Identity and latest work match the canonical artist',
-        status: identityStatus,
-        evidenceRefs: [
-          'artifact:public-profile/http-profile',
-          'artifact:public-profile/build-info',
-        ],
-        notes: `Anonymous GET ${profileUrl} identity markup hits=${identityHits}`,
-      },
-      {
-        criterion: 'A listening destination reaches the intended work',
-        status: listenStatus,
-        evidenceRefs: ['artifact:public-profile/http-profile'],
-        notes: `Listen markup hits=${listenHits}; destination click not executed`,
-      },
-      {
-        criterion:
-          'Nearby notification interest and consent persist for the intended artist',
-        status: nearbyStatus,
-        evidenceRefs: ['artifact:public-profile/http-profile'],
-        notes: `Nearby markup hits=${nearbyHits}; consent persistence not completed (truthful fail)`,
-      },
-    ],
-    goalCompletion:
-      passedCount === 3 ? 'completed' : passedCount > 0 ? 'partial' : 'failed',
+    criterionAssessment: criteria.map((criterion, index) => ({
+      criterion,
+      status: 'unverified' as const,
+      evidenceRefs: [profileRef, buildRef],
+      notes: notes[index] ?? notes[0],
+    })),
+    goalCompletion: 'not_completed',
     correctness: 'unverified',
-    method: 'goal_driven',
-    purpose: 'capability',
+    method: 'scripted',
+    purpose: 'regression',
+    probe: {
+      kind: 'agent_on_behalf',
+      driver: 'cli',
+      executed: ['http_get_build_info', 'http_get_profile_html'],
+      unexecuted: [
+        'identity_latest_work_readback',
+        'listening_destination_click',
+        'nearby_consent_persist',
+      ],
+    },
   };
 }
 
-function buildReceipt(observation: ObservationFile) {
+export function buildReceipt(observation: ObservationFile): DogfoodReceipt {
   const mission = getCanonicalSurface('public-profile').outcomeMission;
   const checks = observation.criterionAssessment.map(item => ({
     criterion: item.criterion,
     status: item.status,
     evidenceRefs: [...item.evidenceRefs],
   }));
-  const allPassed = checks.every(check => check.status === 'passed');
-  return dogfoodReceiptFromOutcomeMission(mission, {
+  const profileRef = checks[0]?.evidenceRefs[0];
+  const buildRef = checks[0]?.evidenceRefs[1];
+  if (!profileRef || !buildRef) {
+    throw new Error('observation missing run-specific evidence refs');
+  }
+
+  const receipt = dogfoodReceiptFromOutcomeMission(mission, {
     subjectId: PUBLIC_PROFILE_DOGFOOD_SUBJECT_ID,
     product: 'jov',
-    kind: 'ui_agent',
-    driver: 'playwright',
-    actor: 'verification-ver-5-live-proof',
+    kind: 'agent_on_behalf',
+    driver: 'cli',
+    actor: 'verification-ver-5-http-probe',
     environment: 'production',
     deploymentId: observation.buildInfo.deploymentId,
     commitSha: observation.buildInfo.commitSha,
@@ -213,23 +399,18 @@ function buildReceipt(observation: ObservationFile) {
       `artifact:public-profile/origin:${observation.origin}${observation.path}`,
     ],
     missionObservation: {
-      purpose: observation.purpose,
-      method: observation.method,
+      purpose: 'regression',
+      method: 'scripted',
       missionRevision: mission.outcome.revision,
-      goalCompletion: observation.goalCompletion,
-      correctness: observation.correctness,
-      resultingState: allPassed
-        ? 'Public-profile probe met every success criterion on the served deploy.'
-        : `Truthful probe on ${observation.origin}${observation.path}: ${checks
-            .filter(check => check.status !== 'passed')
-            .map(check => `${check.criterion}=${check.status}`)
-            .join('; ')}`,
+      goalCompletion: 'not_completed',
+      correctness: 'unverified',
+      resultingState: `Honest HTTP/CLI regression probe on ${observation.origin}${observation.path}: criteria remain unverified; capability certification open until browser mission evidence exists.`,
       checks,
       friction: {
-        assessment: allPassed ? 'acceptable' : 'unacceptable',
-        details: observation.criterionAssessment
-          .filter(item => item.status !== 'passed')
-          .map(item => item.notes ?? `${item.criterion}: ${item.status}`),
+        assessment: 'unacceptable',
+        details: observation.criterionAssessment.map(
+          item => item.notes ?? `${item.criterion}: ${item.status}`
+        ),
       },
       recovery: { retries: 0, details: [] },
       durationMs:
@@ -241,17 +422,57 @@ function buildReceipt(observation: ObservationFile) {
       },
     },
   });
+
+  const errors = validateDogfoodReceipt(receipt);
+  if (errors.length > 0) {
+    throw new Error(`constructed receipt invalid: ${errors.join('; ')}`);
+  }
+  return receipt;
+}
+
+export function assertExactPersistence(input: {
+  readonly ledger: Awaited<ReturnType<typeof readDogfoodReceiptLedger>>;
+  readonly subjectId: string;
+  readonly binding: DogfoodSubjectDeployBinding;
+  readonly receipt: DogfoodReceipt;
+  readonly receiptId: string;
+}): {
+  readonly bindingOk: boolean;
+  readonly receiptOk: boolean;
+} {
+  const storedBinding = input.ledger?.subjectDeploys[input.subjectId] ?? null;
+  const storedReceipt = input.ledger?.receipts[input.receiptId] ?? null;
+  const bindingOk =
+    storedBinding?.commitSha === input.binding.commitSha &&
+    storedBinding.deploymentId === input.binding.deploymentId &&
+    storedBinding.source === input.binding.source;
+  const receiptOk =
+    storedReceipt !== null &&
+    JSON.stringify(storedReceipt) === JSON.stringify(input.receipt);
+  if (!bindingOk || !receiptOk) {
+    throw new Error(
+      JSON.stringify({
+        error: 'exact_persistence_readback_failed',
+        bindingOk,
+        receiptOk,
+        storedBinding,
+        hasStoredReceipt: storedReceipt !== null,
+      })
+    );
+  }
+  return { bindingOk, receiptOk };
 }
 
 async function main(): Promise<number> {
   const { values } = parseArgs({
     options: {
-      origin: { type: 'string', default: 'https://jov.ie' },
+      origin: { type: 'string', default: ALLOWED_ORIGIN },
       observation: { type: 'string' },
       observe: { type: 'boolean', default: false },
       path: { type: 'string', default: '/tim' },
       'write-observation': { type: 'string' },
       'write-result': { type: 'string' },
+      'artifact-dir': { type: 'string' },
       apply: { type: 'boolean', default: false },
       'expected-sha': { type: 'string' },
     },
@@ -262,14 +483,15 @@ async function main(): Promise<number> {
     return 64;
   }
 
+  const origin = canonicalizeOrigin(values.origin!);
+  const path = assertSameOriginProfilePath(values.path!);
+  const artifactDir =
+    values['artifact-dir'] ??
+    join(process.cwd(), '.cache', 'public-profile-dogfood-artifacts');
+
   const observation = values.observe
-    ? await observePublicProfile({
-        origin: values.origin!,
-        path: values.path!,
-      })
-    : parseObservation(
-        JSON.parse(readFileSync(values.observation!, 'utf8'))
-      );
+    ? await observePublicProfile({ origin, path, artifactDir })
+    : parseObservation(JSON.parse(readFileSync(values.observation!, 'utf8')));
 
   if (values['write-observation']) {
     writeFileSync(
@@ -278,34 +500,8 @@ async function main(): Promise<number> {
     );
   }
 
-  // Refuse synthetic fixture capability observation shapes (placeholder
-  // artifact refs from buildPublicProfileCapabilityReceipt). Live VER-5
-  // binds only genuine observed receipts from --observe or an equivalent
-  // probe file whose evidence refs come from the live HTTP probe.
-  const fixtureArtifactRefs = new Set([
-    'artifact:public-profile/identity-readback',
-    'artifact:public-profile/listen-destination',
-    'artifact:public-profile/nearby-consent',
-    'artifact:public-profile/scripted-click-trace',
-  ]);
-  const observationRefs = observation.criterionAssessment.flatMap(
-    item => item.evidenceRefs
-  );
-  if (observationRefs.some(ref => fixtureArtifactRefs.has(ref))) {
-    process.stderr.write(
-      `${JSON.stringify(
-        {
-          error: 'refusing_synthetic_fixture_receipt',
-          hint: 'Use --observe for a genuine production probe; do not ingest buildPublicProfileCapabilityReceipt / seedPublicProfileDogfoodFixture',
-        },
-        null,
-        2
-      )}\n`
-    );
-    return 2;
-  }
-
-  const live = await fetchBuildInfo(values.origin!);
+  // Re-check served identity immediately before planning/writing.
+  const live = await fetchBuildInfo(origin);
   if (
     live.commitSha !== observation.buildInfo.commitSha ||
     live.deploymentId !== observation.buildInfo.deploymentId
@@ -323,11 +519,7 @@ async function main(): Promise<number> {
     );
     return 2;
   }
-
-  if (
-    values['expected-sha'] &&
-    live.commitSha !== values['expected-sha']
-  ) {
+  if (values['expected-sha'] && live.commitSha !== values['expected-sha']) {
     process.stderr.write(
       `${JSON.stringify(
         {
@@ -342,28 +534,13 @@ async function main(): Promise<number> {
     return 2;
   }
 
-  if (live.environment && live.environment !== 'production') {
-    process.stderr.write(
-      `${JSON.stringify(
-        {
-          error: 'refusing_non_production_alias',
-          environment: live.environment,
-          hint: 'Bind only jov.ie production for VER-5 prod acceptance; staging is separate',
-        },
-        null,
-        2
-      )}\n`
-    );
-    return 2;
-  }
-
   const binding: DogfoodSubjectDeployBinding = {
     commitSha: live.commitSha,
     deploymentId: live.deploymentId,
-    // Provenance (live vs fixture), not the Vercel env label.
     source: 'production',
   };
 
+  // Validate the complete receipt before either CAS write.
   const receipt = buildReceipt(observation);
   const mission = getCanonicalSurface('public-profile').outcomeMission;
   const proves = dogfoodReceiptProvesOutcome(receipt, {
@@ -375,14 +552,18 @@ async function main(): Promise<number> {
 
   const plan = {
     mode: values.apply ? 'apply' : 'dry-run',
-    origin: values.origin,
+    origin,
     path: observation.path,
-    note: 'source=production means live provenance (not fixture), not Vercel env',
+    note: 'source=production is live provenance; knownGoodDeploymentIds are binder IDs, not product certification',
     liveBuild: live,
     binding,
     receiptId,
     receiptOutcome: receipt.outcome,
     provesOutcome: proves,
+    observationTimestamps: {
+      startedAt: observation.observedAtStarted,
+      completedAt: observation.observedAtCompleted,
+    },
     expectedMetricEffect: {
       dogfoodFeed: {
         status: 'production',
@@ -390,11 +571,18 @@ async function main(): Promise<number> {
         subjectsWithDeploy: '≥1 including public-profile',
       },
       dogfoodKindCoverage:
-        'capability coverage rises only if provesOutcome=true; truthful fails stay 0',
+        'capability coverage stays 0 for this honest non-passing HTTP probe',
+    },
+    commissioning: {
+      feedConnected: false,
+      receiptPersisted: false,
+      productCertification: false,
     },
     readback: {
       ledgerKey: 'jovie:certification:v1:dogfood-receipts',
-      metricsUrl: `${values.origin}/api/ovie/certifications/metrics`,
+      metricsUrl: `${origin}/api/ovie/certifications/metrics`,
+      bindingOk: false,
+      receiptOk: false,
     },
   };
 
@@ -412,7 +600,27 @@ async function main(): Promise<number> {
 
   if (!process.env.DATABASE_URL) {
     process.stderr.write(
-      'DATABASE_URL missing; refuse apply. Use doppler jovie-web/prd\n'
+      'DATABASE_URL missing; refuse apply. Use doppler jovie-web/prd with NODE_OPTIONS=--conditions=react-server\n'
+    );
+    return 2;
+  }
+
+  // Final identity check immediately before either write.
+  const preWrite = await fetchBuildInfo(origin);
+  if (
+    preWrite.commitSha !== binding.commitSha ||
+    preWrite.deploymentId !== binding.deploymentId
+  ) {
+    process.stderr.write(
+      `${JSON.stringify(
+        {
+          error: 'served_identity_drift_before_write',
+          binding,
+          preWrite,
+        },
+        null,
+        2
+      )}\n`
     );
     return 2;
   }
@@ -421,6 +629,7 @@ async function main(): Promise<number> {
     '@/lib/ovie/mcp/postgres-backend'
   );
   const backend = postgresRecordBackend();
+  // Keep observation timestamps for immutable receipt key / safe replay.
   const recordedAt = new Date().toISOString();
   const bindResult = await bindDogfoodSubjectDeploy({
     backend,
@@ -434,6 +643,13 @@ async function main(): Promise<number> {
     recordedAt,
   });
   const ledger = await readDogfoodReceiptLedger(backend);
+  const exact = assertExactPersistence({
+    ledger,
+    subjectId: PUBLIC_PROFILE_DOGFOOD_SUBJECT_ID,
+    binding,
+    receipt,
+    receiptId,
+  });
   const feed = dogfoodFeedStatus(ledger);
   const result = {
     ...plan,
@@ -442,6 +658,19 @@ async function main(): Promise<number> {
     feed,
     subjectDeploy:
       ledger?.subjectDeploys[PUBLIC_PROFILE_DOGFOOD_SUBJECT_ID] ?? null,
+    knownGoodDeploymentIds: ledger?.knownGoodDeploymentIds ?? [],
+    knownGoodNote:
+      'Binder may add deployment IDs to knownGoodDeploymentIds; that is not product certification.',
+    readback: {
+      ...plan.readback,
+      bindingOk: exact.bindingOk,
+      receiptOk: exact.receiptOk,
+    },
+    commissioning: {
+      feedConnected: feed.status === 'production',
+      receiptPersisted: exact.receiptOk && feed.receiptCount >= 1,
+      productCertification: false,
+    },
   };
   const serialized = `${JSON.stringify(result, null, 2)}\n`;
   process.stdout.write(serialized);
@@ -451,11 +680,18 @@ async function main(): Promise<number> {
   return 0;
 }
 
-main()
-  .then(code => {
-    process.exitCode = code;
-  })
-  .catch(error => {
-    process.stderr.write(`${error instanceof Error ? error.message : error}\n`);
-    process.exitCode = 1;
-  });
+const isDirectRun =
+  process.argv[1]?.includes('bind-public-profile-dogfood-feed') === true;
+
+if (isDirectRun) {
+  main()
+    .then(code => {
+      process.exitCode = code;
+    })
+    .catch(error => {
+      process.stderr.write(
+        `${error instanceof Error ? error.message : error}\n`
+      );
+      process.exitCode = 1;
+    });
+}

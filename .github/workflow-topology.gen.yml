@@ -485,6 +485,17 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:garden
     jobCount: 1
+  - name: Dogfood Feed Bind
+    path: .github/workflows/dogfood-feed-bind.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:bind
+    jobCount: 1
   - name: E2E Full Browser Matrix
     path: .github/workflows/e2e-full-matrix.yml
     active: true
