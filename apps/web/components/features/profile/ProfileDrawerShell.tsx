@@ -295,9 +295,9 @@ export function ProfileDrawerShell({
             }
           }}
         >
-          <span id={titleId} className='sr-only'>
+          <h2 id={titleId} className='sr-only'>
             {title}
-          </span>
+          </h2>
           {showHeader ? (
             <div
               className='flex items-center gap-1 px-1 pb-1.5 pt-0.5'
