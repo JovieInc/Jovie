@@ -21,7 +21,6 @@ import { buildStageStrip } from '@/lib/ovie/home/flow-home';
 import { type ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 import type { LaneAgent } from '@/lib/ovie/shipping-state/contract';
 import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
-import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import { ShippingRowWork } from './ShippingRowWork';
 

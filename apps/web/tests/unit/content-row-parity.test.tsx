@@ -138,12 +138,14 @@ function renderFleet(selected: boolean) {
 }
 
 async function renderShipping(selected: boolean) {
-  const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
-    new Response(
-      JSON.stringify(projection([feedTask({ title: 'Shipping row title' })])),
-      { status: 200, headers: { 'content-type': 'application/json' } }
-    )
-  );
+  const fetchMock = vi
+    .fn<typeof fetch>()
+    .mockResolvedValue(
+      new Response(
+        JSON.stringify(projection([feedTask({ title: 'Shipping row title' })])),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    );
   vi.stubGlobal('fetch', fetchMock);
   render(
     <QueryClientProvider
@@ -156,13 +158,11 @@ async function renderShipping(selected: boolean) {
   );
   await screen.findByText('Shipping row title');
   if (selected) {
-    await userEvent
-      .setup()
-      .click(
-        screen.getByRole('button', {
-          name: 'Inspect JOV-1: Shipping row title',
-        })
-      );
+    await userEvent.setup().click(
+      screen.getByRole('button', {
+        name: 'Inspect JOV-1: Shipping row title',
+      })
+    );
   }
   return screen.getByTestId('shipping-row-JOV-1');
 }
