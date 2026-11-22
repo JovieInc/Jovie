@@ -69,6 +69,7 @@ import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import type { PublicRelease } from '../releases/types';
 import { DesktopSurfaceImage } from './DesktopSurfaceImage';
+import { listenServiceProps } from './desktop-listen-services';
 import { useOverlayAnchor } from './useOverlayAnchor';
 
 // JOV-6201: reuse the 360px track at 1180px with min-w-0 on every desktop listen branch.
@@ -868,6 +869,14 @@ export function ProfileDesktopSurface({
           </div>
         </div>
       </DesktopSurfaceCard>
+      {musicSurface.kind === 'catalog' && mergedDSPs.length > 0 ? (
+        <DesktopSurfaceCard
+          title='Listen on'
+          testId='profile-listen-desktop-services'
+        >
+          <StaticListenInterface {...listenServiceProps(artist, mergedDSPs)} />
+        </DesktopSurfaceCard>
+      ) : null}
       {hasTip ? (
         <SideRailRow
           title={`Pay ${artist.name}`}
@@ -908,15 +917,7 @@ export function ProfileDesktopSurface({
         className={PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME}
         testId='profile-primary-tab-artist-streaming'
       >
-        <StaticListenInterface
-          artist={artist}
-          handle={artist.handle}
-          dspsOverride={mergedDSPs}
-          containerClassName='max-w-none'
-          providerButtonClassName='rounded-2xl border-white/8 bg-white/[0.045] px-4 py-3.5 text-white dark:text-white hover:bg-white/[0.08]'
-          emptyStateClassName='rounded-2xl border-white/8 bg-white/[0.04] shadow-none'
-          hideHelpText
-        />
+        <StaticListenInterface {...listenServiceProps(artist, mergedDSPs)} />
       </DesktopSurfaceCard>
     );
     listenTabContent = latestVisibleRelease ? (

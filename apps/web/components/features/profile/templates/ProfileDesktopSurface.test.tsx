@@ -991,7 +991,7 @@ describe('ProfileDesktopSurface', () => {
     expect(screen.getByTestId('mock-desktop-alerts-cta')).toBeInTheDocument();
   });
 
-  it('does not render artist-generic Listen beside an imported catalog', () => {
+  it('lists streaming services in the side rail, not as an artist-generic Listen card, beside an imported catalog', () => {
     render(
       <ProfileDesktopSurface
         artist={artist}
@@ -1025,9 +1025,10 @@ describe('ProfileDesktopSurface', () => {
     expect(
       screen.queryByTestId('profile-primary-tab-artist-streaming')
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('mock-static-listen-interface')
-    ).not.toBeInTheDocument();
+    // Every provider stays a visible desktop action (A11y/axe DSP admission).
+    const services = screen.getByTestId('profile-listen-desktop-services');
+    const spotify = within(services).getByRole('button', { name: 'Spotify' });
+    expect(spotify).toBeVisible();
   });
 
   it('routes selected credits into the drawer About destination (JOV-6199)', () => {
