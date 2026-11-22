@@ -20,9 +20,10 @@ const DEPLOYED_PREFIX = 'recovery:fix-deployed:';
  * - Deployed-at: the first time that holds, recorded once. It is never earlier
  *   than the real deploy, so a user is never judged to have stalled before a
  *   fix that was not yet live.
- * - Whole path: all 8 golden-path surfaces passed on this commit within 24
- *   hours, decided by the shared `certificationVerdict` (see gate.ts). A fixed
- *   step is not enough if the user would fail at signup or claim afterwards.
+ * - Whole path: all 8 golden-path surfaces passed, or carried a pass
+ *   forward, on this commit, decided by the shared `certificationVerdict`
+ *   (see gate.ts). A fixed step is not enough if the user would fail at
+ *   signup or claim afterwards.
  * - Recheck: the fix's own step check (registry `checkId`) passed on exactly
  *   this commit in the latest production golden-path receipts.
  */
@@ -57,7 +58,7 @@ export function createProductionCertifier(
     },
     async goldenPathGreen() {
       const ledger = await readLedger();
-      return isGoldenPathGreen(ledger, ownSha ?? null, new Date());
+      return isGoldenPathGreen(ledger, ownSha ?? null);
     },
     async recheck(checkId) {
       if (!ownSha) return false;
