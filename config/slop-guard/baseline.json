@@ -2556,6 +2556,7 @@
     "apps/web/lib/ovie/cost-ledger/ledger.ts:exports": 3,
     "apps/web/lib/ovie/cost-ledger/ledger.ts:types": 3,
     "apps/web/lib/ovie/dogfood-roster.ts:exports": 3,
+    "apps/web/lib/ovie/home/canvas-turns.ts:exports": 1,
     "apps/web/lib/ovie/home/fleet-verdict.ts:types": 1,
     "apps/web/lib/ovie/home/home-ready-timing.ts:exports": 1,
     "apps/web/lib/ovie/home/shipping-home.ts:exports": 1,
