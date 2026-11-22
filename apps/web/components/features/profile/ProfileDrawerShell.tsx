@@ -281,7 +281,7 @@ export function ProfileDrawerShell({
           sideOffset={8}
           testId={dataTestId}
           aria-labelledby={titleId}
-          className='w-[min(20rem,calc(100vw-2rem))] max-w-80'
+          className='w-80 max-w-80'
           onCloseAutoFocus={event => {
             event.preventDefault();
             restoreAnchorFocus();
@@ -307,7 +307,7 @@ export function ProfileDrawerShell({
                 <button
                   type='button'
                   onClick={onBack}
-                  className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-colors duration-subtle hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+                  className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-colors duration-subtle hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
                   aria-label='Back'
                   data-testid='profile-drawer-back-button'
                 >
@@ -317,7 +317,7 @@ export function ProfileDrawerShell({
               <p
                 aria-hidden='true'
                 className={cn(
-                  'truncate text-sm font-semibold tracking-[-0.01em] text-primary-token',
+                  'truncate text-sm font-semibold tracking-tight text-primary-token',
                   !isSecondaryHeader && 'pl-2.5'
                 )}
               >
@@ -326,7 +326,7 @@ export function ProfileDrawerShell({
             </div>
           ) : null}
           <div
-            className='max-h-[min(28rem,var(--radix-popover-content-available-height))] overflow-y-auto overscroll-contain px-0.5'
+            className='max-h-112 overflow-y-auto overscroll-contain px-0.5'
             data-testid='profile-popover-body'
           >
             {children}
