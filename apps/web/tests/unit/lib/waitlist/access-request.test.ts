@@ -1,10 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Hoisted mocks: the module under test pulls in server-only DB modules at
-// import time; we replace the boundary collaborators here so the unit test
-// can exercise the orchestration logic of `submitWaitlistAccessRequest`
-// without touching a real database.
-
 const readCachedAcquisitionEligibility = vi.fn();
 const withSystemIngestionSession = vi.fn();
 const findLatestEntryByEmail = vi.fn();
@@ -15,7 +10,6 @@ const approveWaitlistEntryInTx = vi.fn();
 const finalizeWaitlistApproval = vi.fn().mockResolvedValue(undefined);
 const invalidateProxyUserStateCache = vi.fn().mockResolvedValue(undefined);
 const notifySlackWaitlist = vi.fn().mockResolvedValue(undefined);
-
 // Track tx mutations to assert against
 let userRow: { id: string; userStatus: string } | null = null;
 const insertedEntries: Array<Record<string, unknown>> = [];
@@ -29,6 +23,10 @@ vi.mock('@/lib/acquisition/eligibility.server', () => ({
     readCachedAcquisitionEligibility(...args),
 }));
 
+vi.mock('@/lib/waitlist/cohort-learnings', () => ({
+  countOpenCohortLearnings: async () => 0,
+  MAX_OPEN_COHORT_LEARNINGS: 10,
+}));
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: (...args: unknown[]) =>
     invalidateProxyUserStateCache(...args),
@@ -300,6 +298,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
         expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
         expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
         expect(finalizeWaitlistApproval).not.toHaveBeenCalled();
+        expect(notifySlackWaitlist).not.toHaveBeenCalled();
       }
     );
 
@@ -450,6 +449,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
 
       expect(result.status).toBe('waitlisted');
       expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
+      expect(notifySlackWaitlist).not.toHaveBeenCalled();
       expect(
         updatedRows.find(row => row.statusReason === 'waitlist_capacity_full')
       ).toBeTruthy();
@@ -591,7 +591,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     expect(result.status).toBe('waitlisted');
     expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
     expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
-    expect(notifySlackWaitlist).toHaveBeenCalledTimes(1);
+    expect(notifySlackWaitlist).not.toHaveBeenCalled();
   });
 
   it('qualifies an unqualified sign-up entry instead of treating it as a resubmission', async () => {
@@ -623,7 +623,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     expect(
       updatedRows.find(row => row.statusReason === 'chat_started')
     ).toMatchObject({ source: 'waitlist_form', fullName: 'Test Creator' });
-    expect(notifySlackWaitlist).toHaveBeenCalledTimes(1);
+    expect(notifySlackWaitlist).not.toHaveBeenCalled();
   });
 
   it('fails closed when the authenticated app user row is missing', async () => {
