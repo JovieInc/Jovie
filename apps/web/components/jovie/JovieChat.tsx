@@ -28,6 +28,7 @@ import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity
 import { useAppFlag } from '@/lib/flags/client';
 import { usePendingOpportunityCardsQuery, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { ChatComposerDockSlot } from './ChatComposerDockSlot';
 import { getChatEmptyStateFirstName } from './chat-empty-greeting';
 import { DESKTOP_CONTENT_GRID_ANCHOR } from './chat-empty-starters';
 import { CHAT_CONTENT_SHELL_CLASSNAME } from './chat-layout';
@@ -80,6 +81,7 @@ export function JovieChat({
   homeCanvas,
   homeCanvasMode = 'empty-state',
   ambientOwnedByShell = false,
+  composerDock,
 }: JovieChatProps) {
   // TanStack Virtual returns fresh rows from a stable `virtualizer` object. React
   // Compiler caches reads keyed on that object; compiled, ChatThreadMessages froze
@@ -757,6 +759,13 @@ export function JovieChat({
     />
   );
 
+  const dockSlot = (measure = false) =>
+    composerDock ? (
+      <ChatComposerDockSlot measure={measure}>
+        {composerDock()}
+      </ChatComposerDockSlot>
+    ) : null;
+
   const inlineChatError =
     chatError &&
     !chatError.suppressComposerPause &&
@@ -883,6 +892,7 @@ export function JovieChat({
                     }
                   >
                     <div className={CHAT_CONTENT_SHELL_CLASSNAME}>
+                      {dockSlot()}
                       {composerSurface}
                       {inlineChatError ? (
                         <div className='mt-3 w-full'>{inlineChatError}</div>
@@ -903,6 +913,7 @@ export function JovieChat({
                     }
                   >
                     <div className={CHAT_CONTENT_SHELL_CLASSNAME}>
+                      {dockSlot()}
                       {composerSurface}
                       {inlineChatError ? (
                         <div className='mt-3 w-full'>{inlineChatError}</div>
@@ -1000,6 +1011,7 @@ export function JovieChat({
                 className={CHAT_COMPOSER_DOCK_CLASSNAME}
                 data-testid='chat-composer-dock'
               >
+                {dockSlot(true)}
                 {composerSurface}
               </div>
             </>

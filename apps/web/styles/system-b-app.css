@@ -3426,7 +3426,10 @@
 }
 
 :where(.system-b-chat-composer-thread-scroll-padding) {
-  padding-bottom: var(--system-b-chat-composer-thread-scroll-padding);
+  padding-bottom: calc(
+    var(--system-b-chat-composer-thread-scroll-padding) +
+    var(--chat-composer-dock-extra, 0px)
+  );
 }
 
 :where(.system-b-chat-composer-surface) {

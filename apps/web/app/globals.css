@@ -2110,6 +2110,9 @@ body {
     border-color: var(--linear-border-focus);
     background: var(--color-bg-surface-0);
   }
+  .composite-field:has(:is(input, textarea, select)[aria-invalid="true"]) {
+    border-color: color-mix(in oklab, var(--color-error) 60%, transparent);
+  }
   .composite-field:has(:is(input, textarea, select):focus-visible) {
     --tw-ring-color: var(--color-focus-ring);
     --tw-ring-offset-color: var(--color-bg-page);
