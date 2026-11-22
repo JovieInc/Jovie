@@ -148,8 +148,8 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:liveness
-    jobCount: 3
+    terminalReceipt: job:synthetic-canary-catchup
+    jobCount: 4
   - name: Buyer Eval Gate
     path: .github/workflows/buyer-eval-gate.yml
     active: true
