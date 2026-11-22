@@ -26,7 +26,7 @@ export const LINEAR_ISSUE_FIXTURE: readonly LinearIssueRow[] = [
     title: 'Fixture: tighten release readiness checks',
     url: 'https://linear.app/jovie/issue/JOV-9002',
     priority: 3,
-    state: { name: 'Todo', type: 'unstarted' },
+    state: { name: 'Ready', type: 'unstarted' },
     assignee: null,
     createdAt: '2026-11-02T09:00:00.000Z',
     updatedAt: '2026-11-19T09:00:00.000Z',
