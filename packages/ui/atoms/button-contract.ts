@@ -10,6 +10,11 @@ export const BUTTON_VARIANT_NAMES = [
   'tertiary',
   'ghost',
   'link',
+  // Glass material family (Drift T2.3): owned by Button so IconButton /
+  // native chat surfaces project through one vocabulary — no twin component.
+  'frosted',
+  'frosted-ghost',
+  'frosted-outline',
 ] as const;
 
 export const BUTTON_SIZE_NAMES = [
@@ -164,9 +169,6 @@ export type DeprecatedButtonVariant =
   | 'accent'
   | 'outline'
   | 'destructive'
-  | 'frosted'
-  | 'frosted-ghost'
-  | 'frosted-outline'
   | 'whitePill';
 export type DeprecatedButtonSize = 'default' | 'xl' | 'hero';
 export type ButtonVariantInput = ButtonVariant | DeprecatedButtonVariant | null;
@@ -179,9 +181,6 @@ const DEPRECATED_VARIANT_ALIASES: Record<
   accent: 'primary',
   outline: 'secondary',
   destructive: 'primary',
-  frosted: 'secondary',
-  'frosted-ghost': 'ghost',
-  'frosted-outline': 'secondary',
   whitePill: 'primary',
 };
 
