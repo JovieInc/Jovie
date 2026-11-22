@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as cohortLearnings from '@/lib/waitlist/cohort-learnings';
+
+vi.spyOn(cohortLearnings, 'countOpenCohortLearnings').mockResolvedValue(0);
 
 const readCachedAcquisitionEligibility = vi.fn();
 const withSystemIngestionSession = vi.fn();
@@ -23,10 +26,6 @@ vi.mock('@/lib/acquisition/eligibility.server', () => ({
     readCachedAcquisitionEligibility(...args),
 }));
 
-vi.mock('@/lib/waitlist/cohort-learnings', () => ({
-  countOpenCohortLearnings: async () => 0,
-  MAX_OPEN_COHORT_LEARNINGS: 10,
-}));
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: (...args: unknown[]) =>
     invalidateProxyUserStateCache(...args),

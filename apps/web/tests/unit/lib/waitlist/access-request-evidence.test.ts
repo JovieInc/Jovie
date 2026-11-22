@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as acquisitionStages from '@/lib/waitlist/acquisition-stages';
+import * as cohortLearnings from '@/lib/waitlist/cohort-learnings';
 
 const readCachedAcquisitionEligibility = vi.fn();
 const withSystemIngestionSession = vi.fn();
@@ -20,41 +22,32 @@ let executeRows: Array<Record<string, unknown>> = [];
 const executedSql: string[] = [];
 
 vi.mock('@/lib/acquisition/eligibility.server', () => ({
-  readCachedAcquisitionEligibility: (...args: unknown[]) =>
-    readCachedAcquisitionEligibility(...args),
+  readCachedAcquisitionEligibility,
 }));
 
-const countOpenCohortLearnings = vi.fn(async () => 0);
-const recordWaitlistJoin = vi.fn(async () => undefined);
-vi.mock('@/lib/waitlist/cohort-learnings', () => ({
-  countOpenCohortLearnings: () => countOpenCohortLearnings(),
-  MAX_OPEN_COHORT_LEARNINGS: 10,
-}));
-vi.mock('@/lib/waitlist/acquisition-stages', () => ({
-  recordWaitlistJoin: (...args: unknown[]) => recordWaitlistJoin(...args),
-}));
+const countOpenCohortLearnings = vi.spyOn(
+  cohortLearnings,
+  'countOpenCohortLearnings'
+);
+const recordWaitlistJoin = vi.spyOn(acquisitionStages, 'recordWaitlistJoin');
 
 vi.mock('@/lib/auth/proxy-state', () => ({
-  invalidateProxyUserStateCache: (...args: unknown[]) =>
-    invalidateProxyUserStateCache(...args),
+  invalidateProxyUserStateCache,
 }));
 
 vi.mock('@/lib/notifications/providers/slack', () => ({
-  notifySlackWaitlist: (...args: unknown[]) => notifySlackWaitlist(...args),
+  notifySlackWaitlist,
 }));
 
 vi.mock('@/lib/waitlist/approval', () => ({
-  approveWaitlistEntryInTx: (...args: unknown[]) =>
-    approveWaitlistEntryInTx(...args),
-  finalizeWaitlistApproval: (...args: unknown[]) =>
-    finalizeWaitlistApproval(...args),
+  approveWaitlistEntryInTx,
+  finalizeWaitlistApproval,
 }));
 
 vi.mock('@/lib/waitlist/settings', () => ({
-  getWaitlistSettings: (...args: unknown[]) => getWaitlistSettings(...args),
-  tryReserveAutoAcceptSlot: (...args: unknown[]) =>
-    tryReserveAutoAcceptSlot(...args),
-  releaseAutoAcceptSlot: (...args: unknown[]) => releaseAutoAcceptSlot(...args),
+  getWaitlistSettings,
+  tryReserveAutoAcceptSlot,
+  releaseAutoAcceptSlot,
 }));
 
 vi.mock('@/lib/utils/social-platform', () => ({
@@ -75,8 +68,7 @@ vi.mock('@/lib/utils/email', async importOriginal => {
 // Mock the ingestion session wrapper to invoke the operation with a tx
 // stub that the test can shape.
 vi.mock('@/lib/ingestion/session', () => ({
-  withSystemIngestionSession: (...args: unknown[]) =>
-    withSystemIngestionSession(...args),
+  withSystemIngestionSession,
 }));
 
 function createTxMock() {
@@ -187,7 +179,7 @@ const baseInput = {
 
 // Cold import of access-request pulls email-jobs / notifications graph (~5–7s
 // on CI shards). Raise describe timeout so the first case can pay that cost.
-describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
+describe('submitWaitlistAccessRequest evidence', () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
     vi.clearAllMocks();
@@ -238,7 +230,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
   it.each([null, 10])(
     'holds a positive decision when cohort learnings are %j',
     async openLearnings => {
-      countOpenCohortLearnings.mockResolvedValue(openLearnings);
+      countOpenCohortLearnings.mockImplementation(async () => openLearnings);
       const { submitWaitlistAccessRequest } = await import(
         '@/lib/waitlist/access-request'
       );

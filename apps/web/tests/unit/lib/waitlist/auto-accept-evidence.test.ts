@@ -7,18 +7,11 @@ const {
   mockApproveWaitlistEntryInTx,
   mockFinalizeWaitlistApproval,
   mockEnqueueWaitlistApprovalInviteEmail,
-  mockWithSerializableRetry,
   mockWithSystemIngestionSession,
-  mockLoggerWarn,
-  mockEq,
-  mockInArray,
-  mockLte,
-  mockIsNotNull,
   mockCountOpenCohortLearnings,
   mockReadCachedAcquisitionEligibility,
 } = vi.hoisted(() => ({
   mockReadCachedAcquisitionEligibility: vi.fn(),
-  mockIsNotNull: vi.fn((column: unknown) => ({ op: 'isNotNull', column })),
   mockCountOpenCohortLearnings: vi.fn(),
   mockDbSelect: vi.fn(),
   mockGetWaitlistSettings: vi.fn(),
@@ -26,15 +19,7 @@ const {
   mockApproveWaitlistEntryInTx: vi.fn(),
   mockFinalizeWaitlistApproval: vi.fn(),
   mockEnqueueWaitlistApprovalInviteEmail: vi.fn(),
-  mockWithSerializableRetry: vi.fn(),
   mockWithSystemIngestionSession: vi.fn(),
-  mockLoggerWarn: vi.fn(),
-  mockEq: vi.fn((_column: unknown, value: unknown) => ({ op: 'eq', value })),
-  mockInArray: vi.fn((_column: unknown, values: readonly unknown[]) => ({
-    op: 'inArray',
-    values,
-  })),
-  mockLte: vi.fn((_column: unknown, value: unknown) => ({ op: 'lte', value })),
 }));
 
 type CandidateRow = {
@@ -44,72 +29,15 @@ type CandidateRow = {
 };
 
 let candidateRows: CandidateRow[] = [];
-let suppressionRows: Array<{ emailHash: string }> = [];
-let userRows: Array<{ email: string; userStatus: string }> = [];
-let transactionUserRows: Array<{ id: string; userStatus: string }> | null =
-  null;
-let _lastCandidateLimit: number | null = null;
-
-const hashEmailForTest = (email: string) =>
-  `hash:${email.trim().toLowerCase()}`;
 
 vi.mock('@/lib/acquisition/eligibility.server', () => ({
   readCachedAcquisitionEligibility: mockReadCachedAcquisitionEligibility,
 }));
-
 vi.mock('@/lib/db', () => ({ db: { select: mockDbSelect } }));
-
-vi.mock('@/lib/db/schema/auth', () => ({
-  users: { email: 'users.email', userStatus: 'users.user_status' },
-}));
-
-vi.mock('@/lib/db/schema/suppression', () => ({
-  emailSuppressions: {
-    emailHash: 'email_suppressions.email_hash',
-    expiresAt: 'email_suppressions.expires_at',
-  },
-}));
-
-vi.mock('@/lib/db/schema/waitlist', () => ({
-  waitlistEntries: {
-    id: 'waitlist_entries.id',
-    email: 'waitlist_entries.email',
-    status: 'waitlist_entries.status',
-    canonical: 'waitlist_entries.canonical',
-    waitlistedAt: 'waitlist_entries.waitlisted_at',
-    createdAt: 'waitlist_entries.created_at',
-    spotifyUrl: 'waitlist_entries.spotify_url',
-  },
-}));
-
-vi.mock('drizzle-orm', () => ({
-  and: vi.fn((...args: unknown[]) => ({ op: 'and', args })),
-  asc: vi.fn((column: unknown) => ({ op: 'asc', column })),
-  eq: mockEq,
-  gt: vi.fn((_column: unknown, value: unknown) => ({ op: 'gt', value })),
-  inArray: mockInArray,
-  isNotNull: mockIsNotNull,
-  isNull: vi.fn((column: unknown) => ({ op: 'isNull', column })),
-  lte: mockLte,
-  or: vi.fn((...args: unknown[]) => ({ op: 'or', args })),
-  sql: vi.fn(),
-}));
-
-vi.mock('@/lib/notifications/suppression', () => ({
-  hashEmail: hashEmailForTest,
-}));
-
-vi.mock('@/lib/utils/logger', () => ({
-  logger: {
-    warn: mockLoggerWarn,
-  },
-}));
-
 vi.mock('@/lib/waitlist/settings', () => ({
   getWaitlistSettings: mockGetWaitlistSettings,
   tryReserveAutoAcceptSlot: mockTryReserveAutoAcceptSlot,
 }));
-
 vi.mock('@/lib/waitlist/support-load.server', () => ({
   readSupportLoadCapacity: async (s: { autoAcceptDailyLimit: number }) => ({
     dailyLimit: s.autoAcceptDailyLimit,
@@ -120,20 +48,13 @@ vi.mock('@/lib/waitlist/approval', () => ({
   approveWaitlistEntryInTx: mockApproveWaitlistEntryInTx,
   finalizeWaitlistApproval: mockFinalizeWaitlistApproval,
 }));
-
 vi.mock('@/lib/waitlist/cohort-learnings', () => ({
   MAX_OPEN_COHORT_LEARNINGS: 10,
   countOpenCohortLearnings: mockCountOpenCohortLearnings,
 }));
-
 vi.mock('@/lib/waitlist/email-jobs', () => ({
   enqueueWaitlistApprovalInviteEmail: mockEnqueueWaitlistApprovalInviteEmail,
 }));
-
-vi.mock('@/lib/db/serializable-retry', () => ({
-  withSerializableRetry: mockWithSerializableRetry,
-}));
-
 vi.mock('@/lib/ingestion/session', () => ({
   withSystemIngestionSession: mockWithSystemIngestionSession,
 }));
@@ -143,10 +64,7 @@ function createCandidateQuery() {
     from: vi.fn(() => ({
       where: vi.fn(() => ({
         orderBy: vi.fn(() => ({
-          limit: vi.fn(async (limit: number) => {
-            _lastCandidateLimit = limit;
-            return candidateRows.slice(0, limit);
-          }),
+          limit: vi.fn(async () => candidateRows),
         })),
       })),
     })),
@@ -165,20 +83,13 @@ function createTxMock() {
   return {
     select: vi.fn((projection: Record<string, unknown>) => ({
       from: vi.fn(() => ({
-        where: vi.fn((condition: { value?: unknown }) => ({
+        where: vi.fn(() => ({
           for: vi.fn(() => ({
             limit: vi.fn(async () => {
               if ('userStatus' in projection) {
-                return (
-                  transactionUserRows ?? [
-                    { id: 'user-1', userStatus: 'waitlist_pending' },
-                  ]
-                );
+                return [{ id: 'user-1', userStatus: 'waitlist_pending' }];
               }
-
-              const candidate = candidateRows.find(
-                row => row.id === condition.value
-              );
+              const candidate = candidateRows[0];
               return candidate
                 ? [
                     {
@@ -196,17 +107,11 @@ function createTxMock() {
   };
 }
 
-describe('runWaitlistAutoAccept', () => {
+describe('runWaitlistAutoAccept evidence retry', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    vi.unstubAllEnvs();
     candidateRows = [];
-    suppressionRows = [];
-    userRows = [];
-    transactionUserRows = null;
-    _lastCandidateLimit = null;
-
     mockGetWaitlistSettings.mockResolvedValue({
       autoAcceptEnabled: true,
       autoAcceptAfterDays: 7,
@@ -214,7 +119,6 @@ describe('runWaitlistAutoAccept', () => {
       autoAcceptedToday: 0,
     });
     mockCountOpenCohortLearnings.mockResolvedValue(0);
-    mockReadCachedAcquisitionEligibility.mockReset();
     mockReadCachedAcquisitionEligibility.mockResolvedValue({
       eligible: true,
       verdict: 'ELIGIBLE',
@@ -235,19 +139,13 @@ describe('runWaitlistAutoAccept', () => {
     );
     mockFinalizeWaitlistApproval.mockResolvedValue(undefined);
     mockEnqueueWaitlistApprovalInviteEmail.mockResolvedValue(undefined);
-    mockWithSerializableRetry.mockImplementation(
-      async (operation: () => Promise<unknown>) => operation()
-    );
     mockWithSystemIngestionSession.mockImplementation(
       async (operation: (tx: unknown) => Promise<unknown>) =>
         operation(createTxMock())
     );
     mockDbSelect.mockImplementation((projection: Record<string, unknown>) => {
-      if ('emailHash' in projection) {
-        return createRowsQuery(suppressionRows);
-      }
-      if ('userStatus' in projection) {
-        return createRowsQuery(userRows);
+      if ('emailHash' in projection || 'userStatus' in projection) {
+        return createRowsQuery([]);
       }
       return createCandidateQuery();
     });
@@ -262,15 +160,6 @@ describe('runWaitlistAutoAccept', () => {
       .mockResolvedValueOnce(null);
     mockWithSystemIngestionSession.mockRejectedValueOnce(
       Object.assign(new Error('serialization conflict'), { code: '40001' })
-    );
-    mockWithSerializableRetry.mockImplementation(
-      async (operation: () => Promise<unknown>) => {
-        try {
-          return await operation();
-        } catch {
-          return operation();
-        }
-      }
     );
     const { runWaitlistAutoAccept } = await import(
       '@/lib/waitlist/auto-accept'
