@@ -35,13 +35,13 @@ const LEVEL_CONFIG: Record<
 > = {
   identified: {
     label: 'Identified',
-    iconClassName: 'text-emerald-500',
-    labelClassName: 'text-emerald-600 dark:text-emerald-400',
+    iconClassName: 'text-success',
+    labelClassName: 'text-success-text',
   },
   partial: {
     label: 'Partial',
-    iconClassName: 'text-amber-400',
-    labelClassName: 'text-amber-600 dark:text-amber-400',
+    iconClassName: 'text-warning',
+    labelClassName: 'text-warning-text',
   },
   anonymous: {
     label: 'Anonymous',

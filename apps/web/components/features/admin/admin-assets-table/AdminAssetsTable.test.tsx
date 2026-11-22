@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AdminAssetRow } from '@/lib/admin/types';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { AdminAssetsTable } from './AdminAssetsTable';
 import { assets as storyAssets } from './story-fixtures';
 
@@ -213,7 +215,8 @@ describe('AdminAssetsTable', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders asset rows, owner identity, and context menu actions', () => {
+  it('renders asset rows, owner identity, and context menu actions', async () => {
+    const user = userEvent.setup();
     const assign = vi.fn();
     vi.stubGlobal('location', { assign });
     const openSpy = vi.spyOn(globalThis, 'open').mockImplementation(() => null);
@@ -226,12 +229,12 @@ describe('AdminAssetsTable', () => {
       'data-multiline-columns',
       'asset,issues,owner'
     );
-    screen.getAllByText('Open Asset')[0]?.click();
+    await user.click(screen.getAllByText('Open Asset')[0] as HTMLElement);
     expect(openSpy).toHaveBeenCalledWith(
       'https://jovie.local/r/first-light',
       '_blank'
     );
-    screen.getAllByText('Impersonate')[0]?.click();
+    await user.click(screen.getAllByText('Impersonate')[0] as HTMLElement);
     expect(mockStartImpersonation).toHaveBeenCalledWith(
       { targetUserId: 'user-alpha' },
       expect.objectContaining({ onSuccess: expect.any(Function) })
@@ -244,15 +247,43 @@ describe('AdminAssetsTable', () => {
     openSpy.mockRestore();
   });
 
-  it('writes filter changes to the URL query state', () => {
+  it('writes filter changes to the URL query state', async () => {
+    const user = userEvent.setup();
     render(<AdminAssetsTable {...baseProps} />);
-    const search = screen.getByLabelText('Search title, owner, URL…');
-    search.dispatchEvent(new Event('change', { bubbles: true }));
-    const selects = screen.getAllByText('select');
-    selects[0]?.click();
-    selects[1]?.click();
-    selects[2]?.click();
-    expect(mockSetFilters).toHaveBeenCalled();
+    await user.type(screen.getByLabelText('Search title, owner, URL…'), 'a');
+    expect(mockSetFilters).toHaveBeenLastCalledWith({ q: 'a' });
+    for (const select of screen.getAllByText('select')) {
+      await user.click(select);
+    }
+    expect(mockSetFilters).toHaveBeenCalledWith({ type: 'release' });
+    expect(mockSetFilters).toHaveBeenCalledWith({ issues: 'release' });
+    expect(mockSetFilters).toHaveBeenCalledWith({ verified: 'release' });
+  });
+
+  it('shows type badges on a neutral surface and thumbnails with dimensions', () => {
+    const { container } = render(<AdminAssetsTable {...baseProps} />);
+    const badge = screen.getAllByText('Release')[0];
+    expect(badge?.className).toContain('bg-secondary-token/10');
+    expect(badge?.className).not.toMatch(/(blue|purple|emerald|amber)-/);
+    const thumb = container.querySelector('img');
+    expect(thumb).toHaveAttribute('width', '36');
+    expect(thumb).toHaveAttribute('height', '36');
+  });
+
+  it('has no accessibility violations with rows and when empty', async () => {
+    const { container, unmount } = render(<AdminAssetsTable {...baseProps} />);
+    await expectNoA11yViolations(container);
+    unmount();
+    mockUseAdminAssetsInfiniteQuery.mockReturnValue({
+      data: { pages: [{ rows: [], total: 0 }] },
+      fetchNextPage: vi.fn(),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+    });
+    const empty = render(
+      <AdminAssetsTable {...baseProps} assets={[]} total={0} />
+    );
+    await expectNoA11yViolations(empty.container);
   });
 
   it('renders an empty state when no assets match', () => {

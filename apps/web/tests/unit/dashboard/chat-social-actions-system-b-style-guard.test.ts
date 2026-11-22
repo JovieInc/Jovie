@@ -38,7 +38,10 @@ describe('chat social add action System B source contract', () => {
         expect(source, `${sourcePath} leaked ${pattern}`).not.toMatch(pattern);
       }
 
-      if (sourcePath.endsWith('ChatLinkConfirmationCard.tsx')) {
+      if (
+        sourcePath.endsWith('ChatLinkConfirmationCard.tsx') ||
+        sourcePath.endsWith('SocialLinkSuggestionRows.tsx')
+      ) {
         // Canonical controls inherit their tokens; local color overrides are
         // prohibited by the forced shadcn/no-restyle probe as well.
         expect(source).toContain("from '@jovie/ui/atoms/button'");

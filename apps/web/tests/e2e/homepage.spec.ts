@@ -189,7 +189,8 @@ test.describe('Homepage', () => {
     );
     await expect(flyout.getByRole('link')).toHaveCount(1);
     await page.keyboard.press('Escape');
-    await expect(flyout).toHaveCount(0);
+    // Native popover keeps the node mounted; closed state is not visible.
+    await expect(flyout).toBeHidden();
   });
 
   test('canonical header has only the Customers flyout', async ({ page }) => {

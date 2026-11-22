@@ -119,19 +119,6 @@
     "imagePath": "artist-profile-hero-section-desktop.png"
   },
   {
-    "id": "artist-profile-adaptive-section-desktop",
-    "title": "Artist Profile Adaptive Profile Section",
-    "group": "marketing",
-    "groupLabel": "Marketing",
-    "route": "/artist-profiles",
-    "viewport": "desktop",
-    "theme": "dark",
-    "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-11-18T16:54:15.583Z",
-    "gitSha": "89cd4c41ddb303d73e9e898662cc4ab62d7ec1c0",
-    "imagePath": "artist-profile-adaptive-section-desktop.png"
-  },
-  {
     "id": "artist-profile-outcomes-section-desktop",
     "title": "Artist Profile Audience outcomes Section",
     "group": "marketing",
@@ -158,32 +145,6 @@
     "imagePath": "artist-profile-capture-section-desktop.png"
   },
   {
-    "id": "artist-profile-opinionated-section-desktop",
-    "title": "Artist Profile Opinionated by Design Section",
-    "group": "marketing",
-    "groupLabel": "Marketing",
-    "route": "/artist-profiles",
-    "viewport": "desktop",
-    "theme": "dark",
-    "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-11-20T19:52:10.202Z",
-    "gitSha": "9fbb700cae91a0d5baf43de048013eac84884a68",
-    "imagePath": "artist-profile-opinionated-section-desktop.png"
-  },
-  {
-    "id": "artist-profile-spec-wall-section-desktop",
-    "title": "Artist Profile Product Truth Section",
-    "group": "marketing",
-    "groupLabel": "Marketing",
-    "route": "/artist-profiles",
-    "viewport": "desktop",
-    "theme": "dark",
-    "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-11-18T16:54:42.063Z",
-    "gitSha": "89cd4c41ddb303d73e9e898662cc4ab62d7ec1c0",
-    "imagePath": "artist-profile-spec-wall-section-desktop.png"
-  },
-  {
     "id": "artist-profile-how-it-works-section-desktop",
     "title": "Artist Profile How It Works Section",
     "group": "marketing",
@@ -195,19 +156,6 @@
     "capturedAt": "2026-11-20T19:52:23.624Z",
     "gitSha": "9fbb700cae91a0d5baf43de048013eac84884a68",
     "imagePath": "artist-profile-how-it-works-section-desktop.png"
-  },
-  {
-    "id": "artist-profile-faq-section-desktop",
-    "title": "Artist Profile FAQ Section",
-    "group": "marketing",
-    "groupLabel": "Marketing",
-    "route": "/artist-profiles",
-    "viewport": "desktop",
-    "theme": "dark",
-    "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-29T08:19:18.647Z",
-    "gitSha": "839119000d69ce7bc06e67914c07eeae1ccdd657",
-    "imagePath": "artist-profile-faq-section-desktop.png"
   },
   {
     "id": "artist-profile-final-cta-section-desktop",
@@ -410,8 +358,8 @@
     "viewport": "mobile",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-11-20T19:53:30.502Z",
-    "gitSha": "9fbb700cae91a0d5baf43de048013eac84884a68",
+    "capturedAt": "2026-11-21T15:04:00.000Z",
+    "gitSha": "jov-14240-public-handle",
     "imagePath": "tim-white-profile-live-mobile.png",
     "publicExportPath": "tim-white-profile-live-phone.png"
   },

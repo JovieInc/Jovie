@@ -15,16 +15,38 @@ import {
   useState,
 } from 'react';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
+import {
+  ActionDialIconTrack,
+  ActionDialSelectionCue,
+  actionDialStreamIcon,
+} from '@/lib/dial/action-dial-chrome';
 import { DialEngine, type DialState } from '@/lib/dial/dial-engine';
 import {
+  DIAL_HINT_SEEN_KEY,
+  DIAL_ICON_OPTICAL_CLASS,
+  type DialGesture,
+  dialBrowserScheduler,
+  isWheelNotch,
+  MIN_HAPTIC_GAP_MS,
+  MIN_PULSE_GAP_MS,
+  NO_HAPTIC,
+  normalizeWheel,
+  PAGE_STEP,
+  ROW_ORIGIN_TOP_PX,
   ROW_STEP_PX,
+  readHintSeen,
   rowIsTappable,
   rowLayout,
+  TAP_SLOP_PX,
+  TYPEAHEAD_RESET_MS,
   WINDOW_RADIUS,
+  writeHintSeen,
 } from '@/lib/dial/dial-layout';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { cn } from '@/lib/utils';
 import { SmartLinkProviderButton } from './SmartLinkProviderButton';
+
+export { DIAL_HINT_SEEN_KEY };
 
 export interface ActionDialOption {
   readonly id: string;
@@ -40,62 +62,12 @@ interface ActionDialProps {
   readonly actionLabel: string;
   readonly groupLabel: string;
   readonly onActivate?: (id: string) => void;
+  /** Cookie / prior choice id; quiet "Remembered" when it matches the center. */
+  readonly preferredId?: string | null;
   readonly hint?: string | null;
   readonly className?: string;
   readonly disabled?: boolean;
 }
-
-const TAP_SLOP_PX = 6;
-const PAGE_STEP = 5;
-const MIN_HAPTIC_GAP_MS = 24;
-const MIN_PULSE_GAP_MS = 90;
-const TYPEAHEAD_RESET_MS = 700;
-const NO_HAPTIC = Symbol('no-haptic');
-export const DIAL_HINT_SEEN_KEY = 'jovie:dial-hint-seen';
-
-function readHintSeen(): boolean {
-  try {
-    return globalThis.localStorage.getItem(DIAL_HINT_SEEN_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function writeHintSeen(): void {
-  try {
-    globalThis.localStorage.setItem(DIAL_HINT_SEEN_KEY, '1');
-  } catch {}
-}
-
-interface Gesture {
-  readonly id: number;
-  readonly startY: number;
-  moved: boolean;
-  readonly caught: boolean;
-}
-
-function normalizeWheel(event: WheelEvent): number {
-  if (event.deltaMode === 1) return event.deltaY * ROW_STEP_PX;
-  if (event.deltaMode === 2) return event.deltaY * ROW_STEP_PX * 3;
-  return event.deltaY;
-}
-
-function isWheelNotch(event: WheelEvent): boolean {
-  if (event.deltaMode === 1) return true;
-  const magnitude = Math.abs(event.deltaY);
-  return (
-    Number.isInteger(event.deltaY) &&
-    magnitude >= 100 &&
-    (magnitude % 100 === 0 || magnitude % 120 === 0)
-  );
-}
-
-const browserScheduler = {
-  now: () => performance.now(),
-  request: (callback: (time: number) => void) =>
-    requestAnimationFrame(callback),
-  cancel: (handle: number) => cancelAnimationFrame(handle),
-};
 
 export function ActionDial({
   options,
@@ -104,6 +76,7 @@ export function ActionDial({
   actionLabel,
   groupLabel,
   onActivate,
+  preferredId = null,
   hint = 'Swipe to switch. Your choice is remembered.',
   className,
   disabled = false,
@@ -119,7 +92,6 @@ export function ActionDial({
 
   const [activeIndex, setActiveIndex] = useState(selectedIndex);
   const [restIndex, setRestIndex] = useState(selectedIndex);
-  // Hidden until storage says this device has not used the dial yet (no flash).
   const [showHint, setShowHint] = useState(false);
   const hintId = `${uid}-hint`;
   const hintGlyphRef = useRef<HTMLSpanElement | null>(null);
@@ -133,7 +105,7 @@ export function ActionDial({
   const iconRefs = useRef(new Map<number, HTMLElement>());
   const tappableRef = useRef(new WeakMap<HTMLElement, boolean>());
   const positionRef = useRef(selectedIndex);
-  const gestureRef = useRef<Gesture | null>(null);
+  const gestureRef = useRef<DialGesture | null>(null);
   const suppressClickRef = useRef(false);
   const suppressHapticRef = useRef<symbol | null>(null);
   const lastHapticRef = useRef(0);
@@ -197,7 +169,7 @@ export function ActionDial({
     for (const [index, icon] of iconRefs.current) {
       const distance = index - position;
       icon.style.transform = `translate3d(0, ${distance * 100}%, 0)`;
-      icon.style.opacity = Math.abs(distance) < 1 ? '1' : '0';
+      icon.style.opacity = String(Math.max(0, 1 - Math.abs(distance)));
     }
   }, []);
 
@@ -214,10 +186,10 @@ export function ActionDial({
     lastPulseRef.current = now;
     action.animate(
       [
-        { transform: 'scale(0.972)', opacity: 0.86 },
+        { transform: 'scale(0.978)', opacity: 0.92 },
         { transform: 'scale(1)', opacity: 1 },
       ],
-      { duration: 140, easing: 'cubic-bezier(0.2, 0, 0, 1)' }
+      { duration: 160, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' }
     );
   }, []);
 
@@ -227,7 +199,7 @@ export function ActionDial({
       count,
       position: positionRef.current,
       reducedMotion,
-      scheduler: browserScheduler,
+      scheduler: dialBrowserScheduler,
       onFrame: paint,
       onIndexChange: index => {
         activeIndexRef.current = index;
@@ -422,36 +394,20 @@ export function ActionDial({
   if (!active) return null;
 
   const position = activeIndex;
-  const actionIcon =
-    count < 2 || !active.icon ? (
-      active.icon
-    ) : (
-      <span
-        className='relative h-5 w-5 shrink-0 overflow-hidden'
-        aria-hidden='true'
-        data-testid='action-dial-icon-track'
-      >
-        {windowed.map(([index, option]) =>
-          Math.abs(index - activeIndex) <= 2 && option.icon ? (
-            <span
-              key={option.id}
-              ref={node => {
-                if (node) iconRefs.current.set(index, node);
-                else iconRefs.current.delete(index);
-              }}
-              className='absolute inset-0 will-change-transform'
-              style={{
-                transform: `translate3d(0, ${(index - position) * 100}%, 0)`,
-                opacity: Math.abs(index - position) < 1 ? 1 : 0,
-              }}
-              data-testid={`action-dial-icon-${option.id}`}
-            >
-              {option.icon}
-            </span>
-          ) : null
-        )}
-      </span>
-    );
+  const settled = options[restIndex] ?? active;
+  // Caption follows the centered option (what Stream Now opens); status waits for rest.
+  const isPreferred = Boolean(preferredId && active.id === preferredId);
+  const settledPreferred = Boolean(preferredId && settled.id === preferredId);
+  const actionIcon = actionDialStreamIcon(
+    count,
+    active,
+    <ActionDialIconTrack
+      windowed={windowed}
+      activeIndex={activeIndex}
+      position={position}
+      iconRefs={iconRefs}
+    />
+  );
 
   const handleActivate = () => {
     const chosen = options[activeIndexRef.current] ?? active;
@@ -472,6 +428,7 @@ export function ActionDial({
       data-testid='action-dial'
       data-position={selectedIndex}
       data-state='idle'
+      data-preferred={isPreferred ? 'true' : 'false'}
     >
       <legend className='sr-only'>{groupLabel}</legend>
       <div
@@ -495,6 +452,9 @@ export function ActionDial({
           >
             {windowed.map(([index, option]) => {
               const layout = rowLayout(index - position);
+              const preferredRow = Boolean(
+                preferredId && option.id === preferredId
+              );
               return (
                 <div
                   key={option.id}
@@ -509,8 +469,10 @@ export function ActionDial({
                   aria-posinset={index + 1}
                   aria-setsize={count}
                   data-dial-offset={index - activeIndex}
-                  className='absolute inset-x-3 top-21 flex h-11 items-center justify-center gap-2 rounded-full text-sm text-foreground will-change-transform'
+                  data-preferred={preferredRow ? 'true' : undefined}
+                  className='absolute inset-x-3 flex h-12 min-h-12 items-center justify-center gap-2.5 rounded-full text-sm font-normal tracking-tight text-foreground will-change-transform'
                   style={{
+                    top: ROW_ORIGIN_TOP_PX,
                     transform: `translate3d(0, ${layout.y}px, 0) scale(${layout.scale})`,
                     opacity: layout.opacity,
                     pointerEvents: rowIsTappable(index - position)
@@ -531,9 +493,17 @@ export function ActionDial({
                   }}
                 >
                   {option.icon ? (
-                    <span aria-hidden='true'>{option.icon}</span>
+                    <span
+                      className={cn(
+                        'shrink-0 [&_svg]:h-7 [&_svg]:w-7',
+                        DIAL_ICON_OPTICAL_CLASS
+                      )}
+                      aria-hidden='true'
+                    >
+                      {option.icon}
+                    </span>
                   ) : null}
-                  <span>{option.label}</span>
+                  <span className='min-w-0 truncate'>{option.label}</span>
                 </div>
               );
             })}
@@ -554,7 +524,7 @@ export function ActionDial({
             primary
             disabled={disabled}
             ariaLabel={`${actionLabel} with ${active.label}`}
-            className='w-full'
+            className='w-full gap-3 tracking-tight [&_svg]:h-7 [&_svg]:w-7'
             onClick={event => {
               if (suppressClickRef.current) {
                 event.preventDefault();
@@ -565,53 +535,23 @@ export function ActionDial({
           />
         </div>
       </div>
-      {/* JOV-INV-019 image-contrast: text-muted-foreground resolves to
-          text-secondary-token, which measures 4.48:1 against a real photo
-          background on the pay hint (just under the 4.5:1 floor); bump one
-          rung to text-primary-token for margin, same fix as the tab-bar
-          scrim label. */}
       {count > 1 ? (
         <p id={hintId} className='sr-only'>
           {hint}
         </p>
       ) : null}
-      {count > 1 ? (
-        <div
-          className='mt-1 flex h-5 items-center justify-center'
-          aria-hidden='true'
-          data-testid='action-dial-hint'
-          data-visible={showHint}
-        >
-          <span
-            ref={hintGlyphRef}
-            className={cn(
-              'text-tertiary-token transition-opacity duration-normal motion-reduce:transition-none',
-              showHint ? 'opacity-100' : 'opacity-0'
-            )}
-          >
-            <svg
-              viewBox='0 0 24 24'
-              fill='none'
-              stroke='currentColor'
-              strokeWidth='1.75'
-              strokeLinecap='round'
-              strokeLinejoin='round'
-              className='h-4 w-4'
-              aria-hidden='true'
-            >
-              {/* Lucide chevrons-up-down geometry; inlined so the dial has no icon-package dependency. */}
-              <path d='m7 15 5 5 5-5' />
-              <path d='m7 9 5-5 5 5' />
-            </svg>
-          </span>
-        </div>
-      ) : hint ? (
-        <p id={hintId} className='mt-1 text-center text-xs text-primary-token'>
-          {hint}
-        </p>
-      ) : null}
+      <ActionDialSelectionCue
+        label={active.label}
+        isPreferred={isPreferred}
+        showHint={showHint}
+        hintGlyphRef={hintGlyphRef}
+        multi={count > 1}
+        hintId={hintId}
+        hint={hint}
+      />
       <p className='sr-only' role='status' aria-live='polite'>
-        {(options[restIndex] ?? active).label} selected
+        {settled.label} selected
+        {settledPreferred ? ', remembered' : ''}
       </p>
     </fieldset>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Button, Input } from '@jovie/ui';
+import { Badge, Button, Input, PlainButton } from '@jovie/ui';
 import { ExternalLink, Eye, EyeOff } from 'lucide-react';
 import {
   type FormEvent,
@@ -139,7 +139,7 @@ function PlatformSection({
               placeholder={tokenPlaceholder}
               className='pr-10 text-app'
             />
-            <button
+            <PlainButton
               type='button'
               onClick={() => setShowToken(!showToken)}
               className='absolute inset-y-0 right-0 flex items-center pr-3 text-tertiary-token transition-colors hover:text-primary-token'
@@ -152,7 +152,7 @@ function PlatformSection({
               ) : (
                 <Eye className='h-4 w-4' />
               )}
-            </button>
+            </PlainButton>
           </div>
         </div>
       </div>
@@ -178,8 +178,8 @@ function HealthIndicator({ health }: { readonly health?: PlatformHealth }) {
     HealthStatus,
     { dot: string; color: string; label: string }
   > = {
-    healthy: { dot: '\u25CF', color: 'text-green-500', label: 'Healthy' },
-    degraded: { dot: '\u25CF', color: 'text-yellow-500', label: 'Degraded' },
+    healthy: { dot: '\u25CF', color: 'text-success-text', label: 'Healthy' },
+    degraded: { dot: '\u25CF', color: 'text-warning-text', label: 'Degraded' },
     unhealthy: {
       dot: '\u25CF',
       color: 'text-error',
@@ -255,7 +255,7 @@ function TestEventButton({
         {status === 'loading' ? 'Testing...' : 'Test'}
       </Button>
       {status === 'success' && (
-        <span role='status' className='text-2xs font-caption text-green-500'>
+        <span role='status' className='text-2xs font-caption text-success-text'>
           Event received
         </span>
       )}

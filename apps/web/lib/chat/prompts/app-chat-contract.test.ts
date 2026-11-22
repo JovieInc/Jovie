@@ -40,8 +40,11 @@ describe('deterministic /app/chat prompt contract (ASS-9 + ASS-16)', () => {
     ],
     ['requiresRevenueFirstVoice', 'Revenue first'],
     ['requiresOneNextMoveWithReason', 'exactly one next move plus the reason'],
+    ['forbidsPermissionToPlanCloser', 'Never close with permission-to-plan'],
     ['forbidsInventedAccountStats', 'Never invent account stats'],
+    ['forbidsInventedAccountFacts', 'Never invent Spotify algorithm'],
     ['requiresDraftHoldOutbound', 'Draft every outbound artifact'],
+    ['requiresDraftClearAskNow', 'Do not grill for a positioning line'],
     [
       'keepsGroundingToPromptOrTools',
       'must come from this prompt or from a tool result in this turn',

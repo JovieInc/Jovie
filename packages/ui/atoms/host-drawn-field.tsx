@@ -23,11 +23,16 @@ export interface HostDrawnSelectProps
   readonly visuallyHidden?: boolean;
 }
 
+export type HostDrawnTextareaProps = React.ComponentPropsWithoutRef<'textarea'>;
+
 /**
  * A native input that paints nothing of its own. Its host draws it: a field
  * shell that owns the surface and the `focus-within` ring, or a chip label
  * that paints the selected and `:has(:focus-visible)` states. `className`
- * carries the host's own text and layout classes. Use `Input` whenever the
+ * carries the host's own layout classes. Inside a `CompositeField` the
+ * control inherits the host's type and colour and paints no fill, border or
+ * padding (`[data-host-drawn]` in apps/web globals.css), so set type and
+ * colour on a plain element around the field. Use `Input` whenever the
  * field draws its own surface.
  */
 export const HostDrawnInput = React.forwardRef<
@@ -40,6 +45,7 @@ export const HostDrawnInput = React.forwardRef<
   return (
     <input
       ref={ref}
+      data-host-drawn=''
       className={
         visuallyHidden ? cn('sr-only', className) : className || undefined
       }
@@ -64,9 +70,31 @@ export const HostDrawnSelect = React.forwardRef<
   return (
     <select
       ref={ref}
+      data-host-drawn=''
       className={
         visuallyHidden ? cn('sr-only', className) : className || undefined
       }
+      {...props}
+    />
+  );
+});
+
+/**
+ * A native textarea that paints nothing of its own: a chat composer, an
+ * inline note or lyric line whose `CompositeField` host draws the surface
+ * and the focus ring. `className` carries layout classes only; type and
+ * colour come from the host. Use `Textarea` whenever the field draws its own
+ * surface.
+ */
+export const HostDrawnTextarea = React.forwardRef<
+  HTMLTextAreaElement,
+  HostDrawnTextareaProps
+>(function HostDrawnTextarea({ className, ...props }, ref) {
+  return (
+    <textarea
+      ref={ref}
+      data-host-drawn=''
+      className={className || undefined}
       {...props}
     />
   );

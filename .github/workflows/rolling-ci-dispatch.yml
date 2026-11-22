@@ -72,6 +72,7 @@ jobs:
             scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
             scripts/lib/ci-typecheck-overlap.mjs
+            scripts/lib/ci-fast-skip-lanes.mjs
             scripts/lib/ci-source-guard-pool.mjs
             scripts/lib/merged-with-base-pool-config.mjs
             scripts/lib/ci-fast-annotations.mjs
@@ -579,6 +580,7 @@ jobs:
             scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
             scripts/lib/ci-typecheck-overlap.mjs
+            scripts/lib/ci-fast-skip-lanes.mjs
             scripts/lib/ci-source-guard-pool.mjs
             scripts/lib/merged-with-base-pool-config.mjs
             scripts/lib/ci-fast-annotations.mjs
@@ -872,6 +874,7 @@ jobs:
             scripts/lib/repo-hygiene-limits.mjs
             scripts/ci-fast-lanes.mjs
             scripts/lib/ci-typecheck-overlap.mjs
+            scripts/lib/ci-fast-skip-lanes.mjs
             scripts/lib/ci-source-guard-pool.mjs
             scripts/lib/merged-with-base-pool-config.mjs
             scripts/lib/ci-fast-annotations.mjs
@@ -1020,6 +1023,7 @@ jobs:
             scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
             scripts/lib/ci-typecheck-overlap.mjs
+            scripts/lib/ci-fast-skip-lanes.mjs
             scripts/lib/ci-source-guard-pool.mjs
             scripts/lib/merged-with-base-pool-config.mjs
             scripts/lib/ci-fast-annotations.mjs

@@ -171,4 +171,11 @@ describe('EmptyState', () => {
     ).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
+
+  it('renders the requested heading level', () => {
+    render(<EmptyState heading='No Rows' headingLevel={2} />);
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'No Rows' })
+    ).toBeInTheDocument();
+  });
 });

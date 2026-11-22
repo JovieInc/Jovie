@@ -12,6 +12,8 @@ describe('FooterLink', () => {
     const link = screen.getByRole('link', { name: 'Privacy Policy' });
     expect(link).toHaveAttribute('href', '/privacy');
     expect(link).not.toHaveAttribute('target');
+    expect(link.className).toContain('text-on-media/70');
+    expect(link.className).not.toContain('text-white');
     await expectNoA11yViolations(container);
   });
 

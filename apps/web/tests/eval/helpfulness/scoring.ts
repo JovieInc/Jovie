@@ -5,13 +5,29 @@
 
 import { lintVoice } from '@/lib/chat/voice-lint';
 import { DEFAULT_MAX_WORDS, type HelpfulnessCase } from './cases';
+import { deniesVisibleCatalog, fixtureHasCatalog } from './catalog-deny';
+import { runFailThemeChecks, upcomingTitleFromFacts } from './fail-themes';
 import type { EvalFixture } from './fixtures';
+import { isPlanningMenuCloser, runOneRecGapChecks } from './one-rec-gaps';
 import {
   type BehaviorId,
   CASE_PASS_SCORE,
   HARD_FAIL_SCORE_CAP,
   HELPFULNESS_BEHAVIORS,
 } from './spec';
+
+/**
+ * ASS-16 planning / greeting asks that must lead with UPCOMING title + days-left
+ * in the first content sentence. Keep this narrower than "any fixture with an
+ * UPCOMING row" so catalog / fan-reply / collab turns do not false-positive.
+ */
+export const UPCOMING_SENTENCE_DAYS_CASE_IDS: ReadonlySet<string> = new Set([
+  'greeting',
+  'presave',
+  'whats-next-release',
+  'week-plan',
+  'song-out-friday',
+]);
 
 export interface EvalToolCall {
   readonly name: string;
@@ -33,6 +49,14 @@ export interface HardCheckResult {
   readonly id: string;
   readonly ok: boolean;
   readonly detail?: string;
+}
+
+/** Optional case context for theme hard checks (UPCOMING-first). */
+export interface HardCheckContext {
+  /** Fixture/judge facts; an UPCOMING row enables upcoming-first. */
+  readonly facts?: readonly string[];
+  /** Explicit upcoming title; wins over facts parsing. */
+  readonly upcomingTitle?: string;
 }
 
 /**
@@ -69,7 +93,8 @@ export function countWords(text: string): number {
 
 export function runHardChecks(
   testCase: HelpfulnessCase,
-  reply: EvalReply
+  reply: EvalReply,
+  context?: HardCheckContext
 ): HardCheckResult[] {
   const text = reply.text;
   const toolText = reply.toolCalls
@@ -155,7 +180,77 @@ export function runHardChecks(
     });
   }
 
+  // ASS-25/ASS-29/ASS-90 fail themes: inventing-stats + inventing-account-facts
+  // + question-not-a-move always; upcoming-first only when case context has an
+  // UPCOMING title.
+  const upcomingTitle =
+    context?.upcomingTitle ??
+    (context?.facts ? upcomingTitleFromFacts(context.facts) : undefined);
+  for (const theme of runFailThemeChecks(text, {
+    upcoming: upcomingTitle ? { upcomingTitle } : undefined,
+  })) {
+    checks.push({
+      id: theme.id.replaceAll('-', '_'),
+      ok: theme.ok,
+      detail: theme.detail,
+    });
+  }
+
+  // ASS-75: fold residual #26491 one-rec hermetic detectors into live scoring.
+  // - upcoming-sentence-days: allowlisted planning asks only (not every UPCOMING fixture)
+  // - planning-menu-not-a-move: ban patterns on every turn (same posture as question-not-a-move)
+  // - collab-draft-one: collab case only (positive draft shape)
+  // - do-it-calls-tool: already covered by expected_tool when expectToolsAny is set
+  const oneRecGaps = runOneRecGapChecks(text, {
+    upcomingTitle:
+      upcomingTitle && UPCOMING_SENTENCE_DAYS_CASE_IDS.has(testCase.id)
+        ? upcomingTitle
+        : undefined,
+    requireCollabDraftOne: testCase.id === 'collab',
+  });
+  const oneRecGapIds = new Set(oneRecGaps.map(gap => gap.id));
+  for (const gap of oneRecGaps) {
+    checks.push({
+      id: gap.id.replaceAll('-', '_'),
+      ok: gap.ok,
+      detail: gap.detail,
+    });
+  }
+  if (!oneRecGapIds.has('planning-menu-not-a-move')) {
+    const menuOk = !isPlanningMenuCloser(text);
+    checks.push({
+      id: 'planning_menu_not_a_move',
+      ok: menuOk,
+      detail: menuOk
+        ? undefined
+        : 'matched planning-menu closer (not a dated next move)',
+    });
+  }
+
+  // ASS-70 / deferred ASS-36: never deny per-release data when the fixture
+  // has a Discography catalog (established / lapsed). Empty-profile (`new`)
+  // skips this check.
+  if (fixtureHasCatalog(testCase.fixture)) {
+    const deny = deniesVisibleCatalog(text);
+    checks.push({
+      id: 'catalog_deny',
+      ok: !deny,
+      detail: deny
+        ? 'denies per-release / track-by-track data despite catalog context'
+        : undefined,
+    });
+  }
+
   return checks;
+}
+
+/** Live-runner helper: UPCOMING title comes from fixture facts. */
+export function runHardChecksForFixture(
+  testCase: HelpfulnessCase,
+  reply: EvalReply,
+  fixture: Pick<EvalFixture, 'facts'>
+): HardCheckResult[] {
+  return runHardChecks(testCase, reply, { facts: fixture.facts });
 }
 
 export type JudgeScores = Partial<Record<BehaviorId, 0 | 1 | 2 | null>>;

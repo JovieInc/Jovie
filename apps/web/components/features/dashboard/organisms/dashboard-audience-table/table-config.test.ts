@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   AUDIENCE_COLUMN_SPECS,
+  buildAudienceMemberColumns,
   getAudienceColumnVisibility,
   getAudienceTableLayout,
   getAudienceTableMinWidth,
@@ -55,5 +56,13 @@ describe('audience column priority', () => {
     expect(getAudienceTableLayout(720)).toBe('medium');
     expect(getAudienceTableLayout(959)).toBe('medium');
     expect(getAudienceTableLayout(960)).toBe('wide');
+  });
+
+  it('names the selection column for assistive tech without a visible label', () => {
+    const select = buildAudienceMemberColumns('members').find(
+      column => column.id === 'select'
+    );
+    expect(select?.header).toBe('Select');
+    expect(select?.meta?.headerVisibility).toBe('sr-only');
   });
 });

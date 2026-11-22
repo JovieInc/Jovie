@@ -5,39 +5,26 @@
  * are deterministic; `great` tells the judge what a top answer does.
  * New cases from real conversations must be anonymized: rewrite the ask in
  * your own words, map the artist onto a fixture, never paste user text.
+ *
+ * ASS-12 quota fills live in cases-quota-a/b.ts (compact, company size-500).
+ * This file keeps the core + ASS-7 seed bank and composes them.
  */
 
+import type { HelpfulnessCase } from './case-types';
 import { FAN_REPLY_QUOTA_CASES } from './cases-fan-reply';
-import type { FixtureId } from './fixtures';
+import { QUOTA_CASES_A } from './cases-quota-a';
+import { QUOTA_CASES_B } from './cases-quota-b';
 
-export interface HelpfulnessCase {
-  readonly id: string;
-  readonly fixture: FixtureId;
-  /** Prior turns, oldest first, for multi-turn cases. */
-  readonly history?: readonly { role: 'user' | 'assistant'; text: string }[];
-  readonly ask: string;
-  /**
-   * Grounding hard check: every group must have at least one
-   * case-insensitive match in the reply or in a tool call's input.
-   */
-  readonly mustMentionAny?: readonly (readonly string[])[];
-  /** Forbidden substrings (case-insensitive) in reply/tool input. */
-  readonly mustNotSay?: readonly string[];
-  /** Draft-hold: fail if reply claims sent/posted unasked. fan-reply-* implies true. */
-  readonly draftHold?: boolean;
-  /** At least one of these tools must be called. */
-  readonly expectToolsAny?: readonly string[];
-  /** Word cap for the final text; default DEFAULT_MAX_WORDS. */
-  readonly maxWords?: number;
-  /** What a great reply does. Judge guidance only. */
-  readonly great: string;
-  /** Run in the cheap CI live subset. */
-  readonly ciSubset?: boolean;
-}
+export type { HelpfulnessCase } from './case-types';
+export { DEFAULT_MAX_WORDS } from './case-types';
 
-export const DEFAULT_MAX_WORDS = 170;
+/** Fan-reply asks also live in ASS-42 `cases-fan-reply`; drop quota-a dupes. */
+const FAN_REPLY_FROM_MAIN = new Set(FAN_REPLY_QUOTA_CASES.map(c => c.id));
+const QUOTA_A_WITHOUT_FAN_DUPES = QUOTA_CASES_A.filter(
+  c => !FAN_REPLY_FROM_MAIN.has(c.id)
+);
 
-export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = [
+export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = ([] = [
   {
     id: 'week-plan',
     fixture: 'established',
@@ -210,6 +197,7 @@ export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = [
     id: 'new-where-start',
     fixture: 'new',
     ask: "I don't have any music out yet. where do I start?",
+    mustMentionAny: [['add a bio', 'jov.ie/maraquill']],
     great:
       'Acknowledges no releases and an empty profile; gives the first concrete step in Jovie (connect Spotify or add a link/bio so jov.ie/maraquill is live) rather than a career essay.',
     ciSubset: true,
@@ -278,7 +266,7 @@ export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = [
     ask: 'a fan DMed asking when Night Swim drops. draft a reply I can send',
     mustMentionAny: [['night swim'], ['friday', 'days', 'tomorrow', 'today']],
     great:
-      'Draft fan reply naming Night Swim + Friday; hold for send. Never claim messaged.',
+      'Drafts a short fan reply that names Night Swim and the Friday drop, then holds for the artist to send. Never claims it messaged the fan or sends unasked.',
     ciSubset: true,
   },
   {
@@ -287,9 +275,8 @@ export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = [
     ask: 'someone commented on my Neon Reef post saying they love it. what should I reply?',
     mustMentionAny: [['neon reef']],
     great:
-      'One Neon Reef paste-ready reply; hold for post; no invented fan/stats.',
+      'Gives one ready-to-paste reply that references Neon Reef, holds for the artist to post it, and does not invent the fan name or engagement stats.',
   },
-  ...FAN_REPLY_QUOTA_CASES,
   {
     id: 'approvals-pending',
     fixture: 'established',
@@ -463,4 +450,8 @@ export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = [
     great:
       'Picks one: a short nudge draft held for yes, or drop and move on - with a reason tied to Night Swim timing. Never sends the nudge unasked; does not invent that River Lantern replied.',
   },
-];
+
+  ...QUOTA_A_WITHOUT_FAN_DUPES,
+  ...QUOTA_CASES_B,
+  ...FAN_REPLY_QUOTA_CASES,
+]);

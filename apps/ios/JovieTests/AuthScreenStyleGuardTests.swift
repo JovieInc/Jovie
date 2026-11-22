@@ -148,10 +148,13 @@ struct AuthScreenStyleGuardTests {
   }
 
   @Test func neutralPillKeepsCompactPaintAndAtLeast44PointHitArea() {
-    #expect(JoviePillButtonStyle.visibleHeight == 28)
+    #expect(JoviePillButtonStyle.visibleHeight == JovieActionButtonMetrics.height)
+    #expect(JoviePillButtonStyle.minimumHitHeight == JovieActionButtonMetrics.hitTarget)
+    #expect(JovieActionButtonMetrics.height == 28)
+    #expect(JovieActionButtonMetrics.hitTarget == 44)
     #expect(JoviePillButtonStyle.visibleHeight + 2 * JoviePillButtonStyle.hitInset >= JoviePillButtonStyle.minimumHitHeight)
-    // Locked chat controls retain their independent existing 32-point geometry.
-    #expect(JovieActionButtonMetrics.height == 32)
+    // Chat face stays 32 (not ActionButton KEEP).
+    #expect(ChatComposerMetrics.lockedControlSize == 32)
   }
 
   /// Staged entrance guard: the auth screen's first-appearance animation

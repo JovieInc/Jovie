@@ -56,6 +56,14 @@ describe('SendInviteDialog', () => {
     await expectNoA11yViolations(document.body);
   });
 
+  it('leaves initial focus to the dialog, on the email field and not a button', async () => {
+    renderDialog();
+
+    const email = screen.getByRole('textbox');
+    await waitFor(() => expect(email).toHaveFocus());
+    expect(screen.getByRole('button', { name: 'Cancel' })).not.toHaveFocus();
+  });
+
   it('renders nothing without a profile', () => {
     renderDialog({ profile: null });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

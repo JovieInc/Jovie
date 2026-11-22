@@ -19,6 +19,7 @@ import {
   dropdownMenuContentClasses,
   MENU_ITEM_BASE,
   MENU_ITEM_DESTRUCTIVE,
+  PlainButton,
 } from '@jovie/ui';
 import { GripVertical, MoreHorizontal } from 'lucide-react';
 import React, { useCallback, useRef } from 'react';
@@ -46,7 +47,7 @@ const SWIPE_ACTION_CLASS =
   'flex h-full flex-col items-center justify-center gap-1 px-4 text-xs font-caption transition-colors active:opacity-80';
 const NEUTRAL_SWIPE_ACTION_CLASS =
   'bg-surface-2 text-primary-token hover:bg-surface-3';
-const DESTRUCTIVE_SWIPE_ACTION_CLASS = 'bg-error text-white dark:text-white';
+const DESTRUCTIVE_SWIPE_ACTION_CLASS = 'bg-error text-error-foreground';
 
 export interface ChatStyleLinkItemProps<T extends DetectedLink = DetectedLink> {
   readonly id: string;
@@ -126,7 +127,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
   const resolvedLabel = buildPillLabel(link);
   const secondaryText = resolvedLabel.startsWith('@') ? platformName : handle;
   const iconMeta = getPlatformIconMetadata(link.platform.icon);
-  const brandColor = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
+  const brandColor = iconMeta?.hex ? `#${iconMeta.hex}` : null;
 
   const menuItems: LinkItemMenuItem[] = [
     {
@@ -152,7 +153,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
 
   const swipeActions = (
     <>
-      <button
+      <PlainButton
         type='button'
         onClick={() => onEdit(index)}
         className={cn(SWIPE_ACTION_CLASS, NEUTRAL_SWIPE_ACTION_CLASS)}
@@ -160,8 +161,8 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
       >
         <Icon name='Pencil' className='h-4 w-4' />
         <span>Edit</span>
-      </button>
-      <button
+      </PlainButton>
+      <PlainButton
         type='button'
         onClick={() => onToggle(index)}
         className={cn(SWIPE_ACTION_CLASS, NEUTRAL_SWIPE_ACTION_CLASS)}
@@ -169,8 +170,8 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
       >
         <Icon name={visible ? 'EyeOff' : 'Eye'} className='h-4 w-4' />
         <span>{visible ? 'Hide' : 'Show'}</span>
-      </button>
-      <button
+      </PlainButton>
+      <PlainButton
         type='button'
         onClick={() => onRemove(index)}
         className={cn(SWIPE_ACTION_CLASS, DESTRUCTIVE_SWIPE_ACTION_CLASS)}
@@ -178,7 +179,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
       >
         <Icon name='Trash' className='h-4 w-4' />
         <span>Delete</span>
-      </button>
+      </PlainButton>
     </>
   );
 
@@ -200,7 +201,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
         >
           {/* Drag handle - 44px tap target on mobile */}
           {draggable && (
-            <button
+            <PlainButton
               type='button'
               className={cn(
                 'flex h-11 w-11 cursor-grab items-center justify-center rounded-md sm:h-8 sm:w-8',
@@ -214,16 +215,23 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
               {...listeners}
             >
               <GripVertical className='h-5 w-5 sm:h-4 sm:w-4' />
-            </button>
+            </PlainButton>
           )}
 
           {/* Platform icon - larger on mobile */}
           <div
-            className='flex h-12 w-12 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10 sm:rounded-lg'
-            style={{
-              backgroundColor: brandColor,
-              color: getContrastTextOnBrand(brandColor),
-            }}
+            className={cn(
+              'flex h-12 w-12 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10 sm:rounded-lg',
+              !brandColor && 'bg-surface-3 text-secondary-token'
+            )}
+            style={
+              brandColor
+                ? {
+                    backgroundColor: brandColor,
+                    color: getContrastTextOnBrand(brandColor),
+                  }
+                : undefined
+            }
           >
             <SocialIcon
               platform={link.platform.icon}
@@ -244,7 +252,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
           </div>
 
           {/* Menu button - 44px tap target on mobile */}
-          <button
+          <PlainButton
             type='button'
             aria-label={`Open actions for ${resolvedLabel}`}
             ref={floatingRefs.setReference}
@@ -257,7 +265,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
             {...getReferenceProps()}
           >
             <MoreHorizontal className='h-5 w-5 sm:h-4 sm:w-4' />
-          </button>
+          </PlainButton>
 
           {/* Dropdown menu */}
           {isMenuOpen && (
@@ -275,7 +283,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
                   {...getFloatingProps()}
                 >
                   {menuItems.map((item, itemIndex) => (
-                    <button
+                    <PlainButton
                       key={item.id}
                       type='button'
                       ref={itemIndex === 0 ? firstItemRef : undefined}
@@ -299,7 +307,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
                       <span className='min-w-0 flex-1 truncate'>
                         {item.label}
                       </span>
-                    </button>
+                    </PlainButton>
                   ))}
                 </div>
               </FloatingFocusManager>

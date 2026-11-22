@@ -125,6 +125,7 @@ vi.mock('./DashboardAudienceWorkspace', () => ({
   ),
 }));
 
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { DashboardAudienceClient } from './DashboardAudienceClient';
 
 function renderClient() {
@@ -223,6 +224,25 @@ describe('DashboardAudienceClient', () => {
 
       expect(screen.getByText('Audience workspace')).toBeVisible();
       expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it('keeps the workspace and the error fallback axe-clean', async () => {
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    try {
+      const ok = renderClient();
+      expect(screen.getByText('Audience workspace')).toBeVisible();
+      await expectNoA11yViolations(ok.container);
+      ok.unmount();
+
+      mockQueryBehavior.current = 'throw';
+      const failed = renderClient();
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeVisible();
+      await expectNoA11yViolations(failed.container);
     } finally {
       consoleError.mockRestore();
     }

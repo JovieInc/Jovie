@@ -7,6 +7,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { FilterSubmenu } from './FilterSubmenu';
 
 type Props = ComponentProps<typeof FilterSubmenu>;
@@ -59,11 +60,9 @@ async function openSubmenu(
   return search;
 }
 
-// No axe run here on purpose: the open submenu puts its search textbox
-// directly inside role="menu", which axe reports as aria-required-children.
-// That needs a source change (the group plus inner menu structure the shared
-// dropdown uses), so this file proves behavior only and the component's a11y
-// criterion stays open until the source is fixed.
+// The menu is portaled to the body, outside any landmark; the page landmark
+// rule belongs to the page, not to this submenu.
+const PORTAL_AXE_OPTIONS = { rules: { region: { enabled: false } } };
 
 describe('FilterSubmenu certificate', () => {
   it('shows the selected count on the category and toggles options by click', async () => {
@@ -170,6 +169,20 @@ describe('FilterSubmenu certificate', () => {
     ).not.toHaveTextContent(/\d/);
     expect(await openSubmenu(user, 'Search...')).toBeInTheDocument();
     expect(screen.getByText('No options found')).toBeInTheDocument();
+  });
+
+  it('keeps the open submenu and its empty state axe-clean', async () => {
+    const user = userEvent.setup();
+    const { baseElement } = renderSubmenu();
+
+    await openSubmenu(user);
+    await expectNoA11yViolations(baseElement, PORTAL_AXE_OPTIONS);
+    await user.type(
+      screen.getByRole('textbox', { name: 'Search types...' }),
+      'zzz'
+    );
+    expect(screen.getByText('No options found')).toBeInTheDocument();
+    await expectNoA11yViolations(baseElement, PORTAL_AXE_OPTIONS);
   });
 
   it('renders no category when filtered out of the main menu', () => {
