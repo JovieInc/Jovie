@@ -30,18 +30,19 @@ export function shortTitle(blocker: CompanyBlocker): string {
   // 'bad'). A missing or out-of-date measurement leaves it unconfirmed.
   if (blocker.tone !== 'bad') return UNPROVEN_BOTTLENECK_TITLE;
   if (blocker.kind === 'certification') {
+    if (blocker.step === 'public_profile') {
+      return 'Public profile certification needs attention';
+    }
     const name =
       blocker.step === 'checkout_payment_entitlement'
         ? 'Checkout'
         : blocker.step === 'homepage_entry'
           ? 'Homepage entry'
-          : blocker.step === 'public_profile'
-            ? 'The public profile'
-            : blocker.step === 'onboarding_auth_claim'
-              ? 'Sign-up and claim'
-              : blocker.step === 'activation_dashboard'
-                ? 'First use after paying'
-                : stepLabel(blocker.step);
+          : blocker.step === 'onboarding_auth_claim'
+            ? 'Sign-up and claim'
+            : blocker.step === 'activation_dashboard'
+              ? 'First use after paying'
+              : stepLabel(blocker.step);
     return `${name} is blocking revenue`;
   }
   // Funnel body already carries the measured detail — headline must differ.
