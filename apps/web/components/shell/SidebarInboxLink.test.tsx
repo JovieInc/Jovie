@@ -250,7 +250,7 @@ describe('central Inbox bell', () => {
     render(
       <SidebarInboxLink availability={{ state: 'empty', pendingCount: 0 }} />
     );
-    const link = screen.getByRole('link', { name: 'Inbox — all caught up' });
+    const link = screen.getByRole('link', { name: 'Home — all caught up' });
     fireEvent.click(link, { metaKey: true });
     expect(startNavigationTelemetry).not.toHaveBeenCalled();
     fireEvent.click(link, { detail: 1 });
