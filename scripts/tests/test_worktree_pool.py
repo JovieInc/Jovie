@@ -62,6 +62,8 @@ class PoolTest(unittest.TestCase):
         self.install.start()
         self.disk = patch.object(pool_mod, "free_gb", return_value=100)
         self.disk.start()
+        import worktree_pool_bootstrap
+        self.enterContext(patch.object(worktree_pool_bootstrap, "strict_dependency_env", side_effect=lambda slot, env, run: env(slot)))
 
     def tearDown(self):
         self.disk.stop()

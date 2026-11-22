@@ -166,7 +166,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_fix_red_size_split.py",
               "scripts/tests/test_continuity_clock.py",
               "scripts/tests/test_worktree_sweep.py", "scripts/tests/test_service_census.py",
-              "scripts/tests/test_worktree_pool.py",
+              "scripts/tests/test_worktree_pool.py", "scripts/tests/test_worktree_pool_bootstrap.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
               "scripts/tests/test_remediation.py", "scripts/tests/test_revert_first.py", "scripts/tests/test_repair_order.py", "scripts/tests/test_autoscale.py", "scripts/tests/test_pr_wip.py",
@@ -10693,15 +10693,15 @@ def release_paths(repo: Path, revision: str) -> list[str]:
 
 
 def ensure_dependency_pool(host: Host) -> bool:
-    """The mesh runtime compiles against a pool slot restored from a recent lock; slots age out after
-    three days and an aged pool made every release refuse 'mesh runtime dependency closure failed'
-    (Gem, 2026-10-26 to 10-29). Refill before building when no ready slot remains. True when a fill ran."""
+    """Return true only when a refill leaves a ready slot for the release proof."""
     try:
-        if not worktree_pool.enabled() or worktree_pool.ready_slots(worktree_pool.pool_dir(host.repo)):
+        if not worktree_pool.enabled() or worktree_pool.ready_slots(pool := worktree_pool.pool_dir(host.repo)):
             return False
         print("lane update: dependency pool has no ready slot; refilling before the release build", file=sys.stderr)
-        worktree_pool.fill(host.repo, warm=False, log=sys.stderr)
-        return True
+        actions = worktree_pool.fill(host.repo, warm=False, log=sys.stderr)
+        if not (ready := bool(worktree_pool.ready_slots(pool))):
+            print(f"lane update: dependency pool refill left no ready slot; actions={', '.join(actions[-3:])[:450]}", file=sys.stderr)
+        return ready
     except (OSError, subprocess.SubprocessError) as error:
         print(f"lane update: dependency pool refill failed: {error}", file=sys.stderr)
         return False

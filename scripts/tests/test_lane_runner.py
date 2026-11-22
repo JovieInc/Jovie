@@ -12420,7 +12420,7 @@ class UpdaterSelfHealTest(unittest.TestCase):
         host = lane.Host(state=Path("/nonexistent-state"), repo=Path("/nonexistent-repo"))
         with patch.object(lane.worktree_pool, "enabled", return_value=True), \
              patch.object(lane.worktree_pool, "pool_dir", return_value=Path("/p")), \
-             patch.object(lane.worktree_pool, "ready_slots", return_value=[]), \
+             patch.object(lane.worktree_pool, "ready_slots", side_effect=[[], [Path("/p/slot-a")]]), \
              patch.object(lane.worktree_pool, "fill", return_value=["built slot-a"]) as fill:
             self.assertTrue(lane.ensure_dependency_pool(host))
             fill.assert_called_once()
