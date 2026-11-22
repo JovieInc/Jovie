@@ -2,8 +2,8 @@
 
 import { cn } from '@jovie/ui/lib/utils';
 import { Slot } from '@radix-ui/react-slot';
-import { Check } from 'lucide-react';
 import { cva } from 'class-variance-authority';
+import { Check } from 'lucide-react';
 import * as React from 'react';
 
 import {
@@ -453,211 +453,216 @@ function MorphFace({
 }
 
 /** Internal presentation of Button, not a second action component. */
-const ButtonMorph = React.forwardRef<
-  HTMLButtonElement,
-  ButtonMorphProps
->(function ButtonMorph(
-  {
-    children,
-    className,
-    surfaceClassName,
-    state,
-    labels,
-    primary,
-    destructive,
-    disabled,
-    style,
-    onClick,
-    onClickCapture,
-    onKeyDown,
-    onPointerDown,
-    'aria-label': ariaLabel,
-    'aria-labelledby': ariaLabelledBy,
-    'aria-busy': ariaBusy,
-    'aria-disabled': ariaDisabled,
-    type = 'button',
-    ...props
-  },
-  ref
-) {
-  const labelId = React.useId();
-  const buttonRef = React.useRef<HTMLButtonElement | null>(null);
-  const [keyboard, setKeyboard] = React.useState(false);
-  const [spinnerVisible, setSpinnerVisible] = React.useState(false);
-  const pending = state === 'pending';
-  const compact = pending || state === 'success';
-  const text = {
-    error: 'Could not complete.',
-    pending: 'Loading',
-    retry: 'Retry',
-    success: 'Complete',
-    ...labels,
-  };
+const ButtonMorph = React.forwardRef<HTMLButtonElement, ButtonMorphProps>(
+  function ButtonMorph(
+    {
+      children,
+      className,
+      surfaceClassName,
+      state,
+      labels,
+      primary,
+      destructive,
+      disabled,
+      style,
+      onClick,
+      onClickCapture,
+      onKeyDown,
+      onPointerDown,
+      'aria-label': ariaLabel,
+      'aria-labelledby': ariaLabelledBy,
+      'aria-busy': ariaBusy,
+      'aria-disabled': ariaDisabled,
+      type = 'button',
+      ...props
+    },
+    ref
+  ) {
+    const labelId = React.useId();
+    const buttonRef = React.useRef<HTMLButtonElement | null>(null);
+    const [keyboard, setKeyboard] = React.useState(false);
+    const [spinnerVisible, setSpinnerVisible] = React.useState(false);
+    const pending = state === 'pending';
+    const compact = pending || state === 'success';
+    const text = {
+      error: 'Could not complete.',
+      pending: 'Loading',
+      retry: 'Retry',
+      success: 'Complete',
+      ...labels,
+    };
 
-  // Delay presentation only. Action dispatch and aria-busy are synchronous.
-  // Each pending episode owns its timer; reversals/unmount cancel it.
-  React.useEffect(() => {
-    if (!pending) {
-      setSpinnerVisible(false);
-      return;
-    }
-    const value = buttonRef.current
-      ? getComputedStyle(buttonRef.current)
-          .getPropertyValue('--duration-subtle')
-          .trim()
-      : '';
-    const delay = Number.parseFloat(value) * (value.endsWith('ms') ? 1 : 1000);
-    const timer = setTimeout(
-      () => setSpinnerVisible(true),
-      Number.isFinite(delay) ? delay : 0
-    );
-    return () => clearTimeout(timer);
-  }, [pending]);
+    // Delay presentation only. Action dispatch and aria-busy are synchronous.
+    // Each pending episode owns its timer; reversals/unmount cancel it.
+    React.useEffect(() => {
+      if (!pending) {
+        setSpinnerVisible(false);
+        return;
+      }
+      const value = buttonRef.current
+        ? getComputedStyle(buttonRef.current)
+            .getPropertyValue('--duration-subtle')
+            .trim()
+        : '';
+      const delay =
+        Number.parseFloat(value) * (value.endsWith('ms') ? 1 : 1000);
+      const timer = setTimeout(
+        () => setSpinnerVisible(true),
+        Number.isFinite(delay) ? delay : 0
+      );
+      return () => clearTimeout(timer);
+    }, [pending]);
 
-  const noTravel = keyboard ? { transitionProperty: 'none' } : undefined;
-  const status =
-    state === 'idle'
-      ? ''
-      : state === 'error'
-        ? `${text.error} ${text.retry}`
-        : text[state];
-  return (
-    <>
-      <button
-        {...props}
-        ref={node => {
-          buttonRef.current = node;
-          if (typeof ref === 'function') ref(node);
-          else if (ref) ref.current = node;
-        }}
-        type={type}
-        disabled={disabled}
-        aria-busy={pending || ariaBusy}
-        aria-disabled={disabled || pending || ariaDisabled}
-        aria-label={ariaLabel}
-        aria-labelledby={ariaLabel ? undefined : (ariaLabelledBy ?? labelId)}
-        data-state={disabled ? 'disabled' : state}
-        data-destructive={destructive || undefined}
-        data-pending-presentation='morph'
-        data-keyboard={keyboard || undefined}
-        className={cn(
-          surfaceClassName,
-          'isolate max-w-full min-w-11 min-h-11',
-          pending && 'aria-disabled:opacity-100',
-          className
-        )}
-        style={{
-          ...style,
-          background: 'transparent',
-          borderColor: 'transparent',
-          boxShadow: 'none',
-          minHeight: ACTION_BUTTON_MOBILE_HIT_TARGET_PX,
-          minWidth: ACTION_BUTTON_MOBILE_HIT_TARGET_PX,
-        }}
-        onPointerDown={event => {
-          setKeyboard(false);
-          onPointerDown?.(event);
-        }}
-        onKeyDown={event => {
-          if (event.key === 'Enter' || event.key === ' ') setKeyboard(true);
-          onKeyDown?.(event);
-        }}
-        onClickCapture={event => {
-          if (
-            pending ||
-            disabled ||
-            ariaDisabled === true ||
-            ariaDisabled === 'true'
-          ) {
-            event.preventDefault();
-            event.stopPropagation();
-            return;
-          }
-          onClickCapture?.(event);
-        }}
-        onClick={event => {
-          setKeyboard(event.detail === 0);
-          onClick?.(event);
-        }}
-      >
-        {/* Both labels reserve the larger footprint, including full-width CTAs.
-              Only the face's caps/fill transform; the target/ring never move. */}
-        <span aria-hidden='true' className='invisible grid min-w-0 max-w-full'>
-          <span className='col-start-1 row-start-1 truncate'>{children}</span>
-          <span className='col-start-1 row-start-1 truncate'>{text.retry}</span>
-        </span>
-        <span id={labelId} className='sr-only'>
-          {state === 'error' ? `${text.error} ${text.retry}` : children}
-        </span>
-        <MorphFace
-          compact={compact}
-          pending={pending}
-          keyboard={keyboard}
-          chrome={surfaceClassName}
-        />
-        <span
-          aria-hidden='true'
-          data-part='morph-label'
-          className='pointer-events-none absolute inset-0 flex min-w-0 items-center justify-center transition-opacity duration-fast ease-subtle motion-reduce:transition-none'
+    const noTravel = keyboard ? { transitionProperty: 'none' } : undefined;
+    const status =
+      state === 'idle'
+        ? ''
+        : state === 'error'
+          ? `${text.error} ${text.retry}`
+          : text[state];
+    return (
+      <>
+        <button
+          {...props}
+          ref={node => {
+            buttonRef.current = node;
+            if (typeof ref === 'function') ref(node);
+            else if (ref) ref.current = node;
+          }}
+          type={type}
+          disabled={disabled}
+          aria-busy={pending || ariaBusy}
+          aria-disabled={disabled || pending || ariaDisabled}
+          aria-label={ariaLabel}
+          aria-labelledby={ariaLabel ? undefined : (ariaLabelledBy ?? labelId)}
+          data-state={disabled ? 'disabled' : state}
+          data-destructive={destructive || undefined}
+          data-pending-presentation='morph'
+          data-keyboard={keyboard || undefined}
+          className={cn(
+            surfaceClassName,
+            'isolate max-w-full min-w-11 min-h-11',
+            pending && 'aria-disabled:opacity-100',
+            className
+          )}
           style={{
-            paddingInline: 'inherit',
-            opacity: compact ? 0 : 1,
-            ...noTravel,
+            ...style,
+            background: 'transparent',
+            borderColor: 'transparent',
+            boxShadow: 'none',
+            minHeight: ACTION_BUTTON_MOBILE_HIT_TARGET_PX,
+            minWidth: ACTION_BUTTON_MOBILE_HIT_TARGET_PX,
+          }}
+          onPointerDown={event => {
+            setKeyboard(false);
+            onPointerDown?.(event);
+          }}
+          onKeyDown={event => {
+            if (event.key === 'Enter' || event.key === ' ') setKeyboard(true);
+            onKeyDown?.(event);
+          }}
+          onClickCapture={event => {
+            if (
+              pending ||
+              disabled ||
+              ariaDisabled === true ||
+              ariaDisabled === 'true'
+            ) {
+              event.preventDefault();
+              event.stopPropagation();
+              return;
+            }
+            onClickCapture?.(event);
+          }}
+          onClick={event => {
+            setKeyboard(event.detail === 0);
+            onClick?.(event);
           }}
         >
-          <span className='grid w-full min-w-0'>
-            <span
-              className='col-start-1 row-start-1 inline-flex min-w-0 items-center justify-center gap-1.5 truncate'
-              style={{ opacity: state === 'error' ? 0 : 1 }}
-            >
-              {children}
-            </span>
-            <span
-              className='col-start-1 row-start-1 truncate'
-              style={{ opacity: state === 'error' ? 1 : 0 }}
-            >
+          {/* Both labels reserve the larger footprint, including full-width CTAs.
+              Only the face's caps/fill transform; the target/ring never move. */}
+          <span
+            aria-hidden='true'
+            className='invisible grid min-w-0 max-w-full'
+          >
+            <span className='col-start-1 row-start-1 truncate'>{children}</span>
+            <span className='col-start-1 row-start-1 truncate'>
               {text.retry}
             </span>
           </span>
-        </span>
-        <span
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-0 flex items-center justify-center'
-        >
-          {pending && (
-            <span
-              data-part='morph-spinner'
-              style={{ opacity: spinnerVisible ? 1 : 0 }}
-            >
-              <Spinner
-                size='sm'
-                tone={primary ? 'inverse' : 'primary'}
-                className={
-                  primary && destructive
-                    ? 'text-btn-destructive-foreground'
-                    : undefined
-                }
-              />
-            </span>
-          )}
-          <Check
-            data-part='morph-check'
-            className='absolute size-4 transition-opacity duration-subtle ease-subtle motion-reduce:transition-none'
-            style={{ opacity: state === 'success' ? 1 : 0, ...noTravel }}
+          <span id={labelId} className='sr-only'>
+            {state === 'error' ? `${text.error} ${text.retry}` : children}
+          </span>
+          <MorphFace
+            compact={compact}
+            pending={pending}
+            keyboard={keyboard}
+            chrome={surfaceClassName}
           />
+          <span
+            aria-hidden='true'
+            data-part='morph-label'
+            className='pointer-events-none absolute inset-0 flex min-w-0 items-center justify-center transition-opacity duration-fast ease-subtle motion-reduce:transition-none'
+            style={{
+              paddingInline: 'inherit',
+              opacity: compact ? 0 : 1,
+              ...noTravel,
+            }}
+          >
+            <span className='grid w-full min-w-0'>
+              <span
+                className='col-start-1 row-start-1 inline-flex min-w-0 items-center justify-center gap-1.5 truncate'
+                style={{ opacity: state === 'error' ? 0 : 1 }}
+              >
+                {children}
+              </span>
+              <span
+                className='col-start-1 row-start-1 truncate'
+                style={{ opacity: state === 'error' ? 1 : 0 }}
+              >
+                {text.retry}
+              </span>
+            </span>
+          </span>
+          <span
+            aria-hidden='true'
+            className='pointer-events-none absolute inset-0 flex items-center justify-center'
+          >
+            {pending && (
+              <span
+                data-part='morph-spinner'
+                style={{ opacity: spinnerVisible ? 1 : 0 }}
+              >
+                <Spinner
+                  size='sm'
+                  tone={primary ? 'inverse' : 'primary'}
+                  className={
+                    primary && destructive
+                      ? 'text-btn-destructive-foreground'
+                      : undefined
+                  }
+                />
+              </span>
+            )}
+            <Check
+              data-part='morph-check'
+              className='absolute size-4 transition-opacity duration-subtle ease-subtle motion-reduce:transition-none'
+              style={{ opacity: state === 'success' ? 1 : 0, ...noTravel }}
+            />
+          </span>
+        </button>
+        <span
+          role='status'
+          aria-live='polite'
+          aria-atomic='true'
+          className='sr-only'
+        >
+          {status}
         </span>
-      </button>
-      <span
-        role='status'
-        aria-live='polite'
-        aria-atomic='true'
-        className='sr-only'
-      >
-        {status}
-      </span>
-    </>
-  );
-});
+      </>
+    );
+  }
+);
 
 export type { ButtonSize, ButtonVariant };
 export { BUTTON_SIZE_NAMES, BUTTON_VARIANT_NAMES, Button, buttonVariants };
