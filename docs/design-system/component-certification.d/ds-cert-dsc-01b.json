@@ -180,15 +180,6 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
     "apps/web/components/features/dashboard/organisms/audience-member-sidebar/AudienceMemberReferrers.tsx": [
       "ds-owner",
       "tokens",
@@ -230,9 +221,6 @@
     "apps/web/components/features/dashboard/atoms/link-actions/LinkActions.tsx": {
       "long-content": "The component renders only icons and fixed menu labels (Edit, Hide or Show, Delete); no caller text can overflow.",
       "permission-denied": "The component has no access check; callers decide whether to render it."
-    },
-    "apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard.tsx": {
-      "offline": "The card reads one query; a failed or offline request renders the same unavailable row shown by the Error story."
     },
     "apps/web/components/features/dashboard/organisms/audience-member-sidebar/AudienceMemberReferrers.tsx": {
       "error": "The list renders already-loaded member data; copy and QR failures surface only as toasts (tested), with no in-component error UI to show."
