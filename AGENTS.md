@@ -85,7 +85,7 @@ onboarding, canonical tokens, and generated files.
 
 ## Finish line
 
-Done means the user's outcome works, not that a PR exists.
+Done means the outcome works live: `pnpm done:check --pr N`.
 
 1. First write the done-check (what a user sees when it works) and reproduce
    the problem.
@@ -99,7 +99,5 @@ Done means the user's outcome works, not that a PR exists.
 4. Work the given task, not receipts, freshness markers or self-checks.
 5. Report before/after, exact checks and gaps. Don't infer source, CI, queue,
    deploy or runtime from each other.
-6. Say done, or propose done, only after `pnpm done:check --pr N` passes:
-   merged, live on jov.ie, production probes green, production screenshot.
 
 Company canon: JovieInc/ci canon/COMPANY.md.
