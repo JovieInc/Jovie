@@ -377,7 +377,7 @@ export function createEveSummerSpeaker(
           yield { type: 'error', state: 'failure', hop: 'summer_turn_failed' };
           return;
         }
-        // A `[[chart:<metric>]]` line asks Ovie for an inline chart built
+        // A chart line (see summer-chart-directives) asks Ovie for an inline chart built
         // from live, registered sources; the line itself never reaches chat.
         const reply = extractSummerChartDirectives(result.responseText);
         if (reply.text) yield { type: 'text-delta', text: reply.text };

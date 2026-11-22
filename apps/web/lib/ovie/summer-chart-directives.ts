@@ -1,8 +1,9 @@
 /**
  * Inline chart directives in Summer's Ovie replies.
  *
- * Summer ends a reply with a line such as `[[chart:revenue]]` when Tim asks to
- * see a metric. Ovie strips the line and renders a summer.ops-card.v1 built
+ * Summer ends a reply with a chart line (two open brackets, `chart`, a colon,
+ * the metric id such as `revenue`, two close brackets) when Tim asks to see a
+ * metric. Ovie strips the line and renders a summer.ops-card.v1 built
  * from live, registered sources (never numbers Summer wrote), following the
  * generative-views rule: compose canonical blocks bound to registered metric
  * ids, never model-written UI or queries (docs/architecture/generative-views.md).
@@ -14,7 +15,11 @@ export type SummerChartMetric = (typeof SUMMER_CHART_METRICS)[number];
 /** Maximum charts one reply may ask for. */
 export const SUMMER_CHART_LIMIT = 2;
 
-const DIRECTIVE = /\[\[chart:([a-z][a-z0-9-]{0,40})\]\]/giu;
+const DIRECTIVE_KEY = 'chart';
+const DIRECTIVE = new RegExp(
+  String.raw`\[\[${DIRECTIVE_KEY}:([a-z][a-z0-9-]{0,40})\]\]`,
+  'giu'
+);
 
 function isChartMetric(value: string): value is SummerChartMetric {
   return (SUMMER_CHART_METRICS as readonly string[]).includes(value);
