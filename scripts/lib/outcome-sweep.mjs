@@ -6,6 +6,7 @@
 // the same remediation issue the action files: red opens or updates it, the
 // first green after a red resolves it. A steady red refiles at most every
 // REFILE_MS so the shared Linear budget is not spent on repeats.
+// api-budget: github-actions-token 15/hr - automation-liveness bucket every 20 minutes: 3-5 completed-run list pages on main
 import { GITHUB_API } from '../../packages/api-client/github.ts';
 import { readGithubJson } from './github-json-read.mjs';
 import { outcomeFingerprint, readSweptList } from './outcome-coverage.mjs';
