@@ -4952,6 +4952,86 @@ describe('production promotion exact-artifact contract', () => {
     expect(healthEvaluation).toContain(
       'incident controller_completed_without_marker'
     );
+    // JOV-8157: run 40673640421 paged controller_completed_without_marker for
+    // a controller whose conclusion was failure (promote gate red, no marker
+    // because promotion never succeeded). That class is only inside the
+    // success branch. Other terminal conclusions are release-owned.
+    const missingMarkerAt = healthEvaluation.indexOf(
+      'incident controller_completed_without_marker'
+    );
+    const terminalHandoffAt = healthEvaluation.indexOf(
+      'terminal_reason="$(controller_terminal_recovery_reason "$controller_conclusion")"'
+    );
+    expect(missingMarkerAt).toBeGreaterThan(0);
+    expect(terminalHandoffAt).toBeGreaterThan(missingMarkerAt);
+    expect(
+      healthEvaluation.slice(missingMarkerAt, terminalHandoffAt)
+    ).toContain('fi');
+    expect(healthEvaluation).toContain('incident malformed_controller_conclusion');
+    expect(healthEvaluation).toContain('incident controller_failed');
+    expect(healthEvaluation).toContain(
+      'startswith("Production Release /")'
+    );
+    expect(healthEvaluation.indexOf('incident controller_failed')).toBeGreaterThan(
+      terminalHandoffAt
+    );
+    const releaseStartedMatch =
+      /if jq -e '\n([\s\S]*?)\n\s+' >\/dev\/null <<<"\$controller_jobs"; then\n\s+release_started=1/.exec(
+        healthEvaluation
+      );
+    expect(releaseStartedMatch).not.toBeNull();
+    const releaseStartedFilter = releaseStartedMatch?.[1] ?? 'false';
+    const releaseJob = (name: string) => ({ name });
+    expect(
+      spawnSync('jq', ['-e', releaseStartedFilter], {
+        encoding: 'utf8',
+        input: JSON.stringify({
+          jobs: [releaseJob('Production Release / Promote to Production')],
+        }),
+      }).status
+    ).toBe(0);
+    expect(
+      spawnSync('jq', ['-e', releaseStartedFilter], {
+        encoding: 'utf8',
+        input: JSON.stringify({
+          jobs: [releaseJob('Authorize exact main CI evidence')],
+        }),
+      }).status
+    ).not.toBe(0);
+    const terminalReasonMatch =
+      / {10}(controller_terminal_recovery_reason\(\) \{[\s\S]*?\n {10}\})/.exec(
+        healthEvaluation
+      );
+    expect(terminalReasonMatch).not.toBeNull();
+    const terminalReasonFn = (terminalReasonMatch?.[1] ?? '').replace(
+      /^ {10}/gm,
+      ''
+    );
+    for (const [conclusion, expected] of [
+      ['failure', 'controller_terminal_failure'],
+      ['cancelled', 'controller_terminal_cancelled'],
+      ['timed_out', 'controller_terminal_timed_out'],
+      ['startup_failure', 'controller_terminal_startup_failure'],
+      ['neutral', 'controller_terminal_neutral'],
+      ['skipped', 'controller_terminal_skipped'],
+      ['stale', 'controller_terminal_stale'],
+      ['success', 'malformed'],
+      ['action_required', 'malformed'],
+      ['', 'malformed'],
+    ] as const) {
+      const classification = spawnSync(
+        'bash',
+        [
+          '-c',
+          `${terminalReasonFn}\ncontroller_terminal_recovery_reason "$1"`,
+          'controller-terminal-reason',
+          conclusion,
+        ],
+        { encoding: 'utf8' }
+      );
+      expect(classification.status).toBe(0);
+      expect(classification.stdout.trim()).toBe(expected);
+    }
     expect(manualIncident).toContain(
       "if: ${{ github.event_name == '__retired_linear_only__' }}"
     );
