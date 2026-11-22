@@ -89,7 +89,7 @@ private actor SuspendableRefreshTokenProvider: TokenProviding {
   }
 }
 
-private enum FenceLegacySurface: String, CaseIterable, Sendable {
+enum FenceLegacySurface: String, CaseIterable, Sendable {
   case me
   case audience
   case inbox
