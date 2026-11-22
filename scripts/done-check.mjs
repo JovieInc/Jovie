@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { execFileSync } from 'node:child_process';
 /**
  * Done means seen working on production (Tim 2026-11-22). An agent or task may
  * report done, or propose done, only when this check passes for its PR:
@@ -16,10 +15,13 @@ import { execFileSync } from 'node:child_process';
  *
  * Exit 0 done, 1 not done (reasons printed), 75 unknown (a read failed; never done).
  * Read-only: one plain production request plus a few GitHub reads.
+ *
+ * api-budget: github-app-core 350/hr - at most 35 reads per check (the PR, one page of probe runs, up to 32 compares, artifacts), about ten checks an hour fleet-wide
  */
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
+import { runGh } from '../packages/api-client/gh.ts';
 
 export const REPO = 'JovieInc/Jovie';
 export const ORIGIN = 'https://jov.ie';
@@ -52,6 +54,12 @@ async function contains(gh, merge, sha) {
  */
 export async function doneCheck({ pr, screenshot }, { gh, served }) {
   const reasons = [];
+  /**
+   * @type {{ pr: number, merged: boolean, deployed: boolean, outcome: boolean,
+   *   screenshot: boolean, reasons: string[], status?: string, probeRun?: string,
+   *   screenshotUrl?: string, screenshotFile?: string, mergeSha?: string,
+   *   servedSha?: string }}
+   */
   const verdict = {
     pr,
     merged: false,
@@ -172,30 +180,15 @@ export async function doneCheck({ pr, screenshot }, { gh, served }) {
   return { ...verdict, status: done ? 'done' : 'not-done' };
 }
 
-function token() {
-  if (process.env.GH_TOKEN || process.env.GITHUB_TOKEN)
-    return process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
-  try {
-    return execFileSync('gh', ['auth', 'token'], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    }).trim();
-  } catch {
-    return '';
-  }
-}
-
-export function githubReader(fetchImpl = fetch, auth = token()) {
-  return async path => {
-    const response = await fetchImpl(`https://api.github.com${path}`, {
-      headers: {
-        accept: 'application/vnd.github+json',
-        ...(auth ? { authorization: `Bearer ${auth}` } : {}),
-      },
-    });
-    if (!response.ok)
-      throw new Error(`GitHub ${response.status} for ${path.split('?')[0]}`);
-    return response.json();
+/** GitHub reads go through the shared client (quota ledger, retries, credentials). */
+export function githubReader(run = runGh) {
+  return async (/** @type {string} */ path) => {
+    const result = await run(['api', path], { priority: 'report' });
+    if (result.code !== 0)
+      throw new Error(
+        `GitHub read failed (exit ${result.code}) for ${path.split('?')[0]}`
+      );
+    return JSON.parse(result.stdout);
   };
 }
 
