@@ -45,10 +45,11 @@ import {
 } from '@/lib/ovie/certifications/golden-path-status';
 import {
   certifiedProdGoldenPathSurfaces,
-  isFreshProdGoldenPathPass,
   type ProdGoldenPathLedger,
+  ProdGoldenPathPersistenceError,
   type ProdGoldenPathReceipt,
-  prodGoldenPathPacketFiles,
+  parseProdGoldenPathLedger,
+  recordProdGoldenPathRun,
 } from '@/lib/ovie/certifications/prod-golden-path-ledger';
 import {
   EXPECTED_BROWSER_CHECKS,
@@ -148,13 +149,12 @@ describe('closed-loop Golden Path certification & eligibility guardrails', () =>
     expect(projected.stepsPassed).toBe(7);
   });
 
-  it('fails closed on future and unparseable timestamps across all certification projections', () => {
+  it('fails closed on future and unparseable timestamps at the ledger boundary (JOV-14402)', async () => {
+    // Certification is release-bound and reads no clock, so a bogus timestamp
+    // is refused where receipts enter: it could otherwise pose as the newest
+    // release and certify it.
     const nowMs = NOW.getTime();
     const future = new Date(nowMs + 10 * 60_000).toISOString();
-    expect(isFreshProdGoldenPathPass(RECENT, nowMs)).toBe(true);
-    expect(isFreshProdGoldenPathPass(future, nowMs)).toBe(false);
-    expect(isFreshProdGoldenPathPass('not-a-timestamp', nowMs)).toBe(false);
-
     const makePass = (surface: string, endedAt: string) =>
       ({
         schema: 'jovie.prod-golden-path-receipt/v1',
@@ -180,17 +180,34 @@ describe('closed-loop Golden Path certification & eligibility guardrails', () =>
         issueUrl: null,
         observations: [],
       }) as unknown as ProdGoldenPathReceipt;
+    const store = new Map<string, string>();
+    const backend = {
+      get: async (key: string) => store.get(key) ?? null,
+      setIfAbsent: async (key: string, value: unknown) => {
+        if (store.has(key)) return false;
+        store.set(key, String(value));
+        return true;
+      },
+      compareAndSet: async (key: string, expected: string, next: string) => {
+        if (store.get(key) !== expected) return false;
+        store.set(key, next);
+        return true;
+      },
+    };
+    await expect(
+      recordProdGoldenPathRun({
+        backend,
+        receipts: [makePass('landing', future)],
+        recordedAt: NOW.toISOString(),
+      })
+    ).rejects.toBeInstanceOf(ProdGoldenPathPersistenceError);
+    expect(store.size).toBe(0);
 
-    const ledger: ProdGoldenPathLedger = {
+    const stored: ProdGoldenPathLedger = {
       schemaVersion: 1,
       contract: 'jovie.prod-golden-path-ledger/v1',
       updatedAt: RECENT,
       surfaces: {
-        landing: {
-          latest: makePass('landing', future),
-          lastPassedSha: SHA,
-          history: [],
-        },
         claim: {
           latest: makePass('claim', 'invalid-date'),
           lastPassedSha: SHA,
@@ -198,17 +215,10 @@ describe('closed-loop Golden Path certification & eligibility guardrails', () =>
         },
       },
     };
-    expect(certifiedProdGoldenPathSurfaces(ledger, nowMs)).toEqual([]);
-    const status = goldenPathStatus(ledger, NOW);
-    expect(status.certified).toBe(0);
-    expect(status.surfaces.find(s => s.id === 'landing')?.status).toBe(
-      'expired'
+    expect(() => parseProdGoldenPathLedger(JSON.stringify(stored))).toThrow(
+      ProdGoldenPathPersistenceError
     );
-    expect(status.surfaces.find(s => s.id === 'claim')?.status).toBe('expired');
-    const packets = prodGoldenPathPacketFiles(ledger, { nowMs });
-    expect(packets[0].packet.operational?.runtimeDogfood?.[0]?.status).toBe(
-      'pending'
-    );
+    expect(certifiedProdGoldenPathSurfaces(null)).toEqual([]);
   });
 
   it('registers every non-commerce eligibility source in REQUIRED_ELIGIBILITY_SOURCES and enforces buyer_would_pay in cache revalidation', async () => {

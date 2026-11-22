@@ -193,6 +193,55 @@ describe('buildStoryFirstBottleneck', () => {
     });
   });
 
+  it('links only shipping work on the blocker as Moving', () => {
+    const row = (identifier: string, title: string, complete = false) => ({
+      id: identifier,
+      identifier,
+      title,
+      url: null,
+      stage: 'building' as const,
+      stageIndex: 1,
+      complete,
+      attention: null,
+      updatedAt: null,
+    });
+    const lanes = row(
+      'JOV-10172',
+      'feat(lanes): gem-default worktree hosts, fallback cap'
+    );
+    const unrelated = buildStoryFirstBottleneck({
+      revenue: checkout,
+      revenueRead: true,
+      constraint: null,
+      highlight: {
+        identifier: lanes.identifier,
+        title: lanes.title,
+        href: null,
+      },
+      rows: [lanes],
+    });
+    expect(unrelated.moving).toBeNull();
+    const related = buildStoryFirstBottleneck({
+      revenue: checkout,
+      revenueRead: true,
+      constraint: null,
+      highlight: {
+        identifier: lanes.identifier,
+        title: lanes.title,
+        href: null,
+      },
+      rows: [
+        lanes,
+        row('JOV-1', 'Stripe checkout copy', true),
+        row('JOV-2', 'fix(billing): success page receipt'),
+      ],
+    });
+    expect(related.moving).toEqual({
+      label: 'JOV-2 · fix(billing): success page receipt',
+      href: null,
+    });
+  });
+
   it('keeps funnel title distinct from the measured body', () => {
     const funnel: CompanyBlocker = {
       schema: 'jovie.company-blocker/v1',

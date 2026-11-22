@@ -43,7 +43,9 @@ export function checkAppChatPromptContract(prompt: string) {
       'Never invent product features',
       'third-party UI paths',
       'say plainly what you cannot see',
-      'Never claim you will set up'
+      'Never claim you will set up',
+      'smart link is live or will live',
+      'lands on Spotify'
     ),
     requiresDraftHoldOutbound: includesAll(
       'Draft every outbound artifact',

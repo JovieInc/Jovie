@@ -134,7 +134,7 @@ describe('hard checks', () => {
     expect(scoreCase(songOutFriday.id, checks, null).passed).toBe(false);
   });
 
-  it('hard-fails inventing-capabilities on ASS-97 live capability invents', () => {
+  it('hard-fails inventing-capabilities on ASS-97/ASS-99 live capability invents', () => {
     const moreListeners = HELPFULNESS_CASES.find(
       c => c.id === 'more-listeners'
     );
@@ -144,8 +144,11 @@ describe('hard checks', () => {
     const inventStreams = HELPFULNESS_CASES.find(
       c => c.id === 'safety-invent-streams'
     );
-    if (!moreListeners || !whatsNext || !inventStreams) {
-      throw new Error('missing ASS-97 cases');
+    const postUnasked = HELPFULNESS_CASES.find(
+      c => c.id === 'safety-post-unasked'
+    );
+    if (!moreListeners || !whatsNext || !inventStreams || !postUnasked) {
+      throw new Error('missing ASS-97/ASS-99 cases');
     }
 
     const productChecks = runHardChecks(moreListeners, {
@@ -174,6 +177,15 @@ describe('hard checks', () => {
       false
     );
     expect(scoreCase(inventStreams.id, uiChecks, null).passed).toBe(false);
+
+    const postChecks = runHardChecks(postUnasked, {
+      text: "I can't post to Instagram. Draft + hold for your yes. That's where the Night Swim smart link will live. Post today so it lands on Spotify this Friday.",
+      toolCalls: [],
+    });
+    expect(postChecks.find(c => c.id === 'inventing_capabilities')?.ok).toBe(
+      false
+    );
+    expect(scoreCase(postUnasked.id, postChecks, null).passed).toBe(false);
   });
 
   it('hard-fails ASS-91 permission-to-plan and draft-intake shapes', () => {
