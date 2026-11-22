@@ -33,6 +33,9 @@ import {
  */
 
 const RELEASE_DATE = new Date('2026-01-01T00:00:00.000Z');
+// The promo rights attestation is immutable once set, so it carries a fixed
+// timestamp: re-running apply writes the same value and the guard allows it.
+const RIGHTS_ATTESTED_AT = RELEASE_DATE;
 
 export async function readCrawlContentFixtureState(
   fixture: CrawlContentFixture = CRAWL_CONTENT_FIXTURE
@@ -282,6 +285,12 @@ async function writeFixture(fixture: CrawlContentFixture): Promise<void> {
     fileName: fixture.promoDownload.fileName,
     fileMimeType: 'audio/mpeg',
     isActive: true,
+    // Active downloads must carry a full-control rights attestation. The
+    // fixture's own account attests for a placeholder file Jovie made and
+    // never uploaded, which no one else holds rights to.
+    rightsControlAttested: true,
+    rightsControlAttestedBy: user.id,
+    rightsControlAttestedAt: RIGHTS_ATTESTED_AT,
     position: 0,
     updatedAt: now,
   };
