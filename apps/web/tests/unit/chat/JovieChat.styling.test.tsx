@@ -375,7 +375,7 @@ describe('JovieChat styling regressions', () => {
 
   it('keeps the composer dock padded above mobile shell navigation', () => {
     const { container } = renderWithQueryClient(
-      <JovieChat profileId='profile-1' />
+      <JovieChat profileId='profile-1' composerDock={() => null} />
     );
 
     const composerDock = container.querySelector('[data-testid="chat-input"]')
@@ -383,6 +383,7 @@ describe('JovieChat styling regressions', () => {
 
     expect(composerDock?.className).toContain(CHAT_COMPOSER_DOCK_CLASSNAME);
     expect(composerDock?.className).toContain('system-b-chat-composer-dock');
+    expect(composerDock?.firstElementChild?.childElementCount).toBe(0);
   });
 
   it('keeps the live transcript mounted when a reserved conversation starts loading', () => {

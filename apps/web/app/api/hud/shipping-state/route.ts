@@ -31,6 +31,31 @@ async function measureWithin(ms: number) {
   ]);
 }
 
+/** Run one coalesced reconciliation that outlives the response. */
+function keepMeasuring(): void {
+  scheduleAfter(
+    async () => {
+      try {
+        await publishConfiguredShippingState();
+      } catch (error) {
+        logger.error(
+          '[hud/shipping-state] Background reconciliation failed',
+          error
+        );
+        await captureError('HUD shipping-state reconciliation failed', error, {
+          route: '/api/hud/shipping-state',
+          method: 'GET',
+        });
+      }
+    },
+    {
+      // Local packaged dogfood has no Vercel request helper. Start the
+      // reconciliation on the same tick while returning cached state first.
+      fallback: 'inline',
+    }
+  );
+}
+
 function hasForbiddenQuery(request: NextRequest): boolean {
   for (const key of FORBIDDEN_QUERY_KEYS) {
     if (request.nextUrl.searchParams.has(key)) return true;
@@ -67,6 +92,10 @@ export async function GET(request: NextRequest) {
     // on the finished measurement.
     if (!hasCachedConfiguredShippingState()) {
       const measured = await measureWithin(INLINE_REFRESH_WAIT_MS);
+      // Outlasted the inline wait: keep the coalesced measurement alive past
+      // the response so the next poll reads the measured projection instead of
+      // the serverless instance freezing it mid-flight.
+      if (!measured) keepMeasuring();
       return NextResponse.json(
         measured ?? readCachedConfiguredShippingState(),
         { headers: NO_STORE_HEADERS }
@@ -100,31 +129,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    scheduleAfter(
-      async () => {
-        try {
-          await publishConfiguredShippingState();
-        } catch (error) {
-          logger.error(
-            '[hud/shipping-state] Background reconciliation failed',
-            error
-          );
-          await captureError(
-            'HUD shipping-state reconciliation failed',
-            error,
-            {
-              route: '/api/hud/shipping-state',
-              method: 'GET',
-            }
-          );
-        }
-      },
-      {
-        // Local packaged dogfood has no Vercel request helper. Start the
-        // reconciliation on the same tick while returning cached state first.
-        fallback: 'inline',
-      }
-    );
+    keepMeasuring();
 
     return NextResponse.json(projection, { headers: NO_STORE_HEADERS });
   } catch (error) {

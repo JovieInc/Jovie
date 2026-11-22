@@ -115,7 +115,7 @@ describe('homepage-optical-polish-v1', () => {
     expect(heroCss).not.toMatch(
       /\.homepage-name-search__field:focus-within[\s\S]*?border-color:/
     );
-    expect(search).toContain("size='marketing'");
+    expect(search).toContain("isEditorial ? 'marketing' : 'sm'");
   });
 
   it('keeps landed visual chapters on product rhythm and preserves close spacing', () => {

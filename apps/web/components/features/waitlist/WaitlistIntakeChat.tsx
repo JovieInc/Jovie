@@ -1,5 +1,6 @@
 'use client';
 
+import { Button, CompositeField, HostDrawnInput } from '@jovie/ui';
 import { ArrowRight, Loader2, SendHorizontal } from 'lucide-react';
 import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -314,29 +315,29 @@ export function WaitlistIntakeChat({
   }
 
   return (
-    <div className='flex min-h-dvh w-full bg-(--color-bg-base) text-white dark:text-white [color-scheme:dark]'>
+    <div className='flex min-h-dvh w-full bg-base text-primary-token'>
       <main className='mx-auto flex w-full max-w-260 flex-col px-4 py-5 sm:px-6 lg:px-8'>
         <header className='flex h-11 items-center justify-between'>
           <div className='inline-flex items-center gap-2'>
-            <BrandLogo size='chrome' tone='white' aria-hidden />
-            <span className='text-mid font-semibold text-white dark:text-white'>
+            <BrandLogo size='chrome' aria-hidden />
+            <span className='text-mid font-semibold text-primary-token'>
               Jovie
             </span>
           </div>
           {userEmail ? (
-            <span className='hidden truncate text-xs text-white/50 sm:block'>
+            <span className='hidden truncate text-xs text-tertiary-token sm:block'>
               {userEmail}
             </span>
           ) : null}
         </header>
 
         <section className='grid flex-1 gap-6 py-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-stretch'>
-          <div className='flex min-h-140 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-(--color-bg-surface-0) shadow-[0_24px_90px_rgba(0,0,0,0.34)]'>
-            <div className='border-b border-white/[0.07] px-4 py-3 sm:px-5'>
-              <h1 className='text-lg font-semibold leading-6 text-white dark:text-white'>
+          <div className='flex min-h-140 flex-col overflow-hidden rounded-2xl border border-subtle bg-surface-0 shadow-xl'>
+            <div className='bg-surface-1 px-4 py-3 sm:px-5'>
+              <h1 className='text-lg text-balance font-semibold leading-6 text-primary-token'>
                 Request Access
               </h1>
-              <p className='mt-1 text-app leading-5 text-white/52'>
+              <p className='mt-1 text-app leading-5 text-secondary-token'>
                 Early access is limited. Answer a few launch questions — we save
                 only the fields needed to decide access or waitlist placement.
               </p>
@@ -359,8 +360,8 @@ export function WaitlistIntakeChat({
                     className={cn(
                       'max-w-[78%] rounded-2xl px-3.5 py-2.5 text-sm leading-6',
                       message.role === 'user'
-                        ? 'bg-white dark:bg-surface-1 text-black dark:text-white'
-                        : 'border border-white/[0.08] bg-white/[0.035] text-white/76'
+                        ? 'bg-btn-primary text-btn-primary-foreground'
+                        : 'bg-surface-1 text-secondary-token'
                     )}
                   >
                     {message.text}
@@ -370,7 +371,7 @@ export function WaitlistIntakeChat({
 
               {saving ? (
                 <div className='flex justify-start'>
-                  <div className='inline-flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.035] px-3.5 py-2.5 text-sm text-white/64'>
+                  <div className='inline-flex items-center gap-2 rounded-2xl bg-surface-1 px-3.5 py-2.5 text-sm text-secondary-token'>
                     <Loader2 className='h-4 w-4 animate-spin' aria-hidden />
                     Saving Your Request
                   </div>
@@ -378,38 +379,40 @@ export function WaitlistIntakeChat({
               ) : null}
             </div>
 
-            <form
-              onSubmit={handleSubmit}
-              className='border-t border-white/[0.07] p-3 sm:p-4'
-            >
+            <form onSubmit={handleSubmit} className='bg-surface-1 p-3 sm:p-4'>
               {error ? (
                 <p className='mb-2 text-app text-error' role='alert'>
                   {error}
                 </p>
               ) : null}
               <div className='flex gap-2'>
-                <input
-                  value={input}
-                  onChange={event => setInput(event.target.value)}
-                  placeholder={step?.placeholder}
-                  disabled={saving}
-                  aria-label={step?.prompt ?? 'Your answer'}
-                  className='h-11 min-w-0 flex-1 rounded-full border border-white/[0.09] bg-white/[0.04] px-4 text-sm text-white dark:text-white outline-none placeholder:text-white dark:text-white/32 focus:border-white/24'
-                />
+                <div className='min-w-0 flex-1 text-sm text-primary-token'>
+                  <CompositeField shape='pill' size='md' surface='field'>
+                    <HostDrawnInput
+                      value={input}
+                      onChange={event => setInput(event.target.value)}
+                      placeholder={step?.placeholder}
+                      disabled={saving}
+                      aria-label={step?.prompt ?? 'Your answer'}
+                      className='min-w-0 flex-1'
+                    />
+                  </CompositeField>
+                </div>
                 {step?.optional ? (
-                  <button
-                    type='button'
+                  <Button
+                    variant='secondary'
+                    size='lg'
                     onClick={() => commitAnswer('', true)}
                     disabled={saving}
-                    className='inline-flex h-11 items-center rounded-full border border-white/[0.1] px-4 text-app font-semibold text-white/70 transition-colors hover:bg-white/[0.04] hover:text-white focus-ring-themed'
                   >
                     Skip
-                  </button>
+                  </Button>
                 ) : null}
-                <button
+                <Button
                   type='submit'
+                  variant='primary'
+                  size='icon-lg'
                   disabled={saving}
-                  className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white dark:bg-surface-1 text-black dark:text-white transition-colors hover:bg-white dark:bg-surface-1/90 disabled:cursor-not-allowed disabled:opacity-60 focus-ring-themed'
                   aria-label={isFinalStep ? 'Save request' : 'Send answer'}
                 >
                   {isFinalStep ? (
@@ -417,13 +420,13 @@ export function WaitlistIntakeChat({
                   ) : (
                     <SendHorizontal className='h-4 w-4' aria-hidden />
                   )}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
 
-          <aside className='hidden rounded-2xl border border-white/[0.08] bg-white/[0.035] p-4 lg:block'>
-            <h2 className='text-sm font-semibold text-white dark:text-white'>
+          <aside className='hidden rounded-2xl border border-subtle bg-surface-1 p-4 lg:block'>
+            <h2 className='text-sm text-balance font-semibold text-primary-token'>
               Saved Context
             </h2>
             <dl className='mt-4 space-y-3 text-app'>
@@ -450,8 +453,10 @@ function ContextRow({
 }: Readonly<{ label: string; value: string }>) {
   return (
     <div>
-      <dt className='text-white/50'>{label}</dt>
-      <dd className='mt-1 break-words text-white/74'>{value || 'Not Set'}</dd>
+      <dt className='text-tertiary-token'>{label}</dt>
+      <dd className='mt-1 break-words text-secondary-token'>
+        {value || 'Not Set'}
+      </dd>
     </div>
   );
 }

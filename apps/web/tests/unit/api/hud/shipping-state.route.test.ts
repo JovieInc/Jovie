@@ -10,6 +10,7 @@ const mockLoggerError = vi.hoisted(() => vi.fn());
 const mockCreateLiveReaders = vi.hoisted(() => vi.fn());
 const mockDefaultLiveIo = vi.hoisted(() => vi.fn());
 const mockFetch = vi.hoisted(() => vi.fn());
+const mockScheduleAfter = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/hud', () => ({
   authorizeHud: mockAuthorizeHud,
@@ -40,6 +41,10 @@ vi.mock('@/lib/ovie/shipping-state/live', async importOriginal => {
   };
 });
 
+vi.mock('@/lib/next/schedule-after', () => ({
+  scheduleAfter: mockScheduleAfter,
+}));
+
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
 }));
@@ -60,6 +65,10 @@ describe('GET /api/hud/shipping-state', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    mockScheduleAfter.mockImplementation((task: () => unknown) => {
+      void task();
+      return true;
+    });
     mockCreateLiveReaders.mockReturnValue({});
     mockDefaultLiveIo.mockReturnValue({ fetch: mockFetch });
     mockHasCached.mockReturnValue(true);
@@ -178,6 +187,25 @@ describe('GET /api/hud/shipping-state', () => {
     });
     expect(mockPublish).toHaveBeenCalledTimes(1);
     expect(mockReadCached).not.toHaveBeenCalled();
+  });
+
+  it('keeps the cold measurement alive past the response when it outlasts the inline wait', async () => {
+    vi.useFakeTimers();
+    try {
+      mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
+      mockHasCached.mockReturnValue(false);
+      mockPublish.mockReturnValue(new Promise(() => {}));
+      const { GET } = await import('@/app/api/hud/shipping-state/route');
+      const pending = GET(
+        new NextRequest('http://localhost/api/hud/shipping-state')
+      );
+      await vi.advanceTimersByTimeAsync(2_300);
+      const response = await pending;
+      expect(response.status).toBe(200);
+      expect(mockScheduleAfter).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('returns 500 when the cold-instance measurement throws', async () => {
