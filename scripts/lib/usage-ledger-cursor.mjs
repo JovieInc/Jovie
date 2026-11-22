@@ -1,12 +1,25 @@
 /**
  * Cursor provider adapters for the usage ledger (first slice).
+ *
+ * @typedef {{ accountId: string, observedAt?: string, now?: number }} CursorSnapshotMeta
+ * @typedef {{
+ *   accountId: string,
+ *   pool?: string,
+ *   transcript: string,
+ *   observedAt?: string,
+ *   plan?: object | null,
+ *   limitScope?: string,
+ *   resetTimezone?: string,
+ *   remaining?: number | null,
+ *   providerEventId?: string | null,
+ * }} CursorQuotaInput
  */
 
 import { createHash } from 'node:crypto';
 import {
+  appendUsageEvent,
   EVENT_SCHEMA,
   PLAN_SCHEMA,
-  appendUsageEvent,
   recordPlanSnapshot,
   sanitizeReceipt,
 } from './usage-ledger.mjs';
@@ -15,7 +28,8 @@ const USAGE_EXHAUSTED =
   /(?:you(?:'re| are) out of usage|usage limit|included usage.*(?:exhausted|depleted))/i;
 const THROTTLE = /(?:rate limit|too many requests|\b429\b)/i;
 const OUTAGE = /(?:service unavailable|\b503\b|temporarily unavailable)/i;
-const AUTH = /(?:not logged in|login required|unauthori[zed]|invalid.*credential)/i;
+const AUTH =
+  /(?:not logged in|login required|unauthori[zed]|invalid.*credential)/i;
 
 const RESET_IN = /try again in\s+((?:\d+\s*(?:hours?|minutes?|mins?))+)/i;
 const RESET_AT = /resets?\s+(?:at|on)\s+([0-9T:\-+Z. ]+)/i;
@@ -31,8 +45,11 @@ export function parseResetPhrase(text, nowMs) {
   const inMatch = RESET_IN.exec(text);
   if (inMatch) {
     let seconds = 0;
-    for (const [, amount, unit] of inMatch[1].matchAll(/(\d+)\s*(hours?|minutes?|mins?)/gi)) {
-      seconds += Number(amount) * (unit.toLowerCase().startsWith('h') ? 3600 : 60);
+    for (const [, amount, unit] of inMatch[1].matchAll(
+      /(\d+)\s*(hours?|minutes?|mins?)/gi
+    )) {
+      seconds +=
+        Number(amount) * (unit.toLowerCase().startsWith('h') ? 3600 : 60);
     }
     return seconds ? toIsoSeconds(nowMs + seconds * 1000) : null;
   }
@@ -78,8 +95,7 @@ export function cursorQuotaEventFromTranscript(
   const observed = observedAt ?? new Date(now).toISOString();
   const condition = classifyCursorTranscript(transcript);
   const resetsAt = parseResetPhrase(transcript, Date.parse(observed));
-  const id =
-    providerEventId ?? cursorProviderEventId(transcript, observed);
+  const id = providerEventId ?? cursorProviderEventId(transcript, observed);
   return {
     schema: EVENT_SCHEMA,
     provider: CURSOR_PROVIDER,
@@ -104,14 +120,22 @@ export function cursorQuotaEventFromTranscript(
   };
 }
 
-export function cursorPlanSnapshotFromAbout(payload, { accountId, observedAt, now = Date.now() } = {}) {
-  const observed = observedAt ?? payload?.observedAt ?? new Date(now).toISOString();
+/**
+ * @param {Record<string, unknown>} payload
+ * @param {CursorSnapshotMeta} [meta]
+ */
+export function cursorPlanSnapshotFromAbout(
+  payload,
+  { accountId, observedAt, now = Date.now() } = /** @type {CursorSnapshotMeta} */ ({})
+) {
+  const observed =
+    observedAt ?? payload?.observedAt ?? new Date(now).toISOString();
   return {
     schema: PLAN_SCHEMA,
     provider: CURSOR_PROVIDER,
     accountId,
     tier: payload?.membership ?? payload?.plan ?? 'unknown',
-    pools: (payload?.pools ?? []).map(row => ({
+    pools: /** @type {Array<Record<string, unknown>>} */ (payload?.pools ?? []).map(row => ({
       id: row.id ?? DEFAULT_CURSOR_POOL,
       label: row.label ?? row.id,
       status: row.status ?? 'unknown',
@@ -119,7 +143,9 @@ export function cursorPlanSnapshotFromAbout(payload, { accountId, observedAt, no
     observedAt: observed,
     source: {
       channel: 'cursor-cli-about',
-      receipt: sanitizeReceipt(payload?.receipt ?? { membership: payload?.membership }),
+      receipt: sanitizeReceipt(
+        payload?.receipt ?? { membership: payload?.membership }
+      ),
     },
   };
 }
@@ -142,6 +168,6 @@ export function ingestCursorQuotaEvent(ledger, transcript, meta, options = {}) {
 }
 
 export function ingestCursorPlanSnapshot(ledger, payload, meta, options = {}) {
-  const snapshot = cursorPlanSnapshotFromAbout(payload, meta, options);
+  const snapshot = cursorPlanSnapshotFromAbout(payload, { ...meta, ...options });
   return recordPlanSnapshot(ledger, snapshot);
 }

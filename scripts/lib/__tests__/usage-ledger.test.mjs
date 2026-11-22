@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { describe, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   appendResetGrant,
   appendUsageEvent,
@@ -9,7 +9,6 @@ import {
   createEmptyLedger,
   endRefresh,
   evaluateRecovery,
-  EVENT_SCHEMA,
   GRANT_SCHEMA,
   PLAN_SCHEMA,
   projectOvieUsagePools,
@@ -19,9 +18,9 @@ import {
   usageEventKey,
 } from '../usage-ledger.mjs';
 import {
+  CURSOR_PROVIDER,
   cursorPlanSnapshotFromAbout,
   cursorQuotaEventFromTranscript,
-  CURSOR_PROVIDER,
   DEFAULT_CURSOR_POOL,
   ingestCursorPlanSnapshot,
   ingestCursorQuotaEvent as ingestQuota,
@@ -51,7 +50,9 @@ describe('usage ledger — cursor first slice', () => {
       { accountId: 'company-ultra', observedAt: planFixture.observedAt },
       { now: NOW }
     );
-    const result = ingestQuota(ledger, quotaFixture.transcript, quotaFixture, { now: NOW });
+    const result = ingestQuota(ledger, quotaFixture.transcript, quotaFixture, {
+      now: NOW,
+    });
     assert.equal(result.applied, true);
     const state = readPoolState(result.ledger, {
       provider: CURSOR_PROVIDER,
@@ -67,8 +68,10 @@ describe('usage ledger — cursor first slice', () => {
   });
 
   test('cached read stays fresh inside maxAge; stale without forced read', () => {
-    let ledger = createEmptyLedger();
-    const applied = ingestQuota(ledger, quotaFixture.transcript, quotaFixture, { now: NOW });
+    const ledger = createEmptyLedger();
+    const applied = ingestQuota(ledger, quotaFixture.transcript, quotaFixture, {
+      now: NOW,
+    });
     const fresh = readPoolState(applied.ledger, {
       provider: CURSOR_PROVIDER,
       accountId: 'company-ultra',
@@ -119,13 +122,15 @@ describe('usage ledger — cursor first slice', () => {
       },
       { now: NOW + 3_600_000 }
     );
-    const scheduled = newer.ledger.scheduledResets.find(r => r.jobId === 'summer:cursor-reset-check');
+    const scheduled = newer.ledger.scheduledResets.find(
+      r => r.jobId === 'summer:cursor-reset-check'
+    );
     assert.equal(scheduled.status, 'superseded');
     assert.equal(scheduled.supersededBy, newer.event.idempotencyKey);
   });
 
   test('duplicate event suppression is idempotent', () => {
-    let ledger = createEmptyLedger();
+    const ledger = createEmptyLedger();
     const event = cursorQuotaEventFromTranscript(
       {
         accountId: 'company-ultra',
@@ -164,6 +169,7 @@ describe('usage ledger — cursor first slice', () => {
 
   test('no false recovery for pong, wrong account, auth failure, still exhausted', () => {
     const base = {
+      signal: 'bounded-check',
       provider: CURSOR_PROVIDER,
       accountId: 'company-ultra',
       pool: DEFAULT_CURSOR_POOL,
@@ -176,22 +182,29 @@ describe('usage ledger — cursor first slice', () => {
         condition: 'available',
       },
     };
-    assert.deepEqual(
-      evaluateRecovery({ ...base, signal: 'pong' }),
-      { recovered: false, reason: 'pong-not-capacity-proof' }
-    );
+    assert.deepEqual(evaluateRecovery({ ...base, signal: 'pong' }), {
+      recovered: false,
+      reason: 'pong-not-capacity-proof',
+    });
     assert.deepEqual(
       evaluateRecovery({ ...base, authorizedAccountId: 'other-account' }),
       { recovered: false, reason: 'wrong-account' }
     );
     assert.deepEqual(
-      evaluateRecovery({ ...base, after: { ...base.after, authFailure: true } }),
+      evaluateRecovery({
+        ...base,
+        after: { ...base.after, authFailure: true },
+      }),
       { recovered: false, reason: 'auth-failure' }
     );
     assert.deepEqual(
       evaluateRecovery({
         ...base,
-        after: { ...base.after, remaining: { value: 0 }, condition: 'exhausted' },
+        after: {
+          ...base.after,
+          remaining: { value: 0 },
+          condition: 'exhausted',
+        },
       }),
       { recovered: false, reason: 'still-exhausted' }
     );
@@ -209,13 +222,16 @@ describe('usage ledger — cursor first slice', () => {
     const second = beginRefresh(first.ledger, key, { now: NOW + 1_000 });
     assert.equal(first.started, true);
     assert.equal(second.coalesced, true);
-    ledger = endRefresh(first.ledger, key, { error: 'provider-429', now: NOW + 2_000 });
+    ledger = endRefresh(first.ledger, key, {
+      error: 'provider-429',
+      now: NOW + 2_000,
+    });
     assert.equal(refreshAllowed(ledger, key, NOW + 3_000), false);
     assert.equal(refreshAllowed(ledger, key, NOW + 120_000), true);
   });
 
   test('batch reset grant is separate with provenance and expiry', () => {
-    let ledger = createEmptyLedger();
+    const ledger = createEmptyLedger();
     const grant = {
       schema: GRANT_SCHEMA,
       provider: CURSOR_PROVIDER,
@@ -241,7 +257,9 @@ describe('usage ledger — cursor first slice', () => {
 
   test('ovie projection is read-only and omits email from receipts', () => {
     let ledger = createEmptyLedger();
-    ledger = ingestQuota(ledger, quotaFixture.transcript, quotaFixture, { now: NOW }).ledger;
+    ledger = ingestQuota(ledger, quotaFixture.transcript, quotaFixture, {
+      now: NOW,
+    }).ledger;
     const projection = projectOvieUsagePools(ledger, { now: NOW });
     assert.equal(projection.schema, 'jovie.usage-ledger-ovie-projection/v1');
     assert.equal(projection.controls, 'read-only');
@@ -254,6 +272,7 @@ describe('usage ledger — cursor first slice', () => {
     const snapshot = cursorPlanSnapshotFromAbout(planFixture, {
       accountId: 'company-ultra',
       observedAt: planFixture.observedAt,
+      now: NOW,
     });
     assert.equal(snapshot.tier, 'ultra');
     assert.equal(snapshot.pools[0].id, DEFAULT_CURSOR_POOL);
