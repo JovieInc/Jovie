@@ -69,7 +69,7 @@ jobs:
   resolve-target:
     name: Resolve landed production target
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     outputs:
       # A rate-limited trigger read sets quota_deferred and must not dispatch
       # probes or page production. Commit identity is resolved with git,
@@ -483,7 +483,6 @@ jobs:
 
       - name: Resolve CRON_SECRET for the Ovie ledger read
         if: ${{ steps.target.outputs.commit_sha != '' && steps.trigger.outputs.quota_deferred != 'true' && (steps.trigger.outputs.should_certify == 'true' || (steps.admission.outputs.admitted == 'true' && steps.admission.outputs.quota_deferred != 'true')) }}
-        continue-on-error: true
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
