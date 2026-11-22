@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { clearRemediationLabelCache } from '../linear-issue-intake.mjs';
+import {
+  clearRemediationLabelCache,
+  upsertLinearIssueByTitleFingerprint,
+} from '../linear-issue-intake.mjs';
 import {
   applyRemediationDecision,
   canonicalFingerprint,
@@ -202,5 +205,153 @@ describe('freshness green may resolve the shared incident', () => {
       }
     );
     expect(/** @type {any} */ (result.results[0]).action).toBe('resolved');
+  });
+});
+
+// Filers never write Todo (2026-11-22: JOV Todo held 468 against a code target of 6). A caller asking
+// for 'Todo' files into Backlog, and priority admission / the sub-lane refill promote it from there.
+const backlogTeam = {
+  states: {
+    nodes: [
+      { id: 'todo-state', name: 'Todo', type: 'unstarted' },
+      { id: 'backlog-state', name: 'Backlog', type: 'backlog' },
+      { id: 'started-state', name: 'In Progress', type: 'started' },
+    ],
+  },
+  labels: { nodes: [] },
+};
+
+function backlogFetch(match) {
+  return vi.fn(async (_url, init) => {
+    const payload = JSON.parse(String(init.body));
+    if (payload.query.includes('FindIssueByFingerprint')) {
+      return Response.json({
+        data: { team: backlogTeam, issues: { nodes: match ? [match] : [] } },
+      });
+    }
+    if (payload.query.includes('FindIssueByRemediationLabel')) {
+      return Response.json({ data: { issues: { nodes: [] } } });
+    }
+    if (payload.query.includes('issueLabelCreate')) {
+      return Response.json({
+        data: { issueLabelCreate: { success: true, issueLabel: { id: 'l' } } },
+      });
+    }
+    if (payload.query.includes('issueCreate')) {
+      return Response.json({
+        data: {
+          issueCreate: {
+            success: true,
+            issue: { id: 'new', identifier: 'JOV-1', url: 'u' },
+          },
+        },
+      });
+    }
+    return Response.json({
+      data: {
+        issueUpdate: {
+          success: true,
+          issue: { id: 'old', identifier: 'JOV-2' },
+        },
+      },
+    });
+  });
+}
+
+function sentVars(fetchImpl, name) {
+  const call = fetchImpl.mock.calls.find(([, init]) =>
+    JSON.parse(String(init.body)).query.includes(name)
+  );
+  return call ? JSON.parse(String(call[1].body)).variables : null;
+}
+
+const filed = {
+  fingerprint: 'ci-red-main-abc',
+  labelKey: 'ci-red-main',
+  title: '[ci] main is red (ci-red-main-abc)',
+  description: 'body',
+  apiKey: 'lin-key',
+};
+
+describe('filers create and reopen in Backlog, never Todo', () => {
+  it('maps a Todo create to Backlog and keeps the remediation label', async () => {
+    const fetchImpl = backlogFetch(null);
+    await expect(
+      upsertLinearIssueByTitleFingerprint({
+        ...filed,
+        createStateName: 'Todo',
+        priority: 1,
+        fetchImpl,
+      })
+    ).resolves.toMatchObject({ ok: true, action: 'created' });
+    const create = sentVars(fetchImpl, 'issueCreate');
+    expect(create.stateId).toBe('backlog-state');
+    expect(create.priority).toBe(1);
+    // remediation:<key> is what places the issue in the remediation sub-lane.
+    expect(create.labelIds).toEqual(['l']);
+  });
+
+  it('keeps any other requested state as asked', async () => {
+    const fetchImpl = backlogFetch(null);
+    await upsertLinearIssueByTitleFingerprint({
+      ...filed,
+      createStateName: 'In Progress',
+      fetchImpl,
+    });
+    expect(sentVars(fetchImpl, 'issueCreate').stateId).toBe('started-state');
+  });
+
+  it('reopens a Done issue into Backlog even when the caller asked for Todo', async () => {
+    const done = {
+      id: 'old',
+      identifier: 'JOV-2',
+      title: filed.title,
+      state: { type: 'completed' },
+      labels: { nodes: [] },
+    };
+    const fetchImpl = backlogFetch(done);
+    await expect(
+      upsertLinearIssueByTitleFingerprint({
+        ...filed,
+        createStateName: 'Todo',
+        fetchImpl,
+      })
+    ).resolves.toMatchObject({ ok: true, reopened: true });
+    expect(sentVars(fetchImpl, 'issueUpdate').input.stateId).toBe(
+      'backlog-state'
+    );
+  });
+});
+
+// binding_refill.ACCEPTANCE and MIN_DESCRIPTION: what admission needs to promote from Backlog.
+const READY =
+  /acceptance|accept\b|\bverif(?:y|ication)\b|required outcome|definition of done|\bdone bar\b|(?:^|\n)#+[ \t]*done\b/i;
+
+describe('filed remediation passes the admission readiness check', () => {
+  it('adds a definition of done when the body has no acceptance criteria', async () => {
+    const fetchImpl = backlogFetch(null);
+    await upsertLinearIssueByTitleFingerprint({
+      ...filed,
+      description: 'Run 12 failed.',
+      fetchImpl,
+    });
+    const { description } = sentVars(fetchImpl, 'issueCreate');
+    expect(description).toMatch(READY);
+    expect(description).toContain('## Definition of done');
+    expect(description).toContain('`remediation:ci-red-main` is green on main');
+    expect(description.length).toBeGreaterThanOrEqual(200);
+  });
+
+  it('leaves a body that already states its acceptance criteria alone', async () => {
+    const fetchImpl = backlogFetch(null);
+    const description = 'Broken.\n\n## Acceptance criteria\n- [ ] green';
+    await upsertLinearIssueByTitleFingerprint({
+      ...filed,
+      description,
+      fetchImpl,
+    });
+    expect(sentVars(fetchImpl, 'issueCreate').description).not.toContain(
+      'Definition of done'
+    );
   });
 });
