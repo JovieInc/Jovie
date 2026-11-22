@@ -17,6 +17,13 @@ import {
   bindCurrentSummerSpeaker,
   type SummerSpeaker,
 } from '@/lib/ovie/summer-transport';
+import {
+  ADMISSION_RETRY_BASE_MS,
+  admitWithRetry,
+  isCurrentCompanySnapshot,
+  SUMMER_ADMISSION_ATTEMPTS,
+  summerErrorCode,
+} from '@/lib/ovie/summer-turn-admission';
 
 const eveSessionIdSchema = z.string().regex(/^(?:ses_|wrun_)[A-Za-z0-9_-]+$/u);
 const resultSchema = z.object({
@@ -49,38 +56,17 @@ const prefix = '/ovie/v1/summer-shadow/conversation/events';
 const MAX_RESPONSE_BYTES = 128 * 1024;
 const MAX_MIGRATION_HISTORY_BYTES = 20 * 1024;
 const MAX_MIGRATION_HISTORY_ENTRIES = 200;
-/**
- * Admission attempts when the first hop never reached Summer (a network error
- * or an edge 5xx with no deployment header). The event id is fixed per client
- * turn and Summer replays it idempotently, so a resend cannot start a second
- * run. A body that stalls after Summer answered is not retried here: the
- * result endpoint reconciles it.
- */
-export const SUMMER_ADMISSION_ATTEMPTS = 3;
-const ADMISSION_RETRY_BASE_MS = 400;
 const PENDING_RECOVERY_TEXT =
   'Summer is still reconciling this turn. Retry this message in a moment; the same turn is recovered rather than duplicated.';
 const BLOCKING_RECOVERY_TEXT =
   'Summer is still finishing an earlier turn. This message was not sent; wait for that turn to finish, then retry.';
-
-/**
- * A snapshot older than this is not "current company state". Preview and
- * staging never run the cron that refreshes it, so Summer quoted a frozen
- * 2026-09-27 GitHub read as current (2026-11-22). Send nothing instead and let
- * her read live with her own tools.
- */
-export const COMPANY_STATE_MAX_AGE_MS = 30 * 60_000;
 
 function companyStateContext(
   readback: CompanyStateReadback | null,
   nowMs: number
 ) {
   if (!readback) return null;
-  const generatedAt = Date.parse(readback.snapshot.generatedAt);
-  if (
-    !Number.isFinite(generatedAt) ||
-    nowMs - generatedAt > COMPANY_STATE_MAX_AGE_MS
-  )
+  if (!isCurrentCompanySnapshot(readback.snapshot.generatedAt, nowMs))
     return null;
   const { sourcePayloads: _payloads, ...snapshot } = readback.snapshot;
   return { ...snapshot, cache: readback.cache };
@@ -198,33 +184,6 @@ function failureHopFor(
     : 'summer_unreachable';
 }
 
-function errorCode(error: unknown): string {
-  if (error instanceof z.ZodError) return 'invalid_summer_contract';
-  if (error instanceof Error) return error.message.slice(0, 120) || error.name;
-  return 'unknown_error';
-}
-
-/** Never reached Summer, so resending the same event id is safe. */
-class SummerTransportError extends Error {
-  constructor(readonly cause: unknown) {
-    super('summer_transport_failed');
-    this.name = 'SummerTransportError';
-  }
-}
-
-function waitBeforeRetry(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise(resolve => {
-    if (signal?.aborted) return resolve();
-    const done = () => {
-      clearTimeout(timer);
-      signal?.removeEventListener('abort', done);
-      resolve();
-    };
-    const timer = setTimeout(done, ms);
-    signal?.addEventListener('abort', done, { once: true });
-  });
-}
-
 export interface EveSummerSpeakerOptions {
   /** Admission tries for a first hop that never reached Summer. */
   readonly admissionAttempts?: number;
@@ -280,49 +239,25 @@ export function createEveSummerSpeaker(
             ? { canonicalTailRecovery: true }
             : {}),
         });
-        let response!: Response;
-        for (let attempt = 1; ; attempt += 1) {
-          try {
-            try {
-              response = await fetchShadow(prefix, {
-                method: 'POST',
-                signal: input.signal,
-                body: rawBody,
-              });
-            } catch (error) {
-              throw new SummerTransportError(error);
-            }
+        let response = await admitWithRetry({
+          eventId,
+          send: () =>
+            fetchShadow(prefix, {
+              method: 'POST',
+              signal: input.signal,
+              body: rawBody,
+            }),
+          verify: async admitted => {
             deploymentId = await verifiedDeploymentId(
-              response,
+              admitted,
               deploymentId,
               refreshDeploymentId
             );
-            break;
-          } catch (error) {
-            // Only a hop that never reached a Summer deployment is retried:
-            // a network error or an edge 5xx. A 4xx is a refusal, not luck.
-            const retryable =
-              error instanceof SummerTransportError ||
-              (error instanceof Error &&
-                error.message === 'summer_http_error' &&
-                (response?.status ?? 0) >= 500);
-            const cause =
-              error instanceof SummerTransportError
-                ? errorCode(error.cause)
-                : `${errorCode(error)}:${response?.status ?? 'none'}`;
-            logSummerBridgeEvent({
-              event: 'summer_admission_failed',
-              eventId,
-              attempt,
-              cause,
-              willRetry:
-                retryable && attempt < attempts && !input.signal?.aborted,
-            });
-            if (!retryable || attempt >= attempts || input.signal?.aborted)
-              throw error instanceof SummerTransportError ? error.cause : error;
-            await waitBeforeRetry(retryDelayMs * attempt, input.signal);
-          }
-        }
+          },
+          attempts,
+          retryDelayMs,
+          signal: input.signal,
+        });
         let admission = await body(response, input.signal);
         if (response.status === 409 && admission.code === 'conversation_busy') {
           const blocking = blockingEventSchema.safeParse(
@@ -501,7 +436,7 @@ export function createEveSummerSpeaker(
           eventId,
           stage,
           hop,
-          cause: errorCode(error),
+          cause: summerErrorCode(error),
         });
         yield { type: 'error', state: 'unknown', hop };
       }
