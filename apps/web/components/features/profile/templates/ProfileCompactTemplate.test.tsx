@@ -178,4 +178,11 @@ describe('ProfileCompactTemplate states', () => {
     ).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
+
+  it('has no Release credits pill in the desktop top chrome', async () => {
+    renderTemplate({});
+
+    await screen.findByTestId('profile-compact-surface');
+    expect(screen.queryByTestId('profile-release-credits')).toBeNull();
+  });
 });

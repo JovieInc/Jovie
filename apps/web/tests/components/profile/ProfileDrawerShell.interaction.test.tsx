@@ -497,3 +497,32 @@ describe('ProfileUnifiedDrawer public menu interactions', () => {
     expect(screen.getByTestId('profile-menu-drawer')).toBeInTheDocument();
   });
 });
+
+describe('ProfileDrawerShell anchored popover contract', () => {
+  it('renders the same children as a popover with a labelled back control', () => {
+    const trigger = document.createElement('button');
+    document.body.appendChild(trigger);
+    const onBack = vi.fn();
+    render(
+      <ProfileDrawerShell
+        open
+        onOpenChange={vi.fn()}
+        title='Share'
+        navigationLevel='secondary'
+        onBack={onBack}
+        anchorRef={{ current: trigger }}
+        dataTestId='profile-menu-drawer'
+      >
+        <div>Body</div>
+      </ProfileDrawerShell>
+    );
+
+    expect(screen.getByText('Body')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByTestId('profile-drawer-overlay')
+    ).not.toBeInTheDocument();
+    trigger.remove();
+  });
+});
