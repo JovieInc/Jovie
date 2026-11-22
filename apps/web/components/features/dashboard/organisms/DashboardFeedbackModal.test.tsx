@@ -83,6 +83,15 @@ describe('DashboardFeedbackModal', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it('opens with focus on the message field rather than the Close button', async () => {
+    openModal();
+
+    await waitFor(() => expect(screen.getByRole('textbox')).toHaveFocus());
+    expect(
+      screen.getAllByRole('button', { name: 'Close' })[0]
+    ).not.toHaveFocus();
+  });
+
   it('keeps the message for a retry when sending fails', async () => {
     const onSubmit = vi
       .fn()

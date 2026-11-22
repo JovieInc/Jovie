@@ -6,23 +6,26 @@ import Image from 'next/image';
 import { Combobox } from '@/components/organisms/Combobox';
 import { Container } from '@/components/site/Container';
 import { ThemeToggle } from '@/components/site/theme-toggle';
+import type { UseArtistSelectionFormReturn } from './types';
 import { useArtistSelectionForm } from './useArtistSelectionForm';
 
 export function ArtistSelectionForm() {
-  const {
-    selectedArtist,
-    pendingClaim,
-    state,
-    searchError,
-    isLoading,
-    options,
-    handleArtistSelect,
-    handleInputChange,
-    handleSubmit,
-    handleSkip,
-    retryOperation,
-  } = useArtistSelectionForm();
+  return <ArtistSelectionFormView {...useArtistSelectionForm()} />;
+}
 
+export function ArtistSelectionFormView({
+  selectedArtist,
+  pendingClaim,
+  state,
+  searchError,
+  isLoading,
+  options,
+  handleArtistSelect,
+  handleInputChange,
+  handleSubmit,
+  handleSkip,
+  retryOperation,
+}: Readonly<UseArtistSelectionFormReturn>) {
   return (
     <div className='min-h-screen bg-base transition-colors'>
       {/* Subtle grid background pattern */}
@@ -92,7 +95,7 @@ export function ArtistSelectionForm() {
                 </div>
 
                 {selectedArtist && (
-                  <div className='flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/10 p-3'>
+                  <div className='flex items-center gap-3 rounded-lg border border-subtle bg-surface-1 p-3'>
                     {selectedArtist.imageUrl ? (
                       <Image
                         src={selectedArtist.imageUrl}
@@ -112,7 +115,7 @@ export function ArtistSelectionForm() {
                       <p className='text-app font-caption text-primary-token truncate'>
                         {selectedArtist.name}
                       </p>
-                      <p className='text-2xs text-green-600 dark:text-green-400 flex items-center gap-1'>
+                      <p className='text-2xs text-secondary-token flex items-center gap-1'>
                         <CheckCircle2
                           className='h-3.5 w-3.5'
                           aria-hidden='true'
@@ -120,14 +123,16 @@ export function ArtistSelectionForm() {
                         Artist selected
                       </p>
                     </div>
-                    <button
+                    <Button
                       type='button'
+                      variant='ghost'
+                      size='icon'
                       onClick={() => handleArtistSelect(null)}
-                      className='flex-shrink-0 rounded-md p-1 text-secondary-token hover:text-primary-token hover:bg-surface-2 transition-colors'
+                      className='flex-shrink-0'
                       aria-label={`Remove ${selectedArtist.name}`}
                     >
                       <X className='h-4 w-4' />
-                    </button>
+                    </Button>
                   </div>
                 )}
 

@@ -18,6 +18,7 @@ class FakeSentry:
 class FakeLinear:
     def __init__(self):
         self.created, self.comments = [], []
+        self._state = "unstarted"
 
     def find_by_label(self, name, open_only=False):
         return next((c["id"] for c in self.created if name in c["labels"]), None)
@@ -30,8 +31,12 @@ class FakeLinear:
     def comment(self, ident, body):
         self.comments.append((ident, body))
 
+    def comment_bodies(self, ident, limit=30):
+        bodies = [b for i, b in reversed(self.comments) if i == ident]
+        return bodies[:limit]
+
     def state_type(self, ident):
-        return "unstarted"  # the linked issue stays open: the parking path is what fires
+        return self._state
 
 
 class ClaimParkingTest(unittest.TestCase):
@@ -121,6 +126,47 @@ class ClaimParkingTest(unittest.TestCase):
             pe.escalate_or_park = orig
         self.assertEqual(len(seen), 1)
         self.assertIs(seen[0], pe)  # live module object, not a re-import
+
+    def test_stand_down_notice_is_one_shot_even_if_status_reclaimed(self):
+        # Canceled Linear + lost/reclaimed ledger status must not re-post stand-down notices
+        # (JOV-10504 recurrence: four stand-downs on frozen lastSeen with no reopen receipt).
+        pe.handle_issue(self.issue(), self.ledger, self.s, self.l, [], self.t, self.dir)
+        self.l._state = "canceled"
+        self.expire(1)
+        self.assertEqual(self.ledger["101"]["status"], "closed")
+        self.assertEqual(sum("standing the claim down" in c[1] for c in self.l.comments), 1)
+        # Simulate competing writer / lost closed: status back to claimed with expired window.
+        self.ledger["101"].update(status="claimed", claimExpiresAt=self.t)
+        self.expire(2)
+        self.assertEqual(self.ledger["101"]["status"], "closed")
+        self.assertEqual(sum("standing the claim down" in c[1] for c in self.l.comments), 1)
+
+    def test_park_notice_is_one_shot_after_false_reclaim(self):
+        pe.handle_issue(self.issue(), self.ledger, self.s, self.l, [], self.t, self.dir)
+        for k in range(1, pe.MAX_CLAIM_ESCALATIONS + 2):
+            self.expire(k)
+        self.assertEqual(sum("Parking this claim" in c[1] for c in self.l.comments), 1)
+        park_alerts = sum(a["kind"] == "claim-parked" for a in self.alerts())
+        # False reclaim (e.g. closed-unmerged PR used to unpark): status claimed again, escalations
+        # still above cap → next expiry parks silently.
+        self.ledger["101"].update(status="claimed", claimExpiresAt=self.t)
+        self.expire(pe.MAX_CLAIM_ESCALATIONS + 3)
+        self.assertEqual(self.ledger["101"]["status"], "parked")
+        self.assertEqual(sum("Parking this claim" in c[1] for c in self.l.comments), 1)
+        self.assertEqual(sum(a["kind"] == "claim-parked" for a in self.alerts()), park_alerts)
+
+    def test_closed_unmerged_pr_does_not_unpark(self):
+        pe.handle_issue(self.issue(), self.ledger, self.s, self.l, [], self.t, self.dir)
+        ident = self.ledger["101"]["linear"]
+        for k in range(1, pe.MAX_CLAIM_ESCALATIONS + 2):
+            self.expire(k)
+        self.assertEqual(self.ledger["101"]["status"], "parked")
+        at = self.t + 100 * (pe.CLAIM_S + 2)
+        prs = [{"number": 99, "title": f"wip ({ident})", "body": f"Refs {ident}.",
+                "headRefName": "wip", "mergedAt": None, "closedAt": pe.iso(at - 10)}]
+        pe.advance(self.ledger, self.l, self.s, prs, at, self.dir)
+        self.assertEqual(self.ledger["101"]["status"], "parked")
+        self.assertNotIn("pr", self.ledger["101"])
 
 
 if __name__ == "__main__":

@@ -178,6 +178,7 @@ const dashboardData = {
   },
 };
 
+/** ViewTransition shell wrap (JOV-14244). */
 describe('DashboardShellContent privacy decision', () => {
   afterEach(() => vi.clearAllMocks());
   beforeEach(() => {

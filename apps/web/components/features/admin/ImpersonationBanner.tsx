@@ -37,11 +37,7 @@ export function ImpersonationBanner({
   const [minimized, setMinimized] = useState(false);
 
   // TanStack Query for fetching impersonation status
-  const {
-    data: state,
-    isLoading: loading,
-    refetch: refetchStatus,
-  } = useImpersonationQuery();
+  const { data: state, refetch: refetchStatus } = useImpersonationQuery();
 
   // TanStack Query mutation for ending impersonation
   const { mutate: endImpersonation, isPending: ending } =
@@ -99,8 +95,10 @@ export function ImpersonationBanner({
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  // Don't render if not impersonating or still loading
-  if (loading || !state?.isImpersonating) {
+  // Nothing to show until the query has data and says we are impersonating.
+  // The banner is fixed-position, so rendering nothing reserves no space and
+  // cannot shift the page.
+  if (!state?.isImpersonating) {
     return null;
   }
 
@@ -112,7 +110,7 @@ export function ImpersonationBanner({
           variant='secondary'
           size='sm'
           onClick={() => setMinimized(false)}
-          className='flex items-center gap-2 bg-amber-500 text-black dark:text-white hover:bg-amber-400'
+          className='flex items-center gap-2'
         >
           <Eye className='size-4' />
           <span>Impersonating</span>
@@ -126,7 +124,7 @@ export function ImpersonationBanner({
 
   return (
     <div
-      className={`fixed inset-x-0 top-0 z-9999 border-b-2 border-amber-500 bg-amber-500/95 px-4 py-2 text-black dark:text-white backdrop-blur ${className}`}
+      className={`fixed inset-x-0 top-0 z-9999 border-b-2 border-warning bg-warning-subtle px-4 py-2 text-primary-token backdrop-blur ${className}`}
       role='alert'
       aria-live='polite'
       data-testid='impersonation-banner'
@@ -137,9 +135,9 @@ export function ImpersonationBanner({
           <AlertTriangle className='size-5 shrink-0' aria-hidden='true' />
           <div className='flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-3'>
             <span className='font-semibold'>Admin Impersonation Active</span>
-            <span className='text-sm text-amber-900'>
+            <span className='text-sm text-secondary-token'>
               Viewing as user:{' '}
-              <code className='rounded bg-amber-600/30 px-1 py-0.5 font-mono text-xs'>
+              <code className='rounded bg-surface-2 px-1 py-0.5 font-mono text-xs'>
                 {state.effectiveUserId?.slice(0, 16)}...
               </code>
             </span>
@@ -159,7 +157,6 @@ export function ImpersonationBanner({
             variant='ghost'
             size='sm'
             onClick={() => setMinimized(true)}
-            className='text-amber-900 hover:bg-amber-600/30 hover:text-black dark:text-white'
             aria-label='Minimize Impersonation Banner'
           >
             <EyeOff className='size-4' />

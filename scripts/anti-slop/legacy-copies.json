@@ -27,16 +27,6 @@
     "decorative-color apps/web/components/features/admin/SentryMetricsCard.tsx: iconClassName='text-error'",
     "decorative-color apps/web/components/features/admin/SentryMetricsCard.tsx: iconClassName='text-info'",
     "decorative-color apps/web/components/features/admin/SentryMetricsCard.tsx: iconClassName='text-warning'",
-    "raw-status-palette apps/web/components/features/admin/ImpersonationBanner.tsx: <code className='rounded bg-amber-600/30 px-1 py-0.5 font-mono text-xs'>",
-    "raw-status-palette apps/web/components/features/admin/ImpersonationBanner.tsx: <span className='text-sm text-amber-900'>",
-    "raw-status-palette apps/web/components/features/admin/ImpersonationBanner.tsx: className='flex items-center gap-2 bg-amber-500 text-black dark:text-white hover:bg-amber-400'",
-    "raw-status-palette apps/web/components/features/admin/ImpersonationBanner.tsx: className='text-amber-900 hover:bg-amber-600/30 hover:text-black dark:text-white'",
-    "raw-status-palette apps/web/components/features/admin/ImpersonationBanner.tsx: className={`fixed inset-x-0 top-0 z-9999 border-b-2 border-amber-500 bg-amber-500/95 px-4 py-2 text-black dark:text-white backdrop-blur ${className}`}",
-    "raw-status-palette apps/web/components/features/admin/table/TableRowActions.tsx: isClaimed ? 'fill-current text-yellow-500' : 'opacity-40'",
-    "raw-status-palette apps/web/components/features/dashboard/molecules/universal-link-input/MultiLinkPasteDialog.tsx: <span className='flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-3xs font-caption text-amber-600 dark:text-amber-400'>",
-    "raw-status-palette apps/web/components/features/dashboard/molecules/universal-link-input/MultiLinkPasteDialog.tsx: <span className='text-amber-600 dark:text-amber-400'>",
-    "raw-status-palette apps/web/components/features/dashboard/organisms/artist-selection-form/ArtistSelectionForm.tsx: <div className='flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/10 p-3'>",
-    "raw-status-palette apps/web/components/features/dashboard/organisms/artist-selection-form/ArtistSelectionForm.tsx: <p className='text-2xs text-green-600 dark:text-green-400 flex items-center gap-1'>",
     "raw-status-palette apps/web/components/features/dashboard/organisms/dashboard-audience-table/row-contract.ts: high: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/25',",
     "raw-status-palette apps/web/components/features/dashboard/organisms/dashboard-audience-table/row-contract.ts: rising: 'bg-amber-500/15 text-amber-300 ring-amber-500/25',"
   ]
