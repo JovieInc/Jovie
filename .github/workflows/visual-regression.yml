@@ -382,6 +382,9 @@ jobs:
         id: diff
         if: ${{ env.REFRESH_MODE == 'true' && github.ref == 'refs/heads/main' }}
         run: |
+          # Baselines are Git LFS files: the clean filter turns a refreshed
+          # png into a pointer, so git status sees only real changes.
+          git lfs install --local --skip-smudge --skip-repo
           # One PR for the whole run: baselines of every suite that passed,
           # and a list of the suites that did not (scripts/lib/visual-baseline-refresh.mjs).
           node scripts/lib/visual-baseline-refresh.mjs --suites-dir "$RUNNER_TEMP/visual-suites" \
@@ -433,7 +436,9 @@ jobs:
           PUSHED=false
           for ATTEMPT in 1 2 3; do
             set +e
-            PUSH_OUTPUT=$(git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push --force origin "$BRANCH" 2>&1)
+            # Upload the refreshed images before the pointers that name them.
+            PUSH_OUTPUT=$(git -c "http.https://github.com/.extraheader=$AUTH_HEADER" lfs push origin "$BRANCH" 2>&1 &&
+              git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push --force origin "$BRANCH" 2>&1)
             PUSH_EXIT=$?
             set -e
 
@@ -516,6 +521,9 @@ jobs:
           BASELINE_SPECS: ${{ inputs.baseline_specs }}
         run: |
           set -euo pipefail
+          # Baselines are Git LFS files: the clean filter turns a refreshed
+          # png into a pointer, so git status sees only real changes.
+          git lfs install --local --skip-smudge --skip-repo
           if ! [[ "$BASELINE_SPECS" =~ ^[a-z0-9-]+\.spec\.ts(,[a-z0-9-]+\.spec\.ts)*$ ]]; then
             echo "::error::baseline_specs must name the specs to commit, comma-separated (got '$BASELINE_SPECS')."
             exit 1
@@ -570,6 +578,8 @@ jobs:
 
           Specs: ${BASELINE_SPECS}. Rendered by run ${GITHUB_RUN_ID} from ${GITHUB_SHA::8}."
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          # Upload the refreshed images (Git LFS) before the pointers that name them.
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" lfs push origin HEAD
           # Plain fast-forward push: never force, so a newer branch commit wins.
           git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
 
@@ -717,6 +727,9 @@ jobs:
         id: diff
         run: |
           set -euo pipefail
+          # Baselines are Git LFS files: the clean filter turns a refreshed
+          # png into a pointer, so git status sees only real changes.
+          git lfs install --local --skip-smudge --skip-repo
           CHANGED=$(git status --porcelain --untracked-files=all -- "$SNAPSHOT_DIR" | awk '{print $2}')
           echo "$CHANGED"
           if echo "$CHANGED" | grep -v -E '/homepage-[a-z0-9]+\.png$' | grep -q .; then
@@ -757,6 +770,8 @@ jobs:
           Rendered by run ${GITHUB_RUN_ID} from ${GITHUB_SHA::8}.
           Approval: ${RECEIPT_MESSAGE}"
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          # Upload the refreshed images (Git LFS) before the pointers that name them.
+          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" lfs push origin HEAD
           # Plain fast-forward push: never force, so a newer branch commit wins.
           git -c "http.https://github.com/.extraheader=$AUTH_HEADER" push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
 

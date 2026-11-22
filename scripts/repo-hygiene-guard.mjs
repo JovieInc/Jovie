@@ -1,16 +1,15 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
-import {
-  lstatSync,
-  readdirSync,
-  readFileSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { lstatSync, readFileSync, writeFileSync } from 'node:fs';
 import { extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { validateControllerHopChanges } from './invariants/controller-hop-contract.mjs';
+import {
+  collectLfsBlobs,
+  collectSnapshotBudget,
+  plainLfsBlobErrors,
+} from './lib/lfs-blobs.mjs';
 import { findOrphanReviewImages } from './lib/orphan-screenshot-guard.mjs';
 import {
   GEN_JSON_SIZE_ALLOWLIST,
@@ -578,30 +577,6 @@ function hasRepeatedAdjacentSequence(parts) {
   return false;
 }
 
-function collectSnapshotBudget(root) {
-  const snapshotRoot = resolve(root, 'apps/web/tests/e2e/__snapshots__');
-  let bytes = 0;
-  let files = 0;
-  function visit(directory) {
-    let entries;
-    try {
-      entries = readdirSync(directory, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      const path = resolve(directory, entry.name);
-      if (entry.isDirectory()) visit(path);
-      else if (entry.isFile()) {
-        files += 1;
-        bytes += statSync(path).size;
-      }
-    }
-  }
-  visit(snapshotRoot);
-  return { bytes, files };
-}
-
 export function evaluateRepoHygiene({
   addedPaths,
   addedRegularPaths = addedPaths,
@@ -612,6 +587,7 @@ export function evaluateRepoHygiene({
   deletedRegularPaths = deletedPaths,
   exceptions = [],
   headRef = '',
+  lfsBlobs = new Map(),
   now = new Date(),
   root = process.cwd(),
   rollout = REPO_HEALTH_ROLLOUT,
@@ -622,6 +598,7 @@ export function evaluateRepoHygiene({
     ...validateRepoHealthBaseline(baseline),
     ...validateRepoHealthRollout(rollout),
     ...findOrphanReviewImages({ root, trackedPaths }),
+    ...plainLfsBlobErrors(lfsBlobs),
   ];
   const candidateFindings = [];
   const added = [...new Set(addedPaths.map(normalizePath))];
@@ -694,18 +671,20 @@ export function evaluateRepoHygiene({
       continue;
     }
     if (!stats.isFile()) continue;
+    // Git stores a Git LFS path as a text pointer: measure the pointer, and
+    // do not count it as binary churn.
+    const lfsBlob = lfsBlobs.get(path);
+    const size = lfsBlob?.blobBytes ?? stats.size;
     changedFiles += 1;
-    changedBytes += stats.size;
-    if (stats.size > HYGIENE_LIMITS.maxFileBytes)
-      errors.push(
-        `${path}: ${formatBytes(stats.size)} exceeds the per-file budget`
-      );
-    if (!isBinary(path)) continue;
+    changedBytes += size;
+    if (size > HYGIENE_LIMITS.maxFileBytes)
+      errors.push(`${path}: ${formatBytes(size)} exceeds the per-file budget`);
+    if (!isBinary(path) || lfsBlob?.pointer) continue;
     changedBinaryFiles += 1;
-    changedBinaryBytes += stats.size;
-    if (stats.size > HYGIENE_LIMITS.maxBinaryBytes)
+    changedBinaryBytes += size;
+    if (size > HYGIENE_LIMITS.maxBinaryBytes)
       errors.push(
-        `${path}: ${formatBytes(stats.size)} exceeds the per-file binary budget`
+        `${path}: ${formatBytes(size)} exceeds the per-file binary budget`
       );
   }
   if (changedBytes > HYGIENE_LIMITS.maxChangedBytes)
@@ -764,7 +743,7 @@ export function evaluateRepoHygiene({
       );
   }
 
-  const snapshots = collectSnapshotBudget(root);
+  const snapshots = collectSnapshotBudget(root, lfsBlobs);
   if (snapshots.files > HYGIENE_LIMITS.maxSnapshotFiles)
     errors.push(
       `${snapshots.files} canonical visual-test baselines exceed the ${HYGIENE_LIMITS.maxSnapshotFiles}-file budget`
@@ -802,10 +781,11 @@ export function evaluateRepoHygiene({
       );
     if (!TRACKED_FILE_COUNT_EXCLUSIONS.some(pattern => pattern.test(path)))
       trackedFiles += 1;
-    trackedBytes += stats.size;
-    if (isBinary(path)) {
+    const lfsBlob = lfsBlobs.get(path);
+    trackedBytes += lfsBlob?.blobBytes ?? stats.size;
+    if (isBinary(path) && !lfsBlob?.pointer) {
       trackedBinaryFiles += 1;
-      trackedBinaryBytes += stats.size;
+      trackedBinaryBytes += lfsBlob?.blobBytes ?? stats.size;
     }
   }
   if (trackedBytes > HYGIENE_LIMITS.maxTrackedBytes)
@@ -1088,10 +1068,15 @@ function main() {
       error: `unable to load exceptions (${error.name})`,
     };
   }
+  const gitPaths = collectGitPaths(guardArgs);
   const result = evaluateRepoHygiene({
-    ...collectGitPaths(guardArgs),
+    ...gitPaths,
     exceptions: exceptionConfig.exceptions,
     headRef,
+    lfsBlobs: collectLfsBlobs({
+      paths: gitPaths.trackedPaths,
+      staged: guardArgs.includes('--staged'),
+    }),
   });
   if (exceptionConfig.error) result.errors.unshift(exceptionConfig.error);
   result.errors.unshift(

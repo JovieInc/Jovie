@@ -10,6 +10,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import {
+  collectLfsBlobs,
+  collectSnapshotBudget,
+  parseLfsPointer,
+  plainLfsBlobErrors,
+} from '../lfs-blobs.mjs';
 import { parseTrackedRegularTree } from '../merge-group-member-policy.mjs';
 import {
   enforceProjectedTreeBudget,
@@ -387,6 +393,88 @@ process.exit(17);
         { cwd: dir, encoding: 'utf8' }
       );
       expect(output).toContain('PASS — 1300 tracked regular-file bytes');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('Git LFS blobs in the tracked-bytes budget', () => {
+  const SNAPSHOTS = 'apps/web/tests/e2e/__snapshots__';
+  const pointer = size =>
+    `version https://git-lfs.github.com/spec/v1\noid sha256:${'a'.repeat(64)}\nsize ${size}\n`;
+
+  it('parses only well-formed pointers', () => {
+    expect(parseLfsPointer(pointer(9_000))).toEqual({
+      oid: 'a'.repeat(64),
+      objectBytes: 9_000,
+    });
+    expect(parseLfsPointer('\x89PNG not a pointer')).toBeNull();
+    expect(parseLfsPointer(`${pointer(1)}${'x'.repeat(1_024)}`)).toBeNull();
+  });
+
+  it('counts pointers at their blob size and rejects a plain blob', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lfs-blobs-'));
+    // Blobs are written with --no-filters, so the test needs no git-lfs.
+    const git = (args, input) =>
+      execFileSync('git', ['-C', dir, ...args], {
+        encoding: 'utf8',
+        input,
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 't',
+          GIT_AUTHOR_EMAIL: 't@example.com',
+          GIT_COMMITTER_NAME: 't',
+          GIT_COMMITTER_EMAIL: 't@example.com',
+        },
+      });
+    const stage = (path, content) => {
+      const oid = git(
+        ['hash-object', '-w', '--no-filters', '--stdin'],
+        content
+      ).trim();
+      git(['update-index', '--add', '--cacheinfo', `100644,${oid},${path}`]);
+    };
+    try {
+      git(['init', '-q', '-b', 'main']);
+      writeFileSync(
+        join(dir, '.gitattributes'),
+        `${SNAPSHOTS}/**/*.png filter=lfs diff=lfs merge=lfs -text\n`
+      );
+      git(['add', '.gitattributes']);
+      const lfsPath = `${SNAPSHOTS}/home.spec.ts/home.png`;
+      const plainPath = `${SNAPSHOTS}/home.spec.ts/plain.png`;
+      stage(lfsPath, pointer(9_000));
+      stage(plainPath, 'p'.repeat(2_000));
+      stage('docs/other.png', 'o'.repeat(3_000));
+      const paths = ['.gitattributes', lfsPath, plainPath, 'docs/other.png'];
+
+      const staged = collectLfsBlobs({ paths, cwd: dir, staged: true });
+      expect([...staged.keys()].sort()).toEqual([lfsPath, plainPath]);
+      expect(staged.get(lfsPath)).toEqual({
+        blobBytes: pointer(9_000).length,
+        pointer: true,
+        objectBytes: 9_000,
+      });
+      expect(staged.get(plainPath)).toMatchObject({
+        blobBytes: 2_000,
+        pointer: false,
+      });
+      const errors = plainLfsBlobErrors(staged);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain(`git add --renormalize ${plainPath}`);
+
+      git(['commit', '-qm', 'baselines']);
+      expect(collectLfsBlobs({ paths, cwd: dir }).get(lfsPath)?.pointer).toBe(
+        true
+      );
+
+      // The snapshot budget keeps counting a baseline at its image size.
+      git(['checkout', '-q', '--', '.']);
+      expect(collectSnapshotBudget(dir, staged)).toEqual({
+        bytes: 11_000,
+        files: 2,
+      });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

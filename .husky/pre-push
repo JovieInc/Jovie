@@ -15,6 +15,21 @@ export AUTOMATION_VERIFY_SHARD_CONCURRENCY="${AUTOMATION_VERIFY_SHARD_CONCURRENC
 # JOVIE_PREFLIGHT_JOBS overrides; standalone preflight stays at 3.
 export JOVIE_PREFLIGHT_JOBS="${JOVIE_PREFLIGHT_JOBS:-1}"
 
+# git passes the pushed refs on stdin once; both readers below need them.
+push_refs="$(cat)"
+
+# Visual-test baselines are Git LFS files (.gitattributes). This hook replaces
+# the one `git lfs install` would write, so it uploads their objects before the
+# push; without git-lfs a push would leave pointers to objects GitHub lacks.
+if command -v git-lfs >/dev/null 2>&1; then
+  if [ -n "$push_refs" ]; then
+    printf '%s\n' "$push_refs" | git lfs pre-push "$@"
+  fi
+elif git ls-files ':(attr:filter=lfs)' | grep -q .; then
+  echo "git-lfs is required to push this repository (see docs/ci/repository-health.md)." >&2
+  exit 1
+fi
+
 # Scratch refs for the Actions preflight backend (scripts/lib/preflight-actions.mjs):
 # skip ONLY when the caller opted in AND every pushed ref is under refs/preflight/.
 # Any real branch/tag in the same push falls through to the full gate.
@@ -22,7 +37,9 @@ if [ "${JOVIE_PREFLIGHT_SCRATCH_PUSH:-}" = "1" ]; then
   scratch_only=1
   while read -r _lref _lsha rref _rsha; do
     case "$rref" in refs/preflight/*) ;; *) scratch_only=0 ;; esac
-  done
+  done <<EOF
+$push_refs
+EOF
   if [ "$scratch_only" = "1" ]; then exit 0; fi
 fi
 
