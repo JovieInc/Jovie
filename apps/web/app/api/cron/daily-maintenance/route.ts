@@ -27,6 +27,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { reportExpiredTestAccounts } from '@/lib/accounts/test-account-cleanup.server';
 import { purgeExpiredAgentDrafts } from '@/lib/agent-acquisition/draft-purge.server';
 import { recordDailyGatewaySpend } from '@/lib/ai/gateway-spend';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
@@ -288,6 +289,13 @@ export async function GET(request: Request) {
   //     (claim-verify spec Q2). Reports skipped while the code flag is off.
   results.legacyClaimSweep = await runSubJob('legacyClaimSweep', () =>
     runLegacyClaimVerificationSweep()
+  );
+
+  // 12d. Expired test accounts (founder tmp dogfood + per-run prodcert
+  //      users), counted only. Removal is the cleanup-dogfood-accounts route.
+  results.expiredTestAccounts = await runSubJob(
+    'expiredTestAccounts',
+    reportExpiredTestAccounts
   );
 
   // 13. Data retention — Sundays only (heavy operation)

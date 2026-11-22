@@ -38,6 +38,19 @@ export function canaryResetConfigured(
   return !!(environment.CRON_SECRET && environment.SYNTHETIC_PASSAGE_KEY);
 }
 
+/**
+ * The endpoint's 409 when the fixed claim-walk canary has no account in this
+ * environment yet. The walk answers it by signing the canary up through the
+ * real email-code flow (`provisionClaimCanary` in the spec), so no person
+ * ever has to create the account by hand.
+ */
+export class ClaimCanaryNotProvisionedError extends Error {
+  constructor(detail: string) {
+    super(`canary reset HTTP 409: ${detail}`);
+    this.name = 'ClaimCanaryNotProvisionedError';
+  }
+}
+
 /** POST /api/internal/canary/reset and assert it completed. */
 export async function resetClaimCanary({
   request,
@@ -70,6 +83,9 @@ export async function resetClaimCanary({
   });
   const contentType = (response.headers()['content-type'] ?? '').toLowerCase();
   const bodyText = await response.text();
+  if (response.status() === 409 && /not provisioned/iu.test(bodyText)) {
+    throw new ClaimCanaryNotProvisionedError(bodyText.slice(0, 300));
+  }
   if (response.status() !== 200) {
     throw new Error(
       `canary reset HTTP ${response.status()}: ${bodyText.slice(0, 300)}`
