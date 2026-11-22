@@ -356,6 +356,8 @@ module.exports = [
       'components/atoms/TableErrorFallback.tsx',
       'components/atoms/AvatarUploadOverlay.tsx',
       'components/atoms/ReleaseArtworkThumb.tsx',
+      // Reduced-motion + mount gate predate the rule; JOV-14411 only changed its motion imports.
+      'components/atoms/AnimatedIconSwap.tsx',
     ],
     rules: {
       'no-restricted-syntax': [
