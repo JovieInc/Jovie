@@ -1229,6 +1229,10 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border-width: 0;
+    /* The desktop shell is the visible surface here. Hide the clipped compact
+       copy from tab order and assistive tech so keyboard and screen-reader
+       users never land on invisible duplicate controls before hand-off. */
+    visibility: hidden;
   }
 
   .profile-viewport--desktop-surface:not(

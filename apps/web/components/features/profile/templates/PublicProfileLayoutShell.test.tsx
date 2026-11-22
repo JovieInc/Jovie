@@ -152,19 +152,6 @@ describe('PublicProfileLayoutShell', () => {
     expect(screen.getByTestId('desktop-content')).toBeInTheDocument();
   });
 
-  it('places the desktop shell before the clipped compact slot so first-match controls are the visible desktop ones', () => {
-    render(
-      <PublicProfileLayoutShell {...commonProps} isDesktopLayout={false} />
-    );
-
-    const desktop = screen.getByTestId('profile-desktop-shell');
-    const compact = screen.getByTestId('compact-content');
-    expect(
-      desktop.compareDocumentPosition(compact) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-  });
-
   it('marks the viewport for the desktop hand-off only when a desktop surface ships', () => {
     render(
       <PublicProfileLayoutShell {...commonProps} isDesktopLayout={false} />

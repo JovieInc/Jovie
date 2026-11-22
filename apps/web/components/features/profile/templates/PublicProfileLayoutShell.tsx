@@ -122,26 +122,6 @@ export function PublicProfileLayoutShell({
           {shouldRenderHeading ? (
             <h1 className='sr-only'>{artistName}</h1>
           ) : null}
-          {/* The desktop shell precedes the compact slot in DOM order: at
-              desktop widths the compact slot is visually clipped (not removed)
-              until hand-off, and tab order and first-match queries must reach
-              the visible desktop controls (Menu, DSP links) before it. */}
-          {hasDesktopSurface ? (
-            <div
-              className='public-profile-layout-desktop-shell overflow-hidden rounded-3xl'
-              data-testid='profile-desktop-shell'
-            >
-              {desktopBanner ? (
-                <div
-                  className='relative z-20 w-full shrink-0 overflow-hidden rounded-t-3xl'
-                  data-testid='profile-desktop-banner'
-                >
-                  {desktopBanner}
-                </div>
-              ) : null}
-              {embedded ? <ProfileDesktopLoadingPlaceholder /> : desktopSurface}
-            </div>
-          ) : null}
           <div className='public-profile-layout-compact-slot'>
             {isDesktopLayout && desktopSurfaceReady ? null : embedded ? (
               <div className='profile-preview-frame flex h-full min-h-0 w-full flex-col overflow-hidden rounded-(--profile-shell-card-radius) border border-(--profile-panel-border) bg-(--profile-content-bg) shadow-(--profile-panel-shadow)'>
@@ -166,6 +146,22 @@ export function PublicProfileLayoutShell({
               compactSurface
             )}
           </div>
+          {hasDesktopSurface ? (
+            <div
+              className='public-profile-layout-desktop-shell overflow-hidden rounded-3xl'
+              data-testid='profile-desktop-shell'
+            >
+              {desktopBanner ? (
+                <div
+                  className='relative z-20 w-full shrink-0 overflow-hidden rounded-t-3xl'
+                  data-testid='profile-desktop-banner'
+                >
+                  {desktopBanner}
+                </div>
+              ) : null}
+              {embedded ? <ProfileDesktopLoadingPlaceholder /> : desktopSurface}
+            </div>
+          ) : null}
           {showClaimFooter && claimFooterHref ? (
             <ProfileClaimFooter
               href={claimFooterHref}
