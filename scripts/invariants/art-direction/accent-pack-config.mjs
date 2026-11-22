@@ -35,17 +35,71 @@ export function expectedAccent(index, size) {
 
 /** Roots the sweep covers. */
 export const SCAN_ROOTS = Object.freeze([
-  'apps/web/app',
-  'apps/web/components',
-  'apps/web/lib',
-  'apps/web/styles',
-  'packages/ui',
+  'apps/web',
   'apps/ovie',
+  'apps/console',
+  'apps/docs',
+  'apps/desktop',
+  'apps/extension',
+  'apps/should-i-make',
+  'apps/eve-pilot',
+  'packages/ui',
+  'packages/brand',
+]);
+
+/** Hidden directories the walker enters (Storybook config and stories). */
+export const HIDDEN_ROOT_DIRS = Object.freeze(['.storybook']);
+
+/** Test files are not rendered surfaces. Stories are, so they are scanned. */
+export const TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/;
+
+/**
+ * OKLCH chroma below which a Figma color is a neutral. The icy border tokens
+ * (for example #C7EDFF, chroma about 0.04) read as neutral edges; real
+ * accents sit at 0.14 or more, so 0.06 separates them with room.
+ */
+export const FIGMA_NEUTRAL_CHROMA = 0.06;
+
+/** Figma variables snapshot and generated tokens (scanned when present). */
+export const FIGMA_SNAPSHOT_ROOT = 'docs/design/figma';
+
+/**
+ * Server-rendered color outside JSX: email templates, HTML strings and image
+ * routes keep colors in plain strings, so rule (a) reads every string there.
+ */
+export const STRING_COLOR_PATH =
+  /(^|\/)(email|emails|email-signature|html|templates?|share|og)\/|opengraph-image|twitter-image|ImageResponse|standalone-page/i;
+
+/**
+ * Surfaces this scan cannot reach, and why. Reported with the sweep so
+ * "nothing escapes" is honest about its edges.
+ */
+export const UNREACHABLE_SURFACES = Object.freeze([
+  [
+    'apps/ios, apps/macos',
+    'Swift and asset catalogs: no JS/CSS scan reaches them. Tokens are projected from design.tokens.json, which is pack-only.',
+  ],
+  [
+    'Remotion or video compositions',
+    'No Remotion package exists in this repo; rendered video files cannot be scanned for hue.',
+  ],
+  [
+    'Raster and video pixels',
+    'Images are covered by the marketing-image-grading manifest, not by this scan; video frames are not scanned.',
+  ],
+  [
+    'Third-party embeds and remote CSS',
+    'Colors fetched at runtime (brand logos, DSP widgets) are outside the source tree.',
+  ],
+  [
+    'Computed colors',
+    'hsl(var(--x)) or runtime-generated palettes (for example per-artist hues) are only caught when a literal or variable name is visible.',
+  ],
 ]);
 
 /** Directory names the sweep never enters, on top of paths.mjs SKIP_DIRS. */
 export const SKIP_PATH =
-  /(^|\/)(__tests__|__mocks__|tests?|e2e|fixtures|stories|storybook)\//;
+  /(^|\/)(__tests__|__mocks__|tests?|e2e|fixtures|public|drizzle|node_modules)\//;
 
 /**
  * Token source files. They define the palette, so off-pack variable and

@@ -13,17 +13,27 @@
  *   node scripts/invariants/art-direction/accent-pack.mjs --update   rewrite baseline (shrink only)
  *   node scripts/invariants/art-direction/accent-pack.mjs --report   counts by rule and area
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   EXTRA_PACK_HEX,
+  FIGMA_SNAPSHOT_ROOT,
+  HIDDEN_ROOT_DIRS,
   SCAN_ROOTS,
   SKIP_PATH,
+  TEST_FILE,
   TOKEN_SOURCE_FILES,
+  UNREACHABLE_SURFACES,
 } from './accent-pack-config.mjs';
-import { scanSource } from './accent-pack-lib.mjs';
-import { REPO_ROOT, relPath, walkFiles } from './paths.mjs';
+import { figmaSnapshotIds, scanSource } from './accent-pack-lib.mjs';
+import { REPO_ROOT, relPath } from './paths.mjs';
 import { ancestorJson, evaluateRatchet } from './ratchet.mjs';
 
 export const ACCENT_PACK_BASELINE =
@@ -58,13 +68,73 @@ function packHexes(repoRoot) {
   return [...hexes];
 }
 
+const WALK_SKIP = new Set([
+  'node_modules',
+  '.next',
+  'dist',
+  'coverage',
+  'storybook-static',
+  'generated',
+  'build',
+  'out',
+]);
+const SOURCE_EXT = new Set(['.ts', '.tsx', '.css']);
+
+/** Source files under the roots, stories and .storybook included, tests excluded. */
+export function walkSources(repoRoot, roots, exts = SOURCE_EXT) {
+  const files = [];
+  const visit = abs => {
+    let st;
+    try {
+      st = statSync(abs);
+    } catch {
+      return;
+    }
+    if (st.isFile()) {
+      files.push(abs);
+      return;
+    }
+    if (!st.isDirectory()) return;
+    for (const entry of readdirSync(abs)) {
+      if (WALK_SKIP.has(entry)) continue;
+      if (entry.startsWith('.') && !HIDDEN_ROOT_DIRS.includes(entry)) continue;
+      visit(join(abs, entry));
+    }
+  };
+  for (const root of roots) visit(join(repoRoot, root));
+  return files.filter(f => {
+    const dot = f.lastIndexOf('.');
+    return exts.has(dot === -1 ? '' : f.slice(dot)) && !TEST_FILE.test(f);
+  });
+}
+
+function figmaIds(repoRoot, allowedHex) {
+  const ids = [];
+  for (const file of walkSources(
+    repoRoot,
+    [FIGMA_SNAPSHOT_ROOT],
+    new Set(['.json'])
+  )) {
+    try {
+      ids.push(
+        ...figmaSnapshotIds(
+          JSON.parse(readFileSync(file, 'utf8')),
+          relPath(repoRoot, file),
+          allowedHex
+        )
+      );
+    } catch {
+      /* not JSON */
+    }
+  }
+  return ids;
+}
+
 export function scanAccentPack(repoRoot = REPO_ROOT) {
   const allowedHex = packHexes(repoRoot);
   /** @type {string[]} */
   const ids = [];
-  const files = walkFiles(repoRoot, SCAN_ROOTS, {
-    exts: new Set(['.ts', '.tsx', '.css']),
-  });
+  const files = walkSources(repoRoot, SCAN_ROOTS);
   for (const file of files) {
     const rel = relPath(repoRoot, file);
     if (SKIP_PATH.test(rel) || rel.endsWith('.d.ts')) continue;
@@ -76,6 +146,7 @@ export function scanAccentPack(repoRoot = REPO_ROOT) {
       })
     );
   }
+  ids.push(...figmaIds(repoRoot, allowedHex));
   return [...new Set(ids)].sort();
 }
 
@@ -111,6 +182,20 @@ export function checkAccentPack(repoRoot = REPO_ROOT, recordedIds) {
 
 /** Surfaces, most specific first. */
 export const SURFACES = Object.freeze([
+  ['Storybook', /\.stories\.[jt]sx?:?|\/\.storybook\//],
+  ['Figma snapshot', /^docs\/design\/figma\//],
+  [
+    'Emails and HTML templates',
+    /^apps\/web\/lib\/(email|email-signature|html)\//,
+  ],
+  [
+    'OG, share and story images',
+    /opengraph-image|twitter-image|^apps\/web\/lib\/share\/|^apps\/web\/app\/api\/(share|celebration-card)\//,
+  ],
+  [
+    'Other apps (console, docs, desktop, extension, eve-pilot, should-i-make)',
+    /^apps\/(console|docs|desktop|extension|eve-pilot|should-i-make)\//,
+  ],
   [
     'Homepage',
     /^apps\/web\/(app\/\(home\)|components\/(homepage|features\/(home|landing))\/)/,
@@ -309,11 +394,14 @@ export function buildInventory(
       out.push('');
     }
   }
+  out.push('', '## Surfaces the scan cannot reach', '');
+  for (const [name, why] of UNREACHABLE_SURFACES)
+    out.push(`- **${name}**: ${why}`);
   return out.join('\n');
 }
 
-function tally(ids, keyFn) {
-  const map = new Map();
+function tally(ids, keyFn, seed = []) {
+  const map = new Map(seed.map(k => [k, 0]));
   for (const id of ids) map.set(keyFn(id), (map.get(keyFn(id)) ?? 0) + 1);
   return [...map.entries()].sort((a, b) => b[1] - a[1]);
 }
@@ -332,6 +420,10 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     const out = {
       total: ids.length,
       byRule: tally(ids, ruleOf),
+      bySurface: tally(ids, id => surfaceOf(id.split(':')[1]), [
+        ...SURFACES.map(([n]) => n),
+        'Other (lib, shared, misc)',
+      ]),
       byArea: tally(ids, areaOf),
       byFile: tally(ids, id => id.split(':')[1]).slice(0, 15),
     };

@@ -17,6 +17,7 @@ import {
   DATA_VIZ_PATH,
   EXTRA_PACK_HEX,
   expectedAccent,
+  FIGMA_NEUTRAL_CHROMA,
   GRADIENT_HUE_TOLERANCE,
   GRADIENT_NEUTRAL_CHROMA,
   GRADIENT_TWO_ACCENT_ALLOW,
@@ -27,6 +28,7 @@ import {
   STATUS_NAME,
   STATUS_TAG,
   STATUS_VALUE,
+  STRING_COLOR_PATH,
 } from './accent-pack-config.mjs';
 
 /* ------------------------------------------------------------------ color */
@@ -811,7 +813,7 @@ function allowedHexSet(extra) {
   return new Set(extra.map(h => h.toLowerCase()));
 }
 
-export function offPackLiteralIds(toks, file, allowedHex) {
+export function offPackLiteralIds(toks, file, allowedHex, allStrings = false) {
   const ids = new Set();
   const allowed = allowedHexSet(allowedHex);
   const regions = [];
@@ -827,7 +829,8 @@ export function offPackLiteralIds(toks, file, allowedHex) {
     }
   }
   for (const tk of strTokens(toks))
-    if (/-\[(?:#|rgba?\(|hsla?\(|oklch\()/.test(tk.v)) regions.push(tk);
+    if (allStrings || /-\[(?:#|rgba?\(|hsla?\(|oklch\()/.test(tk.v))
+      regions.push(tk);
   for (const tk of regions) {
     for (const m of tk.v.matchAll(COLOR_TOKEN)) {
       const t = m[0].toLowerCase();
@@ -1285,7 +1288,12 @@ export function scanSource(source, file, options) {
       ...offPackTailwindIds(joined, file),
       ...offPackVarIds(joined, file)
     );
-    if (ext === '.tsx' || ext === '.jsx')
+    const stringColors =
+      STRING_COLOR_PATH.test(file) ||
+      /ImageResponse|<!DOCTYPE html/.test(source);
+    if (stringColors)
+      ids.push(...offPackLiteralIds(toks, file, allowedHex, true));
+    else if (ext === '.tsx' || ext === '.jsx')
       ids.push(...offPackLiteralIds(toks, file, allowedHex));
   }
   ids.push(
@@ -1297,4 +1305,42 @@ export function scanSource(source, file, options) {
   if (ext === '.tsx' || ext === '.jsx')
     ids.push(...jsxIds(toks, file, { dataViz: DATA_VIZ_PATH.test(file) }));
   return [...new Set(ids)];
+}
+
+/**
+ * Figma variables snapshot and generated tokens: every color must be a pack
+ * hex or a neutral. Accent-like colors outside the pack fail.
+ */
+export function figmaSnapshotIds(json, file, allowedHex) {
+  const ids = new Set();
+  const allowed = new Set(allowedHex.map(h => h.toLowerCase()));
+  const visit = (node, trail) => {
+    if (typeof node === 'string') {
+      for (const m of node.matchAll(/#[0-9a-fA-F]{3,8}\b/g)) {
+        const t = m[0].toLowerCase();
+        const hex =
+          t.length === 4
+            ? `#${t[1]}${t[1]}${t[2]}${t[2]}${t[3]}${t[3]}`
+            : t.slice(0, 7);
+        const ok = toOklch(hex);
+        if (ok && ok.C >= FIGMA_NEUTRAL_CHROMA && !allowed.has(hex))
+          ids.add(`figma-off-pack:${file}:${trail}:${hex}`);
+      }
+      return;
+    }
+    if (node && typeof node === 'object')
+      for (const [k, v] of Object.entries(node))
+        visit(
+          v,
+          Array.isArray(node)
+            ? trail
+            : k === 'values' || k === 'variables'
+              ? trail
+              : trail
+                ? `${trail}.${k}`
+                : k
+        );
+  };
+  visit(json, '');
+  return [...ids];
 }
