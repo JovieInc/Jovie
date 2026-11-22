@@ -127,3 +127,45 @@ describe('UnifiedTable states', () => {
     await expectNoA11yViolations(container);
   });
 });
+
+describe('UnifiedTable hideWhenEmpty columns', () => {
+  const hideable: ColumnDef<CatalogRow, unknown>[] = [
+    columns[0],
+    { ...columns[1], meta: { hideWhenEmpty: true } },
+  ];
+  const render2 = (data: CatalogRow[]) =>
+    render(
+      <UnifiedTable
+        data={data}
+        columns={hideable}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        rowMode='compact'
+      />
+    );
+
+  it('hides a flagged column that no row has a value for', () => {
+    render2([{ id: 'a', title: 'Only Title' }]);
+    expect(screen.getByRole('columnheader', { name: 'Title' })).toBeVisible();
+    expect(
+      screen.queryByRole('columnheader', { name: 'Artist' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the flagged column once any row has a value', () => {
+    render2(RELEASES);
+    expect(screen.getByRole('columnheader', { name: 'Artist' })).toBeVisible();
+  });
+
+  it('keeps every column on an empty table so the empty state reads as a table', () => {
+    render2([]);
+    expect(screen.getByRole('columnheader', { name: 'Artist' })).toBeVisible();
+  });
+
+  it('applies the compact row mode to the table', () => {
+    const { container } = render2(RELEASES);
+    expect(
+      container.querySelector('[data-table-row-mode="compact"]')
+    ).not.toBeNull();
+  });
+});
