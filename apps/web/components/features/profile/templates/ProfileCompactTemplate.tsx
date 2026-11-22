@@ -204,15 +204,12 @@ function getInitialModeFromLocation(
   return modeParam === null ? fallbackMode : getProfileMode(modeParam);
 }
 
+// First client render matches the server; both sync in an effect post-hydration.
 function getInitialDrawerPresentation(): ProfileSurfacePresentation {
-  // Keep the first client render identical to the server render. The responsive
-  // presentation is synced in an effect immediately after hydration.
   return 'standalone';
 }
 
 function getInitialIsDesktopLayout(): boolean {
-  // Keep the first client render identical to the server render. The responsive
-  // layout is synced in an effect immediately after hydration.
   return false;
 }
 
