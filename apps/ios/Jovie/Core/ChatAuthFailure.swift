@@ -1,4 +1,5 @@
 import Foundation
+import JovieKit
 
 /// Terminal chat auth: missing token or a 401 after retry. Not a transport outage.
 func isTerminalChatAuthFailure(_ error: Error) -> Bool {
