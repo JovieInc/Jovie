@@ -7871,6 +7871,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/v/[token]/page.tsx",
+      "kind": "page",
+      "route": "/v/[token]",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/waitlist/invite/page.tsx",
       "kind": "page",
       "route": "/waitlist/invite",
