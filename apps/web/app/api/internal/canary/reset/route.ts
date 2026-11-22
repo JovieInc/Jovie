@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { env } from '@/lib/env-server';
@@ -91,6 +92,20 @@ export async function POST(request: Request): Promise<NextResponse> {
   // passage-token allowance.
   const rate = await canaryResetLimiter.limit('canary-reset');
   if (!rate.success) {
+    // The public response remains deliberately indistinguishable. Record only
+    // the provider-independent reason; metrics must not change the denial.
+    try {
+      Sentry.metrics?.count('synthetic.canary_reset.denied', 1, {
+        attributes: {
+          reason:
+            rate.unavailable === true
+              ? 'limiter_unavailable'
+              : 'budget_exhausted',
+        },
+      });
+    } catch {
+      // A telemetry failure cannot replace the original fail-closed 429.
+    }
     return json({ error: 'Canary reset rate limit exceeded' }, 429);
   }
 
