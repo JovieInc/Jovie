@@ -10,7 +10,6 @@ import {
   incrementMerchCardView,
 } from '@/lib/merch/service';
 import { scheduleAfter } from '@/lib/next/schedule-after';
-import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-policy';
 import { generateMerchStructuredData } from '@/lib/seo/structured-data';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import { uuidSchema } from '@/lib/validation/schemas/base';
@@ -83,12 +82,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return {
       title,
       description,
-      // Same indexing rule as the artist's profile: a reserved or synthetic
-      // artist's merch stays out of search.
-      robots: getPublicProfileRobots(
-        profile.usernameNormalized || username,
-        profile.displayName
-      ),
       openGraph: {
         title,
         description,
