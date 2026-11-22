@@ -169,6 +169,69 @@ function Stacked() {
   );
 }
 
+/**
+ * What main shipped before this contract, reproduced class for class so the
+ * drift stays visible: Fleet had no hover, selected or height; Shipping was a
+ * hand-rolled table row with seams and a red tint; Tasks used a heavier title.
+ * Never copy these recipes into product code.
+ */
+function LegacyStacked() {
+  const title = 'Cache Symphony workspaces on NVMe';
+  return (
+    <div
+      data-testid='content-rows-before-stack'
+      className='w-[640px] bg-(--app-shell-content-surface) p-6'
+    >
+      <Section title='Fleet (before)'>
+        <div className='grid gap-1'>
+          {['Running', 'Running', 'Running', 'Blocked'].map((label, i) => (
+            <div
+              key={`${label}-${i}`}
+              className='flex items-center gap-2 rounded-md px-3 py-1'
+            >
+              <Loader2
+                aria-hidden='true'
+                className='h-4 w-4 text-accent-blue'
+              />
+              <div className='min-w-0 flex-1'>
+                <div className='text-app font-semibold leading-tight'>
+                  {title}
+                </div>
+                <div className='text-3xs leading-4 text-tertiary-token'>
+                  {label} · JOV-5544 · Attempt 2
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Section>
+      <Section title='Shipping (before)'>
+        <table className='w-full text-left text-xs tabular-nums'>
+          <tbody>
+            {[false, true, true, false].map((selected, i) => (
+              <tr
+                key={`ship-${i}`}
+                className={cn(
+                  'border-t border-subtle',
+                  selected && 'bg-surface-1',
+                  i === 3 && 'border-l-2 border-l-error bg-error-subtle'
+                )}
+              >
+                <th scope='row' className='p-2 font-medium'>
+                  {title}
+                  <div className='text-2xs text-tertiary-token'>JOV-5544</div>
+                </th>
+                <td className='p-2'>{i === 3 ? 'Blocked' : 'In Review'}</td>
+                <td className='p-2 text-secondary-token'>2h ago</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Section>
+    </div>
+  );
+}
+
 const meta = {
   title: 'Design System/Content Rows',
   component: Stacked,
@@ -179,3 +242,6 @@ type Story = StoryObj<typeof meta>;
 
 /** Fleet, Shipping and Tasks rows stacked: default, hover, selected, attention. */
 export const StackedRows: Story = {};
+
+/** The row recipes main shipped before the contract. */
+export const BeforeUnification: Story = { render: () => <LegacyStacked /> };

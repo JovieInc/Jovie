@@ -14,6 +14,7 @@ import { expect, test } from '@playwright/test';
 const STORYBOOK_THEME_STORAGE_KEY = 'jovie-theme-storybook';
 const STORYBOOK_RENDER_TIMEOUT_MS = 60_000;
 const STORY_ID = 'design-system-content-rows--stacked-rows';
+const BEFORE_ID = 'design-system-content-rows--before-unification';
 const THEMES = ['light', 'dark'] as const;
 
 test.describe('content rows', () => {
@@ -49,6 +50,21 @@ test.describe('content rows', () => {
       expect(Math.abs(heights[0]! - heights[1]!)).toBeLessThanOrEqual(1);
 
       await expect(stack).toHaveScreenshot(`content-rows-${theme}.png`);
+    });
+  }
+
+  for (const theme of THEMES) {
+    test(`before unification [${theme}]`, async ({ page }) => {
+      await page.addInitScript(
+        ({ key, value }) => window.localStorage.setItem(key, value),
+        { key: STORYBOOK_THEME_STORAGE_KEY, value: theme }
+      );
+      await page.goto(`/iframe.html?id=${BEFORE_ID}&viewMode=story`, {
+        waitUntil: 'domcontentloaded',
+      });
+      const stack = page.getByTestId('content-rows-before-stack');
+      await expect(stack).toBeVisible({ timeout: STORYBOOK_RENDER_TIMEOUT_MS });
+      await expect(stack).toHaveScreenshot(`content-rows-before-${theme}.png`);
     });
   }
 });
