@@ -4633,7 +4633,8 @@ html:not(.dark) .smart-link-powered-by {
   }
 }
 
-/* JOV-14241 cover-lit accent line placement (tokenized; no arbitrary top-[] in TSX). */
+/* JOV-14241 cover-lit accent line: a thin edge on the stage's top, never a
+   line floating across content (the /tim stray line at top: 22%). */
 .profile-cover-accent-line {
-  top: 22%;
+  top: 0;
 }
