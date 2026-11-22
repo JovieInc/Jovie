@@ -1,5 +1,11 @@
 {
   "schema": "jovie-automation-schedule-allowlist/v1",
   "description": "Files allowed to add schedule:/cron: triggers or GitHub-API polling (scripts/schedule-trigger-guard.mjs). Entries need a live canon/automation-registry.jsonl id; remove an entry when its file loses the clock. Keep this list small.",
-  "entries": []
+  "entries": [
+    {
+      "file": ".github/workflows/design-reference-intake.yml",
+      "registryId": "github:jovie:design-reference-intake",
+      "justification": "Weekly design reference intake (JOV-14353). Playwright captures only; paid scheduled runs require DESIGN_REFS_SCHEDULED_ENABLED after Tim approves canon/design-refs/intake-config.json spend cap."
+    }
+  ]
 }

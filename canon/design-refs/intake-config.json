@@ -1,0 +1,75 @@
+{
+  "schema": "jovie.design-refs-intake/v1",
+  "scheduledEnabledDefault": false,
+  "spendCap": {
+    "maxBrowserCapturesPerRun": 64,
+    "maxEstimatedUsdPerRun": 0,
+    "estimatedUsdPerBrowserCapture": 0,
+    "note": "Intake uses Playwright only (no LLM). Tim enables scheduled paid runs with DESIGN_REFS_SCHEDULED_ENABLED=1 after written cap approval."
+  },
+  "minReferencesPerSurface": 8,
+  "colorScheme": "dark",
+  "viewports": {
+    "desktop": { "width": 1440, "height": 900, "suffix": "desktop" },
+    "mobile": { "width": 390, "height": 844, "suffix": "mobile" }
+  },
+  "surfaceAliases": {
+    "golden-path": ["onboarding-start"],
+    "public-profile": ["artist-profile-release"],
+    "release-landing": ["artist-profile-release"]
+  },
+  "surfaces": [
+    {
+      "id": "homepage",
+      "label": "Homepage",
+      "pageTypes": ["homepage"]
+    },
+    {
+      "id": "artist-profile-release",
+      "label": "Artist profile and release",
+      "pageTypes": [
+        "artist-profile-release",
+        "public-profile",
+        "release-landing"
+      ]
+    },
+    {
+      "id": "onboarding-start",
+      "label": "Onboarding /start",
+      "pageTypes": ["onboarding-start", "golden-path"]
+    },
+    {
+      "id": "app-shell",
+      "label": "Dashboard and app shell",
+      "pageTypes": ["app-shell"]
+    },
+    {
+      "id": "chat",
+      "label": "Chat",
+      "pageTypes": ["chat"]
+    },
+    {
+      "id": "marketing-icp",
+      "label": "Marketing ICP pages",
+      "pageTypes": ["marketing-icp"]
+    }
+  ],
+  "jovieStagingOrigin": "https://staging.jov.ie",
+  "jovieStagingPaths": [
+    {
+      "path": "/start",
+      "surfaces": ["onboarding-start"],
+      "variable": "hero"
+    },
+    {
+      "path": "/app/chat",
+      "surfaces": ["chat"],
+      "variable": "product-media"
+    },
+    {
+      "path": "/app",
+      "surfaces": ["app-shell"],
+      "variable": "navigation"
+    }
+  ]
+}

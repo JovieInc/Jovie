@@ -303,6 +303,22 @@ describe('design-refs scout', () => {
   });
 });
 
+describe('design-refs intake', () => {
+  it('dry scheduled intake skips without capture when scheduler is gated', async () => {
+    const prev = process.env.DESIGN_REFS_SCHEDULED_ENABLED;
+    delete process.env.DESIGN_REFS_SCHEDULED_ENABLED;
+    const logs: string[] = [];
+    const code = await runDesignRefs(['intake', '--scheduled', '--dry'], {
+      ...deps,
+      log: line => logs.push(line),
+    });
+    if (prev === undefined) delete process.env.DESIGN_REFS_SCHEDULED_ENABLED;
+    else process.env.DESIGN_REFS_SCHEDULED_ENABLED = prev;
+    expect(code).toBe(0);
+    expect(logs.some(line => /scheduled run skipped/u.test(line))).toBe(true);
+  });
+});
+
 describe('design-refs directions and usage', () => {
   it('lists directions and rejects unknown commands', async () => {
     await runDesignRefs(['directions'], deps);

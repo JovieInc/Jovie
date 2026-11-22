@@ -1,0 +1,65 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: TimWhite
+# capability-gap: No durable weekly design-reference intake existed; this
+# workflow runs the gated Playwright scout path and writes captures only to the
+# operator cache (~/.cache/jovie/design-refs), not git or deploy artifacts.
+# removal-trigger: Remove when Summer or a Vercel cron owns reference intake
+# natively with the same spend gate and coverage receipts.
+# github-token-budget: 0 calls/run - checkout only; no GitHub API calls.
+# Weekly design reference intake (JOV-14353). Paid scheduled browser runs stay
+# off until Tim sets DESIGN_REFS_SCHEDULED_ENABLED=1 after written spend-cap
+# approval (canon/design-refs/intake-config.json).
+name: Design reference intake
+
+on:
+  schedule:
+    - cron: '17 14 * * 1'
+  workflow_dispatch:
+    inputs:
+      surface:
+        description: Optional intake surface id (homepage, onboarding-start, ...)
+        required: false
+        type: string
+      dry:
+        description: Dry run (no corpus writes)
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: design-reference-intake
+  cancel-in-progress: false
+
+jobs:
+  intake:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-playwright
+      - name: Run design reference intake
+        env:
+          DESIGN_REFS_SCHEDULED_ENABLED: ${{ github.event_name == 'workflow_dispatch' && inputs.dry == false && '1' || '' }}
+        run: |
+          set -euo pipefail
+          args=(intake --scheduled)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry }}" = "true" ]; then
+            args+=(--dry)
+          fi
+          if [ -n "${{ inputs.surface }}" ]; then
+            args+=(--surface "${{ inputs.surface }}")
+          fi
+          pnpm --filter @jovie/web exec tsx scripts/design-refs.ts "${args[@]}"
+      - name: Intake spend cap note
+        if: ${{ always() }}
+        run: |
+          echo "Spend cap: canon/design-refs/intake-config.json"
+          echo "Enable scheduled paid runs: set repo secret or env DESIGN_REFS_SCHEDULED_ENABLED=1 after Tim approval."

@@ -5,6 +5,7 @@
  *   pnpm --filter web design-refs pull --surface homepage [--terms glass,dark] [--json]
  *   pnpm --filter web design-refs guard <screenshot.png...>
  *   pnpm --filter web design-refs scout [--limit 10] [--dry]
+ *   pnpm --filter web design-refs intake [--surface homepage] [--dry] [--staging]
  *   pnpm --filter web design-refs directions
  *
  * See canon/design-refs/README.md. Pixels go to the local cache only.
@@ -16,9 +17,10 @@ import { basename, extname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import sharp from 'sharp';
-import { z } from 'zod';
 
 import { ingestDesignReference } from '@/lib/agent-os/design-reference-corpus/corpus';
+import { assertIntakeCapturePassesAntiCopyGuard } from '@/lib/agent-os/design-reference-corpus/intake/guard';
+import { ScoutSeedsSchema } from '@/lib/agent-os/design-reference-corpus/intake/seeds';
 import {
   computeDHash,
   findRefCopies,
@@ -39,6 +41,8 @@ import {
   FOLD,
   toFoldJpeg,
 } from './design-refs-capture';
+import { type Flags, list, parseFlags } from './design-refs-flags';
+import { commandDesignRefsIntake } from './design-refs-intake-command';
 import {
   designRefsCacheDir,
   designRefsDir,
@@ -46,6 +50,8 @@ import {
   loadDirections,
   writeCorpus,
 } from './design-refs-store';
+
+export { parseFlags } from './design-refs-flags';
 
 /** Moving heroes re-capture up to ~68 bits apart; past this a site was redesigned. */
 export const SCOUT_UNCHANGED_DISTANCE = 72;
@@ -58,42 +64,6 @@ export interface DesignRefsDeps {
   readonly captureUrl: CaptureUrl;
   readonly now: () => Date;
   readonly log: (line: string) => void;
-}
-
-interface Flags {
-  readonly positional: string[];
-  readonly values: Map<string, string>;
-  readonly switches: Set<string>;
-}
-
-export function parseFlags(argv: readonly string[]): Flags {
-  const flags: Flags = {
-    positional: [],
-    values: new Map(),
-    switches: new Set(),
-  };
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (!arg.startsWith('--')) {
-      flags.positional.push(arg);
-      continue;
-    }
-    const [key, inline] = arg.slice(2).split('=', 2);
-    const next = argv[index + 1];
-    if (inline !== undefined) flags.values.set(key, inline);
-    else if (next !== undefined && !next.startsWith('--')) {
-      flags.values.set(key, next);
-      index += 1;
-    } else flags.switches.add(key);
-  }
-  return flags;
-}
-
-function list(flags: Flags, key: string): string[] {
-  return (flags.values.get(key) ?? '')
-    .split(',')
-    .map(item => item.trim())
-    .filter(Boolean);
 }
 
 export function refSlug(text: string): string {
@@ -288,6 +258,7 @@ async function commandAdd(flags: Flags, deps: DesignRefsDeps): Promise<number> {
     );
     return 0;
   }
+  await assertIntakeCapturePassesAntiCopyGuard({ jpeg, corpus });
   writeCorpus(deps.dir, store(deps, corpus, reference, jpeg));
   deps.log(`added ${reference.id} [proposed]`);
   return 0;
@@ -356,20 +327,6 @@ async function commandGuard(
   return 0;
 }
 
-const ScoutSeedsSchema = z.object({
-  schema: z.literal('jovie.design-refs-scout-seeds/v1'),
-  seeds: z.array(
-    z.object({
-      url: z.string().url(),
-      surfaces: z.array(z.string()).min(1),
-      weight: z.number().min(0).max(1),
-      mood: z.array(z.string()),
-      technique: z.array(z.string()),
-      why: z.string().min(1),
-    })
-  ),
-});
-
 /**
  * Weekly scout: re-captures the seed sites, ranks new captures by novelty
  * against the corpus x seed weight, and ingests the top N as `proposed`. A
@@ -437,7 +394,10 @@ async function commandScout(
     deps.log(
       `${dry ? 'would add' : 'added'} ${reference.id} score=${score.toFixed(3)}`
     );
-    if (!dry) corpus = store(deps, corpus, reference, jpeg);
+    if (!dry) {
+      await assertIntakeCapturePassesAntiCopyGuard({ jpeg, corpus });
+      corpus = store(deps, corpus, reference, jpeg);
+    }
   }
   if (!dry && ranked.length > 0) writeCorpus(deps.dir, corpus);
   return 0;
@@ -458,6 +418,8 @@ export async function runDesignRefs(
       return commandGuard(flags, deps);
     case 'scout':
       return commandScout(flags, deps);
+    case 'intake':
+      return commandDesignRefsIntake(flags, deps);
     case 'directions':
       for (const direction of loadDirections(deps.dir)) {
         deps.log(
@@ -467,7 +429,7 @@ export async function runDesignRefs(
       return 0;
     default:
       deps.log(
-        'usage: design-refs <add|pull|guard|scout|directions> (canon/design-refs/README.md)'
+        'usage: design-refs <add|pull|guard|scout|intake|directions> (canon/design-refs/README.md)'
       );
       return command ? 1 : 0;
   }
