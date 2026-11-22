@@ -908,7 +908,7 @@ export function ProfileCompactSurface({
             aboveNav={
               proofClaimCta ? (
                 <div
-                  className='pointer-events-auto mb-2 md:hidden'
+                  className='pointer-events-auto mb-3 md:hidden'
                   data-testid='profile-proof-claim-bar'
                 >
                   <ProofClaimCtaLink
