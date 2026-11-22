@@ -177,20 +177,18 @@ test.describe('Homepage', () => {
     const viewport = page.viewportSize();
     test.skip(
       (viewport?.width ?? 0) < 1024,
-      'The Customers flyout is a desktop navigation affordance'
+      'The Customers item is a desktop navigation affordance'
     );
-    const trigger = header.getByRole('button', { name: /Customers/ });
-    await trigger.hover();
-    const flyout = page.locator('#marketing-header-flyout-customers');
-    await expect(flyout).toBeVisible();
-    await expect(flyout.getByRole('link', { name: 'Artists' })).toHaveAttribute(
-      'href',
-      '/solutions/artists'
+    // One audience page so far: a plain link, never a caret over one item.
+    await expect(header.getByRole('button', { name: /Customers/ })).toHaveCount(
+      0
     );
-    await expect(flyout.getByRole('link')).toHaveCount(1);
-    await page.keyboard.press('Escape');
-    // Native popover keeps the node mounted; closed state is not visible.
-    await expect(flyout).toBeHidden();
+    await expect(
+      header.getByRole('link', { name: 'Customers' })
+    ).toHaveAttribute('href', '/solutions/artists');
+    await expect(
+      page.locator('#marketing-header-flyout-customers')
+    ).toHaveCount(0);
   });
 
   test('canonical header has only the Customers flyout', async ({ page }) => {

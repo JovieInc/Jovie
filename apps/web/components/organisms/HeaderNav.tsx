@@ -17,6 +17,11 @@ import type { LogoVariant } from '@/components/atoms/Logo';
 import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
 import { MobileNav } from '@/components/molecules/MobileNav';
+import {
+  type HeaderFlyoutMenu,
+  type HeaderFlyoutMultiMenu,
+  toHeaderNavEntries,
+} from '@/components/organisms/headerNavEntries';
 import { MarketingSignInLink } from '@/components/organisms/MarketingSignInLink';
 import { LazyUserButton } from '@/components/organisms/user-button/user-button.lazy';
 import { APP_ROUTES } from '@/constants/routes';
@@ -120,17 +125,7 @@ export interface HeaderNavLinkItem {
   readonly treatment?: 'wordmark' | 'leading';
 }
 
-export interface HeaderFlyoutMenu {
-  readonly id: string;
-  readonly label: string;
-  readonly heading: string;
-  readonly links: ReadonlyArray<{
-    readonly href: string;
-    readonly label: string;
-    /** Omit for a compact list menu (label + arrow), e.g. Customers. */
-    readonly description?: string;
-  }>;
-}
+export type { HeaderFlyoutMenu };
 
 // One front-door CTA for headers rendered without an explicit publicCta.
 const DEFAULT_PUBLIC_CTA: HeaderNavCta =
@@ -279,7 +274,7 @@ function MarketingGlassFlyout({
   menu,
   open,
 }: Readonly<{
-  menu: HeaderFlyoutMenu;
+  menu: HeaderFlyoutMultiMenu;
   open: boolean;
 }>) {
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -395,7 +390,9 @@ export function HeaderNav({
   const isHomepagePresentation = presentation === 'homepage-embedded';
   const isDocked = isMarketingGlass || isHomepagePresentation;
   const { isScrolled, sentinelRef } = useDockScrolled(isDocked);
-  const resolvedFlyoutMenus = isMarketingGlass ? (flyoutMenus ?? []) : [];
+  const resolvedFlyoutEntries = isMarketingGlass
+    ? toHeaderNavEntries(flyoutMenus ?? [])
+    : [];
 
   const clearFlyoutCloseTimer = useCallback(() => {
     if (closeFlyoutTimerRef.current === null) {
@@ -518,7 +515,7 @@ export function HeaderNav({
   const hasDesktopNavLinks =
     !hideNav &&
     !hideDesktopNav &&
-    (!!navLinks?.length || resolvedFlyoutMenus.length > 0);
+    (!!navLinks?.length || resolvedFlyoutEntries.length > 0);
   const mobileLinks = mobileNavLinks ?? navLinks;
   const hasMobileNavLinks =
     !hideNav && !hideDesktopNav && !!mobileLinks?.length;
@@ -552,7 +549,18 @@ export function HeaderNav({
     <div className={cn('max-lg:hidden items-center lg:flex', navGroupClass)}>
       {renderNavLinks(leadingMarketingLinks)}
       {isMarketingGlass
-        ? resolvedFlyoutMenus.map(menu => {
+        ? resolvedFlyoutEntries.map(entry => {
+            if (entry.kind === 'link') {
+              return (
+                <HeaderNavLink
+                  key={entry.id}
+                  href={entry.href}
+                  label={entry.label}
+                  className={navLinkClass}
+                />
+              );
+            }
+            const { menu } = entry;
             const open = openFlyoutId === menu.id;
 
             return (
