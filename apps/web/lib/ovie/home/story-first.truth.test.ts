@@ -20,7 +20,7 @@ describe('Home never asserts an unproven block', () => {
     kind: 'certification',
     step: 'public_profile',
     tone: 'warn',
-    text: "The public profile isn't fully measured yet, so we can't confirm an artist can be sent their profile",
+    text: 'Public profile certification is not confirmed. See Certifications for the latest evidence.',
     detailsHref: APP_ROUTES.ADMIN_CERTIFICATIONS,
     since: null,
     nextAction: null,
@@ -37,24 +37,26 @@ describe('Home never asserts an unproven block', () => {
     });
     expect(story.title).toBe("We can't see the bottleneck yet");
     expect(story.title).not.toMatch(/blocking/);
-    expect(story.body).toContain("isn't fully measured yet");
+    expect(story.body).toContain('not confirmed');
     expect(story.tone).toBe('unknown');
     expect(story.eyebrow).toBe('Not measured · Profile');
   });
 
-  it('still names the block when the evidence proves it', () => {
+  it('reports failed profile certification without declaring a revenue outage', () => {
     const story = buildStoryFirstBottleneck({
       revenue: {
         ...profile,
         tone: 'bad',
-        text: 'The public profile fails certification, so no artist can be sent their profile yet',
+        text: 'The latest available public profile certification report shows a failed check. See Certifications for details.',
       },
       revenueRead: true,
       constraint: null,
       highlight: null,
       rows: [],
     });
-    expect(story.title).toBe('The public profile is blocking revenue');
+    expect(story.title).toBe('Public profile certification needs attention');
+    expect(story.eyebrow).toBe('Certification · Profile');
+    expect(story.body).toContain('latest available');
   });
 
   it('does not call a dashboard query fix work on the public profile', () => {

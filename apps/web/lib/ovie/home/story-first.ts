@@ -351,7 +351,10 @@ export function buildStoryFirstBottleneck(input: {
       tone: input.revenue.tone === 'bad' ? 'bad' : 'unknown',
       eyebrow:
         input.revenue.tone === 'bad'
-          ? `Bottleneck · ${stepLabel(input.revenue.step)}`
+          ? input.revenue.kind === 'certification' &&
+            input.revenue.step === 'public_profile'
+            ? 'Certification · Profile'
+            : `Bottleneck · ${stepLabel(input.revenue.step)}`
           : `Not measured · ${stepLabel(input.revenue.step)}`,
       title: shortTitle(input.revenue),
       body: input.revenue.text,

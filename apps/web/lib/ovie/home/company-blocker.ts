@@ -54,15 +54,10 @@ export interface CompanyBlocker {
  */
 const CONE_COPY: Readonly<
   Record<
-    RevenueConeStep,
+    Exclude<RevenueConeStep, 'public_profile'>,
     { readonly name: string; readonly why: string; readonly unproven: string }
   >
 > = {
-  public_profile: {
-    name: 'The public profile',
-    why: 'no artist can be sent their profile yet',
-    unproven: "we can't confirm an artist can be sent their profile",
-  },
   homepage_entry: {
     name: 'The homepage entry',
     why: "visitors can't be trusted to reach sign-up",
@@ -95,6 +90,13 @@ function certificationText(
   metric: CompanyStateSnapshot['certification'][RevenueConeStep],
   status: string
 ): string {
+  if (step === 'public_profile') {
+    // This projection carries a contract version, not a serving release or
+    // check ID. Attribute the result without claiming current product impact.
+    return status === 'red'
+      ? 'The latest available public profile certification report shows a failed check. See Certifications for details.'
+      : 'Public profile certification is not confirmed. See Certifications for the latest evidence.';
+  }
   const copy = CONE_COPY[step];
   if (status === 'red')
     return `${copy.name} fails certification, so ${copy.why}`;
