@@ -15,10 +15,6 @@ import { DashboardAudienceTableUnified } from './DashboardAudienceTableUnified';
 import { DEFAULT_AUDIENCE_FILTERS } from './types';
 
 // Analytics has its own query contract; this test exercises table/export binding.
-vi.mock(
-  '@/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard',
-  () => ({ AiCrawlerIntelligenceCard: () => null })
-);
 
 function renderWithProviders(ui: ReactElement) {
   const queryClient = new QueryClient({
@@ -202,7 +198,7 @@ describe('DashboardAudienceTableUnified', () => {
     await expectNoA11yViolations(populated.container);
   });
 
-  it('renders members on the 32px dense people row with a face', () => {
+  it('renders members on the 40px compact people row with a face', () => {
     const member: AudienceMember = {
       id: 'm1',
       type: 'email',
@@ -244,7 +240,7 @@ describe('DashboardAudienceTableUnified', () => {
     );
 
     expect(
-      document.querySelector('table[data-table-row-mode="dense"]')
+      document.querySelector('table[data-table-row-mode="compact"]')
     ).not.toBeNull();
     const person = document.querySelector('table [data-table-person-cell]');
     expect(person).toHaveTextContent('Maya Okaformaya@example.com');

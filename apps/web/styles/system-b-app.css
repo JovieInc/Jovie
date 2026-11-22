@@ -883,7 +883,16 @@
 }
 
 :where(.system-b-table-row-height) {
-  height: 40px;
+  height: var(--table-row-height, 40px);
+}
+
+/* Table primary cell text: Linear's 13px. --text-app stays 12px for meta. */
+:root {
+  --table-primary-text-size: 0.8125rem;
+}
+
+.system-b-table-primary-text {
+  font-size: var(--table-primary-text-size);
 }
 
 :where(.system-b-table-column-small) {
