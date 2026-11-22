@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Inbox } from 'lucide-react';
 import { SettingsErrorState } from '@/components/features/dashboard/molecules/SettingsErrorState';
-import { ContentMetricCardSkeleton } from './ContentMetricCardSkeleton';
-import { EmptyState } from './EmptyState';
-import { LoadingSkeleton } from './LoadingSkeleton';
+import { ContentMetricCardSkeleton } from '@/components/molecules/ContentMetricCardSkeleton';
+import { EmptyState } from '@/components/molecules/EmptyState';
+import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 // Card intent contract (.claude/rules/ui.md): empty, loading and error states
 // sit flat on the canvas. No card, border or recessed well around them.

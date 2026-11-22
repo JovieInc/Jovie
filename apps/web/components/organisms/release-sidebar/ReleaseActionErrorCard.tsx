@@ -55,20 +55,11 @@ export function ReleaseActionErrorCard({
         </div>
       </div>
       <div className='flex flex-wrap items-center gap-2'>
-        <DrawerButton
-          type='button'
-          onClick={onRetry}
-          className='h-7 px-2 text-2xs'
-        >
+        <DrawerButton type='button' onClick={onRetry}>
           {actionLabel}
         </DrawerButton>
         {onDismiss ? (
-          <DrawerButton
-            type='button'
-            onClick={onDismiss}
-            tone='ghost'
-            className='h-7 px-2 text-2xs'
-          >
+          <DrawerButton type='button' onClick={onDismiss} tone='ghost'>
             Dismiss
           </DrawerButton>
         ) : null}

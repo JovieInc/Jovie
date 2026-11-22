@@ -34,17 +34,17 @@ function DefaultSkeleton({ rowKeyPrefix }: { readonly rowKeyPrefix: string }) {
     <div className='space-y-3 p-4 sm:p-5' data-skeleton-layout='default'>
       <div className='flex items-center justify-between gap-3'>
         <div className='space-y-2'>
-          <Skeleton className='h-6 w-52' rounded='md' />
-          <Skeleton className='h-4 w-72' />
+          <Skeleton height='h-6' className='w-52' rounded='md' />
+          <Skeleton height='h-4' className='w-72' />
         </div>
-        <Skeleton className='h-8 w-24' rounded='md' />
+        <Skeleton height='h-8' className='w-24' rounded='md' />
       </div>
 
       <div className='space-y-3 p-3'>
         <div className='grid grid-cols-[minmax(0,1.5fr)_120px_72px] gap-3 border-b border-subtle/60 pb-2'>
-          <Skeleton className='h-3 w-24' />
-          <Skeleton className='h-3 w-16' />
-          <Skeleton className='h-3 w-12' />
+          <Skeleton height='h-3' className='w-24' />
+          <Skeleton height='h-3' className='w-16' />
+          <Skeleton height='h-3' className='w-12' />
         </div>
 
         {DASHBOARD_LOADING_ROWS.map(row => (
@@ -52,9 +52,9 @@ function DefaultSkeleton({ rowKeyPrefix }: { readonly rowKeyPrefix: string }) {
             key={`${rowKeyPrefix}-${row}`}
             className='grid grid-cols-[minmax(0,1.5fr)_120px_72px] items-center gap-3 py-1'
           >
-            <Skeleton className='h-4 w-full' />
-            <Skeleton className='h-4 w-20' />
-            <Skeleton className='h-4 w-12' />
+            <Skeleton height='h-4' className='w-full' />
+            <Skeleton height='h-4' className='w-20' />
+            <Skeleton height='h-4' className='w-12' />
           </div>
         ))}
       </div>
@@ -73,7 +73,12 @@ function AdminSkeleton() {
         data-skeleton-slot='admin-health'
       >
         {ADMIN_KPI_CARDS.map(card => (
-          <Skeleton key={card} className='min-h-28 w-full rounded-xl' />
+          <Skeleton
+            key={card}
+            height='min-h-28'
+            className='w-full'
+            rounded='xl'
+          />
         ))}
       </div>
     </div>
@@ -88,12 +93,12 @@ function InsightsSkeleton() {
         data-skeleton-slot='insights-filters'
       >
         {INSIGHT_FILTERS.map(filter => (
-          <Skeleton key={filter} className='h-8 w-20' rounded='full' />
+          <Skeleton key={filter} height='h-8' className='w-20' rounded='full' />
         ))}
       </div>
       <div className='space-y-3' data-skeleton-slot='insights-cards'>
         {INSIGHT_CARDS.map(card => (
-          <Skeleton key={card} className='h-28 w-full rounded-xl' />
+          <Skeleton key={card} height='h-28' className='w-full' rounded='xl' />
         ))}
       </div>
     </div>
@@ -108,15 +113,20 @@ function ProfileSkeleton({ rowKeyPrefix }: { readonly rowKeyPrefix: string }) {
         data-skeleton-slot='profile-filters'
       >
         {PROFILE_FILTERS.map(filter => (
-          <Skeleton key={filter} className='h-7 w-14 sm:w-16' rounded='full' />
+          <Skeleton
+            key={filter}
+            height='h-7'
+            className='w-14 sm:w-16'
+            rounded='full'
+          />
         ))}
       </div>
       <div className='min-w-0' data-skeleton-slot='profile-table'>
         <div className='grid h-10 grid-cols-12 items-center gap-3 border-b border-subtle px-3'>
-          <Skeleton className='col-span-8 h-3 w-24 sm:col-span-6' />
-          <Skeleton className='col-span-2 hidden h-3 w-12 sm:block' />
-          <Skeleton className='col-span-2 hidden h-3 w-16 sm:block' />
-          <Skeleton className='col-span-2 h-3 w-14 sm:col-span-2' />
+          <Skeleton height='h-3' className='col-span-8 w-24 sm:col-span-6' />
+          <Skeleton height='h-3' className='col-span-2 hidden w-12 sm:block' />
+          <Skeleton height='h-3' className='col-span-2 hidden w-16 sm:block' />
+          <Skeleton height='h-3' className='col-span-2 w-14 sm:col-span-2' />
         </div>
         {PROFILE_ROWS.map(row => (
           <div
@@ -124,15 +134,21 @@ function ProfileSkeleton({ rowKeyPrefix }: { readonly rowKeyPrefix: string }) {
             className='grid h-14 grid-cols-12 items-center gap-3 border-b border-subtle px-3'
           >
             <div className='col-span-8 flex min-w-0 items-center gap-2.5 sm:col-span-6'>
-              <Skeleton className='h-7 w-7 shrink-0' rounded='md' />
+              <Skeleton height='h-7' className='w-7 shrink-0' rounded='md' />
               <div className='min-w-0 flex-1 space-y-1.5'>
-                <Skeleton className='h-3.5 w-32 max-w-full' />
-                <Skeleton className='h-3 w-44 max-w-full' />
+                <Skeleton height='h-3.5' className='w-32 max-w-full' />
+                <Skeleton height='h-3' className='w-44 max-w-full' />
               </div>
             </div>
-            <Skeleton className='col-span-2 hidden h-3 w-12 sm:block' />
-            <Skeleton className='col-span-2 hidden h-3 w-20 sm:block' />
-            <Skeleton className='col-span-2 h-3 w-14 sm:col-span-2' />
+            <Skeleton
+              height='h-3'
+              className='col-span-2 hidden w-12 sm:block'
+            />
+            <Skeleton
+              height='h-3'
+              className='col-span-2 hidden w-20 sm:block'
+            />
+            <Skeleton height='h-3' className='col-span-2 w-14 sm:col-span-2' />
           </div>
         ))}
       </div>
@@ -148,12 +164,16 @@ function TourSkeleton() {
         data-skeleton-slot='tour-status'
       >
         <div className='flex items-center gap-2'>
-          <Skeleton className='h-6 w-6' rounded='lg' />
-          <Skeleton className='h-4 w-52 max-w-full' />
+          <Skeleton height='h-6' className='w-6' rounded='lg' />
+          <Skeleton height='h-4' className='w-52 max-w-full' />
         </div>
         <div className='flex items-center gap-2'>
-          <Skeleton className='h-8 w-16' rounded='md' />
-          <Skeleton className='hidden h-8 w-24 sm:block' rounded='md' />
+          <Skeleton height='h-8' className='w-16' rounded='md' />
+          <Skeleton
+            height='h-8'
+            className='hidden w-24 sm:block'
+            rounded='md'
+          />
         </div>
       </div>
       <div
@@ -161,28 +181,42 @@ function TourSkeleton() {
         data-skeleton-slot='tour-table'
       >
         <div className='grid h-10 grid-cols-12 items-center gap-3 border-b border-subtle px-4'>
-          <Skeleton className='col-span-4 h-3 w-16 sm:col-span-2' />
-          <Skeleton className='col-span-5 h-3 w-20 sm:col-span-3' />
-          <Skeleton className='col-span-3 h-3 w-16 sm:col-span-2' />
-          <Skeleton className='col-span-2 hidden h-3 w-14 sm:block' />
-          <Skeleton className='col-span-2 hidden h-3 w-14 sm:block' />
-          <Skeleton className='col-span-1 hidden h-3 w-8 sm:block' />
+          <Skeleton height='h-3' className='col-span-4 w-16 sm:col-span-2' />
+          <Skeleton height='h-3' className='col-span-5 w-20 sm:col-span-3' />
+          <Skeleton height='h-3' className='col-span-3 w-16 sm:col-span-2' />
+          <Skeleton height='h-3' className='col-span-2 hidden w-14 sm:block' />
+          <Skeleton height='h-3' className='col-span-2 hidden w-14 sm:block' />
+          <Skeleton height='h-3' className='col-span-1 hidden w-8 sm:block' />
         </div>
         {TOUR_ROWS.map(row => (
           <div
             key={row}
             className='grid h-10 grid-cols-12 items-center gap-3 border-b border-subtle px-4'
           >
-            <Skeleton className='col-span-4 h-3.5 w-20 sm:col-span-2' />
-            <Skeleton className='col-span-5 h-3.5 w-32 max-w-full sm:col-span-3' />
-            <Skeleton className='col-span-3 h-3.5 w-24 max-w-full sm:col-span-2' />
             <Skeleton
-              className='col-span-2 hidden h-5 w-16 sm:block'
+              height='h-3.5'
+              className='col-span-4 w-20 sm:col-span-2'
+            />
+            <Skeleton
+              height='h-3.5'
+              className='col-span-5 w-32 max-w-full sm:col-span-3'
+            />
+            <Skeleton
+              height='h-3.5'
+              className='col-span-3 w-24 max-w-full sm:col-span-2'
+            />
+            <Skeleton
+              height='h-5'
+              className='col-span-2 hidden w-16 sm:block'
               rounded='full'
             />
-            <Skeleton className='col-span-2 hidden h-3.5 w-20 sm:block' />
             <Skeleton
-              className='col-span-1 hidden h-7 w-7 sm:block'
+              height='h-3.5'
+              className='col-span-2 hidden w-20 sm:block'
+            />
+            <Skeleton
+              height='h-7'
+              className='col-span-1 hidden w-7 sm:block'
               rounded='md'
             />
           </div>
