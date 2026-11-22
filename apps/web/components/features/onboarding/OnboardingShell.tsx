@@ -266,7 +266,7 @@ export function OnboardingShell({
         main={
           <div className='flex min-h-0 min-w-0 flex-1'>
             <div
-              className='relative flex min-h-0 min-w-0 flex-1 flex-col'
+              className='system-b-onboarding-session relative flex min-h-0 min-w-0 flex-1 flex-col'
               data-onboarding-session={sessionLabel}
             >
               {(onRestart && hasConversation) || onLogout || !isSignedIn ? (
