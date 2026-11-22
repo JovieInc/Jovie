@@ -52,11 +52,13 @@ export {
 import {
   escapeAnnotationMessage,
   escapeAnnotationProperty,
+  formatLaneDuration,
 } from './lib/ci-fast-annotations.mjs';
 
 export {
   escapeAnnotationMessage,
   escapeAnnotationProperty,
+  formatLaneDuration,
 } from './lib/ci-fast-annotations.mjs';
 
 export { orderSourceGuardsByFailureRate } from './lib/source-guard-order.mjs';
@@ -3251,11 +3253,6 @@ function annotateFailure(lane, logExcerpt) {
   // Keep annotation body short; full log is in the step output.
   const short = failureAnnotationMessage(lane, logExcerpt);
   if (short) console.error(`::error::${short}`);
-}
-
-/** @param {number} ms */
-export function formatLaneDuration(ms) {
-  return `${(Math.max(0, ms) / 1000).toFixed(1)}s`;
 }
 
 function writeSummary(results, groupId, timingTables = []) {
