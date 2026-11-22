@@ -55,6 +55,36 @@ TITLE_LANES = (
     (re.compile(r"^\s*pen draft for approval:", re.IGNORECASE), "design"),
 )
 
+# A Pen draft Tim accepts (he moves it to Todo; scripts/design/pen-draft-publish.mjs APPROVAL_LINE)
+# is no longer design work: the approved picture now has to be built in the app. Tim, 2026-11-22: "my
+# mac app doesnt seem to be movng very fast no matter how much i push on design work". 13 of 27
+# approved design items in two weeks sat with no builder, because an accepted draft kept its design
+# title and no code seat ever claimed it. Admission labels an accepted draft as a speed-lane code
+# build, so it jumps the code queue; `lane:code` still hands back any one Tim wants left alone.
+ACCEPTED_DESIGN_LABELS = ("lane:speed", "agent-ready")
+PEN_DRAFT_TITLE = TITLE_LANES[0][0]
+AWAITING_DECISION_LABEL = "tim-action-required"
+
+
+def _explicit_lane(labels: set[str]) -> bool:
+    if "lane:code" in labels or labels & SPEED_LABELS or labels & set(LABEL_LANES):
+        return True
+    return any(label == prefix or label.startswith(prefix + ":") for label in labels for prefix, _ in LABEL_PREFIX_LANES)
+
+
+def accepted_pen_drafts(todo_rows):
+    """Todo Pen drafts Tim has accepted that no lane label has yet turned into a build."""
+    out = []
+    for row in todo_rows:
+        labels = _labels(row)
+        if not PEN_DRAFT_TITLE.search(_title(row)) or AWAITING_DECISION_LABEL in labels:
+            continue
+        if _explicit_lane(labels):  # a lane label is a human or workflow decision; leave it
+            continue
+        out.append(row)
+    return out
+
+
 # Each non-code lane holds its own Todo depth; none of it counts toward the code target.
 NON_CODE_TODO_TARGET = 6
 

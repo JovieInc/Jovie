@@ -66,7 +66,7 @@ class GoldenPathNeverHoldsNonCode(unittest.TestCase):
     def test_urgent_code_admission_displaces_code_not_design(self):
         # Todo holds 31 low-scoring non-code items and three code items (code target 2). An Urgent
         # golden-path fix arrives: a code item gives way, every design and data item stays in Todo.
-        todo = [design(100 + i) for i in range(30)] + [design(200, title="Load lead list", labels=("lane:data",)),
+        todo = [design(100 + i, labels=("lane:design",)) for i in range(30)] + [design(200, title="Load lead list", labels=("lane:data",)),
                                                        *(row(300 + i, "Todo", priority=4) for i in range(3))]
         with tempfile.TemporaryDirectory() as d:
             receipt = pa.run(FakeLane, seed(d, [row(1, priority=1), *todo]), "JOV", FakeClient(), now=NOW)
@@ -78,6 +78,22 @@ class GoldenPathNeverHoldsNonCode(unittest.TestCase):
             self.assertEqual(len(receipt["displaced"]), 1)
             self.assertTrue(receipt["displaced"][0].startswith("JOV-30"), receipt["displaced"])
             self.assertEqual(backlogged, {"id-" + receipt["displaced"][0][4:]}, "no design or data item went back to Backlog")
+
+    def test_accepted_pen_draft_becomes_a_speed_build(self):
+        # Tim accepts a Pen draft by moving it to Todo. It must get a builder: admission labels it a
+        # speed-lane build. A draft still awaiting his decision, and one he handed to code, stay put.
+        accepted = design(100)
+        waiting = design(101, labels=("tim-action-required",))
+        handed = design(102, labels=("lane:code",))
+        with tempfile.TemporaryDirectory() as d:
+            receipt = pa.run(FakeLane, seed(d, [accepted, waiting, handed]), "JOV", FakeClient(), now=NOW)
+            self.assertEqual(receipt["acceptedDesignBuilds"], ["JOV-100"])
+            entries = json.loads(ls._outbox_path(Path(d)).read_text())["entries"]
+            labels = sorted(e["body"] for e in entries if e["op"] == "label")
+            self.assertEqual(labels, sorted(work_lane.ACCEPTED_DESIGN_LABELS))
+            self.assertTrue(all(e["issueId"] == "id-100" for e in entries if e["op"] in ("label", "comment")))
+            self.assertEqual(receipt["nonCodeTodo"]["speed"], 1)
+        self.assertEqual(work_lane.lane_of(dict(accepted, labels=["lane:speed", "agent-ready"])), "speed")
 
     def test_full_non_code_lanes_never_trigger_displacement(self):
         todo = [design(100 + i, updated="2026-10-28T00:00:00.000Z") for i in range(40)]

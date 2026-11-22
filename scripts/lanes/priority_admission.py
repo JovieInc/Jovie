@@ -316,6 +316,20 @@ def _live_state(client, issue_id: str):
         return None
 
 
+def accept_design_builds(outbox, todo_rows) -> list[str]:
+    """Turn each accepted Pen draft into a speed-lane build (work_lane.accepted_pen_drafts), in place
+    for this pass and in Linear through the outbox. Returns the identifiers it turned."""
+    turned = []
+    for row in work_lane.accepted_pen_drafts(todo_rows):
+        for name in work_lane.ACCEPTED_DESIGN_LABELS:
+            outbox.label(row["id"], name)
+        row["labels"] = [*(row.get("labels") or ()), *work_lane.ACCEPTED_DESIGN_LABELS]
+        outbox.comment(row["id"], "Accepted design: queued as a speed-lane build. Build the approved draft above in the app "
+                                  "with existing design system components, attach before and after screenshots, and merge on green.")
+        turned.append(row["identifier"])
+    return turned
+
+
 def run(lane, host, team: str, client, now: float | None = None, floor: int = 0, excluded=("hold",)) -> dict:
     """One priority-admission pass for `team`, written through the outbox."""
     now = time.time() if now is None else now
@@ -334,6 +348,8 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
     rows = list((mirror.get("issues") or {}).values())
     pending = linear_sync._pending_moves(state)
     all_todo = linear_sync.todo(state, team)
+    outbox = linear_sync.Outboxed(state, client)
+    receipt["acceptedDesignBuilds"] = accept_design_builds(outbox, all_todo)
     # Ordinary code counts per sub-lane, each against its own depth; speed and non-code lanes hold their own.
     todo = work_lane.code_only(all_todo)
     non_code_todo = [row for row in all_todo if work_lane.own_lane(row)]
@@ -343,7 +359,6 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
     receipt.update(todo=len(todo), target=goal, ceiling=sum(map(work_lane.sub_lane_ceiling, depths.values())),
                    nonCodeTodo={lane: len(rows) for lane, rows in work_lane.by_lane(non_code_todo).items()},
                    codeSubLanes={sub: {"todo": len(by_sub[sub]), "target": depths[sub]} for sub in work_lane.SUB_LANES})
-    outbox = linear_sync.Outboxed(state, client)
     candidates, skipped = admit_candidates(rows, ranks, excluded, lambda row: lane.issue_hits_red_line(binding_refill._issue(lane, row)),
                                            now, pending)
     execution_held = binding_refill.execution_skips(state, candidates)
