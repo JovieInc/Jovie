@@ -5,12 +5,17 @@ import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelCo
 import { PreviewDataHydrator } from '../PreviewDataHydrator';
 import { ProfileContactSidebar } from './ProfileContactSidebar';
 
+// These stories exercise the argless dashboard surface, not the internal chat prop.
+function DashboardProfileContactSidebar() {
+  return <ProfileContactSidebar />;
+}
+
 const meta = {
   title: 'Dashboard/ProfileContactSidebar',
-  component: ProfileContactSidebar,
+  component: DashboardProfileContactSidebar,
   parameters: { layout: 'fullscreen' },
   decorators: [withDashboardProviders, withSignedInSession],
-} satisfies Meta<typeof ProfileContactSidebar>;
+} satisfies Meta<typeof DashboardProfileContactSidebar>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const Loading: Story = {
