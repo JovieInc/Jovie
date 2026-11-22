@@ -459,9 +459,15 @@ app-wide: web, mobile web, iOS, macOS, marketing, and public profiles.
   choose the accent that best complements the image by color theory, and reject
   accents that clash with it (skin tones included). That choice anchors the
   rotation, and the next section cannot reuse it.
-- **One accent per gradient.** A gradient, shader, or background uses one
-  accent only, never two in the same section. Its central hue is the exact accent
-  token value, with the most weight there. Other stops are shades of that hue.
+- **Gradients sit on one accent's hue.** Every stop of every gradient is
+  centered on one accent and keeps only that accent's hue: the exact token
+  value with the most weight, its soft tint, or that accent mixed with
+  transparent, black, white or neutrals. Neutral-only gradients are fine. A
+  mix into a second accent is rare, intentional and purposeful: use
+  complementary neighbours (blue into purple), center each stop on its own
+  accent value, and record it in the gradient allowlist with a reason. The
+  check measures OKLCH hue within a 10 degree tolerance (see
+  `accent-pack-config.mjs`). Nothing escapes this rule.
 - **Saturation is the contrast lever.** Colors are OKLCH. When the foreground
   needs to pop, lower chroma only (keep lightness and hue), by an optically
   equal amount across accents. Behind album art or a profile picture,

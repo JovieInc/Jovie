@@ -291,8 +291,16 @@ saturated but refined, never primary-colored or cartoonish.
    status may. Status components are exempt by role (status props, variants),
    not by path. Use `getRotationAccent(index, setSize)` from
    `apps/web/lib/ui/accent-palette.ts` for dynamic sets.
-7. **No two-tone gradients, anywhere.** A gradient, shader or background uses
-   one accent and shades of that hue, centered on the exact token value.
+7. **Gradients sit on one accent's hue.** Every stop of every gradient (CSS,
+   Tailwind stops, inline styles, SVG `linearGradient` and `radialGradient`)
+   is centered on one accent and keeps only that accent's hue: the accent
+   itself, its soft tint, or that accent mixed with transparent, black, white
+   or neutrals. Neutral-only gradients are fine. A gradient that must mix into
+   a second accent is rare, intentional and purposeful: pick complementary
+   neighbours (blue into purple), center each stop's hue on its own accent
+   value, and add a justified entry to `GRADIENT_TWO_ACCENT_ALLOW` in
+   `accent-pack-config.mjs`. Otherwise no two-tone gradients, anywhere. Nothing
+   escapes: the rule covers app, marketing and every other rendered surface.
 8. **Image anchor.** A card carrying album art, release artwork or a photo
    picks the accent that complements the image by color theory and anchors the
    rotation; the next item cannot reuse it. Lower OKLCH chroma only (never
