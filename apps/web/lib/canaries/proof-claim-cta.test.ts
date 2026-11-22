@@ -4,7 +4,7 @@ import { inspectProofClaimCta } from './proof-claim-cta';
 describe('proof-claim CTA canary inspect (JOV-6439 overlap)', () => {
   it('finds the AEO claim CTA without treating the profile as unclaimed', () => {
     const document = new DOMParser().parseFromString(
-      '<a data-testid="profile-aeo-claim-cta" href="/waitlist?campaign=proof-to-claim">Request access</a>',
+      '<a data-testid="profile-claim-footer-cta" href="/waitlist?campaign=proof-to-claim">Request access</a>',
       'text/html'
     );
     expect(inspectProofClaimCta(document)).toEqual({
