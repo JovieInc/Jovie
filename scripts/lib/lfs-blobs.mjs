@@ -80,6 +80,7 @@ export function parseCatFileBatch(buffer) {
 /**
  * Map of path -> { blobBytes, pointer, objectBytes } for every LFS-attributed
  * path, read from the index (`staged`) or from `treeish`.
+ * @param {{ paths?: string[], cwd?: string, staged?: boolean, treeish?: string }} [options]
  */
 export function collectLfsBlobs({
   paths,
