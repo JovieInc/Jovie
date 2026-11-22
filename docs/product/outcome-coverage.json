@@ -269,8 +269,13 @@
       "core": true,
       "entryPoints": [],
       "chatTools": ["manageTasks"],
-      "checks": [],
-      "gap": "Unit test with createTask mocked."
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/chat-task-outcome.test.ts",
+          "test": "chat manageTasks create writes a task row for the artist",
+          "runs": "merge"
+        }
+      ]
     },
     {
       "id": "chat-creative",
