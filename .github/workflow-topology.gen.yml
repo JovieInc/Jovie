@@ -1758,7 +1758,7 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:report-outcome
+    terminalReceipt: job:report-scheduled-failure
     jobCount: 9
   - name: VOC Mine
     path: .github/workflows/voc-mine.yml

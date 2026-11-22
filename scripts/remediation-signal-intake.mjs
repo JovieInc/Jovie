@@ -126,14 +126,14 @@ const result = await applyRemediationDecisionWithRetry(gated, {
 const recurrence =
   gated.action === 'red'
     ? await noteRecurrence(result, {
-        fingerprint: result.fingerprint || env.REMEDIATION_FINGERPRINT,
+        fingerprint: gated.fingerprint || env.REMEDIATION_FINGERPRINT,
         runUrl: env.REMEDIATION_RUN_URL,
         apiKey: env.LINEAR_API_KEY,
       })
     : { ok: true, action: 'none' };
 if (!recurrence.ok) {
   console.warn(
-    `::warning title=Recurrence not recorded::${result.fingerprint || env.REMEDIATION_FINGERPRINT} reopened but the recurrence comment failed (${recurrence.reason}).`
+    `::warning title=Recurrence not recorded::${gated.fingerprint || env.REMEDIATION_FINGERPRINT} reopened but the recurrence comment failed (${recurrence.reason}).`
   );
 }
 console.log(
