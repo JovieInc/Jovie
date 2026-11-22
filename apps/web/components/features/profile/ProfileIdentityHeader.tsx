@@ -185,7 +185,7 @@ export function ProfileIdentityHeader({
 
         {renderedSocialLinks.length > 0 ? (
           <div
-            className='flex min-w-0 flex-1 items-center justify-end'
+            className='flex min-w-0 flex-1 items-center justify-around'
             data-testid='profile-identity-social-row'
           >
             {renderedSocialLinks.map(({ link, href, platform }) => (

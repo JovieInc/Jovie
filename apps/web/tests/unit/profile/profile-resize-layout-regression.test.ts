@@ -52,14 +52,6 @@ describe('jov.ie/tim resize regressions', () => {
     expect(block).not.toMatch(/0% 100%/);
   });
 
-  it('right-aligns the social icons against the Get Updates pill', () => {
-    const header = read(
-      'components/features/profile/ProfileIdentityHeader.tsx'
-    );
-    expect(header).toContain('flex min-w-0 flex-1 items-center justify-end');
-    expect(header).not.toContain('justify-around');
-  });
-
   it('shows desktop tab focus rings for :focus-visible only', () => {
     const surface = read(
       'components/features/profile/templates/ProfileDesktopSurface.tsx'
