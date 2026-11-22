@@ -25,8 +25,59 @@ export const WORKERS_AI_SUBJECT_MODEL = '@cf/zai-org/glm-5.3';
  * traffic on this account and its per-minute limit is shared.
  */
 export const WORKERS_AI_CHEAP_JUDGE = '@cf/openai/gpt-oss-120b';
+/**
+ * One-shot fallback when the live jovie-workers-ai relay rejects gpt-oss
+ * (`model not allowed`) before ASS-17 deploy rolls the allowlist. Must stay
+ * off glm-5.3 / glm-5.3-flash (Summer share + answerer ≠ judge).
+ */
+export const WORKERS_AI_CHEAP_JUDGE_FALLBACK =
+  '@cf/deepseek-ai/deepseek-v4.1-flash-1017';
 /** Calibrated 2026-10-28: MAE 9.7 vs reference grades (kimi-k2.6 timed out, gpt-oss-120b MAE 18.4). */
 export const WORKERS_AI_STRONG_JUDGE = '@cf/deepseek-ai/deepseek-v4-pro-0813';
+
+/**
+ * Live relay HTTP 400 body: `{"error":{"message":"model not allowed",...}}`.
+ * Also matches allowlist phrasing from older/relay variants.
+ */
+export function isWorkersAiModelAllowlistError(error: unknown): boolean {
+  const text = error instanceof Error ? error.message : String(error);
+  if (!/\bHTTP 400\b/.test(text)) return false;
+  return /model not allowed|not (?:on |in )?the allowlist|allowlist/i.test(
+    text
+  );
+}
+
+/**
+ * When primary is the cheap judge and the error is an allowlist miss, return
+ * the one-shot fallback model; otherwise null (caller rethrows).
+ */
+export function cheapJudgeFallbackModel(
+  primary: string,
+  error: unknown
+): string | null {
+  if (primary !== WORKERS_AI_CHEAP_JUDGE) return null;
+  if (!isWorkersAiModelAllowlistError(error)) return null;
+  return WORKERS_AI_CHEAP_JUDGE_FALLBACK;
+}
+
+/**
+ * Run `fn(primary)`; on a cheap-judge allowlist miss, retry once with
+ * {@link WORKERS_AI_CHEAP_JUDGE_FALLBACK}. Other models/errors pass through.
+ */
+export async function withCheapJudgeFallback<T>(
+  primary: string,
+  fn: (model: string) => Promise<T>,
+  onFallback?: (fallback: string, error: unknown) => void
+): Promise<T> {
+  try {
+    return await fn(primary);
+  } catch (error) {
+    const fallback = cheapJudgeFallbackModel(primary, error);
+    if (!fallback) throw error;
+    onFallback?.(fallback, error);
+    return await fn(fallback);
+  }
+}
 
 const ROUTING = JSON.parse(
   readFileSync(
