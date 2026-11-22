@@ -8758,19 +8758,15 @@ def pr_is_terminal(pr: dict) -> bool:
 
 
 def new_issue_budget(name: str, slots: int, inventory: list[dict] | None = None, *, capacity: dict | None = None) -> dict:
-    """New intake needs current quota/CI evidence and room under the lane's WIP cap (Tim 2026-11-22:
-    finish before starting). Repairs never consult it, so a capped lane spends its seats landing its own PRs."""
+    """New intake uses current quota/CI evidence; counts are diagnostics. Repairs never consult it."""
     if slots <= 0:
         return {"allowed": False, "reason": "provider-disabled", "used": 0, "cap": None, "terminal": 0, "terminalCap": None}
     dated = re.compile(rf"^{re.escape(name)}/jov-\d+-\d{{8}}")
     own = [pr for pr in inventory or [] if dated.match(pr.get("headRefName") or "")]
-    # A prefix shared with interactive sessions (claude/) is capped on the lane's own dated PRs only.
-    lane_scope = own if inventory is not None and pr_wip.per_session(name, pr_wip.load_policy()) else None
-    wip = pr_wip.admit(inventory, name, capacity=capacity, session_prs=lane_scope)
+    wip = pr_wip.admit(inventory, name, capacity=capacity)
     return {"allowed": wip["allowed"], "reason": "within-budget" if wip["allowed"] else wip["reason"], "capacity": wip,
             "used": None if inventory is None else sum(not is_green(pr) and not pr_is_terminal(pr) for pr in own),
-            "cap": None, "terminal": None if inventory is None else sum(pr_is_terminal(pr) for pr in own), "terminalCap": None,
-            "wip": wip["wipUsed"], "wipCap": wip["wipCap"], "landFirst": wip.get("landFirst", [])}
+            "cap": None, "terminal": None if inventory is None else sum(pr_is_terminal(pr) for pr in own), "terminalCap": None, "wip": wip["used"], "wipCap": wip["cap"]}
 
 
 def read_new_issue_budget(name: str, slots: int) -> dict:

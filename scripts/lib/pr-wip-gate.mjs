@@ -32,7 +32,7 @@ export function wipAdmission(branch, execute, cwd, priority = 'default') {
       reason: decision.reason,
       message:
         decision.reason === 'wip-cap'
-          ? `wip-cap: ${decision.wipScope === 'session' ? 'this session' : `\`${decision.producer}/\``} already owns ${decision.wipUsed} open PRs (cap ${decision.wipCap}). Finish before starting: land, repair or hand off ${(decision.landFirst ?? []).map(n => `#${n}`).join(' ') || 'them'} first.`
+          ? `wip-cap: ${decision.wipScope === 'session' ? 'this session' : `\`${decision.producer}/\``} already owns ${decision.wipUsed ?? decision.used} open PRs (cap ${decision.wipCap ?? decision.cap}). Finish before starting: land, repair or hand off ${(decision.landFirst ?? []).map(n => `#${n}`).join(' ') || 'them'} first.`
           : `${decision.reason?.startsWith('github-') ? 'github-quota-deferred: ' : ''}${decision.reason}: current capacity defers this admission${decision.retryAt ? ` until ${new Date(decision.retryAt * 1000).toISOString()}` : ''}.`,
     };
   return {
@@ -50,7 +50,10 @@ export function wipAdmission(branch, execute, cwd, priority = 'default') {
 /** The session id agents run under; pr_wip.py reads the same variables. */
 export function agentSession(env = process.env) {
   const id =
-    env.AGENT_SESSION_ID || env.CLAUDE_CODE_SESSION_ID || env.CODEX_SESSION_ID || '';
+    env.AGENT_SESSION_ID ||
+    env.CLAUDE_CODE_SESSION_ID ||
+    env.CODEX_SESSION_ID ||
+    '';
   return /^[A-Za-z0-9_-]{6,128}$/.test(id) ? id : null;
 }
 
