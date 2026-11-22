@@ -136,7 +136,7 @@ Production golden-path certification (JOV-9822), served build \`${verdict.served
 ${verdict.notGreen.map(n => `- \`${n.surface}\`: ${n.why}`).join('\n')}
 ${uncovered ? `\n## Uncovered JOV-6920 cone cases (fixed 31-case denominator; not run — no producer, never passed silently)\n${uncovered}\n` : ''}
 ## Why it matters
-The recovery email gate, agent-marketplace readiness and launch certification all require every surface to pass on the current production SHA within 24h.
+The recovery email gate, agent-marketplace readiness and launch certification all require every surface to pass, or carry a pass forward, on the current production SHA.
 
 ## Acceptance criteria or triage question
 A production certification run passes all eight surfaces on the served SHA; this issue closes itself then.
