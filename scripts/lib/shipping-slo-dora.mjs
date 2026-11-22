@@ -306,6 +306,7 @@ export function doraMetrics({
   const inRunFailed = p => p.rollback || p.failedProbes.length > 0;
   const isFailed = p => inRunFailed(p) || revertsBySha.has(p.sha);
   const byLive = [...all].sort((a, b) => ms(a.liveAt) - ms(b.liveAt));
+  /** @type {(p: any, extra?: (q: any) => boolean) => any} */
   const healthyAfter = (p, extra = () => true) =>
     byLive.find(
       q => ms(q.liveAt) > ms(p.liveAt) && !inRunFailed(q) && extra(q)
@@ -433,11 +434,6 @@ export function doraGistBlock(dora, flat) {
   };
 }
 
-/**
- * Per-lane flow block from the lanes doctor (scripts/lanes/work_lane.py
- * `view()`: { team: { at, lanes: { lane: measure } } }). Keeps only the
- * numeric measure fields and marks a team stale after `staleAfterMs`.
- */
 const LANE_FIELDS = [
   'queued',
   'started',
@@ -448,6 +444,14 @@ const LANE_FIELDS = [
   'finishedSinceLast',
   'hoursSinceLastExit',
 ];
+/**
+ * Per-lane flow block from the lanes doctor (scripts/lanes/work_lane.py
+ * `view()`: { team: { at, lanes: { lane: measure } } }). Keeps only the
+ * numeric measure fields and marks a team stale after `staleAfterMs`.
+ *
+ * @param {any} view
+ * @param {{ nowMs?: number, staleAfterMs?: number }} [opts]
+ */
 export function lanesFlowBlock(view, { nowMs, staleAfterMs = DAY_MS } = {}) {
   if (!view || typeof view !== 'object' || Array.isArray(view))
     return { teams: {}, reason: 'no lanes doctor snapshot supplied' };
