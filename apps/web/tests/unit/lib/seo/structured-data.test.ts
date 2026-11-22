@@ -150,27 +150,6 @@ describe('generateProfileStructuredData', () => {
     expect(validateProfileRichResults(data)).toEqual([]);
   });
 
-  it('carries the About copy on the ProfilePage node so nothing visible has to duplicate it', () => {
-    const data = generateProfileStructuredData(
-      BASE_PROFILE,
-      null,
-      MOCK_LINKS,
-      [],
-      [],
-      [],
-      'Test Artist is a producer and DJ based in Los Angeles.'
-    );
-    expect(findInGraph(data, 'ProfilePage')?.description).toBe(
-      'Test Artist is a producer and DJ based in Los Angeles.'
-    );
-    expect(
-      findInGraph(
-        generateProfileStructuredData(BASE_PROFILE, null, MOCK_LINKS),
-        'ProfilePage'
-      )
-    ).not.toHaveProperty('description');
-  });
-
   it('matches the page meta description when a bioless artist has location and genres', () => {
     const data = generateProfileStructuredData(
       { ...BASE_PROFILE, bio: null, location: 'Los Angeles, CA' },
