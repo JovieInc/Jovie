@@ -165,7 +165,8 @@ describe('UnifiedTable hideWhenEmpty columns', () => {
   it('applies the compact row mode to the table', () => {
     const { container } = render2(RELEASES);
     expect(
-      container.querySelector('[data-table-row-mode="compact"]')
-    ).not.toBeNull();
+      container.querySelectorAll('[data-table-row-mode="compact"]').length
+    ).toBeGreaterThan(0);
+    expect(container.querySelector('[data-table-row-mode="dense"]')).toBe(null);
   });
 });

@@ -37,8 +37,11 @@ function Panel({ theme }: Readonly<{ theme: 'light' | 'dark' }>) {
       {ROWS.map((row, i) => (
         <div
           key={`${row.name}-${row.secondary ?? 'none'}`}
-          style={tableRowModeStyle('compact')}
-          className='grid h-(--table-row-height) grid-cols-[minmax(0,1fr)_7rem_6rem_4rem] items-center gap-3 border-b border-subtle px-3'
+          style={{
+            ...tableRowModeStyle('compact'),
+            gridTemplateColumns: 'minmax(0,1fr) 7rem 6rem 4rem',
+          }}
+          className='grid h-(--table-row-height) items-center gap-3 border-b border-subtle px-3'
         >
           <IdentityCell
             name={row.name}
