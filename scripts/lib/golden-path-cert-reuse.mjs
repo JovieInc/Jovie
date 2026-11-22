@@ -152,10 +152,9 @@ export function judgeCandidate(candidate, expected) {
   const oldest = Math.min(...ended);
   const ageMs = expected.nowMs - oldest;
   if (ageMs > expected.maxAgeMs) return { why: 'receipt is stale' };
+  // The verdict is release-bound (JOV-14402); the age check above is reuse's own.
   const verdict = certificationVerdict(receipts, {
     servedSha: expected.servedSha,
-    nowMs: expected.nowMs,
-    maxAgeMs: expected.maxAgeMs,
   });
   if (!verdict.certified) return { why: 'certification verdict is not green' };
   return { certifiedAt: new Date(oldest).toISOString(), ageMs };
@@ -259,7 +258,6 @@ export function certifiedStamp(
     return null;
   const verdict = certificationVerdict(document.receipts ?? [], {
     servedSha: expectedSha,
-    nowMs,
   });
   if (!verdict.certified) return null;
   return {

@@ -1,11 +1,23 @@
 import '../../../styles/system-b-app.css';
-import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import type { Decorator, Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, userEvent, within } from 'storybook/test';
 import { OnboardingOverflowMenu, OnboardingShell } from './OnboardingShell';
+
+/**
+ * /start gives the shell the full viewport height. The session column is a
+ * size container (JOV-7771), so stories render it in a definite-height frame
+ * just like the route does.
+ */
+const withRouteFrame: Decorator = Story => (
+  <div className='flex h-dvh flex-col'>
+    <Story />
+  </div>
+);
 
 const meta = {
   title: 'Features/Onboarding/OnboardingShell',
   component: OnboardingShell,
+  decorators: [withRouteFrame],
   parameters: {
     layout: 'fullscreen',
     chromatic: { viewports: [390, 1024] },
@@ -28,6 +40,9 @@ type Story = StoryObj<typeof meta>;
 export const Visitor: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await expect(
+      canvas.getByTestId('onboarding-start-step-rail')
+    ).toBeVisible();
     await userEvent.click(
       canvas.getByRole('button', { name: 'Onboarding options' })
     );
@@ -59,6 +74,33 @@ export const ClaimHandleEntry: Story = {
     entryProfile: { status: 'available', handle: 'timwhite' },
   },
   parameters: { chromatic: { viewports: [1440] } },
+};
+
+/**
+ * A 390x615 phone with 32px root text is 19.2rem tall (JOV-7771). The step
+ * rail gives its room back so the whole composer stays on screen.
+ */
+export const ShortFrameLargeText: Story = {
+  decorators: [
+    Story => (
+      <div className='flex flex-col' style={{ height: '19.2rem' }}>
+        <Story />
+      </div>
+    ),
+  ],
+  parameters: { chromatic: { viewports: [390] } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByTestId('onboarding-start-step-rail')
+    ).not.toBeVisible();
+    await expect(
+      canvas.getByRole('textbox', { name: /chat message input/i })
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole('button', { name: 'Send message' })
+    ).toBeVisible();
+  },
 };
 
 /** Network-free presentation fixture for keyboard, touch and overflow QA. */

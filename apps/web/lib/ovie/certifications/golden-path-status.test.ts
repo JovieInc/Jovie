@@ -60,11 +60,15 @@ describe('goldenPathStatus', () => {
     expect(out).toMatchObject({ ledger: 'missing', total: 8, certified: 0 });
     expect(out.surfaces.every(s => s.status === 'missing')).toBe(true);
   });
-  it('certifies fresh passes and keeps failed, blocked and expired apart', () => {
+  it('certifies passes on the served release and keeps failed, blocked and expired apart', () => {
     const out = goldenPathStatus(
       ledger({
-        landing: receipt('landing', 'passed', '2026-11-01T10:00:00.000Z'),
-        claim: receipt('claim', 'passed', '2026-10-30T10:00:00.000Z'),
+        // Weeks old, same release: still certified (JOV-14402, no decay).
+        landing: receipt('landing', 'passed', '2026-10-01T10:00:00.000Z'),
+        // An older release's pass: superseded, so expired.
+        claim: receipt('claim', 'passed', '2026-10-30T10:00:00.000Z', {
+          sha: 'b'.repeat(40),
+        }),
         checkout: receipt('checkout', 'failed', '2026-11-01T11:00:00.000Z'),
         chat: receipt('chat', 'blocked', '2026-11-01T11:00:00.000Z'),
       }),
@@ -171,8 +175,8 @@ describe('golden-path steps from checks[] (prod-cert receipts, 2026-11-01 run on
     });
   });
 
-  it('projects real prod-cert check IDs into steps and rejects future/NaN timestamps', () => {
-    const future = '2026-11-01T13:00:00.000Z';
+  it('projects real prod-cert check IDs into steps and counts a carried receipt as its pass', () => {
+    const older = '2026-10-20T13:00:00.000Z';
     const out = goldenPathStatus(
       ledger({
         claim: r('claim', 'failed', [
@@ -194,7 +198,7 @@ describe('golden-path steps from checks[] (prod-cert receipts, 2026-11-01 run on
           ['checkout-entry-renders', 'passed'],
           ['fresh-user-checkout-entry', 'blocked'],
         ]),
-        landing: receipt('landing', 'passed', future),
+        landing: receipt('landing', 'passed', older, { sha: 'b'.repeat(40) }),
         smartlink: receipt('smartlink', 'passed', 'not-a-timestamp'),
       }),
       NOW
@@ -217,6 +221,37 @@ describe('golden-path steps from checks[] (prod-cert receipts, 2026-11-01 run on
 
     const surfacesById = Object.fromEntries(out.surfaces.map(s => [s.id, s]));
     expect(surfacesById.landing?.status).toBe('expired');
-    expect(surfacesById.smartlink?.status).toBe('expired');
+    expect(surfacesById.smartlink?.status).toBe('certified');
+  });
+
+  it('counts a carried receipt as the pass of every check it carries', () => {
+    const carried = {
+      ...receipt('chat', 'passed', '2026-11-01T11:00:00.000Z'),
+      checks: [
+        {
+          id: 'carried-forward',
+          status: 'passed',
+          startedAt: '2026-11-01T11:00:00.000Z',
+          endedAt: '2026-11-01T11:00:00.000Z',
+          summary: 'untouched',
+        },
+      ],
+      carriedFrom: {
+        sha: 'b'.repeat(40),
+        endedAt: '2026-10-30T11:00:00.000Z',
+        runUrl: null,
+      },
+    } as unknown as ProdGoldenPathReceipt;
+    const out = goldenPathStatus(
+      ledger({
+        chat: carried,
+        onboarding: r('onboarding', 'passed', [
+          ['fresh-user-onboarding-first-value', 'passed'],
+        ]),
+      }),
+      NOW
+    );
+    expect(out.steps.find(s => s.id === 'first-use')?.status).toBe('passed');
+    expect(out.surfaces.find(s => s.id === 'chat')?.status).toBe('certified');
   });
 });
