@@ -63,6 +63,7 @@ import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
 import { companyHistoryCronJob } from '@/lib/ovie/company-history/configured.server';
 import { refreshCompanyStateCache } from '@/lib/ovie/company-state.server';
 import { fleetRoomCronJob } from '@/lib/ovie/fleet-room.server';
+import { linearIssueSnapshotCronJob } from '@/lib/ovie/linear-issue-snapshot.server';
 import { applySummerCardDefaults } from '@/lib/ovie/summer-cards.server';
 import { proofStatsCronJob } from '@/lib/proof-stats/cron.server';
 import {
@@ -216,6 +217,10 @@ export async function GET(request: Request) {
   // Hourly Ovie backstops: company history and the fleet room (webhook-first).
   results.companyHistory = await companyHistoryCronJob(minute, runSubJob);
   results.fleetRoom = await fleetRoomCronJob(minute, runSubJob);
+  results.linearIssueSnapshot = await runSubJob(
+    'linearIssues',
+    linearIssueSnapshotCronJob
+  ); // webhook backstop
 
   // Default-plus-deadline contract: an overdue founder ask records its
   // declared default (approve or reject) so nothing waits on Tim forever.
