@@ -93,6 +93,17 @@ describe('one-rec gaps: planning-menu closer', () => {
     ).toBe(false);
   });
 
+  it('fails the ASS-91 live permission-to-plan closer', () => {
+    const text =
+      "Night Swim is out Friday, five days from today. Next move: let me build the five-day launch plan for it today. Say the word and I'll start.";
+    expect(isPlanningMenuCloser(text)).toBe(true);
+    expect(
+      runOneRecGapChecks(text, { upcomingTitle: 'Night Swim' }).find(
+        c => c.id === 'planning-menu-not-a-move'
+      )?.ok
+    ).toBe(false);
+  });
+
   it('passes a dated single move without a multi-option menu', () => {
     const text =
       'Night Swim is out Friday, in 2 days. One move: put the pre-save at the top of jov.ie/lunawaves today.';
