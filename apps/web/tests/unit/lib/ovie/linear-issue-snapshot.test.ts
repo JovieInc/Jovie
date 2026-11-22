@@ -155,7 +155,10 @@ describe('linear issue snapshot', () => {
   });
 
   describe('visual-suite fixture path', () => {
-    afterEach(() => vi.unstubAllEnvs());
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.useRealTimers();
+    });
 
     it('is unreachable when the test-mode env is off: the live read runs and a failure stays unreachable', async () => {
       vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '');
@@ -185,15 +188,15 @@ describe('linear issue snapshot', () => {
     it('serves the fixture, stamped fresh from the clock, when the test mode is on', async () => {
       vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
       vi.stubEnv('VERCEL_ENV', '');
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-11-22T12:00:00.000Z'));
       listLinearIssues.mockReset();
       const result = await getLinearIssueSnapshot();
       expect(listLinearIssues).not.toHaveBeenCalled();
       expect(result.status).toBe('ok');
       if (result.status !== 'ok') return;
       expect(result.snapshot.issues).toEqual(LINEAR_ISSUE_FIXTURE);
-      const age = Date.now() - new Date(result.snapshot.generatedAt).getTime();
-      expect(age).toBeGreaterThanOrEqual(0);
-      expect(age).toBeLessThan(60_000);
+      expect(result.snapshot.generatedAt).toBe('2026-11-22T12:00:00.000Z');
     });
   });
 });
