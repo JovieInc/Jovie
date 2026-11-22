@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
@@ -77,5 +79,15 @@ describe('CuesPanel', () => {
     );
     expect(screen.getAllByRole('button')[0]).toBeDisabled();
     await expectNoA11yViolations(container);
+  });
+});
+
+describe('CuesPanel play glyph', () => {
+  it('draws the play triangle through PlayGlyph (JOV-12568)', () => {
+    const source = readFileSync(resolve(__dirname, './CuesPanel.tsx'), 'utf8');
+
+    expect(source).toContain('<PlayGlyph');
+    expect(source).toContain("from '@/components/atoms/PlayGlyph'");
+    expect(source).not.toContain('translate-x-px');
   });
 });

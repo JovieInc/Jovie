@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ThreadAudioCard } from './ThreadAudioCard';
@@ -36,5 +38,18 @@ describe('ThreadAudioCard', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: /Play/ }));
     expect(onPlay).toHaveBeenCalledOnce();
+  });
+});
+
+describe('ThreadAudioCard play glyph', () => {
+  it('draws the play triangle through PlayGlyph (JOV-12568)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './ThreadAudioCard.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain('<PlayGlyph');
+    expect(source).toContain("from '@/components/atoms/PlayGlyph'");
+    expect(source).not.toContain('translate-x-px');
   });
 });

@@ -1,13 +1,14 @@
 'use client';
 
 import { Button, IconButton } from '@jovie/ui';
-import { AudioLines, Pause, Play, X } from 'lucide-react';
+import { AudioLines, Pause, X } from 'lucide-react';
 import Image from 'next/image';
 import React from 'react';
 import {
   ARTWORK_FIT_CLASSNAME,
   ArtworkFrame,
 } from '@/components/atoms/ArtworkFrame';
+import { PlayGlyph } from '@/components/atoms/PlayGlyph';
 import { cn } from '@/lib/utils';
 import type { NowPlayingTrack } from './SidebarNowPlaying';
 import { Tooltip } from './Tooltip';
@@ -129,9 +130,10 @@ export const SidebarBottomNowPlaying = React.memo(
                   fill='currentColor'
                 />
               ) : (
-                <Play
+                <PlayGlyph
+                  size={12}
                   aria-hidden='true'
-                  className='relative size-3 translate-x-px text-tooltip-foreground'
+                  className='relative text-tooltip-foreground'
                   strokeWidth={2.5}
                   fill='currentColor'
                 />

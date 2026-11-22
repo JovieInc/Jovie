@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -125,5 +127,18 @@ describe('SmartLinkAudioPreview', () => {
     const { container } = render(<SmartLinkAudioPreview {...baseProps} />);
     expect(screen.getByText('Unavailable')).toBeInTheDocument();
     await expectNoA11yViolations(container);
+  });
+});
+
+describe('SmartLinkAudioPreview play glyph', () => {
+  it('draws the play triangle through PlayGlyph (JOV-12568)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './SmartLinkAudioPreview.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain('<PlayGlyph');
+    expect(source).toContain("from '@/components/atoms/PlayGlyph'");
+    expect(source).not.toContain('translate-x-px');
   });
 });

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -488,5 +490,18 @@ describe('ReleaseSidebarSections', () => {
 
     expect(screen.getByRole('button', { name: /preview/i })).toBeDisabled();
     await expectNoA11yViolations(container);
+  });
+});
+
+describe('ReleaseSidebarSections play glyph', () => {
+  it('draws the play triangle through PlayGlyph (JOV-12568)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './ReleaseSidebarSections.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain('<PlayGlyph');
+    expect(source).toContain("from '@/components/atoms/PlayGlyph'");
+    expect(source).not.toContain('translate-x-px');
   });
 });

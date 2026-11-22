@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -685,5 +687,32 @@ describe('ShellReleaseRow weekly streams metric', () => {
     const row = container.querySelector('[data-shell-release-row]');
     await user.hover(row as Element);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('ShellReleaseRow optical fixes (JOV-12568)', () => {
+  it('keeps 28px circle actions, 14px glyphs and an ellipsised title', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../../../../../components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain(
+      "'shrink-0 h-7 w-7 rounded-full grid place-items-center"
+    );
+    expect(source).toMatch(/<Clock\s+className='h-3\.5 w-3\.5'/);
+    expect(source).toContain("<Lock className='h-3.5 w-3.5'");
+    expect(source).toContain("<ExternalLink className='h-3.5 w-3.5'");
+    expect(source).toContain('<PlayGlyph');
+    expect(source).toContain(
+      "<span className='min-w-0 truncate'>{release.title}</span>"
+    );
+    expect(source).toContain("'min-w-0 shrink-9999'");
+    expect(source).not.toContain('h-7 w-7 rounded-md');
+    expect(source).not.toContain("className='h-3 w-3'");
+    expect(source).not.toContain('translate-x-px');
   });
 });

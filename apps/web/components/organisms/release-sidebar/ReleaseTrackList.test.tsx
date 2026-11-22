@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -83,4 +85,17 @@ describe('ReleaseTrackList certification', () => {
       await expectNoA11yViolations(container);
     }
   );
+});
+
+describe('ReleaseTrackList play glyph', () => {
+  it('draws the play triangle through PlayGlyph (JOV-12568)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './ReleaseTrackList.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain('<PlayGlyph');
+    expect(source).toContain("from '@/components/atoms/PlayGlyph'");
+    expect(source).not.toContain('translate-x-px');
+  });
 });

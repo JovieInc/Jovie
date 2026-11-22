@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   act,
   fireEvent,
@@ -1162,5 +1164,25 @@ describe('PersistentAudioBar', () => {
 
       expect(screen.queryByTestId('media-canvas-dock')).toBeNull();
     });
+  });
+});
+
+describe('PersistentAudioBar transport axis (JOV-12568)', () => {
+  it('owns the dock padding once and centres the side blocks on the 44px band', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../components/organisms/PersistentAudioBar.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain("'flex items-end gap-3 px-4 py-1.5 lg:px-6'");
+    expect(source).toContain(
+      "'flex h-11 w-56 min-w-0 shrink-0 items-center gap-3'"
+    );
+    expect(source).toContain("'min-w-0 flex-1 px-0'");
+    expect(source).toContain("'flex h-11 shrink-0 items-center gap-1'");
+    expect(source).not.toContain("'min-w-0 flex-1 px-0 py-0'");
   });
 });

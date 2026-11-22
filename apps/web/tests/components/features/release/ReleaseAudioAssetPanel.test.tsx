@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AudioWaveformEditor } from '@/components/features/release/AudioWaveformEditor';
@@ -260,4 +262,20 @@ describe('ReleaseAudioAssetPanel', () => {
       expect(screen.queryByTestId('audio-preview-retry')).toBeNull();
     }
   );
+});
+
+describe('AudioWaveformEditor play glyph', () => {
+  it('draws the play triangle through PlayGlyph (JOV-12568)', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../../components/features/release/AudioWaveformEditor.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain('<PlayGlyph');
+    expect(source).toContain("from '@/components/atoms/PlayGlyph'");
+    expect(source).not.toContain('translate-x-px');
+  });
 });

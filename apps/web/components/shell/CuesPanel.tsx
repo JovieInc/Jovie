@@ -1,8 +1,8 @@
 'use client';
 
 import { PlainButton } from '@jovie/ui';
-import { Play } from 'lucide-react';
 import { memo } from 'react';
+import { PlayGlyph } from '@/components/atoms/PlayGlyph';
 import { cn } from '@/lib/utils';
 import type { Cue, CueKind } from './cues.types';
 import { SHELL_CAPTION_CLASSNAME } from './shell-caption';
@@ -65,11 +65,7 @@ const CueRow = memo(function CueRow({
         </span>
         {onSeek && (
           <span className='absolute inset-0 grid place-items-center text-primary-token opacity-0 group-hover/cue:opacity-100 transition-opacity duration-subtle ease-subtle'>
-            <Play
-              className='h-3 w-3 translate-x-px'
-              strokeWidth={2.5}
-              fill='currentColor'
-            />
+            <PlayGlyph size={12} strokeWidth={2.5} fill='currentColor' />
           </span>
         )}
       </span>
