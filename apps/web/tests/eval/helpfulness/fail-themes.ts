@@ -1,5 +1,5 @@
 /**
- * Hermetic detectors for known helpfulness fail themes (ASS-16 / ASS-25).
+ * Hermetic detectors for known helpfulness fail themes (ASS-16 / ASS-25 / ASS-90).
  *
  * Offline only: no model, Gateway, or network. Used by golden-eval CI and by
  * live helpfulness `runHardChecks` so those reply shapes fail closed without
@@ -9,6 +9,7 @@
  * - upcoming-first: planning/greeting replies must name the UPCOMING release early
  * - question-not-a-move: clarifying closers are not a next move when a dated move exists
  * - inventing-stats: never invent / narrate popularity or stream counts to the artist
+ * - inventing-account-facts: algorithm/momentum, Jovie-hosted pre-save, CPC rankings, lore
  */
 
 /** Parse the first UPCOMING title from fixture/judge facts, if any. */
@@ -33,6 +34,42 @@ export const INVENTED_STREAM_PATTERN =
   /\b\d{1,3}(?:,\d{3})*\s*(?:daily\s+)?streams?\b|\bstreams?\s+(?:of|at|around)\s+\d/i;
 
 /**
+ * Live ASS-13 truthful=0 shapes (run 44967227762): Spotify algorithm / momentum
+ * causal claims that are not in fixture facts or tool results.
+ */
+export const INVENTED_ALGORITHM_CLAIM_PATTERNS: readonly RegExp[] = [
+  /\bspotify(?:['’]s)?\s+algorithms?\b/i,
+  /\bbuilds?\s+day-?one\s+momentum?\b/i,
+  /\bpush(?:es)?\s+spotify(?:['’]s)?\s+algorithm\b/i,
+  /\bpre-?saves?\s+[\s\S]{0,100}\b(?:spotify(?:['’]s)?\s+)?algorithms?\b/i,
+];
+
+/**
+ * Claims that Jovie itself hosts/creates a DSP pre-save (link-on-profile is OK).
+ */
+export const INVENTED_JOVIE_PRESAVE_PATTERNS: readonly RegExp[] = [
+  /\b(?:pre-?save|presave)\s+(?:goes\s+live|is\s+live|live)\s+on\s+(?:your\s+)?jovie\b/i,
+  /\bget\s+the\s+[\s\S]{0,80}pre-?save\s+(?:live\s+)?on\s+(?:your\s+)?jovie\b/i,
+  /\bpre-?save\s+on\s+your\s+jovie\s+profile\b/i,
+];
+
+/** Unsupported ad cost / CPC rankings (ad-copy-presave-budget live red). */
+export const INVENTED_AD_COST_PATTERNS: readonly RegExp[] = [
+  /\brun\s+cheapest\b/i,
+  /\bcheapest\b[\s\S]{0,40}\b(?:click|cpc|cpm|meta|tiktok|ads?)\b/i,
+  /\b(?:meta|tiktok|instagram|facebook)[\s\S]{0,40}\bcheapest\b/i,
+  /\blowest\s+cpc\b/i,
+];
+
+/** Invented studio / silence lore beyond catalog dates (lapsed-flopped live red). */
+export const INVENTED_LORE_PATTERNS: readonly RegExp[] = [
+  /\bpractice\s+room\b/i,
+  /\bfour\s+months\s+of\s+silence\b/i,
+  /\bnever\s+got\s+a\s+real\s+push\b/i,
+  /\bfreezing\s+leeds\b/i,
+];
+
+/**
  * Closers that score next_action ≤1 when a dated Jovie move or tool exists.
  * Kept narrow so legit "one missing required field?" questions still pass.
  */
@@ -45,12 +82,18 @@ export const QUESTION_NOT_A_MOVE_PATTERNS: readonly RegExp[] = [
   /\bwhich (?:one|artist|release) (?:do you|should i|would you)\b/i,
   /\bthree things are missing\b/i,
   /\bone at a time\b[\s\S]{0,80}\bconfirm, edit, or say unknown\b/i,
+  // ASS-91 specialist-outreach: clear draft ask → intake grill instead of draft+hold
+  /\bi take them one at a time\b/i,
+  /\bchecklist is missing\b/i,
+  /\bconfirm that or send your own\b/i,
+  /\bfirst:\s*why does\b/i,
 ];
 
 export type FailThemeId =
   | 'upcoming-first'
   | 'question-not-a-move'
-  | 'inventing-stats';
+  | 'inventing-stats'
+  | 'inventing-account-facts';
 
 export interface FailThemeCheck {
   readonly id: FailThemeId;
@@ -87,6 +130,16 @@ export function namesUpcomingFirst(
 export function inventsPopularityOrStreams(text: string): boolean {
   return (
     POPULARITY_SCORE_PATTERN.test(text) || INVENTED_STREAM_PATTERN.test(text)
+  );
+}
+
+/** True when the reply invents algorithm, Jovie-presave, CPC, or lore facts. */
+export function inventsUnsupportedAccountFacts(text: string): boolean {
+  return (
+    INVENTED_ALGORITHM_CLAIM_PATTERNS.some(pattern => pattern.test(text)) ||
+    INVENTED_JOVIE_PRESAVE_PATTERNS.some(pattern => pattern.test(text)) ||
+    INVENTED_AD_COST_PATTERNS.some(pattern => pattern.test(text)) ||
+    INVENTED_LORE_PATTERNS.some(pattern => pattern.test(text))
   );
 }
 
@@ -133,6 +186,15 @@ export function runFailThemeChecks(
       : 'reply invents or narrates popularity/stream counts',
   });
 
+  const accountFactsOk = !inventsUnsupportedAccountFacts(text);
+  checks.push({
+    id: 'inventing-account-facts',
+    ok: accountFactsOk,
+    detail: accountFactsOk
+      ? undefined
+      : 'reply invents algorithm/momentum, Jovie-hosted pre-save, CPC ranking, or studio lore',
+  });
+
   return checks;
 }
 
@@ -147,6 +209,7 @@ export function checkFailThemePromptContract(prompt: string): {
   readonly upcomingFirst: boolean;
   readonly questionNotAMove: boolean;
   readonly inventingStats: boolean;
+  readonly inventingAccountFacts: boolean;
 } {
   const normalized = prompt.toLowerCase();
   const has = (...needles: string[]) =>
@@ -166,7 +229,12 @@ export function checkFailThemePromptContract(prompt: string): {
         'clarifying question is allowed only'
       ) &&
       has('"do it"', 'do it') &&
-      has('yes'),
+      has('yes') &&
+      has(
+        'never close with permission-to-plan',
+        'commit the next move in this turn'
+      ) &&
+      has('do not grill for a positioning line'),
     // Prefer ASS-16 needles after #26360; keep a popularity co-occurrence
     // fallback so older wording still passes before that lands everywhere.
     inventingStats:
@@ -176,5 +244,10 @@ export function checkFailThemePromptContract(prompt: string): {
         'never mention a popularity score'
       ) ||
       (has('never invent') && has('popularity')),
+    inventingAccountFacts:
+      has('never invent spotify algorithm') &&
+      has('do not claim jovie creates or hosts a dsp pre-save') &&
+      has('never invent cpc') &&
+      has('never invent studio lore'),
   };
 }

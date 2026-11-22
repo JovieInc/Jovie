@@ -44,6 +44,9 @@ export const DAYS_LEFT_CUE_PATTERN =
  */
 export const PLANNING_MENU_NOT_A_MOVE_PATTERNS: readonly RegExp[] = [
   /\bsay the word and i can help\b/i,
+  /\bsay the word and i(?:'|’)?ll\b/i,
+  /\blet me build the [\s\S]{0,60}(?:plan|launch)\b/i,
+  /\bwant me to (?:build|draft|start|plan|run)\b/i,
   /\bsmart links,\s*release plan\b/i,
   /\brelease plan,\s*promo strategy\b/i,
   /\bpromo strategy,?\s*or a pitch\b/i,

@@ -226,7 +226,7 @@ export function suggestDeltaThemes(
         title: 'No invented ranking numbers; catalog facts only',
         count: inventIds.length,
         caseIds: inventIds,
-        note: 'truthful===0 — invented popularity/stats.',
+        note: 'truthful===0 — invented popularity/stats/algorithm/lore.',
       },
     ] as const
   )
