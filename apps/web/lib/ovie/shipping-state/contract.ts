@@ -21,7 +21,8 @@ export const MAX_ACCEPTED_SOURCE_SEQUENCE_GAP = 10_000;
  * Branch prefixes of agent lanes. Every prefix gets one GitHub search (cost 1
  * point each). The list was `devin|codex` only, so on 2026-10-25 ~50 of ~140
  * open PRs (glm, opus, grok, cursor) were invisible and Home read "No work in
- * flight" beside 91 red PRs. Add a prefix here when a new lane ships.
+ * flight" beside 91 red PRs. On 2026-11-22 the `claude/` lane (49 of ~126 open
+ * PRs) was missing the same way. Add a prefix here when a new lane ships.
  */
 export const LANE_BRANCH_PREFIXES = [
   'codex',
@@ -32,6 +33,7 @@ export const LANE_BRANCH_PREFIXES = [
   'cursor',
   'sonnet',
   'fable',
+  'claude',
 ] as const;
 /** The agent lane a PR belongs to; one value per {@link LANE_BRANCH_PREFIXES}. */
 export type LaneAgent = (typeof LANE_BRANCH_PREFIXES)[number];

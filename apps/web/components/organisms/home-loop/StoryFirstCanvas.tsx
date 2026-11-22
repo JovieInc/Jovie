@@ -20,12 +20,13 @@ const TONE_DOT: Record<StoryFirstBottleneck['tone'], string> = {
   loading: 'bg-subtle',
 };
 
-const DELTA_TONE: Record<string, string> = {
-  good: 'text-success',
-  warn: 'text-warning',
-  bad: 'text-error',
-  neutral: 'text-tertiary-token',
-};
+/**
+ * Founder colour rule: greys, black and white carry the page; colour is only a
+ * thin line, edge, dot or glow. Links and numbers are neutral text, so deltas
+ * keep their direction in words ("+4", "-2"), not in a coloured fill.
+ */
+const NEUTRAL_LINK =
+  'text-secondary-token underline-offset-2 transition-colors hover:text-primary-token hover:underline focus-visible:text-primary-token focus-visible:underline';
 
 /** Editorial meta labels — flat board, no card chrome (no CSS uppercase; ASR-022). */
 const META_LABEL = 'text-2xs font-medium tracking-wide text-tertiary-token';
@@ -94,11 +95,8 @@ function GlancePulse({
           </span>
           {pulse.delta ? (
             <span
-              className={cn(
-                'text-xs font-medium tabular-nums',
-                DELTA_TONE[deltaToneKey(pulse.delta, pulse.tone)] ??
-                  DELTA_TONE.neutral
-              )}
+              className='text-xs font-medium tabular-nums text-tertiary-token'
+              data-delta-tone={deltaToneKey(pulse.delta, pulse.tone)}
             >
               {pulse.delta}
             </span>
@@ -111,10 +109,15 @@ function GlancePulse({
           trend={pulse.trend}
           variant='pulse'
           ariaLabel={`${pulse.label} trend`}
-          className='mt-0.5 h-7 w-full'
+          className='mt-0.5 h-4 w-full'
         />
       ) : (
-        <div className='h-7' aria-hidden='true' />
+        <p
+          className='h-4 truncate text-2xs text-tertiary-token'
+          data-testid={`story-first-glance-${pulse.key}-reason`}
+        >
+          {pulse.measured ? null : pulse.reason}
+        </p>
       )}
     </div>
   );
@@ -123,7 +126,7 @@ function GlancePulse({
     return (
       <a
         href={pulse.href}
-        className='block rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-accent/60'
+        className='block rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/55'
       >
         {body}
       </a>
@@ -185,10 +188,7 @@ function BottleneckHero({
                       <dt className={META_LABEL}>Moving</dt>
                       <dd>
                         {story.moving.href ? (
-                          <a
-                            href={story.moving.href}
-                            className='text-accent underline-offset-2 hover:underline'
-                          >
+                          <a href={story.moving.href} className={NEUTRAL_LINK}>
                             {story.moving.label}
                           </a>
                         ) : (
@@ -212,10 +212,7 @@ function BottleneckHero({
                 </dl>
               ) : null}
               {story.detailsHref ? (
-                <a
-                  href={story.detailsHref}
-                  className='text-accent underline-offset-2 hover:underline'
-                >
+                <a href={story.detailsHref} className={NEUTRAL_LINK}>
                   Details
                 </a>
               ) : null}
@@ -246,11 +243,14 @@ function StageBuckets({
       data-status={status}
     >
       <div className='flex items-baseline justify-between gap-3'>
-        <h2 className={cn(META_LABEL, 'text-balance')}>In Flight</h2>
+        <h2 className={cn(META_LABEL, 'text-balance')}>
+          In Flight
+          <span className='font-normal'> · open agent PRs</span>
+        </h2>
         {href ? (
           <a
             href={href}
-            className='text-xs text-accent underline-offset-2 hover:underline'
+            className={cn('text-xs', NEUTRAL_LINK)}
             data-testid='story-first-stages-more'
           >
             Open Shipping →
@@ -297,17 +297,20 @@ function StageBuckets({
               data-testid={`story-first-stage-${bucket.stage}`}
               data-highlighted={bucket.highlight ? 'true' : 'false'}
             >
-              <span className={META_LABEL}>{bucket.label}</span>
-              <span
-                className={cn(
-                  'text-2xl font-semibold tabular-nums tracking-tight',
-                  bucket.highlight ? 'text-accent' : 'text-primary-token'
-                )}
-              >
+              <span className={cn(META_LABEL, 'flex items-center gap-1.5')}>
+                {bucket.highlight ? (
+                  <span
+                    aria-hidden='true'
+                    className='size-1 rounded-full bg-accent'
+                  />
+                ) : null}
+                {bucket.label}
+              </span>
+              <span className='text-2xl font-semibold tabular-nums tracking-tight text-primary-token'>
                 {bucket.count}
               </span>
               {bucket.highlight ? (
-                <span className='truncate text-2xs text-accent'>
+                <span className='truncate text-2xs text-secondary-token'>
                   {bucket.highlight.identifier}{' '}
                   {stripIssueId(
                     bucket.highlight.identifier,

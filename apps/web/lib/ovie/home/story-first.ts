@@ -22,7 +22,7 @@ import {
   type OviePulseTile,
   type OvieShipStage,
 } from './shipping-home';
-import { perDay } from './shipping-pulse-format';
+import { weekCount } from './shipping-pulse-format';
 
 /** Matches shell Sparkline trend without importing UI into lib. */
 export type StoryFirstSparkTrend = 'up' | 'down' | 'flat';
@@ -36,6 +36,8 @@ export interface StoryFirstGlancePulse {
   readonly delta: string | null;
   readonly tone: HomeLoopTone;
   readonly measured: boolean;
+  /** Why the value is not measured, in plain words; null when measured. */
+  readonly reason: string | null;
   readonly points: readonly number[];
   readonly trend: StoryFirstSparkTrend;
   readonly href: string | null;
@@ -157,7 +159,8 @@ function formatDelta(
   if (kind === 'alive') {
     if (current > prior) return 'alive';
     if (current < prior) return 'down';
-    return 'flat';
+    // $0 that stayed $0 is not a trend worth a label.
+    return current === 0 ? null : 'flat';
   }
   if (kind === 'flat-label') {
     if (current === prior) return 'flat';
@@ -187,11 +190,12 @@ export function buildStoryFirstGlance(input: {
   readonly shippingPulse: readonly OviePulseTile[];
 }): readonly StoryFirstGlancePulse[] {
   const merges = input.shippingPulse.find(tile => tile.key === 'merges-day');
+  // The raw 7-day counts, not the per-day average: the label says 7D.
   const currentMerges = input.delivery
-    ? perDay(input.delivery.merges.last7Days)
+    ? weekCount(input.delivery.merges.last7Days)
     : null;
   const priorMerges = input.delivery
-    ? perDay(input.delivery.merges.prior7Days)
+    ? weekCount(input.delivery.merges.prior7Days)
     : null;
   const shippingPoints =
     currentMerges !== null && priorMerges !== null
@@ -227,11 +231,18 @@ export function buildStoryFirstGlance(input: {
       : null;
   const shipping: StoryFirstGlancePulse = {
     key: 'shipping',
-    label: 'Shipping · 7D',
-    value: merges?.measured ? merges.value : HOME_LOOP_NOT_MEASURED,
+    label: 'PRs merged · 7D',
+    value:
+      currentMerges !== null ? String(currentMerges) : HOME_LOOP_NOT_MEASURED,
     delta: shippingDelta,
     tone: shippingTone,
-    measured: merges?.measured ?? false,
+    measured: currentMerges !== null,
+    reason:
+      currentMerges !== null
+        ? null
+        : input.delivery
+          ? "GitHub's merge count didn't load"
+          : 'Waiting for the shipping feed',
     points: shippingPoints,
     trend: sparkTrendForPulse(shippingPoints, shippingTone, {
       hasPriorSeries: priorMerges !== null,
@@ -245,11 +256,12 @@ export function buildStoryFirstGlance(input: {
     mrrNow !== null ? formatDelta(mrrNow, mrrWas, 'alive') : null;
   const revenue: StoryFirstGlancePulse = {
     key: 'revenue',
-    label: 'Revenue',
+    label: 'MRR',
     value: mrr?.measured ? mrr.value : HOME_LOOP_NOT_MEASURED,
     delta: revenueDelta,
     tone: revenueTone,
     measured: mrr?.measured ?? false,
+    reason: mrr?.measured ? null : "Stripe revenue didn't load",
     points: revenuePoints,
     trend: sparkTrendForPulse(revenuePoints, revenueTone, {
       hasPriorSeries: mrrWas !== null,
@@ -265,11 +277,12 @@ export function buildStoryFirstGlance(input: {
       : null;
   const usersPulse: StoryFirstGlancePulse = {
     key: 'users',
-    label: 'Users',
+    label: 'New accounts · 7D',
     value: users?.measured ? users.value : HOME_LOOP_NOT_MEASURED,
     delta: usersDelta,
     tone: usersTone,
     measured: users?.measured ?? false,
+    reason: users?.measured ? null : "The signup funnel didn't load",
     points: usersPoints,
     trend: sparkTrendForPulse(usersPoints, usersTone, {
       hasPriorSeries: false,
@@ -290,7 +303,13 @@ function stepLabel(step: string): string {
     .join(' ');
 }
 
+/** Never assert a block the evidence doesn't prove (Tim, 2026-11-22). */
+export const UNPROVEN_BOTTLENECK_TITLE = "We can't see the bottleneck yet";
+
 function shortTitle(blocker: CompanyBlocker): string {
+  // Only a failing certification or a measured funnel drop is proof (tone
+  // 'bad'). A missing or out-of-date measurement leaves it unconfirmed.
+  if (blocker.tone !== 'bad') return UNPROVEN_BOTTLENECK_TITLE;
   if (blocker.kind === 'certification') {
     const name =
       blocker.step === 'checkout_payment_entitlement'
@@ -354,8 +373,11 @@ export function buildStoryFirstBottleneck(input: {
           })
         : null;
     return {
-      tone: input.revenue.tone,
-      eyebrow: `Bottleneck · ${stepLabel(input.revenue.step)}`,
+      tone: input.revenue.tone === 'bad' ? 'bad' : 'unknown',
+      eyebrow:
+        input.revenue.tone === 'bad'
+          ? `Bottleneck · ${stepLabel(input.revenue.step)}`
+          : `Not measured · ${stepLabel(input.revenue.step)}`,
       title: shortTitle(input.revenue),
       body: input.revenue.text,
       moving: moving

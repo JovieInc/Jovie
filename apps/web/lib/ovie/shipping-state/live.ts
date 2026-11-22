@@ -63,6 +63,13 @@ const PUBLIC_SOURCE_TIMEOUT_MS = 3_000;
 const GITHUB_TIMEOUT_MS = 2_500;
 /** Search with `mergeable` computes merge state per PR; it runs ~2.5s. */
 const LANE_SEARCH_TIMEOUT_MS = 6_000;
+/**
+ * Six aliased searches in one request (org + three repos + two 7-day
+ * windows) take longer than the 2.5s single-read budget, so under the default
+ * it timed out on every read and Home's 7-day count never measured. Stays
+ * under the 7.5s per-source read ceiling.
+ */
+const MERGES_TIMEOUT_MS = 6_000;
 const LANES_STATUS_SCHEMA = 'symphony-lanes-status/v1';
 const DAY_MS = 24 * 60 * 60_000;
 
@@ -1405,14 +1412,20 @@ export async function readMerges(io: LiveIo): Promise<AuthorityRead> {
   const repoQuery = (repo: DeliveryMergeRepo) =>
     `repo:${owner}/${repo} ${merged} merged:>=${since}`;
   try {
-    const data = await githubGraphql(io, sourceId, MERGES_QUERY, {
-      org: `org:${owner} ${merged} merged:>=${since}`,
-      jovie: repoQuery('Jovie'),
-      lyb: repoQuery('LogYourBody'),
-      summer: repoQuery('summer-config'),
-      last7: `org:${owner} ${merged} merged:>=${weekAgo}`,
-      prior7: `org:${owner} ${merged} merged:${twoWeeksAgo}..${weekAgo}`,
-    });
+    const data = await githubGraphql(
+      io,
+      sourceId,
+      MERGES_QUERY,
+      {
+        org: `org:${owner} ${merged} merged:>=${since}`,
+        jovie: repoQuery('Jovie'),
+        lyb: repoQuery('LogYourBody'),
+        summer: repoQuery('summer-config'),
+        last7: `org:${owner} ${merged} merged:>=${weekAgo}`,
+        prior7: `org:${owner} ${merged} merged:${twoWeeksAgo}..${weekAgo}`,
+      },
+      MERGES_TIMEOUT_MS
+    );
     if (isAuthorityRead(data)) return data;
     const today = issueCount(data, 'org');
     const byRepo: Record<DeliveryMergeRepo, number | null> = {
