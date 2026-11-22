@@ -77,7 +77,6 @@ export function ProfileDesktopSideRailRows({
               checked={isSubscribed}
               onCheckedChange={() => onGetUpdates()}
               aria-label='Artist Emails'
-              className='data-[state=checked]:bg-white/36 data-[state=unchecked]:bg-white/14'
             />
           </div>
         ) : null}

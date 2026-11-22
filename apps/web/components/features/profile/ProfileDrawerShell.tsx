@@ -279,10 +279,9 @@ export function ProfileDrawerShell({
           align='end'
           side='bottom'
           sideOffset={8}
-          size='bare'
           testId={dataTestId}
           aria-labelledby={titleId}
-          className='w-[min(20rem,calc(100vw-2rem))] max-w-80 rounded-2xl border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] p-1.5 text-primary-token'
+          className='w-[min(20rem,calc(100vw-2rem))] max-w-80'
           onCloseAutoFocus={event => {
             event.preventDefault();
             restoreAnchorFocus();
