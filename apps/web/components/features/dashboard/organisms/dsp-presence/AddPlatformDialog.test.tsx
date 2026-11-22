@@ -2,7 +2,8 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AddPlatformDialog } from '@/features/dashboard/organisms/dsp-presence/AddPlatformDialog';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { AddPlatformDialog } from './AddPlatformDialog';
 
 const { addManualDspMatchMock, toastSuccessMock } = vi.hoisted(() => ({
   addManualDspMatchMock: vi.fn(),
@@ -191,5 +192,101 @@ describe('AddPlatformDialog', () => {
       artistName: 'Presence QA',
     });
     expect(screen.getByRole('alert')).toHaveTextContent('Invalid URL');
+  });
+
+  it('keeps typed values and focus through a parent rerender and Escape', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <AddPlatformDialog
+        open
+        onClose={() => undefined}
+        existingProviderIds={[]}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Spotify/ }));
+    const artistName = screen.getByLabelText('Artist name');
+    const profileUrl = screen.getByLabelText('Profile URL');
+    await user.type(artistName, 'Midnight Echo');
+    await user.type(profileUrl, 'https://open.spotify.com/artist/123');
+    rerender(
+      <AddPlatformDialog
+        open
+        onClose={() => undefined}
+        existingProviderIds={['deezer']}
+      />
+    );
+    await user.keyboard('{Escape}');
+
+    expect(artistName).toHaveValue('Midnight Echo');
+    expect(profileUrl).toHaveValue('https://open.spotify.com/artist/123');
+    expect(profileUrl).toHaveFocus();
+  });
+
+  it('presses a provider chip as a native button and shows its fields, axe-clean', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <AddPlatformDialog
+        open
+        onClose={() => undefined}
+        existingProviderIds={[]}
+      />
+    );
+
+    const chip = screen.getByRole('button', { name: /Spotify/ });
+    expect(chip).toHaveAttribute('type', 'button');
+    expect(chip).toHaveAttribute('aria-pressed', 'false');
+    await user.click(chip);
+
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText('Artist name')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('says every platform is linked when none are left, axe-clean', async () => {
+    const { container } = render(
+      <AddPlatformDialog
+        open
+        onClose={() => undefined}
+        existingProviderIds={[
+          'spotify',
+          'apple_music',
+          'deezer',
+          'youtube_music',
+          'tidal',
+          'soundcloud',
+          'amazon_music',
+          'musicbrainz',
+          'genius',
+          'discogs',
+          'allmusic',
+        ]}
+      />
+    );
+
+    expect(
+      screen.getByText('All platforms are already linked')
+    ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('closes and resets from the dialog close', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    addManualDspMatchMock.mockResolvedValueOnce({ success: true });
+    render(
+      <AddPlatformDialog open onClose={onClose} existingProviderIds={[]} />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Spotify/ }));
+    await user.type(screen.getByLabelText('Artist name'), 'Midnight Echo');
+    await user.type(
+      screen.getByLabelText('Profile URL'),
+      'https://open.spotify.com/artist/123'
+    );
+    await user.click(screen.getByRole('button', { name: 'Add Platform' }));
+
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(toastSuccessMock).toHaveBeenCalled();
   });
 });
