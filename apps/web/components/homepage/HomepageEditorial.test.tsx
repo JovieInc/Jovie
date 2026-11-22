@@ -36,6 +36,24 @@ import {
 const COPY = HOMEPAGE_EDITORIAL_COPY;
 
 describe('HomepageEditorial chapters', () => {
+  it('gives each section one accent from the pack, in pack order', () => {
+    const hero = render(<HomepageStoryHero />);
+    expect(hero.getByTestId('marketing-section-hero')).toHaveAttribute(
+      'data-accent',
+      'ion'
+    );
+    hero.unmount();
+    const releases = render(<HomepageReleasesChapter />);
+    expect(
+      releases.getByTestId('marketing-section-product-gallery')
+    ).toHaveAttribute('data-accent', 'ultra');
+    releases.unmount();
+    const profile = render(<HomepageProfileChapter />);
+    expect(
+      profile.getByTestId('marketing-section-feature-split')
+    ).toHaveAttribute('data-accent', 'orange');
+  });
+
   it('renders the hero as one labelled section with the locked headline and two actions', async () => {
     const { container } = render(<HomepageStoryHero />);
 

@@ -2,7 +2,8 @@ import { cn } from '@/lib/utils';
 
 /**
  * The Orbit, the homepage's signature device (approved v3): concentric
- * hairline rings with one lit ion arc that is also the section's key light.
+ * hairline rings with one lit hairline arc and one small point of light, in
+ * the section's one accent. No wash, no bloom.
  * Geometry is computed at render, so the page ships it as static SVG.
  */
 export interface OrbitProps {
@@ -16,6 +17,11 @@ export interface OrbitProps {
   readonly arcRing?: number;
   /** A closed ring with no lit arc (the invitation). */
   readonly closed?: boolean;
+  /**
+   * The ring's one accent from the ZiaWI pack, or neutral for grey light.
+   * Omitted, it takes the section's `data-accent`.
+   */
+  readonly accent?: 'ion' | 'ultra' | 'pulse' | 'orange' | 'neutral';
   readonly className?: string;
 }
 
@@ -34,6 +40,7 @@ export function Orbit({
   arc,
   arcRing = 0,
   closed = false,
+  accent,
   className,
 }: OrbitProps) {
   const outer = rings[0] / 2;
@@ -52,6 +59,7 @@ export function Orbit({
   return (
     <div
       aria-hidden
+      data-accent={accent}
       className={cn('hv3-orbit', closed && 'hv3-orbit--closed', className)}
     >
       <svg
@@ -74,30 +82,7 @@ export function Orbit({
             <stop offset='0.55' stopOpacity='1' />
             <stop offset='1' stopOpacity='0' />
           </linearGradient>
-          <radialGradient id={`${id}-light`}>
-            <stop offset='0' stopOpacity='0.14' />
-            <stop offset='0.4' stopOpacity='0.08' />
-            <stop offset='1' stopOpacity='0' />
-          </radialGradient>
-          <filter
-            id={`${id}-blur`}
-            x='-50%'
-            y='-50%'
-            width='200%'
-            height='200%'
-          >
-            <feGaussianBlur stdDeviation='7' />
-          </filter>
         </defs>
-        {closed ? null : (
-          <circle
-            cx={lx}
-            cy={ly}
-            r={450}
-            fill={`url(#${id}-light)`}
-            className='hv3-orbit__light'
-          />
-        )}
         {rings.map((diameter, index) => (
           <circle
             key={diameter}
@@ -119,14 +104,9 @@ export function Orbit({
           />
         ) : (
           <>
-            <path
-              d={d}
-              stroke={`url(#${id})`}
-              filter={`url(#${id}-blur)`}
-              className='hv3-orbit__bloom'
-            />
             <path d={d} stroke={`url(#${id})`} className='hv3-orbit__arc' />
             <path d={d} pathLength={100} className='hv3-orbit__sweep' />
+            <circle cx={lx} cy={ly} r={2} className='hv3-orbit__point' />
           </>
         )}
       </svg>
