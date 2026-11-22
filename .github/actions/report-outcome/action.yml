@@ -8,7 +8,7 @@ description: >-
   marked it Done reopens it and records the recurrence. Run it last, with
   `if: always()`, in a job that needs every job of the workflow, guarded to
   main (`github.ref == 'refs/heads/main'`, not workflow_dispatch). A chained
-  workflow must also check the upstream run's head branch is main. Needs a
+  run reports only when its upstream ran on main. Needs a
   checkout of this repository at the same commit.
 
 inputs:
@@ -52,6 +52,8 @@ runs:
         FINGERPRINT: ${{ inputs.fingerprint }}
         DETAIL: ${{ inputs.detail }}
         WORKFLOW_REF: ${{ github.workflow_ref }}
+        EVENT_NAME: ${{ github.event_name }}
+        UPSTREAM_BRANCH: ${{ github.event.workflow_run.head_branch }}
       run: |
         set -euo pipefail
         conclusion="$CONCLUSION"
@@ -67,6 +69,11 @@ runs:
         # A cancelled run (superseded or stopped by hand) proves nothing either
         # way: it neither files nor resolves.
         case "$conclusion" in success|failure) ;; *) conclusion=skip ;; esac
+        # A chained run reports only when its upstream ran on main: a red
+        # chained run for a PR branch is that PR's business, not a repair.
+        if [ "$EVENT_NAME" = workflow_run ] && [ "$UPSTREAM_BRANCH" != main ]; then
+          conclusion=skip
+        fi
         file="${WORKFLOW_REF%@*}"
         file="${file##*/}"
         fp="$FINGERPRINT"
