@@ -323,8 +323,11 @@ Gaps closed after the first week (no PR may sit unowned):
   merge intent. `hold:dependency` applies while a named dependency is open; a landed
   dependency releases the draft to the lanes. `hold` and human branches are never reclaimed,
   and nothing here grants authority to discard the branch.
-  JOV-INV-011 requires an explicit `duplicate` label before automatic retirement; age and
-  exhaustion never close a PR. Parked work is requeued instead (JOV-7708): an agent-owned PR
+  Age closes a PR only through the old-PR rule (JOV-INV-011 v5, Tim 2026-11-22): at 7 days
+  an agent PR gets one last repair try (`last-repair-try` + `lane-fix-stale`, main merged in),
+  and at 10 days it is closed and its Linear issue goes back to Backlog
+  (`scripts/summer/pr-age-rule.mjs`, policy `ageRule` in `pr-wip-policy.json`). Exhaustion alone
+  never closes a PR. Parked work is requeued instead (JOV-7708): an agent-owned PR
   carrying `lane-fix-exhausted` or `queue-poison` for more than 48h (measured from the label's
   latest `labeled` event) sends its issue to Todo + `agent-ready` with a rebuild-from-main note,
   unless the issue is done or another open PR carries it. The PR stays open and gets
