@@ -1,3 +1,5 @@
+'use client';
+
 import { useMemo } from 'react';
 import type { ColumnDef, RowData, VisibilityState } from '@/lib/tanstack-table';
 import { readColumnId } from '../column-priority';
