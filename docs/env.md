@@ -279,7 +279,10 @@ retired $199 prices are mapped as legacy in `lib/stripe/legacy-prices.ts`. Free 
 capture remain free; Enterprise contact sales goes to `support@jov.ie`.
 
 Provision the value through the supported Doppler/deployment environment path
-and redeploy so the server rebuilds its checkout price mappings. Startup checks
+and redeploy so the server rebuilds its checkout price mappings. A price ID
+from the other Stripe account (test price with a live secret key, or the
+reverse) is replaced with the canonical Artist Presence price for that key
+before checkout. An unset value is not filled in. Startup checks
 verify presence, not the price's actual Stripe amount, currency, or active status.
 Verify those in Stripe and exercise checkout on the deployed build separately;
 a passing unit test or startup check is not live billing proof.

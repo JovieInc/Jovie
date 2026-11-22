@@ -381,8 +381,13 @@ export function ProfileCompactSurface({
       ? 'profile'
       : requestedPrimaryTab;
   const hasTourDates = tourDates.length > 0;
+  // JOV-14241: empty Events is not a destination; rewrite mode to home.
+  useEffect(() => {
+    if (activeMode === 'tour' && !hasTourDates) onModeSelect('profile');
+  }, [activeMode, hasTourDates, onModeSelect]);
   const activeVisiblePrimaryTab =
-    !allowFanCapture && activePrimaryTab === 'subscribe'
+    (!allowFanCapture && activePrimaryTab === 'subscribe') ||
+    (activePrimaryTab === 'tour' && !hasTourDates)
       ? 'profile'
       : activePrimaryTab;
   const currentAnalyticsTab = mapPrimaryTabToAnalyticsTab(
