@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { SharedViewPage } from './SharedViewPage';
 import { SAMPLE_VIEW_SPEC } from './ViewRenderer.stories';
-import { ViewShell } from './ViewShell';
 
 const meta = {
-  title: 'Features/Views/ViewShell',
-  component: ViewShell,
+  title: 'Features/Views/SharedViewPage',
+  component: SharedViewPage,
   parameters: { layout: 'fullscreen' },
   tags: ['autodocs'],
   args: {
@@ -15,7 +15,7 @@ const meta = {
       updatedAt: new Date('2026-11-22T00:00:00Z'),
     },
   },
-} satisfies Meta<typeof ViewShell>;
+} satisfies Meta<typeof SharedViewPage>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

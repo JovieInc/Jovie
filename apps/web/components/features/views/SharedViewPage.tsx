@@ -5,13 +5,13 @@ import type { SharedView } from '@/lib/views/service.server';
 import { ViewAnalytics, ViewSignupCard } from './ViewAnalytics';
 import { ViewRenderer } from './ViewRenderer';
 
-type ShellView = Pick<SharedView, 'title' | 'spec' | 'updatedAt'>;
+type SharedViewPageView = Pick<SharedView, 'title' | 'spec' | 'updatedAt'>;
 
 /** Dashboard-looking frame for a shared view; slice B wires Save as dashboard. */
-export function ViewShell({
+export function SharedViewPage({
   view,
   signedIn,
-}: Readonly<{ view: ShellView; signedIn: boolean }>) {
+}: Readonly<{ view: SharedViewPageView; signedIn: boolean }>) {
   return (
     <div className='flex min-h-dvh bg-base text-primary-token'>
       <ViewAnalytics signedIn={signedIn} />

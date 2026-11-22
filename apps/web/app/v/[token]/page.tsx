@@ -1,16 +1,16 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { ViewShell } from '@/components/features/views/ViewShell';
+import { SharedViewPage } from '@/components/features/views/SharedViewPage';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import { getSharedView } from '@/lib/views/service.server';
 
-interface SharedViewPageProps {
+interface SharedViewRouteProps {
   readonly params: Promise<{ token: string }>;
 }
 
 export async function generateMetadata({
   params,
-}: SharedViewPageProps): Promise<Metadata> {
+}: SharedViewRouteProps): Promise<Metadata> {
   const { token } = await params;
   const view = await getSharedView(token);
   return {
@@ -19,10 +19,12 @@ export async function generateMetadata({
   };
 }
 
-export default async function SharedViewPage({ params }: SharedViewPageProps) {
+export default async function SharedViewRoute({
+  params,
+}: SharedViewRouteProps) {
   const { token } = await params;
   const view = await getSharedView(token);
   if (!view) notFound();
   const { userId } = await getOptionalAuth();
-  return <ViewShell view={view} signedIn={Boolean(userId)} />;
+  return <SharedViewPage view={view} signedIn={Boolean(userId)} />;
 }

@@ -7,7 +7,7 @@ vi.mock('@/lib/analytics', () => ({ track }));
 vi.mock('./ViewTable', () => ({ ViewTable: () => <div /> }));
 vi.mock('@/components/shell/Sparkline', () => ({ Sparkline: () => <div /> }));
 
-import { ViewShell } from './ViewShell';
+import { SharedViewPage } from './SharedViewPage';
 
 const view = {
   title: 'Weekly snapshot',
@@ -15,11 +15,11 @@ const view = {
   updatedAt: new Date('2026-11-22T00:00:00Z'),
 };
 
-describe('ViewShell', () => {
+describe('SharedViewPage', () => {
   beforeEach(() => track.mockClear());
 
   it('shows the signup prompt to signed-out visitors and tracks the click', () => {
-    render(<ViewShell view={view} signedIn={false} />);
+    render(<SharedViewPage view={view} signedIn={false} />);
     expect(track).toHaveBeenCalledWith('shared_view_viewed', {
       signedIn: false,
     });
@@ -31,7 +31,7 @@ describe('ViewShell', () => {
   });
 
   it('shows a disabled Save as dashboard to signed-in users and no signup prompt', () => {
-    render(<ViewShell view={view} signedIn />);
+    render(<SharedViewPage view={view} signedIn />);
     const save = screen.getByRole('button', { name: 'Save as dashboard' });
     expect(save).toBeDisabled();
     expect(save).toHaveAttribute('title', 'Coming next');
