@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   checkScreenshotCatalog,
+  imageBytes,
   SCREENSHOT_CATALOG_BUDGETS,
   ScreenshotCatalogIntegrityError,
   type ScreenshotCatalogPaths,
@@ -233,5 +234,20 @@ describe('checkScreenshotCatalog', () => {
       publicExportBytes: 30,
       publicExportFiles: 2,
     });
+  });
+});
+
+describe('imageBytes', () => {
+  it('counts a Git LFS pointer at the size of the image it stands for', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'catalog-lfs-'));
+    fixtureRoots.push(root);
+    const pointer = join(root, 'pointer.png');
+    const body = `version https://git-lfs.github.com/spec/v1\noid sha256:${'a'.repeat(64)}\nsize 1986778\n`;
+    await writeFile(pointer, body);
+    expect(await imageBytes(pointer, body.length)).toBe(1_986_778);
+    const small = join(root, 'small.png');
+    await writeFile(small, 'tiny png bytes');
+    expect(await imageBytes(small, 14)).toBe(14);
+    expect(await imageBytes(small, 5_000)).toBe(5_000);
   });
 });

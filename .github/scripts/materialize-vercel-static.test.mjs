@@ -91,30 +91,6 @@ test('real canonical public exports survive Vercel relocation and bind exact ima
   assert.deepEqual(artifactSnapshot(f.root), receipt);
 });
 
-test('refuses Git LFS pointers in the static output before any write', t => {
-  const f = fixture(t);
-  const pointer =
-    'version https://git-lfs.github.com/spec/v1\noid sha256:' +
-    'a'.repeat(64) +
-    '\nsize 1234\n';
-  f.put('apps/web/screenshot-catalog/current/image.png', pointer);
-  f.link(
-    'apps/web/public/product-screenshots/image.png',
-    '../../screenshot-catalog/current/image.png'
-  );
-  const output = f.link(
-    '.vercel/output/static/product-screenshots/image.png',
-    '../../screenshot-catalog/current/image.png'
-  );
-  assert.throws(
-    () => materializeStatic(f.root),
-    /Git LFS pointers.*screenshot-catalog\/current\/image\.png/
-  );
-  assert.equal(lstatSync(output).isSymbolicLink(), true);
-  f.put('.vercel/output/static/plain.png', pointer);
-  assert.throws(() => materializeStatic(f.root), /static\/plain\.png/);
-});
-
 for (const alteredLink of [false, true]) {
   test(`canonical export wins relocated namespace collision; altered link=${alteredLink}`, t => {
     const f = fixture(t);

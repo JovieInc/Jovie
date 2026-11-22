@@ -289,3 +289,11 @@ scheduled refresh writes the new outreach and ingest baselines.
 - `docs/screenshots/ui-escape-holdout/*.png` (27 captures, 6.1 MiB) now live in Git LFS.
 - `scripts/invariants/ui-escape-holdout.test.mjs` still binds each capture to its reviewed SHA-256: from the PNG when LFS is pulled, from the pointer's oid (the SHA-256 of the same bytes) when it is not. The PNG header checks run whenever the PNG is present.
 - The objects were uploaded from main with the visual-regression `lfs_upload_glob` dispatch before the conversion was pushed.
+
+### 2026-11-22: product screenshot catalog to Git LFS
+
+- `apps/web/screenshot-catalog/current/*.png` (53 images, 15.8 MiB) now live in Git LFS, which takes tracked bytes from 87.6% to 79.6% of the budget. The two onboarding captures that `ArtistProfileHowItWorks.tsx` imports at build time stay plain blobs, and so do the three catalog symlinks (Git stores a symlink as its target path, and LFS never filters one; `scripts/lib/lfs-blobs.mjs` skips mode 120000).
+- The served copies at `/product-screenshots/*` are the `apps/web/public` symlinks into the catalog. Every Vercel build (staging and production in `production-release.yml`, the manual preview in `ci.yml`) pulls the catalog through `.github/actions/lfs-pull` before `vercel build`, and `materialize-vercel-static.mjs` refuses to deploy a pointer, so a missed pull fails the build instead of shipping broken images.
+- `setup-playwright` pulls the catalog in every browser-test job (`product_screenshots`, default on). `check-screenshot-catalog.ts` counts a pointer at its image size, so its budgets hold either way.
+- The screenshot refresh in `screenshots.yml` runs `git lfs push` before it pushes `screenshots/auto-update`.
+- Locally: `git lfs pull --include 'apps/web/screenshot-catalog/current/*.png'` before rendering marketing pages.

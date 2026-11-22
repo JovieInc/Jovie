@@ -18,6 +18,10 @@ inputs:
     description: "'true' replaces the Git LFS pointers of the visual-test baselines with their images; 'false' leaves them as pointers"
     required: false
     default: 'true'
+  product_screenshots:
+    description: "'true' replaces the Git LFS pointers of the product screenshot catalog (served at /product-screenshots/*) with their images; 'false' leaves them as pointers"
+    required: false
+    default: 'true'
 
 runs:
   using: 'composite'
@@ -197,4 +201,14 @@ runs:
       uses: ./.github/actions/lfs-pull
       with:
         include: apps/web/tests/e2e/__snapshots__/**
+        cache: ${{ inputs.cache }}
+
+    # Product screenshots are Git LFS files too, served through the
+    # apps/web/public/product-screenshots symlinks; a page that shows one would
+    # render a broken image from a pointer.
+    - name: Pull product screenshots (Git LFS)
+      if: inputs.product_screenshots == 'true'
+      uses: ./.github/actions/lfs-pull
+      with:
+        include: apps/web/screenshot-catalog/current/*.png
         cache: ${{ inputs.cache }}

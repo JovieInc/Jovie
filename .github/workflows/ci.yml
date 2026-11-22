@@ -8672,6 +8672,14 @@ jobs:
                 ;;
             esac
           done
+      # Product screenshots are Git LFS files (.gitattributes) served at
+      # /product-screenshots/*; checkout leaves pointers, and
+      # materialize-vercel-static refuses to deploy one.
+      - name: Pull product screenshots (Git LFS)
+        uses: ./.github/actions/lfs-pull
+        with:
+          include: apps/web/screenshot-catalog/current/*.png
+          cache: 'restore'
       - name: Build (PR preview)
         timeout-minutes: 10
         run: |

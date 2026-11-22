@@ -1100,6 +1100,10 @@ jobs:
           fi
 
           git checkout -b "$BRANCH"
+          # Catalog images are Git LFS files (.gitattributes): the clean filter
+          # stores pointers, and the objects go up before the branch does,
+          # since GitHub refuses a pointer whose object it lacks.
+          git lfs install --local --skip-smudge --skip-repo >/dev/null
           git add apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/
           git commit -m "chore: update product screenshots [auto]
 
@@ -1109,6 +1113,8 @@ jobs:
           # screenshot runs update this branch between list + push.
           # Retry transient GitHub 500s, but gracefully skip when the branch is
           # merge-queue locked (GH006) so this workflow doesn't fail.
+          GIT_TERMINAL_PROMPT=0 git -c "http.https://github.com/.extraheader=$AUTH_HEADER" \
+            lfs push origin "$BRANCH"
           PUSHED=false
           for ATTEMPT in 1 2 3; do
             set +e

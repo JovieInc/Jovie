@@ -166,6 +166,19 @@ function compareRegistryAndManifest(
   }
 }
 
+const LFS_POINTER =
+  /^version https:\/\/git-lfs\.github\.com\/spec\/v1\noid sha256:[0-9a-f]{64}\nsize (\d+)\n$/;
+
+/**
+ * Catalog images are Git LFS files, so a checkout that did not pull them holds
+ * pointers. Budgets count an image at its real size either way.
+ */
+export async function imageBytes(path: string, fileBytes: number) {
+  if (fileBytes > 1024) return fileBytes;
+  const match = LFS_POINTER.exec(await readFile(path, 'utf8'));
+  return match ? Number(match[1]) : fileBytes;
+}
+
 async function inspectDirectory(
   directory: string,
   expectedFiles: ReadonlySet<string>,
@@ -210,9 +223,10 @@ async function inspectDirectory(
     if (linkStats.isSymbolicLink() && label.startsWith('screenshot-catalog')) {
       continue;
     }
-    const fileBytes = linkStats.isSymbolicLink()
-      ? (await stat(path)).size
-      : linkStats.size;
+    const fileBytes = await imageBytes(
+      path,
+      linkStats.isSymbolicLink() ? (await stat(path)).size : linkStats.size
+    );
     totalBytes += fileBytes;
     if (fileBytes > maxImageBytes) {
       violations.push(

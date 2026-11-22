@@ -459,17 +459,12 @@ describe('Git LFS blobs in the tracked-bytes budget', () => {
       const plainPath = `${SNAPSHOTS}/home.spec.ts/plain.png`;
       stage(lfsPath, pointer(9_000));
       stage(plainPath, 'p'.repeat(2_000));
-      stage('docs/other.png', 'o'.repeat(3_000));
+      const other = 'docs/other.png';
+      stage(other, 'o'.repeat(3_000));
       // LFS never filters a symlink, so a linked capture is not a plain blob.
       const linkPath = `${SNAPSHOTS}/home.spec.ts/link.png`;
       stage(linkPath, 'home.png', '120000');
-      const paths = [
-        '.gitattributes',
-        lfsPath,
-        plainPath,
-        linkPath,
-        'docs/other.png',
-      ];
+      const paths = ['.gitattributes', lfsPath, plainPath, linkPath, other];
 
       const staged = collectLfsBlobs({ paths, cwd: dir, staged: true });
       expect([...staged.keys()].sort()).toEqual([lfsPath, plainPath]);
