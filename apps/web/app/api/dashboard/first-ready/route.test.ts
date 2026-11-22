@@ -1,16 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  getCachedAuth: vi.fn(),
+  requireAuth: vi.fn(),
   getCachedCurrentUser: vi.fn(),
   limit: vi.fn(),
   trackServerEvent: vi.fn(),
 }));
 
+vi.mock('server-only', () => ({}));
+vi.mock('@/lib/auth/require-auth', () => ({
+  requireAuth: mocks.requireAuth,
+}));
 vi.mock('@/lib/auth/cached', () => ({
-  getCachedAuth: mocks.getCachedAuth,
   getCachedCurrentUser: mocks.getCachedCurrentUser,
 }));
+vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 vi.mock('@/lib/rate-limit', () => ({
   navigationTelemetryLimiter: { limit: mocks.limit },
 }));
@@ -18,6 +22,7 @@ vi.mock('@/lib/server-analytics', () => ({
   trackServerEvent: mocks.trackServerEvent,
 }));
 
+import type { NextRequest } from 'next/server';
 import { POST } from './route';
 
 const VALID = {
@@ -30,17 +35,19 @@ const VALID = {
   newAccount: true,
 };
 
-function post(body: unknown): Request {
+function post(body: unknown): NextRequest {
   return new Request('https://jov.ie/api/dashboard/first-ready', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
-  });
+  }) as unknown as NextRequest;
 }
 
 describe('POST /api/dashboard/first-ready', () => {
   beforeEach(() => {
-    mocks.getCachedAuth.mockReset().mockResolvedValue({ userId: 'user_1' });
+    mocks.requireAuth
+      .mockReset()
+      .mockResolvedValue({ userId: 'user_1', error: null });
     mocks.getCachedCurrentUser.mockReset().mockResolvedValue({
       primaryEmailAddress: { emailAddress: 'artist@gmail.com' },
     });
@@ -49,7 +56,10 @@ describe('POST /api/dashboard/first-ready', () => {
   });
 
   it('rejects signed-out callers', async () => {
-    mocks.getCachedAuth.mockResolvedValue({ userId: null });
+    mocks.requireAuth.mockResolvedValue({
+      userId: null,
+      error: Response.json({ error: 'Unauthorized' }, { status: 401 }),
+    });
     const response = await POST(post(VALID));
     expect(response.status).toBe(401);
     expect(mocks.trackServerEvent).not.toHaveBeenCalled();
