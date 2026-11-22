@@ -22,6 +22,9 @@ describe('AuthBackdrop', () => {
     expect(css).toContain('-8% 116%');
     expect(css).toContain('var(--color-accent)');
     expect(css).toContain('var(--color-bg-base)');
+    // Soft mixes keep the oaz9c still mockup-less (cert geometry).
+    expect(css).toMatch(/var\(--color-accent\) 10%/);
+    expect(css).not.toMatch(/var\(--color-accent\) 7[0-9]%/);
     expect(css).not.toMatch(/rgb\(|#[0-9a-f]{3,8}\b/i);
 
     await expectNoA11yViolations(container);

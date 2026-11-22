@@ -1,7 +1,7 @@
 'use client';
 
 import { Download, ShieldBan } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { TableRowActionBar } from '../molecules/TableRowActionBar';
 
 export interface AudienceQuickActionsCellProps {
   readonly onExport: () => void;
@@ -15,34 +15,31 @@ export function AudienceQuickActionsCell({
   className,
 }: AudienceQuickActionsCellProps) {
   return (
-    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: stopPropagation prevents row click when using action buttons
-    <div
-      role='toolbar'
-      className={cn(
-        'flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100',
-        className
-      )}
-      onClick={e => e.stopPropagation()}
-      onKeyDown={e => e.stopPropagation()}
-    >
-      <button
-        type='button'
-        onClick={onExport}
-        className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
-        aria-label='Export Contact'
-        title='Export vCard'
-      >
-        <Download className='h-4 w-4' />
-      </button>
-      <button
-        type='button'
-        onClick={onBlock}
-        className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-error/10 hover:text-error focus-visible:outline-none focus-visible:bg-interactive-hover'
-        aria-label='Block Member'
-        title='Block'
-      >
-        <ShieldBan className='h-4 w-4' />
-      </button>
-    </div>
+    <TableRowActionBar
+      className={className}
+      visibility='hover'
+      overflowAriaLabel='Audience member actions'
+      // Both verbs fit the shared primary capacity — no overflow strip.
+      maxPrimary={2}
+      actions={[
+        {
+          id: 'export',
+          label: 'Export Contact',
+          icon: Download,
+          priority: 10,
+          placement: 'primary',
+          onClick: onExport,
+        },
+        {
+          id: 'block',
+          label: 'Block Member',
+          icon: ShieldBan,
+          priority: 20,
+          placement: 'primary',
+          variant: 'destructive',
+          onClick: onBlock,
+        },
+      ]}
+    />
   );
 }

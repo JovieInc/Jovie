@@ -407,21 +407,22 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
         `${route} title aligns with the content column start`
       ).toBeLessThanOrEqual(1);
     }
-    // JOV-8941: the native window owns the right and bottom edges in
-    // Electron, so the main panel meets the window frame instead of reading
-    // as a floating card with a gutter on those edges. Fractional layout can
-    // round rects, so allow the same 1px tolerance the alignment checks use.
+    // JOV-8974: the main panel keeps the shell gutter on the right and
+    // bottom, equal to the top gutter. Allow 1px for fractional layout.
+    const gap = geometry?.shellGap ?? 0;
     expect(
       Math.abs(
-        (geometry?.mainContentRight ?? 0) - (geometry?.viewportWidth ?? 0)
+        (geometry?.viewportWidth ?? 0) - (geometry?.mainContentRight ?? 0) - gap
       ),
-      `${route} main panel is flush with the window right edge (JOV-8941)`
+      `${route} main panel keeps the shell gap on the right edge`
     ).toBeLessThanOrEqual(1);
     expect(
       Math.abs(
-        (geometry?.mainContentBottom ?? 0) - (geometry?.viewportHeight ?? 0)
+        (geometry?.viewportHeight ?? 0) -
+          (geometry?.mainContentBottom ?? 0) -
+          gap
       ),
-      `${route} main panel is flush with the window bottom edge (JOV-8941)`
+      `${route} main panel keeps the shell gap on the bottom edge`
     ).toBeLessThanOrEqual(1);
 
     if (route.startsWith(APP_ROUTES.SETTINGS)) {

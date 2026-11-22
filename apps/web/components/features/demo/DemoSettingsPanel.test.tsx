@@ -1,6 +1,12 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { DemoSettingsPanel } from './DemoSettingsPanel';
+
+const runDemoAction = vi.hoisted(() => vi.fn());
+
+vi.mock('./demo-actions', () => ({ runDemoAction }));
 
 const mockSearchParams = vi.hoisted(() => ({
   get: vi.fn((_key?: string): string | null => null),
@@ -48,4 +54,51 @@ describe('DemoSettingsPanel', () => {
       mockSearchParams.get.mockImplementation(() => null);
     }
   });
+
+  it('toggles a preference through the Switch atom and reports the demo action', async () => {
+    const user = userEvent.setup();
+    runDemoAction.mockClear();
+    const { container } = render(<DemoSettingsPanel />);
+
+    const toggle = screen.getByRole('switch', { name: 'Public Profile' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(runDemoAction).toHaveBeenCalledWith({
+      successMessage: 'Setting updated (demo).',
+    });
+    await expectNoA11yViolations(container);
+  });
+
+  it('reconnects a platform from its row button', async () => {
+    const user = userEvent.setup();
+    runDemoAction.mockClear();
+    render(<DemoSettingsPanel />);
+
+    await user.click(screen.getAllByRole('button', { name: 'Reconnect' })[0]);
+
+    expect(runDemoAction).toHaveBeenCalledWith({
+      successMessage: 'Spotify reconnected (demo).',
+    });
+  });
+
+  it.each(['quality', 'sync'])(
+    'renders the %s capture card without a11y violations or nested borders',
+    async mode => {
+      mockSearchParams.get.mockImplementation((key?: string) =>
+        key === 'capture' ? mode : null
+      );
+      try {
+        const { container } = render(<DemoSettingsPanel />);
+        const switches = screen.getAllByRole('switch', {
+          name: 'Always In Sync',
+        });
+        expect(switches.length).toBeGreaterThan(0);
+        await expectNoA11yViolations(container);
+      } finally {
+        mockSearchParams.get.mockImplementation(() => null);
+      }
+    }
+  );
 });

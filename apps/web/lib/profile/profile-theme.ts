@@ -1,10 +1,15 @@
+import { BRAND_ION_BLUE } from '@/lib/brand/tokens';
 import {
   darkenHex,
   getContrastTextOnBrand,
   hexToRgb,
   hexToRgba,
   lightenHex,
+  relativeLuminance,
 } from '@/lib/utils/color';
+
+/** Ion fallback when no cover exists or the extracted color fails Noir Ion contrast. */
+export const PROFILE_ACCENT_ION_FALLBACK = BRAND_ION_BLUE;
 
 export interface ProfileAccentTheme {
   readonly version: 1;
@@ -182,7 +187,7 @@ export function mergeProfileTheme(
 export function normalizeProfileAccentHex(hex: string): string {
   const normalizedHex = normalizeHexColor(hex);
   if (!normalizedHex) {
-    return '#d18a4f';
+    return PROFILE_ACCENT_ION_FALLBACK;
   }
 
   const { h, s, l } = rgbToHsl(normalizedHex);
@@ -196,18 +201,22 @@ export function normalizeProfileAccentHex(hex: string): string {
     clampedLightness = l;
   }
   const adjustedLightness = clamp(clampedLightness, 0.42, 0.62);
+  const clampedHex = hslToHex(h, adjustedSaturation, adjustedLightness);
 
-  return hslToHex(h, adjustedSaturation, adjustedLightness);
+  // Keep stage text AA on matte near-black: reject wash-out accents.
+  if (relativeLuminance(clampedHex) > 0.55) {
+    return PROFILE_ACCENT_ION_FALLBACK;
+  }
+
+  return clampedHex;
 }
 
 export function buildProfileAccentCssVars(
   accent: ProfileAccentTheme | null | undefined
 ): ProfileAccentCssVars {
-  if (!accent) {
-    return {};
-  }
-
-  const primaryHex = normalizeProfileAccentHex(accent.primaryHex);
+  const primaryHex = accent
+    ? normalizeProfileAccentHex(accent.primaryHex)
+    : PROFILE_ACCENT_ION_FALLBACK;
   const contrastHex = getContrastTextOnBrand(primaryHex);
   const glowStrong = lightenHex(primaryHex, 0.32);
   const glowSoft = darkenHex(primaryHex, 0.82);
@@ -217,6 +226,7 @@ export function buildProfileAccentCssVars(
     '--profile-accent-on-primary': contrastHex,
     '--profile-accent-soft': hexToRgba(primaryHex, 0.12),
     '--profile-accent-soft-strong': hexToRgba(primaryHex, 0.18),
+    '--profile-cover-accent-line': hexToRgba(primaryHex, 0.55),
     '--profile-tab-active-bg': primaryHex,
     '--profile-tab-active-fg': contrastHex,
     '--profile-status-pill-bg': hexToRgba(primaryHex, 0.18),
@@ -226,10 +236,6 @@ export function buildProfileAccentCssVars(
     '--profile-rail-dot-inactive': hexToRgba(primaryHex, 0.18),
     '--profile-stage-glow-a': hexToRgba(glowStrong, 0.24),
     '--profile-stage-glow-b': hexToRgba(glowSoft, 0.14),
-    '--profile-panel-gradient': `linear-gradient(180deg, ${hexToRgba(
-      glowStrong,
-      0.08
-    )}, ${hexToRgba(primaryHex, 0.02)} 24%, transparent 100%)`,
     '--profile-pearl-primary-bg': primaryHex,
     '--profile-pearl-primary-fg': contrastHex,
     '--profile-pearl-bg': hexToRgba(primaryHex, 0.1),

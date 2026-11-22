@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { Play } from 'lucide-react';
 import { memo } from 'react';
 import { cn } from '@/lib/utils';
@@ -47,8 +48,7 @@ const CueRow = memo(function CueRow({
   readonly disabled: boolean;
 }) {
   return (
-    <button
-      type='button'
+    <PlainButton
       onClick={() => onSeek?.(c.at)}
       disabled={disabled}
       className='group/cue w-full flex items-center gap-2 h-8 px-2 rounded-md text-xs text-secondary-token hover:bg-surface-1/40 hover:text-primary-token disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle'
@@ -75,7 +75,7 @@ const CueRow = memo(function CueRow({
       </span>
       <span className='flex-1 text-left truncate'>{c.label}</span>
       <span className={SHELL_CAPTION_CLASSNAME}>{CUE_KIND_LABEL[c.kind]}</span>
-    </button>
+    </PlainButton>
   );
 });
 
@@ -124,7 +124,7 @@ export function CuesPanel({
             <span
               key={`ribbon-${c.at}-${c.label}`}
               aria-hidden='true'
-              className='absolute top-1/2 -translate-y-1/2 h-2 w-0.5 rounded-full bg-cyan-300/60'
+              className='absolute top-1/2 -translate-y-1/2 h-2 w-0.5 rounded-full bg-accent/60'
               style={{ left: `${pct}%` }}
             />
           );

@@ -85,24 +85,15 @@ function renderPanel(
 }
 
 describe('ProfilePrimaryTabPanel', () => {
-  it('renders the Events mode card with a truthful empty state and the alerts opt-in', () => {
-    renderPanel({ mode: 'tour', modeCardAccents: PEN_ACCENTS });
+  it('hides the Events tab panel when there are no dates (JOV-14241)', () => {
+    const { container } = renderPanel({
+      mode: 'tour',
+      modeCardAccents: PEN_ACCENTS,
+    });
 
-    expect(screen.getByTestId('profile-primary-tab-tour')).toBeInTheDocument();
-    const card = screen.getByTestId('profile-primary-tab-events-empty');
-    // Shared nav contract (#18803): Events, never Shows.
-    expect(card).toHaveAccessibleName('Events');
-    expect(screen.queryByText('Shows')).toBeNull();
-    expect(card).toHaveAttribute('data-accent', 'pulse');
-    expect(
-      within(card).getByRole('heading', { name: 'No upcoming events' })
-    ).toBeInTheDocument();
-    expect(within(card).getByText('New dates will appear here.')).toBeVisible();
-    // Only the event-alerts opt-in; no event list, no invented CTA.
-    expect(
-      within(card).getByTestId('mock-tour-event-alerts-action')
-    ).toBeInTheDocument();
-    expect(within(card).queryByTestId('mock-tour-drawer-content')).toBeNull();
+    expect(screen.queryByTestId('profile-primary-tab-tour')).toBeNull();
+    expect(screen.queryByTestId('profile-primary-tab-events-empty')).toBeNull();
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('lists upcoming events inside the Events mode card', () => {

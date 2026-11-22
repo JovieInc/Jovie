@@ -10,5 +10,24 @@
   ],
   "titleCaseHeadings": [
     "apps/web/app/app/(shell)/admin/investors/settings/page.tsx: title='Investor Settings'"
+  ],
+  "dashboardColor": [
+    "accent-on-data apps/web/components/features/admin/hud/HudKpiSubgrid.tsx: stroke='var(--color-accent)'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-accent'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-accent'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-info'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-info'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-info'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-success'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-success'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-success'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-success'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-warning'",
+    "decorative-color apps/web/components/features/admin/SentryMetricsCard.tsx: iconClassName='text-accent'",
+    "decorative-color apps/web/components/features/admin/SentryMetricsCard.tsx: iconClassName='text-error'",
+    "decorative-color apps/web/components/features/admin/SentryMetricsCard.tsx: iconClassName='text-info'",
+    "decorative-color apps/web/components/features/admin/SentryMetricsCard.tsx: iconClassName='text-warning'",
+    "raw-status-palette apps/web/components/features/dashboard/organisms/dashboard-audience-table/row-contract.ts: high: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/25',",
+    "raw-status-palette apps/web/components/features/dashboard/organisms/dashboard-audience-table/row-contract.ts: rising: 'bg-amber-500/15 text-amber-300 ring-amber-500/25',"
   ]
 }

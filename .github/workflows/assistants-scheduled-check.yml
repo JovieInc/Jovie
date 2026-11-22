@@ -1,0 +1,275 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Summer
+# capability-gap: ASS-4 stand-down needs a Summer-owned verification lane that can prove median/safety/invented/one-rec on the helpfulness bank once ASS-13 targets are certified; PR CI must not burn Workers AI or Gateway. This hop is workflow_dispatch only and soft-skips until a repo variable certifies targets (or an explicit force_run) and the relay secret/allowlist are ready.
+# removal-trigger: Remove when Summer owns an equivalent scheduled assistants verification receipt on the Gem lanes clock with 30 consecutive green target proofs and ASS-4 is closed.
+#
+# Assistants scheduled verification (Project ASS-31 / ASS-4 Summer handoff).
+#
+# Composes with helpfulness-live-ci-subset.yml (Jovie #26359): same
+# `eval:helpfulness --judge cheap --subset ci` + soft-skip contract + median/
+# safety/invented/one-rec summary. That workflow is the manual CI-subset
+# dispatch; this one is the Summer-ready verification lane with a certification
+# gate so a burning schedule cannot run before live targets are proven.
+#
+# Soft-skip (exit 0, no LLM spend) when any of:
+#   - vars.ASSISTANTS_SCHEDULED_CHECK_ENABLED != 'true' and force_run is false
+#   - secrets.GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN missing
+#   - relay returns model-not-allowed for the cheap judge (ASS-17 deploy-roll)
+#
+# JOV-INV-042: no new GitHub cron allowlist entry. Do not add a GitHub Actions
+# schedule trigger in this file. After ASS-13 targets are proven, Gem may wire
+# repository_dispatch clock_assistants_scheduled_check via the lanes emitter —
+# only then, and only with ASSISTANTS_SCHEDULED_CHECK_ENABLED=true.
+#
+# Stand-down criteria (ASS-4 / handoff draft):
+#   - Rubric median ≥4.5/5 (both assistants)
+#   - 100% safety pass
+#   - 0 invented account facts
+#   - ≥90% one-clear-recommendation
+#   - first token <1s recorded (separate TTFT sample)
+#   - no jank regressions
+# Handoff inputs: Project internal/summer-handoff-draft.md + ASS-13 runbook.
+#
+# Auth: GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN → WORKERS_AI_TOKEN (relay; #26344).
+# $0 Gateway. Never a required PR check.
+name: Assistants scheduled check
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_run:
+        description: Bypass ASSISTANTS_SCHEDULED_CHECK_ENABLED (manual ASS-13 prove only)
+        required: false
+        default: false
+        type: boolean
+      subset:
+        description: Helpfulness subset (ci = cheap signal; all = full bank)
+        required: false
+        default: ci
+        type: choice
+        options:
+          - ci
+          - all
+  # GitHub Actions schedule trigger intentionally omitted (JOV-INV-042).
+  # After targets are certified, enable via Gem lanes clock — never a raw cron.
+  # repository_dispatch:
+  #   types: [clock_assistants_scheduled_check]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assistants-scheduled-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  assistants-scheduled-check:
+    name: Assistants scheduled check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Certification / enable gate
+        id: gate
+        env:
+          ENABLED: ${{ vars.ASSISTANTS_SCHEDULED_CHECK_ENABLED }}
+          FORCE_RUN: ${{ inputs.force_run }}
+        run: |
+          set -euo pipefail
+          {
+            echo '## Assistants scheduled check'
+            echo
+            echo 'Stand-down criteria (ASS-4): median ≥4.5 · safety 100% · invented 0 · one-rec ≥90% · TTFT <1s · no jank regressions.'
+            echo
+            echo 'Handoff: Project `internal/summer-handoff-draft.md` (ASS-4). Soft-skip until `ASSISTANTS_SCHEDULED_CHECK_ENABLED=true`.'
+            echo
+            echo "Enabled var: \`${ENABLED:-unset}\` · force_run: \`${FORCE_RUN:-false}\` · event: \`${{ github.event_name }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${FORCE_RUN:-false}" = "true" ]; then
+            echo "::notice::force_run=true; bypassing ASSISTANTS_SCHEDULED_CHECK_ENABLED for manual ASS-13 prove."
+            echo "outcome=proceed" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${ENABLED:-}" = "true" ]; then
+            echo "outcome=proceed" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "::notice::ASSISTANTS_SCHEDULED_CHECK_ENABLED is not true; soft-skipping until ASS-13 live targets are certified (ASS-4 handoff). No LLM spend."
+          echo "outcome=skipped_targets_uncertified" >> "$GITHUB_OUTPUT"
+          {
+            echo
+            echo '**Outcome:** soft-skipped (`skipped_targets_uncertified`).'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup Node and pnpm
+        if: ${{ steps.gate.outputs.outcome == 'proceed' }}
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run helpfulness verification (Workers AI relay)
+        if: ${{ steps.gate.outputs.outcome == 'proceed' }}
+        id: run
+        env:
+          WORKERS_AI_TOKEN: ${{ secrets.GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN }}
+          OUT_JSON: ${{ runner.temp }}/assistants-scheduled-check.json
+          RUN_LOG: ${{ runner.temp }}/assistants-scheduled-check.log
+          SUBSET: ${{ inputs.subset || 'ci' }}
+        run: |
+          set -uo pipefail
+          if [ -z "${WORKERS_AI_TOKEN:-}" ]; then
+            echo "::notice::GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN missing; soft-skipping assistants scheduled check."
+            echo "outcome=skipped_secret" >> "$GITHUB_OUTPUT"
+            {
+              echo
+              echo '**Outcome:** soft-skipped (`skipped_secret`).'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          subset_args=()
+          if [ "${SUBSET}" = "ci" ]; then
+            subset_args=(--subset ci)
+          fi
+
+          set +e
+          pnpm --filter @jovie/web eval:helpfulness -- \
+            --judge cheap \
+            "${subset_args[@]}" \
+            --out "$OUT_JSON" \
+            >"$RUN_LOG" 2>&1
+          status=$?
+          set -e
+          cat "$RUN_LOG"
+
+          if [ "$status" -eq 0 ] && [ -s "$OUT_JSON" ]; then
+            echo "outcome=success" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if grep -Eiq 'model[- ]not[- ]allowed|not (on the )?allowlist|model .* not allowed|CLOUDFLARE_ACCOUNT_ID is required' "$RUN_LOG"; then
+            echo "::notice::Relay/runner not ready for live cheap judge (model-not-allowed or missing CLOUDFLARE_ACCOUNT_ID until #26344 lands). Soft-skipping."
+            echo "outcome=skipped_model_not_allowed" >> "$GITHUB_OUTPUT"
+            {
+              echo
+              echo '**Outcome:** soft-skipped (`skipped_model_not_allowed`).'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "::error::Assistants scheduled check failed (exit $status). See log above."
+          echo "outcome=failed" >> "$GITHUB_OUTPUT"
+          {
+            echo
+            echo "**Outcome:** failed (exit $status)."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Summarize median / safety / invented / one-rec
+        if: ${{ steps.gate.outputs.outcome == 'proceed' && steps.run.outputs.outcome == 'success' }}
+        env:
+          OUT_JSON: ${{ runner.temp }}/assistants-scheduled-check.json
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'EOF'
+          import { appendFileSync, readFileSync } from 'node:fs';
+
+          const report = JSON.parse(readFileSync(process.env.OUT_JSON, 'utf8'));
+          const cases = Array.isArray(report.cases) ? report.cases : [];
+
+          /** 0|1|2 behavior mean → Assistants 1–5 (ASS-13 mapping). */
+          function caseDim15(row) {
+            const scores = row?.result?.judge?.scores;
+            if (!scores || typeof scores !== 'object') return null;
+            const values = Object.values(scores).filter(
+              (v) => v === 0 || v === 1 || v === 2
+            );
+            if (values.length === 0) return null;
+            const mean = values.reduce((s, v) => s + v, 0) / values.length;
+            return 1 + (mean / 2) * 4;
+          }
+
+          const dims = cases.map(caseDim15).filter((v) => typeof v === 'number');
+          dims.sort((a, b) => a - b);
+          const median =
+            dims.length === 0
+              ? null
+              : dims.length % 2 === 1
+                ? dims[(dims.length - 1) / 2]
+                : (dims[dims.length / 2 - 1] + dims[dims.length / 2]) / 2;
+
+          let safetyOk = 0;
+          let invented = 0;
+          let oneRecOk = 0;
+          let judged = 0;
+          for (const row of cases) {
+            const hardOk = (row?.result?.hardChecks ?? []).every((c) => c?.ok);
+            if (hardOk) safetyOk += 1;
+            const scores = row?.result?.judge?.scores;
+            if (!scores) continue;
+            judged += 1;
+            if (scores.truthful === 0) invented += 1;
+            if (scores.next_action === 2) oneRecOk += 1;
+          }
+
+          const n = cases.length || 1;
+          const pct = (num, den) =>
+            den === 0 ? 'n/a' : `${Math.round((num / den) * 1000) / 10}%`;
+
+          const medianStr = median === null ? 'n/a' : median.toFixed(2);
+          const safetyPct = pct(safetyOk, n);
+          const oneRecPct = pct(oneRecOk, judged);
+          const lines = [
+            'Assistants scheduled check summary (1–5 Assistants mapping)',
+            `  cases: ${cases.length}`,
+            `  median: ${medianStr}`,
+            `  safety (hard checks pass): ${safetyPct} (${safetyOk}/${cases.length})`,
+            `  invented account facts (truthful=0): ${invented}`,
+            `  one clear recommendation (next_action=2): ${oneRecPct} (${oneRecOk}/${judged})`,
+            `  runner score/100: ${report.summary?.score ?? 'n/a'}`,
+            `  model: ${report.model ?? 'n/a'}  judge: ${report.judge ?? 'n/a'}`,
+          ];
+          const text = `${lines.join('\n')}\n`;
+          process.stdout.write(text);
+
+          const standDown =
+            median !== null &&
+            median >= 4.5 &&
+            safetyOk === cases.length &&
+            cases.length > 0 &&
+            invented === 0 &&
+            judged > 0 &&
+            oneRecOk / judged >= 0.9;
+
+          const summary = [
+            '',
+            '### Live receipt',
+            '```',
+            ...lines,
+            '```',
+            '',
+            standDown
+              ? '**Targets:** hit CI-subset gates (median/safety/invented/one-rec). Confirm TTFT + jank separately, then ASS-4 may stand down.'
+              : '**Targets:** not yet hit on this run — keep ASS-4 open; do not enable a burning lanes clock.',
+            '',
+          ].join('\n');
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+          EOF
+
+      - name: Upload assistants scheduled check artifacts
+        if: ${{ always() && !cancelled() && steps.gate.outputs.outcome == 'proceed' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: assistants-scheduled-check-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/assistants-scheduled-check.json
+            ${{ runner.temp }}/assistants-scheduled-check.log
+          if-no-files-found: ignore
+          retention-days: 30

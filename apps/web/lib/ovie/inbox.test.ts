@@ -3,6 +3,7 @@ import type { OvieCertificationInventory } from './certifications/types';
 import {
   inboxDecisionRequest,
   projectOvieInbox,
+  projectSummerInbox,
   summerCardEscalation,
 } from './inbox';
 import type { SummerCard } from './summer-cards';
@@ -460,3 +461,31 @@ it.each([
     });
   }
 );
+
+describe('Summer inbox order', () => {
+  it('puts escalated no-default cards first, then decideBy, then createdAt', () => {
+    const now = new Date('2026-10-23T00:00:00.000Z');
+    const mk = (id: string, over: Partial<SummerCard>): SummerCard => ({
+      ...card,
+      id,
+      ...over,
+    });
+    const result = projectSummerInbox(
+      [
+        mk('late', { decideBy: '2026-10-30T00:00:00.000Z' }),
+        mk('soon', { decideBy: '2026-10-24T00:00:00.000Z' }),
+        mk('stuck', {
+          defaultDecision: 'none',
+          createdAt: '2026-10-20T00:00:00.000Z',
+          decideBy: '2026-12-01T00:00:00.000Z',
+        }),
+      ],
+      now
+    );
+    expect(result.cases.map(item => item.id)).toEqual([
+      'summer-card:stuck',
+      'summer-card:soon',
+      'summer-card:late',
+    ]);
+  });
+});

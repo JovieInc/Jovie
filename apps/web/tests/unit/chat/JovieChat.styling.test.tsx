@@ -375,7 +375,7 @@ describe('JovieChat styling regressions', () => {
 
   it('keeps the composer dock padded above mobile shell navigation', () => {
     const { container } = renderWithQueryClient(
-      <JovieChat profileId='profile-1' />
+      <JovieChat profileId='profile-1' composerDock={() => null} />
     );
 
     const composerDock = container.querySelector('[data-testid="chat-input"]')
@@ -383,6 +383,7 @@ describe('JovieChat styling regressions', () => {
 
     expect(composerDock?.className).toContain(CHAT_COMPOSER_DOCK_CLASSNAME);
     expect(composerDock?.className).toContain('system-b-chat-composer-dock');
+    expect(composerDock?.firstElementChild?.childElementCount).toBe(0);
   });
 
   it('keeps the live transcript mounted when a reserved conversation starts loading', () => {
@@ -783,6 +784,7 @@ describe('JovieChat styling regressions', () => {
   });
 
   it('keeps a living Home canvas as the surface after messages, with the transcript on request', () => {
+    mockChatState.status = 'ready'; // A restored chat leaves Home up.
     type Living = {
       isStreaming: boolean;
       count: number;
@@ -808,14 +810,13 @@ describe('JovieChat styling regressions', () => {
         }}
       />
     );
-
     const viewport = () =>
       container.querySelector('[data-testid="chat-empty-state-viewport"]');
     expect(viewport()?.getAttribute('data-empty-affordance')).toBe(
       'home-canvas'
     );
     expect(states.at(-1)).toEqual({
-      isStreaming: true,
+      isStreaming: false,
       count: 1,
       composerHasIntent: false,
     });

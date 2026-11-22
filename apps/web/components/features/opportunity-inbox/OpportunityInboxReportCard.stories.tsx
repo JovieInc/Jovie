@@ -17,6 +17,8 @@ const card: OpportunityInboxCardViewModel = {
     deltaPercent: 18,
     deltaDisplay: '+18%',
     direction: 'up',
+    polarity: 'higher-is-better',
+    sentiment: 'positive',
     series: [4, 5, 5, 6, 7, 8, 9],
     items: [
       { label: 'Mobile', deltaPercent: 22, detail: '1,204 visitors' },
@@ -57,6 +59,8 @@ export const Down: Story = {
         deltaPercent: -6,
         deltaDisplay: '-6%',
         direction: 'down',
+        polarity: 'higher-is-better',
+        sentiment: 'negative',
         series: card.report?.series ?? [],
         items: card.report?.items ?? [],
         experimentId: card.report?.experimentId ?? null,

@@ -16,10 +16,10 @@ const INTENT_ICONS: Record<
   AudienceIntentLevel,
   { icon: typeof Flame; color: string; label: string }
 > = {
-  high: { icon: Flame, color: 'text-emerald-500', label: 'High Intent' },
+  high: { icon: Flame, color: 'text-success', label: 'High Intent' },
   medium: {
     icon: TrendingUp,
-    color: 'text-amber-400',
+    color: 'text-warning',
     label: 'Medium Intent',
   },
   low: { icon: Minus, color: 'text-tertiary-token', label: 'Low Intent' },

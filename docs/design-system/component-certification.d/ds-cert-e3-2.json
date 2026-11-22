@@ -144,15 +144,6 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/organisms/table/atoms/TableIconButton.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
     "apps/web/components/organisms/table/molecules/ExportCSVButton.tsx": [
       "ds-owner",
       "tokens",
@@ -268,9 +259,6 @@
     },
     "apps/web/components/organisms/table/atoms/AudienceSourceCell.tsx": {
       "permission-denied": "The source cell has no account, role check or gated action. The detector matched role='img' on the labelled icon wrapper."
-    },
-    "apps/web/components/organisms/table/atoms/TableIconButton.tsx": {
-      "empty": "The icon button renders one icon and an optional tooltip; it owns no collection that could be empty. The detector matched the word rows in the doc comment '24px control for 32px dense rows'."
     },
     "apps/web/components/organisms/table/molecules/TaskProjectionListRow.tsx": {
       "empty": "The row renders one task's leading, title, metadata and action slots; it owns no collection that could be empty (the list that owns rows has its own empty state). The detector matched the class 'items-center' on its wrappers."

@@ -33,3 +33,23 @@ export const Default: Story = {
     onSelect: () => {},
   },
 };
+
+export const EmptyNoReleases: Story = {
+  args: { groups: [], selectedId: null, onSelect: () => {} },
+};
+
+export const LongContentTitles: Story = {
+  args: {
+    groups: [
+      {
+        status: 'live',
+        releases: DEMO_RELEASES.slice(0, 2).map(release => ({
+          ...release,
+          title: `${release.title} (Extended Anniversary Remastered Deluxe Edition)`,
+        })),
+      },
+    ],
+    selectedId: null,
+    onSelect: () => {},
+  },
+};

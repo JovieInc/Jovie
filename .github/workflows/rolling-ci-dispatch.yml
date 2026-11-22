@@ -71,6 +71,9 @@ jobs:
             scripts/lib/trusted-test-planner-snapshot.mjs
             scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
+            scripts/lib/ci-typecheck-overlap.mjs
+            scripts/lib/source-guard-order.mjs
+            scripts/lib/ci-fast-skip-lanes.mjs
             scripts/lib/ci-source-guard-pool.mjs
             scripts/lib/merged-with-base-pool-config.mjs
             scripts/lib/ci-fast-annotations.mjs
@@ -577,6 +580,9 @@ jobs:
             scripts/lib/trusted-test-planner-snapshot.mjs
             scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
+            scripts/lib/ci-typecheck-overlap.mjs
+            scripts/lib/source-guard-order.mjs
+            scripts/lib/ci-fast-skip-lanes.mjs
             scripts/lib/ci-source-guard-pool.mjs
             scripts/lib/merged-with-base-pool-config.mjs
             scripts/lib/ci-fast-annotations.mjs
@@ -869,6 +875,9 @@ jobs:
             scripts/lib/pr-size-guard-policy.mjs
             scripts/lib/repo-hygiene-limits.mjs
             scripts/ci-fast-lanes.mjs
+            scripts/lib/ci-typecheck-overlap.mjs
+            scripts/lib/source-guard-order.mjs
+            scripts/lib/ci-fast-skip-lanes.mjs
             scripts/lib/ci-source-guard-pool.mjs
             scripts/lib/merged-with-base-pool-config.mjs
             scripts/lib/ci-fast-annotations.mjs
@@ -1016,6 +1025,9 @@ jobs:
             scripts/lib/trusted-test-planner-snapshot.mjs
             scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
+            scripts/lib/ci-typecheck-overlap.mjs
+            scripts/lib/source-guard-order.mjs
+            scripts/lib/ci-fast-skip-lanes.mjs
             scripts/lib/ci-source-guard-pool.mjs
             scripts/lib/merged-with-base-pool-config.mjs
             scripts/lib/ci-fast-annotations.mjs

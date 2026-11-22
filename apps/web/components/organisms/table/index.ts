@@ -121,7 +121,6 @@ export {
 } from './atoms/TableEmptyState';
 export type { TableHeaderCellProps } from './atoms/TableHeaderCell';
 export { TableHeaderCell } from './atoms/TableHeaderCell';
-export { TableIconButton } from './atoms/TableIconButton';
 export type { TaskProjectionListRowProps } from './molecules/TaskProjectionListRow';
 export { TaskProjectionListRow } from './molecules/TaskProjectionListRow';
 
@@ -202,6 +201,16 @@ export {
 } from './molecules/TableContextMenu';
 export type { TableHeaderRowProps } from './molecules/TableHeaderRow';
 export { TableHeaderRow } from './molecules/TableHeaderRow';
+export type {
+  TableRowActionBarAction,
+  TableRowActionBarProps,
+  TableRowActionBarVisibility,
+  TableRowOverflowTriggerProps,
+} from './molecules/TableRowActionBar';
+export {
+  TableRowActionBar,
+  TableRowOverflowTrigger,
+} from './molecules/TableRowActionBar';
 export type { TableSearchBarProps } from './molecules/TableSearchBar';
 export { TableSearchBar } from './molecules/TableSearchBar';
 export type {

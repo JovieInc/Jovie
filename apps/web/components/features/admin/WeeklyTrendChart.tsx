@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { DATA_SERIES } from '@/lib/design/metric-tone';
 
 interface WeeklyTrendChartProps {
   readonly data: Array<{
@@ -21,11 +22,15 @@ export function formatWeekLabel(dateStr: string): string {
   });
 }
 
+// Funnel stages are ordered data, not status or actions (ASR-041): one
+// neutral ramp from quiet to bright, so Paid reads strongest.
+const [SCRAPED, CONTACTED, SIGNUPS, PAID] = DATA_SERIES.ordered;
+
 const LEGEND_ITEMS = [
-  { key: 'scraped', label: 'Scraped', color: 'var(--linear-text-tertiary)' },
-  { key: 'contacted', label: 'Contacted', color: 'hsl(var(--color-info))' },
-  { key: 'signups', label: 'Signups', color: 'hsl(var(--color-accent))' },
-  { key: 'paid', label: 'Paid', color: 'hsl(var(--color-success))' },
+  { key: 'scraped', label: 'Scraped', color: SCRAPED },
+  { key: 'contacted', label: 'Contacted', color: CONTACTED },
+  { key: 'signups', label: 'Signups', color: SIGNUPS },
+  { key: 'paid', label: 'Paid', color: PAID },
 ] as const;
 
 const LazyTrendChart = dynamic(
@@ -65,29 +70,29 @@ const LazyTrendChart = dynamic(
               <Line
                 type='monotone'
                 dataKey='scraped'
-                stroke='var(--linear-text-tertiary)'
+                stroke={SCRAPED}
                 strokeWidth={1.5}
                 dot={false}
               />
               <Line
                 type='monotone'
                 dataKey='contacted'
-                stroke='hsl(var(--color-info))'
+                stroke={CONTACTED}
                 strokeWidth={1.5}
                 dot={false}
               />
               <Line
                 type='monotone'
                 dataKey='signups'
-                stroke='hsl(var(--color-accent))'
+                stroke={SIGNUPS}
                 strokeWidth={1.5}
                 dot={false}
               />
               <Line
                 type='monotone'
                 dataKey='paid'
-                stroke='hsl(var(--color-success))'
-                strokeWidth={1.5}
+                stroke={PAID}
+                strokeWidth={2}
                 dot={false}
               />
             </LineChart>

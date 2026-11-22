@@ -11,8 +11,8 @@ import {
   size,
   useFloating,
 } from '@floating-ui/react';
-import { Input } from '@jovie/ui';
-import { useCallback } from 'react';
+import { Input, PlainButton } from '@jovie/ui';
+import { useCallback, useEffect } from 'react';
 
 import {
   getPlatformIconMetadata,
@@ -50,11 +50,10 @@ function SidebarSuggestionItem({
   readonly onClick: () => void;
 }) {
   const iconMeta = getPlatformIconMetadata(option.icon);
-  const iconHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
+  const iconHex = iconMeta?.hex ? `#${iconMeta.hex}` : null;
 
   return (
-    <button
-      type='button'
+    <PlainButton
       className={cn(
         'flex w-full min-h-11 items-center gap-2.5 px-3 py-2.5 text-left text-app text-primary-token transition-[background-color,color] duration-subtle ease-subtle active:bg-surface-2',
         active ? 'bg-surface-2' : 'hover:bg-surface-2'
@@ -63,11 +62,18 @@ function SidebarSuggestionItem({
       onClick={onClick}
     >
       <span
-        className='flex h-6 w-6 shrink-0 items-center justify-center rounded-md'
-        style={{
-          backgroundColor: iconHex,
-          color: getContrastTextOnBrand(iconHex),
-        }}
+        className={cn(
+          'flex h-6 w-6 shrink-0 items-center justify-center rounded-md',
+          !iconHex && 'bg-surface-2 text-secondary-token'
+        )}
+        style={
+          iconHex
+            ? {
+                backgroundColor: iconHex,
+                color: getContrastTextOnBrand(iconHex),
+              }
+            : undefined
+        }
       >
         <SocialIcon platform={option.icon} className='h-3.5 w-3.5' />
       </span>
@@ -78,7 +84,7 @@ function SidebarSuggestionItem({
           Enter
         </span>
       )}
-    </button>
+    </PlainButton>
   );
 }
 
@@ -110,6 +116,11 @@ export function SidebarLinkInput({
     chatEnabled: false,
     clearSignal: 0,
   });
+
+  // Focus the field when the row opens (the parent mounts this on demand).
+  useEffect(() => {
+    urlInputRef.current?.focus();
+  }, [urlInputRef]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -178,9 +189,7 @@ export function SidebarLinkInput({
         autoCapitalize='none'
         autoCorrect='off'
         autoComplete='off'
-        className='h-9 rounded-lg border-subtle bg-surface-0 text-app'
         aria-label='Add Link'
-        autoFocus
       />
 
       {shouldShowAutosuggest && (
@@ -206,8 +215,7 @@ export function SidebarLinkInput({
       )}
 
       {detectedLink?.isValid && (
-        <button
-          type='button'
+        <PlainButton
           onClick={handleAdd}
           className='mt-2 flex w-full items-center gap-2 rounded-md border border-subtle bg-surface-0 px-3 py-2 text-app transition-colors hover:bg-surface-1'
         >
@@ -221,7 +229,7 @@ export function SidebarLinkInput({
           <span className='ml-auto shrink-0 text-app font-caption text-accent'>
             Add
           </span>
-        </button>
+        </PlainButton>
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -32,7 +33,7 @@ export function VoiceDemoVisual({ className }: Readonly<VoiceDemoVisualProps>) {
       data-testid='voice-demo-visual'
     >
       <div className='mb-4 text-center'>
-        <p className='text-xs font-medium uppercase tracking-widest text-tertiary-token'>
+        <p className='text-xs font-medium tracking-widest text-tertiary-token'>
           Live demo
         </p>
         <p className='mt-1 text-sm text-secondary-token'>
@@ -56,7 +57,7 @@ export function VoiceDemoVisual({ className }: Readonly<VoiceDemoVisualProps>) {
         ))}
       </div>
 
-      <button
+      <PlainButton
         type='button'
         onClick={toggleDemo}
         className='focus-ring-themed mt-5 inline-flex items-center gap-2 rounded-full border border-subtle bg-panel px-5 py-2 text-sm font-medium text-primary-token transition-colors hover:bg-surface-1'
@@ -70,7 +71,7 @@ export function VoiceDemoVisual({ className }: Readonly<VoiceDemoVisualProps>) {
         ) : (
           <>Play 4s sample (your voice)</>
         )}
-      </button>
+      </PlainButton>
 
       <div className='mt-4 min-h-10 text-center text-xs text-secondary-token'>
         {isPlaying ? (

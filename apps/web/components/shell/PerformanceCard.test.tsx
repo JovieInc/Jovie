@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { PerformanceCard } from './PerformanceCard';
 
 describe('PerformanceCard', () => {
@@ -82,8 +83,23 @@ describe('PerformanceCard', () => {
         delta={-15}
       />
     );
-    // The delta block uses rose color for down
-    expect(container.innerHTML).toContain('rose-300');
+    // A drop in a higher-is-better metric reads as bad news.
+    expect(container.innerHTML).toContain('text-error-text');
+  });
+
+  it('reads a drop as good news when lower is better', () => {
+    const { container } = render(
+      <PerformanceCard
+        title='Skips'
+        metricLabel='skips'
+        pointsByRange={{ '7d': [10, 8, 6] }}
+        trend='down'
+        polarity='lower-is-better'
+        delta={-15}
+      />
+    );
+    expect(container.innerHTML).toContain('text-success-text');
+    expect(container.innerHTML).toContain('var(--color-success-text)');
   });
 
   it('falls back to the first surfaced range when initialRange is missing', () => {
@@ -110,5 +126,47 @@ describe('JOV-5466 token retire', () => {
       'utf8'
     );
     expect(source).not.toMatch(/--linear-app-/);
+  });
+
+  it('colours the trend with semantic tokens and keeps tabs axe-clean', async () => {
+    const props = {
+      title: 'Smart Link',
+      metricLabel: 'clicks',
+      pointsByRange: { '7d': [10, 12, 14], '30d': [8, 9, 12, 14] },
+      delta: 12,
+    };
+    const { container, rerender } = render(
+      <PerformanceCard {...props} trend='up' />
+    );
+    const up = screen.getByText('12%');
+    expect(up).toHaveClass('text-success-text');
+    expect(up.className).not.toMatch(/cyan/);
+    await expectNoA11yViolations(container);
+
+    rerender(<PerformanceCard {...props} trend='down' />);
+    const down = screen.getByText('12%');
+    expect(down).toHaveClass('text-error-text');
+    expect(down.className).not.toMatch(/rose/);
+
+    const tab = screen.getByRole('tab', { name: '30d' });
+    expect(tab).toHaveAttribute('type', 'button');
+    fireEvent.click(tab);
+    expect(tab).toHaveAttribute('aria-selected', 'true');
+    expect(tab).toHaveClass('ring-(--app-shell-border)');
+    expect(tab.className).not.toMatch(/white/);
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders without any series, axe-clean', async () => {
+    const { container } = render(
+      <PerformanceCard
+        title='Smart Link'
+        metricLabel='clicks'
+        pointsByRange={{}}
+        trend='flat'
+        delta={0}
+      />
+    );
+    await expectNoA11yViolations(container);
   });
 });

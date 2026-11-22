@@ -183,6 +183,9 @@ output/
 # QA swarm runtime artifacts (findings, remediation manifests, Eve queue)
 /.context/qa-swarm/
 
+# Design audit swarm runtime (read-only propose receipts)
+/.context/design-audit-swarm/
+
 # Journey scout reports + evidence (Production Journey Auditor)
 .context/journey-scout/
 

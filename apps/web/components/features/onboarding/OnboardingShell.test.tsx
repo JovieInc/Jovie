@@ -333,6 +333,10 @@ describe('OnboardingShell status', () => {
       .getByTestId('onboarding-sign-in-header')
       .closest('[data-onboarding-session]');
     expect(session).toHaveClass('flex', 'flex-col', 'min-h-0', 'flex-1');
+    // JOV-7771: the column is the room query the step rail yields to.
+    expect(session).toHaveClass('system-b-onboarding-session');
+    const rail = screen.getByTestId('onboarding-start-step-rail');
+    expect(session).toContainElement(rail);
   });
 
   it('uses the canonical compact icon button and keeps its accessible name without an icon', () => {
@@ -396,6 +400,7 @@ describe('OnboardingShell status', () => {
     builderState.current = {
       artist: null,
       artistConfirmed: false,
+      handleConfirmed: false,
       handle: 'avery',
       socialLinks: ['https://instagram.com/avery'],
     };

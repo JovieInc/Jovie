@@ -16,6 +16,7 @@ import {
   useRightPanel,
 } from '@/contexts/RightPanelContext';
 import { AdminPeopleRightPanelProvider } from '@/features/admin/AdminPeopleRightPanelProvider';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type {
   AdminContactRow,
   AdminContactStageMetrics,
@@ -341,5 +342,63 @@ describe('AdminContactsTable', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Yes' }));
     expect(onDecision).toHaveBeenCalledWith(item, 'yes');
     expect(humanize('dsp')).toBe('DSP artist identities');
+  });
+
+  it('keeps typed search and correction text and focus across rerenders', async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderTable();
+
+    const search = screen.getByRole('searchbox', { name: 'Search Contacts' });
+    await user.type(search, 'ari');
+    expect(search).toHaveValue('ari');
+    expect(search).toHaveFocus();
+
+    const onDecision = vi.fn(async () => {});
+    const item = certification.items[0]!;
+    rerender(
+      <EvidenceItemCard item={item} pending={false} onDecision={onDecision} />
+    );
+    const correction = screen.getByRole('textbox', {
+      name: 'Correct Display name',
+    });
+    await user.type(correction, 'Ari L.');
+    rerender(
+      <EvidenceItemCard
+        item={item}
+        pending={false}
+        active
+        onDecision={onDecision}
+      />
+    );
+    await user.keyboard('{Escape}');
+    expect(correction).toHaveValue('Ari L.');
+    expect(correction).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onDecision).toHaveBeenCalledWith(item, 'no', 'Ari L.');
+  });
+
+  it('has no accessibility violations with rows, filtered empty and evidence', async () => {
+    const { container, unmount } = renderTable();
+    await expectNoA11yViolations(container);
+    unmount();
+    const empty = renderTable({ rows: [], total: 0, search: 'zzz' });
+    expect(screen.getByText(/No contacts matching/)).toBeInTheDocument();
+    await expectNoA11yViolations(empty.container);
+    empty.unmount();
+    const evidence = render(
+      <EvidenceItemCard
+        item={certification.items[0]!}
+        pending={false}
+        onDecision={vi.fn(async () => {})}
+      />
+    );
+    await expectNoA11yViolations(evidence.container);
+  });
+
+  it('draws both fields with the Input atom at the dense size', () => {
+    renderTable();
+    const search = screen.getByRole('searchbox', { name: 'Search Contacts' });
+    expect(search.className).toContain('border-subtle');
+    expect(search.className).toContain('sm:h-7');
   });
 });

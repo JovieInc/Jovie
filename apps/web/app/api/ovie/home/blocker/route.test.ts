@@ -4,6 +4,7 @@ import { GET } from './route';
 const mocks = vi.hoisted(() => ({
   principal: vi.fn(),
   read: vi.fn(),
+  live: vi.fn(),
 }));
 
 vi.mock('@/lib/ovie/mcp/principal', () => ({
@@ -11,6 +12,7 @@ vi.mock('@/lib/ovie/mcp/principal', () => ({
 }));
 vi.mock('@/lib/ovie/company-state.server', () => ({
   readCompanyStateCache: mocks.read,
+  readLiveCompanyBlocker: mocks.live,
 }));
 
 const request = () => new Request('https://jov.ie/api/ovie/home/blocker');
@@ -62,8 +64,25 @@ describe('GET /api/ovie/home/blocker', () => {
     expect(mocks.read).toHaveBeenCalledWith({ track: false });
   });
 
-  it('is unavailable, never clear, when no snapshot is cached', async () => {
+  it('reads the blocker live when no snapshot is cached', async () => {
     mocks.read.mockResolvedValue(null);
+    mocks.live.mockResolvedValue({
+      blocker,
+      generatedAt: '2026-11-08T23:05:00.000Z',
+      source: 'live',
+    });
+    const response = await GET(request());
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      blocker,
+      generatedAt: '2026-11-08T23:05:00.000Z',
+      source: 'live',
+    });
+  });
+
+  it('is unavailable, never clear, when no snapshot is cached and the live read fails', async () => {
+    mocks.read.mockResolvedValue(null);
+    mocks.live.mockRejectedValue(new Error('company_state_live_timeout'));
     const response = await GET(request());
     expect(response.status).toBe(503);
   });

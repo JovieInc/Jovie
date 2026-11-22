@@ -18,15 +18,6 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/atoms/AppIconButton.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
     "apps/web/components/atoms/ArtworkFallbackTile.tsx": [
       "ds-owner",
       "tokens",
@@ -90,15 +81,6 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/atoms/CircleIconButton.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
     "apps/web/components/atoms/CopyToggleIcon.tsx": [
       "ds-owner",
       "tokens",
@@ -145,15 +127,6 @@
       "forced-caps"
     ],
     "apps/web/components/atoms/ImageWithFallback.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
-    "apps/web/components/atoms/InlineIconButton.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -685,15 +658,6 @@
       "forced-caps"
     ],
     "apps/web/components/features/home/MarketingScrollUnlock.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
-    "apps/web/components/features/home/ScrollRevealInit.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -2116,15 +2080,6 @@
       "forced-caps"
     ],
     "apps/web/components/molecules/drawer/DrawerButton.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
-    "apps/web/components/molecules/drawer/DrawerInlineIconButton.tsx": [
       "ds-owner",
       "tokens",
       "states",

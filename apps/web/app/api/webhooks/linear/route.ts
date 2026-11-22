@@ -36,6 +36,7 @@ import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { scheduleFleetRoomWebhook } from '@/lib/ovie/fleet-room.server';
+import { scheduleLinearIssueSnapshotRefresh } from '@/lib/ovie/linear-issue-snapshot.server';
 import { logger } from '@/lib/utils/logger';
 import { verifyLinearSignature } from '@/lib/webhooks/linear-signature';
 import {
@@ -487,6 +488,7 @@ export async function POST(request: NextRequest) {
 
     const payload = JSON.parse(body) as LinearWebhookPayload;
     scheduleFleetRoomWebhook(payload); // Ovie fleet room, after the response
+    scheduleLinearIssueSnapshotRefresh(payload); // Shipping page issue rows
 
     // Check freshness before an authoritative read. Lookup failures are reads,
     // never an ambiguous GitHub dispatch, and must leave the event retryable.

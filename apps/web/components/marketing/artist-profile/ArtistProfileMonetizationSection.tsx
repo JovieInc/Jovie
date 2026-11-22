@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import {
   ChevronLeft,
   ChevronRight,
@@ -237,18 +238,16 @@ export function ArtistProfileMonetizationSection({
             aria-label='Monetization Card Carousel'
             className='ap-monetization__scroller relative grid grid-cols-1 gap-3 overflow-visible px-5 pb-2 sm:flex sm:gap-4 sm:overflow-x-auto sm:overflow-y-hidden sm:overscroll-contain sm:scroll-smooth sm:snap-x sm:snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none] scrollbar-hide [&::-webkit-scrollbar]:hidden'
           >
-            <button
-              type='button'
+            <PlainButton
               onClick={() => {
                 scrollByDirection('next');
               }}
               className='ap-monetization__skip sr-only focus:not-sr-only focus:absolute focus:top-4 focus:z-30'
             >
               Browse monetization cards
-            </button>
+            </PlainButton>
             <div className='ap-monetization__nav pointer-events-none absolute top-5 z-20 hidden items-center gap-2 lg:flex'>
-              <button
-                type='button'
+              <PlainButton
                 onClick={() => {
                   scrollByDirection('prev');
                 }}
@@ -260,9 +259,8 @@ export function ArtistProfileMonetizationSection({
                 aria-label='Scroll Monetization Left'
               >
                 <ChevronLeft className='h-4 w-4' />
-              </button>
-              <button
-                type='button'
+              </PlainButton>
+              <PlainButton
                 onClick={() => {
                   scrollByDirection('next');
                 }}
@@ -275,7 +273,7 @@ export function ArtistProfileMonetizationSection({
                 aria-label='Scroll Monetization Right'
               >
                 <ChevronRight className='h-4 w-4' />
-              </button>
+              </PlainButton>
             </div>
             {cards.map((card, index) => (
               <MonetizationCard

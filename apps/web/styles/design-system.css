@@ -327,6 +327,8 @@
     );
   --profile-stage-glow-a: rgba(255, 255, 255, 0.1);
   --profile-stage-glow-b: rgba(38, 42, 54, 0.42);
+  /* Cover-lit accent hairline (JOV-14241); overridden by profileAccent CSS vars. */
+  --profile-cover-accent-line: rgba(17, 175, 255, 0.55);
   /* Layout shell stage layers (PublicProfileLayoutShell). Declared here, on
      the shell's own element, so --profile-stage-glow-a resolves against the
      artist accent the shell sets inline. */
@@ -1202,12 +1204,18 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
      Without the flag (the default, Tim 2026-09-26) none of this applies and
      the compact shell keeps its base 430px phone-column width, centered on
      the profile stage like the md card. */
+  /* JOV-11623 + Smooth CLS: top-align here for every frame modifier
+     (--compact on SSR, --desktop after hydration). SSR keeps
+     data-layout=compact until JS marks desktop; waiting for that flip
+     jumped MAIN ~58px (y 82→24, CLS ~0.028). Mode switches stay
+     height-stable because both states share this alignment. */
   .profile-viewport--desktop-surface:not(.profile-viewport--embedded)
     .public-profile-layout-frame {
     max-width: min(100%, var(--ds-public-content-max));
     padding-left: max(var(--page-pad), env(safe-area-inset-left));
     padding-right: max(var(--page-pad), env(safe-area-inset-right));
     padding-block: clamp(16px, 2vw, 24px);
+    align-items: flex-start;
   }
 
   .profile-viewport--desktop-surface:not(.profile-viewport--embedded)
@@ -1233,12 +1241,6 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   .profile-viewport--desktop-surface:not(.profile-viewport--embedded)
     .public-profile-layout-desktop-shell {
     display: flex;
-  }
-
-  /* JOV-11623: top-align the desktop stage across mode switches. */
-  .profile-viewport--desktop-surface:not(.profile-viewport--embedded)
-    .public-profile-layout-frame--desktop {
-    align-items: flex-start;
   }
 }
 
@@ -4629,4 +4631,9 @@ html:not(.dark) .smart-link-powered-by {
   .profile-drawer-floating {
     border-radius: var(--profile-drawer-radius-desktop);
   }
+}
+
+/* JOV-14241 cover-lit accent line placement (tokenized; no arbitrary top-[] in TSX). */
+.profile-cover-accent-line {
+  top: 22%;
 }
