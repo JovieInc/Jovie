@@ -3,6 +3,8 @@ import {
   type CompanyStateReadback,
   readCompanyStateCache,
 } from '@/lib/ovie/company-state.server';
+import { readSummerChartCard } from '@/lib/ovie/summer-chart-cards.server';
+import { extractSummerChartDirectives } from '@/lib/ovie/summer-chart-directives';
 import { ovieSummerTurnId } from '@/lib/ovie/summer-conversation';
 import type { SummerFailureHop } from '@/lib/ovie/summer-failure';
 import { resolveSummerEveCallerOrigin } from '@/lib/ovie/summer-production-pin';
@@ -169,7 +171,8 @@ function failureHopFor(
 
 export function createEveSummerSpeaker(
   fetchShadow = fetchSummerShadow,
-  readCompanyState = readCompanyStateCache
+  readCompanyState = readCompanyStateCache,
+  readChartCard = readSummerChartCard
 ): SummerSpeaker {
   return {
     id: 'summer',
@@ -374,7 +377,21 @@ export function createEveSummerSpeaker(
           yield { type: 'error', state: 'failure', hop: 'summer_turn_failed' };
           return;
         }
-        yield { type: 'text-delta', text: result.responseText };
+        // A `[[chart:<metric>]]` line asks Ovie for an inline chart built
+        // from live, registered sources; the line itself never reaches chat.
+        const reply = extractSummerChartDirectives(result.responseText);
+        if (reply.text) yield { type: 'text-delta', text: reply.text };
+        for (const metric of reply.metrics) {
+          const card = await readChartCard(metric);
+          yield {
+            type: 'tool',
+            tool: 'get_company_metric_chart',
+            ok: true,
+            receiptId: `${result.turnId}:chart:${metric}`,
+            summary: card.title,
+            data: card,
+          };
+        }
       } catch (error) {
         yield {
           type: 'error',

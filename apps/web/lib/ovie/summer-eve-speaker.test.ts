@@ -76,6 +76,54 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('Ovie speaks through durable Eve Summer', () => {
+  it('turns a chart line into an inline chart card from live data, never raw markup', async () => {
+    fetchShadow.mockReset();
+    fetchShadow
+      .mockResolvedValueOnce(
+        eveResponse({ ok: true, accepted: { eventId } }, { status: 202 })
+      )
+      .mockResolvedValueOnce(
+        eveResponse({
+          ok: true,
+          result: {
+            ...result,
+            responseText: 'Still $0 MRR.\n\n[[chart:revenue]]',
+          },
+        })
+      );
+    const card = {
+      schema: 'summer.ops-card.v1',
+      kind: 'revenue',
+      title: 'Revenue',
+      state: 'fresh',
+      observedAt: '2026-11-22T02:00:00.000Z',
+      facts: [],
+      series: { label: 'MRR', points: [{ label: 'Now', value: 0 }] },
+    } as const;
+    const readChartCard = vi.fn(async () => card);
+    const events = [];
+    for await (const e of createEveSummerSpeaker(
+      fetchShadow,
+      async () => null,
+      readChartCard
+    ).speak(input))
+      events.push(e);
+    expect(events).toContainEqual({
+      type: 'text-delta',
+      text: 'Still $0 MRR.',
+    });
+    expect(events).toContainEqual({
+      type: 'tool',
+      tool: 'get_company_metric_chart',
+      ok: true,
+      receiptId: 'turn_1:chart:revenue',
+      summary: 'Revenue',
+      data: card,
+    });
+    expect(readChartCard).toHaveBeenCalledWith('revenue');
+    expect(JSON.stringify(events)).not.toContain('[[chart:');
+  });
+
   it('delivers the matching terminal answer and receipt through canonical persistence', async () => {
     const store = new MemoryOperatingStore();
     const events = [];
