@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -47,6 +47,19 @@ async function tempDir(): Promise<string> {
   return path;
 }
 
+/** Unique per-test artifact paths — never fixed /tmp literals (hermetic-ci). */
+function fixtureArtifactRefs(): {
+  readonly profileHtml: string;
+  readonly buildInfo: string;
+} {
+  const path = mkdtempSync(join(tmpdir(), 'dogfood-bind-'));
+  directories.push(path);
+  return {
+    profileHtml: join(path, 'profile.html'),
+    buildInfo: join(path, 'build.json'),
+  };
+}
+
 describe('bind-public-profile-dogfood-feed guards', () => {
   it('canonicalizes only https://jov.ie and rejects other origins', () => {
     expect(canonicalizeOrigin('https://jov.ie/')).toBe('https://jov.ie');
@@ -85,10 +98,7 @@ describe('bind-public-profile-dogfood-feed guards', () => {
         httpStatus: 200,
         htmlSha256: 'abc1234567890def',
         htmlBytes: 12,
-        artifactRefs: {
-          profileHtml: '/tmp/profile.html',
-          buildInfo: '/tmp/build.json',
-        },
+        artifactRefs: fixtureArtifactRefs(),
         buildInfo: {
           commitSha: SHA,
           deploymentId: DEPLOY,
@@ -124,10 +134,7 @@ describe('bind-public-profile-dogfood-feed guards', () => {
       httpStatus: 200,
       htmlSha256: 'abc1234567890def',
       htmlBytes: 12,
-      artifactRefs: {
-        profileHtml: '/tmp/profile.html',
-        buildInfo: '/tmp/build.json',
-      },
+      artifactRefs: fixtureArtifactRefs(),
       buildInfo: {
         commitSha: SHA,
         deploymentId: DEPLOY,
@@ -259,10 +266,7 @@ describe('honest HTTP probe receipt', () => {
       httpStatus: 200,
       htmlSha256: 'abc1234567890def',
       htmlBytes: 12,
-      artifactRefs: {
-        profileHtml: '/tmp/profile.html',
-        buildInfo: '/tmp/build.json',
-      },
+      artifactRefs: fixtureArtifactRefs(),
       buildInfo: {
         commitSha: SHA,
         deploymentId: DEPLOY,
@@ -424,10 +428,7 @@ describe('honest public-profile subject registration', () => {
       httpStatus: 200,
       htmlSha256: 'abc1234567890def',
       htmlBytes: 12,
-      artifactRefs: {
-        profileHtml: '/tmp/profile.html',
-        buildInfo: '/tmp/build.json',
-      },
+      artifactRefs: fixtureArtifactRefs(),
       buildInfo: {
         commitSha: SHA,
         deploymentId: DEPLOY,
