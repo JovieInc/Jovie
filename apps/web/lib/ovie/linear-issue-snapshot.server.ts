@@ -1,10 +1,12 @@
 import 'server-only';
 
 import { after } from 'next/server';
+import { isTestAuthBypassEnabled } from '@/lib/auth/test-mode';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { createLiveFounderWorkReader } from '@/lib/ovie/mcp/founder-work';
 import { getRedis } from '@/lib/redis';
+import { linearIssueFixtureDeps } from './linear-issue-snapshot.fixture';
 import type { LinearIssueRow } from './linear-issue-task-view';
 
 export const LINEAR_ISSUE_SNAPSHOT_KEY = 'ovie:linear-issues:v1';
@@ -45,6 +47,19 @@ const liveDeps = (): LinearIssueSnapshotDeps => ({
     ),
   now: () => new Date(),
 });
+
+/**
+ * Deps for the page read. In the gated E2E test mode (hard-off on Vercel
+ * preview and production, see `isTestAuthBypassEnabled`) the visual suite gets
+ * a fixed issue set stamped from the clock, so it reads as fresh. Everywhere
+ * else this is the live Redis and Linear read, and a failed read still renders
+ * as unreachable.
+ */
+export function resolveLinearIssueSnapshotDeps(
+  testMode: boolean = isTestAuthBypassEnabled()
+): LinearIssueSnapshotDeps {
+  return testMode ? linearIssueFixtureDeps() : liveDeps();
+}
 
 export function decodeLinearIssueSnapshot(
   value: unknown
@@ -126,7 +141,7 @@ export function refreshLinearIssueSnapshot(
 
 /** Page read: serve a fresh snapshot, else one deduped live read. */
 export async function getLinearIssueSnapshot(
-  deps: LinearIssueSnapshotDeps = liveDeps()
+  deps: LinearIssueSnapshotDeps = resolveLinearIssueSnapshotDeps()
 ): Promise<LinearIssueSnapshotResult> {
   const stored = await readStored(deps.redis);
   if (stored && isLinearIssueSnapshotFresh(stored, deps.now())) {

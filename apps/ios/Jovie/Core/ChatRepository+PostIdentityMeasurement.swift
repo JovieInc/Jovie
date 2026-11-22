@@ -1,4 +1,5 @@
 import Foundation
+import JovieKit
 
 extension ChatRepository {
   func notePostIdentityFirstSendStarted(isRetry: Bool, hadPriorUserMessages: Bool) {

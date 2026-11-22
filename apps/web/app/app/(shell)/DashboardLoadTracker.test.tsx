@@ -5,14 +5,26 @@ import { expectNoA11yViolations } from '@/tests/utils/a11y';
 const mocks = vi.hoisted(() => ({
   track: vi.fn(),
   consumeSignupFirstValue: vi.fn(),
+  peekSignupFirstValuePending: vi.fn(() => false),
+  watchFirstDashboardReady: vi.fn(() => () => {}),
 }));
 
 vi.mock('@/lib/analytics', () => ({ track: mocks.track }));
 vi.mock('@/lib/analytics/signup-funnel-client', () => ({
   consumeSignupFirstValue: mocks.consumeSignupFirstValue,
+  peekSignupFirstValuePending: mocks.peekSignupFirstValuePending,
+}));
+vi.mock('@/lib/monitoring/first-dashboard-ready', async importOriginal => ({
+  ...(await importOriginal<
+    typeof import('@/lib/monitoring/first-dashboard-ready')
+  >()),
+  watchFirstDashboardReady: mocks.watchFirstDashboardReady,
 }));
 
-import { DashboardLoadTracker } from './DashboardLoadTracker';
+import {
+  DashboardLoadTracker,
+  resetFirstDashboardProbeForTests,
+} from './DashboardLoadTracker';
 
 const KEY = 'jovie:dashboard_loaded:user-1';
 
@@ -21,6 +33,9 @@ describe('DashboardLoadTracker', () => {
     sessionStorage.clear();
     mocks.track.mockClear();
     mocks.consumeSignupFirstValue.mockClear();
+    mocks.peekSignupFirstValuePending.mockReset().mockReturnValue(false);
+    mocks.watchFirstDashboardReady.mockClear();
+    resetFirstDashboardProbeForTests();
   });
 
   afterEach(() => {
@@ -83,5 +98,37 @@ describe('DashboardLoadTracker', () => {
     expect(mocks.track).toHaveBeenCalledTimes(1);
     expect(container).toBeEmptyDOMElement();
     await expectNoA11yViolations(container);
+  });
+
+  it('starts the first-dashboard probe once per hard load', async () => {
+    mocks.peekSignupFirstValuePending.mockReturnValue(true);
+    const { rerender, unmount } = render(
+      <DashboardLoadTracker pathname='/app' userId='user-1' />
+    );
+    await vi.waitFor(() =>
+      expect(mocks.watchFirstDashboardReady).toHaveBeenCalledTimes(1)
+    );
+    expect(mocks.watchFirstDashboardReady).toHaveBeenCalledWith(
+      expect.objectContaining({ newAccount: true })
+    );
+    // The flag is read before the first-value marker is consumed.
+    expect(
+      mocks.peekSignupFirstValuePending.mock.invocationCallOrder[0]
+    ).toBeLessThan(mocks.consumeSignupFirstValue.mock.invocationCallOrder[0]);
+
+    rerender(<DashboardLoadTracker pathname='/app/chat' userId='user-1' />);
+    unmount();
+    render(<DashboardLoadTracker pathname='/app' userId='user-1' />);
+    await vi.dynamicImportSettled();
+    expect(mocks.watchFirstDashboardReady).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the probe on a reload or back-forward load', async () => {
+    vi.spyOn(performance, 'getEntriesByType').mockReturnValue([
+      { type: 'reload' } as unknown as PerformanceNavigationTiming,
+    ]);
+    render(<DashboardLoadTracker pathname='/app' userId='user-1' />);
+    await vi.dynamicImportSettled();
+    expect(mocks.watchFirstDashboardReady).not.toHaveBeenCalled();
   });
 });

@@ -77,9 +77,6 @@
   "apps/web/components/features/admin/capacity/CapacityBoard.tsx": {
     "billing_claim": 3
   },
-  "apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.tsx": {
-    "trial_claim": 1
-  },
   "apps/web/components/features/dashboard/organisms/jovie-work-feed/JovieWorkFeed.tsx": {
     "trial_claim": 1
   },

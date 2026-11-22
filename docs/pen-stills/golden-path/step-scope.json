@@ -1,0 +1,107 @@
+{
+  "schema": "jovie.golden-path-step-scope/v1",
+  "note": "What each Golden Path step's certification depends on (JOV-14402). A step's scope is the import closure of its cert screens' pages (docs/design-system/cert-screens.json) and of these extra pages and routes, plus every file under its routes. A release that changes nothing in a step's scope carries that step's certification forward; a change to anything in global re-certifies every step. scripts/lib/golden-path-step-scope.mjs reads this file and fails closed: a path it cannot place re-certifies every step.",
+  "steps": {
+    "landing": {
+      "screens": ["landing/homepage"],
+      "pages": [],
+      "routes": ["apps/web/app/api/health/build-info/"]
+    },
+    "signup-signin": {
+      "screens": ["signup-signin/signin", "signup-signin/request-access"],
+      "pages": ["apps/web/app/(auth)/signup/page.tsx"],
+      "routes": [
+        "apps/web/app/(auth)/",
+        "apps/web/app/api/auth/",
+        "apps/web/app/api/waitlist/"
+      ]
+    },
+    "claim": {
+      "screens": ["claim/claim"],
+      "pages": [],
+      "routes": [
+        "apps/web/app/claim/",
+        "apps/web/app/api/handle/check/",
+        "apps/web/app/api/onboarding/claim/"
+      ]
+    },
+    "onboarding": {
+      "screens": ["onboarding/start"],
+      "pages": [],
+      "routes": [
+        "apps/web/app/(dynamic)/start/",
+        "apps/web/app/api/onboarding/",
+        "apps/web/app/api/chat/"
+      ]
+    },
+    "chat": {
+      "screens": ["chat/app-chat"],
+      "pages": [],
+      "routes": ["apps/web/app/app/(shell)/chat/", "apps/web/app/api/chat/"]
+    },
+    "public-profile": {
+      "screens": ["public-profile/profile"],
+      "pages": [],
+      "routes": ["apps/web/app/api/audience/visit/"]
+    },
+    "smartlink": {
+      "screens": ["smartlink/release"],
+      "pages": [],
+      "routes": ["apps/web/app/r/"]
+    },
+    "checkout": {
+      "screens": ["checkout/pricing", "checkout/billing-success"],
+      "pages": ["apps/web/app/onboarding/checkout/page.tsx"],
+      "routes": [
+        "apps/web/app/onboarding/checkout/",
+        "apps/web/app/api/billing/",
+        "apps/web/app/api/stripe/"
+      ]
+    }
+  },
+  "global": {
+    "entries": [
+      "apps/web/proxy.ts",
+      "apps/web/instrumentation.ts",
+      "apps/web/instrumentation-client.ts",
+      "apps/web/sentry.server.config.ts",
+      "apps/web/sentry.edge.config.ts",
+      "apps/web/scripts/stage-runtime-data.mjs",
+      "apps/web/scripts/write-profile-mode-prerender-set.mjs",
+      "apps/web/scripts/ensure-sharp-runtime-traces.mjs",
+      "apps/web/scripts/sync-standalone-assets.mjs",
+      "apps/web/scripts/fix-standalone-loopback-hostname.mjs"
+    ],
+    "files": [
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "tsconfig.json",
+      "vercel.json",
+      "turbo.json",
+      ".nvmrc",
+      ".node-version",
+      ".npmrc",
+      ".vercelignore",
+      "apps/web/next.config.js",
+      "apps/web/next-sitemap.config.js",
+      "apps/web/middleware.ts",
+      "apps/web/proxy.ts",
+      "apps/web/tsconfig.json",
+      "apps/web/tailwind.config.js",
+      "apps/web/postcss.config.js",
+      "apps/web/vercel.json",
+      "apps/web/drizzle.config.ts",
+      "apps/web/playwright.config.ts"
+    ],
+    "prefixes": ["apps/web/drizzle/", "apps/web/lib/env"],
+    "note": "Any package.json anywhere is global too, and so is any path under packages/ except packages/ui, which import closure reaches by name. The certification producer (producerFiles in scripts/lib/golden-path-cert-reuse.mjs) is global."
+  },
+  "producers": {
+    "note": "The certification producer runs from the newest main checkout, not from the served build, so it is diffed from the step's last exercised SHA to that checkout. Its scripts come from producerFiles in scripts/lib/golden-path-cert-reuse.mjs; these browser specs write the step evidence. A change to any of them, this file or cert-screens.json re-certifies every step.",
+    "entries": [
+      "apps/web/tests/e2e/smoke-prod-auth.spec.ts",
+      "apps/web/tests/e2e/prod-cert-start-chat.spec.ts",
+      "apps/web/tests/e2e/canary-claim-checkout.spec.ts"
+    ]
+  }
+}

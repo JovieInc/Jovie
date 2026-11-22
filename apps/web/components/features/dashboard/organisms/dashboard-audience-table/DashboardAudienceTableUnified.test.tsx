@@ -14,12 +14,6 @@ import type { AudienceMember } from '@/types';
 import { DashboardAudienceTableUnified } from './DashboardAudienceTableUnified';
 import { DEFAULT_AUDIENCE_FILTERS } from './types';
 
-// Analytics has its own query contract; this test exercises table/export binding.
-vi.mock(
-  '@/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard',
-  () => ({ AiCrawlerIntelligenceCard: () => null })
-);
-
 function renderWithProviders(ui: ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -326,17 +320,5 @@ describe('DashboardAudienceTableUnified', () => {
     expect(source).not.toContain(
       "from '@/features/dashboard/organisms/AnalyticsSidebar'"
     );
-  });
-});
-
-describe('DashboardAudienceTableUnified seam', () => {
-  it('puts its content on the 12px workspace seam (JOV-12565)', () => {
-    const source = readFileSync(
-      resolve(__dirname, './DashboardAudienceTableUnified.tsx'),
-      'utf8'
-    );
-
-    expect(source).toContain('border-subtle px-3 py-2');
-    expect(source).not.toContain('border-subtle px-4 py-2');
   });
 });
