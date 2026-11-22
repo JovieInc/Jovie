@@ -1,10 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import { and, eq, inArray } from 'drizzle-orm';
-/* eslint-disable no-restricted-imports -- Integration test requires full schema access */
-import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createProfileForExistingUser } from '@/app/onboarding/actions/profile-setup';
 import { createManageTasksTool } from '@/lib/chat/tools/tasks';
-import type * as schema from '@/lib/db/schema';
+import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { tasks } from '@/lib/db/schema/tasks';
@@ -31,23 +30,10 @@ vi.mock('@/app/app/(shell)/dashboard/requireProfileId', () => ({
   requireProfileId: vi.fn(async () => session.profileId),
 }));
 
-type TestDb = NeonDatabase<typeof schema>;
-
 setupDatabaseBeforeAll();
 
-let db: TestDb;
 const createdUserIds: string[] = [];
 const createdProfileIds: string[] = [];
-
-beforeAll(() => {
-  const connection = (globalThis as typeof globalThis & { db?: TestDb }).db;
-  if (!connection) {
-    throw new Error(
-      'Database connection not initialized for chat task outcome integration tests'
-    );
-  }
-  db = connection;
-});
 
 afterEach(async () => {
   if (createdProfileIds.length > 0) {
@@ -77,7 +63,7 @@ afterEach(async () => {
 });
 
 async function createArtist(): Promise<string> {
-  const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const suffix = randomUUID().slice(0, 12);
   const [user] = await db
     .insert(users)
     .values({

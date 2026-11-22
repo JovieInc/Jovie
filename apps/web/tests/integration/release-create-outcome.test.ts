@@ -1,10 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import { eq, inArray } from 'drizzle-orm';
-/* eslint-disable no-restricted-imports -- Integration test requires full schema access */
-import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createProfileForExistingUser } from '@/app/onboarding/actions/profile-setup';
 import { createReleaseTool } from '@/lib/ai/tools/create-release';
-import type * as schema from '@/lib/db/schema';
+import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
@@ -29,23 +28,10 @@ vi.mock('@/lib/cache/releases', () => ({
   invalidateReleaseCaches: vi.fn(),
 }));
 
-type TestDb = NeonDatabase<typeof schema>;
-
 setupDatabaseBeforeAll();
 
-let db: TestDb;
 const createdUserIds: string[] = [];
 const createdProfileIds: string[] = [];
-
-beforeAll(() => {
-  const connection = (globalThis as typeof globalThis & { db?: TestDb }).db;
-  if (!connection) {
-    throw new Error(
-      'Database connection not initialized for release outcome integration tests'
-    );
-  }
-  db = connection;
-});
 
 afterEach(async () => {
   if (createdProfileIds.length > 0) {
@@ -75,7 +61,7 @@ afterEach(async () => {
 });
 
 async function createArtist(): Promise<{ userId: string; profileId: string }> {
-  const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const suffix = randomUUID().slice(0, 12);
   const [user] = await db
     .insert(users)
     .values({
