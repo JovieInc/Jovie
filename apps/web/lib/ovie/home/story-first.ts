@@ -15,6 +15,7 @@ import {
 } from '@/lib/home-loop/contract';
 import type { DeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import { movingForBlocker } from './blocker-work';
+import { shortTitle, stepLabel } from './bottleneck-copy';
 import type { CompanyBlocker } from './company-blocker';
 import type { OvieCompanyTile } from './company-tiles';
 import {
@@ -92,14 +93,6 @@ export const STORY_FIRST_BOARD_STAGES = [
   'tested',
   'merging',
 ] as const satisfies readonly OvieShipStage[];
-
-const STEP_EYEBROW: Readonly<Record<string, string>> = {
-  public_profile: 'Profile',
-  homepage_entry: 'Homepage',
-  onboarding_auth_claim: 'Claim',
-  checkout_payment_entitlement: 'Checkout',
-  activation_dashboard: 'Activation',
-};
 
 /** Drop a trailing " (ID)" or leading "ID: " when it repeats the identifier. */
 export function stripIssueId(identifier: string, title: string): string {
@@ -292,41 +285,6 @@ export function buildStoryFirstGlance(input: {
   };
 
   return [shipping, revenue, usersPulse];
-}
-
-function stepLabel(step: string): string {
-  const labeled = STEP_EYEBROW[step];
-  if (labeled) return labeled;
-  return step
-    .split('_')
-    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
-
-/** Never assert a block the evidence doesn't prove (Tim, 2026-11-22). */
-export const UNPROVEN_BOTTLENECK_TITLE = "We can't see the bottleneck yet";
-
-function shortTitle(blocker: CompanyBlocker): string {
-  // Only a failing certification or a measured funnel drop is proof (tone
-  // 'bad'). A missing or out-of-date measurement leaves it unconfirmed.
-  if (blocker.tone !== 'bad') return UNPROVEN_BOTTLENECK_TITLE;
-  if (blocker.kind === 'certification') {
-    const name =
-      blocker.step === 'checkout_payment_entitlement'
-        ? 'Checkout'
-        : blocker.step === 'homepage_entry'
-          ? 'Homepage entry'
-          : blocker.step === 'public_profile'
-            ? 'The public profile'
-            : blocker.step === 'onboarding_auth_claim'
-              ? 'Sign-up and claim'
-              : blocker.step === 'activation_dashboard'
-                ? 'First use after paying'
-                : stepLabel(blocker.step);
-    return `${name} is blocking revenue`;
-  }
-  // Funnel body already carries the measured detail — headline must differ.
-  return `${stepLabel(blocker.step)} is blocking revenue`;
 }
 
 /**
