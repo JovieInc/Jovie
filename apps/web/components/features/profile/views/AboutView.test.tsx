@@ -14,7 +14,7 @@ const bookingContact: PublicContact = {
 };
 
 describe('AboutView', () => {
-  it('forwards selected credits and contacts to the About destination', () => {
+  it('forwards contacts to About and keeps credits out of About (JOV-14241)', () => {
     render(
       <AboutView
         artist={PROFILE_STORY_ARTIST}
@@ -31,7 +31,7 @@ describe('AboutView', () => {
       />
     );
 
-    expect(screen.getByTestId('profile-about-credits')).toBeVisible();
+    expect(screen.queryByTestId('profile-about-credits')).toBeNull();
     expect(screen.getByTestId('profile-about-contacts')).toBeVisible();
     expect(screen.getByRole('link', { name: /Booking/ })).toHaveAttribute(
       'href',
@@ -39,7 +39,7 @@ describe('AboutView', () => {
     );
   });
 
-  it('omits credits and contact blocks when nothing is verified', () => {
+  it('omits contact blocks when nothing is verified', () => {
     render(<AboutView artist={PROFILE_STORY_ARTIST} />);
 
     expect(screen.queryByTestId('profile-about-credits')).toBeNull();

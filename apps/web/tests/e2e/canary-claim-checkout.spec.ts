@@ -15,6 +15,7 @@ import {
   getRequiredStripeTestContext,
   materializeTestCheckoutCompletion,
   postStripeWebhook,
+  vercelProtectionBypassHeaders,
 } from './helpers/stripe-helpers';
 import {
   certStep,
@@ -182,9 +183,16 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
         'checkout',
         'cone-checkout-launches-owned-context',
         async () => {
-          const start = await page.request.get('/claim/start?new=1', {
-            maxRedirects: 0,
-          });
+          // Use the live page origin (often jov.ie after OTP), not Playwright
+          // baseURL pinned to the protected exact deployment URL.
+          const liveOrigin = new URL(page.url()).origin;
+          const start = await page.request.get(
+            `${liveOrigin}/claim/start?new=1`,
+            {
+              maxRedirects: 0,
+              headers: vercelProtectionBypassHeaders(),
+            }
+          );
           expect(start.status()).toBe(307);
           const cookies = await page.context().cookies();
           expect(cookies.find(c => c.name === 'jv_claim_flow')?.value).toBe(
