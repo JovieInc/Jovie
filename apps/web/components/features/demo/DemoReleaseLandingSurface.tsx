@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { buttonVariants } from '@jovie/ui';
 import { useSearchParams } from 'next/navigation';
 import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import { providerConfig } from '@/app/app/(shell)/dashboard/releases/config';
@@ -53,11 +53,12 @@ export function DemoReleaseLandingSurface() {
                   </p>
                 </div>
                 <div className='mt-5 flex justify-center'>
-                  <Button asChild size='lg'>
-                    <a href={`/${ARTIST.handle}/${RELEASE.slug}/sounds`}>
-                      Use this sound
-                    </a>
-                  </Button>
+                  <a
+                    href={`/${ARTIST.handle}/${RELEASE.slug}/sounds`}
+                    className={buttonVariants({ size: 'lg' })}
+                  >
+                    Use this sound
+                  </a>
                 </div>
               </div>
             </div>
