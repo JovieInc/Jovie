@@ -124,8 +124,12 @@ describe('OvieShippingStateCard (colocated)', () => {
     expect(panel()).toHaveAttribute('role', 'status');
     expect(panel()).toHaveAttribute('aria-label', 'Ubuntu Shipping State');
     expect(panel()).toHaveAttribute('data-truth', 'unknown');
-    expect(screen.getByText('No successful source yet')).toBeInTheDocument();
-    expect(screen.getByText('Lanes feed not measured')).toBeInTheDocument();
+    expect(screen.getByTestId('hud-shipping-truth')).toHaveTextContent(
+      'Syncing'
+    );
+    expect(
+      screen.getByTestId('hud-delivery-metrics-syncing')
+    ).toHaveTextContent('Some signals are still syncing.');
     await expectNoA11yViolations(container);
   });
 
@@ -137,9 +141,8 @@ describe('OvieShippingStateCard (colocated)', () => {
     expect(screen.getByText('Fresh')).toBeInTheDocument();
     expect(panel()).toHaveAttribute('data-revision', 'rev-4');
     expect(
-      screen.getByText('61 harness-failed runs in 24h')
-    ).toBeInTheDocument();
-    expect(screen.getByText('Capacity source gap')).toBeInTheDocument();
+      screen.queryByText('Lanes feed not measured')
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId('hud-delivery-metrics')).toHaveTextContent(
       '862 (+283% WoW)'
     );
@@ -156,11 +159,13 @@ describe('OvieShippingStateCard (colocated)', () => {
       expect(panel()).toHaveAttribute('data-truth', 'unauthorized')
     );
     expect(screen.getByText('Unauthorized')).toBeInTheDocument();
+    const metrics = screen.queryByTestId('hud-delivery-metrics');
     expect(
-      screen
-        .getByTestId('hud-delivery-metrics')
-        .querySelectorAll('[data-measured="unknown"]').length
-    ).toBeGreaterThan(0);
+      metrics?.querySelectorAll('[data-measured="unknown"]').length ?? 0
+    ).toBe(0);
+    expect(
+      screen.getByTestId('hud-delivery-metrics-syncing')
+    ).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 
@@ -192,9 +197,9 @@ describe('OvieShippingStateCard (colocated)', () => {
     await waitFor(() =>
       expect(panel()).toHaveAttribute('data-truth', 'degraded')
     );
-    const detail = screen.getByTestId('hud-shipping-state-detail');
-    expect(detail).toHaveTextContent('GitHub GraphQL returned 502');
-    expect(detail).toHaveTextContent('Partial source');
+    expect(
+      screen.getByTestId('hud-delivery-metrics-syncing')
+    ).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 
