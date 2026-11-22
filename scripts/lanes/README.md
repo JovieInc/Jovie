@@ -448,7 +448,15 @@ The same minute tick schedules `yc_corpus.py refresh` at most daily. Each run ro
 40 public YC Library/blog/YouTube records, respects robots, writes metadata, a bounded excerpt and, for
 YC Library talks, the full embedded transcript (`yc_transcript.py`, internal retrieval only, never
 republished) into the existing GBrain store, and content-hash skips unchanged source and derived-playbook
-pages. Bumping `yc_transcript.RENDER` re-fetches every stored page past ETag/304, up to 200 a run. Refresh
+pages. Bumping `yc_transcript.RENDER` re-fetches every stored page past ETag/304, up to 200 a run.
+`yc_youtube.py` adds the whole YC channel: with `YOUTUBE_DATA_API_KEY` in the lane env or
+`~/.config/jovie-lanes/youtube.env` it lists every upload weekly; without one it reads the public uploads
+playlist page (the newest ~100, kept and merged week to week, `youtubeCatalog.status: keyless-newest-100`),
+because older uploads load only through YouTube's internal browse API, which robots.txt closes. It reads each video's published caption track the
+way a browser does, only where youtube.com's robots.txt allows, at most 150 a run. A video is written once
+it has had its caption attempt; Library-covered videos are skipped without a fetch. A discovery, spawn
+or GBrain write failure, or three days without a finished run, raises the doctor's `yc-corpus-refresh`
+alert, which opens a repair issue. Refresh
 health is recorded under `ycCorpus` in `tick.json`; it never silently converts an outage into a miss.
 A release self-test (`LANES_SELFTEST`) never schedules the refresh, and its default fetch and `gbrain`
 helpers refuse to run there; every self-test process carries a per-run `JOVIE_SELFTEST_RUN` marker and

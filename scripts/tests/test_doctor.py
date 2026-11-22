@@ -632,6 +632,23 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("8h ago", alerts["no-landing"])
         self.assertIn("Boom", alerts["tick-error"])
 
+    def test_yc_corpus_refresh_failures_open_a_repair_alert(self):
+        def judged(corpus=None, **tick):
+            return doctor.judge(obs(tick={"at": "x", "unhealthy": [], "error": None, **tick,
+                                          **({"ycCorpus": corpus} if corpus else {})}))
+        healthy = {"status": "current", "lastRun": {"status": "ok", "at": doctor.epoch_iso(1_000_000 - 3600)}}
+        self.assertNotIn("yc-corpus-refresh", judged(healthy))
+        self.assertNotIn("yc-corpus-refresh", judged({"status": "not-owner", "owner": "gem"}))
+        page_miss = {"status": "current", "lastRun": {"status": "failed", "at": doctor.epoch_iso(1_000_000 - 3600),
+                                                      "failures": ["https://example.test/a: URLError: timed out"]}}
+        self.assertNotIn("yc-corpus-refresh", judged(page_miss))  # one page retries next run
+        broken = {"status": "current", "lastRun": {"status": "failed", "at": doctor.epoch_iso(1_000_000 - 3600),
+                                                   "failures": ["discovery: RuntimeError: YC library sitemap returned 503"]}}
+        self.assertIn("sitemap returned 503", judged(broken)["yc-corpus-refresh"])
+        stale = {"status": "current", "lastRun": {"status": "ok", "at": doctor.epoch_iso(1_000_000 - 4 * 86400)}}
+        self.assertIn("last run 96h ago", judged(stale)["yc-corpus-refresh"])
+        self.assertIn("Boom", judged(ycCorpusError="RuntimeError: Boom")["yc-corpus-refresh"])
+
     def test_repairs_spent_without_work_name_their_infrastructure_causes(self):
         quiet = doctor.judge(obs(noWorkRepairs24h={"target-state-unavailable": doctor.NO_WORK_REPAIR_ALERT - 1}))
         self.assertNotIn("repairs-without-work", quiet)
