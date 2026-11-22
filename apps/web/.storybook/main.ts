@@ -244,6 +244,10 @@ const config: StorybookConfig = {
           replacement: require.resolve('./onboarding-actions-mock.ts'),
         },
         {
+          find: '@/app/onboarding/actions/upgrade-offer',
+          replacement: require.resolve('./onboarding-actions-mock.ts'),
+        },
+        {
           find: '@/app/onboarding/actions/enrich-profile',
           replacement: require.resolve('./enrich-profile-mock.ts'),
         },
