@@ -46,7 +46,7 @@ export function IconBtn({
         data-testid={testId}
         className={cn(
           // Circle at every state; fill and border appear on hover (icon-button rule).
-          'h-7 w-7 grid place-items-center rounded-full border border-transparent transition-[background-color,color,border-color] duration-subtle ease-subtle focus-ring-themed hover:border-subtle',
+          'h-7 w-7 grid place-items-center rounded-full border border-transparent transition-colors duration-subtle ease-subtle focus-ring-themed hover:border-subtle',
           isGhost
             ? active
               ? 'border-subtle text-primary-token bg-surface-1/40'

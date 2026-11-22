@@ -1,5 +1,6 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { PlayGlyph } from './PlayGlyph';
 
 describe('PlayGlyph', () => {
@@ -34,4 +35,16 @@ describe('PlayGlyph', () => {
     expect(svg).toHaveAttribute('stroke-width', '2.5');
     expect(svg).toHaveAttribute('fill', 'currentColor');
   });
+
+  it.each([12, 14, 16] as const)(
+    'has no a11y violations at %spx inside a labelled button',
+    async size => {
+      const { container } = render(
+        <button type='button' aria-label='Play'>
+          <PlayGlyph size={size} />
+        </button>
+      );
+      await expectNoA11yViolations(container);
+    }
+  );
 });
