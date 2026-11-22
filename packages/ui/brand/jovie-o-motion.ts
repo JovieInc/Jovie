@@ -43,6 +43,8 @@ export const JOVIE_O_MOTION_TOKENS = {
   '--duration-ov-blink-hold': 40,
   '--duration-ov-blink-open': 170,
   '--stagger-glyph': 28,
+  '--duration-normal': 160,
+  '--duration-slow': 250,
   '--duration-cinematic': 420,
   '--duration-slower': 350,
 } as const;
