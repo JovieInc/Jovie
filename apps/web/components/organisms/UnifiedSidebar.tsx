@@ -1,6 +1,6 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/components/organisms/UnifiedSidebar.library.test.tsx
+// @coverage-via apps/web/tests/unit/components/organisms/UnifiedSidebar.header.test.tsx
 
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
