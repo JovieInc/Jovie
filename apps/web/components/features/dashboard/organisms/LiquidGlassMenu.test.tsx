@@ -7,7 +7,7 @@ import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { LiquidGlassMenu } from './LiquidGlassMenu';
 
 const { mockPathname } = vi.hoisted(() => ({
-  mockPathname: vi.fn(() => APP_ROUTES.CONTACTS),
+  mockPathname: vi.fn((): string => APP_ROUTES.CONTACTS),
 }));
 
 vi.mock('next/navigation', () => ({
