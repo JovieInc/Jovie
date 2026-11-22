@@ -3036,13 +3036,17 @@ jobs:
     name: ci-fast (profile browser)
     # Secret-free browser proof for public-profile visual, accessibility, and
     # runtime behavior. The aggregate makes this required on PR and merge-group
-    # heads whenever the bounded profile surface selector matches.
+    # heads whenever the bounded profile surface selector matches. It also runs
+    # the viewport sweep (tests/e2e/profile/viewport-sweep.spec.ts): geometric
+    # layout checks across widths 320..1440, continuous resize, embedded panes,
+    # tabs and overlays for the public profile and the golden-path public pages.
+    # The sweep is blocking here: ci-fast fails closed on this job's result.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
-    timeout-minutes: 15
+    timeout-minutes: 35
     if: >-
       !cancelled() &&
       needs.ci-lockfile-preflight.result == 'success' &&
@@ -3110,6 +3114,16 @@ jobs:
             'apps/web/lib/rate-limit/**' \
             'apps/web/lib/tracking/pac-**' \
             'apps/web/styles/design-system.css' \
+            ':(glob)apps/web/styles/**' \
+            'apps/web/app/(home)/**' \
+            'apps/web/app/(auth)/**' \
+            'apps/web/app/(marketing)/pricing/**' \
+            'apps/web/components/features/home/**' \
+            'apps/web/components/features/auth/**' \
+            'apps/web/components/features/pricing/**' \
+            'apps/web/tests/e2e/profile/viewport-sweep.spec.ts' \
+            ':(glob)apps/web/tests/e2e/utils/viewport-sweep-*.ts' \
+            'apps/web/tests/product-screenshots/route-dom-certification-support.ts' \
             'apps/web/tests/e2e/profile-admission.spec.ts' \
             'apps/web/tests/e2e/profile/public-profile-layout.spec.ts' \
             'apps/web/tests/e2e/profile/responsive-shell.spec.ts' \
@@ -3157,6 +3171,42 @@ jobs:
           --config=playwright.config.noauth.ts
           --project=chromium
           --reporter=line
+      - name: Run viewport sweep (public profile and golden-path pages)
+        if: steps.profile-browser.outputs.run == 'true'
+        env:
+          CI: 'true'
+          DATABASE_URL: postgresql://jovie:jovie@127.0.0.1:1/jovie?sslmode=disable
+          E2E_SKIP_SEED: '1'
+          E2E_SKIP_WARMUP: '1'
+          E2E_WEB_SERVER_COMMAND: pnpm run dev:fast
+          NEXT_PUBLIC_AUTH_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          PUBLIC_NOAUTH_SMOKE: '1'
+          # Per width/state screenshots (<width>-<state>.png) are public fixture
+          # renders; they upload as the viewport-sweep artifact below.
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+        run: >-
+          node .github/scripts/guard-playwright-artifacts.mjs --run --
+          pnpm --filter @jovie/web exec playwright test
+          tests/e2e/profile/viewport-sweep.spec.ts
+          --config=playwright.config.noauth.ts
+          --project=chromium
+          --workers=2
+          --retries=0
+          --reporter=line
+      - name: Upload viewport sweep screenshots and evidence
+        # Always upload (pass or fail) so before/after shots exist for every head.
+        if: ${{ always() && steps.profile-browser.outputs.run == 'true' && hashFiles('apps/web/test-results/viewport-sweep-shots/**') != '' }}
+        continue-on-error: true
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: viewport-sweep-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-results/viewport-sweep-shots/
+          retention-days: 14
+          allow-images: 'true'
+          public-images: 'true'
       - name: Upload profile admission failure evidence
         if: ${{ failure() && steps.profile-browser.outputs.run == 'true' && hashFiles('apps/web/test-results/**') != '' }}
         continue-on-error: true
