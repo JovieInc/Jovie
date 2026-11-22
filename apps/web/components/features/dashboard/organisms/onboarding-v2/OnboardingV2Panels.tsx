@@ -149,7 +149,7 @@ export function OnboardingSidebar({
   const currentLabel = steps[currentIndex]?.label ?? steps[0].label;
 
   return (
-    <nav aria-label='Onboarding Steps'>
+    <div>
       {onBack ? (
         <Button
           type='button'
@@ -210,6 +210,6 @@ export function OnboardingSidebar({
           );
         })}
       </ul>
-    </nav>
+    </div>
   );
 }

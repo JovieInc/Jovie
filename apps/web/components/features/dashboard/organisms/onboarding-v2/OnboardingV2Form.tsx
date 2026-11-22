@@ -335,17 +335,19 @@ export function OnboardingV2Form({
       mode='standalone'
       stableStageHeight={currentStep === 'handle' ? 'tall' : 'default'}
       sidebar={
-        <OnboardingSidebar
-          steps={SIDEBAR_STEPS}
-          currentStep={currentStep}
-          onBack={
-            currentStep === 'spotify' ||
-            currentStep === 'artist-confirm' ||
-            currentStep === 'upgrade'
-              ? handleGoBack
-              : undefined
-          }
-        />
+        <nav aria-label='Onboarding Steps'>
+          <OnboardingSidebar
+            steps={SIDEBAR_STEPS}
+            currentStep={currentStep}
+            onBack={
+              currentStep === 'spotify' ||
+              currentStep === 'artist-confirm' ||
+              currentStep === 'upgrade'
+                ? handleGoBack
+                : undefined
+            }
+          />
+        </nav>
       }
       sidebarTitle='Jovie Setup'
       stageVariant='flat'
