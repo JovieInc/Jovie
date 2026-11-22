@@ -274,10 +274,14 @@ export function EntitySidebarShell({
               >
                 {/* The 1px bottom seam is padding, not a transparent border:
                     same border-box geometry, and the card stays the only
-                    bordered surface around the title bar and tabs. */}
+                    bordered surface around the title bar and tabs.
+                    -mx-px cancels the card's 1px border so header text sits at
+                    the same left inset as body text (px-3 from the rail edge).
+                    The slot wrapper owns the px-3 inset, so entity header
+                    content must not add its own horizontal padding. */}
                 <div
                   data-entity-sidebar-header-band=''
-                  className='bg-transparent pb-px backdrop-blur-[12px]'
+                  className='-mx-px bg-transparent pb-px backdrop-blur-[12px]'
                 >
                   {showMinimalHeaderBar ? (
                     <EntityHeader

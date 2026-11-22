@@ -36,7 +36,7 @@ export function ContentChartFrame({
   return (
     <div
       className={cn(
-        'flex w-full items-center rounded-lg bg-surface-0 p-4',
+        'flex w-full items-center rounded-lg p-4',
         heightClassName,
         className
       )}
@@ -56,7 +56,7 @@ export function ContentChartSkeleton({
   return (
     <div
       className={cn(
-        'w-full rounded-lg bg-surface-0',
+        'w-full rounded-lg',
         heightClassName,
         className
       )}

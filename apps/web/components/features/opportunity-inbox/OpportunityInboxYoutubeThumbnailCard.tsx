@@ -91,7 +91,7 @@ export function OpportunityInboxYoutubeThumbnailCard({
         </figure>
       </div>
 
-      <dl className='mt-3 grid grid-cols-3 gap-2 rounded-md bg-surface-0 p-3 text-xs'>
+      <dl className='mt-3 grid grid-cols-3 gap-2 rounded-md p-3 text-xs'>
         <div>
           <dt className='text-tertiary-token'>Views</dt>
           <dd className='mt-0.5 font-medium tabular-nums text-primary-token'>

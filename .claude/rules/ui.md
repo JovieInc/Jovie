@@ -218,14 +218,14 @@ export function MyComponent({ title, children, onAction }: MyComponentProps) {
 
 ### Surface Elevation Rules (Card/Background Consistency)
 
-The main content area (`<main>`) uses `bg-(--app-shell-content-surface)`, the shell-owned canvas tone. In dark mode it must stay distinct from both recessed wells (`bg-surface-0`) and shared cards (`bg-surface-1`).
+The main content area (`<main>`) uses `bg-(--app-shell-content-surface)`, the shell-owned canvas tone. In dark mode it must stay distinct from shared cards (`bg-surface-1`). There are no recessed wells: content never gets a darker/lighter inset fill or inset shadow.
 
 **Allowed patterns:**
 - Card on app-shell canvas parent → `bg-surface-1` for shared cards and panels
-- Recessed/"well" element inside the shell or a card → `bg-surface-0` (e.g., skeleton containers, empty states, input wells)
+- Content inside a card → sits on the card's own surface (`bg-surface-1`); no recessed well, no inset fill, no inset shadow. Separate groups with spacing or a hairline divider, not a darker panel
 - Sticky shell chrome (toolbars, table headers, shell frame) → `bg-(--app-shell-content-surface)`
 - Card with elevation → `Card` component as-is (has `bg-surface-1 border border-subtle shadow-card`)
-- Nested card inside card → `bg-surface-0` for the inner element
+- Nested grouping inside a card → transparent (flat); use spacing or a hairline divider
 - Table/workspace routes → consume the shell-owned canvas by default. A nested bordered `LINEAR_SURFACE.contentContainer` canvas is allowed only when the screen declares `canvasOwner: 'screen'` in the app-screen canvas manifest (`apps/web/data/appScreens/canvas.ts`); undeclared nested canvases are rejected by the canvas-ownership guardrail
 
 **Banned patterns (will cause invisible cards):**
@@ -234,7 +234,7 @@ The main content area (`<main>`) uses `bg-(--app-shell-content-surface)`, the sh
 - `bg-surface-1` on elements inside a `surface-1` parent WITHOUT border+shadow — same color on same color
 - `bg-surface-1/XX` (semi-transparent) — low opacity surface-1 on surface-1 parent is nearly invisible
 - `Card className='border-0 shadow-none'` — strips all elevation from a surface-1 card, making it invisible on surface-1 parent
-- `bg-surface-0/XX` (semi-transparent) — use solid `bg-surface-0` instead
+- `bg-surface-0` or `bg-surface-0/XX` as a recessed well inside a card — content sits on the card surface
 - Card-within-card nesting (e.g., `DrawerSurfaceCard variant='card'` inside another card) — use `variant='flat'` for inner elements
 
 **Quick test:** If removing the element would cause no visual change, it's an elevation bug.

@@ -78,32 +78,33 @@ export const CardOnShellCanvas: Story = {
   ),
 };
 
-export const WellOnShellCanvas: Story = {
-  name: 'Allowed: recessed well on shell canvas',
+export const ContentOnShellCanvas: Story = {
+  name: 'Allowed: flat content on shell canvas',
   render: () => (
     <ShellCanvas>
       <Note tone='allowed'>
-        ALLOWED: recessed well (bg-surface-0) directly on the shell canvas —
-        e.g. skeleton containers, empty states, input wells.
+        ALLOWED: content sits flat on the shell canvas. There are no recessed
+        wells (no bg-surface-0 inset fill), so nothing reads as a hole.
       </Note>
-      <div className='rounded-lg bg-surface-0 p-6'>{PLACEHOLDER}</div>
+      <div className='rounded-lg p-6'>{PLACEHOLDER}</div>
     </ShellCanvas>
   ),
 };
 
-export const WellInsideCard: Story = {
-  name: 'Allowed: recessed well inside Card',
+export const ContentInsideCard: Story = {
+  name: 'Allowed: content on the Card surface',
   render: () => (
     <ShellCanvas>
       <Note tone='allowed'>
-        ALLOWED: inner element uses bg-surface-0 when nested inside a card.
+        ALLOWED: content inside a card sits on the card&apos;s own surface — no
+        darker or lighter inset fill and no inset shadow.
       </Note>
       <Card>
         <CardHeader>
-          <CardTitle>Card with recessed well</CardTitle>
+          <CardTitle>Card with flat content</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className='rounded-lg bg-surface-0 p-4'>{PLACEHOLDER}</div>
+          <div className='rounded-lg p-4'>{PLACEHOLDER}</div>
         </CardContent>
       </Card>
     </ShellCanvas>
@@ -187,7 +188,7 @@ export const EntitySidebarShellDefault: Story = {
         isOpen
         ariaLabel='Elevation matrix sidebar'
         title='Elevation matrix sidebar'
-        entityHeader={<div className='px-3 py-2'>Entity header</div>}
+        entityHeader={<div className='py-2'>Entity header</div>}
       >
         <div className='px-3 py-2'>{PLACEHOLDER}</div>
       </EntitySidebarShell>
@@ -304,8 +305,8 @@ export const BannedSurface0Translucent: Story = {
   render: () => (
     <ShellCanvas>
       <Note tone='banned'>
-        BANNED (should look BROKEN): bg-surface-0/50 — semi-transparent recessed
-        wells must be solid bg-surface-0 instead.
+        BANNED (should look BROKEN): bg-surface-0/50 — recessed wells are banned
+        entirely; content sits on the card surface.
       </Note>
       <Card>
         <CardHeader>

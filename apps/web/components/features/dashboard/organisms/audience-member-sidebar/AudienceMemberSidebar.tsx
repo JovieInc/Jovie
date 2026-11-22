@@ -89,7 +89,7 @@ export function AudienceMemberSidebar({
             subtitle={detailsLine}
             titleLineClamp={1}
             subtitleLineClamp={1}
-            className='px-3 pt-3'
+            className='pt-3'
             titleClassName='text-base leading-5 tracking-tighter'
             thumbnail={
               <DrawerEntityAvatar

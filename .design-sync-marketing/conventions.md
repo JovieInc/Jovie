@@ -8,7 +8,7 @@ generic AI template style.
 
 All backgrounds use the Jovie carbon tokens:
 - `bg-(--linear-bg-page)` (`#06070a`) as the page canvas
-- `bg-surface-0` for recessed wells, `bg-surface-1` for cards / elevated panels
+- no recessed wells (content sits on the card surface); `bg-surface-1` for cards / elevated panels
 - `text-primary-token` / `text-secondary-token` / `text-tertiary-token` for text
 
 Previews render on a dark canvas (`DesignSyncCanvas`) — light-on-dark is the
