@@ -784,6 +784,7 @@ describe('JovieChat styling regressions', () => {
   });
 
   it('keeps a living Home canvas as the surface after messages, with the transcript on request', () => {
+    mockChatState.status = 'ready'; // A restored chat leaves Home up.
     type Living = {
       isStreaming: boolean;
       count: number;
@@ -809,14 +810,13 @@ describe('JovieChat styling regressions', () => {
         }}
       />
     );
-
     const viewport = () =>
       container.querySelector('[data-testid="chat-empty-state-viewport"]');
     expect(viewport()?.getAttribute('data-empty-affordance')).toBe(
       'home-canvas'
     );
     expect(states.at(-1)).toEqual({
-      isStreaming: true,
+      isStreaming: false,
       count: 1,
       composerHasIntent: false,
     });

@@ -342,16 +342,6 @@ describe('production certifier against the golden-path ledger', () => {
   it.each([
     ['a surface failed', { checkout: { status: 'failed' as const } }, []],
     ['a surface is missing', {}, ['smartlink']],
-    [
-      'a surface is stale',
-      {
-        landing: {
-          startedAt: '2026-10-29T05:59:00Z',
-          endedAt: '2026-10-29T06:00:00Z',
-        },
-      },
-      [],
-    ],
     ['a surface passed on another sha', { chat: { sha: 'b'.repeat(40) } }, []],
   ])('golden path red (%s): no send, no card', async (_n, over, omit) => {
     const c = await certifier(over as never, omit);
@@ -364,6 +354,19 @@ describe('production certifier against the golden-path ledger', () => {
     expect(r.skipped.fix_not_live).toBe(1);
     expect(sent).toEqual([]);
     expect(cards).toEqual([]);
+  });
+
+  it('an old pass on the served sha stays green: no age limit (JOV-14402)', async () => {
+    const c = await certifier({
+      landing: {
+        startedAt: '2026-10-20T05:59:00Z',
+        endedAt: '2026-10-20T06:00:00Z',
+      },
+    });
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    expect(await c.goldenPathGreen()).toBe(true);
+    vi.useRealTimers();
   });
 
   it('the fix step check failing blocks even a green path', async () => {

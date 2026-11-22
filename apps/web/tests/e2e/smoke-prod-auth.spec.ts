@@ -543,6 +543,33 @@ async function signInViaRenderedFlow(
   return 'unknown';
 }
 
+/**
+ * Time to fully loaded first dashboard on the production test account, read
+ * from the probe the shell already runs (first-dashboard-ready/v1). The
+ * sign-in redirect is the hard load being timed. Evidence only: it costs no
+ * extra request and never fails the smoke.
+ */
+async function logFirstDashboardReady(page: Page, source: string) {
+  const sample = await page
+    .waitForFunction(
+      () => globalThis.__jovieFirstDashboardReady ?? null,
+      undefined,
+      {
+        timeout: 10_000,
+        polling: 250,
+      }
+    )
+    .then(handle => handle.jsonValue())
+    .catch(() => null);
+  console.log(
+    `FIRST_DASHBOARD_READY_RECEIPT ${JSON.stringify({
+      source,
+      commit: process.env.EXPECTED_COMMIT_SHA ?? null,
+      sample,
+    })}`
+  );
+}
+
 test.describe('Production Auth Smoke @production-smoke', () => {
   // Keep sign-in and authenticated navigation in one browser session. Requesting
   // another Better Auth OTP can invalidate the prior code, so future checks must
@@ -662,6 +689,8 @@ test.describe('Production Auth Smoke @production-smoke', () => {
 
     telemetry.record('onboarding');
     await telemetry.capture(page, 'onboarding');
+
+    await logFirstDashboardReady(page, 'prod-auth-smoke');
 
     // Click the sidebar, not page.goto: only a click proves the shell's
     // client-side navigation still moves between dashboard pages.

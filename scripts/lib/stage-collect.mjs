@@ -447,15 +447,23 @@ export async function collectStageRaw({
     };
   const runFailures = [];
   const controllers = (await settle(sources, 'github-controller', () => {
-    const production = listWorkflowRuns({
+    // Unsuccessful runs keep their jobs too: a run that promoted and then
+    // failed a production probe or rolled back is a failed deployment (DORA
+    // change failure rate, scripts/lib/shipping-slo-dora.mjs). Skipped runs
+    // never start a job. Stage derivation still reads `production` only.
+    const withJobs = listWorkflowRuns({
       gh,
       repository,
       workflow: 'production-controller.yml',
       sinceMs,
       nowMs,
       failures: runFailures,
-    }).filter(run => run.conclusion === 'success');
-    attachJobs({ gh, runs: production });
+    }).filter(run => run.conclusion !== 'skipped');
+    attachJobs({ gh, runs: withJobs });
+    const production = withJobs.filter(run => run.conclusion === 'success');
+    const productionUnsuccessful = withJobs.filter(
+      run => run.conclusion !== 'success'
+    );
     const released = new Set(
       production
         .filter(run =>
@@ -476,8 +484,8 @@ export async function collectStageRaw({
       failures: runFailures,
     }).filter(run => run.conclusion === 'success' && released.has(run.headSha));
     attachJobs({ gh, runs: staging });
-    return { production, staging };
-  })) ?? { production: [], staging: [] };
+    return { production, productionUnsuccessful, staging };
+  })) ?? { production: [], productionUnsuccessful: [], staging: [] };
   const lyb = (await settle(sources, 'github-lyb', () => {
     const runs = listWorkflowRuns({
       gh,
