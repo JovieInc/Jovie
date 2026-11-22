@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it } from 'node:test';
-import { ruleOf } from './accent-pack.mjs';
+import { ruleOf, surfaceOf, walkSources } from './accent-pack.mjs';
 import { expectedAccent, GREEN_RED_MIN_SET } from './accent-pack-config.mjs';
-import { scanSource } from './accent-pack-lib.mjs';
+import { figmaSnapshotIds, scanSource } from './accent-pack-lib.mjs';
 import { evaluateRatchet } from './ratchet.mjs';
 
 const OPTS = {
@@ -504,5 +507,86 @@ describe('ratchet', () => {
       }),
       []
     );
+  });
+});
+
+describe('coverage: nothing escapes', () => {
+  it('flags off-pack literals in an email template string', () => {
+    const bad =
+      'export const html = `<td style="background:#1db954;color:#ffffff">hi</td>`;';
+    assert.ok(
+      has(
+        run(bad, 'apps/web/lib/email/templates/welcome.ts'),
+        'off-pack-literal'
+      )
+    );
+    const ok =
+      'export const html = `<td style="background:#030406;color:#f7f8f8">hi</td>`;';
+    assert.deepEqual(run(ok, 'apps/web/lib/email/templates/welcome.ts'), []);
+  });
+  it('flags off-pack literals in an ImageResponse route', () => {
+    const bad =
+      "import { ImageResponse } from 'next/og';\nexport const BG = '#ff0080';";
+    assert.ok(
+      has(
+        run(bad, 'apps/web/app/brand/opengraph-image.tsx'),
+        'off-pack-literal'
+      )
+    );
+    assert.deepEqual(
+      run(
+        "import { ImageResponse } from 'next/og';\nexport const BG = '#11afff';",
+        'apps/web/app/brand/opengraph-image.tsx'
+      ),
+      []
+    );
+  });
+  it('checks the Figma snapshot: pack and neutral pass, off-pack fails', () => {
+    const allowed = ['#11afff'];
+    const good = {
+      variables: {
+        'surface/canvas': { values: { dark: '#030406' } },
+        'accent/ion': { values: { dark: '#11afff' } },
+        'border/strong': { values: { dark: '#c7edff' } },
+      },
+    };
+    assert.deepEqual(figmaSnapshotIds(good, 'f.json', allowed), []);
+    const bad = {
+      variables: { 'accent/amber': { values: { dark: '#f5a623' } } },
+    };
+    assert.equal(figmaSnapshotIds(bad, 'f.json', allowed).length, 1);
+  });
+  it('walks stories and .storybook but not tests', () => {
+    const root = mkdtempSync(join(tmpdir(), 'accent-pack-'));
+    mkdirSync(join(root, 'apps/web/.storybook'), { recursive: true });
+    mkdirSync(join(root, 'apps/web/components'), { recursive: true });
+    for (const f of [
+      'apps/web/.storybook/preview.tsx',
+      'apps/web/components/A.stories.tsx',
+      'apps/web/components/A.test.tsx',
+      'apps/web/components/A.tsx',
+    ])
+      writeFileSync(join(root, f), 'export {};');
+    const found = walkSources(root, ['apps/web'])
+      .map(f => f.slice(root.length + 1))
+      .sort();
+    assert.deepEqual(found, [
+      'apps/web/.storybook/preview.tsx',
+      'apps/web/components/A.stories.tsx',
+      'apps/web/components/A.tsx',
+    ]);
+  });
+  it('names a surface for stories, emails, OG, figma and other apps', () => {
+    assert.match(surfaceOf('apps/web/components/A.stories.tsx'), /Storybook/);
+    assert.match(surfaceOf('apps/web/lib/email/templates/a.ts'), /Emails/);
+    assert.match(
+      surfaceOf('apps/web/app/[username]/opengraph-image.tsx'),
+      /OG/
+    );
+    assert.match(
+      surfaceOf('docs/design/figma/figma-variables.snapshot.json'),
+      /Figma/
+    );
+    assert.match(surfaceOf('apps/console/app/page.tsx'), /Other apps/);
   });
 });
