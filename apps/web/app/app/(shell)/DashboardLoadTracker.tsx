@@ -2,8 +2,35 @@
 
 import { useEffect, useRef } from 'react';
 import { track } from '@/lib/analytics';
-import { consumeSignupFirstValue } from '@/lib/analytics/signup-funnel-client';
+import {
+  consumeSignupFirstValue,
+  peekSignupFirstValuePending,
+} from '@/lib/analytics/signup-funnel-client';
+import {
+  isHardShellLoad,
+  watchFirstDashboardReady,
+} from '@/lib/monitoring/first-dashboard-ready';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
+
+// One first-dashboard sample per document: the shell remounting after a
+// client navigation is warm and is not the first dashboard state.
+let firstDashboardProbeStarted = false;
+
+/** Test seam: allow another first-dashboard sample in this module. */
+export function resetFirstDashboardProbeForTests(): void {
+  firstDashboardProbeStarted = false;
+}
+
+function readNavigationType(): string | null {
+  try {
+    const entry = globalThis.performance?.getEntriesByType?.('navigation')[0] as
+      | PerformanceNavigationTiming
+      | undefined;
+    return entry?.type ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export function DashboardLoadTracker({
   pathname,
@@ -15,7 +42,25 @@ export function DashboardLoadTracker({
   const trackedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
+    // Read before consume: a pending claim marks a brand-new account's first
+    // dashboard.
+    const newAccount = peekSignupFirstValuePending();
     consumeSignupFirstValue();
+
+    const firstMountInDocument = !firstDashboardProbeStarted;
+    firstDashboardProbeStarted = true;
+    if (
+      !isHardShellLoad({
+        firstMountInDocument,
+        navigationType: readNavigationType(),
+      })
+    ) {
+      return;
+    }
+    return watchFirstDashboardReady({
+      hydratedAt: globalThis.performance?.now?.() ?? 0,
+      newAccount,
+    });
   }, []);
 
   useEffect(() => {
