@@ -144,15 +144,15 @@ function geometryFor(
 ): SurfaceGeometry {
   const width = '100%';
   const maxWidth = `min(calc(100vw - 32px), ${CHAT_COMPOSER_MAX_WIDTH})`;
-  // Radius values come only from SYSTEM_B_RADIUS_PX (JOV-3532).
-  if (stacked) {
-    return { width, maxWidth, borderRadius: SYSTEM_B_RADIUS_PX['3xl'] };
-  }
+  // Tokens only (JOV-3532). The empty hero pill holds at every width.
   if (mode === 'entity') {
     return { width, maxWidth, borderRadius: SYSTEM_B_RADIUS_PX['3xl'] };
   }
   if (variant === 'hero' && usePillLayout) {
     return { width, maxWidth, borderRadius: SYSTEM_B_RADIUS_PX.pill };
+  }
+  if (stacked) {
+    return { width, maxWidth, borderRadius: SYSTEM_B_RADIUS_PX['3xl'] };
   }
   if (variant === 'hero') {
     return { width, maxWidth, borderRadius: SYSTEM_B_RADIUS_PX['3xl'] };

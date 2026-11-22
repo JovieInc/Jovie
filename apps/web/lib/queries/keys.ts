@@ -44,7 +44,6 @@ export const queryKeys = {
         'analytics',
         ...(range === undefined ? [] : [range]),
       ] as const,
-    aiCrawlers: () => [...queryKeys.dashboard.all, 'ai-crawlers'] as const,
     monetizationSummary: () =>
       [...queryKeys.dashboard.all, 'monetization-summary'] as const,
     links: () => [...queryKeys.dashboard.all, 'links'] as const,
