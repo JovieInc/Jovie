@@ -126,7 +126,17 @@ export function ciWalltimeByEvent(
  * Merge-queue wait + ejection. timelines: per-PR arrays of
  * { type: 'added_to_merge_queue'|'removed_from_merge_queue'|'merged', at: ISO }.
  * Wait = last added_to_merge_queue → merged. Ejection = removed without merge.
+ *
+ * A successful merge also emits removed_from_merge_queue (github-merge-queue
+ * [bot]) stamped at the merge second or one second before `merged`, so a
+ * removal with a `merged` event within MERGE_REMOVAL_SLACK_MS after it is the
+ * merge itself. Counting it as an ejection inflated the rate by ~23 points and
+ * dropped those PRs' waits (2026-11-20..22: 104 of 245 merges). A real
+ * ejection cannot be followed by re-enqueue, a merge-group run and a merge
+ * inside the slack.
  */
+export const MERGE_REMOVAL_SLACK_MS = 60_000;
+
 export function mergeQueueStats(timelines, sinceMs, nowMs) {
   const waits = [];
   let enqueued = 0;
@@ -135,6 +145,10 @@ export function mergeQueueStats(timelines, sinceMs, nowMs) {
     const list = [...(events ?? [])].sort(
       (a, b) => Date.parse(a.at) - Date.parse(b.at)
     );
+    const mergedAt = list
+      .filter(event => event.type === 'merged')
+      .map(event => Date.parse(event.at))
+      .filter(Number.isFinite);
     let lastAdd = null;
     for (const event of list) {
       const at = Date.parse(event.at);
@@ -143,6 +157,10 @@ export function mergeQueueStats(timelines, sinceMs, nowMs) {
         lastAdd = event.at;
         enqueued += 1;
       } else if (event.type === 'removed_from_merge_queue') {
+        // The merge's own removal (same second or just before `merged`), or
+        // the trailing removal after `merged` (lastAdd already cleared).
+        if (mergedAt.some(m => m >= at && m - at <= MERGE_REMOVAL_SLACK_MS))
+          continue;
         if (lastAdd) ejected += 1;
         lastAdd = null;
       } else if (event.type === 'merged' && lastAdd) {
