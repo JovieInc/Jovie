@@ -76,7 +76,7 @@ describe('OvieComposerDock', () => {
     ).toHaveTextContent('Approve: Use owned capacity');
     expect(
       screen.getByTestId('ovie-composer-dock-reject-does')
-    ).toHaveTextContent("Reject: it does not go ahead.");
+    ).toHaveTextContent('Reject: it does not go ahead.');
   });
 
   it('has no accessibility violations', async () => {
