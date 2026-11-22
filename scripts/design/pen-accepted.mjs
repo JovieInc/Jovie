@@ -77,6 +77,9 @@ function added(base, extra) {
  * The accepted record for one draft: its last top-level frame named after
  * the brief (the one pen-draft.mjs checks it added), and only the variables
  * and themes the draft added to the canonical it started from.
+ * @param {any} draft
+ * @param {string} frame
+ * @param {{ viewport: number, sectionId?: string, source?: string, canonical?: any }} options
  */
 export function extractAccepted(
   draft,
@@ -117,6 +120,9 @@ export function loadAccepted(dir = join(REPO_ROOT, ACCEPTED_DIR)) {
  * The canonical document with each accepted frame the canonical lacks,
  * placed right of every existing frame. Canonical nodes, variables and
  * themes are never replaced. Returns what was applied and what was skipped.
+ * @param {any} doc
+ * @param {readonly any[]} records
+ * @param {(line: string) => void} [log]
  */
 export function applyAccepted(doc, records, log = () => {}) {
   const applied = [];

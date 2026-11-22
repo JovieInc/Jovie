@@ -13,6 +13,7 @@ import {
   stillNode,
 } from './pen-accepted.mjs';
 
+/** @returns {any} */
 const canonical = () => ({
   version: '2.21',
   variables: { bg: { value: '#000' } },

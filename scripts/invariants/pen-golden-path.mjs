@@ -230,7 +230,7 @@ const defaultRun = (cmd, args, opts = {}) =>
 /**
  * Download the Pen source into DIR/workspace and fingerprint the bytes. Every
  * call downloads again, so the key always describes what this call exports.
- * @param {{ out: string, env: NodeJS.ProcessEnv, run: typeof defaultRun, fetchImpl: typeof fetch }} options
+ * @param {{ out: string, env: NodeJS.ProcessEnv, run: typeof defaultRun, fetchImpl: typeof fetch, accepted?: readonly any[], penName?: string, log?: (line: string) => void }} options
  */
 async function fetchPenSource({
   out,
@@ -305,7 +305,7 @@ export async function installPlaywrightBrowser({ root, run, log }) {
 /**
  * `report` gets each workflow output as soon as it is known, so an export
  * that finished still reports itself when the diff after it throws.
- * @param {{ out: string, baseUrl?: string, storageState?: string, surfaceIds?: readonly string[], env?: NodeJS.ProcessEnv, root?: string, run?: typeof defaultRun, fetchImpl?: typeof fetch, log?: (line: string) => void, fetchOnly?: boolean, report?: (name: string, value: string) => void }} options
+ * @param {{ out: string, baseUrl?: string, storageState?: string, surfaceIds?: readonly string[], env?: NodeJS.ProcessEnv, root?: string, run?: typeof defaultRun, fetchImpl?: typeof fetch, log?: (line: string) => void, fetchOnly?: boolean, report?: (name: string, value: string) => void, accepted?: readonly any[] }} options
  */
 export async function runGoldenPathPen({
   out,
