@@ -21,7 +21,7 @@ function renderBlock(block: ViewBlock, index: number) {
           data-block='sparkline'
           className='space-y-2 rounded-lg border border-subtle bg-surface-1 p-3'
         >
-          <h2 className='text-2xs font-caption text-secondary-token'>
+          <h2 className='text-balance text-2xs font-caption text-secondary-token'>
             {block.label}
           </h2>
           <Sparkline

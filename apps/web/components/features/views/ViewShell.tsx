@@ -51,7 +51,7 @@ export function ViewShell({
         </header>
         <main className='mx-auto w-full max-w-5xl flex-1 space-y-4 px-4 py-6'>
           {view.spec.description ? (
-            <p className='text-sm text-secondary-token'>
+            <p className='text-sm tabular-nums text-secondary-token'>
               {view.spec.description}
             </p>
           ) : null}
