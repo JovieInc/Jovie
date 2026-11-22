@@ -9,6 +9,14 @@
       "removalCondition": "Remove if Checkout stops returning to this route or the request-specific server verification moves to an existing payment surface; reassess this runtime contract under JOV-12407 before expiry.",
       "evidence": "https://github.com/JovieInc/Jovie/actions/runs/43786968068/job/133036679060 records the measured dynamic build. apps/web/app/[username]/tip/thank-you/page.test.tsx verifies distinct request headers and pending-to-confirmed rechecks with a mocked verifier; real-payment production certification remains unclaimed.",
       "expiresOn": "2026-12-16"
+    },
+    "/v/[token]": {
+      "owner": "@itstimwhite",
+      "reason": "Shared dashboard views read the optional session on the server to choose between the signup card and the Save as dashboard button, so each visit renders on request, like the /p/[token] share link.",
+      "issue": "JOV-14462",
+      "removalCondition": "Remove once /v/[token] renders the view as ISR, revalidated on publish and revoke, with viewer state resolved on the client (JOV-14462).",
+      "evidence": "https://github.com/JovieInc/Jovie/actions/runs/45005356258/job/137155650730 records the measured dynamic build for PR #26632.",
+      "expiresOn": "2026-12-22"
     }
   },
   "routes": {
@@ -294,6 +302,7 @@
     "/ui/switches": "static html=27410",
     "/ui/tooltips": "static html=22388",
     "/unavailable": "static html=25662",
+    "/v/[token]": "dynamic",
     "/voice": "static html=70546",
     "/waitlist": "dynamic",
     "/waitlist/invite": "dynamic",
