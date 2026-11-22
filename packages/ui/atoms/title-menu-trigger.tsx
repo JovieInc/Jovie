@@ -14,7 +14,7 @@ export interface TitleMenuTriggerProps
 const TITLE_MENU_TRIGGER_CLASS = cn(
   'inline-flex h-7 min-w-0 max-w-full items-center gap-1 rounded-lg px-1.5',
   'text-primary-token',
-  'transition-colors duration-subtle ease-subtle',
+  'press',
   'hover:bg-surface-1 aria-expanded:bg-surface-1',
   'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus/35'
 );

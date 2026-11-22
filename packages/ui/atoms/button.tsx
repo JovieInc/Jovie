@@ -61,7 +61,7 @@ const BUTTON_SIZE_CLASSES: Record<ButtonSize, string> = {
 };
 
 const buttonVariants = cva(
-  'relative inline-flex items-center justify-center rounded-full text-app [font-weight:var(--font-weight-medium)] tracking-normal transition-[background-color,border-color,color,box-shadow,opacity,transform] duration-subtle ease-subtle motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page aria-disabled:pointer-events-none aria-disabled:opacity-[var(--state-disabled-opacity)] aria-disabled:text-(--color-text-disabled-token)',
+  'relative inline-flex items-center justify-center rounded-full text-app [font-weight:var(--font-weight-medium)] tracking-normal press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page aria-disabled:pointer-events-none aria-disabled:opacity-[var(--state-disabled-opacity)] aria-disabled:text-(--color-text-disabled-token)',
   {
     variants: {
       variant: {
@@ -165,9 +165,9 @@ export interface ButtonProps
   readonly pendingPresentation?: 'spinner' | 'morph';
   readonly actionState?: ButtonActionState;
   readonly stateLabels?: Partial<ButtonStateLabels>;
-  /** Enables subtle tactile compression for actions without another immediate cue. */
+  /** @deprecated No-op. Every Button presses by default through the shared `press` utility. */
   readonly pressFeedback?: boolean;
-  /** @deprecated Prefer leaving pressFeedback unset. */
+  /** Opt-out for non-interactive display: no press. Disabled and busy never press either. */
   readonly static?: boolean;
   readonly destructive?: boolean;
 }
@@ -231,7 +231,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       pendingPresentation = 'spinner',
       actionState = 'idle',
       stateLabels,
-      pressFeedback = false,
+      pressFeedback: _pressFeedback,
       static: isStatic = false,
       destructive = false,
       disabled,
@@ -244,7 +244,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const Comp = asChild ? Slot : 'button';
     const isDisabled = disabled || loading;
-    const hasPressFeedback = pressFeedback && !isStatic && !isDisabled;
+    const hasPressFeedback = !isStatic && !isDisabled;
     const dataState = getDataState(loading, isDisabled);
     const normalizedVariant = normalizeButtonVariant({
       variant,
@@ -307,7 +307,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         normalizedVariant.destructive &&
           DESTRUCTIVE_CLASSES[normalizedVariant.variant],
         className,
-        hasPressFeedback && 'active:scale-press motion-reduce:active:scale-100',
         isDisabled && 'pointer-events-none'
       ),
       'aria-disabled': isDisabled ? true : ariaDisabled,

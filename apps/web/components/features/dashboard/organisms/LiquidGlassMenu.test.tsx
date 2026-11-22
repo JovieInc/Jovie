@@ -132,3 +132,26 @@ describe('LiquidGlassMenu', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
+
+describe('LiquidGlassMenu press', () => {
+  it('presses its destinations and toggle through the shared press utility', () => {
+    mockPathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+    render(
+      <LiquidGlassMenu
+        primaryItems={[
+          {
+            id: 'home',
+            label: 'Home',
+            href: APP_ROUTES.DASHBOARD,
+            icon: Home,
+          },
+        ]}
+        expandedItems={[]}
+      />
+    );
+    expect(screen.getByRole('link', { name: /home/i })).toHaveClass('press');
+    expect(screen.getByRole('button', { name: /more options/i })).toHaveClass(
+      'press'
+    );
+  });
+});

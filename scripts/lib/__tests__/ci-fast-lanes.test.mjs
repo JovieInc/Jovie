@@ -2361,7 +2361,11 @@ describe('source-read guard selection', () => {
     ['packages/ui/src/button.tsx', ['merge-group-unit-guards', 'anti-slop']],
   ])('selects the guards that read %s on a PR', (path, guards) => {
     // PR-wide guards narrow inside their scripts.
-    expect(selected('pull_request', [path])).toEqual([
+    // art-direction (press-state) rides every UI path; it reads no source here.
+    const picked = selected('pull_request', [path]).filter(
+      id => id !== 'art-direction' || guards.includes(id)
+    );
+    expect(picked).toEqual([
       ...guards,
       ...apiGuard(path),
       ...domainGuard(path),

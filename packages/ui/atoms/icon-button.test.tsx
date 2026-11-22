@@ -210,7 +210,7 @@ describe('IconButton', () => {
       });
       expect(button).toHaveClass('focus-visible:ring-focus');
       expect(button).not.toHaveClass('focus-visible:ring-focus/55');
-      expect(button.className).toContain('motion-reduce:transition-none');
+      expect(button).toHaveClass('press');
       expect(button.className).not.toContain('focus-visible:ring-ring');
       expect(button.className).not.toContain('focus-visible:ring-focus/16');
       unmount();
@@ -270,8 +270,8 @@ describe('IconButton', () => {
     );
     const button = screen.getByRole('button');
 
-    expect(button.className).toContain('duration-subtle');
-    expect(button.className).toContain('ease-subtle');
+    expect(button).toHaveClass('press');
+    expect(button.className).not.toContain('duration-subtle');
     expect(button.className).not.toContain('ease-out');
   });
 
@@ -439,5 +439,29 @@ describe('IconButton accessible name', () => {
     expect(
       screen.getByRole('button', { name: 'Fade visible' }).className
     ).toContain('opacity-60');
+  });
+});
+
+describe('IconButton press', () => {
+  it('presses on every variant and skips static', () => {
+    for (const variant of ['quiet', 'surface', 'control', 'inline'] as const) {
+      const { unmount } = render(
+        <IconButton ariaLabel={`${variant} press`} variant={variant}>
+          <svg aria-hidden='true' />
+        </IconButton>
+      );
+      expect(
+        screen.getByRole('button', { name: `${variant} press` })
+      ).toHaveClass('press');
+      unmount();
+    }
+    render(
+      <IconButton ariaLabel='static press' static>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+    expect(
+      screen.getByRole('button', { name: 'static press' })
+    ).toHaveAttribute('data-static', 'true');
   });
 });
