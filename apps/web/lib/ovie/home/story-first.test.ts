@@ -9,6 +9,7 @@ import {
   buildStoryFirstGlance,
   buildStoryFirstStages,
   issueLabel,
+  plainTitle,
   stripIssueId,
 } from './story-first';
 
@@ -189,7 +190,7 @@ describe('buildStoryFirstBottleneck', () => {
       title: 'Checkout is blocking revenue',
       needs: 'Certify payment path',
       since: 'Nov 18',
-      moving: { label: 'JOV-13192 · Checkout cert' },
+      moving: { label: 'Checkout cert' },
     });
   });
 
@@ -237,7 +238,7 @@ describe('buildStoryFirstBottleneck', () => {
       ],
     });
     expect(related.moving).toEqual({
-      label: 'JOV-2 · fix(billing): success page receipt',
+      label: 'Success page receipt',
       href: null,
     });
   });
@@ -392,7 +393,19 @@ describe('issue id de-duplication', () => {
   it('strips a trailing (ID) that repeats the identifier', () => {
     expect(
       issueLabel('JOV-10172', 'feat(lanes): split lanes (JOV-10172)')
-    ).toBe('JOV-10172 · feat(lanes): split lanes');
+    ).toBe('Split lanes');
+  });
+
+  it('reads as a plain title: no issue key, no commit prefix', () => {
+    expect(
+      plainTitle(
+        'JOV-10172',
+        'JOV-10172 feat(lanes): gem-default worktree hosts'
+      )
+    ).toBe('Gem-default worktree hosts');
+    expect(plainTitle('', 'fix!: drop the cache')).toBe('Drop the cache');
+    expect(plainTitle('JOV-1', 'Checkout copy')).toBe('Checkout copy');
+    expect(plainTitle('JOV-1', 'feat: ')).toBe('feat:');
   });
 
   it('strips a leading "ID: " and leaves other titles alone', () => {

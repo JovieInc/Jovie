@@ -106,8 +106,25 @@ export function stripIssueId(identifier: string, title: string): string {
   return stripped || title;
 }
 
+const COMMIT_PREFIX = /^[a-z]+(?:\([^)]*\))?!?:\s*/i;
+const LEADING_ISSUE_KEY = /^[A-Z][A-Z0-9]+-\d+[:\s]\s*/;
+
+/**
+ * A founder-readable title: no issue key, no conventional-commit prefix
+ * ("feat(lanes): "), first letter capitalised. Falls back to the raw title
+ * when stripping would leave nothing.
+ */
+export function plainTitle(identifier: string, title: string): string {
+  const stripped = stripIssueId(identifier, title)
+    .replace(LEADING_ISSUE_KEY, '')
+    .replace(COMMIT_PREFIX, '')
+    .trim();
+  if (!stripped) return title.trim();
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+}
+
 export function issueLabel(identifier: string, title: string): string {
-  return `${identifier} · ${stripIssueId(identifier, title)}`;
+  return plainTitle(identifier, title);
 }
 
 function trendFromPoints(points: readonly number[]): StoryFirstSparkTrend {

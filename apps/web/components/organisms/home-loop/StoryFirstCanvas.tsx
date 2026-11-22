@@ -4,10 +4,10 @@ import { Button } from '@jovie/ui';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { Sparkline } from '@/components/shell/Sparkline';
 import {
+  plainTitle,
   type StoryFirstBottleneck,
   type StoryFirstGlancePulse,
   type StoryFirstStageBucket,
-  stripIssueId,
 } from '@/lib/ovie/home/story-first';
 import { cn } from '@/lib/utils';
 import type { HomeLoopSectionStatus } from './HomeLoopSection';
@@ -199,7 +199,7 @@ function BottleneckHero({
                   ) : null}
                   {story.needs ? (
                     <div className='flex gap-1.5'>
-                      <dt className={META_LABEL}>Needs</dt>
+                      <dt className={META_LABEL}>Next</dt>
                       <dd className='text-secondary-token'>{story.needs}</dd>
                     </div>
                   ) : null}
@@ -311,8 +311,7 @@ function StageBuckets({
               </span>
               {bucket.highlight ? (
                 <span className='truncate text-2xs text-secondary-token'>
-                  {bucket.highlight.identifier}{' '}
-                  {stripIssueId(
+                  {plainTitle(
                     bucket.highlight.identifier,
                     bucket.highlight.title
                   )}

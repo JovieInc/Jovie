@@ -200,7 +200,7 @@ describe('StoryFirstCanvas colour and honesty', () => {
       <StoryFirstCanvas
         bottleneck={{
           ...bottleneck,
-          moving: { label: 'JOV-1 · Checkout copy', href: '/linear/JOV-1' },
+          moving: { label: 'Checkout copy', href: '/linear/JOV-1' },
           detailsHref: '/app/ov/certifications',
         }}
         glance={glance}
