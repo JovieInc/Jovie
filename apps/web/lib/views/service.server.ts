@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { BASE_URL } from '@/constants/domains';
 import { db } from '@/lib/db';
 import { runAtomicDbOperation } from '@/lib/db/legacy-transaction';
@@ -163,4 +163,144 @@ export async function getSharedView(token: string): Promise<SharedView | null> {
   const parsed = viewSpecSchema.safeParse(row.spec);
   if (!parsed.success) return null;
   return { ...row, spec: parsed.data };
+}
+
+export interface SaveViewResult {
+  readonly id: string;
+  readonly token: string;
+  readonly url: string;
+  /** False when the viewer already owned the view or had already saved it. */
+  readonly created: boolean;
+}
+
+/**
+ * Save a shared view into the viewer's own dashboards. Idempotent: an owner
+ * gets their own view back, and a repeat save returns the existing copy.
+ */
+export async function saveViewAsDashboard(input: {
+  readonly token: string;
+  readonly userId: string;
+}): Promise<SaveViewResult> {
+  const { token, userId } = input;
+  if (!isViewShareToken(token)) {
+    throw new PublishViewError('view_not_found', 'View not found');
+  }
+
+  return runAtomicDbOperation(
+    async tx => {
+      const [source] = await tx
+        .select({
+          id: dashboardViews.id,
+          ownerUserId: dashboardViews.ownerUserId,
+          title: dashboardViews.title,
+          spec: dashboardViews.spec,
+          shareToken: dashboardViews.shareToken,
+        })
+        .from(dashboardViews)
+        .where(
+          and(
+            eq(dashboardViews.shareToken, token),
+            isNull(dashboardViews.revokedAt)
+          )
+        )
+        .limit(1);
+      if (!source) {
+        throw new PublishViewError('view_not_found', 'View not found');
+      }
+      if (source.ownerUserId === userId) {
+        return {
+          id: source.id,
+          token: source.shareToken,
+          url: buildViewShareUrl(source.shareToken),
+          created: false,
+        };
+      }
+
+      const [existing] = await tx
+        .select({
+          id: dashboardViews.id,
+          shareToken: dashboardViews.shareToken,
+        })
+        .from(dashboardViews)
+        .where(
+          and(
+            eq(dashboardViews.forkedFromViewId, source.id),
+            eq(dashboardViews.ownerUserId, userId),
+            isNull(dashboardViews.revokedAt)
+          )
+        )
+        .limit(1);
+      if (existing) {
+        return {
+          id: existing.id,
+          token: existing.shareToken,
+          url: buildViewShareUrl(existing.shareToken),
+          created: false,
+        };
+      }
+
+      const spec = parseSpec(source.spec);
+      const newToken = generateViewShareToken();
+      const [row] = await tx
+        .insert(dashboardViews)
+        .values({
+          ownerUserId: userId,
+          title: source.title,
+          spec,
+          version: 1,
+          shareToken: newToken,
+          source: 'user',
+          createdBy: 'user',
+          forkedFromViewId: source.id,
+        })
+        .returning({ id: dashboardViews.id });
+      if (!row) throw new Error('Failed to insert view');
+      await tx
+        .insert(dashboardViewVersions)
+        .values({ viewId: row.id, version: 1, spec, createdBy: 'user' });
+      return {
+        id: row.id,
+        token: newToken,
+        url: buildViewShareUrl(newToken),
+        created: true,
+      };
+    },
+    { actorId: userId, retry: 'never' }
+  );
+}
+
+export interface OwnedDashboard {
+  readonly id: string;
+  readonly title: string;
+  readonly token: string;
+  readonly version: number;
+  readonly source: 'agent' | 'user';
+  readonly updatedAt: Date;
+}
+
+export async function listDashboardsForOwner(
+  userId: string
+): Promise<OwnedDashboard[]> {
+  const rows = await db
+    .select({
+      id: dashboardViews.id,
+      title: dashboardViews.title,
+      token: dashboardViews.shareToken,
+      version: dashboardViews.version,
+      source: dashboardViews.source,
+      updatedAt: dashboardViews.updatedAt,
+    })
+    .from(dashboardViews)
+    .where(
+      and(
+        eq(dashboardViews.ownerUserId, userId),
+        isNull(dashboardViews.revokedAt)
+      )
+    )
+    .orderBy(desc(dashboardViews.updatedAt))
+    .limit(100);
+  return rows.map(row => ({
+    ...row,
+    source: row.source === 'agent' ? 'agent' : 'user',
+  }));
 }

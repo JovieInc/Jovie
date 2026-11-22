@@ -5009,6 +5009,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/views/[token]/save/route.ts",
+      "kind": "handler",
+      "route": "/api/views/[token]/save",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/visibility-audit/offer/route.ts",
       "kind": "handler",
       "route": "/api/visibility-audit/offer",
@@ -6805,6 +6813,14 @@
       "source": "apps/web/app/app/(shell)/dashboard/tour-dates/page.tsx",
       "kind": "page",
       "route": "/app/dashboard/tour-dates",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/app/(shell)/dashboards/page.tsx",
+      "kind": "page",
+      "route": "/app/dashboards",
       "methods": [],
       "surface": "deferred",
       "classification": "C"

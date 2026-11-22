@@ -26,5 +26,12 @@ export default async function SharedViewRoute({
   const view = await getSharedView(token);
   if (!view) notFound();
   const { userId } = await getOptionalAuth();
-  return <SharedViewPage view={view} signedIn={Boolean(userId)} />;
+  return (
+    <SharedViewPage
+      view={view}
+      token={token}
+      signedIn={Boolean(userId)}
+      viewerOwnsView={Boolean(userId) && userId === view.ownerUserId}
+    />
+  );
 }

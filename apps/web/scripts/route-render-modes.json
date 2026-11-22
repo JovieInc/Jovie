@@ -122,6 +122,7 @@
     "/app/chat": "dynamic",
     "/app/chat/[id]": "dynamic",
     "/app/chats": "dynamic",
+    "/app/dashboards": "dynamic",
     "/app/contact": "dynamic",
     "/app/contacts": "dynamic",
     "/app/dashboard": "dynamic",
