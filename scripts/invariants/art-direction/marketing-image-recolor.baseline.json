@@ -1,0 +1,6 @@
+{
+  "schema": "jovie.marketing-image-recolor/v1",
+  "ids": [
+    "image-recolor:apps/web/components/features/home/label-logos.tsx:Image:brightness"
+  ]
+}
