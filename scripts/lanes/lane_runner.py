@@ -7231,8 +7231,9 @@ def note_breaker_run(host: Host, pr: dict, receipt: dict, now: float | None = No
             rows[fp] = [row for row in rows.get(fp, []) if now - float(row[0]) < BREAKER_WINDOW_S] + [[now, productive]]
             if productive:
                 entry.pop("fpOpenHead", None)
+                entry.pop("fpOpenAt", None)
             elif breaker_streak(rows[fp], now) >= fingerprint_breaker_n(host):
-                entry["fpOpenHead"] = pr["headRefOid"]
+                entry["fpOpenHead"], entry["fpOpenAt"] = pr["headRefOid"], now  # held FP_HOLD_S, then retried
                 tripped.append(fp)
         entry["lastRunId"] = receipt.get("runId")
         if breaker_streak(entry["runs"], now) == BREAKER_STREAK and not entry.get("signalAt"):

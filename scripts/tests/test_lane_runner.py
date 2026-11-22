@@ -8319,6 +8319,32 @@ class FixRedTest(unittest.TestCase):
             lane.note_breaker_run(host, pr, {**receipt, "verdict": "fix-pushed"}, now=1020)
             self.assertFalse(lane.fingerprint_breaker_open(host, pr, route["key"], 1021))
 
+    def test_a_fingerprint_hold_ends_after_its_window_so_the_pr_is_retried(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            pr = self.pr()
+            route = {"cls": "other", "key": "abc123abc123", "action": "agent", "signature": "assertionerror"}
+            receipt = {"verdict": "fix-no-change", "runId": "r", "failureFingerprint": route}
+            for index in range(lane.fingerprint_breaker_n(host)):
+                lane.note_breaker_run(host, pr, receipt, now=1000 + index)
+            tripped = 1000 + lane.fingerprint_breaker_n(host) - 1
+            hold = lane.pr_events.FP_HOLD_S
+            self.assertTrue(lane.pr_events.pr_breaker_open(host, 5, tripped + hold - 1, pr["headRefOid"]))
+            self.assertFalse(lane.pr_events.pr_breaker_open(host, 5, tripped + hold, pr["headRefOid"]),
+                             "the same head gets another repair once the hold ends")
+            # misses after the release trip it again, with a fresh hold
+            later = tripped + hold + 10
+            for index in range(lane.fingerprint_breaker_n(host)):
+                lane.note_breaker_run(host, pr, receipt, now=later + index)
+            self.assertTrue(lane.pr_events.pr_breaker_open(host, 5, later + hold - 100, pr["headRefOid"]))
+            self.assertEqual(len(list((host.state / "factory-signals").glob("*.json"))), 1, "one machine-gap issue per class")
+
+    def test_a_legacy_fingerprint_hold_without_a_stamp_releases(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            (host.state / "pr-breaker.json").write_text(json.dumps({"5": {"runs": [], "fpOpenHead": "h1"}}))
+            self.assertFalse(lane.pr_events.pr_breaker_open(host, 5, 5_000_000, "h1"))
+
     def test_red_pr_waits_for_settled_checks_and_caps_attempts(self):
         pending = self.pr(checks=[{"status": "IN_PROGRESS"}, {"conclusion": "FAILURE"}])
         green = self.pr(checks=[{"status": "COMPLETED", "conclusion": "SUCCESS"}])
