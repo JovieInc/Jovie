@@ -6,10 +6,10 @@
 .sidebar-o-status {
   opacity: 0;
   transform: translateX(-0.25rem);
-  /* Out: opacity only; the travel resets after the fade so nothing jumps. */
+  /* Out: opacity only; step-end holds the travel until the fade ends. */
   transition:
     opacity var(--duration-normal) var(--ease-subtle),
-    transform 0s linear var(--duration-normal);
+    transform var(--duration-normal) step-end;
 }
 
 .sidebar-o-status[data-state="visible"] {
