@@ -9,7 +9,13 @@
 
 import { Download, Share2, Sparkles, Users } from 'lucide-react';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  ViewTransition,
+} from 'react';
 import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import { Icon } from '@/components/atoms/Icon';
 import { CreditList } from '@/components/molecules/CreditList';
@@ -35,15 +41,23 @@ import {
   type StorefrontProvider as Provider,
   useStorefrontProviders,
 } from '@/lib/discography/useStorefrontProviders';
+import {
+  artistTitleTransitionName,
+  releaseCoverTransitionName,
+  releaseTitleTransitionName,
+} from '@/lib/motion/view-transition-names';
 import { canonicalizeReleaseArtistHandle } from '@/lib/profile/opaque-internal-profile-handle';
-import { buildReleaseShareContext } from '@/lib/share/context';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 import {
   appendUTMParamsToUrl,
   type PartialUTMParams,
-  resolveSmartLinkOutboundUtmParams,
   SMART_LINK_DEFAULT_UTM_PARAMS,
 } from '@/lib/utm';
+import {
+  createReleaseShareContext,
+  getReleaseSharePathname,
+  resolveReleaseUtmParams,
+} from './release-landing-share';
 
 export interface FeaturedArtist {
   readonly name: string;
@@ -87,68 +101,6 @@ interface ReleaseLandingPageProps
     readonly downloadUrl?: string | null;
     readonly initialMenuOpen?: boolean;
   }> {}
-
-function resolveReleaseUtmParams(
-  defaultParams: PartialUTMParams
-): PartialUTMParams {
-  if (globalThis.window === undefined) {
-    return defaultParams;
-  }
-
-  return resolveSmartLinkOutboundUtmParams(
-    new URLSearchParams(globalThis.location.search),
-    defaultParams
-  );
-}
-
-function getReleaseSharePathname(
-  artistHandle: string | null,
-  shareSlug: string
-): string | undefined {
-  if (artistHandle) {
-    return `/${artistHandle}/${shareSlug}`;
-  }
-
-  if (shareSlug === 'release') {
-    return undefined;
-  }
-
-  return `/r/${shareSlug}`;
-}
-
-function createReleaseShareContext({
-  artistHandle,
-  artistName,
-  releaseTitle,
-  artworkUrl,
-  shareSlug,
-  sharePathname,
-}: Readonly<{
-  artistHandle: string | null;
-  artistName: string;
-  releaseTitle: string;
-  artworkUrl: string | null;
-  shareSlug: string;
-  sharePathname: string | undefined;
-}>) {
-  return buildReleaseShareContext({
-    username: artistHandle ?? 'release',
-    slug: shareSlug,
-    title: releaseTitle,
-    artistName,
-    artworkUrl,
-    pathname: sharePathname,
-    storyQueryParams: artistHandle
-      ? undefined
-      : {
-          slug: shareSlug,
-          title: releaseTitle,
-          artistName,
-          pathname: sharePathname ?? `/r/${shareSlug}`,
-          artworkUrl,
-        },
-  });
-}
 
 function SmartLinkClaimBanner({
   profileId,
@@ -308,7 +260,6 @@ function SmartLinkArtistLine({
     </p>
   );
 }
-
 export function ReleaseLandingPage({
   release,
   artist,
@@ -401,6 +352,11 @@ export function ReleaseLandingPage({
       onMenuOpen={() => setMenuOpen(true)}
       returnHref={artist.handle ? `/${artist.handle}` : null}
       returnLabel={`Back to ${artist.name}`}
+      artworkViewTransitionName={
+        tracking?.smartLinkSlug
+          ? releaseCoverTransitionName(tracking.smartLinkSlug)
+          : undefined
+      }
       artworkWrapper={
         allowDownloads
           ? img => (
@@ -416,12 +372,36 @@ export function ReleaseLandingPage({
       }
       heroMeta={
         <div className='min-w-0'>
-          <h1 className={SMART_LINK_HERO_TITLE_CLASS}>{release.title}</h1>
-          <SmartLinkArtistLine
-            artist={artist}
-            primaryArtists={primaryArtists}
-            featuredArtists={featuredArtists}
-          />
+          {tracking?.smartLinkSlug ? (
+            <ViewTransition
+              name={releaseTitleTransitionName(tracking.smartLinkSlug)}
+              share='jovie-morph'
+              default='none'
+            >
+              <h1 className={SMART_LINK_HERO_TITLE_CLASS}>{release.title}</h1>
+            </ViewTransition>
+          ) : (
+            <h1 className={SMART_LINK_HERO_TITLE_CLASS}>{release.title}</h1>
+          )}
+          {artist.handle ? (
+            <ViewTransition
+              name={artistTitleTransitionName(artist.handle)}
+              share='jovie-morph'
+              default='none'
+            >
+              <SmartLinkArtistLine
+                artist={artist}
+                primaryArtists={primaryArtists}
+                featuredArtists={featuredArtists}
+              />
+            </ViewTransition>
+          ) : (
+            <SmartLinkArtistLine
+              artist={artist}
+              primaryArtists={primaryArtists}
+              featuredArtists={featuredArtists}
+            />
+          )}
         </div>
       }
     >

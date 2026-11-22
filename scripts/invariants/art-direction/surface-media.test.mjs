@@ -121,6 +121,9 @@ describe('surface media', () => {
         'marketing-hero-zoom',
         'onboarding-start-step-panel',
         'artist-profile-mode-morph',
+        'scroll-reveal',
+        'marketing-glass-flyout',
+        'route-view-transitions',
       ]
     );
     assert.equal(scopeIdFor(ZOOM), 'marketing-hero-zoom');

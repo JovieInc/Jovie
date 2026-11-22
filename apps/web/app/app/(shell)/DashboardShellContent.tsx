@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { ViewTransition } from 'react';
 import { UnavailablePage } from '@/components/UnavailablePage';
 import { APP_ROUTES } from '@/constants/routes';
 import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBannerWrapper';
@@ -202,7 +203,15 @@ export async function DashboardShellContent({
           )
         }
       >
-        {initiallyLocked ? null : children}
+        {initiallyLocked ? null : (
+          <ViewTransition
+            enter='jovie-crossfade'
+            exit='jovie-crossfade'
+            default='none'
+          >
+            {children}
+          </ViewTransition>
+        )}
       </DashboardShellPrivacyBoundary>
     </div>
   );
