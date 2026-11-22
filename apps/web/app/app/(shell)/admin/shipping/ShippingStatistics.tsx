@@ -123,8 +123,14 @@ export function ShippingStatistics() {
             </thead>
             <tbody>
               {rows.map(row => (
-                <tr key={row.label} className={shellListRowClasses({ interactive: false })}>
-                  <th scope='row' className='px-3 py-1.5 font-medium whitespace-nowrap'>
+                <tr
+                  key={row.label}
+                  className={shellListRowClasses({ interactive: false })}
+                >
+                  <th
+                    scope='row'
+                    className='px-3 py-1.5 font-medium whitespace-nowrap'
+                  >
                     {row.label}
                   </th>
                   <td className='px-3 py-1.5'>

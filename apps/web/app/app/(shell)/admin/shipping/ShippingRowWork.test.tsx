@@ -18,7 +18,9 @@ describe('ShippingRowWork', () => {
       container.querySelector('[data-attention-dot="failing"]')
     ).not.toBeNull();
     expect(screen.getByText('Failing release')).toHaveClass('font-medium');
-    expect(screen.getByText('JOV-1 · #101 · Failing')).toHaveClass('text-2xs');
+    expect(screen.getByText('JOV-1 · #101 · Failing')).toHaveClass(
+      'text-2xs'
+    );
   });
 
   it('omits the dot and label when nothing needs attention', () => {

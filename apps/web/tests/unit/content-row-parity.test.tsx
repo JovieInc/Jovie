@@ -1,8 +1,8 @@
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
 import type { ComponentProps, ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ShippingMatrix } from '@/app/app/(shell)/admin/shipping/ShippingMatrix';
@@ -95,7 +95,7 @@ const task: TaskView = {
   assigneeKind: 'human',
   assigneeUserId: null,
   agentType: null,
-  agentStatus: null,
+  agentStatus: 'idle',
   agentInput: null,
   agentOutput: null,
   agentError: null,
@@ -147,7 +147,9 @@ async function renderShipping(selected: boolean) {
   vi.stubGlobal('fetch', fetchMock);
   render(
     <QueryClientProvider
-      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      client={
+        new QueryClient({ defaultOptions: { queries: { retry: false } } })
+      }
     >
       <ShippingMatrix />
     </QueryClientProvider>
@@ -182,7 +184,9 @@ describe('content row parity (Fleet, Shipping, Tasks)', () => {
   it('shares one two-line height, inset and type recipe', async () => {
     const fleet = renderFleet(false);
     const shipping = await renderShipping(false);
-    render(<TaskListRow task={task} onOpenRelease={vi.fn()} artistName='Tim' />);
+    render(
+      <TaskListRow task={task} onOpenRelease={vi.fn()} artistName='Tim' />
+    );
     const tasks = screen.getByTestId('task-list-row-parity-task');
 
     for (const row of [fleet, shipping, tasks]) {
