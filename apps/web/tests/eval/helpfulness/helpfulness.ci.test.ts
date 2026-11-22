@@ -203,6 +203,39 @@ describe('hard checks', () => {
     expect(scoreCase(outreach.id, intakeChecks, null).passed).toBe(false);
   });
 
+  it('hard-fails ASS-100 promise-only draft stub on clear draft asks', async () => {
+    const { EMPTY_ASSISTANT_REPLY_FALLBACK } = await import(
+      '@/lib/chat/voice-lint'
+    );
+    const adCopy = HELPFULNESS_CASES.find(
+      c => c.id === 'ad-copy-presave-budget'
+    );
+    const outreach = HELPFULNESS_CASES.find(
+      c => c.id === 'specialist-outreach'
+    );
+    if (!adCopy || !outreach) throw new Error('missing ASS-100 cases');
+    for (const c of [adCopy, outreach]) {
+      const checks = runHardChecks(c, {
+        text: EMPTY_ASSISTANT_REPLY_FALLBACK,
+        toolCalls: [],
+      });
+      expect(
+        checks.find(x => x.id === 'promise_draft_not_a_move')?.ok,
+        c.id
+      ).toBe(false);
+      expect(scoreCase(c.id, checks, null).passed, c.id).toBe(false);
+    }
+
+    const goodOutreach = runHardChecks(outreach, {
+      text: 'Ambient Evening pitch for Night Swim (held): "Night Swim lands Friday — downtempo fit for your list. jov.ie/lunawaves." One email, no send until yes.',
+      toolCalls: [],
+    });
+    expect(
+      goodOutreach.find(x => x.id === 'promise_draft_not_a_move')?.ok
+    ).toBe(true);
+    expect(goodOutreach.find(x => x.id === 'grounding_0')?.ok).toBe(true);
+  });
+
   it('hard-fails question-not-a-move (one-rec) on clarifying closers', () => {
     if (!songOutFriday) throw new Error('missing case');
     for (const id of ['greeting', 'followup-do-it', 'collab'] as const) {
