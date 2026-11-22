@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
@@ -12,9 +12,9 @@ vi.mock('@/lib/auth/require-auth', () => ({
   requireAuth: hoisted.requireAuth,
 }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
-vi.mock('@/lib/rate-limit', () => ({
+vi.mock('@/lib/rate-limit', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/rate-limit')>()),
   generalLimiter: { limit: hoisted.limit },
-  createRateLimitHeaders: () => ({}),
 }));
 vi.mock('@/lib/views/service.server', () => {
   class PublishViewError extends Error {
@@ -32,7 +32,7 @@ import { POST } from '@/app/api/views/[token]/save/route';
 import { PublishViewError } from '@/lib/views/service.server';
 
 const params = (token: string) => ({ params: Promise.resolve({ token }) });
-const request = new Request('http://localhost/api/views/x/save', {
+const request = new NextRequest('http://localhost/api/views/x/save', {
   method: 'POST',
 });
 
@@ -76,7 +76,12 @@ describe('POST /api/views/[token]/save', () => {
 
   it('returns 429 when rate limited', async () => {
     hoisted.requireAuth.mockResolvedValue({ userId: 'user-1', error: null });
-    hoisted.limit.mockResolvedValue({ success: false });
+    hoisted.limit.mockResolvedValue({
+      success: false,
+      limit: 10,
+      remaining: 0,
+      reset: new Date('2026-11-22T00:00:00Z'),
+    });
     const res = await POST(request, params('a'.repeat(32)));
     expect(res.status).toBe(429);
   });

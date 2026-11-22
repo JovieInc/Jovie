@@ -158,7 +158,7 @@ describe('getSharedView', () => {
   });
 
   it('returns the validated view', async () => {
-    const updatedAt = new Date();
+    const updatedAt = new Date('2026-11-22T00:00:00Z');
     hoisted.dbSelect.push([
       {
         id: 'v',

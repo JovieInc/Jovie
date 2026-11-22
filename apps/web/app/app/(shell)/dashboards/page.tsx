@@ -32,7 +32,9 @@ export default async function DashboardsPage() {
 
   return (
     <div className='mx-auto w-full max-w-5xl space-y-4 px-4 py-6'>
-      <h1 className='text-lg font-medium text-primary-token'>Dashboards</h1>
+      <h1 className='truncate text-lg font-medium text-primary-token'>
+        Dashboards
+      </h1>
       <DashboardsTable rows={rows} />
     </div>
   );
