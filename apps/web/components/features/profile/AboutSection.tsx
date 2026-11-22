@@ -111,7 +111,7 @@ export function AboutSection({
   pressPhotos = [],
   allowPhotoDownloads = false,
   bioSegments,
-  creditSegments,
+  creditSegments: _creditSegments,
   contacts = [],
 }: AboutSectionProps) {
   const hasBio = Boolean(artist.tagline);
@@ -124,7 +124,7 @@ export function AboutSection({
   const hasGenres = uniqueGenres.length > 0;
   const hasPressPhotos = allowPhotoDownloads && pressPhotos.length > 0;
   const hasMetadata = hasLocation || hasHometown || hasActiveSince;
-  const hasCredits = Boolean(creditSegments && creditSegments.length > 0);
+  // JOV-14241: release credits live in the release menu only.
   const contactableContacts = groupAboutContactsByRole(
     contacts.filter(contact => contact.channels.length > 0)
   );
@@ -132,12 +132,7 @@ export function AboutSection({
   const contactHref = `/${encodeURIComponent(artist.handle)}?mode=contact`;
 
   const hasContent =
-    hasBio ||
-    hasMetadata ||
-    hasGenres ||
-    hasPressPhotos ||
-    hasCredits ||
-    hasContacts;
+    hasBio || hasMetadata || hasGenres || hasPressPhotos || hasContacts;
 
   if (!hasContent) {
     return (
@@ -198,20 +193,6 @@ export function AboutSection({
               </span>
             );
           })}
-        </div>
-      )}
-
-      {hasCredits && (
-        <div
-          className='profile-about-credits'
-          data-testid='profile-about-credits'
-        >
-          <h2 className='mb-2 text-balance text-app font-caption text-on-media/70'>
-            Selected Credits
-          </h2>
-          <p className='text-sm font-book leading-relaxed text-on-media/70'>
-            <EntityMentionText segments={creditSegments ?? []} />
-          </p>
         </div>
       )}
 
