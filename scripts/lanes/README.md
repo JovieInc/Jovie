@@ -445,8 +445,10 @@ receipt separates sourced precedent, internal evidence, inference, and new learn
 explicit answer to what is materially different about Jovie's case.
 
 The same minute tick schedules `yc_corpus.py refresh` at most daily. Each run rotates through at most
-40 public YC Library/blog/YouTube records, respects robots, writes metadata plus bounded excerpts into
-the existing GBrain store, and content-hash skips unchanged source and derived-playbook pages. Refresh
+40 public YC Library/blog/YouTube records, respects robots, writes metadata, a bounded excerpt and, for
+YC Library talks, the full embedded transcript (`yc_transcript.py`, internal retrieval only, never
+republished) into the existing GBrain store, and content-hash skips unchanged source and derived-playbook
+pages. Bumping `yc_transcript.RENDER` re-fetches every stored page past ETag/304, up to 200 a run. Refresh
 health is recorded under `ycCorpus` in `tick.json`; it never silently converts an outage into a miss.
 A release self-test (`LANES_SELFTEST`) never schedules the refresh, and its default fetch and `gbrain`
 helpers refuse to run there; every self-test process carries a per-run `JOVIE_SELFTEST_RUN` marker and
