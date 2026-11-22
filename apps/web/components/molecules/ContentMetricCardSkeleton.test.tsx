@@ -1,8 +1,8 @@
 import { render, within } from '@testing-library/react';
 import { Eye } from 'lucide-react';
 import { expect, it } from 'vitest';
-import { ContentMetricCard } from './ContentMetricCard';
 import { expectFlatState } from '@/tests/utils/flat-state';
+import { ContentMetricCard } from './ContentMetricCard';
 import { ContentMetricCardSkeleton } from './ContentMetricCardSkeleton';
 
 it.each([

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { DropdownEmptyRow } from './DropdownEmptyRow';
 import { expectFlatState } from '@/tests/utils/flat-state';
+import { DropdownEmptyRow } from './DropdownEmptyRow';
 
 describe('DropdownEmptyRow', () => {
   it('renders the message text', () => {

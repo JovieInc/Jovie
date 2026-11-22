@@ -10,7 +10,7 @@ import { LoadingSkeleton } from './LoadingSkeleton';
 function FlatStatesGallery() {
   return (
     <div
-      className='grid w-[min(56rem,calc(100vw-2rem))] gap-8 bg-(--app-shell-content-surface) p-6 sm:grid-cols-2'
+      className='grid w-full max-w-4xl gap-8 bg-(--app-shell-content-surface) p-6 sm:grid-cols-2'
       data-testid='flat-states-gallery'
     >
       <section aria-label='Empty state' className='min-h-64'>

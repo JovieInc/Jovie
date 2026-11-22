@@ -28,8 +28,7 @@ export function flatChromeOffenders(root: Element): string[] {
       tokens.includes('border-transparent') ||
       tokens.some(token => SIDE_BORDER.test(token));
     const chrome = tokens.filter(
-      token =>
-        CARD_CHROME.test(token) && !(divider && BORDER_TOKEN.test(token))
+      token => CARD_CHROME.test(token) && !(divider && BORDER_TOKEN.test(token))
     );
     if (chrome.length > 0)
       offenders.push(`${element.tagName.toLowerCase()}: ${chrome.join(' ')}`);

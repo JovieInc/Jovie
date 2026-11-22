@@ -52,9 +52,7 @@ export function TippingEmptyState({
   const config = EMPTY_STATE_CONFIG[type];
 
   const content = (
-    <div
-      className={`p-8 text-center ${className}`}
-    >
+    <div className={`p-8 text-center ${className}`}>
       <EmptyState
         icon={
           <div className='relative h-9 w-9 max-h-full max-w-full overflow-hidden'>

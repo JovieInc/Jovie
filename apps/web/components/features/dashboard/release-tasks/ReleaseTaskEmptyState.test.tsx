@@ -12,7 +12,9 @@ describe('ReleaseTaskEmptyState', () => {
     );
 
     expectFlatState(container);
-    expect(screen.getByTestId('release-task-empty-state')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('release-task-empty-state-content')
+    ).toBeInTheDocument();
   });
 
   it('generates the release plan on request', async () => {

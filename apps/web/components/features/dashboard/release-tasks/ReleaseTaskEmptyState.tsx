@@ -17,7 +17,7 @@ export function ReleaseTaskEmptyState({
   isLoading,
 }: ReleaseTaskEmptyStateProps) {
   return (
-    <div data-testid='release-task-empty-state'>
+    <div data-testid='release-task-empty-state-content'>
       <EmptyState
         icon={<ListChecks className='h-5 w-5' aria-hidden='true' />}
         heading='Your Release Playbook'

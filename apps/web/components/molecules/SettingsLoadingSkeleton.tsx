@@ -28,9 +28,7 @@ export function SettingsLoadingSkeleton({
             <div className={`h-7 ${titleWidth} rounded skeleton`} />
             <div className={`h-4 ${descriptionWidth} rounded skeleton`} />
           </div>
-          <div className='space-y-4 py-4 sm:py-5'>
-            {children}
-          </div>
+          <div className='space-y-4 py-4 sm:py-5'>{children}</div>
         </section>
       </div>
     </div>

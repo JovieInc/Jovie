@@ -1,7 +1,7 @@
 {
   "schema": "jovie-card-intent-ratchet-baseline/v1",
   "rule": "Shrink-only count of card primitive usages (Card, ContentSurfaceCard, DrawerSurfaceCard) without an intent prop. Never raise it: add an intent or remove the card. When a count drops, run --write to lock the floor lower.",
-  "total": 315,
+  "total": 313,
   "files": {
     "apps/web/app/app/(shell)/admin/_components/AdminConversionFunnelSection.tsx": 2,
     "apps/web/app/app/(shell)/admin/_components/AdminHealthDashboard.tsx": 2,
@@ -116,7 +116,6 @@
     "apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.tsx": 3,
     "apps/web/components/features/dashboard/organisms/dsp-matches/ConfirmMatchDialog.tsx": 3,
     "apps/web/components/features/dashboard/organisms/listen-now-form/ListenNowForm.tsx": 4,
-    "apps/web/components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form.tsx": 2,
     "apps/web/components/features/dashboard/organisms/onboarding/OnboardingCompleteStep.tsx": 1,
     "apps/web/components/features/dashboard/organisms/onboarding/OnboardingDspStep.tsx": 2,
     "apps/web/components/features/dashboard/organisms/onboarding/OnboardingProfileReviewStep.tsx": 1,

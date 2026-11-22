@@ -22,7 +22,7 @@ describe('ReleaseTaskEmptyState', () => {
     expect(
       screen.queryByTestId('release-task-empty-state-card')
     ).not.toBeInTheDocument();
-    expectFlatState(screen.getByTestId('release-task-empty-state'));
+    expectFlatState(screen.getByTestId('release-task-empty-state-content'));
     expect(container.querySelector('svg')).toHaveAttribute(
       'aria-hidden',
       'true'
