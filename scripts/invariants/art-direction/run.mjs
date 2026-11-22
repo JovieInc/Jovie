@@ -9,6 +9,8 @@ import { REPO_ROOT } from './paths.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SKIP = new Set([
+  'accent-pack-config.mjs',
+  'accent-pack-lib.mjs',
   'color.mjs',
   'paths.mjs',
   'ratchet.mjs',
