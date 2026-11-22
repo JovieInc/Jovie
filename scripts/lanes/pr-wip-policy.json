@@ -27,12 +27,7 @@
     "devin": 4,
     "grok": 4
   },
-  "exemptProducers": [
-    "tim",
-    "dependabot",
-    "revert",
-    "gh-readonly-queue"
-  ],
+  "exemptProducers": ["tim", "dependabot", "revert", "gh-readonly-queue"],
   "liveWindowHours": 48,
   "expire": {
     "enabled": false,
@@ -41,8 +36,6 @@
     "anyIdleDays": 21,
     "maxClosesPerTick": 10
   },
-  "perSession": [
-    "claude"
-  ],
+  "perSession": ["claude"],
   "perSessionCap": 3
 }
