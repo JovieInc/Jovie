@@ -109,9 +109,10 @@ describe('OvieHomeCanvas Story First flat', () => {
     expect(
       screen.getByTestId('story-first-stage-investigating')
     ).toHaveAttribute('data-highlighted', 'true');
+    // Plain title only: the issue key stays out of the founder view.
     expect(
       screen.getByTestId('story-first-stage-investigating')
-    ).toHaveTextContent('JOV-1');
+    ).not.toHaveTextContent('JOV-1');
     expect(
       screen.getByTestId('story-first-stage-investigating')
     ).toHaveTextContent('Blocked task');
@@ -219,7 +220,6 @@ describe('OvieHomeCanvas Story First flat', () => {
     await vi.waitFor(() =>
       expect(hero).toHaveTextContent("we can't confirm anyone can pay")
     );
-    // The lead shipping row (JOV-1 "Blocked task") isn't checkout work.
     expect(hero).not.toHaveTextContent('Moving');
     expect(hero).not.toHaveTextContent('Blocked task');
   });

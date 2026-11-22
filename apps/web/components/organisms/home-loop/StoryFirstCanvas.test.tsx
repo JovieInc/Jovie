@@ -28,6 +28,7 @@ const glance: readonly StoryFirstGlancePulse[] = [
     delta: '+3',
     tone: 'good',
     measured: true,
+    reason: null,
     // ≥3 points required to paint a sparkline (#26311).
     points: [11, 12, 14],
     trend: 'up',
@@ -40,6 +41,7 @@ const glance: readonly StoryFirstGlancePulse[] = [
     delta: 'alive',
     tone: 'good',
     measured: true,
+    reason: null,
     points: [11.8, 12, 12.4],
     trend: 'up',
     href: '/app/ov/ops',
@@ -51,6 +53,7 @@ const glance: readonly StoryFirstGlancePulse[] = [
     delta: '+18',
     tone: 'good',
     measured: true,
+    reason: null,
     points: [230, 240, 248],
     trend: 'up',
     href: '/app/ov/growth',
@@ -173,7 +176,7 @@ describe('StoryFirstCanvas', () => {
 });
 
 describe('StoryFirstCanvas shipping delta', () => {
-  it('colors a negative delta as an error even when the pulse tone is good', () => {
+  it('reads a negative delta as bad, in grey, even when the pulse tone is good', () => {
     render(
       <StoryFirstCanvas
         bottleneck={bottleneck}
@@ -183,8 +186,70 @@ describe('StoryFirstCanvas shipping delta', () => {
         stages={[]}
       />
     );
-    expect(screen.getByText('-16')).toHaveClass('text-error');
-    expect(screen.getByText('-16')).not.toHaveClass('text-success');
+    // Direction is data, colour is not: the delta stays a neutral grey.
+    expect(screen.getByText('-16')).toHaveAttribute('data-delta-tone', 'bad');
+    expect(screen.getByText('-16')).not.toHaveClass('text-error');
+    expect(screen.getByText('-16')).toHaveClass('text-tertiary-token');
     expect(screen.queryByLabelText('Shipping · 7d trend')).toBeNull();
+  });
+});
+
+describe('StoryFirstCanvas colour and honesty', () => {
+  it('renders links and counters as neutral text, never accent-coloured', () => {
+    const { container } = render(
+      <StoryFirstCanvas
+        bottleneck={{
+          ...bottleneck,
+          moving: { label: 'Checkout copy', href: '/linear/JOV-1' },
+          detailsHref: '/app/ov/certifications',
+        }}
+        glance={glance}
+        stages={[
+          {
+            stage: 'investigating',
+            label: 'Investigating',
+            count: 6,
+            highlight: { identifier: 'JOV-9', title: 'Work', href: '/x' },
+          },
+        ]}
+        inFlightHref='/app/ov/shipping'
+      />
+    );
+    for (const link of container.querySelectorAll('a')) {
+      expect(link.className).not.toMatch(/text-accent/);
+    }
+    expect(screen.getByText('6')).not.toHaveClass('text-accent');
+    expect(container.querySelectorAll('.text-accent')).toHaveLength(0);
+  });
+
+  it('says why a pulse is not measured instead of a bare Not measured wall', () => {
+    render(
+      <StoryFirstCanvas
+        bottleneck={bottleneck}
+        glance={[
+          {
+            ...glance[0],
+            value: 'Not measured',
+            measured: false,
+            delta: null,
+            points: [],
+            reason: "GitHub's merge count didn't load",
+          },
+        ]}
+        stages={[]}
+      />
+    );
+    expect(
+      screen.getByTestId('story-first-glance-shipping-reason')
+    ).toHaveTextContent("GitHub's merge count didn't load");
+  });
+
+  it('labels the In Flight scope as open agent PRs', () => {
+    render(
+      <StoryFirstCanvas bottleneck={bottleneck} glance={glance} stages={[]} />
+    );
+    expect(screen.getByTestId('story-first-stages')).toHaveTextContent(
+      'open agent PRs'
+    );
   });
 });
