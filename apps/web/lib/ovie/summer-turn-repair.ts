@@ -54,7 +54,7 @@ export async function fileSummerTurnRepair(
   lastFiled.set(key, now);
   pending.set(key, 0);
   const fingerprint = summerTurnRepairFingerprint(failure.hop);
-  const line = `- ${failure.at.toISOString()} ${failure.environment} state=${failure.state} request=${failure.requestId} (${count} failure${count === 1 ? '' : 's'} since the last note)`;
+  const line = `Latest: ${failure.at.toISOString()} ${failure.environment} state=${failure.state} request=${failure.requestId} (${count} failure${count === 1 ? '' : 's'} since the last note)`;
   try {
     const found = await graphql<{
       issues: {

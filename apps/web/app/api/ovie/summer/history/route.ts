@@ -116,14 +116,12 @@ export async function GET() {
       .map(turn => turn.userText?.trim())
       .filter((text): text is string => Boolean(text))
       .reverse();
-    if (asked.length === 0) return [];
+    if (asked.length === 0) return null;
     const shown = asked
       .slice(0, UNANSWERED_SHOWN)
-      .map(
-        text => `- “${text.length > 140 ? `${text.slice(0, 139)}…` : text}”`
-      );
+      .map(text => `“${text.length > 140 ? `${text.slice(0, 139)}…` : text}”`);
     const rest = asked.length - shown.length;
-    return [[...shown, ...(rest > 0 ? [`- and ${rest} more`] : [])].join('\n')];
+    return rest > 0 ? `${shown.join(', ')} and ${rest} more` : shown.join(', ');
   };
   const collapseSummary = (turns: (typeof sorted)[number][]) => {
     const counts = new Map<string, number>();
@@ -141,13 +139,9 @@ export async function GET() {
       content: (() => {
         const head = `${turns.length} earlier Summer ${turns.length === 1 ? 'turn' : 'turns'} ended without a reply (${breakdown}).`;
         const asked = unanswered(turns);
-        return asked.length === 0
+        return asked === null
           ? `${head} Resend the message to retry.`
-          : [
-              `${head} Here is what you asked, newest first, so nothing is lost:`,
-              ...asked,
-              'Resend the message to retry any that still matter.',
-            ].join('\n\n');
+          : `${head} You asked, newest first, so nothing is lost: ${asked}.\n\nResend the message to retry any that still matter.`;
       })(),
       clientMessageId: null,
       createdAt: last.createdAt,
