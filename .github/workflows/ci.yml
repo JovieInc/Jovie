@@ -3168,14 +3168,8 @@ jobs:
 
   ci-profile-viewport-sweep:
     name: ci-fast (profile viewport sweep)
-    # Secret-free browser proof for public-profile visual, accessibility, and
-    # runtime behavior. The aggregate makes this required on PR and merge-group
-    # heads whenever the sweep surface selector matches. It runs
-    # the viewport sweep (tests/e2e/profile/viewport-sweep.spec.ts): geometric
-    # layout checks across widths 320..1440, continuous resize, embedded panes,
-    # tabs and overlays for the public profile and the golden-path public pages.
-    # Separate from ci-fast (profile browser) so neither job's timeout budget is
-    # raised; ci-fast fails closed on this job's result.
+    # Viewport sweep (tests/e2e/profile/viewport-sweep.spec.ts) for the public
+    # profile and golden-path pages; ci-fast fails closed on its result.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     runs-on: ubuntu-24.04
     permissions:
@@ -3186,28 +3180,14 @@ jobs:
       !cancelled() &&
       needs.ci-lockfile-preflight.result == 'success' &&
       needs.ci-path-changes.result == 'success' &&
-      (
-        github.event_name != 'merge_group' ||
-        (
-          needs.ci-merge-group-workspace.result == 'success' &&
-          needs.ci-merge-group-admission.result == 'success' &&
-          needs.ci-merge-group-admission.outputs.admitted == 'true'
-        )
-      )
+      (github.event_name != 'merge_group' || (needs.ci-merge-group-workspace.result == 'success' &&
+      needs.ci-merge-group-admission.result == 'success' && needs.ci-merge-group-admission.outputs.admitted == 'true'))
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           persist-credentials: false
       - name: Fetch base-branch history
-        # The profile selector reads history only through
-        # `git diff --name-only --no-renames <base> HEAD -- <pathspecs>`, a
-        # pure tree diff: it needs HEAD's full commit/tree ancestry plus
-        # origin/<base>, never historical blobs (rename detection, the only
-        # blob reader, is disabled). A plain --unshallow downloaded every
-        # historical blob (~47s on the hosted runner). --filter=blob:none
-        # keeps every commit and tree, so the selection is identical. The
-        # selector runs with GIT_NO_LAZY_FETCH=1 to prove no promisor fetch.
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -3216,71 +3196,33 @@ jobs:
           set -euo pipefail
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
           git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
-      - name: Select public-profile browser admission
-        id: profile-browser
+      - name: Select viewport sweep admission
+        id: sweep
         shell: bash
         env:
           GIT_NO_LAZY_FETCH: '1'
+          EVENT: ${{ github.event_name }}
+          MG_BASE: ${{ github.event.merge_group.base_sha }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" == "merge_group" ]]; then
-            BASE="${{ github.event.merge_group.base_sha }}"
-          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            git fetch origin "${{ github.base_ref }}" --no-tags
-            BASE="origin/${{ github.base_ref }}"
-          elif [[ -n "${{ github.event.before }}" && "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
-            BASE="${{ github.event.before }}"
-          else
-            BASE="HEAD^1"
-          fi
-
-          CHANGED_FILES="$(git diff --diff-filter=ACDMRT --name-only --no-renames "$BASE" HEAD -- \
-            ':(glob)apps/web/app/\[username\]/**' \
-            'apps/web/app/(marketing)/renders/profile-admission/**' \
-            'apps/web/app/(marketing)/renders/**' \
-            'apps/web/app/api/profile/**' \
-            'apps/web/components/features/home/homepage-profile-preview-fixture.ts' \
-            'apps/web/components/features/release/SmartLinkProviderButton.tsx' \
-            'apps/web/components/features/profile/**' \
-            'apps/web/components/organisms/CookieBannerMount.tsx' \
-            'apps/web/components/organisms/CookieBannerSection.tsx' \
-            'apps/web/lib/cookies/**' \
-            'apps/web/lib/profile/**' \
-            'apps/web/lib/rate-limit/**' \
-            'apps/web/lib/tracking/pac-**' \
-            'apps/web/styles/design-system.css' \
-            ':(glob)apps/web/styles/**' \
-            'apps/web/app/(home)/**' \
-            'apps/web/app/(auth)/**' \
-            'apps/web/app/(marketing)/pricing/**' \
-            'apps/web/components/features/home/**' \
-            'apps/web/components/features/auth/**' \
-            'apps/web/components/features/pricing/**' \
-            'apps/web/tests/e2e/profile/viewport-sweep.spec.ts' \
-            ':(glob)apps/web/tests/e2e/utils/viewport-sweep-*.ts' \
-            'apps/web/tests/product-screenshots/route-dom-certification-support.ts' \
-            'apps/web/tests/e2e/profile-admission.spec.ts' \
-            'apps/web/tests/e2e/profile/public-profile-layout.spec.ts' \
-            'apps/web/tests/e2e/profile/responsive-shell.spec.ts' \
-            ':(glob)apps/web/tests/e2e/utils/profile-admission-diagnostics*.mjs' \
-            'apps/web/tests/e2e/utils/public-profile-layout-invariant.ts' \
-            'apps/web/tests/e2e/utils/public-surface-helpers.ts' \
-            'apps/web/tests/components/profile/ClaimBanner.test.tsx' \
-            'apps/web/tests/unit/profile/profile-shell-token-contract.test.ts')"
-          if [[ -n "$CHANGED_FILES" ]]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          fi
+          if [[ "$EVENT" == merge_group ]]; then BASE="$MG_BASE"
+          elif [[ "$EVENT" == pull_request ]]; then git fetch origin "$BASE_REF" --no-tags; BASE="origin/$BASE_REF"
+          elif [[ -n "$BEFORE" && "$BEFORE" != 0000000000000000000000000000000000000000 ]]; then BASE="$BEFORE"
+          else BASE="HEAD^1"; fi
+          mapfile -t PATHSPECS < <(grep -v '^#' .github/viewport-sweep-paths.txt)
+          CHANGED="$(git diff --diff-filter=ACDMRT --name-only --no-renames "$BASE" HEAD -- "${PATHSPECS[@]}")"
+          echo "run=$([[ -n "$CHANGED" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
       - uses: ./.github/actions/setup-node-pnpm
-        if: steps.profile-browser.outputs.run == 'true'
+        if: steps.sweep.outputs.run == 'true'
         with:
           reuse_merge_group_workspace: 'true'
       - name: Setup Playwright (Chromium)
-        if: steps.profile-browser.outputs.run == 'true'
+        if: steps.sweep.outputs.run == 'true'
         uses: ./.github/actions/setup-playwright
       - name: Run viewport sweep (public profile and golden-path pages)
-        if: steps.profile-browser.outputs.run == 'true'
+        if: steps.sweep.outputs.run == 'true'
         env:
           CI: 'true'
           DATABASE_URL: postgresql://jovie:jovie@127.0.0.1:1/jovie?sslmode=disable
@@ -3291,36 +3233,21 @@ jobs:
           NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
           PUBLIC_NOAUTH_SMOKE: '1'
-          # Per width/state screenshots (<width>-<state>.png) are public fixture
-          # renders; they upload as the viewport-sweep artifact below.
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
         run: >-
           node .github/scripts/guard-playwright-artifacts.mjs --run --
-          pnpm --filter @jovie/web exec playwright test
-          tests/e2e/profile/viewport-sweep.spec.ts
-          --config=playwright.config.noauth.ts
-          --project=chromium
-          --workers=2
-          --retries=0
-          --reporter=line
+          pnpm --filter @jovie/web exec playwright test tests/e2e/profile/viewport-sweep.spec.ts
+          --config=playwright.config.noauth.ts --project=chromium --workers=2 --retries=0 --reporter=line
       - name: Upload viewport sweep screenshots and evidence
-        # Always upload (pass or fail) so before/after shots exist for every head.
-        if: ${{ always() && steps.profile-browser.outputs.run == 'true' && hashFiles('apps/web/test-results/viewport-sweep-shots/**') != '' }}
+        if: ${{ always() && steps.sweep.outputs.run == 'true' && hashFiles('apps/web/test-results/**') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: viewport-sweep-${{ github.run_id }}-${{ github.run_attempt }}
-          path: apps/web/test-results/viewport-sweep-shots/
+          path: apps/web/test-results/
           retention-days: 14
           allow-images: 'true'
           public-images: 'true'
-      - name: Upload profile admission failure evidence
-        if: ${{ failure() && steps.profile-browser.outputs.run == 'true' && hashFiles('apps/web/test-results/**') != '' }}
-        uses: ./.github/actions/upload-safe-playwright-artifact
-        with:
-          name: profile-viewport-sweep-failure-${{ github.run_id }}-${{ github.run_attempt }}
-          path: apps/web/test-results/
-          retention-days: 3
 
   ci-fast:
     name: ci-fast

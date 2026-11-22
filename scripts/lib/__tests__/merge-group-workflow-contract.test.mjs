@@ -232,6 +232,13 @@ const BLOBLESS_BASE_FETCH_JOBS = new Set([
 const BACKGROUND_BASE_FETCH_JOBS = new Set(['ci-fast-remaining-shards']);
 
 describe('merge_group workflow contract', () => {
+  it('keeps ci.yml under the size GitHub will start', () => {
+    // A 515,363-byte ci.yml produced startup_failure runs with zero jobs
+    // (runs 45001660220 and 45001666190); 507,101 bytes started normally.
+    // Move long scripts or path lists into files instead of growing ci.yml.
+    expect(Buffer.byteLength(CI_WORKFLOW, 'utf8')).toBeLessThan(512_000);
+  });
+
   it('runs the web build for changelog-only releases without turning ordinary docs into builds', () => {
     const script = CI_WORKFLOW.slice(
       CI_WORKFLOW.indexOf('# CHANGELOG.md is customer-facing web content'),
