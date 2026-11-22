@@ -263,13 +263,14 @@ describe('doraMetrics', () => {
   });
 });
 
+// The DORA keys are reported in the snapshot but not ratcheted yet: adding
+// them to METRIC_DEFS grows a shrink-only baseline module, which needs a
+// gate-change review. Until then the committed baseline must stay valid.
 describe('DORA metric definitions', () => {
-  it('declares ratchet directions and keeps old baselines valid', () => {
-    expect(defFor('dora.deploy_frequency.per_day').direction).toBe('higher');
-    expect(defFor('dora.change_failure_rate').direction).toBe('lower');
-    expect(defFor('dora.failed_deployment_recovery.p95').direction).toBe(
-      'lower'
-    );
+  it('reports DORA keys without ratcheting them, and keeps the baseline valid', () => {
+    expect(defFor('dora.deploy_frequency.per_day')).toBeUndefined();
+    expect(defFor('dora.change_failure_rate')).toBeUndefined();
+    expect(defFor('dora.failed_deployment_recovery.p95')).toBeUndefined();
     const committed = JSON.parse(
       readFileSync(
         resolve(
@@ -280,8 +281,6 @@ describe('DORA metric definitions', () => {
       )
     );
     expect(validateBaseline(committed)).toEqual({ ok: true, errors: [] });
-    committed.metrics['dora.change_failure_rate'] = { value: 0.05 };
-    expect(validateBaseline(committed).ok).toBe(true);
   });
 });
 
