@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { load as parseYaml } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
@@ -64,6 +64,41 @@ describe('product screenshot catalog in Git LFS', () => {
       'Build (PR preview)'
     );
     expect(preview.with?.cache).toBe('restore');
+  });
+
+  it('pulls the catalog before every web build in any workflow', () => {
+    const build = /turbo (run )?build --filter=@jovie\/web|vercel build/;
+    const missing: string[] = [];
+    for (const file of readdirSync(resolve(ROOT, '.github/workflows'))) {
+      if (!file.endsWith('.yml')) continue;
+      const path = `.github/workflows/${file}`;
+      const jobs = (parseYaml(read(path)) as Workflow).jobs ?? {};
+      for (const [name, job] of Object.entries(jobs)) {
+        let pulled = false;
+        for (const step of job.steps ?? []) {
+          if (
+            (step.uses === './.github/actions/lfs-pull' &&
+              step.with?.include === CATALOG) ||
+            (step.uses === './.github/actions/setup-playwright' &&
+              String(step.with?.product_screenshots ?? 'true') !== 'false')
+          )
+            pulled = true;
+          if (build.test(step.run ?? '') && !pulled)
+            missing.push(`${path} ${name}: ${step.name}`);
+        }
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it('refuses to copy pointers into the standalone public tree', () => {
+    const sync = read('apps/web/scripts/sync-standalone-assets.mjs');
+    expect(sync).toContain(
+      "import { assertPublicLfsFiles } from './assert-public-lfs-files.mjs';"
+    );
+    const guard = sync.indexOf('assertPublicLfsFiles({ publicDir');
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(sync.indexOf('function countSymlinks'));
   });
 
   it('pulls the catalog in every Playwright job by default', () => {

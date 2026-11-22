@@ -132,6 +132,13 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
 
+      # The product screenshot catalog is in Git LFS; sync-standalone-assets
+      # refuses to copy its pointers into the standalone public/ tree.
+      - name: Pull product screenshots (Git LFS)
+        uses: ./.github/actions/lfs-pull
+        with:
+          include: apps/web/screenshot-catalog/current/*.png
+          cache: 'restore'
       - name: Build app (public routes)
         run: pnpm turbo build --filter=@jovie/web
         env:

@@ -74,6 +74,14 @@ jobs:
       # compiler state matches what Build + Layout restores. No remote Turbo
       # credentials: a remote hit would replay outputs without compiling and
       # leave the Turbopack cache empty.
+      # The product screenshot catalog is in Git LFS; sync-standalone-assets
+      # refuses to copy its pointers into the standalone public/ tree.
+      - name: Pull product screenshots (Git LFS)
+        if: ${{ steps.next-build-cache-lookup.outputs.cache-hit != 'true' }}
+        uses: ./.github/actions/lfs-pull
+        with:
+          include: apps/web/screenshot-catalog/current/*.png
+          cache: 'true'
       - name: Build web for cache
         if: ${{ steps.next-build-cache-lookup.outputs.cache-hit != 'true' }}
         run: pnpm turbo build --filter=@jovie/web
