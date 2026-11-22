@@ -43,6 +43,7 @@ describe('deterministic /app/chat prompt contract (ASS-9 + ASS-16)', () => {
     ['forbidsPermissionToPlanCloser', 'Never close with permission-to-plan'],
     ['forbidsInventedAccountStats', 'Never invent account stats'],
     ['forbidsInventedAccountFacts', 'Never invent Spotify algorithm'],
+    ['forbidsInventedCapabilities', 'Never claim you will set up'],
     ['requiresDraftHoldOutbound', 'Draft every outbound artifact'],
     ['requiresDraftClearAskNow', 'Do not grill for a positioning line'],
     [

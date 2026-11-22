@@ -13,13 +13,17 @@ import {
   assertStripeTestAccount,
   getRequiredStripeTestConfig,
 } from '@/lib/stripe/test-price-contract';
+import {
+  getBillingStatus,
+  vercelProtectionBypassHeaders,
+} from './billing-status';
 
-export interface BillingStatus {
-  isPro: boolean;
-  plan: string;
-  stripeCustomerId: string | null;
-  stripeSubscriptionId: string | null;
-}
+export type { BillingStatus } from './billing-status';
+export {
+  getBillingStatus,
+  parseBillingStatusPayload,
+  vercelProtectionBypassHeaders,
+} from './billing-status';
 
 export interface SignedStripeWebhook {
   eventId: string;
@@ -103,13 +107,6 @@ export async function getRequiredStripeTestContext(): Promise<{
   return { stripeClient, priceId };
 }
 
-/** Fetch current billing status via the app's API. */
-export async function getBillingStatus(page: Page): Promise<BillingStatus> {
-  const response = await page.request.get('/api/billing/status');
-  expect(response.ok()).toBeTruthy();
-  return (await response.json()) as BillingStatus;
-}
-
 /**
  * Manually fire a Stripe webhook to localhost.
  * Webhooks don't auto-fire to dev servers — we construct a signed payload
@@ -164,11 +161,13 @@ export async function postStripeWebhook(
   webhook: SignedStripeWebhook,
   signature = webhook.signature
 ): Promise<APIResponse> {
-  return page.request.post('/api/stripe/webhooks', {
+  const origin = new URL(page.url()).origin;
+  return page.request.post(`${origin}/api/stripe/webhooks`, {
     data: webhook.payload,
     headers: {
       'stripe-signature': signature,
       'content-type': 'application/json',
+      ...vercelProtectionBypassHeaders(),
     },
   });
 }
