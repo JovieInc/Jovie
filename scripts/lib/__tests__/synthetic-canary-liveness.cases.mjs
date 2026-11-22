@@ -138,6 +138,7 @@ describe('watchdog wiring', () => {
     );
     const catchup = observer.jobs['synthetic-canary-catchup'];
     expect(catchup.needs).toBe('liveness');
+    expect(catchup['runs-on']).toBe('ubuntu-24.04');
     expect(catchup.if).toBe(
       "${{ always() && needs.liveness.outputs.missed_slot == 'true' }}"
     );

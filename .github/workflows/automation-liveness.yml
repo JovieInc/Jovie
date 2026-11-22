@@ -273,7 +273,7 @@ jobs:
     name: Catch up missed synthetic canary
     needs: liveness
     if: ${{ always() && needs.liveness.outputs.missed_slot == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
