@@ -37,8 +37,8 @@ export function registerOccupiedRightRailTest() {
       await expect(context).toBeVisible();
       await notes.fill('Unsent draft');
       const initial = await main.boundingBox();
-      expect(initial).not.toBeNull();
-      expect(initial?.width).toBeGreaterThanOrEqual(320);
+      if (!initial) throw new Error('Expected the composer route bounding box');
+      expect(initial.width).toBeGreaterThanOrEqual(320);
       await page.clock.install();
 
       await toggle.hover();
@@ -50,9 +50,9 @@ export function registerOccupiedRightRailTest() {
       await expect(drawer).toHaveAttribute('data-rail-phase', 'closed');
       expect(await main.boundingBox()).toEqual(initial);
       const contextBox = await context.boundingBox();
-      expect(initial!.x + initial!.width).toBeLessThanOrEqual(
-        contextBox!.x + 0.5
-      );
+      if (!contextBox)
+        throw new Error('Expected the chat context bounding box');
+      expect(initial.x + initial.width).toBeLessThanOrEqual(contextBox.x + 0.5);
       await expectComposerEdgeReachable(notes);
       await expect(notes).toHaveValue('Unsent draft');
 
