@@ -66,6 +66,26 @@
       "tables": ["creatorProfiles"]
     },
     {
+      "id": "profile.catalog-sync",
+      "entity": "profile",
+      "module": "apps/web/lib/discography/post-import-profile-sync.ts",
+      "exports": [
+        "syncProfileGenresFromReleases",
+        "syncProfileAfterCatalogImport"
+      ],
+      "tables": ["creatorProfiles"]
+    },
+    {
+      "id": "profile.cover-accent",
+      "entity": "profile",
+      "module": "apps/web/lib/profile/sync-cover-accent.server.ts",
+      "exports": [
+        "syncProfileCoverAccentTheme",
+        "syncProfileCoverAccentThemeBestEffort"
+      ],
+      "tables": ["creatorProfiles"]
+    },
+    {
       "id": "profile.edit",
       "entity": "profile",
       "module": "apps/web/lib/domain/profile.ts",
