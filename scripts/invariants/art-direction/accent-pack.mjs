@@ -109,7 +109,10 @@ export function checkAccentPack(repoRoot = REPO_ROOT, recordedIds) {
 
 /* ---------------------------------------------------------------- inventory */
 
-/** Surfaces, most specific first. */
+/**
+ * Surfaces, most specific first.
+ * @type {ReadonlyArray<readonly [string, RegExp]>}
+ */
 export const SURFACES = Object.freeze([
   [
     'Homepage',
@@ -147,7 +150,10 @@ export const SURFACES = Object.freeze([
 export const surfaceOf = file =>
   SURFACES.find(([, re]) => re.test(file))?.[0] ?? 'Other (lib, shared, misc)';
 
-/** Worst first: filled blocks, two-tone gradients, multi-accent, green/red decor, then the rest. */
+/**
+ * Worst first: filled blocks, two-tone gradients, multi-accent, green/red decor, then the rest.
+ * @type {ReadonlyArray<readonly [string, string[], number]>}
+ */
 export const SEVERITY = Object.freeze([
   ['Filled accent blocks', ['solid-accent-fill'], 8],
   ['Two-tone gradients', ['two-tone-gradient'], 5],
