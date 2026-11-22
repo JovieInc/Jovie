@@ -6,7 +6,8 @@ import {
 } from '@/lib/ovie/review-inbox/pilot-fixture';
 import { ReviewCanvas } from './ReviewCanvas';
 
-const asset = createPilotReviewCase().candidates[0]!;
+const [asset] = createPilotReviewCase().candidates;
+if (!asset) throw new Error('Pilot review case has no candidate asset.');
 
 const marks = {
   pins: [],

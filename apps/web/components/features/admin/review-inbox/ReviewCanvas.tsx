@@ -158,9 +158,10 @@ export function ReviewCanvas({
     const points = activeStrokeRef.current;
     activeStrokeRef.current = null;
     setActiveStroke(null);
-    if (!points?.length) return;
+    const first = points?.[0];
+    if (!points || !first) return;
     // A tap is a dot: two identical points keep the contract's 2-point floor.
-    const finished = points.length === 1 ? [points[0]!, points[0]!] : points;
+    const finished = points.length === 1 ? [first, first] : points;
     const id = newId('stroke');
     setDraftStrokes(current => [
       ...current,
