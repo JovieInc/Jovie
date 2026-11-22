@@ -107,7 +107,6 @@
       "apps/web/tests/unit/ci/runner-setup-action.test.ts": 1,
       "apps/web/tests/unit/ci/test-truth-guard.test.ts": 1,
       "apps/web/tests/unit/components/alerts/AlertGrowthLanding.test.tsx": 4,
-      "apps/web/tests/unit/components/organisms/UnifiedSidebar.library.test.tsx": 1,
       "apps/web/tests/unit/components/tour-dates-empty-state.test.tsx": 2,
       "apps/web/tests/unit/dashboard/CelebrationCardPreview.test.tsx": 3,
       "apps/web/tests/unit/dashboard/DashboardDataContext.test.tsx": 2,
