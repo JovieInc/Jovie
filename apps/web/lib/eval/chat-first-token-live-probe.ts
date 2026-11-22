@@ -5,25 +5,16 @@
  * flash twin (Workers AI credits; no Gateway, no prod DB writes). Soft-skips
  * when the relay cannot answer safely.
  */
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { AI_ROUTING } from '@/lib/ai/routing';
 import {
   buildRecordedChatFirstTokenSample,
   buildUnrunChatFirstTokenSample,
   type ChatFirstTokenSample,
 } from './chat-first-token-sample';
 
-const ROUTING = JSON.parse(
-  readFileSync(
-    join(dirname(fileURLToPath(import.meta.url)), '../ai/routing.json'),
-    'utf8'
-  )
-) as { providers: { 'workers-ai': { relayBaseUrl: string } } };
-
 /** Same relay base as production Workers AI (`lib/ai/workers-ai.ts`). */
 export const CHAT_TTFT_RELAY_BASE_URL: string =
-  ROUTING.providers['workers-ai'].relayBaseUrl;
+  AI_ROUTING.providers['workers-ai'].relayBaseUrl;
 
 /**
  * Flash twin of `jovie-web.chat` glm-5.3-flash (JOV-13141). Latency probe uses

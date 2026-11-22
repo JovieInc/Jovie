@@ -186,7 +186,9 @@ describe('chat first-token sample', () => {
       token: 't',
       sampleCount: 2,
       fetchImpl: async () => {
-        throw new DOMException('aborted', 'TimeoutError');
+        const err = new Error('aborted');
+        err.name = 'TimeoutError';
+        throw err;
       },
       now,
     });
