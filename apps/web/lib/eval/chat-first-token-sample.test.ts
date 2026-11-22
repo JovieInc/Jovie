@@ -9,7 +9,10 @@ import {
   main as recordCli,
 } from '../../scripts/record-chat-first-token-sample';
 import {
+  CHAT_TTFT_PROBE_MAX_TOKENS,
   CHAT_TTFT_PROBE_MODEL,
+  CHAT_TTFT_PROBE_REASONING_EFFORT,
+  deltaContentText,
   measureStreamTtftMs,
   probeOneChatFirstTokenMs,
   runLiveChatFirstTokenProbe,
@@ -128,9 +131,15 @@ describe('chat first-token sample', () => {
 
   it('live probe records SSE TTFT and soft-skips unsafe failures', async () => {
     expect(CHAT_TTFT_PROBE_MODEL).toMatch(/^@cf\//);
+    expect(CHAT_TTFT_PROBE_REASONING_EFFORT).toBe('none');
+    expect(CHAT_TTFT_PROBE_MAX_TOKENS).toBeGreaterThan(8);
+    expect(deltaContentText('pong')).toBe('pong');
+    expect(deltaContentText([{ type: 'text', text: 'p' }])).toBe('p');
+    expect(deltaContentText('')).toBeNull();
+
     let clock = 1_000;
     const now = () => clock;
-    const ms = await measureStreamTtftMs({
+    const measured = await measureStreamTtftMs({
       response: new Response(
         sseBody([
           'data: {"choices":[{"delta":{"role":"assistant"}}]}\n',
@@ -145,9 +154,25 @@ describe('chat first-token sample', () => {
         return clock;
       },
     });
-    expect(ms).toBe(180);
+    expect(measured).toEqual({ ms: 180 });
 
-    const okFetch: typeof fetch = async () => {
+    const reasoningOnly = await measureStreamTtftMs({
+      response: new Response(
+        sseBody([
+          'data: {"choices":[{"delta":{"reasoning_content":"think"}}]}\n',
+          'data: [DONE]\n',
+        ]),
+        { status: 200 }
+      ),
+      startedAt: 1_000,
+      now,
+    });
+    expect(reasoningOnly).toEqual({ ms: null, reason: 'reasoning_only' });
+
+    let capturedBody: string | undefined;
+    const okFetch: typeof fetch = async (_url, init) => {
+      capturedBody =
+        typeof init?.body === 'string' ? init.body : String(init?.body ?? '');
       clock += 90;
       return new Response(
         sseBody(['data: {"choices":[{"delta":{"content":"pong"}}]}\n']),
@@ -174,6 +199,12 @@ describe('chat first-token sample', () => {
     if (typeof live.sample.p50Ms === 'number') {
       expect(live.sample.p50Ms).toBeLessThan(ASSISTANTS_FIRST_TOKEN_TARGET_MS);
     }
+    expect(capturedBody).toContain(
+      `"reasoning_effort":"${CHAT_TTFT_PROBE_REASONING_EFFORT}"`
+    );
+    expect(capturedBody).toContain(
+      `"max_tokens":${CHAT_TTFT_PROBE_MAX_TOKENS}`
+    );
 
     const fail = await probeOneChatFirstTokenMs({
       token: 't',
@@ -181,6 +212,20 @@ describe('chat first-token sample', () => {
       now,
     });
     expect(fail).toEqual({ error: 'workers-ai 503' });
+
+    const softReasoning = await probeOneChatFirstTokenMs({
+      token: 't',
+      fetchImpl: async () =>
+        new Response(
+          sseBody([
+            'data: {"choices":[{"delta":{"reasoning_content":"x"}}]}\n',
+            'data: [DONE]\n',
+          ]),
+          { status: 200 }
+        ),
+      now,
+    });
+    expect(softReasoning).toEqual({ error: 'reasoning_only' });
 
     const soft = await runLiveChatFirstTokenProbe({
       token: 't',
