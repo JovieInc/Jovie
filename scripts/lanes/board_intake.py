@@ -13,9 +13,10 @@ them, so detections piled up. This module is that consumer, inside the existing 
 2. claims new work it can serve: open tasks assigned to `codex`, or unassigned tasks whose caps are
    all in CAPS, posted by a trusted orchestrator (FLEET-AUTHORITY.md). Work is handed to the lanes'
    existing intake: a stuck PR is already in the lanes' PR repair and escalation ladder; a
-   detector task's Linear issue is moved to Todo (every JOV Todo issue is lane-eligible); any other
-   task becomes a JOV Todo issue whose description is a goal prompt with a definition of done and
-   verification steps.
+   detector task's Linear issue is moved out of Triage to Backlog; any other task becomes a JOV
+   Backlog issue whose description is a goal prompt with a definition of done and verification
+   steps. Priority admission and the sub-lane refill are the only writers of Backlog -> Todo, so
+   board work takes a seat in its own code sub-lane instead of jumping every queue (2026-11-22).
 
 Every transition appends a `jovie.board-intake/v1` row to runs/board-intake.jsonl (posted, claimed
 and closed epochs), which `metrics()` turns into claim latency, run time, success rate and
@@ -228,12 +229,13 @@ def issue_state(linear, identifier: str) -> dict | None:
     return {"id": issue["id"], "state": issue["state"]["name"], "type": issue["state"]["type"]} if issue else None
 
 
-def ensure_todo(linear, identifier: str) -> dict | None:
-    """Make a detector issue lane-eligible: every JOV Todo issue is claimable by the lanes."""
+def ensure_backlog(linear, identifier: str) -> dict | None:
+    """Make a detector issue admissible: out of Triage into Backlog, where admission picks it up.
+    An issue already in Backlog, Todo or further along is left where it is."""
     issue = issue_state(linear, identifier)
-    if issue and issue["type"] in ("backlog", "triage", "unstarted") and issue["state"] != "Todo":
-        linear.move(issue["id"], "Todo")
-        issue = {**issue, "state": "Todo", "type": "unstarted"}
+    if issue and issue["type"] == "triage":
+        linear.move(issue["id"], "Backlog")
+        issue = {**issue, "state": "Backlog", "type": "backlog"}
     return issue
 
 
@@ -258,10 +260,11 @@ def create_goal_issue(linear, task: dict) -> str | None:
     marker = f"[board:{key}]"
     team = linear.gql('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels{nodes{id name}}}}}',
                       {})["teams"]["nodes"][0]
-    todo = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Todo")
-    labels = [label["id"] for label in team["labels"]["nodes"] if label["name"] in ("symphony", "compounding")]
+    backlog = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Backlog")
+    # No `compounding` label: it would put every board goal in the speed lane, ahead of all code.
+    labels = [label["id"] for label in team["labels"]["nodes"] if label["name"] == "symphony"]
     data = linear.gql('mutation($i:IssueCreateInput!){issueCreate(input:$i){issue{id identifier}}}',
-                      {"i": {"teamId": team["id"], "stateId": todo, "labelIds": labels, "priority": 2,
+                      {"i": {"teamId": team["id"], "stateId": backlog, "labelIds": labels, "priority": 2,
                              "title": f"{marker} {task.get('title') or task['id']}"[:200], "description": goal_prompt(task)}})
     return data["issueCreate"]["issue"]["identifier"]
 
@@ -385,7 +388,7 @@ def _tick(state: Path, linear, *, now: float | None = None, call=hub, gh=None) -
         row = {**work, "postedEpoch": (task.get("postedAt") or now * 1000) / 1000, "claimedEpoch": now, "renewedEpoch": now}
         try:
             if work["kind"] == "linear":
-                issue = ensure_todo(linear, work["identifier"])
+                issue = ensure_backlog(linear, work["identifier"])
                 row["issue"] = issue and work["identifier"]
             elif work["kind"] == "goal":
                 row["issue"] = create_goal_issue(linear, task)

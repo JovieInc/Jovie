@@ -353,6 +353,17 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:ai-routing-drift
     jobCount: 2
+  - name: Crawl content fixture
+    path: .github/workflows/crawl-content-fixture.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:reconcile
+    jobCount: 1
   - name: Native Security Advisory
     path: .github/workflows/deepsec-native.yml
     active: true
@@ -1019,6 +1030,17 @@ nodes:
       - repository_dispatch
       - workflow_dispatch
     terminalReceipt: job:canary
+    jobCount: 1
+  - name: Pen draft accept
+    path: .github/workflows/pen-draft-accept.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:accept
     jobCount: 1
   - name: Pen draft pictures to Linear
     path: .github/workflows/pen-draft-publish.yml

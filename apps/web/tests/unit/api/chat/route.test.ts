@@ -289,6 +289,10 @@ function chatRequest(body: Record<string, unknown>) {
   });
 }
 
+function userMessages(text: string) {
+  return [{ id: 'm1', role: 'user', parts: [{ type: 'text', text }] }];
+}
+
 function validBody(overrides: Record<string, unknown> = {}) {
   return {
     messages: [
@@ -608,13 +612,7 @@ describe('POST /api/chat guard wiring', () => {
       chatRequest(
         validBody({
           chatMode: 'ov',
-          messages: [
-            {
-              id: 'm1',
-              role: 'user',
-              parts: [{ type: 'text', text: 'research eval dogfood' }],
-            },
-          ],
+          messages: userMessages('research eval dogfood'),
         })
       )
     );
@@ -687,13 +685,7 @@ describe('POST /api/chat guard wiring', () => {
           chatMode: 'ov',
           profileId: undefined,
           clientTurnId: 'ov-turn-1',
-          messages: [
-            {
-              id: 'm1',
-              role: 'user',
-              parts: [{ type: 'text', text: 'status of the kanban' }],
-            },
-          ],
+          messages: userMessages('status of the kanban'),
         })
       )
     );
@@ -711,6 +703,12 @@ describe('POST /api/chat guard wiring', () => {
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
     expect(hoisted.reserveChatTurnMock).not.toHaveBeenCalled();
     expect(hoisted.fetchSummerShadowMock).toHaveBeenCalledTimes(2);
+    // First-token path: no artist-only context, flags or preflights for OV.
+    expect(hoisted.resolveChatAccountContextMock).not.toHaveBeenCalled();
+    expect(hoisted.getAppFlagValueMock).not.toHaveBeenCalled();
+    const serverTiming = response.headers.get('server-timing') ?? '';
+    expect(serverTiming).toMatch(/auth;dur=\d/);
+    expect(serverTiming).toMatch(/preflight;dur=\d/);
   });
 
   it('rejects OV turns without a stable client turn id before Eve dispatch', async () => {
@@ -720,13 +718,7 @@ describe('POST /api/chat guard wiring', () => {
       chatRequest(
         validBody({
           chatMode: 'ov',
-          messages: [
-            {
-              id: 'm1',
-              role: 'user',
-              parts: [{ type: 'text', text: 'status of the kanban' }],
-            },
-          ],
+          messages: userMessages('status of the kanban'),
         })
       )
     );
@@ -751,13 +743,7 @@ describe('POST /api/chat guard wiring', () => {
         validBody({
           chatMode: 'ov',
           clientTurnId: 'ov-turn-not-founder',
-          messages: [
-            {
-              id: 'm1',
-              role: 'user',
-              parts: [{ type: 'text', text: 'private founder status' }],
-            },
-          ],
+          messages: userMessages('private founder status'),
         })
       )
     );
@@ -782,13 +768,7 @@ describe('POST /api/chat guard wiring', () => {
         validBody({
           chatMode: 'ov',
           clientTurnId: 'ov-turn-unconfigured',
-          messages: [
-            {
-              id: 'm1',
-              role: 'user',
-              parts: [{ type: 'text', text: 'private founder status' }],
-            },
-          ],
+          messages: userMessages('private founder status'),
         })
       )
     );

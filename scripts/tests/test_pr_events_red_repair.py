@@ -156,7 +156,7 @@ class FakeIntakeLinear:
     def gql(self, query, variables):
         self.reads.append(query)
         if "teams(" in query:
-            return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{"id": "todo", "name": "Todo"}]},
+            return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{"id": "todo", "name": "Todo"}, {"id": "backlog", "name": "Backlog"}]},
                     "labels": {"nodes": [{"id": name, "name": name} for name in events.remediation.intake_labels("ci")]}}]}}
         if "issueCreate(" in query:
             data = variables["i"]
@@ -294,7 +294,7 @@ class IntakeConversionTest(unittest.TestCase):
 
             def gql(self, query, variables):
                 if 'teams(' in query:
-                    return {'teams': {'nodes': [{'id': 'team', 'states': {'nodes': [{'id': 'todo', 'name': 'Todo'}]},
+                    return {'teams': {'nodes': [{'id': 'team', 'states': {'nodes': [{'id': 'todo', 'name': 'Todo'}, {'id': 'backlog', 'name': 'Backlog'}]},
                         'labels': {'nodes': [{'id': name, 'name': name} for name in
                             events.remediation.intake_labels('ci')]}}]}}
                 if 'issueCreate(' in query:

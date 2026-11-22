@@ -3589,8 +3589,6 @@
     "apps/web/components/features/dashboard/organisms/SettingsUsageStatsSection.tsx": 22,
     "apps/web/components/features/dashboard/organisms/SocialsForm.stories.tsx": 36,
     "apps/web/components/features/dashboard/organisms/account-settings/AccountSettingsSection.stories.tsx": 26,
-    "apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.stories.tsx": 100,
-    "apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard.stories.tsx": 92,
     "apps/web/components/features/dashboard/organisms/dashboard-audience-table/AudienceTableContext.stories.tsx": 19,
     "apps/web/components/features/dashboard/organisms/dashboard-audience-table/cells/AudienceActionCell.stories.tsx": 19,
     "apps/web/components/features/dashboard/organisms/dsp-presence/DspPresenceSidebar.stories.tsx": 24,

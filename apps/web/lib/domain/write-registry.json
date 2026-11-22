@@ -158,6 +158,18 @@
       "tables": ["creatorProfiles", "userProfileClaims"]
     },
     {
+      "id": "synthetic.crawl-content-fixture",
+      "entity": "product crawl hidden demo artist fixture",
+      "module": "apps/web/lib/synthetic/crawl-content-fixture.server.ts",
+      "exports": ["reconcileCrawlContentFixture"],
+      "tables": [
+        "users",
+        "creatorProfiles",
+        "userProfileClaims",
+        "discogReleases"
+      ]
+    },
+    {
       "id": "synthetic.canary-reset",
       "entity": "claim-walk canary reset (JOV-9826)",
       "module": "apps/web/lib/synthetic/canary-reset.server.ts",

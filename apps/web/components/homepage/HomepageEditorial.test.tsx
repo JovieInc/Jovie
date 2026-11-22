@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -36,6 +38,34 @@ import {
 const COPY = HOMEPAGE_EDITORIAL_COPY;
 
 describe('HomepageEditorial chapters', () => {
+  it('keys the shared-file sections to the stylesheet accent map', () => {
+    const css = readFileSync(
+      resolve(process.cwd(), 'components/homepage/v3/stage.css'),
+      'utf8'
+    );
+    const hero = render(<HomepageStoryHero />);
+    expect(hero.getByTestId('marketing-section-hero')).toHaveAttribute(
+      'data-accent',
+      'ion'
+    );
+    hero.unmount();
+    const releases = render(<HomepageReleasesChapter />);
+    expect(
+      releases.getByTestId('marketing-section-product-gallery')
+    ).toHaveAttribute('data-pen-section', 'releases');
+    expect(css).toMatch(
+      /\.hv3\[data-pen-section="releases"\]\s*\{\s*--hv3-accent:\s*var\(--color-accent-purple\)/
+    );
+    releases.unmount();
+    const profile = render(<HomepageProfileChapter />);
+    expect(
+      profile.getByTestId('marketing-section-feature-split')
+    ).toHaveAttribute('data-pen-section', 'profile');
+    expect(css).toMatch(
+      /\.hv3\[data-pen-section="profile"\]\s*\{\s*--hv3-accent:\s*var\(--color-accent-pink\)/
+    );
+  });
+
   it('renders the hero as one labelled section with the locked headline and two actions', async () => {
     const { container } = render(<HomepageStoryHero />);
 

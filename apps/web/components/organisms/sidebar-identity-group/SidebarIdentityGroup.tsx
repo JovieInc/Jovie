@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { UserButton } from '@/components/organisms/user-button';
 import type { SidebarDockStatus } from '@/components/shell/SidebarDock';
+import { useSidebarDockStatus } from '@/components/shell/sidebar-dock-status';
 import { Tooltip } from '@/components/shell/Tooltip';
 import { HOSTNAME } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
@@ -50,11 +51,14 @@ export function publicProfileAccessibleName(
 export function SidebarIdentityGroup({
   showAccountMenu = true,
   calm = false,
-  dockStatus,
+  dockStatus: dockStatusProp,
   profileHref,
   label = SIDEBAR_IDENTITY_GROUP_LABEL,
 }: SidebarIdentityGroupProps) {
   const pathname = usePathname();
+  // The dock lives in the footer; it publishes its icon-rail status here.
+  const publishedDockStatus = useSidebarDockStatus();
+  const dockStatus = dockStatusProp ?? publishedDockStatus;
   const profileDisplayHref = profileHref
     ? formatPublicProfileDisplayHref(profileHref)
     : undefined;

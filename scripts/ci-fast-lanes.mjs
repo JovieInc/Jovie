@@ -1380,7 +1380,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/postdeploy-probe-transport.test.mjs',
   'scripts/lib/__tests__/postdeploy-probe-workflow-admission.test.mjs',
   'scripts/lib/__tests__/postdeploy-crawl-receipt.test.mjs',
-  'scripts/lib/__tests__/golden-path-cert-reuse.test.mjs',
+  'scripts/lib/__tests__/golden-path-cert-reuse.test.mjs scripts/lib/__tests__/golden-path-step-scope.test.mjs',
   'scripts/lib/__tests__/postdeploy-cert-after-pen.test.mjs',
   'scripts/lib/__tests__/pr-preparation-safety.test.mjs',
   'scripts/lib/__tests__/production-environment-secrets.test.mjs',
@@ -1585,7 +1585,7 @@ const LANES = [
     id: 'design-governance-enforcement',
     name: 'Design governance enforcement',
     nextLocalCommand:
-      'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel && pnpm --filter @jovie/web run lint:composite-field && pnpm --filter @jovie/web run lint:design-noise',
+      'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:tokens-export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel && pnpm --filter @jovie/web run lint:composite-field && pnpm --filter @jovie/web run lint:design-noise',
     run: runDesignGovernanceEnforcement,
   },
   {

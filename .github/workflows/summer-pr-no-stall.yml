@@ -57,8 +57,9 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      # github-token-budget: 8 calls/run - one open-PR inventory via the classifier,
-      # then at most five empty-head pushes via git (no extra REST) plus optional re-read
+      # github-token-budget: 8 calls/run - one light open-PR list (two gh pages), at
+      # most six check-rollup reads for idle ready PRs, then at most five
+      # empty-head pushes via git (no extra REST)
       - name: Inventory (report)
         id: inventory
         env:
