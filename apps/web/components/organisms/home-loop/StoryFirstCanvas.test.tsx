@@ -201,6 +201,20 @@ describe('StoryFirstCanvas', () => {
 });
 
 describe('StoryFirstCanvas shipping delta', () => {
+  it('hides unmeasured glance pulses and shows syncing copy', () => {
+    render(
+      <StoryFirstCanvas
+        bottleneck={bottleneck}
+        glance={glance.map(pulse =>
+          pulse.key === 'shipping' ? { ...pulse, measured: false } : pulse
+        )}
+        stages={stages}
+      />
+    );
+    expect(screen.queryByTestId('story-first-glance-shipping')).toBeNull();
+    expect(screen.getByText('Some signals are still syncing.')).toBeVisible();
+  });
+
   it('colors a negative delta as an error even when the pulse tone is good', () => {
     render(
       <StoryFirstCanvas

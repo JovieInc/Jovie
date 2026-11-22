@@ -63,4 +63,10 @@ describe('OvieCeoOverview certificate', () => {
     render(<OvieCeoOverview metrics={buildMetrics('unavailable')} />);
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
   });
+
+  it('hides unmeasured tiles and surfaces syncing copy', () => {
+    render(<OvieCeoOverview metrics={buildMetrics('unavailable')} />);
+    expect(screen.getByTestId('ovie-ceo-syncing')).toBeVisible();
+    expect(screen.queryByText('Not Measured')).toBeNull();
+  });
 });

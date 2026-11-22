@@ -14,6 +14,8 @@ export function snapshot() {
           ...delivery.merges,
           since: '2026-10-20T07:00:00.000Z',
           today: { state: 'measured-nonzero', value: 3 },
+          last7Days: { state: 'measured-nonzero', value: 14 },
+          prior7Days: { state: 'measured-nonzero', value: 12 },
         },
       },
     },

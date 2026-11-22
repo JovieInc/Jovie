@@ -314,7 +314,7 @@ export function OvieShippingStateCard({
             </p>
           </div>
           <span
-            className='text-2xs font-medium text-secondary-token'
+            className='text-2xs font-medium tabular-nums text-secondary-token'
             data-testid='hud-shipping-truth'
           >
             {shippingTruthHeaderLabel(view, isPending)}
