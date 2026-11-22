@@ -32,9 +32,6 @@ const mockRunLegacyClaimSweep = vi.hoisted(() =>
   }))
 );
 
-vi.mock('@/lib/accounts/test-account-cleanup.server', () => ({
-  reportExpiredTestAccounts: vi.fn().mockResolvedValue({}),
-}));
 vi.mock('@/lib/claim/legacy-verification.server', () => ({
   runLegacyClaimVerificationSweep: mockRunLegacyClaimSweep,
 }));
