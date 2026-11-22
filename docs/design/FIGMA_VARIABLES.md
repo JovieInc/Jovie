@@ -5,7 +5,7 @@ tokens stay the source of truth. Figma variables are generated from them, and
 Figma frames come back into code 1:1.
 
 ```text
-design-system.css + ziawi-color-sot.json  ->  docs/design/figma/{light,dark}.tokens.json  ->  Figma variables
+design-system.css + ziawi-color-sot.json  ->  docs/design/figma/generated/{light,dark}.tokens.json  ->  Figma variables
 Figma frames  ->  code components, mirrored 1:1 by hand
 ```
 
@@ -14,7 +14,7 @@ Homepage headline stays locked: **Be found. Be understood.**
 ## Export (code -> Figma)
 
 ```bash
-pnpm design:tokens-export         # write docs/design/figma/light.tokens.json and dark.tokens.json
+pnpm design:tokens-export         # write docs/design/figma/generated/light.tokens.json and dark.tokens.json
 pnpm design:tokens-export:check   # CI: stale files, off-palette colors, Figma drift
 ```
 
@@ -60,16 +60,19 @@ Tokens board), then commit it. Shape:
   "$schema": "jovie-figma-variables-snapshot/v1",
   "fileKey": "9EtbM0FIxqViEJkLJy10qD",
   "capturedAt": "<ISO time>",
+  "modes": ["dark"],
   "variables": {
-    "surface/canvas": { "type": "color", "values": { "light": "#f3f4f6", "dark": "#030406" } },
-    "space/4": { "type": "float", "values": { "light": 4, "dark": 4 } }
+    "surface/canvas": { "type": "color", "values": { "dark": "#030406" } },
+    "space/4": { "type": "float", "values": { "dark": 4 } }
   }
 }
 ```
 
 Until a real snapshot lands (`variables` empty) the check
 prints "no Figma snapshot yet" and passes. Once it exists, a variable that is
-missing, extra or different fails the check.
+extra in Figma or has a different value fails the check. Only the modes listed
+in `modes` are compared, and code variables not in Figma yet (light mode, space,
+text sizes, size/*, radius none and pill) are warnings, not failures.
 
 ## Frames back into code
 

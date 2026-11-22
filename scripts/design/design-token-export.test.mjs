@@ -117,10 +117,18 @@ test('deliberate red: an off-palette color fails the palette cap', () => {
 });
 
 test('Figma snapshot: empty passes as "no snapshot yet"', () => {
+  const empty = { fileKey: '9EtbM0FIxqViEJkLJy10qD', variables: {} };
+  assert.equal(compareSnapshot(empty, flatExport()).status, 'no-snapshot');
+});
+
+test('committed Figma snapshot matches the code export in the modes it holds', () => {
   const snapshot = JSON.parse(readFileSync(SNAPSHOT_PATH, 'utf8'));
   assert.equal(snapshot.fileKey, '9EtbM0FIxqViEJkLJy10qD');
-  assert.deepEqual(snapshot.variables, {});
-  assert.equal(compareSnapshot(snapshot, flatExport()).status, 'no-snapshot');
+  assert.equal(Object.keys(snapshot.variables).length, 40);
+  const result = compareSnapshot(snapshot, flatExport());
+  assert.deepEqual(result.findings, []);
+  assert.equal(result.status, 'in-sync');
+  assert.ok(result.warnings.some(w => /mode not in Figma yet: light/.test(w)));
 });
 
 test('Figma snapshot: matching passes, drift fails (deliberate red)', () => {
@@ -134,9 +142,17 @@ test('Figma snapshot: matching passes, drift fails (deliberate red)', () => {
     type: 'color',
     values: { light: '#ffffff', dark: '#000000' },
   };
-  const { status, findings } = compareSnapshot(snapshot, flat);
+  const { status, findings, warnings } = compareSnapshot(snapshot, flat);
   assert.equal(status, 'drift');
-  assert.equal(findings.length, 3);
+  assert.equal(findings.length, 2);
+  assert.ok(warnings.some(w => w.includes('text/primary')));
+  const dark = {
+    fileKey: 'abc',
+    modes: ['dark'],
+    variables: structuredClone(flat),
+  };
+  dark.variables['text/disabled'].values.dark = '#000000';
+  assert.equal(compareSnapshot(dark, flat).findings.length, 1);
 });
 
 test('grid tokens: new sizes, and existing row modes reused by alias', () => {

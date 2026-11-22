@@ -31,8 +31,8 @@ const OUT_DIR = join(REPO_ROOT, 'docs/design/figma');
 export const SNAPSHOT_PATH = join(OUT_DIR, 'figma-variables.snapshot.json');
 export const MODES = /** @type {const} */ (['light', 'dark']);
 export const FILE_FOR_MODE = {
-  light: join(OUT_DIR, 'light.tokens.json'),
-  dark: join(OUT_DIR, 'dark.tokens.json'),
+  light: join(OUT_DIR, 'generated/light.tokens.json'),
+  dark: join(OUT_DIR, 'generated/dark.tokens.json'),
 };
 
 /** Text and border roles in the approved palette (surfaces/accents come from ZiaWI). */
@@ -398,31 +398,46 @@ export function flatExport() {
  * Compare the code export with the committed Figma snapshot.
  * @param {any} snapshot parsed figma-variables.snapshot.json
  * @param {ReturnType<typeof flatExport>} flat
- * @returns {{status: 'no-snapshot'|'in-sync'|'drift', findings: string[]}}
+ * Only modes present in the snapshot are compared. A code variable that is not
+ * in Figma yet is a warning, not drift; a Figma variable that code does not
+ * export, or a different value, is drift.
+ * @returns {{status: 'no-snapshot'|'in-sync'|'drift', findings: string[], warnings: string[]}}
  */
 export function compareSnapshot(snapshot, flat) {
   const vars = snapshot?.variables ?? {};
   if (!snapshot?.fileKey || Object.keys(vars).length === 0) {
-    return { status: 'no-snapshot', findings: [] };
+    return { status: 'no-snapshot', findings: [], warnings: [] };
   }
   /** @type {string[]} */
   const findings = [];
+  /** @type {string[]} */
+  const warnings = [];
+  const modes = MODES.filter(m => (snapshot.modes ?? MODES).includes(m));
+  for (const m of MODES) {
+    if (!modes.includes(m)) warnings.push(`mode not in Figma yet: ${m}`);
+  }
+  const pending = [];
   for (const [name, want] of Object.entries(flat)) {
     const got = vars[name];
     if (!got) {
-      findings.push(`missing in Figma: ${name}`);
+      pending.push(name);
       continue;
     }
-    for (const mode of MODES) {
+    for (const mode of modes) {
       const a = lower(got.values?.[mode]);
       const b = lower(want.values[mode]);
       if (a !== b) findings.push(`${name} (${mode}): Figma ${a}, code ${b}`);
     }
   }
+  if (pending.length) {
+    warnings.push(
+      `${pending.length} code variables not in Figma yet: ${pending.join(', ')}`
+    );
+  }
   for (const name of Object.keys(vars)) {
     if (!(name in flat)) findings.push(`in Figma, not in code export: ${name}`);
   }
-  return { status: findings.length ? 'drift' : 'in-sync', findings };
+  return { status: findings.length ? 'drift' : 'in-sync', findings, warnings };
 }
 
 function main() {
@@ -447,7 +462,11 @@ function main() {
     }
   }
   const snapshot = existsSync(SNAPSHOT_PATH) ? readJson(SNAPSHOT_PATH) : null;
-  const { status, findings } = compareSnapshot(snapshot, flatExport());
+  const { status, findings, warnings } = compareSnapshot(
+    snapshot,
+    flatExport()
+  );
+  for (const w of warnings) console.warn(`warning: ${w}`);
   if (status === 'drift') {
     errors.push(
       ...findings.map(f => `Figma snapshot drift: ${f}`),
