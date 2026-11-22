@@ -111,26 +111,3 @@ it('the legacy dashboard loader keeps its explicit-user signature with one conte
   ).toBe(101);
   expect(state.contextReads).toBe(1);
 });
-
-it('the actual crawler domain loader filters on the captured profile after an active switch', async () => {
-  const { resolveAuthorizedAnalyticsProfile } = await import(
-    '@/lib/analytics/authorized-profile'
-  );
-  const scope = await resolveAuthorizedAnalyticsProfile(
-    '11111111-1111-4111-8111-111111111111'
-  );
-  state.profileId = 'profile-B';
-  state.executions = [];
-  const { getAiCrawlerAnalyticsForProfile } = await import(
-    '@/lib/db/queries/ai-crawler-analytics'
-  );
-  await getAiCrawlerAnalyticsForProfile(scope, { isPro: true });
-  const parameters = state.executions.flatMap(
-    query =>
-      new PgDialect().sqlToQuery(
-        query as Parameters<PgDialect['sqlToQuery']>[0]
-      ).params
-  );
-  expect(parameters).toContain('profile-A');
-  expect(parameters).not.toContain('profile-B');
-});

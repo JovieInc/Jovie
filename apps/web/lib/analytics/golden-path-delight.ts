@@ -21,6 +21,7 @@ export const DELIGHT_MIN_SAMPLE = 10;
 
 export type DelightMetricId =
   | 'time_to_wow'
+  | 'time_to_first_dashboard'
   | 'wow_reach'
   | 'turns_before_wow'
   | 'continuity_breaks'
@@ -65,6 +66,20 @@ export const DELIGHT_METRICS: readonly DelightMetricDefinition[] = [
       p95: 30,
       basis:
         'Bier: aha within seconds; Lovable/v0 prompt-first value in 2-3 min; Tim: under 30s.',
+    },
+  },
+  {
+    id: 'time_to_first_dashboard',
+    unit: 'seconds',
+    definition:
+      'Per hard load of the signed-in app shell (customers only): document start to the first frame with no skeleton, spinner or busy region above the fold.',
+    producer: 'server_analytics_events first_dashboard_ready',
+    target: {
+      direction: 'at_most',
+      p50: 1.5,
+      p95: 2.5,
+      basis:
+        'Core Web Vitals good LCP 2.5s at p75; Linear and Superhuman app shells settle in about 1s.',
     },
   },
   {
@@ -141,6 +156,8 @@ export interface DelightDistribution {
 
 export interface DelightInput {
   readonly timeToWowSeconds: DelightDistribution | null;
+  /** Absent until the first-dashboard query runs (older callers). */
+  readonly timeToFirstDashboardSeconds?: DelightDistribution | null;
   readonly wowReach: {
     readonly reached: number;
     readonly started: number;
@@ -203,6 +220,11 @@ export function buildDelightReport(input: DelightInput): DelightReport {
     let value: number | null = null;
     if (definition.id === 'time_to_wow' && input.timeToWowSeconds) {
       ({ samples, p50, p95 } = input.timeToWowSeconds);
+    } else if (
+      definition.id === 'time_to_first_dashboard' &&
+      input.timeToFirstDashboardSeconds
+    ) {
+      ({ samples, p50, p95 } = input.timeToFirstDashboardSeconds);
     } else if (definition.id === 'turns_before_wow' && input.turnsBeforeWow) {
       ({ samples, p50, p95 } = input.turnsBeforeWow);
     } else if (definition.id === 'wow_reach' && input.wowReach) {

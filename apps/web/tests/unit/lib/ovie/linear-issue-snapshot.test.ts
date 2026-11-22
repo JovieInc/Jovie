@@ -1,20 +1,23 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/server', () => ({ after: vi.fn() }));
 vi.mock('@/lib/env-server', () => ({ env: { LINEAR_API_KEY: undefined } }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 vi.mock('@/lib/redis', () => ({ getRedis: () => null }));
+const listLinearIssues = vi.fn();
 vi.mock('@/lib/ovie/mcp/founder-work', () => ({
-  createLiveFounderWorkReader: vi.fn(),
+  createLiveFounderWorkReader: () => ({ listLinearIssues }),
 }));
 
+import { LINEAR_ISSUE_FIXTURE } from '@/lib/ovie/linear-issue-snapshot.fixture';
 import {
   getLinearIssueSnapshot,
   LINEAR_ISSUE_SNAPSHOT_KEY,
   LINEAR_ISSUE_SNAPSHOT_SCHEMA,
   type LinearIssueSnapshotDeps,
   linearIssueSnapshotCronJob,
+  resolveLinearIssueSnapshotDeps,
   scheduleLinearIssueSnapshotRefresh,
 } from '@/lib/ovie/linear-issue-snapshot.server';
 
@@ -148,6 +151,52 @@ describe('linear issue snapshot', () => {
   it('cron backstop skips instead of failing when Linear is not configured', async () => {
     await expect(linearIssueSnapshotCronJob()).resolves.toEqual({
       skipped: 'linear_not_configured',
+    });
+  });
+
+  describe('visual-suite fixture path', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.useRealTimers();
+    });
+
+    it('is unreachable when the test-mode env is off: the live read runs and a failure stays unreachable', async () => {
+      vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '');
+      vi.stubEnv('VERCEL_ENV', '');
+      listLinearIssues.mockRejectedValue(new Error('down'));
+      const resolved = resolveLinearIssueSnapshotDeps();
+      expect(await resolved.fetchIssues().catch(() => 'live-failed')).toBe(
+        'live-failed'
+      );
+      expect(listLinearIssues).toHaveBeenCalledTimes(1);
+      const result = await getLinearIssueSnapshot();
+      expect(result).toEqual({ status: 'unreachable', snapshot: null });
+    });
+
+    it('stays off on Vercel production and preview even with the bypass flag set', async () => {
+      for (const vercelEnv of ['production', 'preview']) {
+        vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+        vi.stubEnv('VERCEL_ENV', vercelEnv);
+        listLinearIssues.mockReset();
+        listLinearIssues.mockRejectedValue(new Error('down'));
+        const result = await getLinearIssueSnapshot();
+        expect(result.status).toBe('unreachable');
+        expect(listLinearIssues).toHaveBeenCalledTimes(1);
+      }
+    });
+
+    it('serves the fixture, stamped fresh from the clock, when the test mode is on', async () => {
+      vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+      vi.stubEnv('VERCEL_ENV', '');
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-11-22T12:00:00.000Z'));
+      listLinearIssues.mockReset();
+      const result = await getLinearIssueSnapshot();
+      expect(listLinearIssues).not.toHaveBeenCalled();
+      expect(result.status).toBe('ok');
+      if (result.status !== 'ok') return;
+      expect(result.snapshot.issues).toEqual(LINEAR_ISSUE_FIXTURE);
+      expect(result.snapshot.generatedAt).toBe('2026-11-22T12:00:00.000Z');
     });
   });
 });

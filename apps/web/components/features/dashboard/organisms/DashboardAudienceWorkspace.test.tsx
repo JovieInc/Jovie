@@ -2,7 +2,7 @@ import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { TableMetaProvider } from '@/contexts/TableMetaContext';
@@ -10,11 +10,6 @@ import { AudiencePanelProvider } from '@/features/dashboard/organisms/AudiencePa
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { DashboardAudienceWorkspace } from './DashboardAudienceWorkspace';
 import { DEFAULT_AUDIENCE_FILTERS } from './dashboard-audience-table/types';
-
-vi.mock(
-  '@/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard',
-  () => ({ AiCrawlerIntelligenceCard: () => null })
-);
 
 function Providers({ children }: { readonly children: ReactNode }) {
   const queryClient = new QueryClient({

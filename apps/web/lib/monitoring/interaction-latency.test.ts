@@ -121,6 +121,13 @@ describe('UX latency telemetry', () => {
         p50Ms: null,
         p95Ms: null,
       },
+      {
+        metric: 'first_dashboard_ready',
+        label: 'First Dashboard Ready',
+        sampleCount: 0,
+        p50Ms: null,
+        p95Ms: null,
+      },
     ]);
   });
 
@@ -215,7 +222,7 @@ describe('UX latency telemetry', () => {
 
     vi.stubGlobal('window', undefined);
     expect(recordUxLatency('chat_first_token', 100)).toBe(false);
-    expect(getUxLatencySummaries()).toHaveLength(6);
+    expect(getUxLatencySummaries()).toHaveLength(7);
     expect(() => resetUxLatencyForTests()).not.toThrow();
     expect(() => subscribeUxLatency(vi.fn())()).not.toThrow();
   });
