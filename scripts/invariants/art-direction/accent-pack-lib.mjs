@@ -17,7 +17,11 @@ import {
   DATA_VIZ_PATH,
   EXTRA_PACK_HEX,
   expectedAccent,
+  GRADIENT_HUE_TOLERANCE,
+  GRADIENT_NEUTRAL_CHROMA,
+  GRADIENT_TWO_ACCENT_ALLOW,
   GREEN_RED_MIN_SET,
+  PACK_HEX,
   ROTATION_HELPER_NAME,
   STATUS_IDENT,
   STATUS_NAME,
@@ -461,19 +465,167 @@ const isStatusRole = toks =>
 const STOP = /(?<![\w-])((?:[\w[\]-]+:)*)(from|via|to)-(\[[^\]]+\]|[\w./%-]+)/g;
 const BG = /(?<![\w-])((?:[\w[\]-]+:)*)bg-(\[[^\]]+\]|[\w./%-]+)/g;
 
-function gradientFamilies(str) {
+/* ------------------------------------------------- gradient hue analysis */
+
+function srgbToOklch(r, g, b) {
+  const lin = c => {
+    const v = c / 255;
+    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  const [lr, lg, lb] = [lin(r), lin(g), lin(b)];
+  const l = Math.cbrt(
+    0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb
+  );
+  const m = Math.cbrt(
+    0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb
+  );
+  const sx = Math.cbrt(
+    0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb
+  );
+  const L = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * sx;
+  const a = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * sx;
+  const bb = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * sx;
+  return {
+    L,
+    C: Math.hypot(a, bb),
+    h: ((Math.atan2(bb, a) * 180) / Math.PI + 360) % 360,
+  };
+}
+
+/** OKLCH of one color token, or null when it is not a color literal. */
+export function toOklch(token) {
+  const t = token.toLowerCase();
+  if (t.startsWith('#')) {
+    let body = t.slice(1);
+    if (body.length === 3 || body.length === 4)
+      body = body
+        .slice(0, 3)
+        .split('')
+        .map(c => c + c)
+        .join('');
+    if (body.length === 8) body = body.slice(0, 6);
+    if (!/^[0-9a-f]{6}$/.test(body)) return null;
+    const n = Number.parseInt(body, 16);
+    return srgbToOklch((n >> 16) & 255, (n >> 8) & 255, n & 255);
+  }
+  const nums = (t.match(/-?\d*\.?\d+%?/g) ?? []).map(Number.parseFloat);
+  if (t.startsWith('rgb') && nums.length >= 3)
+    return srgbToOklch(nums[0], nums[1], nums[2]);
+  if (t.startsWith('hsl') && nums.length >= 3) {
+    const h = ((nums[0] % 360) + 360) % 360;
+    const s2 = nums[1] / 100;
+    const l2 = nums[2] / 100;
+    const k = n => (n + h / 30) % 12;
+    const a2 = s2 * Math.min(l2, 1 - l2);
+    const f = n =>
+      l2 - a2 * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    return srgbToOklch(f(0) * 255, f(8) * 255, f(4) * 255);
+  }
+  if (t.startsWith('oklch') && nums.length >= 3) {
+    const L =
+      /%/.test(t.split(/[\s,]+/)[0]) || nums[0] > 1 ? nums[0] / 100 : nums[0];
+    return { L, C: nums[1], h: ((nums[2] % 360) + 360) % 360 };
+  }
+  return null;
+}
+
+const hueDistance = (a, b) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
+const PACK_HUES = Object.fromEntries(
+  Object.entries(PACK_HEX).map(([name, hex]) => [name, toOklch(hex).h])
+);
+const ACCENT_BY_WORD = {
+  blue: 'ion',
+  ion: 'ion',
+  purple: 'ultra',
+  ultra: 'ultra',
+  pink: 'pulse',
+  pulse: 'pulse',
+  orange: 'orange',
+  gold: 'orange',
+  green: 'mint',
+  mint: 'mint',
+  aqua: 'mint',
+  teal: 'mint',
+  red: 'red',
+  flare: 'red',
+};
+
+/** A gradient stop: neutral, an accent, or an off-accent hue. */
+function stopOf(token) {
+  const t = token.toLowerCase();
+  const v = /^var\(--([a-z0-9-]+)/.exec(t);
+  if (v) {
+    if (/geist/.test(v[1])) {
+      const fam = familyOfWords(v[1]);
+      return fam
+        ? { kind: 'off', family: fam, hue: null }
+        : { kind: 'neutral' };
+    }
+    const word = v[1]
+      .replace(/^noir-ion-/, '')
+      .split(/[^a-z]+/)
+      .find(w => ACCENT_BY_WORD[w] || WORD_FAMILY[w]);
+    if (!word) return { kind: 'neutral' };
+    if (ACCENT_BY_WORD[word])
+      return { kind: 'accent', accent: ACCENT_BY_WORD[word] };
+    return { kind: 'off', family: WORD_FAMILY[word], hue: null };
+  }
+  const ok = toOklch(t);
+  if (!ok) return null;
+  if (ok.C < GRADIENT_NEUTRAL_CHROMA || ok.L < 0.1 || ok.L > 0.985)
+    return { kind: 'neutral' };
+  let best = null;
+  for (const [name, hue] of Object.entries(PACK_HUES)) {
+    const d = hueDistance(ok.h, hue);
+    if (!best || d < best.d) best = { name, d };
+  }
+  if (best && best.d <= GRADIENT_HUE_TOLERANCE)
+    return { kind: 'accent', accent: best.name };
+  return { kind: 'off', family: oklchFamily(ok.h), hue: Math.round(ok.h) };
+}
+
+function oklchFamily(hh) {
+  if (hh < 20 || hh >= 345) return 'red';
+  if (hh < 70) return 'orange';
+  if (hh < 110) return 'yellow';
+  if (hh < 175) return 'green';
+  if (hh < 225) return 'cyan';
+  if (hh < 265) return 'blue';
+  if (hh < 320) return 'purple';
+  return 'pink';
+}
+
+const TW_ACCENT =
+  /^(?:accent-|noir-ion-)?(ion|ultra|pulse|mint|aqua|blue|purple|pink|orange|gold|green|teal|red|flare)(?:-(?:subtle|soft))?(?:\/\d+)?$/;
+
+function tailwindStop(value) {
+  const v = value.replace(/_/g, ' ').replace(/^\[|\]$/g, '');
+  const colors = [...v.matchAll(COLOR_TOKEN)]
+    .map(m => stopOf(m[0]))
+    .filter(Boolean);
+  if (colors.length) return colors;
+  const word = v.replace(/\/\d+$/, '');
+  const m = TW_ACCENT.exec(word);
+  if (
+    m &&
+    (/^(accent-|noir-ion-)/.test(word) || /^(ion|ultra|pulse|mint)/.test(word))
+  )
+    return [{ kind: 'accent', accent: ACCENT_BY_WORD[m[1]] }];
+  const pal = new RegExp(`^(?:${PALETTE_WORDS})-\\d{2,3}`).exec(word);
+  if (pal) return [{ kind: 'off', family: familyOfWords(word), hue: null }];
+  return [];
+}
+
+/** Every gradient in a string: { stops: stop[] } from CSS, Tailwind and SVG. */
+export function analyzeGradients(str) {
+  const out = [];
   const groups = new Map();
   for (const m of str.matchAll(STOP)) {
-    const fams = colorFamilies(m[3].replace(/_/g, ' '));
-    if (!fams.length) continue;
-    const key = m[1];
-    const list = groups.get(key) ?? [];
-    for (const f of fams) if (!list.includes(f)) list.push(f);
-    groups.set(key, list);
+    const stops = tailwindStop(m[3]);
+    if (!stops.length) continue;
+    groups.set(m[1], [...(groups.get(m[1]) ?? []), ...stops]);
   }
-  const out = [];
-  for (const list of groups.values()) if (list.length >= 2) out.push(list);
-  // css gradients
+  for (const stops of groups.values()) out.push({ stops });
   for (const m of str.matchAll(
     /(?:repeating-)?(?:linear|radial|conic)-gradient\(/g
   )) {
@@ -485,10 +637,101 @@ function gradientFamilies(str) {
       else if (str[j] === ')') depth--;
       j++;
     }
-    const fams = colorFamilies(str.slice(start, j));
-    if (fams.length >= 2) out.push(fams);
+    const body = str.slice(start, j);
+    out.push({
+      stops: [...body.matchAll(COLOR_TOKEN)]
+        .map(c => stopOf(c[0]))
+        .filter(Boolean),
+    });
   }
   return out;
+}
+
+/** SVG linearGradient and radialGradient stops, in markup or JSX. */
+export function analyzeSvgGradients(str) {
+  const out = [];
+  for (const g of str.matchAll(
+    /<(linear|radial)Gradient\b[\s\S]*?<\/\1Gradient>/gi
+  )) {
+    const stops = [
+      ...g[0].matchAll(/stop-?color\s*[=:]\s*\{?\s*["'`]?([^"'`};>]+)/gi),
+    ]
+      .flatMap(c => [...c[1].matchAll(COLOR_TOKEN)].map(x => stopOf(x[0])))
+      .filter(Boolean);
+    out.push({ stops });
+  }
+  return out;
+}
+
+const FAMILY_OF_ACCENT = {
+  ion: 'blue',
+  ultra: 'purple',
+  pulse: 'pink',
+  orange: 'orange',
+  mint: 'green',
+  red: 'red',
+};
+
+function violationsOf(gradients, file, allow) {
+  const out = [];
+  for (const g of gradients) {
+    const accents = [
+      ...new Set(g.stops.filter(x => x.kind === 'accent').map(x => x.accent)),
+    ].sort();
+    const off = g.stops.filter(x => x.kind === 'off');
+    const families = new Set([
+      ...accents.map(a => FAMILY_OF_ACCENT[a]),
+      ...off.map(x => x.family).filter(Boolean),
+    ]);
+    if (families.size >= 2) {
+      if (off.length === 0 && gradientAllowed(allow, file, accents)) continue;
+      out.push({
+        rule: 'two-tone-gradient',
+        label: [...families].map(accentOf).sort().join('+'),
+      });
+    } else if (off.length) {
+      out.push({
+        rule: 'gradient-off-hue',
+        label: off.map(x => `${x.family}${x.hue ? `@${x.hue}` : ''}`).sort()[0],
+      });
+    }
+  }
+  return out;
+}
+
+/** Violations of the gradient rule: [{ rule, label }]. */
+export function gradientViolations(
+  str,
+  file,
+  allow = GRADIENT_TWO_ACCENT_ALLOW
+) {
+  return violationsOf(
+    [...analyzeGradients(str), ...analyzeSvgGradients(str)],
+    file,
+    allow
+  );
+}
+
+export function svgGradientViolations(
+  str,
+  file,
+  allow = GRADIENT_TWO_ACCENT_ALLOW
+) {
+  return violationsOf(analyzeSvgGradients(str), file, allow);
+}
+
+export function gradientAllowed(allow, file, accents) {
+  return allow.some(
+    e =>
+      e.file === file &&
+      e.reason &&
+      Array.isArray(e.stops) &&
+      e.stops.slice().sort().join('+') === accents.join('+')
+  );
+}
+
+function gradientFamilies(str) {
+  return gradientViolations(str, '').map(v => v.label.split('+'));
 }
 
 const bgParts = value => {
@@ -608,14 +851,21 @@ export function offPackLiteralIds(toks, file, allowedHex) {
 
 /* ------------------------------------------------------------ (b) gradient */
 
-export function gradientIds(strings, file) {
+export function svgGradientIds(
+  source,
+  file,
+  allow = GRADIENT_TWO_ACCENT_ALLOW
+) {
+  return svgGradientViolations(source, file, allow).map(
+    v => `${v.rule}:${file}:${v.label}`
+  );
+}
+
+export function gradientIds(strings, file, allow = GRADIENT_TWO_ACCENT_ALLOW) {
   const ids = new Set();
-  for (const s of strings) {
-    for (const fams of gradientFamilies(s))
-      ids.add(
-        `two-tone-gradient:${file}:${[...fams].map(accentOf).sort().join('+')}`
-      );
-  }
+  for (const str of strings)
+    for (const v of violationsOf(analyzeGradients(str), file, allow))
+      ids.add(`${v.rule}:${file}:${v.label}`);
   return [...ids];
 }
 
@@ -958,13 +1208,18 @@ function cssRules(text) {
 const CSS_SMALL =
   /dot|badge|pill|chip|swatch|bar|indicator|marker|track|fill|thumb|ring|glow|line|status|avatar|icon|tint|wash|halo|stroke|border|underline|edge/i;
 
-export function cssIds(text, file, { tokenSource }) {
+export function cssIds(
+  text,
+  file,
+  { tokenSource, gradientAllow = GRADIENT_TWO_ACCENT_ALLOW }
+) {
   const ids = new Set();
   if (!tokenSource) {
     for (const id of offPackVarIds(text, file)) ids.add(id);
     for (const id of offPackTailwindIds(text, file)) ids.add(id);
   }
-  for (const id of gradientIds([text], file)) ids.add(id);
+  for (const id of gradientIds([text], file, gradientAllow)) ids.add(id);
+  for (const id of svgGradientIds(text, file, gradientAllow)) ids.add(id);
   for (const rule of cssRules(text)) {
     const bg = [
       ...rule.body.matchAll(
@@ -1010,11 +1265,15 @@ export function cssIds(text, file, { tokenSource }) {
 /* ----------------------------------------------------------- file scanner */
 
 export function scanSource(source, file, options) {
-  const { allowedHex, tokenSource = false } = options;
+  const {
+    allowedHex,
+    tokenSource = false,
+    gradientAllow = GRADIENT_TWO_ACCENT_ALLOW,
+  } = options;
   const ext = file.slice(file.lastIndexOf('.'));
   if (ext === '.css') {
     const text = source.replace(/\/\*[\s\S]*?\*\//g, '');
-    return cssIds(text, file, { tokenSource });
+    return cssIds(text, file, { tokenSource, gradientAllow });
   }
   const toks = tokenize(source);
   const strings = strTokens(toks).map(t => t.v);
@@ -1029,7 +1288,10 @@ export function scanSource(source, file, options) {
     if (ext === '.tsx' || ext === '.jsx')
       ids.push(...offPackLiteralIds(toks, file, allowedHex));
   }
-  ids.push(...gradientIds(strings, file));
+  ids.push(
+    ...gradientIds(strings, file, gradientAllow),
+    ...svgGradientIds(source, file, gradientAllow)
+  );
   ids.push(...rotationIds(toks, source, file));
   ids.push(...weightIds(toks, file));
   if (ext === '.tsx' || ext === '.jsx')

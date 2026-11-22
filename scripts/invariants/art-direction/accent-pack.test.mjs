@@ -132,6 +132,124 @@ describe('(b) two-tone gradient', () => {
   });
 });
 
+describe('(b) gradients sit on one accent hue', () => {
+  const css = (decl, extra) =>
+    run(`.a{${decl}}`, 'apps/web/styles/a.css', extra);
+  it('passes neutral-only gradients', () => {
+    assert.deepEqual(
+      css('background:linear-gradient(#030406,#1a1b1e,rgba(255,255,255,.04))'),
+      []
+    );
+    assert.deepEqual(
+      run(
+        'const c = "bg-gradient-to-b from-black via-neutral-900 to-transparent";',
+        'apps/web/lib/g.ts'
+      ),
+      []
+    );
+  });
+  it('passes one accent mixed with transparent, black, white or its own shades', () => {
+    assert.deepEqual(
+      css(
+        'background:radial-gradient(circle,var(--color-accent-blue),transparent)'
+      ),
+      []
+    );
+    assert.deepEqual(
+      css('background:linear-gradient(#11afff,#0b6fa6,#030406)'),
+      []
+    );
+    assert.deepEqual(
+      css(
+        'background:linear-gradient(color-mix(in oklab,var(--color-accent-pink) 20%,white),transparent)'
+      ),
+      []
+    );
+    assert.deepEqual(
+      run(
+        'const c = "from-[#11afff] via-[#7fd0ff] to-black";',
+        'apps/web/lib/g.ts'
+      ),
+      []
+    );
+  });
+  it('fails a gradient whose stop drifts off the accent hue', () => {
+    assert.ok(
+      has(
+        css('background:linear-gradient(#0070f3,transparent)'),
+        'gradient-off-hue'
+      )
+    );
+    assert.ok(
+      has(
+        run('const c = "from-blue-500 to-transparent";', 'apps/web/lib/g.ts'),
+        'gradient-off-hue'
+      )
+    );
+  });
+  it('fails a two-accent gradient in CSS, Tailwind and inline style', () => {
+    assert.ok(
+      has(
+        css('background:linear-gradient(#11afff,#8e56f5)'),
+        'two-tone-gradient'
+      )
+    );
+    assert.ok(
+      has(
+        run(
+          'const c = "from-accent-blue to-accent-purple";',
+          'apps/web/lib/g.ts'
+        ),
+        'two-tone-gradient'
+      )
+    );
+    assert.ok(
+      has(
+        run(
+          `export const A = () => <div style={{ backgroundImage: 'linear-gradient(90deg, #f52bb5, #ff7800)' }} />;`
+        ),
+        'two-tone-gradient'
+      )
+    );
+  });
+  it('checks SVG gradient stops', () => {
+    const bad = `export const S = () => <svg><linearGradient id="g"><stop offset="0" stopColor="#11afff" /><stop offset="1" stopColor="#f52bb5" /></linearGradient></svg>;`;
+    assert.ok(has(run(bad), 'two-tone-gradient'));
+    const ok = `export const S = () => <svg><radialGradient id="g"><stop offset="0" stopColor="#11afff" /><stop offset="1" stopColor="#030406" /></radialGradient></svg>;`;
+    assert.deepEqual(run(ok), []);
+  });
+  it('lets an allowlisted, justified two-accent gradient through', () => {
+    const file = 'apps/web/styles/a.css';
+    const allow = [
+      { file, reason: 'paired state ramp', stops: ['ion', 'ultra'] },
+    ];
+    assert.deepEqual(
+      css('background:linear-gradient(#11afff,#8e56f5)', {
+        gradientAllow: allow,
+      }),
+      []
+    );
+    const noReason = [{ file, reason: '', stops: ['ion', 'ultra'] }];
+    assert.ok(
+      has(
+        css('background:linear-gradient(#11afff,#8e56f5)', {
+          gradientAllow: noReason,
+        }),
+        'two-tone-gradient'
+      )
+    );
+    const otherPair = [{ file, reason: 'x', stops: ['ion', 'pulse'] }];
+    assert.ok(
+      has(
+        css('background:linear-gradient(#11afff,#8e56f5)', {
+          gradientAllow: otherPair,
+        }),
+        'two-tone-gradient'
+      )
+    );
+  });
+});
+
 describe('(c) order and adjacency', () => {
   it('passes the fixed order and its prefixes', () => {
     for (const seq of [
