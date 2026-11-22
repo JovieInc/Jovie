@@ -96,4 +96,15 @@ describe('product screenshot catalog in Git LFS', () => {
     expect(lfsPush).toBeGreaterThan(add);
     expect(lfsPush).toBeLessThan(push);
   });
+
+  it('keeps LFS upload dispatches out of the baseline refresh group', () => {
+    const workflow = parseYaml(
+      read('.github/workflows/visual-regression.yml')
+    ) as { concurrency: { group: string } };
+    expect(workflow.concurrency.group).toContain('lfs_upload_glob');
+    expect(workflow.concurrency.group).toContain('github.run_id');
+    expect(workflow.concurrency.group).toContain(
+      'visual-regression-baseline-refresh'
+    );
+  });
 });

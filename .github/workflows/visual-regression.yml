@@ -64,7 +64,9 @@ on:
 permissions: {}
 
 concurrency:
-  group: visual-regression-baseline-refresh
+  # An lfs_upload_glob dispatch only uploads objects, so it gets its own group
+  # and never cancels a baseline refresh that is running for another branch.
+  group: ${{ inputs.lfs_upload_glob != '' && format('visual-regression-lfs-upload-{0}', github.run_id) || 'visual-regression-baseline-refresh' }}
   cancel-in-progress: true
 
 jobs:

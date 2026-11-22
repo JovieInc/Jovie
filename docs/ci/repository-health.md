@@ -297,3 +297,4 @@ scheduled refresh writes the new outreach and ingest baselines.
 - `setup-playwright` pulls the catalog in every browser-test job (`product_screenshots`, default on). `check-screenshot-catalog.ts` counts a pointer at its image size, so its budgets hold either way.
 - The screenshot refresh in `screenshots.yml` runs `git lfs push` before it pushes `screenshots/auto-update`.
 - Locally: `git lfs pull --include 'apps/web/screenshot-catalog/current/*.png'` before rendering marketing pages.
+- An `lfs_upload_glob` dispatch of `visual-regression.yml` now runs in its own concurrency group; before this it shared `visual-regression-baseline-refresh` and cancelled a running baseline refresh.
