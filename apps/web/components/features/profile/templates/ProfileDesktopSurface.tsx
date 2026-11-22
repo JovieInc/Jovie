@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, IconButton } from '@jovie/ui';
+import { Button, IconButton, Switch } from '@jovie/ui';
 import {
   BadgeCheck,
   CalendarDays,
@@ -15,13 +15,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
@@ -75,7 +69,7 @@ import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import type { PublicRelease } from '../releases/types';
 import { DesktopSurfaceImage } from './DesktopSurfaceImage';
-import { ProfileDesktopSideRailRows } from './ProfileDesktopSideRailRows';
+import { useOverlayAnchor } from './useOverlayAnchor';
 
 // JOV-6201: reuse the 360px track at 1180px with min-w-0 on every desktop listen branch.
 export const PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME =
@@ -266,6 +260,91 @@ function DesktopSurfaceCard({
   );
 }
 
+function EventRow({
+  tourDate,
+  large = false,
+}: Readonly<{ tourDate: TourDateViewModel; large?: boolean }>) {
+  const place = [tourDate.city, tourDate.region].filter(Boolean).join(', ');
+  return (
+    <div
+      className={cn(
+        'grid items-center bg-white/[0.025]',
+        large
+          ? 'grid-cols-[68px_minmax(0,1fr)_auto] gap-4 rounded-3xl px-4 py-3'
+          : 'grid-cols-[52px_minmax(0,1fr)_auto] gap-3 rounded-2xl px-3 py-2'
+      )}
+    >
+      <div className='rounded-xl border border-white/10 bg-white/[0.07] px-2 py-2 text-center'>
+        <div className='text-3xs font-semibold tracking-wide text-white/58'>
+          {formatMonth(tourDate.startDate, tourDate.timezone)}
+        </div>
+        <div
+          className={cn(
+            'mt-1 font-semibold leading-none tracking-[-0.05em] text-white dark:text-white',
+            large ? 'text-2xl' : 'text-xl'
+          )}
+        >
+          {formatDay(tourDate.startDate, tourDate.timezone)}
+        </div>
+      </div>
+      <div className='min-w-0'>
+        <p
+          className={cn(
+            'truncate font-medium tracking-[-0.03em] text-white dark:text-white',
+            large ? 'text-xl' : 'text-lg'
+          )}
+        >
+          {tourDate.venueName}
+        </p>
+        <p className='flex items-center gap-2 truncate text-sm text-white/48'>
+          {large ? <MapPin className='h-4 w-4 shrink-0' /> : null}
+          <span className='truncate'>{place}</span>
+        </p>
+      </div>
+      {tourDate.ticketUrl ? (
+        <a
+          href={tourDate.ticketUrl}
+          aria-label={ticketLinkLabel(tourDate)}
+          className='inline-flex h-11 items-center rounded-full border border-white/12 px-3 text-xs font-medium text-white/82 transition-colors duration-subtle hover:bg-white/[0.04]'
+        >
+          Tickets
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
+function SideRailRow({
+  title,
+  subtitle,
+  testId,
+  onClick,
+}: Readonly<{
+  title: string;
+  subtitle: string;
+  testId: string;
+  onClick: React.MouseEventHandler<HTMLButtonElement>;
+}>) {
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      data-testid={testId}
+      className='group flex min-h-14 w-full items-center justify-between gap-4 rounded-xl px-1 py-3 text-left transition-colors duration-subtle hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+    >
+      <span className='min-w-0'>
+        <span className='block truncate text-mid font-semibold tracking-[-0.015em] text-white dark:text-white'>
+          {title}
+        </span>
+        <span className='block truncate text-xs leading-5 text-white/48'>
+          {subtitle}
+        </span>
+      </span>
+      <ChevronRight className='size-4 shrink-0 text-white/40' aria-hidden />
+    </button>
+  );
+}
+
 function EmptySurfaceBlock({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -417,20 +496,8 @@ export function ProfileDesktopSurface({
     hasPlayableDestinations: mergedDSPs.length > 0,
     catalogLoadFailed,
   });
-  // Overlays are compact popovers anchored to whichever control opened them
-  // (Menu, Pay row); they fall back to the Menu button.
-  const ownMenuButtonRef = useRef<HTMLButtonElement | null>(null);
-  const menuButtonRef = menuButtonRefProp ?? ownMenuButtonRef;
-  const lastTriggerRef = useRef<HTMLElement | null>(null);
-  const anchorRef = useMemo<React.RefObject<HTMLElement | null>>(
-    () => ({
-      get current() {
-        const trigger = lastTriggerRef.current;
-        return trigger?.isConnected ? trigger : menuButtonRef.current;
-      },
-    }),
-    [menuButtonRef]
-  );
+  const { menuButtonRef, anchorRef, lastTriggerRef } =
+    useOverlayAnchor(menuButtonRefProp);
   const openDrawerFrom = (trigger: HTMLElement, view: DrawerView) => {
     lastTriggerRef.current = trigger;
     onDrawerViewChange(view);
@@ -703,38 +770,7 @@ export function ProfileDesktopSurface({
             >
               <div className='space-y-2'>
                 {upcomingTourDates.slice(0, 2).map(tourDate => (
-                  <div
-                    key={tourDate.id}
-                    className='grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-2'
-                  >
-                    <div className='rounded-xl border border-white/10 bg-white/[0.07] px-2 py-2 text-center'>
-                      <div className='text-3xs font-semibold tracking-wide text-white/58'>
-                        {formatMonth(tourDate.startDate, tourDate.timezone)}
-                      </div>
-                      <div className='mt-1 text-xl font-semibold leading-none tracking-[-0.05em] text-white dark:text-white'>
-                        {formatDay(tourDate.startDate, tourDate.timezone)}
-                      </div>
-                    </div>
-                    <div className='min-w-0'>
-                      <p className='truncate text-lg font-medium tracking-[-0.03em] text-white dark:text-white'>
-                        {tourDate.venueName}
-                      </p>
-                      <p className='truncate text-sm text-white/48'>
-                        {[tourDate.city, tourDate.region]
-                          .filter(Boolean)
-                          .join(', ')}
-                      </p>
-                    </div>
-                    {tourDate.ticketUrl ? (
-                      <a
-                        href={tourDate.ticketUrl}
-                        aria-label={ticketLinkLabel(tourDate)}
-                        className='inline-flex h-11 items-center rounded-full border border-white/12 px-3 text-xs font-medium text-white/82 transition-colors duration-subtle hover:bg-white/[0.04]'
-                      >
-                        Tickets
-                      </a>
-                    ) : null}
-                  </div>
+                  <EventRow key={tourDate.id} tourDate={tourDate} />
                 ))}
               </div>
             </DesktopSurfaceCard>
@@ -751,15 +787,55 @@ export function ProfileDesktopSurface({
         )}
         data-testid='profile-desktop-side-rail'
       >
-        <ProfileDesktopSideRailRows
-          artistName={artist.name}
-          showUpdates={showUpdatesSideRailCard}
-          isSubscribed={isSubscribed}
-          showArtistEmailRow={showArtistEmailRow}
-          hasTip={hasTip}
-          onGetUpdates={() => onModeSelect('subscribe')}
-          onOpenPayments={trigger => openDrawerFrom(trigger, 'pay')}
-        />
+        <div
+          className={cn(
+            'min-w-0 divide-y divide-white/8',
+            !showUpdatesSideRailCard && 'hidden'
+          )}
+          data-testid='profile-desktop-alerts-card'
+        >
+          <SideRailRow
+            title={isSubscribed ? 'Updates on' : 'Get updates'}
+            subtitle={
+              isSubscribed
+                ? 'Manage what you hear about.'
+                : 'New music, shows, and merch.'
+            }
+            testId={
+              isSubscribed
+                ? 'profile-desktop-manage-updates'
+                : 'profile-desktop-get-updates'
+            }
+            onClick={() => onModeSelect('subscribe')}
+          />
+          {showArtistEmailRow ? (
+            <div className='flex items-center justify-between gap-4 px-1 py-3'>
+              <div className='min-w-0'>
+                <p className='text-sm font-medium text-white/84'>
+                  Artist Emails
+                </p>
+                <p className='text-xs leading-5 text-white/48'>
+                  Occasional emails from {artist.name}.
+                </p>
+              </div>
+              <Switch
+                checked={isSubscribed}
+                onCheckedChange={() => onModeSelect('subscribe')}
+                aria-label='Artist Emails'
+              />
+            </div>
+          ) : null}
+        </div>
+        {hasTip ? (
+          <div data-testid='profile-desktop-payments-card'>
+            <SideRailRow
+              title={`Pay ${artist.name}`}
+              subtitle='Send support directly.'
+              testId='profile-desktop-open-payments'
+              onClick={event => openDrawerFrom(event.currentTarget, 'pay')}
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -794,19 +870,12 @@ export function ProfileDesktopSurface({
         </div>
       </DesktopSurfaceCard>
       {hasTip ? (
-        <DesktopSurfaceCard
-          title='Pay'
-          actionLabel='Open Pay'
-          onAction={() => onDrawerViewChange('pay')}
-        >
-          <button
-            type='button'
-            onClick={event => openDrawerFrom(event.currentTarget, 'pay')}
-            className='inline-flex h-12 items-center rounded-full border border-white/12 px-4 text-sm font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
-          >
-            Pay {artist.name}
-          </button>
-        </DesktopSurfaceCard>
+        <SideRailRow
+          title={`Pay ${artist.name}`}
+          subtitle='Send support directly.'
+          testId='profile-listen-open-pay'
+          onClick={event => openDrawerFrom(event.currentTarget, 'pay')}
+        />
       ) : null}
     </div>
   );
@@ -905,41 +974,7 @@ export function ProfileDesktopSurface({
         <div className='space-y-2'>
           {upcomingTourDates.length > 0 ? (
             upcomingTourDates.map(tourDate => (
-              <div
-                key={tourDate.id}
-                className='grid grid-cols-[68px_minmax(0,1fr)_auto] items-center gap-4 rounded-3xl bg-white/[0.025] px-4 py-3'
-              >
-                <div className='rounded-xl border border-white/10 bg-white/[0.07] px-2 py-2.5 text-center'>
-                  <div className='text-3xs font-semibold tracking-wide text-white/58'>
-                    {formatMonth(tourDate.startDate, tourDate.timezone)}
-                  </div>
-                  <div className='mt-1 text-2xl font-semibold leading-none tracking-[-0.05em] text-white dark:text-white'>
-                    {formatDay(tourDate.startDate, tourDate.timezone)}
-                  </div>
-                </div>
-                <div className='min-w-0'>
-                  <p className='truncate text-xl font-medium tracking-[-0.03em] text-white dark:text-white'>
-                    {tourDate.venueName}
-                  </p>
-                  <div className='mt-1 flex items-center gap-2 text-sm text-white/48'>
-                    <MapPin className='h-4 w-4' />
-                    <span className='truncate'>
-                      {[tourDate.city, tourDate.region]
-                        .filter(Boolean)
-                        .join(', ')}
-                    </span>
-                  </div>
-                </div>
-                {tourDate.ticketUrl ? (
-                  <a
-                    href={tourDate.ticketUrl}
-                    aria-label={ticketLinkLabel(tourDate)}
-                    className='inline-flex h-11 items-center rounded-full border border-white/12 px-4 text-sm font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
-                  >
-                    Tickets
-                  </a>
-                ) : null}
-              </div>
+              <EventRow key={tourDate.id} tourDate={tourDate} large />
             ))
           ) : (
             <EmptySurfaceBlock>{emptyState.tour}</EmptySurfaceBlock>
