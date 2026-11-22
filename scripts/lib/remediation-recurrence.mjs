@@ -8,7 +8,7 @@
 // failure stays with the agents.
 import {
   addLinearIssueComment,
-  addLinearIssueLabel,
+  linearGraphql,
   listLinearIssueComments,
 } from './linear-issue-intake.mjs';
 
@@ -16,6 +16,28 @@ export const RECURRENCE_MARKER = '<!-- remediation-recurred -->';
 export const HUMAN_AFTER = 3;
 // Same label as NEEDS_HUMAN_LABEL_ID in scripts/lanes/remediation.py.
 export const NEEDS_HUMAN_LABEL_ID = 'ccf5eaaa-8705-49f0-b264-ec3558d678b7';
+
+/** Add one label to a Linear issue; Linear keeps it once if it is already there. */
+export async function addLinearIssueLabel({
+  issueId,
+  labelId,
+  apiKey,
+  fetchImpl,
+}) {
+  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
+  const result = await linearGraphql(
+    {
+      query: `mutation AddLinearIssueLabel($id: String!, $labelId: String!) {
+      issueAddLabel(id: $id, labelId: $labelId) { success }
+    }`,
+      variables: { id: issueId, labelId },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_label_add'
+  );
+  return { ok: Boolean(result.ok && result.data?.issueAddLabel?.success) };
+}
 
 /** @param {{body: string}[]} comments */
 export function recurrenceCount(comments) {

@@ -3,7 +3,7 @@ import { linearRequest } from './linear-cooldown.mjs';
 
 export const JOVIE_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
 
-async function linearGraphql(
+export async function linearGraphql(
   { query, variables, apiKey, fetchImpl = fetch },
   caller
 ) {
@@ -78,33 +78,6 @@ export async function addLinearIssueComment({
     };
   }
   return { ok: true, id: result.data.commentCreate.comment?.id ?? null };
-}
-
-/** Add one label to a Linear issue; Linear keeps it once if it is already there. */
-export async function addLinearIssueLabel({
-  issueId,
-  labelId,
-  apiKey = process.env.LINEAR_API_KEY,
-  fetchImpl = fetch,
-}) {
-  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
-  if (!issueId || !labelId)
-    return { ok: false, reason: 'missing_label_target' };
-  const result = await linearGraphql(
-    {
-      query: `mutation AddLinearIssueLabel($id: String!, $labelId: String!) {
-      issueAddLabel(id: $id, labelId: $labelId) { success }
-    }`,
-      variables: { id: issueId, labelId },
-      apiKey,
-      fetchImpl,
-    },
-    'linear_label_add'
-  );
-  if (!result.ok) return result;
-  return result.data?.issueAddLabel?.success
-    ? { ok: true }
-    : { ok: false, reason: 'linear_label_add_unsuccessful' };
 }
 
 /** Reopen a measurement finding in its owning team's triage state. */
