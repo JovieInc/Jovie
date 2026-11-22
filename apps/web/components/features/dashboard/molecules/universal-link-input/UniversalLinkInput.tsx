@@ -42,6 +42,10 @@ import {
   type RankedPlatformOption,
 } from './utils';
 
+function formatVoiceMessage(durationSnapshot: string): string {
+  return `[Voice message ${durationSnapshot}]`;
+}
+
 export interface UniversalLinkInputRef {
   getInputElement: () => HTMLInputElement | null;
 }
@@ -235,7 +239,11 @@ export const UniversalLinkInput = forwardRef<
       handleCancelVoiceRecording,
       handleSendVoiceRecording,
       handleDismissPermissionError,
-    } = useVoiceDictation({ voiceInputEnabled, onChatSubmit });
+    } = useVoiceDictation({
+      voiceInputEnabled,
+      onChatSubmit,
+      formatVoiceMessage,
+    });
 
     const canSubmit = useMemo(() => {
       const trimmed = url.trim();

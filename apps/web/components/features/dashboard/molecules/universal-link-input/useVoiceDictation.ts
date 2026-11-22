@@ -37,11 +37,14 @@ export type DictationState =
 export interface UseVoiceDictationOptions {
   readonly voiceInputEnabled: boolean;
   readonly onChatSubmit?: (message: string) => void;
+  /** Builds the chat message for a finished recording from its duration label. */
+  readonly formatVoiceMessage: (durationSnapshot: string) => string;
 }
 
 export function useVoiceDictation({
   voiceInputEnabled,
   onChatSubmit,
+  formatVoiceMessage,
 }: UseVoiceDictationOptions) {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -218,7 +221,7 @@ export function useVoiceDictation({
     setDictationState('processing');
     processingTimerRef.current = globalThis.setTimeout(() => {
       if (onChatSubmit) {
-        onChatSubmit(`[Voice message ${durationSnapshot}]`);
+        onChatSubmit(formatVoiceMessage(durationSnapshot));
       }
       setDictationState('done');
       setRecordingDurationSeconds(0);
@@ -229,7 +232,12 @@ export function useVoiceDictation({
         );
       }, DONE_DELAY_MS);
     }, PROCESSING_DELAY_MS);
-  }, [onChatSubmit, recordingDurationLabel, stopRecordingSession]);
+  }, [
+    formatVoiceMessage,
+    onChatSubmit,
+    recordingDurationLabel,
+    stopRecordingSession,
+  ]);
 
   const handleDismissPermissionError = useCallback(() => {
     setDictationState('idle');
