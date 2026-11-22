@@ -2,10 +2,10 @@
    surface can opt in. The surface keeps its own cyan focus border; this only
    adds a very faint 3.2s glow. Reduced motion gets a static glow, no animation. */
 :root {
-  --focus-glow-rest: 0 0 0 1px rgba(17, 175, 255, 0),
-    0 0 14px 0 rgba(17, 175, 255, 0.06);
-  --focus-glow-peak: 0 0 0 1px rgba(17, 175, 255, 0.1),
-    0 0 18px 1px rgba(17, 175, 255, 0.14);
+  --focus-glow-rest:
+    0 0 0 1px rgba(17, 175, 255, 0), 0 0 14px 0 rgba(17, 175, 255, 0.06);
+  --focus-glow-peak:
+    0 0 0 1px rgba(17, 175, 255, 0.1), 0 0 18px 1px rgba(17, 175, 255, 0.14);
   --focus-glow-static: 0 0 16px 0 rgba(17, 175, 255, 0.1);
   --focus-glow-duration: 3.2s;
 }

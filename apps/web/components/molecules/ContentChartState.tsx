@@ -55,11 +55,7 @@ export function ContentChartSkeleton({
 }: Readonly<ContentChartSkeletonProps>) {
   return (
     <div
-      className={cn(
-        'w-full rounded-lg',
-        heightClassName,
-        className
-      )}
+      className={cn('w-full rounded-lg', heightClassName, className)}
       role='status'
       aria-busy='true'
       aria-live='polite'
