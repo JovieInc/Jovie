@@ -9,7 +9,7 @@ import {
   useState,
 } from 'react';
 
-export type AudiencePanelMode = 'contact' | 'analytics' | 'ai-crawlers';
+export type AudiencePanelMode = 'contact' | 'analytics';
 
 interface AudiencePanelContextValue {
   /** Currently active panel, or null if closed */

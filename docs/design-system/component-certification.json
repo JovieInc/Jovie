@@ -1717,7 +1717,9 @@
       "permission-denied": "A public read-failure page with no gated action or permission input; the detector matched role='alert' (ErrorTransientRead)."
     },
     "apps/web/app/app/(shell)/DashboardLoadTracker.tsx": {
-      "error": "The tracker returns null in every state. Unreadable or full session storage is caught and falls through to a single tracked event, so there is no failure to draw; DashboardLoadTracker.test.tsx asserts the one event when storage throws and an axe-clean render."
+      "error": "The tracker returns null in every state. Unreadable or full session storage is caught and falls through to a single tracked event, so there is no failure to draw; DashboardLoadTracker.test.tsx asserts the one event when storage throws and an axe-clean render.",
+      "loading": "The tracker draws nothing while the dashboard loads; it only watches the page's own skeletons to time the first fully loaded frame (first-dashboard-ready.ts). The loading faces belong to shell-route-skeleton.tsx and OpportunityInboxRouteSkeleton.tsx, which carry the loading stories.",
+      "offline": "The tracker renders null with or without a network. Its first-dashboard sample goes out by a fire-and-forget beacon that never throws (json-beacon.ts), so an offline load records nothing and shows nothing; first-dashboard-ready.test.ts asserts no sink failure can throw."
     },
     "apps/web/app/app/(shell)/DashboardShellContent.tsx": {
       "loading": "DashboardShellContent is an async server component awaited inside the shell layout's Suspense boundary, so it never renders a loading frame of its own; that fallback is shell-route-skeleton.tsx, which carries the loading stories.",

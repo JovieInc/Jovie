@@ -31,6 +31,8 @@ interface TaskListRowProps {
   readonly hideTitle?: boolean;
   /** Hide when the detail pane already shows the due state. */
   readonly hideDue?: boolean;
+  /** Replaces the default `J-{taskNumber}` label, e.g. a Linear `JOV-123`. */
+  readonly identifierLabel?: string;
 }
 
 function TaskStageGlyph({ task }: Readonly<{ task: TaskView }>) {
@@ -157,6 +159,7 @@ export const TaskListRow = memo(function TaskListRow({
   showAssignee = true,
   hideTitle = false,
   hideDue = false,
+  identifierLabel,
 }: Readonly<TaskListRowProps>) {
   const stage = getTaskStageVisual(task.status, task.agentStatus);
   const isDone = task.status === 'done';
@@ -203,7 +206,7 @@ export const TaskListRow = memo(function TaskListRow({
             {stage.label}
           </span>
           <span className='shrink-0 truncate font-semibold text-tertiary-token'>
-            J-{task.taskNumber}
+            {identifierLabel ?? `J-${task.taskNumber}`}
           </span>
           {categoryLabel ? (
             <div className='min-w-0 max-w-full overflow-hidden text-left'>

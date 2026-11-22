@@ -160,7 +160,6 @@
   "app/api/cron/voice-pipeline/route.ts",
   "app/api/cron/web-ai-health/route.ts",
   "app/api/dashboard/activity/recent/route.ts",
-  "app/api/dashboard/ai-crawlers/route.ts",
   "app/api/dashboard/analytics/route.ts",
   "app/api/dashboard/approvals/[id]/route.ts",
   "app/api/dashboard/audience/members/route.ts",

@@ -45,30 +45,62 @@ export interface CompanyBlocker {
   readonly observedAt: string;
 }
 
+/**
+ * `why` is what a failing step breaks. `unproven` is what an unmeasured or
+ * out-of-date step leaves unconfirmed: unknown evidence is not a failure, so
+ * it must not claim the product is broken (Tim, 2026-11-22: checkout read
+ * "nobody can pay yet" while its own probes passed).
+ */
 const CONE_COPY: Readonly<
-  Record<RevenueConeStep, { readonly name: string; readonly why: string }>
+  Record<
+    RevenueConeStep,
+    { readonly name: string; readonly why: string; readonly unproven: string }
+  >
 > = {
   public_profile: {
     name: 'The public profile',
     why: 'no artist can be sent their profile yet',
+    unproven: "we can't confirm an artist can be sent their profile",
   },
   homepage_entry: {
     name: 'The homepage entry',
     why: "visitors can't be trusted to reach sign-up",
+    unproven: "we can't confirm visitors reach sign-up",
   },
   onboarding_auth_claim: {
     name: 'Sign-up and claim',
     why: "an artist can't take their profile yet",
+    unproven: "we can't confirm an artist can take their profile",
   },
   checkout_payment_entitlement: {
     name: 'Checkout',
     why: 'nobody can pay yet',
+    unproven: "we can't confirm anyone can pay",
   },
   activation_dashboard: {
     name: 'First use after paying',
     why: 'a new customer may not get what they paid for',
+    unproven: "we can't confirm a new customer gets what they paid for",
   },
 };
+
+/**
+ * Red fails; green evidence past its budget is out of date; anything else
+ * was never recorded. The three read differently because they need
+ * different fixes.
+ */
+function certificationText(
+  step: RevenueConeStep,
+  metric: CompanyStateSnapshot['certification'][RevenueConeStep],
+  status: string
+): string {
+  const copy = CONE_COPY[step];
+  if (status === 'red')
+    return `${copy.name} fails certification, so ${copy.why}`;
+  if (metric.status === 'green')
+    return `${copy.name}'s certification is out of date, so ${copy.unproven}`;
+  return `${copy.name} isn't fully measured yet, so ${copy.unproven}`;
+}
 
 const FUNNEL_COPY: Readonly<Record<CompanyFunnelStep, string>> = {
   visits: 'real visits',
@@ -181,19 +213,14 @@ export function companyBlocker(
     observedAt: snapshot.generatedAt,
   };
   if (kind === 'certification' && isConeStep(step)) {
-    const status = effectiveCompanyMetricStatus(
-      snapshot.certification[step],
-      now
-    );
+    const metric = snapshot.certification[step];
+    const status = effectiveCompanyMetricStatus(metric, now);
     return {
       ...base,
       kind: 'certification',
       step,
       tone: status === 'red' ? 'bad' : 'warn',
-      text:
-        status === 'red'
-          ? `${CONE_COPY[step].name} fails certification, so ${CONE_COPY[step].why}`
-          : `${CONE_COPY[step].name} has no fresh certification, so ${CONE_COPY[step].why}`,
+      text: certificationText(step, metric, status),
       detailsHref: APP_ROUTES.ADMIN_CERTIFICATIONS,
     };
   }
