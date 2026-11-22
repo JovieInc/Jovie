@@ -5,6 +5,7 @@ import {
   wcag22AaAxeOptions,
 } from '@/lib/a11y-gates/wcag-standard.cjs';
 import { registerChatEntityPreviewOwnershipTest } from './utils/storybook-chat-entity-preview';
+import { registerOccupiedRightRailTest } from './utils/storybook-occupied-right-rail';
 
 test('ancillary inspector restores a focused edit after loading without stealing moved focus', async ({
   page,
@@ -34,7 +35,7 @@ test('ancillary inspector restores a focused edit after loading without stealing
   await expect(assets).toBeFocused();
 });
 registerChatEntityPreviewOwnershipTest();
-// Keep ancillary inspector regressions in the required overlay suite.
+registerOccupiedRightRailTest();
 for (const viewport of [
   { width: 1440, height: 900 },
   { width: 1100, height: 600 },
@@ -47,7 +48,6 @@ for (const viewport of [
     }, testInfo) => {
       await page.setViewportSize(viewport);
       await page.emulateMedia({ reducedMotion });
-      // The default Storybook fixture freezes motion; exercise the real rail.
       await page.addInitScript(() => {
         Object.defineProperty(window, 'matchMedia', {
           value: window.matchMedia.bind(window),
