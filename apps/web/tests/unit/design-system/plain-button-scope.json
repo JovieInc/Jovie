@@ -1,6 +1,6 @@
 {
   "approved": "2026-11-12",
-  "maxFiles": 253,
+  "maxFiles": 252,
   "note": "Files allowed to use PlainButton: the components that rendered raw <button> elements when Tim approved the plain button (Nov 12, 2026), plus the 171 raw-button files he approved on Nov 14, 2026 (\"certify now then ratchet down\"), so they could use the design system without a visual change. New code uses Button. maxFiles only goes down: each file moved to Button leaves the list and lowers it. Adding a file or raising maxFiles needs his approval.",
   "files": [
     "app/(marketing)/smart-links/SmartLinksDemo.tsx",
@@ -108,7 +108,6 @@
     "components/features/dashboard/tasks/TaskBoard.tsx",
     "components/features/dashboard/tasks/TaskDescriptionHelper.tsx",
     "components/features/dashboard/tasks/TaskListRow.tsx",
-    "components/features/dashboard/tasks/TaskRowActionMenu.tsx",
     "components/features/dashboard/tasks/TasksPageClient.tsx",
     "components/features/demo/DemoReleasePresaveSurface.tsx",
     "components/features/demo/DemoReleasesPanel.tsx",
@@ -225,7 +224,6 @@
     "components/organisms/sidebar-identity-group/fixtures/split-layout.tsx",
     "components/organisms/sidebar/controls.tsx",
     "components/organisms/table/atoms/AudienceMobileCard.tsx",
-    "components/organisms/table/atoms/AudienceQuickActionsCell.tsx",
     "components/organisms/table/atoms/ShellListRowFrame.tsx",
     "components/organisms/table/molecules/DisplayMenuDropdown.tsx",
     "components/organisms/table/molecules/TableHeaderCell.tsx",

@@ -4,14 +4,7 @@
 
 import { PlainButton } from '@jovie/ui';
 import { QueryClientContext } from '@tanstack/react-query';
-import {
-  Clock,
-  ExternalLink,
-  Lock,
-  MoreHorizontal,
-  Pause,
-  Play,
-} from 'lucide-react';
+import { Clock, ExternalLink, Lock, Pause, Play } from 'lucide-react';
 import Link from 'next/link';
 import {
   type ComponentPropsWithoutRef,
@@ -30,6 +23,7 @@ import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useT
 import {
   contextualAction,
   ShellListRowFrame,
+  TableRowOverflowTrigger,
 } from '@/components/organisms/table';
 import { AgentPulse } from '@/components/shell/AgentPulse';
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
@@ -494,14 +488,9 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
             open={actionsOpen}
             onOpenChange={setActionsOpen}
           >
-            <PlainButton
-              onClick={e => e.stopPropagation()}
-              onKeyDown={e => e.stopPropagation()}
-              aria-label={`Release actions for ${release.title}`}
-              className='relative grid h-7 w-7 shrink-0 place-items-center rounded-md text-quaternary-token before:absolute before:left-1/2 before:top-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 transition-[opacity,color,background-color] duration-subtle ease-subtle hover:bg-surface-2/70 hover:text-primary-token'
-            >
-              <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
-            </PlainButton>
+            <TableRowOverflowTrigger
+              ariaLabel={`Release actions for ${release.title}`}
+            />
           </TableActionMenu>
         </div>
       ) : null}
