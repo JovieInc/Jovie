@@ -1,0 +1,20 @@
+{
+  "membership": "ultra",
+  "observedAt": "2026-11-18T20:15:00Z",
+  "pools": [
+    {
+      "id": "included-auto",
+      "label": "Included usage (Auto)",
+      "status": "depleted"
+    },
+    {
+      "id": "frontier-request",
+      "label": "Frontier model requests",
+      "status": "available"
+    }
+  ],
+  "receipt": {
+    "command": "cursor-agent about",
+    "summary": "Logged in; Ultra membership; default model pool depleted; Auto route still available"
+  }
+}
