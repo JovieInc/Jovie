@@ -32,6 +32,10 @@ import { primeOriginBoundVercelBypass } from './utils/prime-vercel-bypass';
 import { assertChatResponseOk } from './utils/prod-cert-chat-response';
 import { assertProdCertCheckoutEntry } from './utils/prod-cert-checkout-entry';
 import {
+  saveBioAndReadBack,
+  saveLinkAndReadBack,
+} from './utils/prod-cert-outcomes';
+import {
   certStep,
   certStepBlocked,
   createSurfaceTelemetry,
@@ -82,6 +86,7 @@ recordCertCapabilities({
   'public-profile': [
     'owned-profile-renders-publicly',
     'profile-edit-save-readback',
+    'profile-links-save-readback',
   ],
   chat: ['composer-ready', 'first-reply'],
   checkout: ['checkout-entry-renders', 'fresh-user-checkout-entry'],
@@ -742,86 +747,31 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       () => `/${claimedUsername} renders publicly`
     );
 
-    // JOV-9625 outcome cert: the artist edit loop — edit the profile, save,
-    // read the change back on the public profile, restore. Exercises the real
-    // PUT /api/dashboard/profile save path and the public readback with the
-    // signed-in canary identity; the bio is restored so the run is idempotent.
+    // JOV-9625 / JOV-14474 outcome certs: perform the artist's edits as the
+    // canary, read the real result back, restore (utils/prod-cert-outcomes.ts).
     await certStep(
       'public-profile',
       'profile-edit-save-readback',
-      async () => {
-        const profileResponse = await page
-          .context()
-          .request.get(`${expectedOrigin}/api/dashboard/profile`);
-        expect(profileResponse.status()).toBe(200);
-        const { profile } = (await profileResponse.json()) as {
-          profile?: { id?: unknown; bio?: string | null; username?: unknown };
-        };
-        // The save route requires the claimed profile's canonical UUID plus
-        // an updates envelope (apps/web/app/api/dashboard/profile/route.ts);
-        // a bare field payload is rejected with 400 before any write.
-        const profileId = typeof profile?.id === 'string' ? profile.id : '';
-        expect(
-          profileId,
-          'Profile edit save requires the claimed profile id'
-        ).toMatch(
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-        );
-        const originalBio = typeof profile?.bio === 'string' ? profile.bio : '';
-        const marker = `prodcert edit-save-readback ${runTag()}`;
-        const save = await page
-          .context()
-          .request.put(`${expectedOrigin}/api/dashboard/profile`, {
-            data: { profileId, updates: { bio: marker } },
-          });
-        expect(save.status(), 'Profile edit save failed').toBe(200);
-        try {
-          // The save path invalidates the public profile's ISR + edge caches
-          // (lib/cache/profile.ts invalidateProfileCache fires revalidatePath,
-          // revalidateTag and the Redis edge purge), but that invalidation is
-          // eventually consistent across the CDN. A single immediate sample
-          // races the propagation window — the readback failed one attempt and
-          // passed the next in run 41155363486 ("Saved bio must read back",
-          // spec :692) and again in 41157880251. Poll the public render with a
-          // bounded window instead of sampling once — the same move
-          // waitForCheckoutEntryContent made for billing text after the
-          // 2026-10-29 05:06Z promotion failed on a single empty sample.
-          const readbackDeadlineMs = Date.now() + 30_000;
-          let publicText = '';
-          for (;;) {
-            const publicPage = await page
-              .context()
-              .request.get(`${expectedOrigin}/${claimedUsername}`);
-            expect(
-              publicPage.status(),
-              `Public profile /${claimedUsername} must render after the save`
-            ).toBe(200);
-            publicText = await publicPage.text();
-            if (
-              publicText.includes(marker) ||
-              Date.now() >= readbackDeadlineMs
-            ) {
-              break;
-            }
-            await page.waitForTimeout(1_000);
-          }
-          expect(
-            publicText,
-            'Saved bio must read back on the public profile'
-          ).toContain(marker);
-          return marker;
-        } finally {
-          // Restore even on a failed readback so the canary profile is not
-          // left carrying the marker between runs.
-          const restore = await page
-            .context()
-            .request.put(`${expectedOrigin}/api/dashboard/profile`, {
-              data: { profileId, updates: { bio: originalBio } },
-            });
-          expect(restore.status(), 'Profile edit restore failed').toBe(200);
-        }
-      },
+      () =>
+        saveBioAndReadBack({
+          request: page.context().request,
+          origin: expectedOrigin,
+          username: claimedUsername,
+          marker: `prodcert edit-save-readback ${runTag()}`,
+          wait: ms => page.waitForTimeout(ms),
+        }),
       () => 'profile edit saved, read back on the public profile, restored'
+    );
+    await certStep(
+      'public-profile',
+      'profile-links-save-readback',
+      () =>
+        saveLinkAndReadBack({
+          request: page.context().request,
+          origin: expectedOrigin,
+          tag: runTag(),
+        }),
+      () => 'link added, read back as stored, removed, own links restored'
     );
     await page.goto(`${expectedOrigin}/${claimedUsername}`, {
       waitUntil: 'domcontentloaded',

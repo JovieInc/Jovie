@@ -99,11 +99,11 @@
       "checks": [
         {
           "file": "apps/web/tests/e2e/smoke-prod-auth.spec.ts",
-          "test": "sign-in works and dashboard loads",
+          "test": "profile-edit-save-readback",
           "runs": "prod-postdeploy"
         }
       ],
-      "note": "Bio only (step profile-edit-save-readback): display name and avatar are unchecked."
+      "note": "Bio only: display name and avatar are unchecked."
     },
     {
       "id": "profile-switch",
@@ -129,8 +129,14 @@
         "apps/web/app/app/(shell)/dashboard/actions/social-links.ts#getProfileSocialLinks"
       ],
       "chatTools": [],
-      "checks": [],
-      "gap": "Slice 2: add a link as a test account, read it back on the public profile, remove it."
+      "checks": [
+        {
+          "file": "apps/web/tests/e2e/smoke-prod-auth.spec.ts",
+          "test": "profile-links-save-readback",
+          "runs": "prod-postdeploy"
+        }
+      ],
+      "note": "Reads the stored link back through the API; the public render of links is not asserted."
     },
     {
       "id": "release-create",
