@@ -73,8 +73,15 @@ struct AuthScreenStyleGuardTests {
     let buttonEnd = try #require(source.range(of: "private struct AuthErrorText: View"))
     let buttonSource = source[buttonStart.lowerBound..<buttonEnd.lowerBound]
 
-    #expect(buttonSource.contains("private static let minimumHitTargetHeight: CGFloat = 44"))
+    // #26134: the 44pt hit target now comes from the projected metrics, not a local constant.
+    #expect(JovieActionButtonMetrics.hitTarget == 44)
+    #expect(!buttonSource.contains("minimumHitTargetHeight"))
     #expect(buttonSource.contains("private static var minimumHitTargetPadding: CGFloat"))
+    #expect(
+      buttonSource.contains(
+        "max((JovieActionButtonMetrics.hitTarget - JovieActionButtonMetrics.height) / 2, 0)"
+      )
+    )
     let hasHitTargetPaddingInsideLabel = buttonSource.range(
       of: #"\.padding\(\.vertical,\s*Self\.minimumHitTargetPadding\)\s*\.contentShape\(Rectangle\(\)\)"#,
       options: .regularExpression
