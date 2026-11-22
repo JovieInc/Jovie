@@ -13,7 +13,9 @@ describe('AddConnectionRail inset (JOV-12568)', () => {
   });
 
   it('puts choice rows on the plate rule: plate at 4, content at 12', () => {
-    expect(source).toContain("className='px-1 py-1'");
+    expect(source).toContain(
+      "<DrawerSection sectionKind='details' surface='plain' className='p-1'>"
+    );
     expect(source).toContain(
       "'group flex w-full items-start gap-3 rounded-lg px-2 py-3 text-left"
     );

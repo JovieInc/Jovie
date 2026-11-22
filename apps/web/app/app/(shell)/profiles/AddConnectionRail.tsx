@@ -161,7 +161,6 @@ function handleSuggestions(
         creatorName
       );
       if (!candidate) return [];
-
       return [
         {
           ...candidate,
@@ -390,11 +389,7 @@ export function AddConnectionRail({
       }
     >
       {view === 'home' ? (
-        <DrawerSection
-          sectionKind='details'
-          surface='plain'
-          className='px-1 py-1'
-        >
+        <DrawerSection sectionKind='details' surface='plain' className='p-1'>
           <ChoiceRow
             icon={<Link2 className='h-4 w-4' aria-hidden />}
             title='Add Public Profile'

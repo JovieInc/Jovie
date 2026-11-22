@@ -254,7 +254,6 @@ export function AudioWaveformEditor({
   const handleTogglePlayback = useCallback(async () => {
     const audio = audioRef.current;
     if (!audio) return;
-
     if (isPlaying) {
       audio.pause();
       if (holdsGlobalFocusRef.current) {
