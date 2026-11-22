@@ -353,6 +353,17 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:ai-routing-drift
     jobCount: 2
+  - name: Crawl content fixture
+    path: .github/workflows/crawl-content-fixture.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:reconcile
+    jobCount: 1
   - name: Native Security Advisory
     path: .github/workflows/deepsec-native.yml
     active: true
