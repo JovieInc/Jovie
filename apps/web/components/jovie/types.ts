@@ -100,6 +100,12 @@ export interface JovieChatProps {
    * request (founder decision 2026-10-20, Q3).
    */
   readonly homeCanvasMode?: 'empty-state' | 'living';
+  /**
+   * Optional card pinned directly above the composer in both the Home and the
+   * thread layouts (Ovie: Summer's pending ask). Return `null` from the
+   * rendered element to show nothing. Absent: the layout is unchanged.
+   */
+  readonly composerDock?: () => ReactNode;
   /** Whether profile setup is complete, used to suppress setup quick actions. */
   readonly isProfileComplete?: boolean;
   /**

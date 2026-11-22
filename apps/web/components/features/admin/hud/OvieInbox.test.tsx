@@ -385,4 +385,12 @@ describe('Ovie Inbox', () => {
       screen.getByTestId('ovie-inbox-decision')
     );
   });
+
+  it('shows the swipe card Discuss link for the current decision', async () => {
+    mount(response([item]));
+    expect(await screen.findByTestId('decision-card-discuss')).toHaveAttribute(
+      'href',
+      expect.stringContaining('discuss=summer%3Aone')
+    );
+  });
 });
