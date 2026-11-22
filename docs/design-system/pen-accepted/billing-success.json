@@ -1,0 +1,266 @@
+{
+  "schema": "pen-accepted/v1",
+  "frame": "billing-success",
+  "sectionId": "checkout/billing-success",
+  "stillNodeId": "lCw0V",
+  "viewport": 1440,
+  "source": "https://github.com/JovieInc/Jovie/actions/runs/44979547632",
+  "node": {
+    "type": "frame",
+    "id": "lCw0V",
+    "x": 267158,
+    "y": -8000,
+    "name": "billing-success",
+    "context": "route /billing/success",
+    "theme": { "mode-2": "dark" },
+    "clip": true,
+    "width": 1440,
+    "height": 900,
+    "fill": [
+      "#0A0A0F",
+      {
+        "type": "gradient",
+        "gradientType": "radial",
+        "enabled": true,
+        "rotation": 0,
+        "size": { "width": 1.3, "height": 2.08 },
+        "colors": [
+          { "color": "#6D4AFFAA", "position": 0 },
+          { "color": "#1E2A6E66", "position": 0.45 },
+          { "color": "#0A0A0F00", "position": 1 }
+        ],
+        "center": { "x": 0.25, "y": 0.15 }
+      },
+      {
+        "type": "gradient",
+        "gradientType": "radial",
+        "enabled": true,
+        "opacity": 0.6,
+        "rotation": 0,
+        "size": { "width": 0.7, "height": 1.1199999999999999 },
+        "colors": [
+          { "color": "#FF6A4D80", "position": 0 },
+          { "color": "#B8336A33", "position": 0.5 },
+          { "color": "#0A0A0F00", "position": 1 }
+        ],
+        "center": { "x": 0.8, "y": 0.85 }
+      }
+    ],
+    "layout": "vertical",
+    "justifyContent": "center",
+    "alignItems": "center",
+    "children": [
+      {
+        "type": "frame",
+        "id": "X0hRW",
+        "name": "Success column",
+        "width": 480,
+        "layout": "vertical",
+        "gap": 24,
+        "alignItems": "center",
+        "children": [
+          {
+            "type": "frame",
+            "id": "MArQa",
+            "name": "Pro mark",
+            "gap": 8,
+            "alignItems": "center",
+            "children": [
+              {
+                "id": "T97MpB",
+                "type": "ref",
+                "ref": "Dl0KZ",
+                "name": "Brand mark",
+                "width": 20,
+                "height": 20
+              },
+              {
+                "type": "text",
+                "id": "FKyxN",
+                "name": "Pro label",
+                "fill": "$atom-text-secondary",
+                "content": "PRO",
+                "fontFamily": "$type-font-ui",
+                "fontSize": 12,
+                "fontWeight": "600",
+                "letterSpacing": 1.2
+              }
+            ]
+          },
+          {
+            "type": "frame",
+            "id": "uEVoe",
+            "name": "Heading",
+            "width": "fill_container",
+            "layout": "vertical",
+            "gap": 10,
+            "children": [
+              {
+                "type": "text",
+                "id": "PBi7L",
+                "name": "Headline",
+                "fill": "$atom-text-primary",
+                "textGrowth": "fixed-width",
+                "width": "fill_container",
+                "content": "You're on Pro: unlocked",
+                "lineHeight": 1.1,
+                "textAlign": "center",
+                "fontFamily": "$type-font-ui",
+                "fontSize": 40,
+                "fontWeight": "600",
+                "letterSpacing": -0.8
+              },
+              {
+                "type": "text",
+                "id": "jr7N8",
+                "name": "Secondary copy",
+                "fill": "$atom-text-secondary",
+                "textGrowth": "fixed-width",
+                "width": "fill_container",
+                "content": "Everything in Pro is live on your profile now. Your receipt is on its way by email.",
+                "lineHeight": 1.5,
+                "textAlign": "center",
+                "fontFamily": "$type-font-ui",
+                "fontSize": 15,
+                "fontWeight": "normal"
+              }
+            ]
+          },
+          {
+            "id": "CriAN",
+            "type": "ref",
+            "ref": "g3IC1",
+            "name": "Go to dashboard",
+            "descendants": {
+              "FoiAh": {
+                "height": 32,
+                "cornerRadius": "$radius-md",
+                "effect": [],
+                "fill": "$ink"
+              },
+              "iqbJo": { "content": "Go to dashboard", "fontSize": 14 }
+            }
+          },
+          {
+            "type": "frame",
+            "id": "BkoVc",
+            "name": "Profile link row",
+            "width": "fill_container",
+            "gap": 8,
+            "alignItems": "center",
+            "children": [
+              {
+                "id": "ehKa0",
+                "type": "ref",
+                "ref": "vzkXf",
+                "name": "Profile link field",
+                "width": "fill_container",
+                "height": 32,
+                "fill": "$atom-surface-card",
+                "stroke": "$atom-border",
+                "strokeWidth": 1,
+                "cornerRadius": "$radius-md",
+                "padding": [0, 12],
+                "descendants": {
+                  "JTJta": { "enabled": false },
+                  "bVAJD": { "icon": "link" },
+                  "bFFMU": { "content": "jov.ie/yourname" },
+                  "Dqpbl": { "enabled": false }
+                }
+              },
+              {
+                "id": "vRG70",
+                "type": "ref",
+                "ref": "g3IC1",
+                "name": "Copy button",
+                "descendants": {
+                  "FoiAh": {
+                    "height": 32,
+                    "cornerRadius": "$radius-md",
+                    "effect": [],
+                    "fill": "$atom-surface-elevated",
+                    "stroke": "$atom-border",
+                    "strokeWidth": 1
+                  },
+                  "iqbJo": {
+                    "content": "Copy",
+                    "fontSize": 14,
+                    "fill": "$atom-text-primary"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "type": "frame",
+            "id": "AkQZt",
+            "name": "Next steps",
+            "width": "fill_container",
+            "layout": "vertical",
+            "gap": 2,
+            "padding": [8, 0, 0, 0],
+            "children": [
+              {
+                "id": "dBlpf",
+                "type": "ref",
+                "ref": "vzkXf",
+                "name": "Turn on fan capture for your next release",
+                "width": "fill_container",
+                "descendants": {
+                  "JTJta": { "enabled": false },
+                  "bVAJD": { "icon": "sparkles", "fill": "$atom-text-muted" },
+                  "bFFMU": {
+                    "content": "Turn on fan capture for your next release",
+                    "fill": "$atom-text-secondary"
+                  },
+                  "Twb19": { "fill": "$atom-text-muted" },
+                  "CBeRv": { "enabled": false },
+                  "wTkKR": { "enabled": false }
+                }
+              },
+              {
+                "id": "SKeOc",
+                "type": "ref",
+                "ref": "vzkXf",
+                "name": "See who's visiting your profile",
+                "width": "fill_container",
+                "descendants": {
+                  "JTJta": { "enabled": false },
+                  "bVAJD": {
+                    "icon": "bar-chart-3",
+                    "fill": "$atom-text-muted"
+                  },
+                  "bFFMU": {
+                    "content": "See who's visiting your profile",
+                    "fill": "$atom-text-secondary"
+                  },
+                  "Twb19": { "fill": "$atom-text-muted" },
+                  "CBeRv": { "enabled": false },
+                  "wTkKR": { "enabled": false }
+                }
+              },
+              {
+                "id": "TbnJG",
+                "type": "ref",
+                "ref": "vzkXf",
+                "name": "Remove Jovie branding from your profile",
+                "width": "fill_container",
+                "descendants": {
+                  "JTJta": { "enabled": false },
+                  "bVAJD": { "icon": "palette", "fill": "$atom-text-muted" },
+                  "bFFMU": {
+                    "content": "Remove Jovie branding from your profile",
+                    "fill": "$atom-text-secondary"
+                  },
+                  "Twb19": { "fill": "$atom-text-muted" },
+                  "CBeRv": { "enabled": false },
+                  "wTkKR": { "enabled": false }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
