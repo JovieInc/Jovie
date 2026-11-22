@@ -2,21 +2,20 @@
 /**
  * JOV-7200 / VER-5 — bind public-profile dogfood feed to a served deploy.
  *
- * Default is dry-run (no DB writes). Apply requires DATABASE_URL (same Doppler
- * jovie-web/prd path as scripts/db/prod-read.mjs). Does not add an HTTP bind
- * route; uses existing CAS helpers against ovie_operating_kv.
+ * Default is dry-run (no DB writes). Apply requires DATABASE_URL (Doppler
+ * jovie-web/prd — same as scripts/db/prod-read.mjs). No HTTP bind route;
+ * uses existing CAS helpers against ovie_operating_kv.
  *
+ * Dry-run observe:
  *   pnpm --filter=@jovie/web exec tsx scripts/bind-public-profile-dogfood-feed.ts \
- *     --origin https://jov.ie \
- *     --observation /path/to/public-profile-observation.json
+ *     --origin https://jov.ie --observe --path /tim
  *
- *   doppler run -p jovie-web -c prd -- \
+ * Apply on authorized runner (postdeploy golden-path-cert):
+ *   doppler run --project jovie-web --config prd --only-secrets=DATABASE_URL --no-fallback -- \
  *     pnpm --filter=@jovie/web exec tsx scripts/bind-public-profile-dogfood-feed.ts \
- *       --origin https://jov.ie \
- *       --observation /path/to/public-profile-observation.json \
- *       --apply
+ *       --origin https://jov.ie --observe --path /tim --apply
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import {
   dogfoodReceiptFromOutcomeMission,
@@ -33,7 +32,6 @@ import {
 } from '@/lib/ovie/certifications/dogfood-receipt-ledger';
 import { PUBLIC_PROFILE_DOGFOOD_SUBJECT_ID } from '@/lib/ovie/certifications/public-profile-dogfood-fixture';
 
-const MERGE_SHA = 'c35613ecd6910e9575109182d6cd28beb0c3519d';
 const COMMIT_SHA = /^[0-9a-f]{40}$/i;
 
 type CriterionStatus = 'passed' | 'failed' | 'blocked' | 'skipped';
@@ -76,7 +74,10 @@ function parseObservation(raw: unknown): ObservationFile {
   if (typeof deploymentId !== 'string' || deploymentId.trim().length === 0) {
     throw new Error('observation.buildInfo.deploymentId required');
   }
-  if (!Array.isArray(raw.criterionAssessment) || raw.criterionAssessment.length === 0) {
+  if (
+    !Array.isArray(raw.criterionAssessment) ||
+    raw.criterionAssessment.length === 0
+  ) {
     throw new Error('observation.criterionAssessment required');
   }
   return raw as unknown as ObservationFile;
@@ -103,6 +104,83 @@ async function fetchBuildInfo(origin: string): Promise<{
     deploymentId: body.deploymentId,
     environment:
       typeof body.environment === 'string' ? body.environment : undefined,
+  };
+}
+
+function countMatches(html: string, pattern: RegExp): number {
+  return (html.match(pattern) ?? []).length;
+}
+
+async function observePublicProfile(input: {
+  readonly origin: string;
+  readonly path: string;
+}): Promise<ObservationFile> {
+  const started = new Date().toISOString();
+  const buildInfo = await fetchBuildInfo(input.origin);
+  const profileUrl = new URL(input.path, input.origin);
+  const response = await fetch(profileUrl);
+  const html = await response.text();
+  const completed = new Date().toISOString();
+
+  const identityHits = countMatches(html, /artist|profile|@|display.?name/gi);
+  const listenHits = countMatches(
+    html,
+    /spotify|listen|apple music|tidal|soundcloud|youtube/gi
+  );
+  const nearbyHits = countMatches(
+    html,
+    /nearby|notify|alert|concert|tour|notification/gi
+  );
+
+  // Nearby consent persistence requires an interactive write; anonymous HTML
+  // alone never proves it. Identity/listen can pass on markup presence only
+  // when the page actually loads.
+  const identityStatus: CriterionStatus =
+    response.ok && identityHits > 0 ? 'passed' : 'failed';
+  const listenStatus: CriterionStatus =
+    response.ok && listenHits > 0 ? 'passed' : 'failed';
+  const nearbyStatus: CriterionStatus = 'failed';
+
+  const passedCount = [identityStatus, listenStatus, nearbyStatus].filter(
+    status => status === 'passed'
+  ).length;
+
+  return {
+    observedAtStarted: started,
+    observedAtCompleted: completed,
+    origin: input.origin,
+    path: input.path,
+    httpStatus: response.status,
+    buildInfo,
+    criterionAssessment: [
+      {
+        criterion: 'Identity and latest work match the canonical artist',
+        status: identityStatus,
+        evidenceRefs: [
+          'artifact:public-profile/http-profile',
+          'artifact:public-profile/build-info',
+        ],
+        notes: `Anonymous GET ${profileUrl} identity markup hits=${identityHits}`,
+      },
+      {
+        criterion: 'A listening destination reaches the intended work',
+        status: listenStatus,
+        evidenceRefs: ['artifact:public-profile/http-profile'],
+        notes: `Listen markup hits=${listenHits}; destination click not executed`,
+      },
+      {
+        criterion:
+          'Nearby notification interest and consent persist for the intended artist',
+        status: nearbyStatus,
+        evidenceRefs: ['artifact:public-profile/http-profile'],
+        notes: `Nearby markup hits=${nearbyHits}; consent persistence not completed (truthful fail)`,
+      },
+    ],
+    goalCompletion:
+      passedCount === 3 ? 'completed' : passedCount > 0 ? 'partial' : 'failed',
+    correctness: 'unverified',
+    method: 'goal_driven',
+    purpose: 'capability',
   };
 }
 
@@ -137,7 +215,7 @@ function buildReceipt(observation: ObservationFile) {
       goalCompletion: observation.goalCompletion,
       correctness: observation.correctness,
       resultingState: allPassed
-        ? 'Anonymous/public-profile probe met every success criterion on the served deploy.'
+        ? 'Public-profile probe met every success criterion on the served deploy.'
         : `Truthful probe on ${observation.origin}${observation.path}: ${checks
             .filter(check => check.status !== 'passed')
             .map(check => `${check.criterion}=${check.status}`)
@@ -166,25 +244,43 @@ async function main(): Promise<number> {
     options: {
       origin: { type: 'string', default: 'https://jov.ie' },
       observation: { type: 'string' },
+      observe: { type: 'boolean', default: false },
+      path: { type: 'string', default: '/tim' },
+      'write-observation': { type: 'string' },
+      'write-result': { type: 'string' },
       apply: { type: 'boolean', default: false },
-      'require-contains': { type: 'string', default: MERGE_SHA },
+      'expected-sha': { type: 'string' },
     },
   });
-  if (!values.observation) {
-    process.stderr.write('--observation <file> is required\n');
+
+  if (!values.observe && !values.observation) {
+    process.stderr.write('Provide --observe or --observation <file>\n');
     return 64;
   }
 
-  const observation = parseObservation(
-    JSON.parse(readFileSync(values.observation, 'utf8'))
-  );
+  const observation = values.observe
+    ? await observePublicProfile({
+        origin: values.origin!,
+        path: values.path!,
+      })
+    : parseObservation(
+        JSON.parse(readFileSync(values.observation!, 'utf8'))
+      );
+
+  if (values['write-observation']) {
+    writeFileSync(
+      values['write-observation'],
+      `${JSON.stringify(observation, null, 2)}\n`
+    );
+  }
+
   const live = await fetchBuildInfo(values.origin!);
   if (
     live.commitSha !== observation.buildInfo.commitSha ||
     live.deploymentId !== observation.buildInfo.deploymentId
   ) {
     process.stderr.write(
-      JSON.stringify(
+      `${JSON.stringify(
         {
           error: 'observation_build_mismatch',
           live,
@@ -192,7 +288,40 @@ async function main(): Promise<number> {
         },
         null,
         2
-      ) + '\n'
+      )}\n`
+    );
+    return 2;
+  }
+
+  if (
+    values['expected-sha'] &&
+    live.commitSha !== values['expected-sha']
+  ) {
+    process.stderr.write(
+      `${JSON.stringify(
+        {
+          error: 'expected_sha_mismatch',
+          expected: values['expected-sha'],
+          live: live.commitSha,
+        },
+        null,
+        2
+      )}\n`
+    );
+    return 2;
+  }
+
+  if (live.environment && live.environment !== 'production') {
+    process.stderr.write(
+      `${JSON.stringify(
+        {
+          error: 'refusing_non_production_alias',
+          environment: live.environment,
+          hint: 'Bind only jov.ie production for VER-5 prod acceptance; staging is separate',
+        },
+        null,
+        2
+      )}\n`
     );
     return 2;
   }
@@ -200,9 +329,7 @@ async function main(): Promise<number> {
   const binding: DogfoodSubjectDeployBinding = {
     commitSha: live.commitSha,
     deploymentId: live.deploymentId,
-    // Provenance flag (live vs fixture seed), not Vercel environment name.
-    // staging.jov.ie canary and jov.ie production both use source=production
-    // when the binding names the deployment that was actually exercised.
+    // Provenance (live vs fixture), not the Vercel env label.
     source: 'production',
   };
 
@@ -218,8 +345,8 @@ async function main(): Promise<number> {
   const plan = {
     mode: values.apply ? 'apply' : 'dry-run',
     origin: values.origin,
-    requireContains: values['require-contains'],
-    note: 'source=production means live provenance (not fixture), not the Vercel env label',
+    path: observation.path,
+    note: 'source=production means live provenance (not fixture), not Vercel env',
     liveBuild: live,
     binding,
     receiptId,
@@ -228,34 +355,29 @@ async function main(): Promise<number> {
     expectedMetricEffect: {
       dogfoodFeed: {
         status: 'production',
-        receiptCountDelta: '+1 (or replay if identical key)',
+        receiptCountDelta: '+1 (or replay)',
         subjectsWithDeploy: '≥1 including public-profile',
       },
       dogfoodKindCoverage:
-        'capability coverage increases only if provesOutcome=true; truthful fails stay 0',
-      idempotency:
-        'identical receipt key replays; mutated payload fails closed (immutable)',
+        'capability coverage rises only if provesOutcome=true; truthful fails stay 0',
     },
     readback: {
       ledgerKey: 'jovie:certification:v1:dogfood-receipts',
-      prodReadExample: `node scripts/db/prod-read.mjs "select value->'subjectDeploys'->'public-profile' as deploy, jsonb_object_keys(value->'receipts') as receipt_keys from ovie_operating_kv where key = 'jovie:certification:v1:dogfood-receipts'"`,
       metricsUrl: `${values.origin}/api/ovie/certifications/metrics`,
-      metricsAuth:
-        'resolveOviePrincipal (Ovie OAuth bearer or Better Auth session) + authorizeSummerControl (isAdmin); 401=unauthenticated, 403=non-admin',
     },
   };
-  process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
 
   if (!values.apply) {
+    process.stdout.write(`${JSON.stringify(plan, null, 2)}\n`);
     process.stdout.write(
-      'dry-run complete; pass --apply with DATABASE_URL (doppler jovie-web/prd) to persist\n'
+      'dry-run complete; pass --apply with DATABASE_URL to persist\n'
     );
     return 0;
   }
 
   if (!process.env.DATABASE_URL) {
     process.stderr.write(
-      'DATABASE_URL missing; refuse apply. Use doppler run -p jovie-web -c prd\n'
+      'DATABASE_URL missing; refuse apply. Use doppler jovie-web/prd\n'
     );
     return 2;
   }
@@ -278,19 +400,19 @@ async function main(): Promise<number> {
   });
   const ledger = await readDogfoodReceiptLedger(backend);
   const feed = dogfoodFeedStatus(ledger);
-  process.stdout.write(
-    `${JSON.stringify(
-      {
-        bindResult,
-        receiptResult,
-        receiptId,
-        feed,
-        subjectDeploy: ledger?.subjectDeploys[PUBLIC_PROFILE_DOGFOOD_SUBJECT_ID] ?? null,
-      },
-      null,
-      2
-    )}\n`
-  );
+  const result = {
+    ...plan,
+    bindResult,
+    receiptResult,
+    feed,
+    subjectDeploy:
+      ledger?.subjectDeploys[PUBLIC_PROFILE_DOGFOOD_SUBJECT_ID] ?? null,
+  };
+  const serialized = `${JSON.stringify(result, null, 2)}\n`;
+  process.stdout.write(serialized);
+  if (values['write-result']) {
+    writeFileSync(values['write-result'], serialized);
+  }
   return 0;
 }
 
