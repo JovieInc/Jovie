@@ -99,7 +99,7 @@ describe('Ovie Inbox', () => {
     const refresh = screen.getByRole('button', { name: 'Refresh' });
     resolveRead(Response.json({ cases: [], issues: [] }));
     expect(
-      await screen.findByText('No pending founder decisions.')
+      await screen.findByText('Summer has nothing for you right now.')
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh' })).toBe(refresh);
     expect(container.querySelector('[data-empty-state-card]')).toBeNull();
@@ -354,12 +354,12 @@ describe('Ovie Inbox', () => {
     mount(new Response('{}', { status: 503 }), response([]));
     await screen.findByRole('alert');
     expect(
-      screen.queryByText('No pending founder decisions.')
+      screen.queryByText('Summer has nothing for you right now.')
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() =>
       expect(
-        screen.getByText('No pending founder decisions.')
+        screen.getByText('Summer has nothing for you right now.')
       ).toBeInTheDocument()
     );
   });

@@ -76,8 +76,8 @@ export function checkAppChatPromptContract(prompt: string) {
       'Never say you lack per-release data',
       'today Jovie setup step'
     ),
-    // ASS-87 live hardcheck themes (44964568648): empty-after-tool, length,
-    // refuse→draft-hold, stream-count phrasing without catalog deny.
+    // ASS-87 / ASS-95: empty-after-tool, length, refuse→draft-hold,
+    // stream-count phrasing without catalog deny (44964568648 / 44968636057).
     requiresArtistFacingTextAfterTools: includesAll(
       'After any tool or useSkill result, always write the artist-facing reply',
       'tool-only turn with empty text is a failure'

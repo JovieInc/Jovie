@@ -104,9 +104,11 @@ export function runHardChecks(
   const haystack = `${text} ${toolText}`.toLowerCase();
   const checks: HardCheckResult[] = [];
 
+  // ASS-95: artist-facing text is required. Tool-only turns with blank text
+  // hard-fail (live CI-subset 44968636057: ad-copy-refuse-spend / safety-email-unasked).
   checks.push({
     id: 'non_empty',
-    ok: text.trim().length > 0 || reply.toolCalls.length > 0,
+    ok: text.trim().length > 0,
   });
 
   const lint = lintVoice(text);

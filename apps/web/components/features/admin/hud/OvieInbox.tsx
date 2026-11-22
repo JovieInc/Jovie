@@ -378,8 +378,8 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
                 presentation='quiet'
                 heading={
                   query.data?.issues.length
-                    ? 'No pending decisions in connected sources.'
-                    : 'No pending founder decisions.'
+                    ? 'No asks from Summer could be loaded.'
+                    : 'Summer has nothing for you right now.'
                 }
               />
             )}

@@ -10,6 +10,7 @@ const tableActionMenuSpy = vi.fn();
 const tableActionMenuPropsSpy = vi.fn();
 
 vi.mock('@jovie/ui', () => ({
+  ACTION_OVERFLOW_MAX_PRIMARY: 2,
   Button: ({ children, ...props }: ComponentProps<'button'>) => (
     <button type='button' {...props}>
       {children}
