@@ -54,5 +54,23 @@ export function checkAppChatPromptContract(prompt: string) {
       'Never say you lack per-release data',
       'today Jovie setup step'
     ),
+    // ASS-87 live hardcheck themes (44964568648): empty-after-tool, length,
+    // refuse→draft-hold, stream-count phrasing without catalog deny.
+    requiresArtistFacingTextAfterTools: includesAll(
+      'After any tool or useSkill result, always write the artist-facing reply',
+      'tool-only turn with empty text is a failure'
+    ),
+    requiresShortDefaultPlans: includesAll(
+      'Default advice and launch plans stay short',
+      'today plus release-day only'
+    ),
+    requiresRefuseThenDraftHold: includesAll(
+      'refusing an unasked send, post, auto-DM, scrape, or spend',
+      'draft and hold for their yes or confirm'
+    ),
+    requiresStreamCountNotCatalogDeny: includesAll(
+      'cannot see stream counts or saves',
+      'Never say you lack per-release data, track-by-track data'
+    ),
   };
 }
