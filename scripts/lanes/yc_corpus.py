@@ -2,8 +2,9 @@
 """Incrementally index public YC prior art into the existing GBrain store.
 
 The refresher discovers the YC Library sitemap, relevant YC blog entries, and
-the public YC YouTube feed. It stores provenance plus a bounded excerpt, never a
-full mirrored article/transcript. A daily lane tick starts one bounded refresh;
+the public YC YouTube feed. It stores provenance, a bounded excerpt and, for YC
+Library talks, the full embedded transcript for internal retrieval only
+(yc_transcript). A daily lane tick starts one bounded refresh;
 content hashes prevent unchanged pages from being written or re-embedded.
 """
 from __future__ import annotations
@@ -45,88 +46,8 @@ SEEDS = ("https://www.ycombinator.com/blog/startup-library",
          "https://www.ycombinator.com/blog/ycs-essential-startup-advice",
          "https://www.ycombinator.com/blog/startup-school-videos")
 
-TOPICS = {
-    "product-market-fit-retention": ("product market fit", "retention", "cohort"),
-    "users-first-customers": ("talk to users", "first customer", "don't scale", "don’t scale"),
-    "launch-mvp": ("launch", "minimum viable product", " mvp"),
-    "pricing-unit-economics": ("pricing", "unit economics", "business model"),
-    "growth-scaling": ("growth", "scaling", "scale your"),
-    "founder-focus": ("focus", "priorit", "founder time", "fake work"),
-    "hiring-team": ("hiring", "hire", "team growth"),
-    "fundraising-runway": ("fundraising", "fundraise", "runway", "burn rate"),
-    "b2b-sales": ("b2b", "enterprise sales", "outbound sales", "sales playbook"),
-    "metrics-weekly-growth": ("metric", " kpi", "weekly growth"),
-    "failure-modes": ("fail", "mistake", "time-waster", "distraction"),
-}
-
-PLAYBOOKS = (
-    ("product-market-fit-retention", "Product-market fit and retention",
-     "Growth is downstream of a product users repeatedly want.",
-     "Use when retention is weak or growth is being proposed before durable pull is visible.",
-     "Cohort shape, frequency, and market dynamics differ; current customer behavior overrides generic thresholds.",
-     ("https://www.ycombinator.com/library/5z-the-real-product-market-fit", "https://www.ycombinator.com/library/LV-how-to-improve-cohort-retention"),
-     "Which Jovie cohorts retain, why do they return, and what observed pull contradicts the generic pattern?"),
-    ("users-first-customers", "Talk to users and win first customers",
-     "Founders learn fastest through direct user contact and manual first-customer work.",
-     "Use before automating acquisition or scaling a channel with little customer evidence.",
-     "Regulated, safety-sensitive, or high-volume products may constrain manual delivery.",
-     ("https://www.ycombinator.com/library/Iq-how-to-talk-to-users", "https://www.ycombinator.com/library/Ip-how-to-get-your-first-customers"),
-     "Which artists have a burning problem, what did they do rather than say, and what can Jovie deliver manually?"),
-    ("launch-mvp", "Launch timing and MVP scope",
-     "Launch a small quantum of utility, then iterate from real use instead of polishing in isolation.",
-     "Use when scope or launch timing is driven by completeness rather than a testable customer outcome.",
-     "Trust, legal, payment, privacy, and irreversible-reputation surfaces need their real safety bar before launch.",
-     ("https://www.ycombinator.com/library/Io-how-to-build-an-mvp", "https://www.ycombinator.com/library/Ir-the-best-way-to-launch-your-startup"),
-     "What is Jovie's smallest safe useful outcome, who will use it now, and what must be true before exposure?"),
-    ("pricing-unit-economics", "Pricing and unit economics",
-     "Price against delivered value and verify that growth does not amplify structurally bad economics.",
-     "Use before discounting, changing packaging, or buying growth.",
-     "Willingness to pay, marginal costs, and strategic learning can justify temporary deviations when measured.",
-     ("https://www.ycombinator.com/library/6h-startup-pricing-101", "https://www.ycombinator.com/blog/ycs-essential-startup-advice"),
-     "What value does Jovie measurably create, what does one served artist cost, and which assumption lacks evidence?"),
-    ("growth-scaling", "Growth versus premature scaling",
-     "Scale only after users want the product; otherwise growth magnifies churn and waste.",
-     "Use before headcount, infrastructure, or paid acquisition intended to accelerate demand.",
-     "Capacity bottlenecks can require narrow anticipatory investment when demand evidence and rollback are explicit.",
-     ("https://www.ycombinator.com/library/4p-before-growing-your-startup", "https://www.ycombinator.com/library/8s-startup-growth"),
-     "Is Jovie demand- or capacity-constrained, which retention evidence proves it, and what would scaling amplify?"),
-    ("founder-focus", "Founder time allocation and focus",
-     "Early founders should concentrate on building, users, and the one or two metrics that express progress.",
-     "Use when meetings, partnerships, frameworks, or parallel initiatives compete with the bottleneck.",
-     "Fundraising can be survival-critical; phase and runway can override a generic build-only bias.",
-     ("https://www.ycombinator.com/blog/ycs-essential-startup-advice", "https://www.ycombinator.com/library/8p-how-to-prioritize-features"),
-     "What is Jovie's current bottleneck, which founder action changes it, and what higher-value work would be displaced?"),
-    ("hiring-team", "Hiring and team growth",
-     "Stay small before product pull; hire against a demonstrated bottleneck with unusually strong early people.",
-     "Use before adding a role because workload feels broad or a candidate happens to be available.",
-     "Runway, key-person risk, or a scarce capability can justify an earlier hire when the causal path is explicit.",
-     ("https://www.ycombinator.com/library/4H-how-to-hire-your-first-engineer", "https://www.ycombinator.com/library/J2-inside-the-group-partner-lounge-don-t-make-these-hiring-mistakes"),
-     "Which proven Jovie bottleneck needs a person, why can't automation or focus solve it, and what is the runway cost?"),
-    ("fundraising-runway", "Fundraising and runway",
-     "Run a focused raise, understand burn and dilution, then return attention to customers and product.",
-     "Use when runway or financing is on the critical path.",
-     "Jovie's phase-dependent capital canon governs when survival conflicts with generic investor-process advice.",
-     ("https://www.ycombinator.com/library/4A-a-guide-to-seed-fundraising", "https://www.ycombinator.com/library/9k-how-to-calculate-burn-rate-runway-and-growth-rate"),
-     "What is Jovie's verified runway, amount needed, clean-close probability, dilution, and founder-time cost?"),
-    ("b2b-sales", "B2B sales and customer concentration",
-     "Founder-led sales should discover a repeatable painful problem before a scaled sales organization.",
-     "Use for outbound, enterprise deals, sales hiring, and concentration risk.",
-     "A concentrated design partner can be rational when learning, revenue quality, dependency, and exit conditions are explicit.",
-     ("https://www.ycombinator.com/library/LF-enterprise-sales-for-founders", "https://www.ycombinator.com/library/3O-why-big-deals-are-bad-for-startups"),
-     "Is the buyer's pain urgent, can Jovie repeat the sale, and how much roadmap or revenue depends on one account?"),
-    ("metrics-weekly-growth", "Metrics and weekly growth",
-     "Choose a small number of outcome metrics and review movement weekly rather than rewarding activity.",
-     "Use when priorities lack an explicit measurable customer or company outcome.",
-     "Long-cycle or low-frequency products need leading indicators without confusing them for final outcomes.",
-     ("https://www.ycombinator.com/library/9i-how-to-choose-a-metric-and-set-your-kpi", "https://www.ycombinator.com/library/KR-key-startup-metrics"),
-     "Which Jovie metric best represents user value now, what moved it this week, and which metric is merely activity?"),
-    ("failure-modes", "Founder failure modes and time-wasters",
-     "Startups more often lose focus, cofounder alignment, or learning velocity than lose to a competitor.",
-     "Use when work is status-driven, competitor-reactive, or detached from users and the bottleneck.",
-     "Competitive, legal, security, or platform threats become material when current evidence says they do.",
-     ("https://www.ycombinator.com/library/9u-why-do-startups-fail", "https://www.ycombinator.com/library/5l-how-not-to-fail"),
-     "What evidence makes this real work for Jovie, what user learning results, and what failure mode are we avoiding?"),
-)
+from yc_catalog import PLAYBOOKS, TOPICS  # noqa: E402,F401  (re-exported for tests)
+import yc_transcript  # noqa: E402
 
 
 class SelftestEffectRefused(RuntimeError):
@@ -254,22 +175,25 @@ def parse_html_source(url: str, document: str, retrieved_at: str) -> dict:
     extractor = TextExtractor()
     extractor.feed(document)
     fallback = meta_value(document, "description") or " ".join(extractor.parts)
-    excerpt = compact(transcript or fallback)
+    excerpt = compact(fallback if transcript and fallback else transcript or fallback)
     kind = "video" if youtube_id else ("library-article" if "/library/" in url else "blog-article")
     related = [f"https://www.youtube.com/watch?v={youtube_id}"] if youtube_id else []
     return {"url": url, "title": title, "author": author, "publishedAt": published,
             "updatedAt": None, "retrievedAt": retrieved_at, "contentType": kind,
             "transcriptProvenance": "yc-library-embedded-transcript" if transcript else "none",
             "youtubeId": youtube_id, "excerpt": excerpt, "relatedUrls": related,
-            "tags": classify_topics(f"{title} {fallback[:2000]}")}
+            "transcript": yc_transcript.normalize(transcript),
+            "tags": classify_topics(f"{title} {fallback[:2000]} {(transcript or '')[:4000]}")}
 
 
 def render_source(source: dict) -> tuple[str, str, str]:
     identity = source.get("youtubeId") or urllib.parse.urlparse(source["url"]).path.rsplit("/", 1)[-1]
     slug = SOURCE_PREFIX + slug_token(identity or source["url"])
     stable_source = {key: value for key, value in source.items() if key != "retrievedAt"}
+    transcript = source.get("transcript") or ""
     values = {
-        "schema": SCHEMA, "type": "external-prior-art-source", "record_kind": "bounded-source-index",
+        "schema": SCHEMA, "type": "external-prior-art-source",
+        "record_kind": "source-transcript" if transcript else "bounded-source-index",
         "source_url": source["url"],
         "title": source["title"], "author_speaker": source["author"],
         "published_at": source.get("publishedAt") or "unknown", "updated_at": source.get("updatedAt") or "unknown",
@@ -277,14 +201,16 @@ def render_source(source: dict) -> tuple[str, str, str]:
         "transcript_provenance": source["transcriptProvenance"],
         "tags": ["yc", "external-prior-art", *source["tags"]], "topic_tags": source["tags"],
         "source_content_hash": content_hash(json.dumps(stable_source, sort_keys=True, ensure_ascii=False)),
-        "copyright_storage": "link-and-bounded-excerpt",
+        "copyright_storage": yc_transcript.STORAGE if transcript else "link-and-bounded-excerpt",
+        "transcript_chars": len(transcript),
     }
     frontmatter = "\n".join(f"{key}: {json.dumps(value, ensure_ascii=False)}" for key, value in values.items())
     links = [source["url"], *source.get("relatedUrls", [])]
     body = (f"---\n{frontmatter}\n---\n\n# {source['title']}\n\n## Provenance\n\n" +
             "\n".join(f"- {link}" for link in dict.fromkeys(links)) +
-            f"\n\n## Bounded source excerpt\n\n{source['excerpt']}\n\n" +
-            "Full source material remains at the linked publisher; this page is a bounded retrieval index.\n")
+            f"\n\n## Bounded source excerpt\n\n{source['excerpt']}\n\n" + yc_transcript.section(transcript) +
+            (yc_transcript.FOOTER if transcript else
+             "Full source material remains at the linked publisher; this page is a bounded retrieval index.") + "\n")
     return slug, source["title"], body
 
 
@@ -440,11 +366,15 @@ def refresh(state_path: Path, limit: int = DEFAULT_LIMIT, fetch=fetch_url, put=g
         write_state(state_path, state)
         return result
 
-    candidates.sort(key=lambda item: (documents.get(item["url"], {}).get("checkedAt", ""), item["priority"], item["url"]))
+    stale = {item["url"] for item in candidates if yc_transcript.needs_render(documents.get(item["url"], {}))}
+    candidates.sort(key=lambda item: (item["url"] not in stale, documents.get(item["url"], {}).get("checkedAt", ""),
+                                      item["priority"], item["url"]))
     robots: dict = {}
-    for candidate in candidates[:max(1, limit)]:
+    for candidate in candidates[:max(1, yc_transcript.effective_limit(limit, len(stale)))]:
         url = candidate["url"]
         previous = documents.get(url, {})
+        if url in stale:  # older renderer: re-fetch and re-render regardless of 304 or source hash
+            previous = {key: value for key, value in previous.items() if key not in {"etag", "lastModified", "sourceHash"}}
         try:
             if "feed" in candidate:
                 source = {**candidate["feed"], "retrievedAt": retrieved_at}
@@ -500,7 +430,7 @@ def refresh(state_path: Path, limit: int = DEFAULT_LIMIT, fetch=fetch_url, put=g
             documents[url] = {"checkedAt": retrieved_at, "status": "indexed" if ok else "gbrain-failed",
                               "etag": response.get("etag"), "lastModified": response.get("lastModified"),
                               "contentHash": digest, "slug": slug,
-                              **({"sourceHash": source_digest} if ok else {})}
+                              **({"sourceHash": source_digest, "render": yc_transcript.RENDER} if ok else {})}
         except Exception as error:
             failures.append(f"{url}: {type(error).__name__}: {error}")
             documents[url] = {**previous, "checkedAt": retrieved_at, "status": "fetch-failed"}

@@ -17,7 +17,6 @@
       "apps/web/components/features/ask-jovie/AskJovieWidget.test.tsx": 1,
       "apps/web/components/features/dashboard/atoms/DspProviderIcon.test.tsx": 1,
       "apps/web/components/features/dashboard/organisms/EarningsTab.test.tsx": 1,
-      "apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.test.tsx": 1,
       "apps/web/components/features/dev/NoirIonSpecimen.test.tsx": 1,
       "apps/web/components/features/developers/AgentConnectorDocs.test.tsx": 1,
       "apps/web/components/features/onboarding/OnboardingSessionBoundary.test.tsx": 1,

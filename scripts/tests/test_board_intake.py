@@ -69,8 +69,10 @@ class FakeLinear:
             self.descriptions[variables["id"].replace("uuid-", "")] = variables["d"]
             return {"issueUpdate": {"success": True}}
         if "teams(" in query:
-            return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{"id": "todo", "name": "Todo"}]},
-                                         "labels": {"nodes": [{"id": "l1", "name": "symphony"}]}}]}}
+            return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{"id": "todo", "name": "Todo"},
+                                                                           {"id": "backlog", "name": "Backlog"}]},
+                                         "labels": {"nodes": [{"id": "l1", "name": "symphony"},
+                                                              {"id": "l2", "name": "compounding"}]}}]}}
         name, kind = self.states.get(variables["id"], ("Backlog", "backlog"))
         return {"issue": {"id": "uuid-" + variables["id"], "identifier": variables["id"], "state": {"name": name, "type": kind}}}
 
@@ -194,11 +196,13 @@ class TickTest(unittest.TestCase):
     def test_claims_hands_off_and_records_claim_latency(self):
         hub = FakeHub([task("stall-jovie-1-aaaaaaa-a1"), task("jov-10167"), task("goal-x"),
                        task("other", assignee="claude")])
-        linear = FakeLinear()
+        linear = FakeLinear({"JOV-10167": ("Triage", "triage")})
         receipt = self.run_tick(hub, linear)
         self.assertEqual(sorted(receipt["claimed"]), ["goal-x", "jov-10167", "stall-jovie-1-aaaaaaa-a1"])
-        self.assertEqual(linear.moved, [("uuid-JOV-10167", "Todo")])
-        self.assertEqual(linear.created[0]["stateId"], "todo")
+        # Intake writes Backlog only; priority admission and the sub-lane refill are the only Backlog -> Todo writers.
+        self.assertEqual(linear.moved, [("uuid-JOV-10167", "Backlog")])
+        self.assertEqual(linear.created[0]["stateId"], "backlog")
+        self.assertEqual(linear.created[0]["labelIds"], ["l1"], "no `compounding`: a board goal is not a speed win")
         self.assertIn("## Definition of done", linear.created[0]["description"])
         self.assertEqual(hub.ops("caps"), [{"caps": ["code", "ops"]}])
         rows = [json.loads(l) for l in (self.state / "runs/board-intake.jsonl").read_text().splitlines()]

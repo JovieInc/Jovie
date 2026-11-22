@@ -17,8 +17,8 @@ function PanelConsumer() {
       <button type='button' onClick={() => toggle('contact')}>
         toggle-contact
       </button>
-      <button type='button' onClick={() => open('ai-crawlers')}>
-        open-crawlers
+      <button type='button' onClick={() => open('analytics')}>
+        open-analytics
       </button>
       <button type='button' onClick={close}>
         close
@@ -78,12 +78,12 @@ describe('AudiencePanelProvider', () => {
       </AudiencePanelProvider>
     );
 
-    act(() => screen.getByText('open-crawlers').click());
-    expect(screen.getByTestId('mode')).toHaveTextContent('ai-crawlers');
+    act(() => screen.getByText('open-analytics').click());
+    expect(screen.getByTestId('mode')).toHaveTextContent('analytics');
 
     // open is idempotent — activating the same panel keeps it open
-    act(() => screen.getByText('open-crawlers').click());
-    expect(screen.getByTestId('mode')).toHaveTextContent('ai-crawlers');
+    act(() => screen.getByText('open-analytics').click());
+    expect(screen.getByTestId('mode')).toHaveTextContent('analytics');
   });
 
   it('close clears whichever panel is open', () => {
@@ -139,8 +139,8 @@ describe('ControlledAudiencePanelProvider', () => {
       </ControlledAudiencePanelProvider>
     );
 
-    act(() => screen.getByText('open-crawlers').click());
-    expect(onModeChange).toHaveBeenCalledWith('ai-crawlers');
+    act(() => screen.getByText('open-analytics').click());
+    expect(onModeChange).toHaveBeenCalledWith('analytics');
 
     act(() => screen.getByText('close').click());
     expect(onModeChange).toHaveBeenCalledWith(null);

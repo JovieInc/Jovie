@@ -18,15 +18,6 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/features/profile/ProfileAboutShare.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
     "apps/web/components/features/profile/ProfilePaymentsCard.tsx": [
       "ds-owner",
       "tokens",
@@ -87,10 +78,6 @@
       "loading": "No loading state: the detector matched the image attribute loading={index < 2 ? 'eager' : 'lazy'} on the press photo grid.",
       "error": "No error UI exists: when a press photo download fails, the catch block falls back to globalThis.open(photo.blobUrl, '_blank', 'noopener,noreferrer'), which AboutSection.certificate.test.tsx covers.",
       "offline": "No offline UI exists: the only request is the press photo fetch(, and an offline failure takes the same catch fallback that opens the original photo in a new tab."
-    },
-    "apps/web/components/features/profile/ProfileAboutShare.tsx": {
-      "empty": "The share button renders no collection; the detector matched the items-center class in its className.",
-      "error": "No error UI exists: share and clipboard failures end in the catch marked '// Silent failure — matches the hero share control.', which ProfileAboutShare.test.tsx covers."
     },
     "apps/web/components/features/profile/ProfilePrimaryCTA.tsx": {
       "long-content": "Labels are fixed copy ('Listen now', 'Find tickets', 'Shop merch', 'Open in Spotify'); no caller text reaches the buttons.",
