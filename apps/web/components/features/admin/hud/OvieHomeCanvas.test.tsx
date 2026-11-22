@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HomeCanvasState } from '@/components/jovie/types';
 import { APP_ROUTES } from '@/constants/routes';
+import { oUpdateSpecs } from '@/lib/ovie/o-updates';
 import { SUMMER_OPS_CARD_SCHEMA } from '@/lib/ovie/ops-card';
 import { emptyDeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import { OvieHomeCanvas } from './OvieHomeCanvas';
@@ -53,6 +54,7 @@ function renderCanvas(chat?: HomeCanvasState) {
   );
   return {
     ...view,
+    client,
     rerenderChat: (next: HomeCanvasState) =>
       view.rerender(
         <QueryClientProvider client={client}>
@@ -276,6 +278,17 @@ describe('OvieHomeCanvas Story First flat', () => {
     await screen.findByTestId('story-first-glance-revenue');
     await vi.waitFor(() => expect(readyTiming).toHaveBeenCalledWith(true));
     expect(panelAlert).not.toHaveBeenCalled();
+  });
+
+  it('opts the glance query in to the O update reveal through meta only', async () => {
+    const { client } = renderCanvas();
+    await screen.findByTestId('story-first-glance-revenue');
+    const query = client
+      .getQueryCache()
+      .find({ queryKey: ['ovie', 'home', 'company'] });
+    expect(oUpdateSpecs(query?.meta).map(spec => spec.key)).toEqual([
+      'ovie.home-glance',
+    ]);
   });
 
   it('keeps reconciled tasks visible when a later shipping read fails', async () => {

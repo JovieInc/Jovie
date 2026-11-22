@@ -37,6 +37,7 @@ import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
 import type { HudMetrics } from '@/types/hud';
 import { useCanvasHistory } from './useCanvasHistory';
 import { useHudShippingStateQuery } from './useHudShippingStateQuery';
+import { homeGlanceUpdate } from './useOUpdateOptIns';
 import { useOvieHomeReadyTiming } from './useOvieHomeReadyTiming';
 
 const LAST_VISIT_KEY = 'ovie.home.last-visit.v1';
@@ -165,6 +166,7 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     refetchIntervalInBackground: false,
     staleTime: 30_000,
     retry: false,
+    meta: { oUpdate: homeGlanceUpdate },
   });
 
   const snapshot = shipping.isPending ? null : shipping;

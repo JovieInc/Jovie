@@ -6,14 +6,19 @@
 .sidebar-o-status {
   opacity: 0;
   transform: translateX(-0.25rem);
+  /* Out: opacity only; the travel resets after the fade so nothing jumps. */
   transition:
-    opacity var(--duration-slow) var(--ease-out),
-    transform var(--duration-slow) var(--ease-out);
+    opacity var(--duration-normal) var(--ease-subtle),
+    transform 0s linear var(--duration-normal);
 }
 
 .sidebar-o-status[data-state="visible"] {
   opacity: 1;
   transform: translateX(0);
+  /* In: opacity and a 4px slide. */
+  transition:
+    opacity var(--duration-slow) var(--ease-out),
+    transform var(--duration-slow) var(--ease-out);
 }
 
 /* Duration tokens resolve to 0 here; the slot also drops its travel. */
