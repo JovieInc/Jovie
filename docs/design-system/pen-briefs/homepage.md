@@ -2,11 +2,20 @@
 frame: homepage
 route: /
 context: home, marketing, landing
-model: claude-opus-5-5
 ---
 Design Jovie's homepage, desktop 1440 wide and mobile 390 wide, dark mode first. On mobile the footer stacks into one column: the logo, then the link groups as short lists, then one row with the theme and language controls, then the legal links on their own line. Nothing in the footer overlaps or runs past the screen edge. Section row numbers (01, 02, 03) sit inside the content padding, never flush to the frame edge.
 
 This is a general editorial page for creators and entertainment, in the spirit of the ElevenLabs or Lovable homepages: a confident headline, one line on what Jovie does (an always-on marketing department that turns a creator's existing catalog into growth loops with their fans), and one primary call to action: the existing name search, a "Search your name" field with a "Find me" button (the certified homepage conversion lock, JOV-5085). No "Request access", "Get started" or waitlist link on this page; the waitlist gate comes later in the flow. Below, three short editorial sections that show outcomes rather than features: more of the right fans, brand deals and bookings, higher earnings per fan. Music-specific detail belongs on product pages, not here.
+
+Art direction (Tim, 2026-11-22: "the homepage direction is right but the design is nonexistent"). The last draft was flat text panels on black with nothing to look at. This one is a designed page: every section has a visual, the type has real hierarchy, and light and colour give it depth. Build it like this, top to bottom, on a 12-column grid with 80px outer margins on desktop.
+
+1. Nav, 64 tall: the Jovie mark (28px in a 32px container) on the left, three quiet text links in the middle, "Sign in" as a text link on the right. No button in the nav.
+2. Hero, about 900 tall. A centered headline of two short lines at 80px, semibold, tight tracking, solid primary ink. One line of secondary copy under it at 20px. Then the pill name search. Below that, rising out of the bottom of the hero and cropped by the fold, a large straight-on product window about 1200 wide: Tim White's Jovie workspace with the sidebar, a release list whose rows each carry a square cover tile, and a right panel titled "This week" with two or three plain-language wins as cards (for example a release pitched to playlists, a new fan segment found, a booking inquiry drafted). Behind the window, one wide plain radial glow, violet bleeding into a warmer ember on one side, so the light is asymmetric and the window reads as lit from above.
+3. Three outcome sections, each a two-column composition that alternates sides: copy on one side (the row number 01, 02 or 03 in muted ink, a 44px headline, two lines of body at 17px), and on the other a product vignette about 560 wide composed from real components. 01 "More of the right fans": a stack of fan segment chips over a message card announcing a new release to those fans. 02 "Brand deals and bookings": an inbox card with three inbound requests, each with an initial avatar circle and a Booking or Brand chip. 03 "Higher earnings per fan": the artist's profile link card (jov.ie/tim) with release tiles and listen, tickets and merch rows. Each section gets its own single accent colour for its rule line and low glow, so the page moves through three moods while staying one system.
+4. Closing band: one large headline at 64px and the same pill name search again, centered, over the strongest glow on the page.
+5. Footer as described above.
+
+Cover art and avatars are drawn shapes, not pictures: each cover tile is a square with its own two-stop radial or linear gradient in a distinct palette, offset so no two look alike; avatars are solid circles with initials. That gives the page colour and rhythm without image fills. Generous vertical space between sections (at least 160px), and the product visuals are large enough to carry each section, never thumbnails.
 
 No dashboards screenshots wall, no logo cloud of fake brands. Nothing shifts after load. Match the type, spacing, colors and components already in this file.
 
