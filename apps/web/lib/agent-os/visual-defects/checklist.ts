@@ -38,7 +38,7 @@ export const DEFECT_CHECKLIST: readonly DefectRule[] = [
   {
     category: 'empty-or-duplicated',
     title: 'Empty or duplicated element',
-    look: 'An empty container or card, a header with no content under it, a repeated element, a placeholder that never filled.',
+    look: 'An empty container or card, a header with no content under it, a repeated element, a section that never filled in.',
   },
   {
     category: 'clipped-text',
@@ -90,6 +90,19 @@ export function isBlockingFinding(
 /** Bumped when the rules change, so caches keyed on it invalidate. */
 export const CHECKLIST_VERSION = '1';
 
+const EXAMPLE_REPLY = JSON.stringify({
+  findings: [
+    {
+      category: 'affordance-no-behavior',
+      finding:
+        'The Customers header shows a down chevron with no items under it',
+      severity: 'high',
+      confidence: 0.9,
+      bbox: [16, 80, 140, 32],
+    },
+  ],
+});
+
 export function buildDefectSystemPrompt(): string {
   return 'You are a meticulous visual QA reviewer. You look only at what is visible in the screenshot and report real, visible defects, never taste. When unsure, lower the confidence instead of guessing.';
 }
@@ -108,7 +121,8 @@ export function buildDefectPrompt(context?: string): string {
     'Do not flag fixture data, or skeleton loaders that are plainly still loading.',
     'severity "high" means a user would plainly see a bug.',
     '',
-    `Answer ONLY with minified JSON: {"findings":[{"category":"${DEFECT_CATEGORIES.join('|')}","finding":"one sentence naming the element and what is wrong","severity":"low|medium|high","confidence":0.0-1.0,"bbox":[x,y,width,height]}]}`,
+    `Answer ONLY with minified JSON of this shape: ${EXAMPLE_REPLY}`,
+    `category is one of ${DEFECT_CATEGORIES.join(', ')}; severity is low, medium or high; confidence is between 0 and 1.`,
     'bbox is optional. Use {"findings":[]} when the screenshot is clean.',
   ]
     .filter(line => line !== null)

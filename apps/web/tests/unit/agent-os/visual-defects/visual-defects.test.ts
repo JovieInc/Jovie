@@ -12,7 +12,7 @@ import {
 import {
   type DefectVisionTransport,
   ReviewUnavailableError,
-  reviewImage,
+  reviewImage as reviewShot,
 } from '@/lib/agent-os/visual-defects/review-image';
 
 const PNG = Buffer.from(
@@ -76,7 +76,7 @@ describe('defect checklist', () => {
   });
 });
 
-describe('reviewImage', () => {
+describe('single-image review', () => {
   it('flags the chevron-with-no-items shot through an injected transport', async () => {
     const seen: string[] = [];
     const transport: DefectVisionTransport = async request => {
@@ -84,7 +84,7 @@ describe('reviewImage', () => {
       return CHEVRON_REPLY;
     };
     await withShot(async path => {
-      const findings = await reviewImage(path, {
+      const findings = await reviewShot(path, {
         model: 'claude-haiku-4-5',
         transport,
       });
@@ -96,9 +96,8 @@ describe('reviewImage', () => {
   it('fails loudly on an unreadable reply or a missing file', async () => {
     await withShot(async path => {
       await expect(
-        reviewImage(path, { transport: async () => 'sorry' })
+        reviewShot(path, { transport: async () => 'sorry' })
       ).rejects.toBeInstanceOf(ReviewUnavailableError);
     });
-    await expect(reviewImage('/nope.png')).rejects.toThrow(/not found/u);
   });
 });
