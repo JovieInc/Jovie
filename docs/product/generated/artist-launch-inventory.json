@@ -4252,7 +4252,7 @@
       "source": "apps/web/app/api/ovie/inbox/route.ts",
       "kind": "handler",
       "route": "/api/ovie/inbox",
-      "methods": ["GET"],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4333,22 +4333,6 @@
       "kind": "handler",
       "route": "/api/ovie/privacy-lock",
       "methods": ["GET", "POST"],
-      "surface": "deferred",
-      "classification": "C"
-    },
-    {
-      "source": "apps/web/app/api/ovie/review-inbox/pilot/decisions/route.ts",
-      "kind": "handler",
-      "route": "/api/ovie/review-inbox/pilot/decisions",
-      "methods": ["POST"],
-      "surface": "deferred",
-      "classification": "C"
-    },
-    {
-      "source": "apps/web/app/api/ovie/review-inbox/pilot/route.ts",
-      "kind": "handler",
-      "route": "/api/ovie/review-inbox/pilot",
-      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },

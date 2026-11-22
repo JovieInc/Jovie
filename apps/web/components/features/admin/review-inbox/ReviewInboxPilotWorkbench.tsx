@@ -24,7 +24,7 @@ const VIEW_LABELS: Record<ReviewInboxViewMode, string> = {
 };
 
 async function fetchPilot(): Promise<ReviewInboxPilotCase> {
-  const response = await fetch('/api/ovie/review-inbox/pilot', {
+  const response = await fetch('/api/ovie/inbox?pilot=review-photo', {
     cache: 'no-store',
   });
   if (!response.ok) throw new Error('Pilot case could not load.');
@@ -33,7 +33,7 @@ async function fetchPilot(): Promise<ReviewInboxPilotCase> {
 }
 
 async function postDecision(body: Record<string, unknown>) {
-  const response = await fetch('/api/ovie/review-inbox/pilot/decisions', {
+  const response = await fetch('/api/ovie/inbox', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

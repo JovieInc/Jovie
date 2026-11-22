@@ -65,7 +65,7 @@ function RevisionList({
   onSelect: (revision: string) => void;
 }>) {
   return (
-    <ul className='min-w-0 space-y-1' aria-label='Revision list'>
+    <ul className='min-w-0 space-y-1' aria-label='Revision List'>
       {candidates.map(row => {
         const selected = row.revision === selectedRevision;
         return (

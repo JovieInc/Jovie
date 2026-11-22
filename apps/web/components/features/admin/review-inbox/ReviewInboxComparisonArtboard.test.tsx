@@ -1,21 +1,26 @@
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPilotReviewCase } from '@/lib/ovie/review-inbox/pilot-fixture';
 import { ReviewInboxComparisonArtboard } from './ReviewInboxComparisonArtboard';
 
 describe('ReviewInboxComparisonArtboard', () => {
   beforeEach(() => {
-    HTMLDialogElement.prototype.showModal = vi.fn();
-    HTMLDialogElement.prototype.close = vi.fn();
+    let open = false;
+    HTMLDialogElement.prototype.showModal = vi.fn(() => {
+      open = true;
+    });
+    HTMLDialogElement.prototype.close = vi.fn(() => {
+      open = false;
+    });
     Object.defineProperty(HTMLDialogElement.prototype, 'open', {
       configurable: true,
       get() {
-        return true;
+        return open;
       },
     });
   });
 
-  it('opens a fullscreen dialog with compare controls', () => {
+  it('opens a fullscreen dialog when the artboard is shown', () => {
     const pilotCase = createPilotReviewCase();
     render(
       <ReviewInboxComparisonArtboard

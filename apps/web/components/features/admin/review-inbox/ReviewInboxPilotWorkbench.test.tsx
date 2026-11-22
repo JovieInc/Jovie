@@ -17,9 +17,12 @@ describe('ReviewInboxPilotWorkbench', () => {
     vi.restoreAllMocks();
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (input: RequestInfo) => {
+      vi.fn(async (input: RequestInfo, init?: RequestInit) => {
         const url = typeof input === 'string' ? input : input.url;
-        if (url.includes('/api/ovie/review-inbox/pilot/decisions')) {
+        if (
+          url.includes('/api/ovie/inbox') &&
+          init?.method?.toUpperCase() === 'POST'
+        ) {
           return new Response(JSON.stringify({ receipt: { ack: true } }), {
             status: 200,
           });

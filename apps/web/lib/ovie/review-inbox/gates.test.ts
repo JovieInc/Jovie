@@ -32,6 +32,40 @@ describe('review inbox gates', () => {
     if (!gate.ok) expect(gate.error).toBe('invalid_pin');
   });
 
+  it('rejects stale revision, pilot spend, and duplicate actions', () => {
+    const pilotCase = createPilotReviewCase();
+    const base = {
+      contract: REVIEW_INBOX_DECISION_CONTRACT,
+      tenant: REVIEW_INBOX_PILOT_TENANT,
+      caseId: REVIEW_INBOX_PILOT_TENANT,
+      revision: 'v0',
+      command: 'favorite' as const,
+      actionId: 'dup',
+    };
+    expect(gateReviewDecision(pilotCase, base, new Set()).ok).toBe(false);
+    expect(
+      gateReviewDecision(
+        pilotCase,
+        { ...base, revision: 'v1', command: 'spend' },
+        new Set()
+      ).ok
+    ).toBe(false);
+    expect(
+      gateReviewDecision(
+        pilotCase,
+        { ...base, revision: 'v1', command: 'accept_version' },
+        new Set()
+      ).ok
+    ).toBe(false);
+    expect(
+      gateReviewDecision(
+        pilotCase,
+        { ...base, revision: 'v1' },
+        new Set(['dup'])
+      ).ok
+    ).toBe(false);
+  });
+
   it('accepts a valid request_changes with pins on v1', () => {
     const body = {
       contract: REVIEW_INBOX_DECISION_CONTRACT,
