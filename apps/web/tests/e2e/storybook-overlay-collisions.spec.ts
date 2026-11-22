@@ -4,6 +4,7 @@ import {
   disabledRuleIds,
   wcag22AaAxeOptions,
 } from '@/lib/a11y-gates/wcag-standard.cjs';
+import { registerChatEntityPreviewOwnershipTest } from './utils/storybook-chat-entity-preview';
 
 test('ancillary inspector restores a focused edit after loading without stealing moved focus', async ({
   page,
@@ -32,9 +33,8 @@ test('ancillary inspector restores a focused edit after loading without stealing
   await page.getByRole('button', { name: 'Toggle loading' }).click();
   await expect(assets).toBeFocused();
 });
-
-// Ancillary inspectors share the same overlay lifecycle. Keep these regressions
-// in the suite selected by ci-storybook-surfaces, rather than a local-only spec.
+registerChatEntityPreviewOwnershipTest();
+// Keep ancillary inspector regressions in the required overlay suite.
 for (const viewport of [
   { width: 1440, height: 900 },
   { width: 1100, height: 600 },
