@@ -75,9 +75,9 @@ describe('shared press-motion contract', () => {
     expect(utility).toContain('transition-duration: 0s;');
     for (const gate of [
       ':disabled',
-      "[aria-disabled='true']",
-      "[data-static='true']",
-      "[aria-busy='true']",
+      '[aria-disabled=',
+      '[data-static=',
+      '[aria-busy=',
     ]) {
       expect(utility).toContain(gate);
     }

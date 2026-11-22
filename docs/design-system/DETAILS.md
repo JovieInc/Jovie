@@ -721,13 +721,11 @@ These are surface-side aliases of `--ds-motion-*` tokens (DS_FOUNDATION_V1).
   **SoT lock (Drift W1 / T0.5):** web `design-system.css` owns `--scale-press:
   0.98`; iOS/macOS must project the same value (native implementation track
   T4.1). `0.96` and hardcoded active scales are forbidden forks.
-- Every clickable presses (JOV-14459): the `press` utility scales to the token
-  and darkens by `--press-brightness`, felt not seen, with a spring release;
-  reduced motion keeps the darken only. Disabled, static and busy controls do
-  not press.
-- Shared interactive primitives carry `press` once. Feature code must not add
-  its own `whileTap` scale or hardcoded active scale; the `press-state`
-  art-direction invariant enforces it.
+- Press compression is opt-in. Use it only when an action has no immediate
+  visible response; dropdowns, accordions, tabs, toggles, and rail controls
+  already communicate their state change and must stay geometrically static.
+- Shared interactive primitives apply the token once when opted in. Feature
+  code must not add its own `whileTap` scale or hardcoded active scale.
 - Hover and focus feedback do not scale controls. Use semantic surface, text,
   border, opacity, or shadow changes that preserve geometry.
 - `prefers-reduced-motion: reduce` disables press transforms. Components that
