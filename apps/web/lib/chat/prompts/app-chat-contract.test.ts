@@ -43,9 +43,13 @@ describe('deterministic /app/chat prompt contract (ASS-9 + ASS-16)', () => {
     ['forbidsPermissionToPlanCloser', 'Never close with permission-to-plan'],
     ['forbidsInventedAccountStats', 'Never invent account stats'],
     ['forbidsInventedAccountFacts', 'Never invent Spotify algorithm'],
-    ['forbidsInventedCapabilities', 'Never claim you will set up'],
+    ['forbidsInventedCapabilities', 'smart link is live or will live'],
     ['requiresDraftHoldOutbound', 'Draft every outbound artifact'],
-    ['requiresDraftClearAskNow', 'Do not grill for a positioning line'],
+    ['requiresDraftClearAskNow', 'Never reply with only a promise to draft'],
+    [
+      'requiresRefuseDraftHoldOnlyForUnasked',
+      'That refuse→draft-hold line is only for unasked',
+    ],
     [
       'keepsGroundingToPromptOrTools',
       'must come from this prompt or from a tool result in this turn',

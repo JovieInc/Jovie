@@ -527,6 +527,13 @@ export function JovieChat({
   // stays above the transcript, matching inbox → pinned-card behavior.
   const livingCanvas = homeCanvas != null && homeCanvasMode === 'living';
   const [transcriptOpen, setTranscriptOpen] = useState(false);
+  // A turn on a living canvas hands the whole surface to the chat: the board
+  // steps aside for the normal transcript, and Back To Home returns to it
+  // (Tim 2026-11-22: "this chat should take over the dashboard").
+  const turnRunning = status === 'submitted' || status === 'streaming';
+  useEffect(() => {
+    if (livingCanvas && turnRunning) setTranscriptOpen(true);
+  }, [livingCanvas, turnRunning]);
   const hasThread =
     conversationExists || conversationInProgress || pinnedOpportunity !== null;
   // A living canvas keeps owning the surface after messages arrive; the

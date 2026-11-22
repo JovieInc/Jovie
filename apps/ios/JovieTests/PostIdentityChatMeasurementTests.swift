@@ -1,4 +1,5 @@
 import Foundation
+import JovieKit
 import Testing
 @testable import Jovie
 
@@ -459,6 +460,7 @@ private struct PostIdentityStubRepository: AppStateRepository {
   }
 
   func clearCachedUser(_: String) async {}
+  func clearCachedUser(_: String, ifOwnedBy _: NativeSessionOwnership) async {}
 }
 
 private final class PostIdentityStubBrightness: BrightnessControlling, @unchecked Sendable {

@@ -1,3 +1,4 @@
+import { act } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createComposerDraft } from '@/components/jovie/hooks/useComposerDraft';
 import { JovieChat } from '@/components/jovie/JovieChat';
@@ -296,5 +297,27 @@ describe('JovieChat transient surfaces (JOV-5413)', () => {
     const without = renderWithQueryClient(<JovieChat profileId='profile-1' />);
     expect(without.queryByTestId('dock-fixture')).toBeNull();
     expect(without.queryByTestId('chat-composer-dock-slot')).toBeNull();
+  });
+
+  it('hands a living Home to the normal chat once a turn runs, with a way back', () => {
+    mockChatState.isLoading = true;
+    mockChatState.status = 'streaming';
+    const view = renderWithQueryClient(
+      <JovieChat
+        profileId='profile-1'
+        chatMode='ov'
+        homeCanvasMode='living'
+        homeCanvas={() => <div data-testid='living-board-fixture' />}
+      />
+    );
+
+    // Tim 2026-11-22: the chat takes over the dashboard, never floats below.
+    expect(view.queryByTestId('chat-empty-state-viewport')).toBeNull();
+    expect(view.queryByTestId('living-board-fixture')).toBeNull();
+
+    act(() => {
+      view.getByRole('button', { name: 'Back To Home' }).click();
+    });
+    expect(view.getByTestId('living-board-fixture')).toBeTruthy();
   });
 });
