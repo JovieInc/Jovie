@@ -958,8 +958,8 @@ nodes:
     triggeringStateTransition:
       - repository_dispatch
       - workflow_dispatch
-    terminalReceipt: job:notify
-    jobCount: 4
+    terminalReceipt: job:report-outcome
+    jobCount: 5
   - name: Node Runtime Compatibility
     path: .github/workflows/node-runtime-compatibility.yml
     active: true
@@ -970,8 +970,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:promotion-readiness
-    jobCount: 3
+    terminalReceipt: job:report-outcome
+    jobCount: 4
   - name: Node Runtime Freshness
     path: .github/workflows/node-runtime-freshness.yml
     active: true
@@ -1782,8 +1782,8 @@ nodes:
     triggeringStateTransition:
       - repository_dispatch
       - workflow_dispatch
-    terminalReceipt: job:remeasure
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: Wins Ledger
     path: .github/workflows/wins-ledger.yml
     active: true

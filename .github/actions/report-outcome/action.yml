@@ -6,7 +6,9 @@ description: >-
   agent-ready) that the lanes remediation loop picks up; the first green after
   a red resolves it; steady green spends no Linear calls. A red after a repair
   marked it Done reopens it and records the recurrence. Run it last, with
-  `if: always()`, in a job that needs every job of the workflow. Needs a
+  `if: always()`, in a job that needs every job of the workflow, guarded to
+  main (`github.ref == 'refs/heads/main'`, not workflow_dispatch). A chained
+  workflow must also check the upstream run's head branch is main. Needs a
   checkout of this repository at the same commit.
 
 inputs:

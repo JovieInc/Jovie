@@ -43,9 +43,12 @@ describe('outcome coverage gate (nothing fails without a repair or a success)', 
     const covered = new Set(rows.filter(r => r.covered).map(r => r.file));
     for (const file of [
       'e2e-full-matrix.yml',
+      'nightly-tests.yml',
+      'node-runtime-compatibility.yml',
       'screenshots.yml',
       'test-coverage-audit.yml',
       'visual-regression.yml',
+      'vs-linktree-claims.yml',
     ]) {
       expect(covered.has(file), file).toBe(true);
     }

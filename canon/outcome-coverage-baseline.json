@@ -41,8 +41,6 @@
     "mutation-diff.yml",
     "next-build-cache-warm.yml",
     "nightly-testing-agent.yml",
-    "nightly-tests.yml",
-    "node-runtime-compatibility.yml",
     "node-runtime-freshness.yml",
     "npm-publish.yml",
     "observability-issue.yml",
@@ -72,7 +70,6 @@
     "test-flakiness-report.yml",
     "tsc-cache-warm.yml",
     "visual-a11y.yml",
-    "voc-mine.yml",
-    "vs-linktree-claims.yml"
+    "voc-mine.yml"
   ]
 }
