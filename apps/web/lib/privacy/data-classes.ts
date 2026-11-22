@@ -200,6 +200,20 @@ export const DATA_CLASSES: DataClass[] = [
       'Vendor-held copies (issued OAuth grants) revoke via the provider.',
   },
   {
+    id: 'dashboard-views',
+    title: 'Shared dashboard views',
+    purpose:
+      'Views agents or users publish (title, block spec with inline data) and ' +
+      'the opaque share token that opens them at /v/[token].',
+    owner: 'app/views',
+    classification: 'credentials',
+    tables: ['dashboard_views', 'dashboard_view_versions'],
+    retention:
+      'Until the owner deletes or revokes the view; versions live with the view.',
+    deletion: ['fk-cascade'],
+    export: ['none'],
+  },
+  {
     id: 'audience-members',
     title: 'Audience/fan records',
     purpose:
