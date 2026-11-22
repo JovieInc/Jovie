@@ -49,6 +49,8 @@ export function createPilotReviewCase(
       },
     ],
     pins: [],
+    strokes: [],
+    comments: [],
     acceptedRevision: null,
     privateLibraryReceipt: null,
   };
