@@ -12,12 +12,16 @@ import {
   REVIEW_INBOX_DECISION_CONTRACT,
   REVIEW_INBOX_PILOT_TENANT,
 } from '@/lib/ovie/review-inbox/contract';
+import { isMarkStale } from '@/lib/ovie/review-inbox/marks';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
+import { cn } from '@/lib/utils';
+import { ReviewCanvas, type ReviewCanvasDraft } from './ReviewCanvas';
 import { ReviewInboxComparisonArtboard } from './ReviewInboxComparisonArtboard';
 import { ReviewInboxEditorialView } from './ReviewInboxEditorialView';
 import { ReviewInboxListView } from './ReviewInboxListView';
 
 const VIEW_LABELS: Record<ReviewInboxViewMode, string> = {
+  canvas: 'Annotate',
   list: 'List',
   editorial: 'Decision',
   artboard: 'Compare',
@@ -51,8 +55,9 @@ async function postDecision(body: Record<string, unknown>) {
  * Three-view pilot workbench for one stable InteractionCase item (synthetic).
  */
 export function ReviewInboxPilotWorkbench() {
-  const [view, setView] = useState<ReviewInboxViewMode>('list');
-  const [selectedRevision, setSelectedRevision] = useState('v1');
+  const [view, setView] = useState<ReviewInboxViewMode>('canvas');
+  // null follows the active revision until the reviewer picks another one.
+  const [pickedRevision, setPickedRevision] = useState<string | null>(null);
   const [artboardOpen, setArtboardOpen] = useState(false);
   const [draftPins, setDraftPins] = useState<Omit<ReviewInboxPin, 'author'>[]>(
     []
@@ -79,10 +84,11 @@ export function ReviewInboxPilotWorkbench() {
   const pilotCase = query.data;
 
   const activeRevision = pilotCase?.activeRevision ?? 'v1';
+  const selectedRevision = pickedRevision ?? activeRevision;
 
   const viewOptions = useMemo(
     () =>
-      (['list', 'editorial', 'artboard'] as const).map(mode => ({
+      (['canvas', 'list', 'editorial', 'artboard'] as const).map(mode => ({
         value: mode,
         label: VIEW_LABELS[mode],
       })),
@@ -108,6 +114,7 @@ export function ReviewInboxPilotWorkbench() {
     extra: Record<string, unknown> = {}
   ) {
     if (!pilotCase) return;
+    // The review route is the only writer; marks travel with their revision.
     await mutation.mutateAsync({
       contract: REVIEW_INBOX_DECISION_CONTRACT,
       tenant: REVIEW_INBOX_PILOT_TENANT,
@@ -145,11 +152,30 @@ export function ReviewInboxPilotWorkbench() {
           {mutation.error.message}
         </p>
       ) : null}
+      {view === 'canvas' ? (
+        <ReviewInboxCanvasView
+          pilotCase={pilotCase}
+          selectedRevision={selectedRevision}
+          onSelectRevision={setPickedRevision}
+          busy={mutation.isPending}
+          onRequestChanges={async draft => {
+            await decide('request_changes', {
+              pins: draft.pins,
+              strokes: draft.strokes,
+              ...(draft.comment ? { notes: draft.comment } : {}),
+            });
+            setPickedRevision(null);
+          }}
+          onAcceptV2={() =>
+            void decide('accept_version', { acceptRevision: 'v2' })
+          }
+        />
+      ) : null}
       {view === 'list' ? (
         <ReviewInboxListView
           pilotCase={pilotCase}
           selectedRevision={selectedRevision}
-          onSelect={setSelectedRevision}
+          onSelect={setPickedRevision}
         />
       ) : null}
       {view === 'editorial' ? (
@@ -205,5 +231,92 @@ export function ReviewInboxPilotWorkbench() {
         onAddPin={pin => setDraftPins(current => [...current, pin])}
       />
     </section>
+  );
+}
+
+function ReviewInboxCanvasView({
+  pilotCase,
+  selectedRevision,
+  onSelectRevision,
+  busy,
+  onRequestChanges,
+  onAcceptV2,
+}: Readonly<{
+  pilotCase: ReviewInboxPilotCase;
+  selectedRevision: string;
+  onSelectRevision: (revision: string) => void;
+  busy: boolean;
+  onRequestChanges: (draft: ReviewCanvasDraft) => Promise<void>;
+  onAcceptV2: () => void;
+}>) {
+  const asset =
+    pilotCase.candidates.find(c => c.revision === selectedRevision) ??
+    pilotCase.candidates[0];
+  if (!asset) return null;
+  const stale = isMarkStale({ revision: asset.revision }, pilotCase);
+  const canRequest =
+    pilotCase.lifecycle === 'awaiting_review' &&
+    asset.revision === pilotCase.activeRevision;
+  const comments = pilotCase.comments.filter(
+    comment => comment.revision === asset.revision
+  );
+
+  return (
+    <div className='space-y-3' data-testid='review-inbox-canvas-view'>
+      <div className='flex flex-wrap gap-1'>
+        {pilotCase.candidates.map(candidate => (
+          <button
+            key={candidate.revision}
+            type='button'
+            aria-pressed={candidate.revision === asset.revision}
+            className={cn(
+              'rounded-md border border-subtle px-2 py-1 text-xs',
+              candidate.revision === asset.revision && 'bg-surface-1'
+            )}
+            onClick={() => onSelectRevision(candidate.revision)}
+          >
+            {candidate.revision}
+            {candidate.revision === pilotCase.activeRevision ? ' · active' : ''}
+          </button>
+        ))}
+      </div>
+      <ReviewCanvas
+        key={`${asset.contentDigest}:${asset.revision}`}
+        asset={asset}
+        marks={pilotCase}
+        stale={stale}
+        newerRevision={stale ? pilotCase.activeRevision : undefined}
+        readOnly={!canRequest}
+        busy={busy}
+        onSave={onRequestChanges}
+      />
+      {comments.length ? (
+        <ul className='space-y-1 text-xs text-secondary-token'>
+          {comments.map(comment => (
+            <li key={comment.id}>
+              <span className='font-medium'>
+                {comment.author === 'agent' ? 'Designer' : 'You'}:
+              </span>{' '}
+              {comment.body}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {pilotCase.privateLibraryReceipt ? (
+        <p className='text-xs text-secondary-token' role='status'>
+          Accepted {pilotCase.acceptedRevision}. Stored:{' '}
+          {pilotCase.privateLibraryReceipt}
+        </p>
+      ) : pilotCase.lifecycle === 'changes_requested' ? (
+        <button
+          type='button'
+          disabled={busy}
+          className='rounded-lg border border-subtle px-3 py-2 text-sm disabled:opacity-40'
+          onClick={onAcceptV2}
+        >
+          Accept v2
+        </button>
+      ) : null}
+    </div>
   );
 }
