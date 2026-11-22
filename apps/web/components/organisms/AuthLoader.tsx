@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import {
-  BRAND_MARK_MUTED_CLASS,
-  JOVIE_PATH,
-  JOVIE_VIEWBOX,
-} from '@/lib/brand/tokens';
+  JOVIE_ICON_PATH,
+  JOVIE_ICON_VIEW_BOX,
+} from '@/components/atoms/jovie-icon-path';
+import { BRAND_MARK_MUTED_CLASS } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
 
 // Delay before showing loading message (milliseconds)
@@ -61,14 +61,14 @@ export function AuthLoader() {
         >
           <svg
             xmlns='http://www.w3.org/2000/svg'
-            viewBox={`0 0 ${JOVIE_VIEWBOX.width} ${JOVIE_VIEWBOX.height}`}
+            viewBox={JOVIE_ICON_VIEW_BOX}
             width={24}
             height={24}
             fill='currentColor'
             shapeRendering='geometricPrecision'
             aria-hidden='true'
           >
-            <path d={JOVIE_PATH} />
+            <path d={JOVIE_ICON_PATH} />
           </svg>
         </span>
         <p
