@@ -180,9 +180,9 @@ export function runHardChecks(
     });
   }
 
-  // ASS-25/ASS-29/ASS-90 fail themes: inventing-stats + inventing-account-facts
-  // + question-not-a-move always; upcoming-first only when case context has an
-  // UPCOMING title.
+  // ASS-25/ASS-29/ASS-90/ASS-97 fail themes: inventing-stats +
+  // inventing-account-facts + inventing-capabilities + question-not-a-move
+  // always; upcoming-first only when case context has an UPCOMING title.
   const upcomingTitle =
     context?.upcomingTitle ??
     (context?.facts ? upcomingTitleFromFacts(context.facts) : undefined);

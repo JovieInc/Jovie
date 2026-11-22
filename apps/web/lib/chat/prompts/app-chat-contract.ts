@@ -30,7 +30,7 @@ export function checkAppChatPromptContract(prompt: string) {
     forbidsInventedAccountStats: includesAll(
       'Never invent account stats',
       'streams, followers, popularity, saves, playlist adds',
-      'say you cannot see it',
+      'say plainly what you cannot see',
       'Never invent the missing figure'
     ),
     forbidsInventedAccountFacts: includesAll(
@@ -38,6 +38,12 @@ export function checkAppChatPromptContract(prompt: string) {
       'Do not claim Jovie creates or hosts a DSP pre-save',
       'Never invent CPC',
       'Never invent studio lore'
+    ),
+    forbidsInventedCapabilities: includesAll(
+      'Never invent product features',
+      'third-party UI paths',
+      'say plainly what you cannot see',
+      'Never claim you will set up'
     ),
     requiresDraftHoldOutbound: includesAll(
       'Draft every outbound artifact',

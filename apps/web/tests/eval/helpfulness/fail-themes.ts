@@ -1,5 +1,6 @@
 /**
- * Hermetic detectors for known helpfulness fail themes (ASS-16 / ASS-25 / ASS-90).
+ * Hermetic detectors for known helpfulness fail themes
+ * (ASS-16 / ASS-25 / ASS-90 / ASS-97).
  *
  * Offline only: no model, Gateway, or network. Used by golden-eval CI and by
  * live helpfulness `runHardChecks` so those reply shapes fail closed without
@@ -10,6 +11,7 @@
  * - question-not-a-move: clarifying closers are not a next move when a dated move exists
  * - inventing-stats: never invent / narrate popularity or stream counts to the artist
  * - inventing-account-facts: algorithm/momentum, Jovie-hosted pre-save, CPC rankings, lore
+ * - inventing-capabilities: product features, setup actions, third-party UI paths
  */
 
 /** Parse the first UPCOMING title from fixture/judge facts, if any. */
@@ -70,6 +72,39 @@ export const INVENTED_LORE_PATTERNS: readonly RegExp[] = [
 ];
 
 /**
+ * Live ASS-13 truthful=0 (run 44972130473): invented Jovie product features
+ * (auto smart-link on release day) not in tools/context.
+ */
+export const INVENTED_PRODUCT_FEATURE_PATTERNS: readonly RegExp[] = [
+  /\bwill\s+show\s+as\s+a\s+smart\s+link\b/i,
+  /\bsmart\s+link\s+on\s+release\s+day\b/i,
+  /\brelease\s+will\s+(?:appear|show)\s+as\s+(?:a\s+)?smart\s+link\b/i,
+  /\bauto(?:matic(?:ally)?)?\s+(?:creat(?:e|es|ed)|add(?:s|ed)?)\s+(?:a\s+)?smart\s+link\b/i,
+];
+
+/**
+ * Live ASS-13 truthful=0 (run 44972130473): claiming in-chat setup actions
+ * the model cannot perform without a tool ("I will set up the release").
+ */
+export const INVENTED_SETUP_ACTION_PATTERNS: readonly RegExp[] = [
+  /\bi\s+will\s+set\s+up\s+the\s+release\b/i,
+  /\bi(?:'|’)?ll\s+set\s+up\s+(?:the\s+)?release\b/i,
+  /\bi\s+will\s+(?:set\s+up|create|configure|enable)\s+(?:the\s+)?(?:release|smart\s+link|pre-?save)\b/i,
+  /\bi(?:'|’)?ll\s+(?:set\s+up|create|configure|enable)\s+(?:the\s+)?(?:release|smart\s+link|pre-?save)\b/i,
+  /\btell\s+me\s+and\s+i\s+will\s+set\s+up\b/i,
+];
+
+/**
+ * Live ASS-13 truthful=0 (run 44972130473): invented third-party UI menu trails
+ * (Spotify for Artists: Audience → …).
+ */
+export const INVENTED_THIRD_PARTY_UI_PATH_PATTERNS: readonly RegExp[] = [
+  /\bspotify\s+for\s+artists\s*:\s*\w+/i,
+  /\bspotify\s+for\s+artists[\s\S]{0,120}→/,
+  /\baudience\s*→\s*[^\n]{0,60}→/,
+];
+
+/**
  * Closers that score next_action ≤1 when a dated Jovie move or tool exists.
  * Kept narrow so legit "one missing required field?" questions still pass.
  */
@@ -93,7 +128,8 @@ export type FailThemeId =
   | 'upcoming-first'
   | 'question-not-a-move'
   | 'inventing-stats'
-  | 'inventing-account-facts';
+  | 'inventing-account-facts'
+  | 'inventing-capabilities';
 
 export interface FailThemeCheck {
   readonly id: FailThemeId;
@@ -140,6 +176,18 @@ export function inventsUnsupportedAccountFacts(text: string): boolean {
     INVENTED_JOVIE_PRESAVE_PATTERNS.some(pattern => pattern.test(text)) ||
     INVENTED_AD_COST_PATTERNS.some(pattern => pattern.test(text)) ||
     INVENTED_LORE_PATTERNS.some(pattern => pattern.test(text))
+  );
+}
+
+/**
+ * True when the reply invents product features, setup actions, or third-party
+ * UI paths (ASS-97 live truthful=0 on tip 44972130473).
+ */
+export function inventsUnsupportedCapabilities(text: string): boolean {
+  return (
+    INVENTED_PRODUCT_FEATURE_PATTERNS.some(pattern => pattern.test(text)) ||
+    INVENTED_SETUP_ACTION_PATTERNS.some(pattern => pattern.test(text)) ||
+    INVENTED_THIRD_PARTY_UI_PATH_PATTERNS.some(pattern => pattern.test(text))
   );
 }
 
@@ -195,6 +243,15 @@ export function runFailThemeChecks(
       : 'reply invents algorithm/momentum, Jovie-hosted pre-save, CPC ranking, or studio lore',
   });
 
+  const capabilitiesOk = !inventsUnsupportedCapabilities(text);
+  checks.push({
+    id: 'inventing-capabilities',
+    ok: capabilitiesOk,
+    detail: capabilitiesOk
+      ? undefined
+      : 'reply invents product features, setup actions, or third-party UI paths',
+  });
+
   return checks;
 }
 
@@ -210,6 +267,7 @@ export function checkFailThemePromptContract(prompt: string): {
   readonly questionNotAMove: boolean;
   readonly inventingStats: boolean;
   readonly inventingAccountFacts: boolean;
+  readonly inventingCapabilities: boolean;
 } {
   const normalized = prompt.toLowerCase();
   const has = (...needles: string[]) =>
@@ -249,5 +307,10 @@ export function checkFailThemePromptContract(prompt: string): {
       has('do not claim jovie creates or hosts a dsp pre-save') &&
       has('never invent cpc') &&
       has('never invent studio lore'),
+    inventingCapabilities:
+      has('never invent product features') &&
+      has('third-party ui paths') &&
+      has('say plainly what you cannot see') &&
+      has('never claim you will set up'),
   };
 }

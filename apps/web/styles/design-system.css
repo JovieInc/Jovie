@@ -327,6 +327,8 @@
     );
   --profile-stage-glow-a: rgba(255, 255, 255, 0.1);
   --profile-stage-glow-b: rgba(38, 42, 54, 0.42);
+  /* Cover-lit accent hairline (JOV-14241); overridden by profileAccent CSS vars. */
+  --profile-cover-accent-line: rgba(17, 175, 255, 0.55);
   /* Layout shell stage layers (PublicProfileLayoutShell). Declared here, on
      the shell's own element, so --profile-stage-glow-a resolves against the
      artist accent the shell sets inline. */
@@ -4629,4 +4631,9 @@ html:not(.dark) .smart-link-powered-by {
   .profile-drawer-floating {
     border-radius: var(--profile-drawer-radius-desktop);
   }
+}
+
+/* JOV-14241 cover-lit accent line placement (tokenized; no arbitrary top-[] in TSX). */
+.profile-cover-accent-line {
+  top: 22%;
 }

@@ -57,15 +57,27 @@ export async function resetClaimCanary({
     run: runTag.slice(0, 64),
     ttlSeconds: 300,
   });
+  const bypassSecret = process.env.PLAYWRIGHT_VERCEL_BYPASS_SECRET;
   const response = await request.post(`${origin}/api/internal/canary/reset`, {
     headers: {
       authorization: `Bearer ${cronSecret}`,
       'x-jovie-synthetic-passage': token,
+      // Exact `*.vercel.app` postdeploy targets are behind Vercel Authentication.
+      // Without the bypass header, Playwright follows the SSO redirect to an
+      // HTML 200 and a status-only check would soft-pass a no-op reset.
+      ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
     },
   });
+  const contentType = (response.headers()['content-type'] ?? '').toLowerCase();
+  const bodyText = await response.text();
   if (response.status() !== 200) {
     throw new Error(
-      `canary reset HTTP ${response.status()}: ${(await response.text()).slice(0, 300)}`
+      `canary reset HTTP ${response.status()}: ${bodyText.slice(0, 300)}`
+    );
+  }
+  if (!contentType.includes('application/json')) {
+    throw new Error(
+      `canary reset returned non-JSON (${contentType || 'missing content-type'}): ${bodyText.slice(0, 200)}`
     );
   }
 }
