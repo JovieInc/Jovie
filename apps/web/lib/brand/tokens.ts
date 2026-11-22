@@ -76,6 +76,15 @@ export type BrandMarkSize = BrandMarkSizeName | BrandMarkSizePx;
 export const BRAND_MARK_CREAM = '#F5F4F0' as const;
 
 /**
+ * The one muted value for the mark on loading screens (ovie-o-presence
+ * slice 2). Dark: quaternary text. Light: the logo-muted icon token, because
+ * quaternary on white is too loud. BrandLogo tone='muted' and AuthLoader both
+ * read this; the desktop splash mirrors it with textSecondary at 0.35.
+ */
+export const BRAND_MARK_MUTED_CLASS =
+  'text-logo-muted dark:text-quaternary-token' as const;
+
+/**
  * Ion blue — the canonical brand accent (Noir Ion; PALETTE.feature Ion).
  * Consumed by app-chrome metadata (msapplication-TileColor, Safari mask-icon)
  * so browser chrome renders the locked brand accent instead of retired

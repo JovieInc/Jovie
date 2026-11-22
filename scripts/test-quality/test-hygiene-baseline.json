@@ -31,7 +31,6 @@
       "apps/web/components/marketing/ConnectedComponentsGallery.test.tsx": 1,
       "apps/web/components/molecules/SettingsLoadingSkeleton.test.tsx": 1,
       "apps/web/components/organisms/AppShellSkeleton.test.tsx": 1,
-      "apps/web/components/organisms/CinematicAppBoot.test.tsx": 1,
       "apps/web/components/organisms/billing/PlanComparisonSection.test.tsx": 1,
       "apps/web/components/organisms/release-sidebar/ReleaseSidebarSections.test.tsx": 2,
       "apps/web/components/organisms/sidebar/controls.test.tsx": 2,
