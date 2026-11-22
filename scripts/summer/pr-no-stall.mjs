@@ -338,6 +338,23 @@ export function parseArgs(args) {
  */
 
 /**
+ * @param {string[]} args
+ * @param {RunSync} [run]
+ */
+function ghJson(args, run = spawnSync) {
+  const done = run('gh', args, {
+    encoding: 'utf8',
+    env: process.env,
+  });
+  if (done.status !== 0) {
+    throw new Error(
+      `gh ${args.join(' ')} failed: ${(done.stderr || done.stdout || '').slice(0, 400)}`
+    );
+  }
+  return JSON.parse(done.stdout || '[]');
+}
+
+/**
  * @param {RunSync} run
  * @param {string[]} gitArgs
  */
@@ -401,7 +418,7 @@ export function main(argv = process.argv.slice(2), deps = {}) {
   const listPrs =
     deps.listPrs ??
     (() => {
-      const listed = listOpenPrs(deps.run, {
+      const listed = listOpenPrs(args => ghJson(args, deps.run), {
         idleHours: args.idleHours,
         nowMs: deps.nowMs,
       });

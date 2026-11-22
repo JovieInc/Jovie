@@ -358,7 +358,12 @@ describe('open PR listing (JOV-13876)', () => {
       args[1] === 'view' && args[2] === '1'
         ? { status: 1, stdout: '', stderr: 'HTTP 504' }
         : base(cmd, args);
-    const { prs, rollupErrors } = listOpenPrs(run, {
+    const gh = runner => args => {
+      const done = runner('gh', args);
+      if (done.status !== 0) throw new Error(done.stderr);
+      return JSON.parse(done.stdout);
+    };
+    const { prs, rollupErrors } = listOpenPrs(gh(run), {
       idleHours: 6,
       nowMs: NOW,
     });
@@ -368,7 +373,7 @@ describe('open PR listing (JOV-13876)', () => {
     assert.equal(requiredChecksSettledGreen(prs[0]), false);
     assert.equal(requiredChecksSettledGreen(prs[2]), true);
     // Fresh heads are not read at all.
-    const fresh = listOpenPrs(fakeGh([]), { idleHours: 1000, nowMs: NOW });
+    const fresh = listOpenPrs(gh(fakeGh([])), { idleHours: 1000, nowMs: NOW });
     assert.equal(fresh.rollupSkipped, 0);
     assert.equal(fresh.prs.filter(pr => pr.statusCheckRollup).length, 0);
   });

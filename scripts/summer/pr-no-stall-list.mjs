@@ -8,29 +8,13 @@
  * leaves that PR without one, which the classifier treats as not green.
  */
 
-import { spawnSync } from 'node:child_process';
-
-/** @typedef {(cmd: string, args: string[], opts?: object) => { status: number | null, stdout?: string, stderr?: string }} RunSync */
+/** @typedef {(args: string[]) => any} GhJson */
 
 export const LIST_FIELDS =
   'number,title,isDraft,author,headRefName,updatedAt,url,labels,mergeable,mergeStateStatus,autoMergeRequest,isCrossRepository,headRepository';
 export const LIST_LIMIT = 1000;
 /** Keeps the run inside its declared 8-call token budget (two list pages + six reads). */
 export const MAX_ROLLUP_READS = 6;
-
-/**
- * @param {string[]} args
- * @param {RunSync} [run]
- */
-export function ghJson(args, run = spawnSync) {
-  const done = run('gh', args, { encoding: 'utf8', env: process.env });
-  if (done.status !== 0) {
-    throw new Error(
-      `gh ${args.join(' ')} failed: ${(done.stderr || done.stdout || '').slice(0, 400)}`
-    );
-  }
-  return JSON.parse(done.stdout || '[]');
-}
 
 /**
  * The classifier only acts on checks for ready, conflict-free, same-repo PRs
@@ -51,24 +35,21 @@ export function needsRollup(pr, opts = {}) {
 }
 
 /**
- * @param {RunSync} [run]
+ * @param {GhJson} ghJson the caller's gh wrapper (pr-no-stall.mjs owns the subprocess)
  * @param {{ idleHours?: number, nowMs?: number }} [opts]
  * @returns {{ prs: any[], rollupErrors: number, rollupSkipped: number }}
  */
-export function listOpenPrs(run = spawnSync, opts = {}) {
-  const prs = ghJson(
-    [
-      'pr',
-      'list',
-      '--state',
-      'open',
-      '--limit',
-      String(LIST_LIMIT),
-      '--json',
-      LIST_FIELDS,
-    ],
-    run
-  );
+export function listOpenPrs(ghJson, opts = {}) {
+  const prs = ghJson([
+    'pr',
+    'list',
+    '--state',
+    'open',
+    '--limit',
+    String(LIST_LIMIT),
+    '--json',
+    LIST_FIELDS,
+  ]);
   // lane-fix-red heads are the deadlock candidates, so they read first, oldest first.
   const red = pr =>
     (pr.labels ?? []).some(l => (l?.name ?? l) === 'lane-fix-red');
@@ -82,10 +63,13 @@ export function listOpenPrs(run = spawnSync, opts = {}) {
   let rollupErrors = 0;
   for (const pr of candidates.slice(0, MAX_ROLLUP_READS)) {
     try {
-      const view = ghJson(
-        ['pr', 'view', String(pr.number), '--json', 'statusCheckRollup'],
-        run
-      );
+      const view = ghJson([
+        'pr',
+        'view',
+        String(pr.number),
+        '--json',
+        'statusCheckRollup',
+      ]);
       pr.statusCheckRollup = view.statusCheckRollup;
     } catch {
       rollupErrors += 1;
