@@ -8,6 +8,7 @@ const meta = {
   parameters: { layout: 'fullscreen' },
   tags: ['autodocs'],
   args: {
+    token: 'a'.repeat(32),
     signedIn: false,
     view: {
       title: SAMPLE_VIEW_SPEC.title,
@@ -23,3 +24,7 @@ type Story = StoryObj<typeof meta>;
 export const SignedOut: Story = {};
 
 export const SignedIn: Story = { args: { signedIn: true } };
+
+export const OwnsView: Story = {
+  args: { signedIn: true, viewerOwnsView: true },
+};

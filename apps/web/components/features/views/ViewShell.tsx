@@ -2,16 +2,24 @@ import Link from 'next/link';
 import { LogoLink } from '@/components/atoms/LogoLink';
 import { APP_ROUTES } from '@/constants/routes';
 import type { SharedView } from '@/lib/views/service.server';
+import { SaveViewButton } from './SaveViewButton';
 import { ViewAnalytics, ViewSignupCard } from './ViewAnalytics';
 import { ViewRenderer } from './ViewRenderer';
 
 type ShellView = Pick<SharedView, 'title' | 'spec' | 'updatedAt'>;
 
-/** Dashboard-looking frame for a shared view; slice B wires Save as dashboard. */
+/** Dashboard-looking frame for a shared view; signed-in viewers can save it to their dashboards. */
 export function ViewShell({
   view,
+  token,
   signedIn,
-}: Readonly<{ view: ShellView; signedIn: boolean }>) {
+  viewerOwnsView = false,
+}: Readonly<{
+  view: ShellView;
+  token: string;
+  signedIn: boolean;
+  viewerOwnsView?: boolean;
+}>) {
   return (
     <div className='flex min-h-dvh bg-base text-primary-token'>
       <ViewAnalytics signedIn={signedIn} />
@@ -32,14 +40,7 @@ export function ViewShell({
             </p>
           </div>
           {signedIn ? (
-            <button
-              type='button'
-              disabled
-              title='Coming next'
-              className='rounded-md border border-subtle px-3 py-1.5 text-xs text-tertiary-token disabled:cursor-not-allowed'
-            >
-              Save as dashboard
-            </button>
+            <SaveViewButton token={token} viewerOwnsView={viewerOwnsView} />
           ) : (
             <Link
               href={APP_ROUTES.SIGNIN}

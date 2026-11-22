@@ -24,5 +24,12 @@ export default async function SharedViewPage({ params }: SharedViewPageProps) {
   const view = await getSharedView(token);
   if (!view) notFound();
   const { userId } = await getOptionalAuth();
-  return <ViewShell view={view} signedIn={Boolean(userId)} />;
+  return (
+    <ViewShell
+      view={view}
+      token={token}
+      signedIn={Boolean(userId)}
+      viewerOwnsView={Boolean(userId) && userId === view.ownerUserId}
+    />
+  );
 }

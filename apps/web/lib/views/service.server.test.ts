@@ -14,7 +14,12 @@ vi.mock('@/lib/db', () => ({
   db: {
     select: () => ({
       from: () => ({
-        where: () => ({ limit: async () => hoisted.dbSelect.shift() ?? [] }),
+        where: () => ({
+          limit: async () => hoisted.dbSelect.shift() ?? [],
+          orderBy: () => ({
+            limit: async () => hoisted.dbSelect.shift() ?? [],
+          }),
+        }),
       }),
     }),
   },
@@ -60,7 +65,12 @@ vi.mock('@/lib/db/legacy-transaction', async () => {
   };
 });
 
-import { getSharedView, publishView } from './service.server';
+import {
+  getSharedView,
+  listDashboardsForOwner,
+  publishView,
+  saveViewAsDashboard,
+} from './service.server';
 
 const spec = {
   schema: 'jovie.view.v1',
@@ -161,5 +171,95 @@ describe('getSharedView', () => {
     ]);
     const view = await getSharedView('c'.repeat(32));
     expect(view).toMatchObject({ id: 'v', version: 1, ownerUserId: 'u' });
+  });
+});
+
+describe('saveViewAsDashboard', () => {
+  const token = 'd'.repeat(32);
+  const source = {
+    id: 'src-1',
+    ownerUserId: 'owner-1',
+    title: 'Weekly',
+    spec,
+    shareToken: token,
+  };
+
+  it('copies a shared view into the viewer dashboards with a version row', async () => {
+    hoisted.txSelect.push([source], []);
+    const result = await saveViewAsDashboard({ token, userId: 'user-2' });
+    expect(result.created).toBe(true);
+    expect(result.id).toBe('view-1');
+    expect(result.token).toMatch(/^[0-9a-f]{32}$/);
+    expect(result.token).not.toBe(token);
+    expect(result.url).toBe(`https://jov.ie/v/${result.token}`);
+    expect(hoisted.inserts.map(i => i.table)).toEqual([
+      'dashboard_views',
+      'dashboard_view_versions',
+    ]);
+    expect(hoisted.inserts[0]?.values).toMatchObject({
+      ownerUserId: 'user-2',
+      source: 'user',
+      createdBy: 'user',
+      forkedFromViewId: 'src-1',
+      version: 1,
+      title: 'Weekly',
+    });
+    expect(hoisted.atomicOptions[0]).toMatchObject({ actorId: 'user-2' });
+  });
+
+  it('returns the owner view unchanged without copying', async () => {
+    hoisted.txSelect.push([source]);
+    const result = await saveViewAsDashboard({ token, userId: 'owner-1' });
+    expect(result).toMatchObject({ id: 'src-1', token, created: false });
+    expect(hoisted.inserts).toHaveLength(0);
+  });
+
+  it('is idempotent when the viewer already saved a copy', async () => {
+    const copyToken = 'e'.repeat(32);
+    hoisted.txSelect.push([source], [{ id: 'copy-1', shareToken: copyToken }]);
+    const result = await saveViewAsDashboard({ token, userId: 'user-2' });
+    expect(result).toMatchObject({
+      id: 'copy-1',
+      token: copyToken,
+      created: false,
+    });
+    expect(hoisted.inserts).toHaveLength(0);
+  });
+
+  it('reports not found for missing or revoked views and bad tokens', async () => {
+    await expect(
+      saveViewAsDashboard({ token, userId: 'user-2' })
+    ).rejects.toMatchObject({ code: 'view_not_found' });
+    await expect(
+      saveViewAsDashboard({ token: 'nope', userId: 'user-2' })
+    ).rejects.toMatchObject({ code: 'view_not_found' });
+    expect(hoisted.inserts).toHaveLength(0);
+  });
+});
+
+describe('listDashboardsForOwner', () => {
+  it('maps rows and normalizes source', async () => {
+    const updatedAt = new Date('2026-11-22T00:00:00Z');
+    hoisted.dbSelect.push([
+      {
+        id: 'a',
+        title: 'A',
+        token: 't1',
+        version: 2,
+        source: 'agent',
+        updatedAt,
+      },
+      {
+        id: 'b',
+        title: 'B',
+        token: 't2',
+        version: 1,
+        source: 'user',
+        updatedAt,
+      },
+    ]);
+    const rows = await listDashboardsForOwner('user-1');
+    expect(rows.map(r => r.source)).toEqual(['agent', 'user']);
+    expect(rows[0]).toMatchObject({ id: 'a', token: 't1', version: 2 });
   });
 });
