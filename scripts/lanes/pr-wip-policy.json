@@ -1,12 +1,13 @@
 {
   "schema": "jovie-pr-wip-policy/v1",
-  "about": "Historical producer WIP targets for census and repair ordering, plus disabled idle expiry. These November 1 throughput estimates are diagnostic, never admission ceilings. Canonical pr_wip.py admission uses the matched caller's shared quota ledger and fresh runner backlog; actual API calls reserve at the shared client. Unknown evidence preserves existing bounded seats and prevents autoscale growth. Producer names, draft counts and historical quota-deferred heads do not attest current capacity.",
-  "admission": "observed-capacity",
-  "measuredAt": "2026-11-01T00:40:00Z",
+  "about": "Per-agent WIP caps, enforced on new work since 2026-11-22 (Tim: \"Do all three\", cap open work per agent; supersedes the 2026-10-12 no-ceiling rule). A producer is the branch prefix. At its cap, a producer's new intake (lanes) and new PRs (pr-open) are refused with reason wip-cap and the PRs to land first; repairs of existing PRs never consult the cap. Producers in perSession share one prefix across many concurrent sessions, so each session is capped at perSessionCap through the agent-session body marker; their producer cap is only a backstop. Held, repair-exhausted, escalated and queue-poisoned PRs are handed off and do not count. Quota and CI capacity still gate first.",
+  "admission": "observed-capacity+wip-cap",
+  "measuredAt": "2026-11-22T11:30:00Z",
   "targetLeadTimeDays": 1,
   "minCap": 4,
   "defaultCap": 6,
   "caps": {
+    "claude": 60,
     "opus": 30,
     "glm": 20,
     "fix": 15,
@@ -14,9 +15,14 @@
     "codex": 8,
     "compounding": 8,
     "bot": 6,
+    "chloe": 6,
+    "lola": 6,
+    "aeon": 6,
+    "cursor": 6,
+    "evr": 6,
+    "flash": 6,
     "hyperagent": 5,
     "ci": 4,
-    "claude": 4,
     "sonnet": 4,
     "devin": 4,
     "grok": 4
@@ -37,5 +43,7 @@
     "ownerlessIdleDays": 7,
     "anyIdleDays": 21,
     "maxClosesPerTick": 10
-  }
+  },
+  "perSession": ["claude"],
+  "perSessionCap": 3
 }
