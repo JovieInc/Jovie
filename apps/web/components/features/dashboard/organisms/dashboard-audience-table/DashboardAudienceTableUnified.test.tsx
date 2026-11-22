@@ -328,3 +328,15 @@ describe('DashboardAudienceTableUnified', () => {
     );
   });
 });
+
+describe('DashboardAudienceTableUnified seam', () => {
+  it('puts its content on the 12px workspace seam (JOV-12565)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './DashboardAudienceTableUnified.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain('border-subtle px-3 py-2');
+    expect(source).not.toContain('border-subtle px-4 py-2');
+  });
+});

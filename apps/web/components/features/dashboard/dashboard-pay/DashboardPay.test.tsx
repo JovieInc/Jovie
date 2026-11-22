@@ -249,3 +249,15 @@ describe('DashboardPay icon geometry', () => {
     expect(source).not.toMatch(/\b[hw]-4\.5\b|\bsize-4\.5\b/);
   });
 });
+
+describe('DashboardPay seam', () => {
+  it('puts its content on the 12px workspace seam (JOV-12565)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './DashboardPay.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain("contentPadding='default'");
+    expect(source).not.toContain("contentPadding='compact'");
+  });
+});
