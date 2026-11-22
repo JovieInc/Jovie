@@ -1,15 +1,10 @@
 'use client';
 
-import {
-  Button,
-  CompositeField,
-  HostDrawnInput,
-  Spinner as LoadingSpinner,
-  PlainButton,
-} from '@jovie/ui';
+import { Spinner as LoadingSpinner } from '@jovie/ui';
 import { ArrowRight, Check } from 'lucide-react';
 import React from 'react';
 import { AUTH_SURFACE } from '@/lib/auth/constants';
+import { cn } from '@/lib/utils';
 
 interface HandleValidationState {
   readonly available: boolean;
@@ -101,59 +96,65 @@ export function OnboardingHandleStep({
 
       <form onSubmit={onSubmit} className='space-y-4'>
         <fieldset disabled={!isHydrated} className='min-w-0 space-y-4'>
-          {/* Inline input with claim button. The shared field shell draws the
-              surface, the error border and the focus ring. */}
-          <div className='text-mid font-semibold tracking-tighter text-primary-token'>
-            <CompositeField shape='pill' size='md' surface='field'>
-              {/* Prefix and handle share one group with no gap so the URL
-                  reads as one string (jov.ie/tim, not "jov.ie/ tim"). */}
-              <div className='flex min-w-0 flex-1 items-center'>
-                <span className='whitespace-nowrap text-secondary-token'>
-                  jov.ie/
-                </span>
-                <HostDrawnInput
-                  id='handle-input'
-                  ref={inputRef}
-                  name='username'
-                  aria-label='Claim Your Handle'
-                  type='text'
-                  value={handleInput}
-                  onChange={e =>
-                    onHandleChange(
-                      e.target.value
-                        .toLowerCase()
-                        .replaceAll(/\s+/g, '')
-                        .replace(/^@+/, '')
-                    )
-                  }
-                  placeholder='yourname' // ui-casing-allow: literal example placeholder
-                  autoComplete='username'
-                  autoCapitalize='none'
-                  autoCorrect='off'
-                  spellCheck={false}
-                  aria-invalid={hasError ? 'true' : undefined}
-                  className='min-w-0 flex-1'
-                />
-              </div>
-              <Button
-                data-testid='onboarding-handle-submit'
-                aria-label='Continue'
-                type='submit'
-                variant='primary'
-                size='icon-lg'
-                disabled={!canSubmit}
-                aria-describedby={
-                  ctaDisabledReason ? disabledReasonId : undefined
+          {/* Inline input with claim button */}
+          <div
+            className={cn(
+              'flex items-center gap-2 rounded-full border px-2 py-1.5 transition-[background-color,border-color,box-shadow] duration-subtle',
+              'border-subtle bg-[color-mix(in_oklab,var(--app-shell-content-surface)_94%,var(--linear-bg-surface-0))]',
+              'hover:border-default hover:bg-surface-0',
+              hasError && 'border-destructive/60'
+            )}
+          >
+            {/* Prefix and handle share one group with no gap so the URL
+                reads as one string (jov.ie/tim, not "jov.ie/ tim"). */}
+            <div className='flex min-w-0 flex-1 items-center'>
+              <span className='pl-3 text-mid font-semibold whitespace-nowrap text-secondary-token'>
+                jov.ie/
+              </span>
+              <input
+                id='handle-input'
+                ref={inputRef}
+                name='username'
+                aria-label='Claim Your Handle'
+                type='text'
+                value={handleInput}
+                onChange={e =>
+                  onHandleChange(
+                    e.target.value
+                      .toLowerCase()
+                      .replaceAll(/\s+/g, '')
+                      .replace(/^@+/, '')
+                  )
                 }
-                className='shrink-0'
-              >
-                <SubmitButtonIcon
-                  isLoading={isLoading}
-                  checking={handleValidation.checking}
-                  autoSubmitClaimed={autoSubmitClaimed}
-                />
-              </Button>
-            </CompositeField>
+                placeholder='yourname' // ui-casing-allow: literal example placeholder
+                autoComplete='username'
+                autoCapitalize='none'
+                autoCorrect='off'
+                spellCheck={false}
+                aria-invalid={hasError ? 'true' : undefined}
+                className='min-w-0 flex-1 bg-transparent text-mid font-semibold tracking-tighter text-primary-token placeholder:text-tertiary-token placeholder:opacity-60 focus-ring-themed'
+              />
+            </div>
+            <button
+              data-testid='onboarding-handle-submit'
+              aria-label='Continue'
+              type='submit'
+              disabled={!canSubmit}
+              aria-describedby={
+                ctaDisabledReason ? disabledReasonId : undefined
+              }
+              className={cn(
+                'focus-ring-themed inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-[background-color,opacity] duration-subtle',
+                'border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover',
+                'disabled:cursor-not-allowed disabled:opacity-40'
+              )}
+            >
+              <SubmitButtonIcon
+                isLoading={isLoading}
+                checking={handleValidation.checking}
+                autoSubmitClaimed={autoSubmitClaimed}
+              />
+            </button>
           </div>
 
           {/* Validation feedback + suggestions — tight under input */}
@@ -181,8 +182,9 @@ export function OnboardingHandleStep({
               <div className='flex flex-wrap items-center gap-2'>
                 <span className='text-xs text-tertiary-token'>Try:</span>
                 {handleValidation.suggestions.map(suggestion => (
-                  <PlainButton
+                  <button
                     key={suggestion}
+                    type='button'
                     onClick={() =>
                       onSuggestionClick
                         ? onSuggestionClick(suggestion)
@@ -191,7 +193,7 @@ export function OnboardingHandleStep({
                     className={AUTH_SURFACE.pillOption}
                   >
                     jov.ie/{suggestion}
-                  </PlainButton>
+                  </button>
                 ))}
               </div>
             )}

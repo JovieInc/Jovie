@@ -230,7 +230,7 @@ export function HeroSpotifyResults({
           }
           onMouseEnter={() => onActiveIndexChange(pasteUrlIndex)}
         >
-          <div className='mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-surface-1'>
+          <div className='mr-3 flex h-10 w-10 shrink-0 items-center justify-center'>
             <Link2 className='h-5 w-5 text-tertiary-token' aria-hidden='true' />
           </div>
           <div className='flex-1 text-left'>

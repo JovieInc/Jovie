@@ -236,8 +236,8 @@ export function OnboardingV2DiscoveryStep({
                       unoptimized
                     />
                   ) : (
-                    <div className='flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-0 text-tertiary-token'>
-                      <AudioLines className='h-5 w-5' />
+                    <div className='flex h-16 w-16 shrink-0 items-center justify-center text-tertiary-token'>
+                      <AudioLines className='h-5 w-5' aria-hidden='true' />
                     </div>
                   )}
                   <div className='min-w-0'>
