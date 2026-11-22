@@ -4337,6 +4337,22 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/ovie/review-inbox/pilot/decisions/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/review-inbox/pilot/decisions",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/ovie/review-inbox/pilot/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/review-inbox/pilot",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/ovie/summer-cards/[id]/decision/route.ts",
       "kind": "handler",
       "route": "/api/ovie/summer-cards/[id]/decision",
