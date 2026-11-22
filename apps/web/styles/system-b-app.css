@@ -839,7 +839,6 @@
   --color-bg-elevated: var(--noir-ion-elevated);
   --color-bg-tooltip: var(--noir-ion-floating);
   --color-bg-hover: rgba(255, 255, 255, 0.055);
-  --color-bg-menu-row-selected: var(--noir-ion-card);
   --color-bg-active: rgba(255, 255, 255, 0.085);
   --color-bg-input: var(--noir-ion-card);
   --color-row-hover: rgba(255, 255, 255, 0.055);

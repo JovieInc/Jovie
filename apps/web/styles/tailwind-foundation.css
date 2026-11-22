@@ -279,7 +279,6 @@
   /* Additional surface tokens — generates bg-surface-page, bg-surface-hover, etc. */
   --color-surface-page: var(--color-bg-page);
   --color-surface-hover: var(--color-bg-hover);
-  --color-surface-menu-selected: var(--color-bg-menu-row-selected);
   --color-surface-elevated: var(--color-bg-elevated);
   --color-surface-input: var(--color-bg-input);
   --color-surface-active: var(--color-bg-active);

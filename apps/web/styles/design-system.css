@@ -1885,7 +1885,6 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-bg-surface-3: var(--noir-ion-floating);
   --color-bg-page: var(--noir-ion-canvas);
   --color-bg-hover: rgba(0, 0, 0, 0.04);
-  --color-bg-menu-row-selected: rgba(0, 0, 0, 0.05);
   --color-bg-elevated: var(--noir-ion-elevated);
   --color-bg-input: var(--noir-ion-card);
   /* Raised = lighter (ZiaWI re-lock 2026-09-25): card/elevated/floating are all
@@ -2231,7 +2230,6 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-bg-surface-0: var(--noir-ion-shell);
   /* recessed wells / shell-adjacent */
   --color-bg-surface-1: var(--noir-ion-card);
-  --color-bg-menu-row-selected: var(--noir-ion-card);
   /* Shared card surface */
   --color-bg-surface-2: var(--noir-ion-elevated);
   /* elevated / inputs */
@@ -3841,7 +3839,6 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   --color-bg-base: #030406;
   --color-bg-surface-0: #07080a;
   --color-bg-surface-1: #131417;
-  --color-bg-menu-row-selected: #131417;
   --color-bg-surface-2: #1a1b1e;
   --color-bg-surface-3: #232427;
   --color-bg-page: #030406;
@@ -3950,7 +3947,6 @@ html:not(.dark) .teleprompter-studio {
   --color-bg-base: #030406;
   --color-bg-surface-0: #07080a;
   --color-bg-surface-1: #131417;
-  --color-bg-menu-row-selected: #131417;
   --color-bg-surface-2: #1a1b1e;
   --color-bg-surface-3: #232427;
   --color-bg-page: #030406;

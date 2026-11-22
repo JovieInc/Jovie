@@ -370,7 +370,7 @@ describe('CommonDropdown', () => {
 
       expect(item).toHaveAttribute('data-selected', 'true');
       expect(item?.className).toContain(
-        'data-[selected=true]:bg-surface-menu-selected'
+        'data-[selected=true]:bg-surface-hover'
       );
     });
 
@@ -535,7 +535,7 @@ describe('CommonDropdown', () => {
         'checked'
       );
       expect(screen.getByRole('menuitemcheckbox').className).toContain(
-        'data-[state=checked]:bg-surface-menu-selected'
+        'data-[state=checked]:bg-surface-hover'
       );
     });
 
@@ -625,7 +625,7 @@ describe('CommonDropdown', () => {
       ).toHaveAttribute('data-state', 'checked');
       expect(
         screen.getByRole('menuitemradio', { name: 'Medium' }).className
-      ).toContain('data-[state=checked]:bg-surface-menu-selected');
+      ).toContain('data-[state=checked]:bg-surface-hover');
     });
   });
 
