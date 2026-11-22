@@ -666,37 +666,37 @@ export async function executeChatTurn(
       },
     }),
     onFinish: async ({ steps, text, finishReason }) => {
-      if (
-        !(typeof text === 'string' && text.trim()) &&
-        steps.every(step => step.toolCalls.length === 0)
-      ) {
-        const emptyOutputError = Object.assign(
-          new Error('Model turn produced no text or tool calls'),
-          { name: 'EmptyChatTurnError' }
-        );
-        // An empty turn is a failure the caller would otherwise persist as a
-        // placeholder reply (JOV-6533); console.error so prod logs show it.
-        console.error('[chat] model turn produced no output', {
+      // ASS-95: blank artist-facing text (with or without tools) is soft-
+      // recovered at the persist gate via EMPTY_ASSISTANT_REPLY_FALLBACK.
+      // Do not abort the stream — callers persist the draft-hold fallback.
+      if (!(typeof text === 'string' && text.trim())) {
+        const hadTools = steps.some(step => step.toolCalls.length > 0);
+        console.error('[chat] model turn produced blank artist-facing text', {
           requestId,
           mode,
           selectedModel,
           finishReason,
           steps: steps.length,
+          hadTools,
           aborted: signal?.aborted ?? false,
         });
-        langfuseTrace.endError(emptyOutputError);
-        await telemetry?.captureException?.(emptyOutputError, {
-          tags: { feature: 'ai-chat', errorType: 'empty_output' },
-          extra: {
-            userId,
-            messageCount: uiMessages.length,
-            requestId,
-            profileId: resolvedProfileId,
-            conversationId: resolvedConversationId,
-          },
-        });
-        await onStreamError?.(emptyOutputError);
-        return;
+        await telemetry?.captureException?.(
+          Object.assign(
+            new Error('Model turn produced blank artist-facing text'),
+            { name: 'EmptyChatTurnError' }
+          ),
+          {
+            tags: { feature: 'ai-chat', errorType: 'empty_output' },
+            extra: {
+              userId,
+              messageCount: uiMessages.length,
+              requestId,
+              profileId: resolvedProfileId,
+              conversationId: resolvedConversationId,
+              hadTools,
+            },
+          }
+        );
       }
       let promptLeakBlocked = false;
       if (!blockedForDisclosure && typeof text === 'string') {

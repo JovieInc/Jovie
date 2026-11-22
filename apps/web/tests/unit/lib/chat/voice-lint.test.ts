@@ -6,6 +6,7 @@ import {
 } from '@/lib/chat/onboarding-script/script';
 import {
   ASSISTANT_REPLY_FALLBACK,
+  EMPTY_ASSISTANT_REPLY_FALLBACK,
   gateAssistantReply,
   lintVoice,
 } from '@/lib/chat/voice-lint';
@@ -85,6 +86,15 @@ describe('gateAssistantReply (JOV-6616)', () => {
 
   it('keeps the fallback lint-clean', () => {
     expect(lintVoice(ASSISTANT_REPLY_FALLBACK).ok).toBe(true);
+  });
+
+  it('ASS-95: replaces blank or whitespace replies with a draft-hold fallback', () => {
+    for (const blank of ['', '   ', '\n\t']) {
+      const result = gateAssistantReply(blank);
+      expect(result.text).toBe(EMPTY_ASSISTANT_REPLY_FALLBACK);
+      expect(result.violations.map(v => v.rule)).toContain('empty-reply');
+    }
+    expect(lintVoice(EMPTY_ASSISTANT_REPLY_FALLBACK).ok).toBe(true);
   });
 });
 
