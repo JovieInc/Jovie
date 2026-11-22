@@ -304,7 +304,7 @@ export const GOLDEN_PATH_TEST_EMAIL_LIKE = 'gp-%+e2e@test.jovie.com';
  * never hit ownership_conflict:v1.
  */
 export async function releaseGoldenPathTestBindings(
-  sql: ReturnType<typeof neon>
+  sql: ReturnType<typeof dogfoodSql>
 ): Promise<void> {
   await sql`
     UPDATE creator_profiles
@@ -325,7 +325,7 @@ export async function releaseGoldenPathTestBindings(
  * `scripts/cleanup-test-profiles.ts`.
  */
 export async function teardownGoldenPathRun(
-  sql: ReturnType<typeof neon>,
+  sql: ReturnType<typeof dogfoodSql>,
   emails: readonly string[]
 ): Promise<void> {
   if (emails.length === 0) return;
@@ -342,7 +342,7 @@ export async function teardownGoldenPathRun(
  * SHARED_E2E_ARTIST_POOL whose Spotify id has no bound creator_profiles row.
  */
 export async function selectGoldenPathArtist(
-  sql: ReturnType<typeof neon>
+  sql: ReturnType<typeof dogfoodSql>
 ): Promise<{ id: string; name: string; url: string }> {
   await releaseGoldenPathTestBindings(sql);
   return selectUnclaimedCertArtist(SHARED_E2E_ARTIST_POOL, async spotifyId => {
