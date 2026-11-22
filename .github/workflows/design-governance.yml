@@ -51,6 +51,8 @@ on:
       - 'scripts/component-*.mjs'
       - 'scripts/design-*.mjs'
       - 'scripts/generate-design-tokens-export.mjs'
+      - 'scripts/design/pen-token-import.mjs'
+      - 'docs/pen-stills/pen-import/**'
       - 'scripts/generate-llms-design-manifest.mjs'
       - 'scripts/shared-ui-visual-arbitrary-audit.mjs'
   pull_request:

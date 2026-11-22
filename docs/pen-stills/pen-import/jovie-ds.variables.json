@@ -1,0 +1,703 @@
+{
+  "schema": "jovie-ds-pen-import/v1",
+  "generatedBy": "scripts/design/pen-token-import.mjs",
+  "note": "Generated from design.tokens.json. Load in Pen web. Never edit Pen variables by hand; change code tokens and regenerate.",
+  "primaryMode": "dark",
+  "variables": {
+    "atom-surface-canvas": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#030406",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-surface-shell": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#07080a",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-surface-panel": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#131417",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-surface-card": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#131417",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-surface-elevated": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#1a1b1e",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-surface-floating": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#232427",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-surface-glass": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#090c10d1",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-surface-bg-base": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#030406",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-surface-bg-page": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#030406",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-surface-surface0": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#07080a",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-surface-surface1": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#131417",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-surface-surface2": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#1a1b1e",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-surface-surface3": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#232427",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-text-primary": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#f5f7fb",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-text-secondary": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#a0a5af",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-text-tertiary": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#9da2ac",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-text-quaternary": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#8c939e",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-text-disabled": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#77839d",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-border-subtle": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#a8b0c31a",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-border-default": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#a8b0c329",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-border-strong": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#c7edff42",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-border-glass": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#f5f7fb1a",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-border-focus": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#11afff",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-accent-ion": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#11afff",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-accent-focus-ring": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#11afffb8",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-accent-selected": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#11afff1a",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-accent-ultra": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#8e56f5",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-accent-pulse": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#f52bb5",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-accent-aqua": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#3ffa8b",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-accent-mint": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#3ffa8b",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-accent-gold": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#ff7800",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-accent-flare": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#f72a36",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-status-success": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#3ffa8b",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-status-warning": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#ff7800",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-status-error": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#f72a36",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-feature-analytics": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#11afff",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-feature-conversion": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#8e56f5",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-feature-beauty": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#f52bb5",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-feature-links": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#3ffa8b",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-feature-speed": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#3ffa8b",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-color-feature-pro": {
+      "type": "color",
+      "value": [
+        {
+          "value": "#ff7800",
+          "theme": {
+            "mode": "dark"
+          }
+        }
+      ]
+    },
+    "atom-space-0": {
+      "type": "number",
+      "value": 0
+    },
+    "atom-space-1": {
+      "type": "number",
+      "value": 4
+    },
+    "atom-space-2": {
+      "type": "number",
+      "value": 8
+    },
+    "atom-space-3": {
+      "type": "number",
+      "value": 12
+    },
+    "atom-space-4": {
+      "type": "number",
+      "value": 16
+    },
+    "atom-space-5": {
+      "type": "number",
+      "value": 20
+    },
+    "atom-space-6": {
+      "type": "number",
+      "value": 24
+    },
+    "atom-space-7": {
+      "type": "number",
+      "value": 28
+    },
+    "atom-space-8": {
+      "type": "number",
+      "value": 32
+    },
+    "atom-space-9": {
+      "type": "number",
+      "value": 36
+    },
+    "atom-space-10": {
+      "type": "number",
+      "value": 40
+    },
+    "atom-space-11": {
+      "type": "number",
+      "value": 44
+    },
+    "atom-space-12": {
+      "type": "number",
+      "value": 48
+    },
+    "atom-space-16": {
+      "type": "number",
+      "value": 64
+    },
+    "atom-space-20": {
+      "type": "number",
+      "value": 80
+    },
+    "atom-space-24": {
+      "type": "number",
+      "value": 96
+    },
+    "atom-space-28": {
+      "type": "number",
+      "value": 112
+    },
+    "atom-space-32": {
+      "type": "number",
+      "value": 128
+    },
+    "atom-space-40": {
+      "type": "number",
+      "value": 160
+    },
+    "atom-space-px": {
+      "type": "number",
+      "value": 1
+    },
+    "atom-space-0-5": {
+      "type": "number",
+      "value": 2
+    },
+    "atom-space-1-5": {
+      "type": "number",
+      "value": 6
+    },
+    "atom-space-2-5": {
+      "type": "number",
+      "value": 10
+    },
+    "atom-space-3-5": {
+      "type": "number",
+      "value": 14
+    },
+    "atom-text-3xs": {
+      "type": "number",
+      "value": 10
+    },
+    "atom-text-2xs": {
+      "type": "number",
+      "value": 12
+    },
+    "atom-text-xs": {
+      "type": "number",
+      "value": 12
+    },
+    "atom-text-app": {
+      "type": "number",
+      "value": 12
+    },
+    "atom-text-sm": {
+      "type": "number",
+      "value": 14
+    },
+    "atom-text-mid": {
+      "type": "number",
+      "value": 14
+    },
+    "atom-text-base": {
+      "type": "number",
+      "value": 16
+    },
+    "atom-text-lg": {
+      "type": "number",
+      "value": 16
+    },
+    "atom-text-xl": {
+      "type": "number",
+      "value": 20
+    },
+    "atom-text-2xl": {
+      "type": "number",
+      "value": 24
+    },
+    "atom-text-3xl": {
+      "type": "number",
+      "value": 32
+    },
+    "atom-text-4xl": {
+      "type": "number",
+      "value": 40
+    },
+    "atom-text-5xl": {
+      "type": "number",
+      "value": 48
+    },
+    "atom-radius-none": {
+      "type": "number",
+      "value": 0
+    },
+    "atom-radius-xs": {
+      "type": "number",
+      "value": 2
+    },
+    "atom-radius-default": {
+      "type": "number",
+      "value": 4
+    },
+    "atom-radius-sm": {
+      "type": "number",
+      "value": 8
+    },
+    "atom-radius-md": {
+      "type": "number",
+      "value": 10
+    },
+    "atom-radius-lg": {
+      "type": "number",
+      "value": 12
+    },
+    "atom-radius-xl": {
+      "type": "number",
+      "value": 16
+    },
+    "atom-radius-2xl": {
+      "type": "number",
+      "value": 20
+    },
+    "atom-radius-3xl": {
+      "type": "number",
+      "value": 24
+    },
+    "atom-radius-pill": {
+      "type": "number",
+      "value": 9999
+    },
+    "atom-radius-full": {
+      "type": "number",
+      "value": 9999
+    },
+    "atom-size-header-height": {
+      "type": "number",
+      "value": 32
+    },
+    "atom-size-row-dense": {
+      "type": "number",
+      "value": 32
+    },
+    "atom-size-row-content-dense": {
+      "type": "number",
+      "value": 24
+    },
+    "atom-size-row-compact": {
+      "type": "number",
+      "value": 40
+    },
+    "atom-size-row-content-compact": {
+      "type": "number",
+      "value": 32
+    },
+    "atom-size-row-list": {
+      "type": "number",
+      "value": 44
+    },
+    "atom-size-row-content-list": {
+      "type": "number",
+      "value": 36
+    },
+    "atom-size-row-two-line": {
+      "type": "number",
+      "value": 56
+    },
+    "atom-size-row-content-two-line": {
+      "type": "number",
+      "value": 48
+    },
+    "atom-size-row-description": {
+      "type": "number",
+      "value": 72
+    },
+    "atom-size-row-content-description": {
+      "type": "number",
+      "value": 64
+    },
+    "atom-size-row-controls": {
+      "type": "number",
+      "value": 96
+    },
+    "atom-size-row-content-controls": {
+      "type": "number",
+      "value": 88
+    }
+  }
+}
