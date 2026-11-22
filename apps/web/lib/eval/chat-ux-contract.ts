@@ -5,7 +5,8 @@
  * - which jank unit tests must stay green for the CI ratchet
  * - the Assistants first-token target (<1s)
  *
- * Live TTFT: `./chat-first-token-sample` (ASS-28); unrun skips latency compare.
+ * Live TTFT: `./chat-first-token-sample` + `./chat-first-token-live-probe`
+ * (ASS-28/ASS-86); unrun skips latency compare.
  */
 
 export const ASSISTANTS_CHAT_UX_CONTRACT_VERSION =
