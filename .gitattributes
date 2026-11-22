@@ -20,3 +20,9 @@ docs/product/generated/artist-launch-inventory.json linguist-generated=true
 # JOV-8754: vendored third-party GitHub Actions stay byte-identical to upstream
 # (integrity-checked by scripts/vendor-actions.mjs); skip whitespace checks.
 .github/actions/vendor/** -whitespace
+
+# Visual-test baselines live in Git LFS so they stop counting against the
+# tracked-bytes budget (docs/ci/repository-health.md). CI fetches them only in
+# browser-test jobs, through .github/actions/lfs-pull, from a cache keyed by
+# their pointers. repo-hygiene-guard rejects one committed as a plain blob.
+apps/web/tests/e2e/__snapshots__/**/*.png filter=lfs diff=lfs merge=lfs -text
