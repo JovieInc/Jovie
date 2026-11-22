@@ -9,6 +9,14 @@ vi.mock('@/components/features/admin/hud/OvieInbox', () => ({
     <section data-testid='existing-unified-inbox' data-case-id={caseId} />
   ),
 }));
+vi.mock(
+  '@/components/features/admin/review-inbox/ReviewInboxPilotWorkbench',
+  () => ({
+    ReviewInboxPilotWorkbench: () => (
+      <section data-testid='review-inbox-pilot-workbench' />
+    ),
+  })
+);
 vi.mock('@/components/features/admin/layout/AdminPage', () => ({
   AdminPage: ({ children }: { readonly children: ReactNode }) => (
     <main>{children}</main>
@@ -18,6 +26,14 @@ vi.mock('@/components/features/admin/layout/AdminPage', () => ({
 describe('guarded Ovie inbox destination', () => {
   beforeEach(() => {
     requireCurrentAdminPageAccess.mockReset().mockResolvedValue('founder');
+  });
+
+  it('renders the pilot workbench when pilot=1', async () => {
+    const { default: InboxPage } = await import('./page');
+    render(await InboxPage({ searchParams: Promise.resolve({ pilot: '1' }) }));
+    expect(
+      screen.getByTestId('review-inbox-pilot-workbench')
+    ).toBeInTheDocument();
   });
 
   it('renders the existing inbox after the current admin and privacy guard', async () => {
