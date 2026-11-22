@@ -64,6 +64,9 @@ TITLE_LANES = (
 ACCEPTED_DESIGN_LABELS = ("lane:speed", "agent-ready")
 PEN_DRAFT_TITLE = TITLE_LANES[0][0]
 AWAITING_DECISION_LABEL = "tim-action-required"
+# Any other design review (a design-system taste pick, a launch redraw) marks the build issue it
+# files with this label once Tim picks; admission then turns it into a speed build the same way.
+DESIGN_APPROVED_LABEL = "design-approved"
 
 
 def _explicit_lane(labels: set[str]) -> bool:
@@ -73,11 +76,14 @@ def _explicit_lane(labels: set[str]) -> bool:
 
 
 def accepted_pen_drafts(todo_rows):
-    """Todo Pen drafts Tim has accepted that no lane label has yet turned into a build."""
+    """Todo design work Tim has accepted (a Pen draft he moved to Todo, or an issue a design review
+    labelled design-approved) that no lane label has yet turned into a build."""
     out = []
     for row in todo_rows:
         labels = _labels(row)
-        if not PEN_DRAFT_TITLE.search(_title(row)) or AWAITING_DECISION_LABEL in labels:
+        if AWAITING_DECISION_LABEL in labels:
+            continue
+        if not (PEN_DRAFT_TITLE.search(_title(row)) or DESIGN_APPROVED_LABEL in labels):
             continue
         if _explicit_lane(labels):  # a lane label is a human or workflow decision; leave it
             continue

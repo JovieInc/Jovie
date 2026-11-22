@@ -95,6 +95,17 @@ class GoldenPathNeverHoldsNonCode(unittest.TestCase):
             self.assertEqual(receipt["nonCodeTodo"]["speed"], 1)
         self.assertEqual(work_lane.lane_of(dict(accepted, labels=["lane:speed", "agent-ready"])), "speed")
 
+    def test_design_approved_issue_becomes_a_speed_build(self):
+        # A design-system taste pick or launch redraw Tim approves files its build with design-approved.
+        picked = row(200, "Todo", priority=3, labels=("design-approved",))
+        picked["title"] = "Build approved launch redraw: billing success"
+        unpicked = row(201, "Todo", priority=3, labels=("design-approved", "tim-action-required"))
+        unpicked["title"] = "Build launch redraw: empty states"
+        with tempfile.TemporaryDirectory() as d:
+            receipt = pa.run(FakeLane, seed(d, [picked, unpicked]), "JOV", FakeClient(), now=NOW)
+            self.assertEqual(receipt["acceptedDesignBuilds"], ["JOV-200"])
+            self.assertEqual(receipt["nonCodeTodo"]["speed"], 1)
+
     def test_full_non_code_lanes_never_trigger_displacement(self):
         todo = [design(100 + i, updated="2026-10-28T00:00:00.000Z") for i in range(40)]
         with tempfile.TemporaryDirectory() as d:
