@@ -2,6 +2,7 @@
 
 // @coverage-via apps/web/tests/components/profile/ProfileDrawerShell.interaction.test.tsx
 
+import { Popover, PopoverAnchor, PopoverContent } from '@jovie/ui';
 import { ChevronLeft, X } from 'lucide-react';
 import {
   useCallback,
@@ -13,7 +14,6 @@ import {
   useState,
 } from 'react';
 import { Drawer } from 'vaul';
-import { Popover, PopoverAnchor, PopoverContent } from '@jovie/ui';
 import type { ProfileSurfacePresentation } from '@/features/profile/contracts';
 import { useModalFocusBoundary } from '@/lib/a11y/modal-focus-boundary';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';

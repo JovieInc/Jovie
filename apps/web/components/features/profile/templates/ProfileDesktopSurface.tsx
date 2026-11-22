@@ -25,7 +25,6 @@ import {
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
-import { ProfileDesktopSideRailRows } from './ProfileDesktopSideRailRows';
 import { AboutSection } from '@/features/profile/AboutSection';
 import { AlertsSettingsView } from '@/features/profile/AlertsSettingsView';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
@@ -76,6 +75,7 @@ import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import type { PublicRelease } from '../releases/types';
 import { DesktopSurfaceImage } from './DesktopSurfaceImage';
+import { ProfileDesktopSideRailRows } from './ProfileDesktopSideRailRows';
 
 // JOV-6201: reuse the 360px track at 1180px with min-w-0 on every desktop listen branch.
 export const PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME =

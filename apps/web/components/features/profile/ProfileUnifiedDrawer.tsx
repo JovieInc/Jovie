@@ -519,15 +519,13 @@ export function ProfileUnifiedDrawer({
           {renderedView === 'pay' && (
             <div data-testid='profile-mode-drawer-pay'>
               {hasValidVenmoLink ? (
-                <>
-                  <PayView
-                    profileId={artist.id}
-                    artistHandle={artist.handle}
-                    venmoLink={venmoLink ?? ''}
-                    venmoUsername={venmoUsername}
-                    amounts={PAY_AMOUNTS}
-                  />
-                </>
+                <PayView
+                  profileId={artist.id}
+                  artistHandle={artist.handle}
+                  venmoLink={venmoLink ?? ''}
+                  venmoUsername={venmoUsername}
+                  amounts={PAY_AMOUNTS}
+                />
               ) : (
                 <div className='rounded-(--profile-drawer-radius-mobile) border border-subtle bg-[color:var(--color-interactive-hover)] px-4 py-5 text-center'>
                   <p className='text-sm font-semibold text-primary-token'>
