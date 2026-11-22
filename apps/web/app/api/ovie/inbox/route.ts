@@ -5,31 +5,42 @@ import {
   operatorAccess,
 } from '@/lib/api/route-access';
 import { defineRoute } from '@/lib/api/route-pipeline';
+import { getFreshAuth } from '@/lib/auth/cached';
 import { authorizeSummerControl } from '@/lib/ovie/control';
 import { readOvieInbox } from '@/lib/ovie/inbox.server';
 import { resolveOviePrincipal } from '@/lib/ovie/mcp/principal';
 import {
   REVIEW_INBOX_DECISION_CONTRACT,
+  REVIEW_INBOX_MARK_LIMITS,
   REVIEW_INBOX_PILOT_TENANT,
 } from '@/lib/ovie/review-inbox/contract';
-import {
-  applyReviewInboxDecision,
-  readReviewInboxPilotCase,
-  reviewInboxPilotReceiptForAction,
-} from '@/lib/ovie/review-inbox/pilot-ledger';
+import { pilotReviewInboxScope } from '@/lib/ovie/review-inbox/ledger';
+import { reviewInboxLedger } from '@/lib/ovie/review-inbox/store.server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const headers = { 'Cache-Control': 'private, no-store' } as const;
 
+const unit = z.number().min(0).max(1);
+
 const pinSchema = z.object({
   id: z.string(),
   assetDigest: z.string(),
   revision: z.string(),
-  x: z.number().min(0).max(1),
-  y: z.number().min(0).max(1),
-  note: z.string(),
+  x: unit,
+  y: unit,
+  note: z.string().max(REVIEW_INBOX_MARK_LIMITS.noteChars),
+});
+
+const strokeSchema = z.object({
+  id: z.string(),
+  assetDigest: z.string(),
+  revision: z.string(),
+  points: z
+    .array(z.tuple([unit, unit]))
+    .min(2)
+    .max(REVIEW_INBOX_MARK_LIMITS.pointsPerStroke),
 });
 
 const reviewDecisionBodySchema = z.object({
@@ -46,9 +57,22 @@ const reviewDecisionBodySchema = z.object({
   ]),
   actionId: z.string().min(1),
   acceptRevision: z.string().optional(),
-  pins: z.array(pinSchema).optional(),
-  notes: z.string().optional(),
+  pins: z.array(pinSchema).max(REVIEW_INBOX_MARK_LIMITS.pins).optional(),
+  strokes: z
+    .array(strokeSchema)
+    .max(REVIEW_INBOX_MARK_LIMITS.strokes)
+    .optional(),
+  notes: z.string().max(REVIEW_INBOX_MARK_LIMITS.commentChars).optional(),
 });
+
+/**
+ * Review marks belong to the signed-in operator, never to an impersonated
+ * account or a principal named in the payload.
+ */
+async function reviewPrincipalId(): Promise<string | null> {
+  const auth = await getFreshAuth();
+  return auth.actorUserId ?? auth.userId ?? null;
+}
 
 function isReviewInboxPilotRead(request: Request): boolean {
   const pilot = new URL(request.url).searchParams.get('pilot');
@@ -67,7 +91,24 @@ export async function GET(request: Request): Promise<NextResponse> {
         headers,
       });
     }
-    return NextResponse.json({ case: readReviewInboxPilotCase() }, { headers });
+    const principalId = await reviewPrincipalId();
+    if (!principalId) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers }
+      );
+    }
+    try {
+      const reviewCase = await reviewInboxLedger.readCase(
+        pilotReviewInboxScope(principalId)
+      );
+      return NextResponse.json({ case: reviewCase }, { headers });
+    } catch {
+      return NextResponse.json(
+        { error: 'inbox_unavailable' },
+        { status: 503, headers }
+      );
+    }
   }
 
   let principal;
@@ -113,7 +154,16 @@ async function postReviewInboxDecisionHandler({
     );
   }
 
-  const existing = reviewInboxPilotReceiptForAction(body.actionId);
+  const principalId = await reviewPrincipalId();
+  if (!principalId) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401, headers }
+    );
+  }
+  const scope = pilotReviewInboxScope(principalId);
+
+  const existing = await reviewInboxLedger.receiptFor(scope, body.actionId);
   if (existing) {
     return NextResponse.json(
       { receipt: existing, duplicate: true },
@@ -121,7 +171,7 @@ async function postReviewInboxDecisionHandler({
     );
   }
 
-  const outcome = applyReviewInboxDecision(body);
+  const outcome = await reviewInboxLedger.apply(scope, body);
   if (!outcome.ok) {
     return NextResponse.json(
       { error: outcome.error, message: outcome.message },

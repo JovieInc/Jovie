@@ -92,8 +92,22 @@ describe('companyBlocker', () => {
       NOW
     );
     expect(blocker?.tone).toBe('warn');
+    // Unknown evidence is not a failure: it must not claim nobody can pay.
     expect(blocker?.text).toBe(
-      'Checkout has no fresh certification, so nobody can pay yet'
+      "Checkout isn't fully measured yet, so we can't confirm anyone can pay"
+    );
+  });
+
+  it('calls green evidence past its budget out of date, not failing', () => {
+    const blocker = companyBlocker(
+      snapshot({
+        activeConstraint: 'certification:checkout_payment_entitlement',
+      }),
+      new Date('2026-11-09T05:00:00.000Z')
+    );
+    expect(blocker?.tone).toBe('warn');
+    expect(blocker?.text).toBe(
+      "Checkout's certification is out of date, so we can't confirm anyone can pay"
     );
   });
 

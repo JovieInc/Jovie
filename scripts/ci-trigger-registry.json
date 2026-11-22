@@ -134,6 +134,7 @@
     "spend-guard.yml": {"runsPerMergedPr":0.2,"triggers":["repository_dispatch:clock_spend_guard","workflow_dispatch"]},
     "staging-controller.yml": {"runsPerMergedPr":0.9,"triggers":["workflow_run:CI"]},
     "stale-branch-sweep.yml": {"runsPerMergedPr":0,"triggers":["repository_dispatch:clock_stale_branch_sweep","workflow_dispatch"]},
+    "storybook-host.yml": {"runsPerMergedPr":0.4,"triggers":["push","workflow_dispatch"]},
     "summer-eve-pin.yml": {"runsPerMergedPr":3.6,"triggers":["pull_request","schedule","workflow_dispatch"]},
     "summer-pr-no-stall.yml": {"runsPerMergedPr":1,"triggers":["push","workflow_dispatch"]},
     "surface-recertify.yml": {"runsPerMergedPr":0.4,"triggers":["push","workflow_dispatch"]},

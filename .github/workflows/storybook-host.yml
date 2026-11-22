@@ -1,0 +1,83 @@
+name: Storybook Host
+
+# Hosted Storybook for browsing the design system. On each merge to main that
+# touches components, stories or Storybook config, build Storybook as static
+# files and deploy them to the jovie-storybook Vercel project as production.
+# That project has no git link and no functions, and Vercel Authentication
+# covers every deployment, so only team members can open it. No per-PR builds.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/components/**'
+      - 'apps/web/.storybook/**'
+      - 'apps/web/app/globals.css'
+      - 'apps/web/styles/**'
+      - 'packages/ui/**'
+      - 'apps/web/package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/storybook-host.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: storybook-host
+  cancel-in-progress: true
+
+env:
+  # jovie-storybook: static-only project, Vercel Authentication on all deployments.
+  STORYBOOK_VERCEL_PROJECT_ID: prj_YAUlr2gjRQps5xErfp2dkjRu6TAC
+
+jobs:
+  deploy:
+    name: Build and deploy Storybook
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate Vercel configuration
+        id: validate
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: |
+          if [ -z "${VERCEL_TOKEN}" ] || [ -z "${VERCEL_ORG_ID}" ]; then
+            echo "Vercel credentials missing; skipping Storybook deploy." >&2
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.validate.outputs.skip != 'true'
+
+      - name: Build static Storybook
+        if: steps.validate.outputs.skip != 'true'
+        working-directory: apps/web
+        run: pnpm exec storybook build -o "$RUNNER_TEMP/storybook-static" --quiet
+
+      - name: Deploy static files
+        if: steps.validate.outputs.skip != 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ env.STORYBOOK_VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          site="$RUNNER_TEMP/storybook-site"
+          # Build Output API v3 with static files only: Vercel runs no build
+          # and serves no functions.
+          mkdir -p "$site/.vercel/output"
+          mv "$RUNNER_TEMP/storybook-static" "$site/.vercel/output/static"
+          printf '{"version":3}\n' > "$site/.vercel/output/config.json"
+          printf '{"projectId":"%s","orgId":"%s"}\n' "$VERCEL_PROJECT_ID" "$VERCEL_ORG_ID" > "$site/.vercel/project.json"
+          vercel="$GITHUB_WORKSPACE/node_modules/.bin/vercel"
+          url="$(cd "$site" && "$vercel" deploy --prebuilt --prod --yes --scope "$VERCEL_ORG_ID")"
+          echo "Storybook deployed: $url" >> "$GITHUB_STEP_SUMMARY"

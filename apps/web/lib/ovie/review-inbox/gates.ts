@@ -6,8 +6,10 @@ import type {
 } from './contract';
 import {
   REVIEW_INBOX_DECISION_CONTRACT,
+  REVIEW_INBOX_MARK_LIMITS,
   REVIEW_INBOX_PILOT_TENANT,
 } from './contract';
+import { isReviewInboxStrokeInput } from './marks';
 
 export type ReviewInboxGateFailure =
   | 'invalid_contract'
@@ -36,6 +38,7 @@ function isPin(value: unknown): value is Omit<ReviewInboxPin, 'author'> {
     typeof pin.assetDigest === 'string' &&
     typeof pin.revision === 'string' &&
     typeof pin.note === 'string' &&
+    pin.note.length <= REVIEW_INBOX_MARK_LIMITS.noteChars &&
     typeof pin.x === 'number' &&
     typeof pin.y === 'number' &&
     pin.x >= 0 &&
@@ -67,9 +70,27 @@ export function validateReviewDecisionBody(
     return null;
   }
   if (candidate.pins !== undefined) {
-    if (!Array.isArray(candidate.pins) || !candidate.pins.every(isPin))
+    if (
+      !Array.isArray(candidate.pins) ||
+      candidate.pins.length > REVIEW_INBOX_MARK_LIMITS.pins ||
+      !candidate.pins.every(isPin)
+    )
       return null;
   }
+  if (candidate.strokes !== undefined) {
+    if (
+      !Array.isArray(candidate.strokes) ||
+      candidate.strokes.length > REVIEW_INBOX_MARK_LIMITS.strokes ||
+      !candidate.strokes.every(isReviewInboxStrokeInput)
+    )
+      return null;
+  }
+  if (
+    candidate.notes !== undefined &&
+    (typeof candidate.notes !== 'string' ||
+      candidate.notes.length > REVIEW_INBOX_MARK_LIMITS.commentChars)
+  )
+    return null;
   return candidate as ReviewInboxDecisionBody;
 }
 
@@ -149,29 +170,29 @@ export function gateReviewDecision(
     }
   }
   if (body.command === 'request_changes') {
-    if (!body.pins?.length) {
+    if (!body.pins?.length && !body.strokes?.length) {
       return {
         ok: false,
         error: 'invalid_pin',
-        message: 'Place at least one pin before requesting changes.',
+        message: 'Place a pin or draw on the image before requesting changes.',
       };
     }
-    for (const pin of body.pins) {
+    for (const mark of [...(body.pins ?? []), ...(body.strokes ?? [])]) {
       const asset = current.candidates.find(
-        c => c.contentDigest === pin.assetDigest
+        c => c.contentDigest === mark.assetDigest
       );
-      if (!asset) {
+      if (!asset || asset.revision !== mark.revision) {
         return {
           ok: false,
           error: 'invalid_pin',
-          message: 'Pin must bind to immutable asset bytes.',
+          message: 'Marks must bind to immutable asset bytes.',
         };
       }
-      if (pin.revision !== current.activeRevision) {
+      if (mark.revision !== current.activeRevision) {
         return {
           ok: false,
           error: 'invalid_pin',
-          message: 'Pin revision must match the active revision.',
+          message: 'Marks must be made on the active revision.',
         };
       }
     }
