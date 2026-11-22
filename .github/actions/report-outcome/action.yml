@@ -50,10 +50,12 @@ runs:
         RESULTS: ${{ inputs.results }}
         CONCLUSION: ${{ inputs.conclusion }}
         FINGERPRINT: ${{ inputs.fingerprint }}
+        DETAIL: ${{ inputs.detail }}
         WORKFLOW_REF: ${{ github.workflow_ref }}
       run: |
         set -euo pipefail
         conclusion="$CONCLUSION"
+        DETAIL="${DETAIL//$'\n'/ }"
         failed=''
         if [ -n "$RESULTS" ]; then
           failed="$(printf '%s' "$RESULTS" | jq -r '[to_entries[] | select(.value.result == "failure") | .key] | join(", ")')"
@@ -77,6 +79,7 @@ runs:
           echo "fingerprint=$fp"
           echo "source=$file"
           echo "failed=$failed"
+          echo "detail=${DETAIL:-${failed:+Failed jobs: $failed}}"
         } >> "$GITHUB_OUTPUT"
         echo "Outcome for $file: $conclusion (fingerprint $fp)${failed:+, failed jobs: $failed}"
 
@@ -109,7 +112,7 @@ runs:
         REMEDIATION_CONCLUSION: ${{ steps.decide.outputs.conclusion }}
         REMEDIATION_FINGERPRINT: ${{ steps.decide.outputs.fingerprint }}
         REMEDIATION_SOURCE: ${{ steps.decide.outputs.source }}
-        REMEDIATION_DETAIL: ${{ inputs.detail || (steps.decide.outputs.failed && format('Failed jobs: {0}', steps.decide.outputs.failed)) || '' }}
+        REMEDIATION_DETAIL: ${{ steps.decide.outputs.detail }}
         REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         REMEDIATION_GATE_STEADY_GREEN: '1'
         REMEDIATION_PREVIOUS_FILE: ${{ runner.temp }}/outcome-state/state
