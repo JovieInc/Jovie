@@ -59,10 +59,7 @@ describe('deterministic /app/chat prompt contract (ASS-9 + ASS-16)', () => {
       'requiresArtistFacingTextAfterTools',
       'After any tool or useSkill result, always write the artist-facing reply',
     ],
-    [
-      'requiresShortDefaultPlans',
-      'Default advice and launch plans stay short',
-    ],
+    ['requiresShortDefaultPlans', 'Default advice and launch plans stay short'],
     [
       'requiresRefuseThenDraftHold',
       'refusing an unasked send, post, auto-DM, scrape, or spend',
