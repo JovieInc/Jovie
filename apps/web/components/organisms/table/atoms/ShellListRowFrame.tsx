@@ -73,6 +73,50 @@ const shellListRowDensityClassName = {
   spacious: 'h-14',
 } as const satisfies Record<ShellListRowDensity, string>;
 
+/**
+ * Canonical content-row type and icon recipe. Every list or table row in an
+ * app surface (Tasks, Fleet, Shipping) uses these so titles, metadata and
+ * leading icons cannot drift. Contract: `.claude/rules/ui.md` "Content rows".
+ */
+export const contentRowType = {
+  title: 'text-app font-medium leading-tight text-primary-token',
+  meta: 'text-2xs leading-4 text-tertiary-token',
+  icon: 'size-4',
+  inset: 'px-3',
+} as const;
+
+/** `<tr>` height per density. Table rows size from `h-*`, not `min-h-*`. */
+const shellTableRowDensityClassName = {
+  dense: 'h-8 min-h-8',
+  standard: 'h-11 min-h-11',
+} as const;
+
+/**
+ * Class helper for rows that must stay a native `<tr>` (column alignment).
+ * Same height, hover and selected tokens as `ShellListRowFrame`; selected is a
+ * distinct fill from hover. Cells take `contentRowType.inset`. No borders.
+ */
+export function shellListRowClasses({
+  className,
+  density = 'standard',
+  interactive = true,
+  isSelected = false,
+}: Readonly<{
+  className?: string;
+  density?: keyof typeof shellTableRowDensityClassName;
+  interactive?: boolean;
+  isSelected?: boolean;
+}> = {}) {
+  return cn(
+    rowState.base,
+    rowState.focusVisible,
+    shellTableRowDensityClassName[density],
+    isSelected ? rowState.selected : rowState.hover,
+    interactive && 'cursor-pointer',
+    className
+  );
+}
+
 function getTaskRowGroupState(isSelected: boolean): string {
   if (isSelected) {
     return 'system-b-shell-list-task-row-selected';

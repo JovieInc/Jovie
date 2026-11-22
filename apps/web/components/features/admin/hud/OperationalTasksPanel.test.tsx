@@ -196,4 +196,16 @@ describe('OperationalTasksPanelView (colocated)', () => {
       screen.getByRole('button', { name: /Inspect JOV-5544/ })
     ).toHaveAttribute('aria-expanded', 'false');
   });
+
+  it('gives Fleet rows real hover and a selected fill distinct from hover', () => {
+    const { unmount } = renderView({ feed: feed() });
+    const idle = screen.getByTestId('operational-task-linear:JOV-5544');
+    expect(idle).toHaveClass('min-h-11', 'system-b-table-row-hover');
+    unmount();
+
+    renderView({ feed: feed(), selectedTaskId: 'linear:JOV-5544' });
+    const selected = screen.getByTestId('operational-task-linear:JOV-5544');
+    expect(selected).toHaveClass('system-b-table-row-selected');
+    expect(selected).not.toHaveClass('system-b-table-row-hover');
+  });
 });

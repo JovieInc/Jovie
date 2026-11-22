@@ -15,6 +15,7 @@ import {
 } from '@/components/molecules/drawer';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { HomeLoopStageStrip } from '@/components/organisms/home-loop/HomeLoopStageStrip';
+import { shellListRowClasses } from '@/components/organisms/table/atoms/ShellListRowFrame';
 import { AdminDetailRail } from '@/features/admin/layout/AdminDetailRail';
 import { buildStageStrip } from '@/lib/ovie/home/flow-home';
 import { type ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
@@ -22,6 +23,7 @@ import type { LaneAgent } from '@/lib/ovie/shipping-state/contract';
 import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
+import { ShippingRowWork } from './ShippingRowWork';
 
 const SHIPPING_COLUMNS = [
   'Work',
@@ -210,14 +212,6 @@ function QueueCell({ row }: Readonly<{ readonly row: MatrixRow }>) {
   }
   return <span className='text-tertiary-token'>—</span>;
 }
-
-const ROW_ATTENTION_CLASS: Record<MatrixAttention, string> = {
-  blocked: 'border-l-2 border-l-error bg-error-subtle',
-  failing: 'border-l-2 border-l-error bg-error-subtle',
-  stalled: 'border-l-2 border-l-warning',
-  queued: 'border-l-2 border-l-success',
-  ok: 'border-l-2 border-l-transparent',
-};
 
 function railAttentionTone(row: MatrixRow): 'good' | 'warning' | 'bad' {
   if (row.attention === 'queued' && row.stage === 'merge-queued') return 'good';
@@ -503,7 +497,7 @@ export function ShippingMatrix() {
                   <th
                     key={label}
                     scope='col'
-                    className='p-2 font-medium whitespace-nowrap'
+                    className='px-3 py-1.5 font-medium whitespace-nowrap'
                   >
                     {label}
                   </th>
@@ -515,7 +509,7 @@ export function ShippingMatrix() {
                 ['first', 'second', 'third', 'fourth', 'fifth'].map(row => (
                   <tr
                     key={`loading-${row}`}
-                    className='border-t border-subtle'
+                    className={shellListRowClasses({ interactive: false })}
                     aria-busy='true'
                   >
                     {[
@@ -527,7 +521,7 @@ export function ShippingMatrix() {
                       'age',
                       'transition',
                     ].map(column => (
-                      <td key={`loading-${column}`} className='p-2'>
+                      <td key={`loading-${column}`} className='px-3 py-1.5'>
                         <LoadingSkeleton
                           height='h-4'
                           width='w-full'
@@ -538,7 +532,7 @@ export function ShippingMatrix() {
                   </tr>
                 ))
               ) : rows.length === 0 ? (
-                <tr className='border-t border-subtle'>
+                <tr>
                   <td
                     colSpan={7}
                     className='p-6 text-center text-secondary-token'
@@ -555,16 +549,17 @@ export function ShippingMatrix() {
                     key={row.id}
                     data-testid={`shipping-row-${row.identifier}`}
                     aria-selected={selectedId === row.id}
-                    className={cn(
-                      'cursor-pointer border-t border-subtle transition-colors hover:bg-surface-1',
-                      ROW_ATTENTION_CLASS[row.attention],
-                      selectedId === row.id && 'bg-surface-1'
-                    )}
+                    className={shellListRowClasses({
+                      isSelected: selectedId === row.id,
+                    })}
                     onClick={() =>
                       setSelectedId(prev => (prev === row.id ? null : row.id))
                     }
                   >
-                    <th scope='row' className='relative max-w-0 truncate p-2'>
+                    <th
+                      scope='row'
+                      className='relative max-w-0 truncate px-3 py-1.5'
+                    >
                       <Button
                         type='button'
                         variant='link'
@@ -573,38 +568,37 @@ export function ShippingMatrix() {
                         aria-label={`Inspect ${row.identifier}: ${row.title}`}
                         className='absolute inset-0'
                       />
-                      <div aria-hidden='true' className='min-w-0'>
-                        <div className='truncate font-medium text-primary-token'>
-                          {row.title}
-                        </div>
-                        <div className='truncate text-2xs text-tertiary-token'>
-                          {row.identifier}
-                          {row.prNumber != null ? ` · #${row.prNumber}` : ''}
-                          {row.attention !== 'ok' && row.attention !== 'queued'
-                            ? ` · ${ATTENTION_LABELS[row.attention]}`
-                            : ''}
-                        </div>
-                      </div>
+                      <ShippingRowWork
+                        title={row.title}
+                        identifier={row.identifier}
+                        prNumber={row.prNumber}
+                        attention={row.attention}
+                        attentionLabel={
+                          row.attention !== 'ok' && row.attention !== 'queued'
+                            ? ATTENTION_LABELS[row.attention]
+                            : null
+                        }
+                      />
                     </th>
-                    <td className='p-2 whitespace-nowrap'>
+                    <td className='px-3 py-1.5 whitespace-nowrap'>
                       <HudStatusPill
                         label={STAGE_LABELS[row.stage]}
                         tone={stageTone(row.stage, row.attention)}
                       />
                     </td>
-                    <td className='max-w-48 truncate p-2 whitespace-nowrap'>
+                    <td className='max-w-48 truncate px-3 py-1.5 whitespace-nowrap'>
                       <ChecksCell row={row} />
                     </td>
-                    <td className='p-2 whitespace-nowrap'>
+                    <td className='px-3 py-1.5 whitespace-nowrap'>
                       <QueueCell row={row} />
                     </td>
-                    <td className='p-2 whitespace-nowrap text-secondary-token'>
+                    <td className='px-3 py-1.5 whitespace-nowrap text-secondary-token'>
                       {row.agent ?? '—'}
                     </td>
-                    <td className='p-2 whitespace-nowrap text-secondary-token'>
+                    <td className='px-3 py-1.5 whitespace-nowrap text-secondary-token'>
                       {row.createdAt ? formatTimeAgo(row.createdAt) : '—'}
                     </td>
-                    <td className='p-2 whitespace-nowrap text-secondary-token'>
+                    <td className='px-3 py-1.5 whitespace-nowrap text-secondary-token'>
                       {row.transition ??
                         (row.updatedAt ? formatTimeAgo(row.updatedAt) : '—')}
                     </td>

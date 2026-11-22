@@ -23,7 +23,10 @@ import {
   ShippingRowRail,
 } from '@/app/app/(shell)/admin/shipping/ShippingMatrix';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { TaskProjectionListRow } from '@/components/organisms/table';
+import {
+  contentRowType,
+  TaskProjectionListRow,
+} from '@/components/organisms/table';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 import { cn } from '@/lib/utils';
@@ -212,10 +215,11 @@ export function OperationalTasksPanelView({
                     key={task.id}
                     testId={`operational-task-${task.id}`}
                     isSelected={selectedTaskId === task.id}
+                    interaction='self'
                     leading={
                       <Icon
                         className={cn(
-                          'h-4 w-4',
+                          contentRowType.icon,
                           visual.className,
                           task.workflowState === 'running' && 'animate-spin'
                         )}
@@ -236,7 +240,12 @@ export function OperationalTasksPanelView({
                       )
                     }
                     metadata={
-                      <div className='mt-px flex min-w-0 flex-wrap items-center gap-x-1.5 overflow-hidden text-3xs leading-4 text-tertiary-token'>
+                      <div
+                        className={cn(
+                          'mt-px flex min-w-0 flex-wrap items-center gap-x-1.5 overflow-hidden',
+                          contentRowType.meta
+                        )}
+                      >
                         <span className='font-medium text-secondary-token'>
                           {visual.label}
                         </span>

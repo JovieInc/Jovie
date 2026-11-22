@@ -4,7 +4,10 @@
 import { PlainButton, UserAvatar } from '@jovie/ui';
 import { Layers, Sparkles, Tag } from 'lucide-react';
 import { memo, type ReactNode } from 'react';
-import { TaskProjectionListRow } from '@/components/organisms/table';
+import {
+  contentRowType,
+  TaskProjectionListRow,
+} from '@/components/organisms/table';
 import { DueChip } from '@/components/shell/DueChip';
 import { toDueIso } from '@/lib/tasks/task-due-date';
 import type { TaskView } from '@/lib/tasks/types';
@@ -40,12 +43,18 @@ function TaskStageGlyph({ task }: Readonly<{ task: TaskView }>) {
 
   return (
     <div
-      className='flex h-5 w-5 shrink-0 items-center justify-center'
+      className={cn(
+        'flex shrink-0 items-center justify-center',
+        contentRowType.icon
+      )}
       style={{ color: accent.solid }}
       title={`Progress ${stage.label}`}
     >
       <StageIcon
-        className={cn('h-3.5 w-3.5', task.status === 'done' && 'fill-current')}
+        className={cn(
+          contentRowType.icon,
+          task.status === 'done' && 'fill-current'
+        )}
       />
     </div>
   );
@@ -189,7 +198,8 @@ export const TaskListRow = memo(function TaskListRow({
         <div
           data-testid={`task-list-row-meta-${task.id}`}
           className={cn(
-            'flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0 overflow-hidden text-3xs leading-4 text-secondary-token',
+            'flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0 overflow-hidden',
+            contentRowType.meta,
             !hideTitle && 'mt-px'
           )}
         >

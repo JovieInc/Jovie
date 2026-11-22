@@ -70,4 +70,15 @@ describe('TaskListRow', () => {
     render(<TaskListRow task={task} hideTitle onOpenRelease={vi.fn()} />);
     expect(screen.queryByText(task.title)).toBeNull();
   });
+
+  it('uses the canonical content-row recipe', () => {
+    render(<TaskListRow task={task} onOpenRelease={vi.fn()} />);
+    const row = screen.getByTestId('task-list-row-task-1');
+    expect(row).toHaveClass('min-h-11', 'px-3');
+    expect(screen.getByText(task.title)).toHaveClass('font-medium');
+    expect(screen.getByText(task.title)).not.toHaveClass('font-semibold');
+    expect(screen.getByTestId('task-list-row-meta-task-1')).toHaveClass(
+      'text-2xs'
+    );
+  });
 });

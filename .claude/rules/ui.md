@@ -448,6 +448,37 @@ button—must compose `SidebarNavItem` or its exported
 focus, collapsed, nested, and density chrome belong to that primitive. Do not
 copy its class string or create route-specific sidebar row styling.
 
+### Content rows
+
+Every list or table row in an app surface (Tasks, Fleet, Shipping, and any new
+list) is one row: `ShellListRowFrame`, or its exported `shellListRowClasses`
+helper when the row must stay a native `<tr>` for column alignment. Ovie
+(`/app/ov/*`) and Jovie render the same row; the Mac app loads the same code.
+
+- **Height:** two-line rows (title + meta) use density `standard` (44px min).
+  Single-line rows use density `dense` (32px). No bespoke heights.
+- **Inset:** `px-3` on the row (or on every `<td>`/`<th>` of a `<tr>` row).
+- **Seams:** none. No `border-t`/`border-b`/`divide-*` between rows and no
+  `border-l-*` accents. State is fill only.
+- **States:** hover is `--color-row-hover`, selected is `--color-row-selected`
+  (via the `system-b-table-row-*` classes). Selected must differ from hover. A
+  standalone row (Fleet) passes `interaction='self'`; a row inside a table that
+  already paints states (Tasks) keeps the default `interaction='none'`.
+- **Type:** import `contentRowType` from `ShellListRowFrame`. Title is
+  `text-app font-medium` in `text-primary-token` (never `font-semibold`); meta is
+  `text-2xs` in `text-tertiary-token`. The leading icon slot is 16px (`size-4`).
+- **Attention:** a small leading dot (`bg-error`) or the status pill's tone.
+  Never a row background tint or a side border.
+- **Banned:** hand-rolled row recipes: `hover:bg-*` on a `<tr>`/`<li>` row,
+  `border-t`/`border-b` row separators, `cursor-pointer` + hover classes copied
+  onto a `<tr>`. Text lists and editorial cards (not rows) may use dividers.
+
+Enforced by `apps/web/tests/unit/content-row-parity.test.tsx`: it renders the
+Fleet, Shipping and Tasks rows and asserts the same height, inset, type and
+state classes, and scans `app/app/(shell)/admin`, the HUD panels, the Tasks
+components and the row molecules for the banned recipes. Visual story:
+`Design System/Content Rows` (`design-system-content-rows--stacked-rows`).
+
 **Banned patterns:**
 - `EntitySidebarShell title="X"` → child renders `<CardHeader><CardTitle>X</CardTitle></CardHeader>` (double title)
 - `Sheet` body wrapped in `Card` when Sheet already provides the surface (redundant carding)
