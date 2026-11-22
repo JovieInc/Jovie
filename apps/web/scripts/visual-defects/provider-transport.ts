@@ -26,6 +26,18 @@ interface VisionProvider {
   ): Promise<{ ok: boolean; text?: string; reason?: string }>;
 }
 
+interface VisionProviderModule {
+  defaultVisionProviders(env: Env): VisionProvider[];
+}
+
+function hasDefaultVisionProviders(mod: unknown): mod is VisionProviderModule {
+  return (
+    typeof mod === 'object' &&
+    mod !== null &&
+    typeof Reflect.get(mod, 'defaultVisionProviders') === 'function'
+  );
+}
+
 export function hasVisionKey(env: Env = process.env): boolean {
   return Boolean(env.ANTHROPIC_API_KEY || env.AI_GATEWAY_API_KEY);
 }
@@ -34,11 +46,14 @@ export function providerTransport(
   env: Env = process.env
 ): DefectVisionTransport {
   return async ({ model, system, prompt, images }) => {
-    const mod = (await import(
+    const mod: unknown = await import(
       '../../../../scripts/screenshot-loop/screenshot-bug-loop.mjs'
-    )) as unknown as {
-      defaultVisionProviders(env: Env): VisionProvider[];
-    };
+    );
+    if (!hasDefaultVisionProviders(mod)) {
+      throw new ReviewUnavailableError(
+        'screenshot-bug-loop.mjs does not export defaultVisionProviders'
+      );
+    }
     const providers = mod.defaultVisionProviders({
       ...env,
       AUX_VISION_MODEL: model,
