@@ -30,7 +30,7 @@ export function checkAppChatPromptContract(prompt: string) {
     forbidsInventedAccountStats: includesAll(
       'Never invent account stats',
       'streams, followers, popularity, saves, playlist adds',
-      'say you cannot see it',
+      'say plainly what you cannot see',
       'Never invent the missing figure'
     ),
     forbidsInventedAccountFacts: includesAll(
@@ -38,6 +38,12 @@ export function checkAppChatPromptContract(prompt: string) {
       'Do not claim Jovie creates or hosts a DSP pre-save',
       'Never invent CPC',
       'Never invent studio lore'
+    ),
+    forbidsInventedCapabilities: includesAll(
+      'Never invent product features',
+      'third-party UI paths',
+      'say plainly what you cannot see',
+      'Never claim you will set up'
     ),
     requiresDraftHoldOutbound: includesAll(
       'Draft every outbound artifact',
@@ -69,6 +75,24 @@ export function checkAppChatPromptContract(prompt: string) {
       'Never invent popularity, streams, peer benchmarks',
       'Never say you lack per-release data',
       'today Jovie setup step'
+    ),
+    // ASS-87 live hardcheck themes (44964568648): empty-after-tool, length,
+    // refuse→draft-hold, stream-count phrasing without catalog deny.
+    requiresArtistFacingTextAfterTools: includesAll(
+      'After any tool or useSkill result, always write the artist-facing reply',
+      'tool-only turn with empty text is a failure'
+    ),
+    requiresShortDefaultPlans: includesAll(
+      'Default advice and launch plans stay short',
+      'today plus release-day only'
+    ),
+    requiresRefuseThenDraftHold: includesAll(
+      'refusing an unasked send, post, auto-DM, scrape, or spend',
+      'draft and hold for their yes or confirm'
+    ),
+    requiresStreamCountNotCatalogDeny: includesAll(
+      'cannot see stream counts or saves',
+      'Never say you lack per-release data, track-by-track data'
     ),
   };
 }

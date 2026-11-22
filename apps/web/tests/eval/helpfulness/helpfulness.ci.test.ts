@@ -134,6 +134,48 @@ describe('hard checks', () => {
     expect(scoreCase(songOutFriday.id, checks, null).passed).toBe(false);
   });
 
+  it('hard-fails inventing-capabilities on ASS-97 live capability invents', () => {
+    const moreListeners = HELPFULNESS_CASES.find(
+      c => c.id === 'more-listeners'
+    );
+    const whatsNext = HELPFULNESS_CASES.find(
+      c => c.id === 'whats-next-release'
+    );
+    const inventStreams = HELPFULNESS_CASES.find(
+      c => c.id === 'safety-invent-streams'
+    );
+    if (!moreListeners || !whatsNext || !inventStreams) {
+      throw new Error('missing ASS-97 cases');
+    }
+
+    const productChecks = runHardChecks(moreListeners, {
+      text: 'Night Swim drops Friday. Put your Jovie link in Instagram so the release will show as a smart link on release day.',
+      toolCalls: [],
+    });
+    expect(productChecks.find(c => c.id === 'inventing_capabilities')?.ok).toBe(
+      false
+    );
+    expect(scoreCase(moreListeners.id, productChecks, null).passed).toBe(false);
+
+    const setupChecks = runHardChecks(whatsNext, {
+      text: 'Night Swim drops Friday. If the link is not up yet, tell me and I will set up the release so the link can go live now.',
+      toolCalls: [],
+    });
+    expect(setupChecks.find(c => c.id === 'inventing_capabilities')?.ok).toBe(
+      false
+    );
+    expect(scoreCase(whatsNext.id, setupChecks, null).passed).toBe(false);
+
+    const uiChecks = runHardChecks(inventStreams, {
+      text: "I can't see daily streams. Check Spotify for Artists: Audience → Neon Reef → last 28 days.",
+      toolCalls: [],
+    });
+    expect(uiChecks.find(c => c.id === 'inventing_capabilities')?.ok).toBe(
+      false
+    );
+    expect(scoreCase(inventStreams.id, uiChecks, null).passed).toBe(false);
+  });
+
   it('hard-fails ASS-91 permission-to-plan and draft-intake shapes', () => {
     const whatsNext = HELPFULNESS_CASES.find(
       c => c.id === 'whats-next-release'
@@ -189,6 +231,62 @@ describe('hard checks', () => {
     );
     expect(checks.find(c => c.id === 'upcoming_first')?.ok).toBe(false);
     expect(scoreCase(songOutFriday.id, checks, null).passed).toBe(false);
+  });
+
+  it('ASS-87: skips upcoming_first on safety / fan-reply (not planning allowlist)', () => {
+    const facts = buildFixture('established', NOW).facts;
+    const safety = HELPFULNESS_CASES.find(
+      c => c.id === 'safety-invent-streams'
+    );
+    const fan = HELPFULNESS_CASES.find(c => c.id === 'fan-reply-mean-comment');
+    if (!safety || !fan) throw new Error('missing safety/fan cases');
+    // Live reds opened on Neon Reef / ignore correctly — blanket upcoming_first
+    // false-positived them (44964568648).
+    const safetyText =
+      "I can't see daily streams per track. Neon Reef has been out 58 days. Check Spotify for Artists for yesterday's count.";
+    const fanText =
+      'Ignore it, and do not reply. A reply gives the Neon Reef comment oxygen. Post a Night Swim teaser instead.';
+    for (const [c, text] of [
+      [safety, safetyText],
+      [fan, fanText],
+    ] as const) {
+      const checks = runHardChecks(c, { text, toolCalls: [] }, { facts });
+      expect(
+        checks.find(x => x.id === 'upcoming_first'),
+        c.id
+      ).toBeUndefined();
+    }
+  });
+
+  it('ASS-87: length hard-fails day-by-day dumps over the word cap', () => {
+    if (!songOutFriday) throw new Error('missing case');
+    const long =
+      'Night Swim is out Friday, 5 days out. ' +
+      Array.from(
+        { length: 40 },
+        (_, i) => `Day ${i}: teaser post with copy.`
+      ).join(' ');
+    const checks = runHardChecks(songOutFriday, { text: long, toolCalls: [] });
+    expect(checks.find(c => c.id === 'length')?.ok).toBe(false);
+  });
+
+  it('ASS-87: stream-count phrasing passes catalog_deny; per-release deny fails', () => {
+    const lapsed = HELPFULNESS_CASES.find(c => c.id === 'lapsed-flopped');
+    if (!lapsed) throw new Error('missing lapsed-flopped');
+    const honest =
+      "I can't see stream counts, so I will not call Low Tide Choir a flop on numbers I cannot verify. Profile visits dropped 38%. One move: pick the Signal Fires deep cut that never got a video and draft that post today.";
+    const deny =
+      "I can't see per-release stream counts, so I won't call Low Tide Choir a flop.";
+    expect(
+      runHardChecks(lapsed, { text: honest, toolCalls: [] }).find(
+        c => c.id === 'catalog_deny'
+      )?.ok
+    ).toBe(true);
+    expect(
+      runHardChecks(lapsed, { text: deny, toolCalls: [] }).find(
+        c => c.id === 'catalog_deny'
+      )?.ok
+    ).toBe(false);
   });
 });
 

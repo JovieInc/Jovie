@@ -201,6 +201,16 @@ export {
 } from './molecules/TableContextMenu';
 export type { TableHeaderRowProps } from './molecules/TableHeaderRow';
 export { TableHeaderRow } from './molecules/TableHeaderRow';
+export type {
+  TableRowActionBarAction,
+  TableRowActionBarProps,
+  TableRowActionBarVisibility,
+  TableRowOverflowTriggerProps,
+} from './molecules/TableRowActionBar';
+export {
+  TableRowActionBar,
+  TableRowOverflowTrigger,
+} from './molecules/TableRowActionBar';
 export type { TableSearchBarProps } from './molecules/TableSearchBar';
 export { TableSearchBar } from './molecules/TableSearchBar';
 export type {
