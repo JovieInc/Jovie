@@ -27,7 +27,7 @@ export async function readOwnedProfile(
   // The save routes require the claimed profile's canonical UUID; a bare
   // field payload is rejected with 400 before any write.
   const id = typeof profile?.id === 'string' ? profile.id : '';
-  expect(id, 'Profile saves require the claimed profile id').toMatch(UUID);
+  expect(id, 'Profile edit save requires the claimed profile id').toMatch(UUID);
   return { id, bio: typeof profile?.bio === 'string' ? profile.bio : '' };
 }
 
@@ -46,9 +46,12 @@ export async function saveBioAndReadBack(options: {
   wait: (ms: number) => Promise<void>;
 }): Promise<string> {
   const { request, origin, username, marker, wait } = options;
-  const profile = await readOwnedProfile(request, origin);
+  const { id: profileId, bio: originalBio } = await readOwnedProfile(
+    request,
+    origin
+  );
   const save = await request.put(`${origin}/api/dashboard/profile`, {
-    data: { profileId: profile.id, updates: { bio: marker } },
+    data: { profileId, updates: { bio: marker } },
   });
   expect(save.status(), 'Profile edit save failed').toBe(200);
   try {
@@ -72,7 +75,7 @@ export async function saveBioAndReadBack(options: {
   } finally {
     // Restore even on a failed readback so the canary keeps no marker.
     const restore = await request.put(`${origin}/api/dashboard/profile`, {
-      data: { profileId: profile.id, updates: { bio: profile.bio } },
+      data: { profileId, updates: { bio: originalBio } },
     });
     expect(restore.status(), 'Profile edit restore failed').toBe(200);
   }
