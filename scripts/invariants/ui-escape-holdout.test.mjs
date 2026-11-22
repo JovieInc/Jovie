@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { parseLfsPointer } from '../lib/lfs-blobs.mjs';
 
 // UI judge calibration set (HumanHoldoutSet v1) for vision and
 // coherence judges (JOV-7713, JOV-7765). Fails render the UI escape corpus.
@@ -13,6 +14,31 @@ const root = join(
 );
 const holdout = JSON.parse(readFileSync(join(root, 'holdout.json'), 'utf8'));
 const PNG = Buffer.from('89504e470d0a1a0a', 'hex');
+
+// The captures are stored in Git LFS (.gitattributes). A checkout that pulled
+// LFS holds the PNG; one that did not holds the pointer, whose oid is the
+// SHA-256 of the exact PNG bytes, so the byte binding holds either way. The
+// pixel header is checked whenever the PNG itself is present.
+function readCapture(path) {
+  const data = readFileSync(path);
+  const pointer = parseLfsPointer(data);
+  if (pointer)
+    return { sha256: pointer.oid, png: null, bytes: pointer.objectBytes };
+  return {
+    sha256: createHash('sha256').update(data).digest('hex'),
+    png: data,
+    bytes: data.length,
+  };
+}
+
+function assertCaptureBytes(capture) {
+  const got = readCapture(join(root, capture.file));
+  assert.equal(got.sha256, capture.sha256);
+  if (got.png) {
+    assert.equal(got.png.readUInt32BE(16), capture.width);
+    assert.equal(got.png.readUInt32BE(20), capture.height);
+  }
+}
 
 describe('ui escape holdout', () => {
   it('preserves the separate fuller-page document-like rejection', () => {
@@ -27,13 +53,7 @@ describe('ui escape holdout', () => {
     assert.equal(item?.humanLabel, 'fail');
     assert.equal(item?.mustReject, true);
     assert.equal(item?.caseId, capture.file);
-    const png = readFileSync(join(root, capture.file));
-    assert.equal(
-      createHash('sha256').update(png).digest('hex'),
-      capture.sha256
-    );
-    assert.equal(png.readUInt32BE(16), capture.width);
-    assert.equal(png.readUInt32BE(20), capture.height);
+    assertCaptureBytes(capture);
     assert.equal(
       capture.libraryFileId,
       'libfile_6ece57e899988191829e40b555afc105'
@@ -59,13 +79,7 @@ describe('ui escape holdout', () => {
     assert.equal(item?.humanLabel, 'fail');
     assert.equal(item?.mustReject, true);
     assert.equal(item?.caseId, capture.file);
-    const png = readFileSync(join(root, capture.file));
-    assert.equal(
-      createHash('sha256').update(png).digest('hex'),
-      capture.sha256
-    );
-    assert.equal(png.readUInt32BE(16), capture.width);
-    assert.equal(png.readUInt32BE(20), capture.height);
+    assertCaptureBytes(capture);
     assert.equal(
       capture.libraryFileId,
       'libfile_d25051e0eca481919874b19a13d7b934'
@@ -103,7 +117,9 @@ describe('ui escape holdout', () => {
       assert.match(item.caseId, /^[a-z0-9-]+\.png$/);
       const path = join(root, item.caseId);
       assert.ok(existsSync(path), `missing ${item.caseId}`);
-      assert.deepEqual(readFileSync(path).subarray(0, 8), PNG);
+      const got = readCapture(path);
+      assert.ok(got.bytes > 0, `empty ${item.caseId}`);
+      if (got.png) assert.deepEqual(got.png.subarray(0, 8), PNG);
       assert.ok(item.notes?.trim(), `${item.id} needs provenance notes`);
     }
   });
