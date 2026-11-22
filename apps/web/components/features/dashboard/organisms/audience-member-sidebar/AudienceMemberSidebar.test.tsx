@@ -72,6 +72,10 @@ describe('AudienceMemberSidebar certificate', () => {
     expect(screen.getByTestId('audience-member-header-card')).toHaveTextContent(
       'Avery Stone'
     );
+    // The shell's header slot owns the px-3 inset; no second inset here.
+    expect(screen.getByTestId('audience-member-header-card')).not.toHaveClass(
+      'px-3'
+    );
     await expectNoA11yViolations(container);
 
     await user.click(screen.getByRole('tab', { name: 'Activity' }));

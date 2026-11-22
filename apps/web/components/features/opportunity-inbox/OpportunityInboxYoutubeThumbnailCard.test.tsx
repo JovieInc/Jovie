@@ -52,6 +52,10 @@ describe('OpportunityInboxYoutubeThumbnailCard', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('1,250')).toBeInTheDocument();
     expect(screen.getByText('300 min')).toBeInTheDocument();
+    // API stats sit flat on the card, not in a recessed well.
+    const stats = screen.getByText('1,250').closest('dl');
+    expect(stats).toHaveClass('rounded-md', 'p-3');
+    expect(stats).not.toHaveClass('bg-surface-0');
     expect(screen.getByText(/API snapshot/)).toBeInTheDocument();
     expect(screen.getByText(/Video video-1/)).toBeInTheDocument();
 

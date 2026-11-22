@@ -22,6 +22,9 @@ describe('ContentMetricRow', () => {
       'text-success'
     );
     expect(container.querySelector('svg')).toHaveClass('text-accent');
+    // No recessed well: the row sits flat on its card.
+    expect(container.firstElementChild).toHaveClass('rounded-lg');
+    expect(container.firstElementChild).not.toHaveClass('bg-surface-0');
     await expectNoA11yViolations(container);
   });
 
