@@ -2,13 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/components/dashboard/organisms/onboarding-dsp-step.test.tsx
 
-import {
-  Button,
-  CompositeField,
-  HostDrawnInput,
-  Spinner as LoadingSpinner,
-  PlainButton,
-} from '@jovie/ui';
+import { Button, Spinner as LoadingSpinner } from '@jovie/ui';
 import { Search } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useReducer, useRef } from 'react';
@@ -134,34 +128,37 @@ export function OnboardingDspStep({
         <ContentSurfaceCard className='p-4 sm:p-5'>
           <div className={cn(FORM_LAYOUT.formInner, 'space-y-2.5')}>
             <div className='relative'>
-              <div className='text-sm leading-5 text-primary-token'>
-                <CompositeField shape='pill' size='md' surface='field'>
-                  <Search
-                    className='h-4 w-4 shrink-0 text-tertiary-token'
-                    aria-hidden='true'
-                  />
-                  <HostDrawnInput
-                    ref={inputRef}
-                    type='text'
-                    data-testid='spotify-link-input'
-                    value={state.searchQuery}
-                    onChange={e => handleInputChange(e.target.value)}
-                    placeholder='Artist name or Spotify link'
-                    autoComplete='off'
-                    autoCapitalize='none'
-                    autoCorrect='off'
-                    spellCheck={false}
-                    aria-label='Search For Your Artist Or Paste A Spotify Link'
-                    aria-invalid={Boolean(state.error)}
-                    aria-describedby={
-                      state.error ? 'onboarding-dsp-search-error' : undefined
-                    }
-                    className='min-w-0 flex-1'
-                  />
-                  {searchState === 'loading' && (
-                    <LoadingSpinner size='sm' className='text-tertiary-token' />
-                  )}
-                </CompositeField>
+              <div
+                className={cn(
+                  AUTH_SURFACE.fieldShell,
+                  state.error && AUTH_SURFACE.fieldShellError
+                )}
+              >
+                <Search
+                  className='h-4 w-4 shrink-0 text-tertiary-token'
+                  aria-hidden='true'
+                />
+                <input
+                  ref={inputRef}
+                  type='text'
+                  data-testid='spotify-link-input'
+                  value={state.searchQuery}
+                  onChange={e => handleInputChange(e.target.value)}
+                  placeholder='Artist name or Spotify link'
+                  autoComplete='off'
+                  autoCapitalize='none'
+                  autoCorrect='off'
+                  spellCheck={false}
+                  aria-label='Search For Your Artist Or Paste A Spotify Link'
+                  aria-invalid={Boolean(state.error)}
+                  aria-describedby={
+                    state.error ? 'onboarding-dsp-search-error' : undefined
+                  }
+                  className={AUTH_SURFACE.fieldInput}
+                />
+                {searchState === 'loading' && (
+                  <LoadingSpinner size='sm' className='text-tertiary-token' />
+                )}
               </div>
 
               {state.showResults && results.length > 0 && (
@@ -171,7 +168,8 @@ export function OnboardingDspStep({
                 >
                   {results.map((artist, index) => (
                     <li key={artist.id}>
-                      <PlainButton
+                      <button
+                        type='button'
                         onClick={() => handleSelect(artist)}
                         onMouseEnter={() =>
                           dispatch({
@@ -216,7 +214,7 @@ export function OnboardingDspStep({
                             {presentUnmanagedListing().label}
                           </span>
                         )}
-                      </PlainButton>
+                      </button>
                     </li>
                   ))}
                 </ContentSurfaceCard>

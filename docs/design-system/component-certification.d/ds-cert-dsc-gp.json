@@ -9,15 +9,6 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/features/dashboard/organisms/onboarding/OnboardingDspStep.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
     "apps/web/components/features/dashboard/organisms/onboarding/OnboardingProfileReviewStep.tsx": [
       "ds-owner",
       "tokens",
@@ -82,15 +73,6 @@
       "forced-caps"
     ],
     "apps/web/components/features/home/claim-handle/ClaimHandleForm.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
-    "apps/web/components/features/onboarding/OnboardingExperienceShell.tsx": [
       "ds-owner",
       "tokens",
       "states",
@@ -164,12 +146,6 @@
     ]
   },
   "waivers": {
-    "apps/web/components/features/dashboard/organisms/onboarding/OnboardingDspStep.tsx": {
-      "error": "Search failures are surfaced by useArtistSearchQuery and the shared error line below the field (state.error); the step adds no separate error UI to show beyond the inline alert.",
-      "partial": "The step has one view: search, optional results and skip. There is no partially loaded layout.",
-      "offline": "Search runs through useArtistSearchQuery, which owns network failure handling; the step renders only its results and error line.",
-      "permission-denied": "Onboarding is already authenticated when this step renders; denial is handled upstream by the onboarding route."
-    },
     "apps/web/components/features/dashboard/organisms/onboarding/OnboardingProfileReviewStep.tsx": {
       "offline": "Saving and avatar upload go through server actions and mutation hooks that surface their own failures; the step renders no distinct offline layout."
     },
