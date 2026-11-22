@@ -72,8 +72,13 @@ export function OvieComposerDock() {
   const view = decisionCardView(item, now);
   const thumbnail = decisionCardThumbnail(item.evidence);
   const failed = failure?.item.id === item.id ? failure : null;
-  const deadline = view.fallback?.relative
-    ? `${view.fallback.decision === 'approve' ? 'Approves' : 'Rejects'} ${view.fallback.relative}`
+  // A card that asks Tim says plainly what each answer does (2026-11-22: the
+  // dock showed only "Approves in 4m" over a bare Approve button).
+  const approveDoes =
+    (view.fallback?.decision === 'approve' ? view.fallback.summary : null) ??
+    item.recommendation.trim();
+  const deadline = view.fallback
+    ? `If you don't answer, it ${view.fallback.decision === 'approve' ? 'approves' : 'rejects'} ${view.fallback.relative ?? 'now'}.`
     : null;
   const count = `1 of ${pending.length}`;
 
@@ -128,9 +133,29 @@ export function OvieComposerDock() {
               <p role='alert' className='truncate text-xs text-error'>
                 {failed.message}
               </p>
-            ) : deadline ? (
-              <p className='truncate text-xs text-tertiary-token'>{deadline}</p>
-            ) : null}
+            ) : (
+              <>
+                {approveDoes ? (
+                  <p
+                    className='line-clamp-2 text-xs text-secondary-token'
+                    data-testid='ovie-composer-dock-approve-does'
+                  >
+                    {`Approve: ${approveDoes}`}
+                  </p>
+                ) : null}
+                <p
+                  className='truncate text-xs text-secondary-token'
+                  data-testid='ovie-composer-dock-reject-does'
+                >
+                  Reject: it doesn't go ahead.
+                </p>
+                {deadline ? (
+                  <p className='truncate text-xs text-tertiary-token'>
+                    {deadline}
+                  </p>
+                ) : null}
+              </>
+            )}
           </div>
         </div>
       )}

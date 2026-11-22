@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const captureErrorMock = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock('@/lib/error-tracking', () => ({ captureError: captureErrorMock }));
+const fileRepairMock = vi.hoisted(() => vi.fn(async () => 'filed' as const));
+vi.mock('@/lib/ovie/summer-turn-repair', () => ({
+  fileSummerTurnRepair: fileRepairMock,
+}));
 
 import { encodeToolEvents } from '@/lib/chat/tool-events';
 import { MemoryOperatingStore } from './mcp/store';
@@ -70,6 +74,9 @@ describe('Summer UI message stream', () => {
         feature: 'ovie-summer',
         hop: 'summer_deployment_unverified',
       })
+    );
+    expect(fileRepairMock).toHaveBeenCalledWith(
+      expect.objectContaining({ hop: 'summer_deployment_unverified' })
     );
   });
 

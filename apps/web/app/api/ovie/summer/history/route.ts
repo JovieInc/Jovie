@@ -108,6 +108,23 @@ export async function GET() {
   // instead of one permanent "do not resend" bubble per turn.
   const isSilentFailure = (turn: (typeof sorted)[number]) =>
     turn.state !== 'completed' && !turn.assistantText && !turn.toolReceipt;
+  // Backfill what the collapse used to hide: the founder's own words, newest
+  // first, so a failed turn is never lost from view (2026-11-22, ×18).
+  const UNANSWERED_SHOWN = 5;
+  const unanswered = (turns: (typeof sorted)[number][]) => {
+    const asked = turns
+      .map(turn => turn.userText?.trim())
+      .filter((text): text is string => Boolean(text))
+      .reverse();
+    if (asked.length === 0) return [];
+    const shown = asked
+      .slice(0, UNANSWERED_SHOWN)
+      .map(
+        text => `- “${text.length > 140 ? `${text.slice(0, 139)}…` : text}”`
+      );
+    const rest = asked.length - shown.length;
+    return [[...shown, ...(rest > 0 ? [`- and ${rest} more`] : [])].join('\n')];
+  };
   const collapseSummary = (turns: (typeof sorted)[number][]) => {
     const counts = new Map<string, number>();
     for (const turn of turns) {
@@ -121,7 +138,17 @@ export async function GET() {
     return {
       id: `summer-history:failed:${first.turnIndex}-${last.turnIndex}`,
       role: 'assistant' as const,
-      content: `${turns.length} earlier Summer ${turns.length === 1 ? 'turn' : 'turns'} ended without a reply (${breakdown}). Nothing was recorded for ${turns.length === 1 ? 'it' : 'them'}; resend the message to retry.`,
+      content: (() => {
+        const head = `${turns.length} earlier Summer ${turns.length === 1 ? 'turn' : 'turns'} ended without a reply (${breakdown}).`;
+        const asked = unanswered(turns);
+        return asked.length === 0
+          ? `${head} Resend the message to retry.`
+          : [
+              `${head} Here is what you asked, newest first, so nothing is lost:`,
+              ...asked,
+              'Resend the message to retry any that still matter.',
+            ].join('\n\n');
+      })(),
       clientMessageId: null,
       createdAt: last.createdAt,
     };

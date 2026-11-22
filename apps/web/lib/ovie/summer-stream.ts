@@ -12,6 +12,7 @@ import {
   summerRetryMode,
 } from '@/lib/ovie/summer-failure';
 import type { SummerTurnEvent } from '@/lib/ovie/summer-transport';
+import { fileSummerTurnRepair } from '@/lib/ovie/summer-turn-repair';
 
 export async function createSummerAssistantStreamResponse(input: {
   readonly events: AsyncIterable<SummerTurnEvent>;
@@ -152,6 +153,14 @@ export async function createSummerAssistantStreamResponse(input: {
             hasVisibleContent,
           }
         ).catch(() => undefined);
+        // And never without a repair: open or refresh one Linear issue per hop.
+        void fileSummerTurnRepair({
+          hop,
+          state: failureState.state,
+          requestId: String(metadata.requestId ?? ''),
+          environment: process.env.VERCEL_ENV ?? 'local',
+          at: new Date(),
+        }).catch(() => undefined);
         if (!hasVisibleContent) {
           // Surface a real stream error, not a fake assistant reply: the chat
           // client restores the composer text and offers Retry, and no

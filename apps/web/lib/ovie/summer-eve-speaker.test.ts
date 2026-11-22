@@ -12,6 +12,7 @@ vi.mock('@/lib/ovie/summer-production-pin', () => ({
   SummerPinInvalidError: class SummerPinInvalidError extends Error {
     readonly code = 'summer_pin_invalid';
   },
+  logSummerBridgeEvent: vi.fn(),
 }));
 
 import { MemoryOperatingStore } from './mcp/store';
@@ -146,7 +147,9 @@ describe('Ovie speaks through durable Eve Summer', () => {
     }));
     const speaker = createEveSummerSpeaker(
       fetchShadow,
-      readCompanyState as never
+      readCompanyState as never,
+      undefined,
+      { now: () => Date.parse('2026-10-14T08:10:00.000Z') }
     );
     for await (const _event of speaker.speak(input)) {
       // Drain the complete turn.
@@ -159,6 +162,69 @@ describe('Ovie speaks through durable Eve Summer', () => {
       revision: 'r1',
       activeConstraint: 'funnel:onboarding_starts',
       cache: { hit: true, readPathUpstreamCalls: 0 },
+    });
+  });
+  it('never hands Summer a frozen company snapshot as current state', async () => {
+    // Staging never runs the refresh cron: Summer quoted a 2026-09-27 GitHub
+    // read as current on 2026-11-22.
+    const readCompanyState = vi.fn(async () => ({
+      snapshot: {
+        schema: 'jovie.summer-company-state/v1',
+        revision: 'r0',
+        generatedAt: '2026-09-27T02:38:00.000Z',
+      },
+      cache: { hit: true, readPathUpstreamCalls: 0 },
+    }));
+    const speaker = createEveSummerSpeaker(
+      fetchShadow,
+      readCompanyState as never,
+      undefined,
+      { now: () => Date.parse('2026-11-22T10:37:00.000Z') }
+    );
+    for await (const _event of speaker.speak(input)) {
+      // Drain the complete turn.
+    }
+    const posted = JSON.parse(
+      String(fetchShadow.mock.calls[0]?.[1]?.body)
+    ) as Record<string, unknown>;
+    expect(posted.companyState).toBeNull();
+  });
+  it('resends an admission that never reached Summer under the same event id', async () => {
+    fetchShadow
+      .mockReset()
+      .mockRejectedValueOnce(new Error('fetch failed'))
+      .mockResolvedValueOnce(new Response('bad gateway', { status: 502 }))
+      .mockResolvedValueOnce(
+        eveResponse({ ok: true, accepted: { eventId } }, { status: 202 })
+      )
+      .mockResolvedValueOnce(eveResponse({ ok: true, result }));
+    const speaker = createEveSummerSpeaker(fetchShadow, undefined, undefined, {
+      admissionAttempts: 3,
+      admissionRetryDelayMs: 0,
+    });
+    const events = [];
+    for await (const event of speaker.speak(input)) events.push(event);
+    const posts = fetchShadow.mock.calls.filter(
+      ([, init]) => init?.method === 'POST'
+    );
+    expect(posts).toHaveLength(3);
+    expect(new Set(posts.map(([, init]) => init?.body)).size).toBe(1);
+    expect(events.at(-1)).not.toMatchObject({ type: 'error' });
+  });
+  it('does not resend an admission Summer refused with a 4xx', async () => {
+    fetchShadow
+      .mockReset()
+      .mockResolvedValueOnce(new Response('forbidden', { status: 403 }));
+    const speaker = createEveSummerSpeaker(fetchShadow, undefined, undefined, {
+      admissionAttempts: 3,
+      admissionRetryDelayMs: 0,
+    });
+    const events = [];
+    for await (const event of speaker.speak(input)) events.push(event);
+    expect(fetchShadow).toHaveBeenCalledOnce();
+    expect(events.at(-1)).toMatchObject({
+      type: 'error',
+      hop: 'summer_unreachable',
     });
   });
   it('bounds the one-time legacy history import to Eve ingress limits', async () => {
