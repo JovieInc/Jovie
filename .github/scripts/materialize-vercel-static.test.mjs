@@ -17,6 +17,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
   dereferenceFunctionFileLinks,
+  isLfsPointerFile,
   materializeStatic,
 } from './materialize-vercel-static.mjs';
 import { artifactSnapshot } from './production-input-provenance.mjs';
@@ -53,9 +54,17 @@ test('real canonical public exports survive Vercel relocation and bind exact ima
     .filter(line => line.startsWith('120000 '))
     .map(line => line.split('\t')[1]);
   assert.ok(names.length >= 6);
+  // Catalog images are Git LFS files; a checkout that did not pull them holds
+  // pointers, which materializeStatic refuses. Stand in distinct bytes then.
+  const bytesOf = name => {
+    const data = readFileSync(resolve(repo, name));
+    return isLfsPointerFile(resolve(repo, name))
+      ? Buffer.from(`image bytes for ${name}`)
+      : data;
+  };
   for (const name of names) {
     const source = resolve(repo, name);
-    f.put(join(dirname(name), readlinkSync(source)), readFileSync(source));
+    f.put(join(dirname(name), readlinkSync(source)), bytesOf(name));
     f.link(name, readlinkSync(source));
     f.link(
       name.replace('apps/web/public', '.vercel/output/static'),
@@ -72,19 +81,38 @@ test('real canonical public exports survive Vercel relocation and bind exact ima
       false
     );
     assert.equal(lstatSync(resolve(f.root, name)).isSymbolicLink(), true);
-    assert.deepEqual(
-      readFileSync(resolve(f.root, outputName)),
-      readFileSync(resolve(repo, name))
-    );
+    assert.deepEqual(readFileSync(resolve(f.root, outputName)), bytesOf(name));
     assert.equal(
       receipt.files.find(file => file.path === outputName).sha256,
-      createHash('sha256')
-        .update(readFileSync(resolve(repo, name)))
-        .digest('hex')
+      createHash('sha256').update(bytesOf(name)).digest('hex')
     );
   }
   assert.equal(materializeStatic(f.root), 0);
   assert.deepEqual(artifactSnapshot(f.root), receipt);
+});
+
+test('refuses Git LFS pointers in the static output before any write', t => {
+  const f = fixture(t);
+  const pointer =
+    'version https://git-lfs.github.com/spec/v1\noid sha256:' +
+    'a'.repeat(64) +
+    '\nsize 1234\n';
+  f.put('apps/web/screenshot-catalog/current/image.png', pointer);
+  f.link(
+    'apps/web/public/product-screenshots/image.png',
+    '../../screenshot-catalog/current/image.png'
+  );
+  const output = f.link(
+    '.vercel/output/static/product-screenshots/image.png',
+    '../../screenshot-catalog/current/image.png'
+  );
+  assert.throws(
+    () => materializeStatic(f.root),
+    /Git LFS pointers.*screenshot-catalog\/current\/image\.png/
+  );
+  assert.equal(lstatSync(output).isSymbolicLink(), true);
+  f.put('.vercel/output/static/plain.png', pointer);
+  assert.throws(() => materializeStatic(f.root), /static\/plain\.png/);
 });
 
 for (const alteredLink of [false, true]) {

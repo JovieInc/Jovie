@@ -441,12 +441,12 @@ describe('Git LFS blobs in the tracked-bytes budget', () => {
           GIT_COMMITTER_EMAIL: 't@example.com',
         },
       });
-    const stage = (path, content) => {
+    const stage = (path, content, mode = '100644') => {
       const oid = git(
         ['hash-object', '-w', '--no-filters', '--stdin'],
         content
       ).trim();
-      git(['update-index', '--add', '--cacheinfo', `100644,${oid},${path}`]);
+      git(['update-index', '--add', '--cacheinfo', `${mode},${oid},${path}`]);
     };
     try {
       git(['init', '-q', '-b', 'main']);
@@ -460,7 +460,16 @@ describe('Git LFS blobs in the tracked-bytes budget', () => {
       stage(lfsPath, pointer(9_000));
       stage(plainPath, 'p'.repeat(2_000));
       stage('docs/other.png', 'o'.repeat(3_000));
-      const paths = ['.gitattributes', lfsPath, plainPath, 'docs/other.png'];
+      // LFS never filters a symlink, so a linked capture is not a plain blob.
+      const linkPath = `${SNAPSHOTS}/home.spec.ts/link.png`;
+      stage(linkPath, 'home.png', '120000');
+      const paths = [
+        '.gitattributes',
+        lfsPath,
+        plainPath,
+        linkPath,
+        'docs/other.png',
+      ];
 
       const staged = collectLfsBlobs({ paths, cwd: dir, staged: true });
       expect([...staged.keys()].sort()).toEqual([lfsPath, plainPath]);
@@ -478,9 +487,9 @@ describe('Git LFS blobs in the tracked-bytes budget', () => {
       expect(errors[0]).toContain(`git add --renormalize ${plainPath}`);
 
       git(['commit', '-qm', 'baselines']);
-      expect(collectLfsBlobs({ paths, cwd: dir }).get(lfsPath)?.pointer).toBe(
-        true
-      );
+      const committed = collectLfsBlobs({ paths, cwd: dir });
+      expect(committed.get(lfsPath)?.pointer).toBe(true);
+      expect(committed.has(linkPath)).toBe(false);
 
       // The snapshot budget keeps counting a baseline at its image size.
       git(['checkout', '-q', '--', '.']);
