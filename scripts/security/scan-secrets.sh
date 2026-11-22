@@ -370,6 +370,11 @@ run_trufflehog_git() {
   log="$(mktemp)"
   out="$(mktemp)"
   status=0
+  # trufflehog's `git clone file://` checks out a work tree, and the Git LFS
+  # smudge filter would try to download every LFS file (visual baselines)
+  # that this checkout never pulled, failing the clone. It scans history
+  # patches, where an LFS file is its pointer, so skip the smudge.
+  export GIT_LFS_SKIP_SMUDGE=1
   # shellcheck disable=SC2046
   "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) --no-update --json \
     >"$out" 2>"$log" || status=$?

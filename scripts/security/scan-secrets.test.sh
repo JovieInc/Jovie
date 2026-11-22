@@ -76,6 +76,7 @@ if [[ -f "$TRUFFLEHOG_COUNT" ]]; then
 fi
 count=$((count + 1))
 printf '%s\n' "$count" >"$TRUFFLEHOG_COUNT"
+printf '%s\n' "${GIT_LFS_SKIP_SMUDGE:-}" >"$TRUFFLEHOG_COUNT.lfs-skip-smudge"
 
 case "${SCAN_TEST_SCENARIO:-}" in
   corruption | repair-failure)
@@ -280,6 +281,8 @@ status="$(run_scenario finding)"
   || fail 'a real finding must not retry'
 [[ "$(grep -c '^fetch ' "$TEST_ROOT/finding.git-calls" || true)" -eq 0 ]] \
   || fail 'a real finding must not repair the checkout'
+[[ "$(cat "$TEST_ROOT/finding.trufflehog-count.lfs-skip-smudge")" == 1 ]] \
+  || fail 'git-mode trufflehog must skip the Git LFS smudge, or its clone fails on unpulled LFS files'
 
 status="$(run_scenario repair-failure)"
 [[ $status -ne 0 ]] || fail 'repair failure must remain nonzero'
