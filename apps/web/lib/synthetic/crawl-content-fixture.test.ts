@@ -59,7 +59,7 @@ describe('crawl content fixture', () => {
         ...CRAWL_CONTENT_FIXTURE,
         email: 'someone@gmail.com',
       })
-    ).toThrow(/harness address/);
+    ).toThrow(/harness address on jov.ie/);
     expect(() =>
       parseCrawlContentFixture({
         ...CRAWL_CONTENT_FIXTURE,

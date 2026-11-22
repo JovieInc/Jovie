@@ -75,7 +75,7 @@ export function parseCrawlContentFixture(input: unknown): CrawlContentFixture {
     problems.push('version must be a positive integer');
   }
   if (!/^browse-ready\+[a-z0-9-]+@jov\.ie$/u.test(fixture?.email ?? '')) {
-    problems.push('email must be a browse-ready+<tag>@jov.ie harness address');
+    problems.push('email must be a browse-ready+ harness address on jov.ie');
   }
   if (!SLUG_PATTERN.test(fixture?.handle ?? '')) {
     problems.push('handle must be a lowercase slug');
