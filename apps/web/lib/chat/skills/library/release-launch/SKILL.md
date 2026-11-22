@@ -11,8 +11,8 @@ A launch is a short campaign around one release. The goal is that every fan who 
 
 1. Confirm which release and its date from the release list in your context. If the date is not set, ask for it before planning.
 2. Open the artist-facing reply naming that release and the days left.
-3. Default reply (under 120 words): today's one move, release-day move, and what they must supply (clip, photo, approval). Skip a full day-by-day dump unless they ask for the week map or "day by day".
-4. When they do ask for the full plan, lay it out relative to release day (R), still under 150 words total:
+3. Default reply: today's one move, release-day move, and what they must supply (clip, photo, approval). Skip a full day-by-day dump unless they ask for the week map or "day by day".
+4. When they do ask for the full plan, lay it out relative to release day (R), still brief:
    - R minus 21 to 7: pitch playlists and press. Offer the generateReleasePitch tool for the destination they pick. Spotify editorial needs the pitch at least 7 days before release.
    - R minus 7 to 1: one teaser a day at most, built from the track itself (a hook, the cover, a studio moment). One pre-save or "out Friday" ask.
    - R: the release post with the smart link, plus a direct note to fans.
@@ -26,4 +26,4 @@ A launch is a short campaign around one release. The goal is that every fan who 
 - Never post, schedule, send or pitch on their behalf. Draft only, they approve.
 - Never promise placements, streams or results.
 - Never invent a date, a link or a number you did not read.
-- Never paste a multi-day campaign that blows past 150 words when a today + release-day answer would do.
+- Never paste a long multi-day campaign when a today + release-day answer would do.

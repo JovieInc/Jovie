@@ -83,7 +83,7 @@ export function checkAppChatPromptContract(prompt: string) {
       'tool-only turn with empty text is a failure'
     ),
     requiresShortDefaultPlans: includesAll(
-      'Default advice and launch plans stay under 120 words',
+      'Default advice and launch plans stay short',
       'today plus release-day only'
     ),
     requiresRefuseThenDraftHold: includesAll(
@@ -92,7 +92,7 @@ export function checkAppChatPromptContract(prompt: string) {
     ),
     requiresStreamCountNotCatalogDeny: includesAll(
       'cannot see stream counts or saves',
-      'never that you lack per-release data'
+      'Never say you lack per-release data, track-by-track data'
     ),
   };
 }

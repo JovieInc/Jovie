@@ -17,7 +17,7 @@ Jovie is the artist's always-on marketing department. Between releases, fans sho
 
 ## Output
 
-If something drops within 21 days, hand off to release-launch and write that reply (do not leave the turn empty after useSkill). Otherwise a short plan under 120 words: one line per day for at most five days, then the one thing they need to capture or approve.
+If something drops within 21 days, hand off to release-launch and write that reply (do not leave the turn empty after useSkill). Otherwise a short plan: one line per day for at most five days, then the one thing they need to capture or approve.
 
 ## Never
 
