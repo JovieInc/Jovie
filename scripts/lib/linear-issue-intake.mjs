@@ -80,6 +80,33 @@ export async function addLinearIssueComment({
   return { ok: true, id: result.data.commentCreate.comment?.id ?? null };
 }
 
+/** Add one label to a Linear issue; Linear keeps it once if it is already there. */
+export async function addLinearIssueLabel({
+  issueId,
+  labelId,
+  apiKey = process.env.LINEAR_API_KEY,
+  fetchImpl = fetch,
+}) {
+  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
+  if (!issueId || !labelId)
+    return { ok: false, reason: 'missing_label_target' };
+  const result = await linearGraphql(
+    {
+      query: `mutation AddLinearIssueLabel($id: String!, $labelId: String!) {
+      issueAddLabel(id: $id, labelId: $labelId) { success }
+    }`,
+      variables: { id: issueId, labelId },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_label_add'
+  );
+  if (!result.ok) return result;
+  return result.data?.issueAddLabel?.success
+    ? { ok: true }
+    : { ok: false, reason: 'linear_label_add_unsuccessful' };
+}
+
 /** Reopen a measurement finding in its owning team's triage state. */
 export async function reopenLinearIssue({
   issueId,

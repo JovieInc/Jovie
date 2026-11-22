@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
@@ -12,6 +13,7 @@ import {
 } from '../outcome-coverage.mjs';
 import {
   HUMAN_AFTER,
+  NEEDS_HUMAN_LABEL_ID,
   noteRecurrence,
   RECURRENCE_MARKER,
   recurrenceComment,
@@ -151,7 +153,9 @@ describe('noteRecurrence', () => {
       calls.push(body);
       const data = body.query.includes('ListLinearIssueComments')
         ? { issue: { comments: { nodes: existing } } }
-        : { commentCreate: { success: true, comment: { id: 'c-new' } } };
+        : body.query.includes('issueAddLabel')
+          ? { issueAddLabel: { success: true } }
+          : { commentCreate: { success: true, comment: { id: 'c-new' } } };
       return new Response(JSON.stringify({ data }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
@@ -199,10 +203,36 @@ describe('noteRecurrence', () => {
       action: 'recurred',
       count: HUMAN_AFTER,
       needsHuman: true,
+      paged: true,
     });
     const posted = calls.find(c => c.query.includes('commentCreate'));
     expect(posted.variables.body).toContain(`recurrence ${HUMAN_AFTER}`);
     expect(posted.variables.body).toContain('needs a human look');
+    const label = calls.find(c => c.query.includes('issueAddLabel'));
+    expect(label.variables).toEqual({
+      id: 'i1',
+      labelId: NEEDS_HUMAN_LABEL_ID,
+    });
+  });
+
+  it('keeps an early recurrence with the agents: no needs-human label', async () => {
+    const { calls, fetchImpl } = fakeLinear([]);
+    const out = await noteRecurrence(
+      { ok: true, action: 'updated', reopened: true, id: 'i1' },
+      { fingerprint: 'workflow-x', apiKey: 'k', fetchImpl }
+    );
+    expect(out).toMatchObject({ count: 1, needsHuman: false, paged: false });
+    expect(calls.some(c => c.query.includes('issueAddLabel'))).toBe(false);
+  });
+
+  it('pages with the same needs-human label the lanes use', () => {
+    const python = readFileSync(
+      resolve(repoRoot, 'scripts/lanes/remediation.py'),
+      'utf8'
+    );
+    expect(python).toContain(
+      `NEEDS_HUMAN_LABEL_ID = "${NEEDS_HUMAN_LABEL_ID}"`
+    );
   });
 
   it('writes the first recurrence without the human line', () => {

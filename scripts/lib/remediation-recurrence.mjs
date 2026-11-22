@@ -3,14 +3,19 @@
 // reopens a remediation issue that a green had resolved, the fix did not hold:
 // say so on the issue with a running count, so the next agent goes after the
 // root cause instead of repeating the last fix. From HUMAN_AFTER recurrences
-// on, the comment also says it needs a human look.
+// on, agent repairs have not held, so the comment says it needs a human look
+// and the issue gets the needs-human label, the one page Tim gets. Every other
+// failure stays with the agents.
 import {
   addLinearIssueComment,
+  addLinearIssueLabel,
   listLinearIssueComments,
 } from './linear-issue-intake.mjs';
 
 export const RECURRENCE_MARKER = '<!-- remediation-recurred -->';
 export const HUMAN_AFTER = 3;
+// Same label as NEEDS_HUMAN_LABEL_ID in scripts/lanes/remediation.py.
+export const NEEDS_HUMAN_LABEL_ID = 'ccf5eaaa-8705-49f0-b264-ec3558d678b7';
 
 /** @param {{body: string}[]} comments */
 export function recurrenceCount(comments) {
@@ -28,7 +33,7 @@ export function recurrenceComment({ count, fingerprint, runUrl }) {
   ];
   if (count >= HUMAN_AFTER) {
     lines.push(
-      `It has come back ${count} times, so it needs a human look if this repair does not hold either.`
+      `It has come back ${count} times and agent repairs have not held, so it needs a human look.`
     );
   }
   lines.push('', `Run: ${runUrl || '(run url unavailable)'}`);
@@ -57,10 +62,16 @@ export async function noteRecurrence(result, context) {
     fetchImpl,
   });
   if (!posted.ok) return { ...posted, action: 'recurrence_unrecorded' };
-  return {
-    ok: true,
-    action: 'recurred',
-    count,
-    needsHuman: count >= HUMAN_AFTER,
-  };
+  const needsHuman = count >= HUMAN_AFTER;
+  const paged = needsHuman
+    ? (
+        await addLinearIssueLabel({
+          issueId: result.id,
+          labelId: NEEDS_HUMAN_LABEL_ID,
+          apiKey,
+          fetchImpl,
+        })
+      ).ok
+    : false;
+  return { ok: true, action: 'recurred', count, needsHuman, paged };
 }
