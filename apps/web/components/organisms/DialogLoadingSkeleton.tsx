@@ -1,10 +1,7 @@
 'use client';
 
 import { Skeleton } from '@jovie/ui';
-import { DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { Dialog, DialogBody } from '@/components/organisms/Dialog';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
-import { cn } from '@/lib/utils';
 
 export interface DialogLoadingSkeletonProps {
   readonly open: boolean;
@@ -32,10 +29,7 @@ export function DialogLoadingSkeleton({
       <DialogBody className='space-y-4'>
         <Skeleton className='h-4 w-80 max-w-full' />
 
-        <div
-          className={cn(LINEAR_SURFACE.dialogCard, 'px-3 py-3')}
-          data-testid='dialog-loading-search-card'
-        >
+        <div className='px-3 py-3' data-testid='dialog-loading-search'>
           <div className='flex items-center gap-3'>
             <Skeleton className='h-6 w-6' rounded='full' />
             <Skeleton className='h-4 flex-1' />
@@ -43,16 +37,12 @@ export function DialogLoadingSkeleton({
           </div>
         </div>
 
-        <div
-          className={cn(LINEAR_SURFACE.dialogCard, 'p-2.5')}
-          data-testid='dialog-loading-results-card'
-        >
+        <div className='p-2.5' data-testid='dialog-loading-results'>
           <div className='space-y-1.5'>
             {rowIds.map(rowId => (
-              <DrawerSurfaceCard
+              <div
                 key={rowId}
-                variant='card'
-                className='flex min-h-14 items-center gap-3 rounded-xl border border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,var(--linear-bg-surface-0))] px-2.5'
+                className='flex min-h-14 items-center gap-3 px-2.5'
               >
                 <Skeleton className='h-10 w-10 shrink-0' rounded='full' />
                 <div className='min-w-0 flex-1 space-y-1.5'>
@@ -60,7 +50,7 @@ export function DialogLoadingSkeleton({
                   <Skeleton className='h-2.5 w-20' />
                 </div>
                 <Skeleton className='h-4 w-4 shrink-0' rounded='full' />
-              </DrawerSurfaceCard>
+              </div>
             ))}
           </div>
         </div>

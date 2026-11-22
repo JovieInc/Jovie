@@ -2,6 +2,7 @@ import { render, within } from '@testing-library/react';
 import { Eye } from 'lucide-react';
 import { expect, it } from 'vitest';
 import { ContentMetricCard } from './ContentMetricCard';
+import { expectFlatState } from '@/tests/utils/flat-state';
 import { ContentMetricCardSkeleton } from './ContentMetricCardSkeleton';
 
 it.each([
@@ -23,7 +24,9 @@ it.each([
   );
   const [loaded, loading] = Array.from(container.children);
   expect(loaded).toHaveClass('p-4');
-  expect(loading.className).toBe(loaded.className);
+  // The loading state keeps the loaded frame geometry but never the card.
+  expect(loading).toHaveClass('p-4', 'border', 'border-transparent');
+  expectFlatState(loading);
   expect(loading).toHaveAttribute('aria-hidden', 'true');
   const placeholders = Array.from(loading.querySelectorAll('.skeleton'));
   const content = within(loaded as HTMLElement);

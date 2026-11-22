@@ -2,7 +2,6 @@
 
 import { LoadingSkeleton, Skeleton } from '@jovie/ui';
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 const PLAN_CARD_SKELETONS = [
   { key: 'free', titleWidth: 'w-24', descriptionWidth: 'w-36' },
@@ -18,7 +17,7 @@ export function BillingLoadingSkeleton() {
         <Skeleton className='h-5 w-80' rounded='sm' />
       </div>
 
-      <ContentSurfaceCard className='px-3 py-3'>
+      <div className='px-3 py-3'>
         <div className='flex items-start gap-3.5'>
           <Skeleton className='h-11 w-11 shrink-0 rounded-lg' />
           <div className='min-w-0 flex-1 space-y-2'>
@@ -27,11 +26,11 @@ export function BillingLoadingSkeleton() {
           </div>
           <Skeleton className='h-8 w-32' rounded='md' />
         </div>
-      </ContentSurfaceCard>
+      </div>
 
       <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
         {PLAN_CARD_SKELETONS.map(card => (
-          <ContentSurfaceCard key={card.key} className='overflow-hidden p-0'>
+          <div key={card.key} className='overflow-hidden'>
             <ContentSectionHeaderSkeleton
               titleWidth={card.titleWidth}
               descriptionWidth={card.descriptionWidth}
@@ -43,11 +42,11 @@ export function BillingLoadingSkeleton() {
               <div className='h-px bg-(--app-shell-frame-seam)' />
               <LoadingSkeleton lines={5} height='h-4' rounded='md' />
             </div>
-          </ContentSurfaceCard>
+          </div>
         ))}
       </div>
 
-      <ContentSurfaceCard className='overflow-hidden p-0'>
+      <div className='overflow-hidden'>
         <ContentSectionHeaderSkeleton
           titleWidth='w-36'
           descriptionWidth='w-56'
@@ -57,9 +56,9 @@ export function BillingLoadingSkeleton() {
           <Skeleton className='h-8 w-40' rounded='md' />
           <Skeleton className='h-8 w-40' rounded='md' />
         </div>
-      </ContentSurfaceCard>
+      </div>
 
-      <ContentSurfaceCard className='overflow-hidden p-0'>
+      <div className='overflow-hidden'>
         <ContentSectionHeaderSkeleton
           titleWidth='w-32'
           descriptionWidth='w-52'
@@ -68,7 +67,7 @@ export function BillingLoadingSkeleton() {
         <div className='px-3 py-3'>
           <LoadingSkeleton lines={3} height='h-14' rounded='md' />
         </div>
-      </ContentSurfaceCard>
+      </div>
     </div>
   );
 }

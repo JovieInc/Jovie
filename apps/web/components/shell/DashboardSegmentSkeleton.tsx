@@ -40,7 +40,7 @@ function DefaultSkeleton({ rowKeyPrefix }: { readonly rowKeyPrefix: string }) {
         <Skeleton className='h-8 w-24' rounded='md' />
       </div>
 
-      <div className='space-y-3 rounded-xl border border-subtle/70 bg-surface-0 p-3'>
+      <div className='space-y-3 p-3'>
         <div className='grid grid-cols-[minmax(0,1.5fr)_120px_72px] gap-3 border-b border-subtle/60 pb-2'>
           <Skeleton className='h-3 w-24' />
           <Skeleton className='h-3 w-16' />
@@ -144,7 +144,7 @@ function TourSkeleton() {
   return (
     <div className='flex h-full min-h-0 flex-col' data-skeleton-layout='tour'>
       <div
-        className='flex h-11 shrink-0 items-center justify-between border-b border-subtle bg-surface-1 px-4'
+        className='flex h-11 shrink-0 items-center justify-between border-b border-subtle px-4'
         data-skeleton-slot='tour-status'
       >
         <div className='flex items-center gap-2'>

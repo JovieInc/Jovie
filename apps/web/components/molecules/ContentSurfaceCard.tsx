@@ -1,4 +1,4 @@
-import { Card } from '@jovie/ui';
+import { Card, type CardIntent } from '@jovie/ui';
 import { cva, type VariantProps } from 'class-variance-authority';
 import {
   type ComponentPropsWithoutRef,
@@ -31,19 +31,22 @@ export interface ContentSurfaceCardProps
     VariantProps<typeof contentSurfaceCardVariants> {
   readonly children?: ComponentPropsWithoutRef<'div'>['children'];
   readonly as?: ElementType;
+  /** Why this box is a card. See "Card intent" in .claude/rules/ui.md. */
+  readonly intent?: CardIntent;
 }
 
 export const ContentSurfaceCard = forwardRef<
   HTMLElement,
   ContentSurfaceCardProps
 >(function ContentSurfaceCard(
-  { children, as: Component = 'div', surface, className, ...props },
+  { children, as: Component = 'div', surface, intent, className, ...props },
   ref
 ) {
   return (
     <Card
       asChild
       unstyled
+      intent={intent}
       className={cn(contentSurfaceCardVariants({ surface }), className)}
     >
       <Component ref={ref} {...props}>
