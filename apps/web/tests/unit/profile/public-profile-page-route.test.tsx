@@ -205,10 +205,6 @@ vi.mock('@/features/tracking/SignupFunnelBeacon', () => ({
 vi.mock('@/features/profile/ProfileAeoContent', () => ({
   ProfileAeoContent: () => createElement('noscript', null, 'aeo-content'),
 }));
-vi.mock('@/features/profile/ProfileAeoProofClaimCard', () => ({
-  ProfileAeoProofClaimCard: () =>
-    createElement('noscript', null, 'aeo-proof-card'),
-}));
 vi.mock('@/app/[username]/_components/PublicClaimBanner', () => ({
   PublicClaimBanner: () => createElement('noscript', null, 'claim-banner'),
 }));

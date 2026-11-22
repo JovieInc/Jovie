@@ -795,56 +795,12 @@
   --color-text-tertiary-token: var(--color-text-tertiary-on-light);
 }
 
-:where(.profile-aeo-claim-card) {
-  --profile-aeo-claim-ink: var(--system-b-cinematic-black);
-  --color-text-tertiary-token: var(--color-text-tertiary-on-light);
-  background: var(--color-bg-paper);
-  border-color: color-mix(
-    in oklab,
-    var(--profile-aeo-claim-ink) 14%,
-    transparent
-  );
-  box-shadow:
-    0 22px 64px rgba(0, 0, 0, 0.24),
-    inset 0 1px 0 rgba(255, 255, 255, 0.82);
-  color: var(--profile-aeo-claim-ink);
-}
-
-:where(.profile-aeo-claim-card__heading) {
-  font-size: clamp(3.75rem, 10vw, 7.5rem);
-  letter-spacing: -0.07em;
-  line-height: 0.8;
-  white-space: nowrap;
-}
-
-:where(.profile-aeo-claim-card__domain) {
-  color: color-mix(in oklab, var(--profile-aeo-claim-ink) 48%, transparent);
-}
-
-:where(.profile-aeo-claim-card__note) {
-  color: color-mix(in oklab, var(--profile-aeo-claim-ink) 66%, transparent);
-}
-
-:where(.profile-aeo-claim-card__cta) {
-  background: var(--profile-aeo-claim-ink);
-  color: var(--color-bg-paper);
-}
-
 /* JOV-3209: hide the consent card while a profile mobile flow is open. */
 html[data-profile-flow-open="true"] .cookie-banner-card {
   visibility: hidden;
   pointer-events: none;
 }
 
-@media (hover: hover) {
-  :where(.profile-aeo-claim-card__cta:hover) {
-    background: color-mix(
-      in oklab,
-      var(--profile-aeo-claim-ink) 86%,
-      transparent
-    );
-  }
-}
 
 /* Mobile public profiles are a fixed one-screen shell. Keep the AEO copy in the
    static DOM, but out of mobile layout so it cannot add page scroll below the
