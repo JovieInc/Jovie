@@ -90,3 +90,31 @@ export function gateAssistantReply(
   const { ok, violations } = lintVoice(repaired);
   return { text: ok ? repaired : ASSISTANT_REPLY_FALLBACK, violations };
 }
+
+/**
+ * Text the completed assistant reply the artist / live helpfulness eval
+ * should score (ASS-95). Blank model text becomes the draft-hold fallback so
+ * tool-only and silent-refuse turns are never scored as `reply.text: ''`.
+ * Copy-floor violations keep the raw text + `persistedAsFallback` so scoring
+ * still fail-closes on floor breaks (JOV-6616).
+ */
+export function surfaceCompletedAssistantReply(
+  text: string,
+  context?: { readonly artistRules?: readonly EnforcedArtistRule[] }
+): {
+  readonly text: string;
+  readonly persistedAsFallback?: true;
+  readonly violations: readonly VoiceLintViolation[];
+} {
+  const gated = gateAssistantReply(text, context);
+  const copyFloorSwapped =
+    text.trim().length > 0 && gated.text === ASSISTANT_REPLY_FALLBACK;
+  if (copyFloorSwapped) {
+    return {
+      text,
+      persistedAsFallback: true,
+      violations: gated.violations,
+    };
+  }
+  return { text: gated.text, violations: gated.violations };
+}

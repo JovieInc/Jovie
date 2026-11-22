@@ -40,11 +40,7 @@ import {
   joinSystemPromptParts,
 } from '@/lib/chat/system-prompt';
 import { resolveChatToolStepLimit } from '@/lib/chat/tool-step-limit';
-import {
-  ASSISTANT_REPLY_FALLBACK,
-  EMPTY_ASSISTANT_REPLY_FALLBACK,
-  gateAssistantReply,
-} from '@/lib/chat/voice-lint';
+import { surfaceCompletedAssistantReply } from '@/lib/chat/voice-lint';
 import { HELPFULNESS_CASES, type HelpfulnessCase } from './cases';
 import { buildEvalToolSpecs } from './eval-tools';
 import { buildFixture } from './fixtures';
@@ -226,20 +222,15 @@ async function askJovie(
     }
   }
 
-  // Mirror the production persist gate (app/api/chat/route.ts onFinish).
-  // Copy-floor swaps keep the raw text for scoring + persistedAsFallback.
-  // Empty swaps keep raw '' so hermetic/live non_empty still fail-closed
-  // (ASS-95); production persist uses EMPTY_ASSISTANT_REPLY_FALLBACK.
-  const gated = gateAssistantReply(text);
-  const copyFloorSwapped =
-    text.trim().length > 0 && gated.text === ASSISTANT_REPLY_FALLBACK;
-  const emptySwapped =
-    !text.trim() && gated.text === EMPTY_ASSISTANT_REPLY_FALLBACK;
+  // Mirror production: blank model text surfaces the draft-hold fallback so
+  // live CI-subset never scores tool-only / silent-refuse as reply.text ''.
+  // Copy-floor swaps keep raw text + persistedAsFallback (JOV-6616).
+  const surfaced = surfaceCompletedAssistantReply(text);
   return {
     reply: {
-      text: copyFloorSwapped || emptySwapped ? text : gated.text,
+      text: surfaced.text,
       toolCalls,
-      persistedAsFallback: copyFloorSwapped || undefined,
+      persistedAsFallback: surfaced.persistedAsFallback,
     },
     usage,
     ms: Date.now() - started,

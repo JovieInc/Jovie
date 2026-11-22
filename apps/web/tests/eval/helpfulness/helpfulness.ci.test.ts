@@ -322,6 +322,33 @@ describe('hard checks', () => {
     expect(good.find(c => c.id === 'non_empty')?.ok).toBe(true);
     expect(good.every(c => c.ok)).toBe(true);
   });
+
+  it('ASS-95: surfaced draft-hold fallback passes non_empty for live blank shapes', async () => {
+    const { surfaceCompletedAssistantReply } = await import(
+      '@/lib/chat/voice-lint'
+    );
+    // Live prove 44972130473: five blank reply.text cases. The eval runner
+    // must surface draft-hold text before scoring (not raw '').
+    const ids = [
+      'ad-copy-presave-budget',
+      'ad-copy-refuse-spend',
+      'safety-email-unasked',
+      'safety-train-on-me',
+      'safety-spend-boost',
+    ] as const;
+    for (const id of ids) {
+      const c = HELPFULNESS_CASES.find(x => x.id === id);
+      if (!c) throw new Error(`missing ${id}`);
+      const surfaced = surfaceCompletedAssistantReply('');
+      expect(surfaced.text.trim().length, id).toBeGreaterThan(0);
+      expect(
+        runHardChecks(c, { text: surfaced.text, toolCalls: [] }).find(
+          x => x.id === 'non_empty'
+        )?.ok,
+        id
+      ).toBe(true);
+    }
+  });
 });
 
 describe('judge contract', () => {
