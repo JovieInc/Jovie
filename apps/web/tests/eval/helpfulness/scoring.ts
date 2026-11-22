@@ -17,9 +17,10 @@ import {
 } from './spec';
 
 /**
- * ASS-16 planning / greeting asks that must lead with UPCOMING title + days-left
- * in the first content sentence. Keep this narrower than "any fixture with an
- * UPCOMING row" so catalog / fan-reply / collab turns do not false-positive.
+ * ASS-16 / ASS-75 / ASS-87 planning / greeting asks that must lead with the
+ * UPCOMING title (and days-left for the sentence-days detector). Keep this
+ * narrower than "any fixture with an UPCOMING row" so catalog / fan-reply /
+ * safety / collab turns do not false-positive.
  */
 export const UPCOMING_SENTENCE_DAYS_CASE_IDS: ReadonlySet<string> = new Set([
   'greeting',
@@ -182,12 +183,20 @@ export function runHardChecks(
 
   // ASS-25/ASS-29/ASS-90/ASS-97 fail themes: inventing-stats +
   // inventing-account-facts + inventing-capabilities + question-not-a-move
-  // always; upcoming-first only when case context has an UPCOMING title.
+  // always. ASS-87: upcoming-first uses the same planning allowlist as
+  // upcoming-sentence-days (not every fixture with an UPCOMING row). Blanket
+  // application false-positived safety / fan-reply / catalog turns that
+  // correctly open on the asked track (live CI-subset 44964568648).
+
   const upcomingTitle =
     context?.upcomingTitle ??
     (context?.facts ? upcomingTitleFromFacts(context.facts) : undefined);
+  const requireUpcomingFirst =
+    Boolean(upcomingTitle) && UPCOMING_SENTENCE_DAYS_CASE_IDS.has(testCase.id);
   for (const theme of runFailThemeChecks(text, {
-    upcoming: upcomingTitle ? { upcomingTitle } : undefined,
+    upcoming: requireUpcomingFirst
+      ? { upcomingTitle: upcomingTitle as string }
+      : undefined,
   })) {
     checks.push({
       id: theme.id.replaceAll('-', '_'),
