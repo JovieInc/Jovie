@@ -50,7 +50,7 @@ export function HeroSpotifyResults({
   return (
     <div
       className={cn(
-        'absolute top-full left-0 z-50 w-full mt-2 rounded-xl border border-default overflow-hidden bg-surface-0 shadow-lg',
+        'absolute top-full left-0 z-popover w-full mt-2 rounded-xl border border-default overflow-hidden bg-surface-0 shadow-lg',
         isEditorial && 'homepage-name-search__results text-left'
       )}
     >

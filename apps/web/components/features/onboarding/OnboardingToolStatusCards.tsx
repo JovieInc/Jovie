@@ -172,7 +172,7 @@ export function OnboardingHandleCheckCard({
       ? 'is being checked'
       : available
         ? 'is available'
-        : 'is not available';
+        : 'is taken';
   const helper =
     error ??
     (available === false

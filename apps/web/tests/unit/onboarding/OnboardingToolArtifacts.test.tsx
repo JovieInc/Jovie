@@ -320,7 +320,7 @@ describe('onboarding tool artifacts', () => {
       />
     );
 
-    expect(screen.getByText('is not available')).toBeDefined();
+    expect(screen.getByText('is taken')).toBeDefined();
     // A taken name offers one way forward, not a disabled confirm.
     expect(screen.queryByTestId('onboarding-confirm-handle')).toBeNull();
     expect(screen.getByRole('button', { name: 'Change Handle' })).toBeDefined();
