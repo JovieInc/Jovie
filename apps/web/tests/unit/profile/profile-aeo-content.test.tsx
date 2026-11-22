@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { projectStructuredReleaseCollaborators } from '@/lib/discography/artist-queries/artist-search';
 import type { PublicMerchCard } from '@/lib/merch/types';

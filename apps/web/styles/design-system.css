@@ -801,7 +801,6 @@ html[data-profile-flow-open="true"] .cookie-banner-card {
   pointer-events: none;
 }
 
-
 /* Mobile public profiles are a fixed one-screen shell. Keep the AEO copy in the
    static DOM, but out of mobile layout so it cannot add page scroll below the
    compact profile. Desktop keeps the readable AEO section. */
