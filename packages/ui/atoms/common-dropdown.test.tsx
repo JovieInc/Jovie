@@ -369,7 +369,9 @@ describe('CommonDropdown', () => {
         .closest('[role="menuitem"]');
 
       expect(item).toHaveAttribute('data-selected', 'true');
-      expect(item?.className).toContain('data-[selected=true]:bg-surface-menu-selected');
+      expect(item?.className).toContain(
+        'data-[selected=true]:bg-surface-menu-selected'
+      );
     });
 
     it('renders danger state as a destructive item variant', () => {
