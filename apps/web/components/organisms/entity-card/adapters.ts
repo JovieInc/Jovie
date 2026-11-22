@@ -1,14 +1,9 @@
 import { COPY_FALLBACKS } from '@/data/copyFallbacks';
-import {
-  buildAiVisibilityMeasurement,
-  requireMeasuredAiVisibilityMetric,
-} from '@/lib/aeo/visibility-measurement';
 import { formatEventDateParts } from '@/lib/events/date';
 import { getMerchPriceDisplay } from '@/lib/merch/pricing';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { TicketStatus, TourDateViewModel } from '@/lib/tour-dates/types';
 import { formatLocationString } from '@/lib/utils/string-utils';
-import type { AiCrawlerAnalyticsResponse } from '@/types/ai-crawler-analytics';
 import { KIND_PRESETS } from './kind-presets';
 import type {
   EntityAccent,
@@ -525,70 +520,6 @@ export function tourDateToEntityCard(
       canBuyTickets && !isCancelled
         ? { label: 'Add To Calendar', href: null }
         : null,
-  };
-}
-
-/** AI crawler analytics summary → dashboard entity card model. */
-export function aiCrawlerAnalyticsToEntityCard(
-  analytics: Pick<
-    AiCrawlerAnalyticsResponse,
-    'totalRequests' | 'weeklyRequests' | 'crawlers' | 'isTeaser'
-  >,
-  options: Readonly<{ onOpenDetail?: () => void }> = {}
-): EntityCardModel {
-  const preset = KIND_PRESETS.ai;
-  const measurement = buildAiVisibilityMeasurement({
-    observed: {
-      crawlerReads: analytics.totalRequests,
-      weeklyCrawlerReads: analytics.weeklyRequests,
-    },
-  });
-  const reads = requireMeasuredAiVisibilityMetric(
-    measurement,
-    'crawler_reads',
-    'observed_visibility'
-  );
-  const weekly = requireMeasuredAiVisibilityMetric(
-    measurement,
-    'weekly_crawler_reads',
-    'observed_visibility'
-  );
-  const readCount = typeof reads.value === 'number' ? reads.value : 0;
-  const weeklyCount = typeof weekly.value === 'number' ? weekly.value : 0;
-  const topCrawler = analytics.crawlers[0]?.name;
-  const detail =
-    readCount > 0
-      ? analytics.crawlers.length > 1
-        ? `${analytics.crawlers.length} services tracked`
-        : (topCrawler ?? 'Last 30 days')
-      : 'Waiting for first AI crawl';
-
-  return {
-    id: 'ai-crawler-intelligence',
-    kind: 'ai',
-    accent: preset.accent,
-    eyebrow: preset.eyebrow,
-    title: `${readCount.toLocaleString()} reads`,
-    meta: detail,
-    secondaryMeta:
-      weeklyCount > 0
-        ? `${weeklyCount.toLocaleString()} this week`
-        : 'Last 30 days',
-    status:
-      readCount > 0
-        ? { label: 'Active', tone: 'live' }
-        : { label: 'Collecting', tone: 'neutral' },
-    cta: analytics.isTeaser
-      ? { label: 'Upgrade To Pro', href: null, disabled: true }
-      : {
-          label: preset.ctaLabel,
-          href: null,
-          onClick: options.onOpenDetail
-            ? () => options.onOpenDetail?.()
-            : undefined,
-        },
-    interactive: true,
-    imageAlt: 'AI crawler analytics',
   };
 }
 

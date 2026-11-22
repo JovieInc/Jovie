@@ -85,8 +85,9 @@ export const isDesignCheck = (/** @type {{ id: string }} */ c) =>
  * How many surfaces pass the functional walk and how many pass Pen design,
  * so a run that is red only on design still shows a working Golden Path,
  * and a functional regression is not hidden inside an already-red verdict.
- * Certification itself still needs both.
- * @param {{ surface: string, checks?: { id: string, status: string }[] }[]} receipts
+ * Certification itself still needs both. A step carried forward, or already
+ * certified on this SHA, passed both on the run that exercised it (JOV-14402).
+ * @param {{ surface: string, status?: string, carriedFrom?: unknown, alreadyCertified?: boolean, checks?: { id: string, status: string }[] }[]} receipts
  * @param {readonly string[]} surfaceOrder
  */
 export function verdictSplit(receipts, surfaceOrder) {
@@ -96,7 +97,13 @@ export function verdictSplit(receipts, surfaceOrder) {
   const functional = [];
   const design = [];
   for (const s of surfaceOrder) {
-    const checks = bySurface.get(s)?.checks ?? [];
+    const r = bySurface.get(s);
+    if (r?.status === 'passed' && (r.carriedFrom || r.alreadyCertified)) {
+      functional.push(s);
+      design.push(s);
+      continue;
+    }
+    const checks = r?.checks ?? [];
     if (green(checks.filter(c => !isDesignCheck(c)))) functional.push(s);
     if (green(checks.filter(isDesignCheck))) design.push(s);
   }
