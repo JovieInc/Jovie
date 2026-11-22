@@ -1,7 +1,7 @@
 /**
  * Open-PR listing for the Summer no-stall sweep.
  *
- * One `gh pr list` that asks for statusCheckRollup on 100 PRs at once times
+ * One open-PR list query that asks for statusCheckRollup on 100 PRs at once times
  * out at GitHub's GraphQL gateway (504) and capped the sweep at 100 PRs. The
  * list call now carries only light fields with no 100 cap, and the rollup is
  * read per PR, only where the classifier needs it. A failed rollup read
