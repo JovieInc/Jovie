@@ -48,13 +48,21 @@ const parsedCi = parseYaml(ci) as {
 describe('JOV-6572 canonical artist-site certification workflow', () => {
   it('runs the exact approved profile and outbound journey on the daily lane', () => {
     const command = packageJson.scripts['test:e2e:golden-path:ci'];
+    const surfaces = packageJson.scripts['test:e2e:golden-path:surfaces'];
+    // Auth/billing JOURNEY_OUTCOME is claim + welcome + golden-path only.
     expect(command).toContain('claim-prebuilt.smoke.spec.ts');
     expect(command).toContain('golden-path-home-welcome.spec.ts');
     expect(command).toContain('golden-path.spec.ts');
-    expect(command).toContain('start-entry-continuity.spec.ts');
-    expect(command).toContain('entry-first-html-visual.spec.ts');
+    expect(command).not.toContain('start-entry-continuity.spec.ts');
+    expect(command).not.toContain('entry-first-html-visual.spec.ts');
     expect(command).toContain('GOLDEN_PATH_REQUIRED=1');
     expect(command).not.toContain('money-path-persistence.spec.ts');
+    // Layout/visual surfaces stay in CI but never rewrite JOURNEY_OUTCOME.
+    expect(surfaces).toContain('start-entry-continuity.spec.ts');
+    expect(surfaces).toContain('entry-first-html-visual.spec.ts');
+    expect(ci).toContain('test:e2e:golden-path:surfaces');
+    expect(ci).toContain('JOURNEY_EXIT=$?');
+    expect(ci).toContain('exit "$JOURNEY_EXIT"');
     expect(ci).toContain('Seed required premade profile claim fixture');
     expect(ci).toContain('pnpm --filter=@jovie/web run seed:test-data');
     expect(cronGapMinutes(workflowTriggers(nightly)).max).toBeLessThanOrEqual(

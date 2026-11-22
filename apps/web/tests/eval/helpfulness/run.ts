@@ -72,6 +72,7 @@ import {
   WORKERS_AI_CHEAP_JUDGE,
   WORKERS_AI_STRONG_JUDGE,
   WORKERS_AI_SUBJECT_MODEL,
+  withCheapJudgeFallback,
   workersAiChat,
 } from './workers-ai';
 
@@ -255,12 +256,23 @@ async function judge(
   prompt: string
 ): Promise<JudgeVerdict | null> {
   if (!model) return null;
-  const result = await chat({
+  // Prefer gpt-oss; one-shot deepseek-v4.1-flash when live relay allowlist
+  // still rejects it (ASS-88 / undeployed ASS-17).
+  const result = await withCheapJudgeFallback(
     model,
-    messages: [{ role: 'user', content: prompt }],
-    // Reasoning judges spend most of the budget thinking before the JSON.
-    maxTokens: 16_000,
-  });
+    m =>
+      chat({
+        model: m,
+        messages: [{ role: 'user', content: prompt }],
+        // Reasoning judges spend most of the budget thinking before the JSON.
+        maxTokens: 16_000,
+      }),
+    fallback => {
+      process.stderr.write(
+        `cheap judge allowlist miss for ${model}; falling back to ${fallback}\n`
+      );
+    }
+  );
   const verdict = parseJudgeVerdict(result.message.content ?? '');
   if (!verdict) {
     throw new Error(

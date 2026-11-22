@@ -1,7 +1,9 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import * as React from 'react';
 import { getPlatformIconMetadata } from '@/components/atoms/SocialIcon';
+import { NEUTRAL_BRAND_FALLBACK_HEX } from '@/constants/platforms/brand-colors';
 import {
   CollapsedContent,
   ExpandedContent,
@@ -99,7 +101,8 @@ export const PlatformPill = React.forwardRef<HTMLElement, PlatformPillProps>(
     );
 
     const brandHex = React.useMemo(
-      () => (iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280'),
+      () =>
+        iconMeta?.hex ? `#${iconMeta.hex}` : `#${NEUTRAL_BRAND_FALLBACK_HEX}`,
       [iconMeta]
     );
 
@@ -173,9 +176,8 @@ export const PlatformPill = React.forwardRef<HTMLElement, PlatformPillProps>(
 
     if (isInteractive) {
       return (
-        <button
+        <PlainButton
           ref={ref as React.Ref<HTMLButtonElement>}
-          type='button'
           onClick={onClick}
           title={getPillTitle(collapsed, platformName, primaryText)}
           className={pillClassName}
@@ -187,7 +189,7 @@ export const PlatformPill = React.forwardRef<HTMLElement, PlatformPillProps>(
             <span className='sr-only'>Select {platformName}: </span>
           )}
           {pillContent}
-        </button>
+        </PlainButton>
       );
     }
 

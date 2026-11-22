@@ -1,7 +1,7 @@
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# capability-gap: soft-skips without WORKERS_AI_TOKEN; inject ASSISTANTS_CHAT_TTFT_SAMPLES_MS.
-# removal-trigger: Remove when Assistants lane records live TTFT for test account.
+# capability-gap: soft-skips without WORKERS_AI_TOKEN or when live relay probe fails safely; inject ASSISTANTS_CHAT_TTFT_SAMPLES_MS for harness-only CI.
+# removal-trigger: Remove when Assistants lane owns scheduled live TTFT for the test account.
 name: Chat first-token sample
 on:
   workflow_dispatch:
