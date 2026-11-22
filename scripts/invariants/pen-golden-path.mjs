@@ -40,6 +40,7 @@ import {
 } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { applyAccepted, loadAccepted } from '../design/pen-accepted.mjs';
 import { validateManifest } from './pen-still-diff.mjs';
 
 // 0.3.10 rejects .pen format 2.21; 0.3.14 exports it (lead session, 2026-11-08).
@@ -231,7 +232,15 @@ const defaultRun = (cmd, args, opts = {}) =>
  * call downloads again, so the key always describes what this call exports.
  * @param {{ out: string, env: NodeJS.ProcessEnv, run: typeof defaultRun, fetchImpl: typeof fetch }} options
  */
-async function fetchPenSource({ out, env, run, fetchImpl }) {
+async function fetchPenSource({
+  out,
+  env,
+  run,
+  fetchImpl,
+  accepted,
+  penName,
+  log,
+}) {
   const work = join(out, 'workspace');
   rmSync(work, { recursive: true, force: true });
   mkdirSync(work, { recursive: true });
@@ -243,7 +252,26 @@ async function fetchPenSource({ out, env, run, fetchImpl }) {
   const download = join(work, isArchive ? 'workspace.tar.gz' : 'src.pen');
   writeFileSync(download, bytes);
   if (isArchive) run('tar', ['-xzf', download, '-C', work]);
-  return { work, download, isArchive, contentSha256: sha256(bytes) };
+  if (!accepted.length)
+    return { work, download, isArchive, contentSha256: sha256(bytes) };
+  // Approved drafts the canonical lacks are spliced in (pen-accepted.mjs);
+  // the key covers them, so a new or changed overlay never hits old PNGs.
+  const pen = isArchive ? locatePen(work, penName) : download;
+  if (!pen) throw new Error('the Pen download holds no .pen file');
+  const merged = applyAccepted(
+    JSON.parse(readFileSync(pen, 'utf8')),
+    accepted,
+    log
+  );
+  writeFileSync(pen, JSON.stringify(merged.doc));
+  log(`Pen accepted overlay: applied ${merged.applied.join(', ') || 'none'}`);
+  const overlay = sha256(JSON.stringify(accepted));
+  return {
+    work,
+    download,
+    isArchive,
+    contentSha256: sha256(`${sha256(bytes)}:${overlay}`),
+  };
 }
 
 /**
@@ -291,6 +319,7 @@ export async function runGoldenPathPen({
   log = line => process.stdout.write(`${line}\n`),
   fetchOnly = false,
   report = () => {},
+  accepted = loadAccepted(join(root, 'docs/design-system/pen-accepted')),
 }) {
   mkdirSync(out, { recursive: true });
   const manifest = JSON.parse(readFileSync(join(root, MANIFEST), 'utf8'));
@@ -314,6 +343,9 @@ export async function runGoldenPathPen({
     env,
     run,
     fetchImpl,
+    accepted,
+    penName: manifest.penFile?.name,
+    log,
   });
   const groups = exportGroups(manifest, frames);
   const cacheKey = exportCacheKey({ contentSha256, groups });
