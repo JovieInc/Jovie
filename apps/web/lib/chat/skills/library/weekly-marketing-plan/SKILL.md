@@ -17,10 +17,11 @@ Jovie is the artist's always-on marketing department. Between releases, fans sho
 
 ## Output
 
-A short plan, one line per day: the day, the channel, what to post, and the copy. End with the one thing they need to capture or approve.
+If something drops within 21 days, hand off to release-launch and write that reply (do not leave the turn empty after useSkill). Otherwise a short plan under 120 words: one line per day for at most five days, then the one thing they need to capture or approve.
 
 ## Never
 
 - Never post, schedule or send anything. This is a draft for the artist to approve.
 - Never invent numbers, streams, follower counts or fan reactions you did not read.
 - Never ask them to make something new when the catalog already has it.
+- Never end on a tool-only empty message after loading this skill.
