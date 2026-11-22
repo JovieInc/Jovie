@@ -14,6 +14,7 @@ import {
   type HomeLoopTone,
 } from '@/lib/home-loop/contract';
 import type { DeliverySummary } from '@/lib/ovie/shipping-state/contract';
+import { movingForBlocker } from './blocker-work';
 import type { CompanyBlocker } from './company-blocker';
 import type { OvieCompanyTile } from './company-tiles';
 import {
@@ -322,6 +323,8 @@ export function buildStoryFirstBottleneck(input: {
   readonly revenueFailed?: boolean;
   readonly constraint: HomeLoopConstraint | null;
   readonly highlight: StoryFirstStageHighlight | null;
+  /** Shipping rows; when given, a revenue blocker's Moving line is the row working on it. */
+  readonly rows?: readonly HomeLoopRow<OvieShipStage>[];
   readonly clearTitle?: string;
   readonly clearBody?: string;
 }): StoryFirstBottleneck {
@@ -339,6 +342,9 @@ export function buildStoryFirstBottleneck(input: {
   }
 
   if (input.revenue) {
+    const moving = input.rows
+      ? movingForBlocker(input.rows, input.revenue.step)
+      : input.highlight;
     const since =
       input.revenue.since != null
         ? new Date(input.revenue.since).toLocaleDateString('en-US', {
@@ -352,13 +358,10 @@ export function buildStoryFirstBottleneck(input: {
       eyebrow: `Bottleneck · ${stepLabel(input.revenue.step)}`,
       title: shortTitle(input.revenue),
       body: input.revenue.text,
-      moving: input.highlight
+      moving: moving
         ? {
-            label: issueLabel(
-              input.highlight.identifier,
-              input.highlight.title
-            ),
-            href: input.highlight.href,
+            label: issueLabel(moving.identifier, moving.title),
+            href: moving.href,
           }
         : null,
       needs: input.revenue.nextAction,

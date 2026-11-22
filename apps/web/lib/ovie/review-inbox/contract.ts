@@ -9,7 +9,7 @@ export const REVIEW_INBOX_DECISION_CONTRACT =
 
 export const REVIEW_INBOX_PILOT_TENANT = 'pilot-synthetic-photo' as const;
 
-export type ReviewInboxViewMode = 'list' | 'editorial' | 'artboard';
+export type ReviewInboxViewMode = 'canvas' | 'list' | 'editorial' | 'artboard';
 
 /** Normalized pin on immutable asset bytes (0–1 in oriented image space). */
 export interface ReviewInboxPin {
@@ -20,6 +20,41 @@ export interface ReviewInboxPin {
   readonly y: number;
   readonly note: string;
   readonly author: 'founder' | 'agent';
+}
+
+/** One normalized point (0–1 in oriented image space). */
+export type ReviewInboxPoint = readonly [x: number, y: number];
+
+/** Freehand mark drawn on immutable asset bytes, scoped like a pin. */
+export interface ReviewInboxStroke {
+  readonly id: string;
+  readonly assetDigest: string;
+  readonly revision: string;
+  readonly points: readonly ReviewInboxPoint[];
+  readonly author: 'founder' | 'agent';
+}
+
+/** Free-text comment saved with a revision request. */
+export interface ReviewInboxComment {
+  readonly id: string;
+  readonly revision: string;
+  readonly body: string;
+  readonly author: 'founder' | 'agent';
+}
+
+/** Bounds that keep one stored case small in the operating KV. */
+export const REVIEW_INBOX_MARK_LIMITS = {
+  pins: 50,
+  strokes: 50,
+  pointsPerStroke: 400,
+  noteChars: 500,
+  commentChars: 2000,
+} as const;
+
+/** Marks a canvas edits for one asset revision. */
+export interface ReviewInboxMarks {
+  readonly pins: readonly ReviewInboxPin[];
+  readonly strokes: readonly ReviewInboxStroke[];
 }
 
 export interface ReviewInboxCandidate {
@@ -51,6 +86,8 @@ export interface ReviewInboxPilotCase {
   readonly activeRevision: string;
   readonly candidates: readonly ReviewInboxCandidate[];
   readonly pins: readonly ReviewInboxPin[];
+  readonly strokes: readonly ReviewInboxStroke[];
+  readonly comments: readonly ReviewInboxComment[];
   readonly acceptedRevision: string | null;
   readonly privateLibraryReceipt: string | null;
 }
@@ -71,6 +108,7 @@ export interface ReviewInboxDecisionBody {
   readonly actionId: string;
   readonly acceptRevision?: string;
   readonly pins?: readonly Omit<ReviewInboxPin, 'author'>[];
+  readonly strokes?: readonly Omit<ReviewInboxStroke, 'author'>[];
   readonly notes?: string;
 }
 
