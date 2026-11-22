@@ -147,7 +147,7 @@ export function OvieComposerDock() {
                   className='truncate text-xs text-secondary-token'
                   data-testid='ovie-composer-dock-reject-does'
                 >
-                  Reject: it doesn't go ahead.
+                  Reject: it does not go ahead.
                 </p>
                 {deadline ? (
                   <p className='truncate text-xs text-tertiary-token'>
