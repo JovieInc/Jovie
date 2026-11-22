@@ -232,10 +232,9 @@ function DesktopSurfaceCard({
   return (
     <section
       className={cn(
-        'min-w-0',
         flat
-          ? 'px-1'
-          : 'rounded-2xl border border-white/6 bg-white/[0.025] p-5',
+          ? 'min-w-0 px-1'
+          : 'min-w-0 rounded-2xl border border-white/6 bg-white/[0.025] p-5',
         className
       )}
       data-testid={testId}
