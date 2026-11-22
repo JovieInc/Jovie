@@ -44,7 +44,7 @@ describe('Summer founder-turn repair', () => {
     const create = graphql.mock.calls.find(([q]) => q.includes('issueCreate'));
     expect(create?.[1]).toMatchObject({
       title: expect.stringContaining(
-        '[summer-founder-turn:summer_unreachable]'
+        'summer-founder-turn-repair summer_unreachable'
       ),
       labelIds: ['lbl'],
     });
@@ -59,7 +59,7 @@ describe('Summer founder-turn repair', () => {
                 nodes: [
                   {
                     id: 'iss',
-                    title: '[summer-founder-turn:summer_unreachable] x',
+                    title: 'summer-founder-turn-repair summer_unreachable x',
                     state: { type: 'started' },
                   },
                 ],

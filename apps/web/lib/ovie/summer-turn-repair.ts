@@ -31,7 +31,7 @@ const lastFiled = new Map<string, number>();
 const pending = new Map<string, number>();
 
 export function summerTurnRepairFingerprint(hop: string): string {
-  return `[summer-founder-turn:${hop}]`;
+  return `summer-founder-turn-repair ${hop}`;
 }
 
 export function resetSummerTurnRepairThrottle(): void {
