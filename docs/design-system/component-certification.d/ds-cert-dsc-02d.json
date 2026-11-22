@@ -13,7 +13,11 @@
   "waivers": {
     "apps/web/components/features/demo/DemoShowcaseSurface.tsx": {
       "long-content": "The router renders fixed demo fixtures and takes only a surface id; no user-supplied text reaches it.",
-      "offline": "The router makes no network requests; every surface renders from static fixtures."
+      "offline": "The router makes no network requests; every surface renders from static fixtures.",
+      "loading": "A switch over authored demo surfaces: every branch renders fixed fixtures (the demo persona, releases and insights), so loading, empty, error and right-to-left runtime states are not inputs; the releases surface already exposes its populated, disconnected, empty, importing, failed and partial variants via the state query.",
+      "empty": "A switch over authored demo surfaces: every branch renders fixed fixtures (the demo persona, releases and insights), so loading, empty, error and right-to-left runtime states are not inputs; the releases surface already exposes its populated, disconnected, empty, importing, failed and partial variants via the state query.",
+      "error": "A switch over authored demo surfaces: every branch renders fixed fixtures (the demo persona, releases and insights), so loading, empty, error and right-to-left runtime states are not inputs; the releases surface already exposes its populated, disconnected, empty, importing, failed and partial variants via the state query.",
+      "rtl-overflow": "A switch over authored demo surfaces: every branch renders fixed fixtures (the demo persona, releases and insights), so loading, empty, error and right-to-left runtime states are not inputs; the releases surface already exposes its populated, disconnected, empty, importing, failed and partial variants via the state query."
     },
     "apps/web/components/features/demo/DemoVideoPlayer.tsx": {
       "empty": "The component renders from a fixed video url or fixed slide list; there is no data set that can be empty.",
@@ -24,7 +28,8 @@
       "empty": "The scripted timeline always has its fixed scenes; there is no data set that can be empty.",
       "error": "The surface has no failure path; it renders a fixed script and takes no props.",
       "long-content": "All copy is fixed script text; no user-supplied text reaches the surface.",
-      "offline": "The surface makes no network requests; it plays from static fixtures."
+      "offline": "The surface makes no network requests; it plays from static fixtures.",
+      "rtl-overflow": "The recording plays a fixed scripted timeline with authored English copy and a fixed-pixel cursor path; right-to-left input is not a case the capture supports."
     },
     "apps/web/components/features/demo/ProductDemoCarousel.tsx": {
       "empty": "The component renders from a fixed video url or fixed slide list; there is no data set that can be empty.",
