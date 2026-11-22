@@ -98,3 +98,38 @@ export const EXTRA_PACK_HEX = Object.freeze([
   '#0084d1',
   '#00bcff',
 ]);
+
+/** The six pack accents, by name. */
+export const PACK_HEX = Object.freeze({
+  ion: '#11afff',
+  ultra: '#8e56f5',
+  pulse: '#f52bb5',
+  mint: '#3ffa8b',
+  orange: '#ff7800',
+  red: '#f72a36',
+});
+
+/**
+ * Gradient hue tolerance, in OKLCH hue degrees. A gradient stop counts as one
+ * accent when its OKLCH hue is within this distance of the accent's hue. Why 10:
+ * the pack's own scene and dark-mode variants and its darker shades sit within
+ * 6 degrees of their accent (ion #0B6FA6 is 2 degrees off #11AFFF), so 10 keeps
+ * every legitimate shade and alpha blend, while the nearest neighbouring
+ * accents are 45+ degrees apart (ion 240, ultra 295, pulse 345, orange 50, mint
+ * 152, red 25) and common off-pack hues (geist blue 258, violet 293 vs ultra
+ * 295 are close, so those rely on the two-hue test) land outside it. Tim, Nov 22
+ * 2026: gradients "must be centered on one of the accent colors and only hue
+ * within their own color".
+ */
+export const GRADIENT_HUE_TOLERANCE = 10;
+
+/** Below this OKLCH chroma a stop is a neutral (grey, black, white, off-white). */
+export const GRADIENT_NEUTRAL_CHROMA = 0.04;
+
+/**
+ * Intentional two-accent gradients, rare and purposeful. Each entry:
+ * { file, reason, stops: ['ion', 'ultra'] } with both stops on accent values.
+ * Tim, Nov 22 2026: mixing "should be rare and be intentional and purposeful".
+ * Seeded empty. An entry without a reason is ignored.
+ */
+export const GRADIENT_TWO_ACCENT_ALLOW = Object.freeze([]);
