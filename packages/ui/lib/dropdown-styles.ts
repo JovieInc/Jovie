@@ -93,7 +93,7 @@ export const OVERLAY_ITEM_RADIUS = 'rounded-(--system-b-radius-overlay-inner)';
 
 /** Shared keyboard-focus treatment kept inside the concentric row radius. */
 export const OVERLAY_ITEM_FOCUS =
-  'focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus/35';
+  'focus-visible:outline-none focus-visible:bg-surface-menu-selected focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus/35';
 
 /** Shared disabled affordance for Radix menu/select rows. */
 const MENU_ITEM_DISABLED_STATE =
@@ -214,11 +214,11 @@ export const MENU_ITEM_DESTRUCTIVE =
  * Selected/active item state for menus with current choices
  */
 export const MENU_ITEM_SELECTED =
-  'bg-surface-1 text-primary-token [&_svg]:text-primary-token';
+  'bg-surface-menu-selected text-primary-token [&_svg]:text-primary-token';
 
 const MENU_ITEM_SELECTED_STATE =
-  'data-[selected=true]:bg-surface-1 data-[selected=true]:text-primary-token data-[selected=true]:[&_svg]:text-primary-token ' +
-  'data-[state=checked]:bg-surface-1 data-[state=checked]:text-primary-token data-[state=checked]:[&_svg]:text-primary-token';
+  'data-[selected=true]:bg-surface-menu-selected data-[selected=true]:text-primary-token data-[selected=true]:[&_svg]:text-primary-token ' +
+  'data-[state=checked]:bg-surface-menu-selected data-[state=checked]:text-primary-token data-[state=checked]:[&_svg]:text-primary-token';
 
 const MENU_ROW_INTERACTION_STATES = `${MENU_ITEM_SELECTED_STATE} ${MENU_ITEM_DISABLED_STATE}`;
 
@@ -229,8 +229,8 @@ const MENU_ROW_INTERACTION_STATES = `${MENU_ITEM_SELECTED_STATE} ${MENU_ITEM_DIS
 export const MENU_ITEM_BASE =
   `relative flex min-h-8 cursor-default select-none items-center gap-2 ${OVERLAY_ITEM_RADIUS} px-2.5 py-1.5 text-app font-normal leading-5 outline-none ` +
   'transition-colors duration-fast ease-interactive ' +
-  'text-secondary-token hover:bg-(--color-bg-surface-1) hover:text-primary-token ' +
-  'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
+  'text-secondary-token hover:bg-surface-menu-selected hover:text-primary-token ' +
+  'data-[highlighted]:bg-surface-menu-selected data-[highlighted]:text-primary-token ' +
   `${MENU_ROW_INTERACTION_STATES} ` +
   `${OVERLAY_ITEM_FOCUS} ` +
   '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-tertiary-token ' +
@@ -242,8 +242,8 @@ export const MENU_ITEM_BASE =
 export const CHECKBOX_RADIO_ITEM_BASE =
   `relative flex min-h-8 cursor-default select-none items-center ${OVERLAY_ITEM_RADIUS} py-1 ps-7 pe-2 text-xs font-normal leading-4 outline-none ` +
   'transition-colors duration-fast ease-interactive ' +
-  'text-secondary-token hover:bg-surface-1 hover:text-primary-token ' +
-  'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
+  'text-secondary-token hover:bg-surface-menu-selected hover:text-primary-token ' +
+  'data-[highlighted]:bg-surface-menu-selected data-[highlighted]:text-primary-token ' +
   `${MENU_ROW_INTERACTION_STATES} ` +
   OVERLAY_ITEM_FOCUS;
 
@@ -255,7 +255,7 @@ export const SELECT_ITEM_BASE =
   'transition-colors duration-fast ease-interactive ' +
   'text-secondary-token ' +
   `${OVERLAY_ITEM_FOCUS} focus-visible:text-primary-token ` +
-  'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
+  'data-[highlighted]:bg-surface-menu-selected data-[highlighted]:text-primary-token ' +
   MENU_ROW_INTERACTION_STATES;
 
 // ============================================================================
@@ -268,8 +268,8 @@ export const SELECT_ITEM_BASE =
 export const MENU_ITEM_COMPACT =
   `relative flex min-h-8 cursor-default select-none items-center gap-2 ${OVERLAY_ITEM_RADIUS} px-2.5 py-1 text-xs font-normal leading-4 outline-none ` +
   'transition-colors duration-fast ease-interactive ' +
-  'text-secondary-token hover:bg-surface-1 hover:text-primary-token ' +
-  'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
+  'text-secondary-token hover:bg-surface-menu-selected hover:text-primary-token ' +
+  'data-[highlighted]:bg-surface-menu-selected data-[highlighted]:text-primary-token ' +
   `${MENU_ROW_INTERACTION_STATES} ` +
   `${OVERLAY_ITEM_FOCUS} ` +
   '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-tertiary-token ' +

@@ -369,7 +369,7 @@ describe('CommonDropdown', () => {
         .closest('[role="menuitem"]');
 
       expect(item).toHaveAttribute('data-selected', 'true');
-      expect(item?.className).toContain('data-[selected=true]:bg-surface-1');
+      expect(item?.className).toContain('data-[selected=true]:bg-surface-menu-selected');
     });
 
     it('renders danger state as a destructive item variant', () => {
@@ -533,7 +533,7 @@ describe('CommonDropdown', () => {
         'checked'
       );
       expect(screen.getByRole('menuitemcheckbox').className).toContain(
-        'data-[state=checked]:bg-surface-1'
+        'data-[state=checked]:bg-surface-menu-selected'
       );
     });
 
@@ -623,7 +623,7 @@ describe('CommonDropdown', () => {
       ).toHaveAttribute('data-state', 'checked');
       expect(
         screen.getByRole('menuitemradio', { name: 'Medium' }).className
-      ).toContain('data-[state=checked]:bg-surface-1');
+      ).toContain('data-[state=checked]:bg-surface-menu-selected');
     });
   });
 

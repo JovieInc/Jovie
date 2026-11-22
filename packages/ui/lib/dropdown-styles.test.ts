@@ -183,7 +183,7 @@ describe('dropdown-styles', () => {
       expect(MENU_ITEM_BASE).toContain('font-normal');
       expect(MENU_ITEM_BASE).toContain('py-1.5');
       expect(MENU_ITEM_BASE).toContain('gap-2');
-      expect(MENU_ITEM_BASE).toContain('hover:bg-(--color-bg-surface-1)');
+      expect(MENU_ITEM_BASE).toContain('hover:bg-surface-menu-selected');
     });
 
     it('menu rows use tokenized focus-visible rings', () => {
@@ -196,12 +196,12 @@ describe('dropdown-styles', () => {
     });
 
     it('shares selected, checked, and disabled state styles across row bases', () => {
-      expect(MENU_ITEM_SELECTED).toContain('bg-surface-1');
+      expect(MENU_ITEM_SELECTED).toContain('bg-surface-menu-selected');
 
       const selectedStateClasses = [
-        'data-[selected=true]:bg-surface-1',
+        'data-[selected=true]:bg-surface-menu-selected',
         'data-[selected=true]:text-primary-token',
-        'data-[state=checked]:bg-surface-1',
+        'data-[state=checked]:bg-surface-menu-selected',
         'data-[state=checked]:text-primary-token',
       ];
       const disabledStateClasses = [
