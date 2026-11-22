@@ -8,7 +8,11 @@ import { DEFAULT_MAX_WORDS, type HelpfulnessCase } from './cases';
 import { deniesVisibleCatalog, fixtureHasCatalog } from './catalog-deny';
 import { runFailThemeChecks, upcomingTitleFromFacts } from './fail-themes';
 import type { EvalFixture } from './fixtures';
-import { isPlanningMenuCloser, runOneRecGapChecks } from './one-rec-gaps';
+import {
+  DRAFT_ASK_NOW_CASE_IDS,
+  isPlanningMenuCloser,
+  runOneRecGapChecks,
+} from './one-rec-gaps';
 import {
   type BehaviorId,
   CASE_PASS_SCORE,
@@ -207,10 +211,11 @@ export function runHardChecks(
     });
   }
 
-  // ASS-75: fold residual #26491 one-rec hermetic detectors into live scoring.
+  // ASS-75 / ASS-100: fold residual one-rec hermetic detectors into live scoring.
   // - upcoming-sentence-days: allowlisted planning asks only (not every UPCOMING fixture)
   // - planning-menu-not-a-move: ban patterns on every turn (same posture as question-not-a-move)
   // - collab-draft-one: collab case only (positive draft shape)
+  // - promise-draft-not-a-move: clear draft asks must deliver artifact, not ASS-95 stub
   // - do-it-calls-tool: already covered by expected_tool when expectToolsAny is set
   const oneRecGaps = runOneRecGapChecks(text, {
     upcomingTitle:
@@ -218,6 +223,7 @@ export function runHardChecks(
         ? upcomingTitle
         : undefined,
     requireCollabDraftOne: testCase.id === 'collab',
+    requireDraftAskNow: DRAFT_ASK_NOW_CASE_IDS.has(testCase.id),
   });
   const oneRecGapIds = new Set(oneRecGaps.map(gap => gap.id));
   for (const gap of oneRecGaps) {
