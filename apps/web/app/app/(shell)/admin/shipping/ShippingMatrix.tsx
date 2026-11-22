@@ -520,7 +520,7 @@ export function ShippingMatrix() {
                       'age',
                       'transition',
                     ].map(column => (
-                      <td key={`loading-${column}`} className='px-3 py-1.5'>
+                      <td key={`loading-${column}`} className='px-3 py-0'>
                         <LoadingSkeleton
                           height='h-4'
                           width='w-full'
@@ -557,7 +557,7 @@ export function ShippingMatrix() {
                   >
                     <th
                       scope='row'
-                      className='relative max-w-0 truncate px-3 py-1.5'
+                      className='relative max-w-0 truncate px-3 py-0'
                     >
                       <Button
                         type='button'
@@ -579,25 +579,25 @@ export function ShippingMatrix() {
                         }
                       />
                     </th>
-                    <td className='px-3 py-1.5 whitespace-nowrap'>
+                    <td className='px-3 py-0 whitespace-nowrap'>
                       <HudStatusPill
                         label={STAGE_LABELS[row.stage]}
                         tone={stageTone(row.stage, row.attention)}
                       />
                     </td>
-                    <td className='max-w-48 truncate px-3 py-1.5 whitespace-nowrap'>
+                    <td className='max-w-48 truncate px-3 py-0 whitespace-nowrap'>
                       <ChecksCell row={row} />
                     </td>
-                    <td className='px-3 py-1.5 whitespace-nowrap'>
+                    <td className='px-3 py-0 whitespace-nowrap'>
                       <QueueCell row={row} />
                     </td>
-                    <td className='px-3 py-1.5 whitespace-nowrap text-secondary-token'>
+                    <td className='px-3 py-0 whitespace-nowrap text-secondary-token'>
                       {row.agent ?? '—'}
                     </td>
-                    <td className='px-3 py-1.5 whitespace-nowrap text-secondary-token'>
+                    <td className='px-3 py-0 whitespace-nowrap text-secondary-token'>
                       {row.createdAt ? formatTimeAgo(row.createdAt) : '—'}
                     </td>
-                    <td className='px-3 py-1.5 whitespace-nowrap text-secondary-token'>
+                    <td className='px-3 py-0 whitespace-nowrap text-secondary-token'>
                       {row.transition ??
                         (row.updatedAt ? formatTimeAgo(row.updatedAt) : '—')}
                     </td>

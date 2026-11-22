@@ -45,7 +45,9 @@ export function TaskProjectionListRow({
       interaction={interaction}
       density='standard'
       className={cn(
-        'group/row flex h-full w-full items-center gap-2 px-3 transition-opacity duration-subtle ease-subtle',
+        // py-0: the 44px minimum sets the height and items-center centers the two
+        // lines, so a standalone row matches a 44px table row exactly.
+        'group/row flex h-full w-full items-center gap-2 px-3 py-0 transition-opacity duration-subtle ease-subtle',
         // 90 keeps muted-row secondary text >= 4.5:1 on the light canvas;
         // 75 composited it to 3.56:1 (axe color-contrast).
         opacity === 'muted' && !isSelected && 'opacity-90',

@@ -47,7 +47,10 @@ test.describe('content rows', () => {
       // table row. Both clear the standard minimum.
       expect(heights[0]).toBeGreaterThanOrEqual(44);
       expect(heights[1]).toBeGreaterThanOrEqual(44);
-      expect(Math.abs(heights[0]! - heights[1]!)).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(heights[0]! - heights[1]!),
+        `Fleet ${heights[0]}px vs Shipping ${heights[1]}px`
+      ).toBeLessThanOrEqual(1);
 
       await expect(stack).toHaveScreenshot(`content-rows-${theme}.png`);
     });
