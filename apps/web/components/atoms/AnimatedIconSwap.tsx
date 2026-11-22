@@ -1,7 +1,9 @@
 'use client';
 
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, useReducedMotion } from 'motion/react';
+import * as m from 'motion/react-m';
 import { type ReactNode, useEffect, useState } from 'react';
+import { LazyDomAnimationMotion } from '@/lib/animation/LazyMotionFeatures';
 import {
   ICON_SWAP_TRANSITION,
   ICON_SWAP_VARIANTS,
@@ -63,19 +65,21 @@ export function AnimatedIconSwap({
         className
       )}
     >
-      <AnimatePresence initial={false} mode='popLayout'>
-        <motion.span
-          key={activeKey}
-          className='inline-flex items-center justify-center'
-          variants={variants}
-          initial={hasMounted ? 'hidden' : false}
-          animate='visible'
-          exit='hidden'
-          transition={ICON_SWAP_TRANSITION}
-        >
-          {children}
-        </motion.span>
-      </AnimatePresence>
+      <LazyDomAnimationMotion>
+        <AnimatePresence initial={false} mode='popLayout'>
+          <m.span
+            key={activeKey}
+            className='inline-flex items-center justify-center'
+            variants={variants}
+            initial={hasMounted ? 'hidden' : false}
+            animate='visible'
+            exit='hidden'
+            transition={ICON_SWAP_TRANSITION}
+          >
+            {children}
+          </m.span>
+        </AnimatePresence>
+      </LazyDomAnimationMotion>
     </span>
   );
 }
