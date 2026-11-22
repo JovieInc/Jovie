@@ -32,6 +32,7 @@ import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
 from atomic_state import atomic_write_text  # noqa: E402
 import macos_pool
+import work_lane
 import execution_attempt
 
 READY_LABEL = "agent-ready"  # retired as a requirement (2026-10-29); still produced by some intake, never required
@@ -178,7 +179,9 @@ def refill(lane, host, binding, linear, floor: int = 0, now: float | None = None
     mirror = lane.linear_sync.read_mirror(state, binding.key)
     rows = list((mirror.get("issues") or {}).values())
     execution_held = execution_skips(state, rows)
-    todo = lane.linear_sync.todo(state, binding.key)
+    # The code target counts code only: non-code lanes (work_lane.py) hold their own depth, so a full
+    # design or data lane never stops code refill and code refill never promotes non-code work.
+    todo = work_lane.code_only(lane.linear_sync.todo(state, binding.key))
     pending = lane.linear_sync._pending_moves(state)  # promotions still in the outbox count as Todo
     depth, goal = len(todo), target(state, floor)  # todo() already counts promotions waiting in the outbox
     path = state / "refill" / f"{binding.key}.json"
@@ -203,7 +206,7 @@ def refill(lane, host, binding, linear, floor: int = 0, now: float | None = None
         receipt["held"] = "mirror-stale"
         _write(path, receipt)
         return receipt
-    live = [row for row in rows if pending.get(row["id"]) != "Todo"]
+    live = [row for row in rows if pending.get(row["id"]) != "Todo" and not work_lane.is_non_code(row)]
     # LYB iOS work waits while LYB's running + queued hosted-macOS jobs are at the cap (macos_pool.HOLD_AT):
     # the shared pool is Jovie's merge-group Mac lane too. Fails open without a fresh sample.
     admission = macos_pool.admission(state, now) if binding.key == "LYB" else {"hold": False}
