@@ -61,6 +61,7 @@
       "apps/web/touch-target-ratchet.baseline.json",
       "apps/web/ui-feel-ratchet.baseline.json",
       "packages/copy/dead-ends.baseline.json",
+      "scripts/invariants/art-direction/accent-pack.baseline.json",
       "scripts/invariants/duplicate-literals.baseline.json",
       "scripts/invariants/native-spacing-scale.baseline.json",
       "scripts/invariants/shell-ia.baseline.json",

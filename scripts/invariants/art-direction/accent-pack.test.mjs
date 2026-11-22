@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { ruleOf } from './accent-pack.mjs';
+import { ruleOf, tightenedIds } from './accent-pack.mjs';
 import { expectedAccent, GREEN_RED_MIN_SET } from './accent-pack-config.mjs';
 import { scanSource } from './accent-pack-lib.mjs';
 import { evaluateRatchet } from './ratchet.mjs';
@@ -384,6 +384,24 @@ describe('ratchet', () => {
         recorded: ['a'],
         ancestor: ['a', 'b'],
       }),
+      []
+    );
+  });
+});
+
+describe('combine safety', () => {
+  it('tighten only drops resolved ids and never adds a live one', () => {
+    assert.deepEqual(tightenedIds(['a', 'b', 'c'], ['a', 'c', 'd']), [
+      'a',
+      'c',
+    ]);
+    assert.deepEqual(tightenedIds([], ['a']), []);
+  });
+  it('a shrink passes when only live recorded ids are compared', () => {
+    const current = ['a'];
+    const recorded = tightenedIds(['a', 'b'], current);
+    assert.deepEqual(
+      evaluateRatchet({ current, recorded, ancestor: ['a', 'b'] }),
       []
     );
   });

@@ -6,11 +6,13 @@
  *
  * Extends the art-direction runner (run.mjs loads every check here) and also
  * runs from `pnpm invariants:check`. Pre-existing violations live in
- * accent-pack.baseline.json, which can only shrink. Rules (d), (e), (f) and
+ * accent-pack.baseline.json: new ids fail, resolved ids pass and are
+ * dropped by --tighten. Rules (d), (e), (f) and
  * (g) are heuristics; see accent-pack-lib.mjs.
  *
  *   node scripts/invariants/art-direction/accent-pack.mjs            check
- *   node scripts/invariants/art-direction/accent-pack.mjs --update   rewrite baseline (shrink only)
+ *   node scripts/invariants/art-direction/accent-pack.mjs --tighten  drop resolved ids (never adds)
+ *   node scripts/invariants/art-direction/accent-pack.mjs --update   rewrite baseline from the live scan
  *   node scripts/invariants/art-direction/accent-pack.mjs --report   counts by rule and area
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -96,15 +98,29 @@ export function checkAccentPack(repoRoot = REPO_ROOT, recordedIds) {
     recordedIds ??
     JSON.parse(readFileSync(join(repoRoot, ACCENT_PACK_BASELINE), 'utf8')).ids;
   const ancestor = ancestorJson(repoRoot, ACCENT_PACK_BASELINE);
-  if (!ancestor.ok) return { failures: [ancestor.error], ids: current };
+  if (!ancestor.ok)
+    return { failures: [ancestor.error], ids: current, stale: [] };
+  // Combine-safe (scripts/lib/queue-drift-guards.json): growth fails, a
+  // shrink passes. A resolved id is stale headroom reported as a notice and
+  // removed later by --tighten, so two green PRs never have to rewrite this
+  // file to stay green together.
+  const live = new Set(current);
+  const stale = recorded.filter(id => !live.has(id));
   return {
     failures: evaluateRatchet({
       current,
-      recorded,
+      recorded: recorded.filter(id => live.has(id)),
       ancestor: ancestor.ancestor?.ids ?? null,
     }),
     ids: current,
+    stale,
   };
+}
+
+/** The recorded ids that are still live. Never adds an id. */
+export function tightenedIds(recorded, current) {
+  const live = new Set(current);
+  return recorded.filter(id => live.has(id));
 }
 
 /* ---------------------------------------------------------------- inventory */
@@ -342,6 +358,21 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
       byFile: tally(ids, id => id.split(':')[1]).slice(0, 15),
     };
     process.stdout.write(JSON.stringify(out, null, 1) + '\n');
+  } else if (process.argv.includes('--tighten')) {
+    const path = join(REPO_ROOT, ACCENT_PACK_BASELINE);
+    const recorded = JSON.parse(readFileSync(path, 'utf8')).ids;
+    const ids = tightenedIds(recorded, scanAccentPack());
+    writeFileSync(
+      path,
+      JSON.stringify(
+        { schema: 'jovie.art-direction-accent-pack/v1', ids },
+        null,
+        2
+      ) + '\n'
+    );
+    process.stdout.write(
+      `accent-pack: baseline tightened (${recorded.length - ids.length} resolved id(s) dropped, ${ids.length} left)\n`
+    );
   } else if (process.argv.includes('--update')) {
     const ids = scanAccentPack();
     writeFileSync(
@@ -354,12 +385,16 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     );
     process.stdout.write(`accent-pack: baseline written (${ids.length} ids)\n`);
   } else {
-    const { failures, ids } = checkAccentPack();
+    const { failures, ids, stale } = checkAccentPack();
     if (failures.length) {
       process.stderr.write(`accent-pack:\n${failures.join('\n')}\n`);
       process.exitCode = 1;
     } else {
       process.stdout.write(`accent-pack: ok (${ids.length} baselined)\n`);
+      if (stale.length)
+        process.stdout.write(
+          `accent-pack: ${stale.length} resolved id(s) still listed; this passes. Run --tighten to drop them.\n`
+        );
     }
   }
 }
