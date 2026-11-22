@@ -17,7 +17,6 @@ import types
 import time
 import unittest
 from pathlib import Path
-from datetime import datetime
 from types import SimpleNamespace
 from unittest import mock
 
@@ -2716,11 +2715,21 @@ class PublishTest(unittest.TestCase):
         self.assertEqual(events({**row, "gateWaitS": 99999}), [events({**row, "gateWaitS": None})[0]])
         self.assertEqual(events({**row, "pr": None}), [])
 
-    def test_a_held_sweep_snapshot_raises_an_alert_per_checkout(self):
-        alerts = doctor.judge(obs(sweepSecretHeld=[{"name": "94af-Jovie", "path": "/w/Jovie",
-                                                     "reason": "secret-finding:trufflehog"}]))
-        self.assertIn("secret-finding:trufflehog", alerts["sweep-snapshot-secret:94af-Jovie"])
-        self.assertFalse([key for key in doctor.judge(obs()) if key.startswith("sweep-snapshot-secret:")])
+    def test_sweep_holds_coalesce_and_leave_non_sweep_linear_lifecycle_unchanged(self):
+        key, old_key = "sweep-snapshot-secret", "sweep-snapshot-secret:old"
+        rows = [{"name": f"checkout-{i}", "path": "/private/root", "reason": "private-detail"} for i in range(150)]
+        alerts = doctor.judge(obs(sweepSecretHeld=rows))
+        self.assertEqual([k for k in alerts if k.startswith(key)], [key])
+        self.assertNotIn("private", alerts[key])
+        baseline, tracker = FakeTracker(), FakeTracker()
+        clean, mixed = {}, {"issues": {old_key: {"id": "legacy", "closedAt": None}}}
+        for i, ordinary in enumerate(({"z": "first", "a": "second"}, {}, {"z": "again"}), 1):
+            events = {k: {"state": "active", "idempotencyKey": k} for k in ordinary}
+            clean = doctor.reconcile(ordinary, clean, baseline, 1000 + i, events)
+            mixed = doctor.reconcile({**ordinary, key: alerts[key], old_key: "legacy"}, mixed, tracker, 1000 + i, events)
+            self.assertNotIn(old_key, mixed["issues"])
+            self.assertEqual(clean["conditions"], mixed["conditions"])
+        self.assertEqual(vars(baseline), vars(tracker))
 
     def test_outcome_verification_is_the_outcome_receipt_stage(self):
         events = doctor.stage_events.events
