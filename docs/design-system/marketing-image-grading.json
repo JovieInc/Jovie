@@ -1,0 +1,230 @@
+{
+  "schema": "jovie.marketing-image-grading/v1",
+  "allowedMethods": {
+    "graded-hue": "hue-by-hue-photographic-grade",
+    "regenerated": "regeneration-under-color-rules"
+  },
+  "bannedMethods": [
+    "LUT",
+    "blanket filter",
+    "CSS filter",
+    "hue-rotate",
+    "overlay or tint"
+  ],
+  "images": [
+    {
+      "path": "apps/web/public/assets/generated/homepage-hero-technical-texture-v1.webp",
+      "pages": [
+        "(public marketing asset)"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/public/brand-logos/black-hole-recordings.png",
+      "pages": [
+        "apps/web/components/features/home/label-logos.tsx"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/public/device-bezels/iphone-18-pro-black-portrait.png",
+      "pages": [
+        "apps/web/components/marketing/device/deviceBezels.ts"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/public/images/hero/api-versioning-hero.webp",
+      "pages": [
+        "apps/web/app/(marketing)/api-versioning/page.tsx"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/public/images/hero/artist-notifications.webp",
+      "pages": [
+        "apps/web/components/marketing/artist-notifications/ArtistNotificationsHero.tsx"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/public/images/hero/developers-hero.webp",
+      "pages": [
+        "apps/web/app/(marketing)/developers/page.tsx"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/public/images/merch/never-say-a-word-tee-mockup.webp",
+      "pages": [
+        "apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/public/images/merch/take-me-over-cap-mockup.webp",
+      "pages": [
+        "apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/public/images/merch/the-deep-end-hoodie-mockup.webp",
+      "pages": [
+        "apps/web/app/(marketing)/instant-merch/InstantMerchLanding.tsx"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/public/images/mock-profile/drawer-releases/release-2.png",
+      "pages": [
+        "apps/web/components/features/home/homepage-profile-preview-fixture.ts"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/public/images/mock-profile/drawer-releases/release-3.png",
+      "pages": [
+        "apps/web/components/features/home/homepage-profile-preview-fixture.ts"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/public/images/mock-profile/drawer-releases/release-4.png",
+      "pages": [
+        "apps/web/components/features/home/homepage-profile-preview-fixture.ts"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/public/images/mock-profile/drawer-releases/release-5.png",
+      "pages": [
+        "apps/web/components/features/home/homepage-profile-preview-fixture.ts"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/public/images/mock-profile/drawer-releases/release-6.png",
+      "pages": [
+        "apps/web/components/features/home/homepage-profile-preview-fixture.ts"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/public/img/releases/first-light.jpg",
+      "pages": [
+        "apps/web/components/features/home/homepage-profile-preview-fixture.ts"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/public/img/releases/never-say-a-word.jpg",
+      "pages": [
+        "apps/web/app/(marketing)/smart-links/SmartLinksDemo.tsx",
+        "apps/web/components/features/home/tim-white-catalog.ts"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/public/img/releases/take-me-over.jpg",
+      "pages": [
+        "apps/web/components/features/home/homepage-profile-preview-fixture.ts",
+        "apps/web/components/features/home/tim-white-catalog.ts"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/public/img/releases/the-deep-end.jpg",
+      "pages": [
+        "apps/web/app/(marketing)/smart-links/SmartLinksDemo.tsx",
+        "apps/web/components/features/home/homepage-profile-preview-fixture.ts",
+        "apps/web/components/features/home/tim-white-catalog.ts"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/public/og/default.png",
+      "pages": [
+        "apps/web/app/(marketing)/pay/page.tsx"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/screenshot-catalog/current/onboarding-dsp-desktop.png",
+      "pages": [
+        "apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    },
+    {
+      "path": "apps/web/screenshot-catalog/current/onboarding-handle-desktop.png",
+      "pages": [
+        "apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx"
+      ],
+      "status": "ungraded",
+      "method": null,
+      "gradedBy": null,
+      "gradedAt": null
+    }
+  ]
+}
