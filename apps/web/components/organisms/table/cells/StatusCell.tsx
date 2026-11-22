@@ -5,13 +5,15 @@ export type StatusCellTone =
   | 'attention'
   | 'neutral'
   | 'negative'
-  | 'info';
+  | 'info'
+  | 'ultra';
 
 const DOT_CLASS: Record<StatusCellTone, string> = {
   positive: 'bg-success-text',
   attention: 'bg-warning',
   negative: 'bg-error',
   info: 'bg-accent',
+  ultra: 'bg-accent-purple',
   neutral: 'bg-quaternary-token',
 };
 

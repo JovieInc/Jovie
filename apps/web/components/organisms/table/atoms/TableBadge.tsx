@@ -1,7 +1,9 @@
 import { Badge } from '@jovie/ui';
 
-/** Neutral table labels use the approved hairline, unfilled `outline` variant. */
-const NEUTRAL_VARIANTS = new Set(['primary', 'secondary']);
+/**
+ * Table label pills use the approved `outline` Badge variant (hairline,
+ * unfilled). Size `sm` keeps them to one 20px text line; no restyling.
+ */
 
 export interface TableBadgeProps
   extends Readonly<{
@@ -20,7 +22,8 @@ export function TableBadge({
   return (
     <Badge
       size={size}
-      variant={NEUTRAL_VARIANTS.has(variant) ? 'outline' : variant}
+      variant='outline'
+      data-table-badge={variant}
       className={className}
     >
       {children}
