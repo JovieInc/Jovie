@@ -241,15 +241,75 @@ The main content area (`<main>`) uses `bg-(--app-shell-content-surface)`, the sh
 
 ### Color & Accent Discipline
 
-`DESIGN.md` is canonical for tokens. Color is neutral by default; accents
-appear only on card and section backgrounds, rotating in visual order
-blue → purple → pink (then orange, then red/green last) with no two
-consecutive sections sharing one. Image cards pick the accent that
-complements the art by color theory and anchor the rotation. Each gradient
-uses one accent centered on its exact token value. Lower OKLCH chroma for
-contrast, and more strongly behind art. The focus/link accent never rotates.
-CTAs stay neutral pills. Color never carries status alone. Full rule:
-`docs/design-system/DETAILS.md` (accent rotation rule).
+`DESIGN.md` is canonical for tokens. Long form with tables and rationale:
+[DETAILS.md, accent rotation rule](../../docs/design-system/DETAILS.md).
+
+**Framing (founder, Nov 22 2026).** Be very Apple in our color approach. The
+picture is the iPod nano lineup, set at night:
+
+- A near-black neutral canvas does the work.
+- Color shows up only as a row of equal-weight, saturated peers, like the nano
+  lineup, glowing against the dark.
+- Functional color is Apple-sparing: one tint per context. Green and red keep
+  success and failure. Nothing relies on color alone.
+
+**Mood.** A monochrome editorial world: high-contrast greys, black and white.
+Color appears only as light: thin hairline strokes, rings and small precise
+points, at most a soft .12 tint. Hues are vivid but used lean and sharp, like a
+downtown fashion editorial, never lush, glossy, rounded or toy-like. One equal
+color per item, with Apple-like restraint. Color is high-fashion and premium:
+saturated but refined, never primary-colored or cartoonish.
+
+#### Accent pack
+
+1. **Pack only.** Accents come from the six-color pack in
+   `apps/web/design/ziawi-color-sot.json` (ion `#11AFFF` blue, ultra `#8E56F5`
+   purple, pulse `#F52BB5` pink, mint `#3FFA8B`, orange `#FF7800`, red
+   `#F72A36`; aqua, gold and flare are aliases) plus neutrals. No Tailwind
+   palette colors, `--geist-*` variables or raw accent-like hex or rgb in
+   components.
+2. **Neutrals dominate.** Greys, black and white make up most of every screen.
+   Accents are small in area. No single accent carries more visual weight than
+   its peers: same tint strength and size per item. No accent is a full-bleed
+   page or hero fill.
+3. **Light, not paint.** An accent shows up as an edge, ring, dot, underline or
+   glow, or at most a faint soft (.12) tint behind a single peer item. Never a
+   solid fill on a card, section, panel or button. Text and CTAs stay neutral,
+   except the focus/link ion.
+4. **One accent per section; peers rotate.** A section gets one accent. If the
+   section is a set of peer items (a data series, a spec or feature grid, a
+   carousel, repeated cards), each item gets exactly one accent, rotating in
+   the fixed order below. One item never carries two colors.
+5. **Fixed order: ion, ultra, pulse, orange, mint, red.** Blue, purple and
+   pink come first. Green and red come last. A rotation list equals this order
+   or a prefix of it. Two adjacent items never share an accent.
+6. **Green and red mean success and failure.** As a decorative or series color,
+   mint and red need a set of 6 or more peers (`GREEN_RED_MIN_SET`). Sets of 5
+   or fewer rotate only ion, ultra, pulse and orange; a 5-item set wraps to ion
+   for item 5, which is not adjacent to item 1. In a set of 1 to 4 items, and
+   at 5, never use green or red as decoration; only real success and error
+   status may. Status components are exempt by role (status props, variants),
+   not by path. Use `getRotationAccent(index, setSize)` from
+   `apps/web/lib/ui/accent-palette.ts` for dynamic sets.
+7. **No two-tone gradients, anywhere.** A gradient, shader or background uses
+   one accent and shades of that hue, centered on the exact token value.
+8. **Image anchor.** A card carrying album art, release artwork or a photo
+   picks the accent that complements the image by color theory and anchors the
+   rotation; the next item cannot reuse it. Lower OKLCH chroma only (never
+   lightness or hue) for contrast, and more strongly behind art.
+9. The focus/link ion never rotates. CTAs stay neutral high-contrast pills.
+   Color never carries status alone.
+
+**Enforcement.** `scripts/invariants/art-direction/accent-pack.mjs`, run by
+`pnpm invariants:check` and the art-direction lane, with a shrink-only baseline
+in `accent-pack.baseline.json` and thresholds in `accent-pack-config.mjs`:
+(a) off-pack color, (b) two-tone gradient, (c) rotation order and adjacency,
+(d) one accent per item or section, (e) green and red minimum set,
+(f) equal weight across peers, (g) solid accent fills on containers. Rules
+(d) to (g) are heuristics: they read the token stream, allow indexed rotations
+and data-viz paths (the allowlist lives in the config), and keep every finding
+reviewable. Do not add ids to the baseline; fix the code or shrink it.
+`pnpm design:accent-pack:inventory` prints the ranked sweep.
 
 For Jovie-owned intentionally art-directed/generated brand imagery, use
 Scene Palette v1 from `apps/web/data/marketing/imageColorPolicy.ts`. The

@@ -431,14 +431,26 @@ CTAs remain high-contrast light pills (not saturated Ion fills) per the
 neutral-CTA rule. Ion carries focus, links, selection, and active navigation.
 Every status also uses text, icon, shape, or pattern — color alone never carries meaning.
 
-Accent color follows the founder rotation rule (Tim, 2026-09-26). It applies
+Accent color follows the founder rotation rule (Tim, 2026-09-26; mood and
+light-only update 2026-11-22). The short contract is "Accent pack" in
+[.claude/rules/ui.md](../../.claude/rules/ui.md#accent-pack). It applies
 app-wide: web, mobile web, iOS, macOS, marketing, and public profiles.
 
 - **Neutral by default.** Color appears only through the rotation below. The
   interactive focus/link accent never rotates. Red and green keep their status
   meaning. CTAs stay neutral high-contrast pills.
-- **Background only.** A rotating accent fills a card or section background
-  (tint, gradient, shader). Text, glyphs, and CTAs stay neutral.
+- **Light, not paint.** Supersedes the earlier "background only" bullet. An
+  accent shows up as an edge, ring, dot, underline or glow, or at most as a
+  faint soft (.12) tint behind a single peer item. Never a solid fill on a
+  card, section, panel or button. Text and CTAs stay neutral, except the
+  focus/link ion.
+- **Neutrals dominate, peers stay equal.** Greys, black and white make up most
+  of every screen. Accents are small, and no accent carries more weight than
+  its peers: same tint and size per item.
+- **Peers rotate.** A section gets one accent. A set of peer items (series, spec
+  grid, carousel) gives each item one accent, rotating ion, ultra, pulse,
+  orange, mint, red. Green and red need a set of 6 or more; sets of 5 or fewer
+  use ion, ultra, pulse, orange and wrap.
 - **Visual-order rotation.** Assign blue (Ion) → purple (Ultra) → pink (Pulse) in
   reading order on each surface. Two consecutive sections or cards never share
   an accent. Orange enters only after those three are used on that surface.

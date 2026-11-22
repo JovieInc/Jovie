@@ -45,6 +45,16 @@ export function markdownSummary(report) {
     lines.push(
       `**CI rounds per merged PR:** mean ${cr.roundsMean.toFixed(2)} (target <= ${cr.target}) · p95 ${cr.roundsP95} · Source Validation first-push pass ${cr.firstPushPassRate === null ? 'n/a' : `${(cr.firstPushPassRate * 100).toFixed(0)}%`} (n=${cr.firstPushSamples})`
     );
+  const d = report.metrics.dora;
+  if (d) {
+    const why = reason => (reason ? ` (n/a: ${reason})` : '');
+    const cfr = d.changeFailureRate;
+    lines.push(
+      `**DORA:** deploys ${d.deployFrequency.perDay === null ? 'n/a' : `${d.deployFrequency.perDay.toFixed(1)}/day (n=${d.deployFrequency.promotions})`}${why(d.deployFrequency.reason)} · ` +
+        `change failure rate ${cfr.rate === null ? 'n/a' : `${(cfr.rate * 100).toFixed(1)}% (${cfr.failed}/${cfr.promotions}, ${cfr.provisional} provisional)`}${why(cfr.reason)} · ` +
+        `failed-deploy recovery p50 ${fmtSeconds(d.recovery.p50)} / p95 ${fmtSeconds(d.recovery.p95)} (n=${d.recovery.n}, open ${d.recovery.open ?? 'n/a'})${why(d.recovery.reason)}`
+    );
+  }
   const blog = report.blogPublishLatency;
   lines.push(
     '',

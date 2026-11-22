@@ -63,8 +63,12 @@ on:
 
 permissions: {}
 
+# Branch dispatches render on a per-run Neon branch and commit only to their
+# own branch, so each branch gets its own lane and two design PRs no longer
+# cancel each other's baseline runs. Main refresh and the schedule open the
+# shared baseline PR, so they keep the one global lane.
 concurrency:
-  group: visual-regression-baseline-refresh
+  group: ${{ github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && format('visual-regression-branch-{0}', github.ref) || 'visual-regression-baseline-refresh' }}
   cancel-in-progress: true
 
 jobs:

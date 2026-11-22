@@ -71,12 +71,6 @@ const TOKEN_MAP = {
   'status.success': '--noir-ion-mint',
   'status.warning': '--noir-ion-gold',
   'status.error': '--noir-ion-flare',
-  'feature.analytics': '--noir-ion-ion',
-  'feature.conversion': '--noir-ion-ultra',
-  'feature.beauty': '--noir-ion-pulse',
-  'feature.links': '--noir-ion-aqua',
-  'feature.speed': '--noir-ion-mint',
-  'feature.pro': '--noir-ion-gold',
 };
 
 /** Parse `--noir-ion-*` anchors from the `:root.dark` block of the CSS. */

@@ -184,6 +184,7 @@ import {
   authorizeFounderSummerUser,
   founderPrincipalHash,
 } from '@/lib/ovie/summer-founder-auth';
+import { FOUNDER_SUMMER_DENIAL } from '@/lib/ovie/summer-founder-denial';
 import { fetchSummerShadow } from '@/lib/ovie/summer-shadow-client';
 import { createSummerAssistantStreamResponse } from '@/lib/ovie/summer-stream';
 import {
@@ -1959,16 +1960,16 @@ export async function POST(req: Request) {
   if (summerTransportRequested) {
     const founderAuthorization = authorizeFounderSummerUser(userId);
     if (founderAuthorization !== 'authorized') {
+      const denial = FOUNDER_SUMMER_DENIAL[founderAuthorization];
       return NextResponse.json(
         {
-          error:
-            founderAuthorization === 'unconfigured'
-              ? 'Founder Summer identity is not configured'
-              : 'Founder Summer access required',
+          error: denial.error,
+          errorCode: denial.errorCode,
+          message: denial.message,
           requestId,
         },
         {
-          status: founderAuthorization === 'unconfigured' ? 503 : 403,
+          status: denial.status,
           headers: { ...corsHeaders, 'x-request-id': requestId },
         }
       );
