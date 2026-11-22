@@ -1,4 +1,3 @@
-import { JOVIE_O_CSS } from '@jovie/ui/brand/jovie-o-motion';
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BRAND_MARK_MUTED_CLASS } from '@/lib/brand/tokens';
@@ -73,14 +72,15 @@ describe('AuthLoader', () => {
   });
 
   describe('muted mark (ovie-o-presence slice 2)', () => {
-    it('draws exactly one decorative O in the muted value for both themes', () => {
+    it('draws exactly one decorative static BrandLogo in the muted value', () => {
       const { container } = render(<AuthLoader />);
-      const marks = container.querySelectorAll('svg.jovie-o');
+      const marks = container.querySelectorAll('[data-brand-variant]');
 
       expect(marks).toHaveLength(1);
       const mark = marks[0];
       expect(mark).toHaveAttribute('aria-hidden', 'true');
-      expect(mark).toHaveAttribute('height', '24');
+      expect(mark).toHaveAttribute('data-brand-mark-size', '24');
+      expect(mark.querySelector('svg')).toHaveAttribute('height', '24');
       expect(mark).toHaveClass('text-logo-muted', 'dark:text-quaternary-token');
       expect(BRAND_MARK_MUTED_CLASS).toBe(
         'text-logo-muted dark:text-quaternary-token'
@@ -91,35 +91,25 @@ describe('AuthLoader', () => {
       );
     });
 
-    it('turns while loading, then holds still after three turns (3.75 s)', () => {
+    it('caps the turn at three iterations in CSS, with no timer', () => {
       const { container } = render(<AuthLoader />);
-      const mark = container.querySelector('svg.jovie-o');
+      const mark = container.querySelector<HTMLElement>('[data-brand-variant]');
 
-      expect(mark).toHaveAttribute('data-jo-state', 'loading');
-      act(() => {
-        vi.advanceTimersByTime(3749);
-      });
-      expect(mark).toHaveAttribute('data-jo-state', 'loading');
-      act(() => {
-        vi.advanceTimersByTime(1);
-      });
-      expect(mark).toHaveAttribute('data-jo-state', 'idle');
+      expect(mark?.style.animationIterationCount).toBe('3');
+      expect(mark?.style.animationDuration).toBe('var(--duration-o-turn)');
+      const before = mark?.outerHTML;
       act(() => {
         vi.advanceTimersByTime(30_000);
       });
-      expect(mark).toHaveAttribute('data-jo-state', 'idle');
+      expect(mark?.outerHTML).toBe(before);
     });
 
-    it('moves only transform, and reduced motion leaves no running animation', () => {
-      render(<AuthLoader />);
-      const turnRule = JOVIE_O_CSS.match(
-        /\[data-jo-state=loading\] \.jo-turn\{[^}]*\}/
-      )?.[0];
-      expect(turnRule).toContain('jo-turn');
-      expect(JOVIE_O_CSS).toMatch(/@keyframes jo-turn\{to\{transform:rotate/);
-      const reduced = JOVIE_O_CSS.slice(JOVIE_O_CSS.indexOf('@media'));
-      expect(reduced).toContain('prefers-reduced-motion:reduce');
-      expect(reduced).toContain('animation:none!important');
+    it('only animates under motion-safe, so reduced motion has no turn', () => {
+      const { container } = render(<AuthLoader />);
+      const mark = container.querySelector('[data-brand-variant]');
+
+      expect(mark).toHaveClass('motion-safe:animate-spin');
+      expect(mark?.className).not.toMatch(/(^|\s)animate-spin/);
     });
   });
 });
