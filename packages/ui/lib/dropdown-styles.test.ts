@@ -197,16 +197,14 @@ describe('dropdown-styles', () => {
 
     it('shares selected, checked, and disabled state styles across row bases', () => {
       expect(MENU_ITEM_SELECTED).toContain('bg-surface-hover');
-      // Dark keeps the surface-1 fill; light needs the hover fill because
-      // surface-1 equals the elevated menu surface there.
-      expect(MENU_ITEM_SELECTED).toContain('dark:bg-surface-1');
+      // surface-1 equals the elevated menu surface in light, so rows use the
+      // hover fill in both themes (no dark: override).
+      expect(MENU_ITEM_SELECTED).not.toContain('dark:');
 
       const selectedStateClasses = [
         'data-[selected=true]:bg-surface-hover',
-        'dark:data-[selected=true]:bg-surface-1',
         'data-[selected=true]:text-primary-token',
         'data-[state=checked]:bg-surface-hover',
-        'dark:data-[state=checked]:bg-surface-1',
         'data-[state=checked]:text-primary-token',
       ];
       const disabledStateClasses = [
