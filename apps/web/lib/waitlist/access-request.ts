@@ -1,7 +1,6 @@
 import 'server-only';
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
-import { readCachedAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { ensurePriceLockForUserSafely } from '@/lib/billing/price-lock.server';
 import {
@@ -20,6 +19,7 @@ import { normalizeEmail } from '@/lib/utils/email';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatformFromUrl } from '@/lib/utils/social-platform';
 import type { WaitlistRequestPayload } from '@/lib/validation/schemas';
+import { holdStaleGoldenPathAdmission } from '@/lib/waitlist/admission-evidence.server';
 import {
   type AdmissionScore,
   isOutrankedByQueue,
@@ -563,20 +563,10 @@ export async function submitWaitlistAccessRequest(
   // attempts re-serialize cleanly.
   const result = await withSerializableRetry<InternalTransactionResult>(
     async () => {
-      // A route's positive decision cannot survive expiry or revocation during
-      // serialization backoff. Only downgrade here; held identities stay held.
-      let goldenPathAdmission = input.goldenPathAdmission;
-      if (goldenPathAdmission?.admit) {
-        const readiness = await readCachedAcquisitionEligibility().catch(
-          () => null
-        );
-        if (readiness?.eligible !== true || readiness.verdict !== 'ELIGIBLE') {
-          goldenPathAdmission = {
-            admit: false,
-            reason: 'hold_golden_path_not_green',
-          };
-        }
-      }
+      // Downgrade a stale admit. Held identities stay held.
+      const goldenPathAdmission = await holdStaleGoldenPathAdmission(
+        input.goldenPathAdmission
+      );
       return withSystemIngestionSession(
         async tx => {
           await lockWaitlistEmail(tx, normalizedEmail);
@@ -692,6 +682,7 @@ export async function submitWaitlistAccessRequest(
             },
           });
 
+          // Confirmation is the waitlist receipt. A hold does not Slack or admit.
           if (nextStatus === 'waitlisted' && !suppressCanaryCommunications) {
             await enqueueWaitlistEmailJob(tx, {
               entryId: entry.id,
@@ -719,6 +710,9 @@ export async function submitWaitlistAccessRequest(
   // proxy-state cache or re-fire Slack on no-op writes.
   const statusActuallyChanged =
     result.statusChange.previousStatus !== result.statusChange.newStatus;
+  const admissionHeld =
+    result.outcome === 'waitlisted_gate_on' ||
+    result.outcome === 'waitlisted_capacity_full';
 
   // Finalize Redis cache invalidation outside the serializable transaction so
   // we don't extend its lock window with non-DB I/O.
@@ -756,6 +750,7 @@ export async function submitWaitlistAccessRequest(
     !result.statusChange.existed ||
     statusActuallyChanged;
   if (
+    !admissionHeld &&
     isNewSignupOutcome &&
     isStatusFreshlyAssigned &&
     !suppressCanaryCommunications
@@ -768,13 +763,16 @@ export async function submitWaitlistAccessRequest(
   if (!suppressCanaryCommunications) {
     if (input.appUserId)
       await ensurePriceLockForUserSafely(input.appUserId, 'waitlist');
-    await recordWaitlistJoin({
-      entryId: result.entryId,
-      acquisitionId: input.acquisitionId,
-      appUserId: input.appUserId,
-      admitted:
-        result.outcome === 'accepted' || result.outcome === 'already_accepted',
-    });
+    if (!admissionHeld) {
+      await recordWaitlistJoin({
+        entryId: result.entryId,
+        acquisitionId: input.acquisitionId,
+        appUserId: input.appUserId,
+        admitted:
+          result.outcome === 'accepted' ||
+          result.outcome === 'already_accepted',
+      });
+    }
   }
 
   logger.info('[waitlist] Access request processed', {
