@@ -12,7 +12,7 @@ vi.mock('@/lib/analytics', () => ({ track }));
 vi.mock('./ViewTable', () => ({ ViewTable: () => <div /> }));
 vi.mock('@/components/shell/Sparkline', () => ({ Sparkline: () => <div /> }));
 
-import { ViewShell } from './ViewShell';
+import { SharedViewPage } from './SharedViewPage';
 
 const view = {
   title: 'Weekly snapshot',
@@ -20,7 +20,7 @@ const view = {
   updatedAt: new Date('2026-11-22T00:00:00Z'),
 };
 
-describe('ViewShell', () => {
+describe('SharedViewPage', () => {
   beforeEach(() => {
     track.mockClear();
     push.mockClear();
@@ -28,7 +28,7 @@ describe('ViewShell', () => {
   });
 
   it('shows the signup prompt to signed-out visitors and tracks the click', () => {
-    render(<ViewShell view={view} token={TOKEN} signedIn={false} />);
+    render(<SharedViewPage view={view} token={TOKEN} signedIn={false} />);
     expect(track).toHaveBeenCalledWith('shared_view_viewed', {
       signedIn: false,
     });
@@ -45,7 +45,7 @@ describe('ViewShell', () => {
       token: 'n'.repeat(32),
       created: true,
     });
-    render(<ViewShell view={view} token={TOKEN} signedIn />);
+    render(<SharedViewPage view={view} token={TOKEN} signedIn />);
     expect(screen.queryByTestId('view-signup-card')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Save as dashboard' }));
     expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled();
@@ -61,7 +61,7 @@ describe('ViewShell', () => {
 
   it('shows an inline error and re-enables the button on failure', async () => {
     fetchMock.mockRejectedValue(new Error('boom'));
-    render(<ViewShell view={view} token={TOKEN} signedIn />);
+    render(<SharedViewPage view={view} token={TOKEN} signedIn />);
     fireEvent.click(screen.getByRole('button', { name: 'Save as dashboard' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Could not save this view'
@@ -73,7 +73,9 @@ describe('ViewShell', () => {
   });
 
   it('shows In your dashboards when the viewer owns the view', () => {
-    render(<ViewShell view={view} token={TOKEN} signedIn viewerOwnsView />);
+    render(
+      <SharedViewPage view={view} token={TOKEN} signedIn viewerOwnsView />
+    );
     expect(
       screen.queryByRole('button', { name: 'Save as dashboard' })
     ).toBeNull();

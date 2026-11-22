@@ -6,16 +6,16 @@ import { SaveViewButton } from './SaveViewButton';
 import { ViewAnalytics, ViewSignupCard } from './ViewAnalytics';
 import { ViewRenderer } from './ViewRenderer';
 
-type ShellView = Pick<SharedView, 'title' | 'spec' | 'updatedAt'>;
+type SharedViewPageView = Pick<SharedView, 'title' | 'spec' | 'updatedAt'>;
 
 /** Dashboard-looking frame for a shared view; signed-in viewers can save it to their dashboards. */
-export function ViewShell({
+export function SharedViewPage({
   view,
   token,
   signedIn,
   viewerOwnsView = false,
 }: Readonly<{
-  view: ShellView;
+  view: SharedViewPageView;
   token: string;
   signedIn: boolean;
   viewerOwnsView?: boolean;
