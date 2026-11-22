@@ -3036,11 +3036,146 @@ jobs:
     name: ci-fast (profile browser)
     # Secret-free browser proof for public-profile visual, accessibility, and
     # runtime behavior. The aggregate makes this required on PR and merge-group
-    # heads whenever the bounded profile surface selector matches. It also runs
+    # heads whenever the bounded profile surface selector matches.
+    needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    timeout-minutes: 15
+    if: >-
+      !cancelled() &&
+      needs.ci-lockfile-preflight.result == 'success' &&
+      needs.ci-path-changes.result == 'success' &&
+      (
+        github.event_name != 'merge_group' ||
+        (
+          needs.ci-merge-group-workspace.result == 'success' &&
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
+      )
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Fetch base-branch history
+        # The profile selector reads history only through
+        # `git diff --name-only --no-renames <base> HEAD -- <pathspecs>`, a
+        # pure tree diff: it needs HEAD's full commit/tree ancestry plus
+        # origin/<base>, never historical blobs (rename detection, the only
+        # blob reader, is disabled). A plain --unshallow downloaded every
+        # historical blob (~47s on the hosted runner). --filter=blob:none
+        # keeps every commit and tree, so the selection is identical. The
+        # selector runs with GIT_NO_LAZY_FETCH=1 to prove no promisor fetch.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_BRANCH: ${{ github.base_ref || 'main' }}
+        run: |
+          set -euo pipefail
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+          git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+      - name: Select public-profile browser admission
+        id: profile-browser
+        shell: bash
+        env:
+          GIT_NO_LAZY_FETCH: '1'
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            BASE="${{ github.event.merge_group.base_sha }}"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin "${{ github.base_ref }}" --no-tags
+            BASE="origin/${{ github.base_ref }}"
+          elif [[ -n "${{ github.event.before }}" && "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
+            BASE="${{ github.event.before }}"
+          else
+            BASE="HEAD^1"
+          fi
+
+          CHANGED_FILES="$(git diff --diff-filter=ACDMRT --name-only --no-renames "$BASE" HEAD -- \
+            ':(glob)apps/web/app/\[username\]/**' \
+            'apps/web/app/(marketing)/renders/profile-admission/**' \
+            'apps/web/app/(marketing)/renders/**' \
+            'apps/web/app/api/profile/**' \
+            'apps/web/components/features/home/homepage-profile-preview-fixture.ts' \
+            'apps/web/components/features/release/SmartLinkProviderButton.tsx' \
+            'apps/web/components/features/profile/**' \
+            'apps/web/components/organisms/CookieBannerMount.tsx' \
+            'apps/web/components/organisms/CookieBannerSection.tsx' \
+            'apps/web/lib/cookies/**' \
+            'apps/web/lib/profile/**' \
+            'apps/web/lib/rate-limit/**' \
+            'apps/web/lib/tracking/pac-**' \
+            'apps/web/styles/design-system.css' \
+            'apps/web/tests/e2e/profile-admission.spec.ts' \
+            'apps/web/tests/e2e/profile/public-profile-layout.spec.ts' \
+            'apps/web/tests/e2e/profile/responsive-shell.spec.ts' \
+            ':(glob)apps/web/tests/e2e/utils/profile-admission-diagnostics*.mjs' \
+            'apps/web/tests/e2e/utils/public-profile-layout-invariant.ts' \
+            'apps/web/tests/e2e/utils/public-surface-helpers.ts' \
+            'apps/web/tests/components/profile/ClaimBanner.test.tsx' \
+            'apps/web/tests/unit/profile/profile-shell-token-contract.test.ts')"
+          if [[ -n "$CHANGED_FILES" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.profile-browser.outputs.run == 'true'
+        with:
+          reuse_merge_group_workspace: 'true'
+      - name: Setup Playwright (Chromium)
+        if: steps.profile-browser.outputs.run == 'true'
+        uses: ./.github/actions/setup-playwright
+      - name: Test profile admission diagnostic redaction
+        if: steps.profile-browser.outputs.run == 'true'
+        run: >-
+          node --experimental-strip-types --test --experimental-test-coverage
+          --test-coverage-include='apps/web/tests/e2e/utils/profile-admission-diagnostics.mjs'
+          --test-coverage-include='apps/web/app/(marketing)/renders/profile-admission/guard.ts'
+          apps/web/tests/e2e/utils/profile-admission-diagnostics.test.mjs
+      - name: Run public-profile browser admission
+        if: steps.profile-browser.outputs.run == 'true'
+        env:
+          CI: 'true'
+          DATABASE_URL: postgresql://jovie:jovie@127.0.0.1:1/jovie?sslmode=disable
+          E2E_SKIP_SEED: '1'
+          E2E_SKIP_WARMUP: '1'
+          E2E_WEB_SERVER_COMMAND: pnpm run dev:fast
+          NEXT_PUBLIC_AUTH_MOCK: '1'
+          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          PUBLIC_NOAUTH_SMOKE: '1'
+          PROFILE_ADMISSION_DIAGNOSTICS: '1'
+        run: >-
+          node .github/scripts/guard-playwright-artifacts.mjs --run --
+          pnpm --filter @jovie/web exec playwright test
+          tests/e2e/profile-admission.spec.ts
+          --config=playwright.config.noauth.ts
+          --project=chromium
+          --reporter=line
+      - name: Upload profile admission failure evidence
+        if: ${{ failure() && steps.profile-browser.outputs.run == 'true' && hashFiles('apps/web/test-results/**') != '' }}
+        continue-on-error: true
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-results/
+          retention-days: 3
+
+  ci-profile-viewport-sweep:
+    name: ci-fast (profile viewport sweep)
+    # Secret-free browser proof for public-profile visual, accessibility, and
+    # runtime behavior. The aggregate makes this required on PR and merge-group
+    # heads whenever the sweep surface selector matches. It runs
     # the viewport sweep (tests/e2e/profile/viewport-sweep.spec.ts): geometric
     # layout checks across widths 320..1440, continuous resize, embedded panes,
     # tabs and overlays for the public profile and the golden-path public pages.
-    # The sweep is blocking here: ci-fast fails closed on this job's result.
+    # Separate from ci-fast (profile browser) so neither job's timeout budget is
+    # raised; ci-fast fails closed on this job's result.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     runs-on: ubuntu-24.04
     permissions:
@@ -3144,33 +3279,6 @@ jobs:
       - name: Setup Playwright (Chromium)
         if: steps.profile-browser.outputs.run == 'true'
         uses: ./.github/actions/setup-playwright
-      - name: Test profile admission diagnostic redaction
-        if: steps.profile-browser.outputs.run == 'true'
-        run: >-
-          node --experimental-strip-types --test --experimental-test-coverage
-          --test-coverage-include='apps/web/tests/e2e/utils/profile-admission-diagnostics.mjs'
-          --test-coverage-include='apps/web/app/(marketing)/renders/profile-admission/guard.ts'
-          apps/web/tests/e2e/utils/profile-admission-diagnostics.test.mjs
-      - name: Run public-profile browser admission
-        if: steps.profile-browser.outputs.run == 'true'
-        env:
-          CI: 'true'
-          DATABASE_URL: postgresql://jovie:jovie@127.0.0.1:1/jovie?sslmode=disable
-          E2E_SKIP_SEED: '1'
-          E2E_SKIP_WARMUP: '1'
-          E2E_WEB_SERVER_COMMAND: pnpm run dev:fast
-          NEXT_PUBLIC_AUTH_MOCK: '1'
-          NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1'
-          NEXT_PUBLIC_E2E_MODE: '1'
-          PUBLIC_NOAUTH_SMOKE: '1'
-          PROFILE_ADMISSION_DIAGNOSTICS: '1'
-        run: >-
-          node .github/scripts/guard-playwright-artifacts.mjs --run --
-          pnpm --filter @jovie/web exec playwright test
-          tests/e2e/profile-admission.spec.ts
-          --config=playwright.config.noauth.ts
-          --project=chromium
-          --reporter=line
       - name: Run viewport sweep (public profile and golden-path pages)
         if: steps.profile-browser.outputs.run == 'true'
         env:
@@ -3199,7 +3307,6 @@ jobs:
       - name: Upload viewport sweep screenshots and evidence
         # Always upload (pass or fail) so before/after shots exist for every head.
         if: ${{ always() && steps.profile-browser.outputs.run == 'true' && hashFiles('apps/web/test-results/viewport-sweep-shots/**') != '' }}
-        continue-on-error: true
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: viewport-sweep-${{ github.run_id }}-${{ github.run_attempt }}
@@ -3209,10 +3316,9 @@ jobs:
           public-images: 'true'
       - name: Upload profile admission failure evidence
         if: ${{ failure() && steps.profile-browser.outputs.run == 'true' && hashFiles('apps/web/test-results/**') != '' }}
-        continue-on-error: true
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
-          name: profile-admission-browser-${{ github.run_id }}-${{ github.run_attempt }}
+          name: profile-viewport-sweep-failure-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
           retention-days: 3
 
@@ -3227,6 +3333,7 @@ jobs:
         ci-fast-typecheck,
         ci-fast-remaining,
         ci-profile-admission-browser,
+        ci-profile-viewport-sweep,
         ci-fast-structural-python,
         ci-fast-structural-web,
         ci-fast-structural-lanes,
@@ -3249,16 +3356,17 @@ jobs:
           TYPECHECK_RESULT: ${{ needs.ci-fast-typecheck.result }}
           REMAINING_RESULT: ${{ needs.ci-fast-remaining.result }}
           PROFILE_BROWSER_RESULT: ${{ needs.ci-profile-admission-browser.result }}
+          PROFILE_VIEWPORT_SWEEP_RESULT: ${{ needs.ci-profile-viewport-sweep.result }}
           STRUCTURAL_PYTHON_RESULT: ${{ needs.ci-fast-structural-python.result }}
           STRUCTURAL_WEB_RESULT: ${{ needs.ci-fast-structural-web.result }}
           STRUCTURAL_LANES_RESULT: ${{ needs.ci-fast-structural-lanes.result }}
         run: |
           set -euo pipefail
-          if [[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" || "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$STRUCTURAL_WEB_RESULT" != "success" || "$STRUCTURAL_LANES_RESULT" != "success" ]]; then
-            echo "::error title=ci-fast failed closed::typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT structural-python=$STRUCTURAL_PYTHON_RESULT structural-web=$STRUCTURAL_WEB_RESULT structural-lanes=$STRUCTURAL_LANES_RESULT"
+          if [[ "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" || "$PROFILE_BROWSER_RESULT" != "success" || "$PROFILE_VIEWPORT_SWEEP_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$STRUCTURAL_WEB_RESULT" != "success" || "$STRUCTURAL_LANES_RESULT" != "success" ]]; then
+            echo "::error title=ci-fast failed closed::typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT profile-viewport-sweep=$PROFILE_VIEWPORT_SWEEP_RESULT structural-python=$STRUCTURAL_PYTHON_RESULT structural-web=$STRUCTURAL_WEB_RESULT structural-lanes=$STRUCTURAL_LANES_RESULT"
             exit 1
           fi
-          echo "All ci-fast lane groups passed: typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT structural-python=$STRUCTURAL_PYTHON_RESULT structural-web=$STRUCTURAL_WEB_RESULT structural-lanes=$STRUCTURAL_LANES_RESULT"
+          echo "All ci-fast lane groups passed: typecheck=$TYPECHECK_RESULT remaining=$REMAINING_RESULT profile-browser=$PROFILE_BROWSER_RESULT profile-viewport-sweep=$PROFILE_VIEWPORT_SWEEP_RESULT structural-python=$STRUCTURAL_PYTHON_RESULT structural-web=$STRUCTURAL_WEB_RESULT structural-lanes=$STRUCTURAL_LANES_RESULT"
 
   ci-promptfoo-evals:
     name: Promptfoo Evals (deterministic)

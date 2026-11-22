@@ -65,7 +65,7 @@ test('CI prevention verifier runs for every source PR and exact merge-group head
   assert.match(ciFastRemainingBlock, /echo "skip=false"/);
   assert.match(
     ciFastAggregateBlock,
-    /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*ci-fast-structural-lanes,\s*\]/s
+    /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-profile-viewport-sweep,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*ci-fast-structural-lanes,\s*\]/s
   );
   assert.match(
     ciFastAggregateBlock,
@@ -81,7 +81,11 @@ test('CI prevention verifier runs for every source PR and exact merge-group head
   );
   assert.match(
     ciFastAggregateBlock,
-    /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \|\| "\$STRUCTURAL_LANES_RESULT" != "success" \]\]/
+    /PROFILE_VIEWPORT_SWEEP_RESULT: \$\{\{ needs\.ci-profile-viewport-sweep\.result \}\}/
+  );
+  assert.match(
+    ciFastAggregateBlock,
+    /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$PROFILE_VIEWPORT_SWEEP_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \|\| "\$STRUCTURAL_LANES_RESULT" != "success" \]\]/
   );
   assert.match(ciFastAggregateBlock, /exit 1/);
   assert.doesNotMatch(

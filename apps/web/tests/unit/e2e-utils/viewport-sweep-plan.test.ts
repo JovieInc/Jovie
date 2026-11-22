@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  chunkSteps,
   planResizeSteps,
   SWEEP_EMBEDDED_WIDTHS,
   SWEEP_FIXED_WIDTHS,
@@ -37,5 +38,20 @@ describe('viewport sweep plan', () => {
 
   it('rejects an empty range', () => {
     expect(() => planResizeSteps(320, 320, 40)).toThrow();
+  });
+
+  it('chunks a resize plan into contiguous segments that preserve every step', () => {
+    const steps = planResizeSteps(1440, 320, SWEEP_RESIZE_STEP);
+    const segments = chunkSteps(steps, 8);
+    expect(segments.flat()).toEqual(steps);
+    for (const segment of segments) {
+      expect(segment.length).toBeGreaterThan(0);
+      expect(segment.length).toBeLessThanOrEqual(8);
+    }
+  });
+
+  it('rejects a non-positive chunk size', () => {
+    expect(() => chunkSteps([1, 2], 0)).toThrow();
+    expect(() => chunkSteps([1, 2], 1.5)).toThrow();
   });
 });

@@ -19,6 +19,7 @@ export type ViewportSweepViolationCode =
   | 'tab_indicator_outside_active_tab'
   | 'tab_underline_wider_than_tab'
   | 'stray_accent_line'
+  | 'accent_line_not_at_top'
   | 'content_after_footer'
   | 'overlay_wider_than_popover_max'
   | 'overlay_is_bottom_sheet_on_desktop'
@@ -468,4 +469,34 @@ export async function auditViewport(
 
     return violations;
   }, merged) as Promise<readonly ViewportSweepViolation[]>;
+}
+
+/**
+ * The cover accent line (JOV-14241) is a thin line pinned to the top edge of
+ * the profile stage. If its top offset within the stage container is not 0 it
+ * renders as a stray blue line partway down the page (the /tim bug). The
+ * element is optional: profiles without it pass.
+ */
+export async function auditCoverAccentLine(
+  page: Page
+): Promise<readonly ViewportSweepViolation[]> {
+  return page.evaluate(() => {
+    const violations: { code: 'accent_line_not_at_top'; detail: string }[] = [];
+    for (const line of Array.from(
+      document.querySelectorAll<HTMLElement>('.profile-cover-accent-line')
+    )) {
+      const container = line.parentElement;
+      if (!container) continue;
+      const offset =
+        line.getBoundingClientRect().top -
+        container.getBoundingClientRect().top;
+      if (Math.abs(offset) > 1) {
+        violations.push({
+          code: 'accent_line_not_at_top',
+          detail: `profile-cover-accent-line top offset ${Math.round(offset)}px within its stage (expected 0)`,
+        });
+      }
+    }
+    return violations;
+  });
 }

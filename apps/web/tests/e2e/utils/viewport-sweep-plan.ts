@@ -40,3 +40,23 @@ export function planResizeSteps(
   const up = [...down].reverse().slice(1);
   return [...down, ...up];
 }
+
+/**
+ * Split a resize plan into consecutive segments of at most `size` widths so
+ * each Playwright test covers one segment and fits the default per-test
+ * timeout. Segments are contiguous: the last width of one segment is followed
+ * by the first width of the next in the original plan.
+ */
+export function chunkSteps(
+  steps: readonly number[],
+  size: number
+): readonly (readonly number[])[] {
+  if (!Number.isInteger(size) || size <= 0) {
+    throw new Error('chunkSteps needs an integer size > 0');
+  }
+  const segments: number[][] = [];
+  for (let index = 0; index < steps.length; index += size) {
+    segments.push(steps.slice(index, index + size));
+  }
+  return segments;
+}

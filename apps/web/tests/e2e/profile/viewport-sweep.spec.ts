@@ -36,12 +36,14 @@ import {
 import { getOverflowingElements } from '../utils/mobile-overflow';
 import { installPublicRouteMocks } from '../utils/public-surface-helpers';
 import {
+  auditCoverAccentLine,
   auditViewport,
   settleViewport,
   type ViewportSweepViolation,
 } from '../utils/viewport-sweep-audit';
 import { auditOverlay } from '../utils/viewport-sweep-overlay-audit';
 import {
+  chunkSteps,
   planResizeSteps,
   SWEEP_EMBEDDED_WIDTHS,
   SWEEP_FIXED_WIDTHS,
@@ -68,6 +70,15 @@ const GOLDEN_PATH_PAGES = [
   { id: 'pricing', path: '/pricing' },
 ] as const;
 const GOLDEN_PATH_WIDTHS = [320, 390, 768, 1024, 1440] as const;
+
+// Every test below fits the config's default per-test timeout: one test per
+// width, per tab, per resize segment and per route/width combination.
+const RESIZE_SEGMENT_SIZE = 8;
+const MENU_RESIZE_SEGMENT_SIZE = 7;
+const GOLDEN_RESIZE_SEGMENT_SIZE = 5;
+const TAB_STATES = profileStates.filter(
+  s => s.kind === 'tab' && s.trigger !== 'Events'
+);
 
 async function shot(
   page: Page,
@@ -128,6 +139,7 @@ async function auditProfileNow(
 ) {
   await settleViewport(page);
   collector.add(label, await auditViewport(page, { kind: 'profile' }));
+  collector.add(label, await auditCoverAccentLine(page));
   const offenders = await getOverflowingElements(page);
   if (offenders.length > 0) {
     collector.addText(
@@ -142,32 +154,38 @@ async function auditProfileNow(
   }
 }
 
-/** Home -> Music -> About with real mouse clicks, auditing each. */
-async function sweepTabs(
+/** Click one tab with a real mouse click and audit it. */
+async function sweepTab(
+  page: Page,
+  collector: ReturnType<typeof createCollector>,
+  width: number,
+  variant: string,
+  state: (typeof TAB_STATES)[number]
+) {
+  const tab = page.getByRole('button', { name: state.trigger, exact: true });
+  if ((await tab.count()) === 0) {
+    test.info().annotations.push({
+      type: 'state-unavailable',
+      description: `${variant} ${width}px: no ${state.trigger} tab`,
+    });
+    return;
+  }
+  await prepareProfileState(page, state);
+  await auditProfileNow(
+    page,
+    collector,
+    `${variant} ${width}px tab ${state.trigger}`
+  );
+  await shot(page, width, `${variant}-${state.id}`);
+}
+
+/** Full-page scroll: scroll every scrollable region to its end and re-audit. */
+async function sweepScrollToEnd(
   page: Page,
   collector: ReturnType<typeof createCollector>,
   width: number,
   variant: string
 ) {
-  for (const state of profileStates.filter(s => s.kind === 'tab')) {
-    if (state.trigger === 'Events') continue;
-    const tab = page.getByRole('button', { name: state.trigger, exact: true });
-    if ((await tab.count()) === 0) {
-      test.info().annotations.push({
-        type: 'state-unavailable',
-        description: `${variant} ${width}px: no ${state.trigger} tab`,
-      });
-      continue;
-    }
-    await prepareProfileState(page, state);
-    await auditProfileNow(
-      page,
-      collector,
-      `${variant} ${width}px tab ${state.trigger}`
-    );
-    await shot(page, width, `${variant}-${state.id}`);
-  }
-  // Full-page scroll: scroll every scrollable region to its end and re-audit.
   await page.evaluate(() => {
     window.scrollTo(0, document.documentElement.scrollHeight);
     for (const element of Array.from(
@@ -190,14 +208,29 @@ async function sweepTabs(
 }
 
 test.describe('viewport sweep: public profile', () => {
-  test.describe.configure({ timeout: 180_000 });
-
   for (const width of SWEEP_FIXED_WIDTHS) {
-    test(`claimed profile tabs and scroll at ${width}px`, async ({ page }) => {
+    test(`claimed profile initial state at ${width}px`, async ({ page }) => {
       const collector = createCollector();
       await openProfile(page, PROFILE_VARIANTS.claimed, width);
       await auditProfileNow(page, collector, `claimed ${width}px initial`);
-      await sweepTabs(page, collector, width, 'claimed');
+      collector.assertClean();
+    });
+
+    for (const state of TAB_STATES) {
+      test(`claimed profile ${state.trigger} tab at ${width}px`, async ({
+        page,
+      }) => {
+        const collector = createCollector();
+        await openProfile(page, PROFILE_VARIANTS.claimed, width);
+        await sweepTab(page, collector, width, 'claimed', state);
+        collector.assertClean();
+      });
+    }
+
+    test(`claimed profile scrolled to end at ${width}px`, async ({ page }) => {
+      const collector = createCollector();
+      await openProfile(page, PROFILE_VARIANTS.claimed, width);
+      await sweepScrollToEnd(page, collector, width, 'claimed');
       collector.assertClean();
     });
 
@@ -277,86 +310,111 @@ test.describe('viewport sweep: public profile', () => {
 });
 
 test.describe('viewport sweep: continuous resize', () => {
-  test.describe.configure({ timeout: 240_000 });
+  const segments = chunkSteps(
+    planResizeSteps(1440, 320, SWEEP_RESIZE_STEP),
+    RESIZE_SEGMENT_SIZE
+  );
 
   for (const [variant, url] of [
     ['claimed', PROFILE_VARIANTS.claimed],
     ['unclaimed', PROFILE_VARIANTS.unclaimed],
   ] as const) {
-    test(`${variant} profile survives step-down and step-up resize without reload`, async ({
+    for (const [segmentIndex, segment] of segments.entries()) {
+      const first = segment[0];
+      const last = segment.at(-1);
+      test(`${variant} profile resize segment ${segmentIndex} (${first}px to ${last}px) without reload`, async ({
+        page,
+      }) => {
+        const collector = createCollector();
+        await openProfile(page, url, first);
+        for (const [index, width] of segment.entries()) {
+          await page.setViewportSize({ width, height: SWEEP_HEIGHT });
+          await auditProfileNow(
+            page,
+            collector,
+            `${variant} resize segment ${segmentIndex} step ${index} -> ${width}px`
+          );
+          if (index === 0 || index === segment.length - 1 || width === 320) {
+            await shot(
+              page,
+              width,
+              `${variant}-resize-${segmentIndex}-${index}`
+            );
+          }
+        }
+        collector.assertClean();
+      });
+    }
+  }
+
+  const menuSegments = chunkSteps(
+    planResizeSteps(1440, 320, 120),
+    MENU_RESIZE_SEGMENT_SIZE
+  );
+  for (const [segmentIndex, segment] of menuSegments.entries()) {
+    test(`menu stays valid while resizing with the menu open, segment ${segmentIndex}`, async ({
       page,
     }) => {
       const collector = createCollector();
-      await openProfile(page, url, 1440);
-      const steps = planResizeSteps(1440, 320, SWEEP_RESIZE_STEP);
-      for (const [index, width] of steps.entries()) {
+      await openProfile(page, PROFILE_VARIANTS.claimed, segment[0]);
+      const menu = profileStates.find(s => s.id === 'menu');
+      if (!menu) throw new Error('menu profile state missing');
+      await prepareProfileState(page, menu);
+      for (const width of segment) {
         await page.setViewportSize({ width, height: SWEEP_HEIGHT });
-        await auditProfileNow(
-          page,
-          collector,
-          `${variant} resize step ${index} -> ${width}px`
-        );
-        if (
-          index === 0 ||
-          width === 320 ||
-          index === steps.length - 1 ||
-          width === 760
-        ) {
-          await shot(page, width, `${variant}-resize-${index}`);
-        }
+        await settleViewport(page);
+        collector.add(`menu open resize ${width}px`, await auditOverlay(page));
       }
       collector.assertClean();
     });
   }
-
-  test('menu stays valid while resizing with the menu open', async ({
-    page,
-  }) => {
-    const collector = createCollector();
-    await openProfile(page, PROFILE_VARIANTS.claimed, 1440);
-    const menu = profileStates.find(s => s.id === 'menu');
-    if (!menu) throw new Error('menu profile state missing');
-    await prepareProfileState(page, menu);
-    for (const width of planResizeSteps(1440, 320, 120)) {
-      await page.setViewportSize({ width, height: SWEEP_HEIGHT });
-      await settleViewport(page);
-      collector.add(`menu open resize ${width}px`, await auditOverlay(page));
-    }
-    collector.assertClean();
-  });
 });
 
 test.describe('viewport sweep: golden-path public pages', () => {
-  test.describe.configure({ timeout: 180_000 });
+  async function openGoldenPage(page: Page, routePath: string, width: number) {
+    await installPublicRouteMocks(page);
+    await page.setViewportSize({ width, height: SWEEP_HEIGHT });
+    const response = await page.goto(routePath, {
+      waitUntil: 'domcontentloaded',
+    });
+    expect(response?.status(), `${routePath} status`).toBeLessThan(400);
+    await settleViewport(page);
+  }
 
   for (const route of GOLDEN_PATH_PAGES) {
-    test(`${route.id} (${route.path}) across widths and resize`, async ({
-      page,
-    }) => {
-      const collector = createCollector();
-      await installPublicRouteMocks(page);
-      await page.setViewportSize({ width: 1440, height: SWEEP_HEIGHT });
-      const response = await page.goto(route.path, {
-        waitUntil: 'domcontentloaded',
-      });
-      expect(response?.status(), `${route.path} status`).toBeLessThan(400);
-      await settleViewport(page);
-      const widths = [
-        ...GOLDEN_PATH_WIDTHS,
-        ...planResizeSteps(1440, 320, 160),
-      ];
-      for (const [index, width] of widths.entries()) {
-        await page.setViewportSize({ width, height: SWEEP_HEIGHT });
-        await settleViewport(page);
+    for (const width of GOLDEN_PATH_WIDTHS) {
+      test(`${route.id} (${route.path}) at ${width}px`, async ({ page }) => {
+        const collector = createCollector();
+        await openGoldenPage(page, route.path, width);
         collector.add(
-          `${route.id} ${width}px (${index})`,
+          `${route.id} ${width}px`,
           await auditViewport(page, { kind: 'page' })
         );
-        if (index < GOLDEN_PATH_WIDTHS.length) {
-          await shot(page, width, `page-${route.id}`);
+        await shot(page, width, `page-${route.id}`);
+        collector.assertClean();
+      });
+    }
+
+    const segments = chunkSteps(
+      planResizeSteps(1440, 320, 160),
+      GOLDEN_RESIZE_SEGMENT_SIZE
+    );
+    for (const [segmentIndex, segment] of segments.entries()) {
+      test(`${route.id} (${route.path}) resize segment ${segmentIndex} without reload`, async ({
+        page,
+      }) => {
+        const collector = createCollector();
+        await openGoldenPage(page, route.path, segment[0]);
+        for (const [index, width] of segment.entries()) {
+          await page.setViewportSize({ width, height: SWEEP_HEIGHT });
+          await settleViewport(page);
+          collector.add(
+            `${route.id} resize segment ${segmentIndex} ${width}px (${index})`,
+            await auditViewport(page, { kind: 'page' })
+          );
         }
-      }
-      collector.assertClean();
-    });
+        collector.assertClean();
+      });
+    }
   }
 });

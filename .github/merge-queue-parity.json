@@ -108,6 +108,13 @@
       "expiresOn": "2027-02-09"
     },
     {
+      "job": "ci.yml#ci-profile-viewport-sweep",
+      "kind": "gap",
+      "reason": "The profile viewport sweep browser proof runs only in the queue; no PR job runs the same Playwright spec.",
+      "createdOn": "2026-11-22",
+      "expiresOn": "2027-02-09"
+    },
+    {
       "job": "ci.yml#ci-fast-structural-python",
       "kind": "gap",
       "reason": "Structural python lanes run only in the queue; no PR job runs the same lane commands.",
