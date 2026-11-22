@@ -11,9 +11,8 @@ import {
   prepareBetterAuthEmailOtp,
 } from '../helpers/auth';
 import {
-  releaseGoldenPathTestBindings,
   selectGoldenPathArtist,
-  unpublishGoldenPathTestProfiles,
+  teardownGoldenPathRun,
 } from './helpers/claim-dogfood-fixtures';
 import { completeGoldenPathBillingJourney } from './helpers/golden-path-billing';
 import { openHomeWelcome } from './helpers/golden-path-home-welcome';
@@ -62,6 +61,8 @@ let TEST_SPOTIFY_ARTIST: { id: string; name: string; url: string } = {
   name: '',
   url: '',
 };
+/** Journey identities this run created; teardown touches only these. */
+const GOLDEN_PATH_RUN_EMAILS = new Set<string>();
 
 const IS_LOCAL_AUTH_BYPASS =
   process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
@@ -507,6 +508,7 @@ async function recordOperatorApproval(
 /** Visible email-OTP sign-in; seeds invitation only when closed-signup kill switch is on. */
 async function createFreshUserOnce(page: import('@playwright/test').Page) {
   const email = `gp-${Date.now().toString(36)}+e2e@test.jovie.com`;
+  GOLDEN_PATH_RUN_EMAILS.add(email);
   const sql = neon(process.env.DATABASE_URL!);
   if (process.env.FEATURE_PUBLIC_SIGNUP_CLOSED === 'true') {
     await issueGoldenPathInvitation(async (q, p) => sql.query(q, p), email);
@@ -833,13 +835,12 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
   // Fresh browser — no inherited auth state
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  // Teardown: release the fixture binding this run created so the next run
-  // (or the prod-cert pool) starts from an unclaimed artist.
+  // Teardown: release only the bindings of identities this run created. The
+  // CI Neon branch is shared with smoke lanes that skip this journey.
   test.afterAll(async () => {
     if (!process.env.DATABASE_URL) return;
     const teardownSql = neon(process.env.DATABASE_URL);
-    await releaseGoldenPathTestBindings(teardownSql);
-    await unpublishGoldenPathTestProfiles(teardownSql);
+    await teardownGoldenPathRun(teardownSql, [...GOLDEN_PATH_RUN_EMAILS]);
   });
 
   test.beforeEach(() => {

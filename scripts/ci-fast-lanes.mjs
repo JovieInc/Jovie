@@ -59,6 +59,8 @@ export {
   escapeAnnotationProperty,
 } from './lib/ci-fast-annotations.mjs';
 
+export { orderSourceGuardsByFailureRate } from './lib/source-guard-order.mjs';
+
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
@@ -110,6 +112,7 @@ import {
 import { STRUCTURAL_PYTEST_FILES } from './lib/ci-structural-pytest-files.mjs';
 import { MERGED_WITH_BASE_POOL_CONCURRENCY } from './lib/merged-with-base-pool-config.mjs';
 import { scriptContractNodeArgs } from './lib/script-contract-node-args.mjs';
+import { orderSourceGuardsByFailureRate } from './lib/source-guard-order.mjs';
 import { testsAffectedBy } from './lib/test-file-dependencies.mjs';
 import { TEST_PLANNER_CONTRACT_TESTS } from './lib/test-planner-contract-tests.mjs';
 
@@ -745,40 +748,6 @@ export function loadSourceGuardHistory(
   } catch {
     return null;
   }
-}
-
-/** Fail-probability per second. 0 without usable runs. */
-function guardFailureScore(entry) {
-  const runs = Number(entry?.runs);
-  const failures = Number(entry?.failures);
-  if (
-    !Number.isInteger(runs) ||
-    runs <= 0 ||
-    !Number.isInteger(failures) ||
-    failures < 0
-  )
-    return 0;
-  const failProbability = Math.min(failures / runs, 1);
-  const durationMs = Number(entry?.durationMs);
-  const durationSeconds =
-    Number.isFinite(durationMs) && durationMs > 0 ? durationMs / 1000 : 0;
-  // No measured duration keeps the fail-probability. Never invent a duration.
-  return durationSeconds > 0
-    ? failProbability / durationSeconds
-    : failProbability;
-}
-
-/** Stable reorder: higher score first, ties keep manifest order. */
-export function orderSourceGuardsByFailureRate(guards, entries) {
-  if (!entries) return [...guards];
-  return guards
-    .map((guard, index) => ({
-      guard,
-      index,
-      score: guardFailureScore(entries[guard?.id]),
-    }))
-    .sort((a, b) => b.score - a.score || a.index - b.index)
-    .map(item => item.guard);
 }
 
 /**
@@ -1465,6 +1434,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/shipping-slo.test.mjs',
   'scripts/lib/__tests__/shipping-slo-snapshot.test.mjs',
   'scripts/lib/__tests__/shipping-slo-history.test.mjs',
+  'scripts/lib/__tests__/shipping-slo-dora.test.mjs',
+  'scripts/lib/__tests__/shipping-slo-queue-removal.test.mjs',
   'scripts/lib/__tests__/stage-collect-linear.test.mjs',
   'scripts/lib/__tests__/stage-derive.test.mjs',
   'scripts/lib/__tests__/stage-events.test.mjs',

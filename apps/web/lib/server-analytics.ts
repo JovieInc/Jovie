@@ -259,6 +259,19 @@ export const SERVER_ANALYTICS_EVENTS = {
   },
   // signup-funnel/v2: no source entity, so a step can never be joined back
   // to a profile, user, or visitor.
+  first_dashboard_ready: {
+    category: 'funnel',
+    properties: [
+      'duration_ms',
+      'server_ms',
+      'document_ms',
+      'boot_ms',
+      'settle_ms',
+      'outcome',
+      'new_account',
+      'cohort',
+    ],
+  },
   funnel_step: {
     category: 'funnel',
     properties: [
