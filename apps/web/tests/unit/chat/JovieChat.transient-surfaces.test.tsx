@@ -274,4 +274,27 @@ describe('JovieChat transient surfaces (JOV-5413)', () => {
     ) as HTMLElement;
     expect(dragOverlay).not.toContainElement(dragDock as HTMLElement);
   });
+
+  it('renders composerDock directly above the composer in the thread layout and nothing without it', () => {
+    const withDock = renderWithQueryClient(
+      <JovieChat
+        profileId='profile-1'
+        composerDock={() => <div data-testid='dock-fixture'>Ask</div>}
+      />
+    );
+    const dock = withDock.container.querySelector(
+      '[data-testid="chat-composer-dock"]'
+    ) as HTMLElement;
+    const fixture = withDock.getByTestId('dock-fixture');
+    expect(dock).toContainElement(fixture);
+    expect(
+      fixture.compareDocumentPosition(withDock.getByTestId('chat-input')) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    withDock.unmount();
+
+    const without = renderWithQueryClient(<JovieChat profileId='profile-1' />);
+    expect(without.queryByTestId('dock-fixture')).toBeNull();
+    expect(without.queryByTestId('chat-composer-dock-slot')).toBeNull();
+  });
 });

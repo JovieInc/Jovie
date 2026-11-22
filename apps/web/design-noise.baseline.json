@@ -27,9 +27,6 @@
     "apps/web/app/error/user-creation-failed/page.tsx": {
       "icon-tile": 1
     },
-    "apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx": {
-      "icon-tile": 1
-    },
     "apps/web/app/out/[id]/InterstitialClient.tsx": {
       "icon-tile": 1
     },
@@ -133,9 +130,6 @@
     "apps/web/components/features/dashboard/organisms/jovie-work-feed/JovieWorkFeed.tsx": {
       "icon-tile": 1
     },
-    "apps/web/components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form.tsx": {
-      "icon-tile": 2
-    },
     "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab.tsx": {
       "icon-tile": 1
     },
@@ -164,7 +158,7 @@
       "icon-tile": 1
     },
     "apps/web/components/features/home/HeroSpotifySearch.tsx": {
-      "icon-tile": 2
+      "icon-tile": 1
     },
     "apps/web/components/features/library-share/LibrarySharePassphraseGate.tsx": {
       "icon-tile": 1

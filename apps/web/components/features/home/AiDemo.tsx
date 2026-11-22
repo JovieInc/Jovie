@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { Pause, Play } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -267,8 +268,7 @@ export function AiDemo({
         <div className='flex-1 text-center text-xs text-tertiary-token'>
           Jovie AI
         </div>
-        <button
-          type='button'
+        <PlainButton
           onClick={prefersReducedMotion ? showNextDemo : togglePause}
           aria-label={toggleLabel}
           className={cn(
@@ -283,7 +283,7 @@ export function AiDemo({
           ) : (
             <Pause className='h-3 w-3' aria-hidden='true' />
           )}
-        </button>
+        </PlainButton>
       </div>
 
       {isPremium && contextChips.length > 0 ? (
@@ -291,7 +291,7 @@ export function AiDemo({
           {contextChips.map(chip => (
             <span
               key={chip}
-              className='rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-3xs text-tertiary-token'
+              className='rounded-full bg-surface-2 px-2.5 py-1 text-3xs text-tertiary-token'
             >
               {chip}
             </span>

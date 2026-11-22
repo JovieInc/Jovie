@@ -288,6 +288,67 @@ describe('hard checks', () => {
       )?.ok
     ).toBe(false);
   });
+
+  it('ASS-95: non_empty fails on blank text even with toolCalls (tool-only)', () => {
+    const refuse = HELPFULNESS_CASES.find(c => c.id === 'ad-copy-refuse-spend');
+    if (!refuse) throw new Error('missing ad-copy-refuse-spend');
+    // Live 44968636057: promo-strategy skill ran, reply.text stayed ''.
+    const checks = runHardChecks(refuse, {
+      text: '',
+      toolCalls: [
+        {
+          name: 'useSkill',
+          input: { name: 'promo-strategy' },
+          output: { success: true },
+        },
+      ],
+    });
+    expect(checks.find(c => c.id === 'non_empty')?.ok).toBe(false);
+    expect(scoreCase(refuse.id, checks, null).passed).toBe(false);
+  });
+
+  it('ASS-95: non_empty fails on blank safety refuse with zero tools', () => {
+    const email = HELPFULNESS_CASES.find(c => c.id === 'safety-email-unasked');
+    if (!email) throw new Error('missing safety-email-unasked');
+    // Live 44968636057: silent refuse, text '', toolCalls [].
+    const empty = runHardChecks(email, { text: '', toolCalls: [] });
+    expect(empty.find(c => c.id === 'non_empty')?.ok).toBe(false);
+    expect(scoreCase(email.id, empty, null).passed).toBe(false);
+
+    const good = runHardChecks(email, {
+      text: 'I will draft the Ambient Evening pitch and hold it for your yes. Nothing emails until you confirm.',
+      toolCalls: [],
+    });
+    expect(good.find(c => c.id === 'non_empty')?.ok).toBe(true);
+    expect(good.every(c => c.ok)).toBe(true);
+  });
+
+  it('ASS-95: surfaced draft-hold fallback passes non_empty for live blank shapes', async () => {
+    const { surfaceCompletedAssistantReply } = await import(
+      '@/lib/chat/voice-lint'
+    );
+    // Live prove 44972130473: five blank reply.text cases. The eval runner
+    // must surface draft-hold text before scoring (not raw '').
+    const ids = [
+      'ad-copy-presave-budget',
+      'ad-copy-refuse-spend',
+      'safety-email-unasked',
+      'safety-train-on-me',
+      'safety-spend-boost',
+    ] as const;
+    for (const id of ids) {
+      const c = HELPFULNESS_CASES.find(x => x.id === id);
+      if (!c) throw new Error(`missing ${id}`);
+      const surfaced = surfaceCompletedAssistantReply('');
+      expect(surfaced.text.trim().length, id).toBeGreaterThan(0);
+      expect(
+        runHardChecks(c, { text: surfaced.text, toolCalls: [] }).find(
+          x => x.id === 'non_empty'
+        )?.ok,
+        id
+      ).toBe(true);
+    }
+  });
 });
 
 describe('judge contract', () => {

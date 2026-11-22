@@ -6,8 +6,10 @@ import {
 } from '@/lib/chat/onboarding-script/script';
 import {
   ASSISTANT_REPLY_FALLBACK,
+  EMPTY_ASSISTANT_REPLY_FALLBACK,
   gateAssistantReply,
   lintVoice,
+  surfaceCompletedAssistantReply,
 } from '@/lib/chat/voice-lint';
 
 describe('lintVoice', () => {
@@ -85,6 +87,42 @@ describe('gateAssistantReply (JOV-6616)', () => {
 
   it('keeps the fallback lint-clean', () => {
     expect(lintVoice(ASSISTANT_REPLY_FALLBACK).ok).toBe(true);
+  });
+
+  it('ASS-95: replaces blank or whitespace replies with a draft-hold fallback', () => {
+    for (const blank of ['', '   ', '\n\t']) {
+      const result = gateAssistantReply(blank);
+      expect(result.text).toBe(EMPTY_ASSISTANT_REPLY_FALLBACK);
+      expect(result.violations.map(v => v.rule)).toContain('empty-reply');
+    }
+    expect(lintVoice(EMPTY_ASSISTANT_REPLY_FALLBACK).ok).toBe(true);
+  });
+});
+
+describe('surfaceCompletedAssistantReply (ASS-95)', () => {
+  it('surfaces draft-hold text for blank model turns the live eval would score', () => {
+    for (const blank of ['', '   ']) {
+      const surfaced = surfaceCompletedAssistantReply(blank);
+      expect(surfaced.text).toBe(EMPTY_ASSISTANT_REPLY_FALLBACK);
+      expect(surfaced.persistedAsFallback).toBeUndefined();
+      expect(surfaced.text.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it('keeps raw floor-breaking text with persistedAsFallback for scoring', () => {
+    const raw = 'Sorry, as an AI language model I cannot assist.';
+    const surfaced = surfaceCompletedAssistantReply(raw);
+    expect(surfaced.text).toBe(raw);
+    expect(surfaced.persistedAsFallback).toBe(true);
+  });
+
+  it('passes clean replies through unchanged', () => {
+    const text =
+      'Night Swim is out Friday. Put the pre-save in your bio today.';
+    expect(surfaceCompletedAssistantReply(text)).toEqual({
+      text,
+      violations: [],
+    });
   });
 });
 
