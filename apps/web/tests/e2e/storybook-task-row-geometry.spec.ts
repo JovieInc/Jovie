@@ -23,14 +23,23 @@ test.describe('sticky table header occlusion (JOV-9079)', () => {
         const header = table.getByRole('columnheader').first();
         await expect(header).toBeVisible();
         const initialBounds = await header.boundingBox();
-        await table.evaluate(element => {
-          element.parentElement!.scrollTop = 2000;
+        // Dense 32px rows (DRI-21) shrink total scroll vs the old 40px fixture
+        // budget (~2000). Scroll to the container max so occlusion still fires.
+        const scrolled = await table.evaluate(element => {
+          const root = element.parentElement!;
+          const maxScroll = Math.max(0, root.scrollHeight - root.clientHeight);
+          root.scrollTop = maxScroll;
+          return { maxScroll, scrollTop: root.scrollTop };
         });
+        expect(
+          scrolled.maxScroll,
+          'fixture must remain tall enough to scroll under the sticky header'
+        ).toBeGreaterThan(500);
         await expect
           .poll(() =>
             table.evaluate(element => element.parentElement!.scrollTop)
           )
-          .toBe(2000);
+          .toBe(scrolled.maxScroll);
         const bounds = await header.boundingBox();
         expect(bounds!.y).toBe(initialBounds!.y);
         // Prove that content actually lies beneath the sticky header, so this
