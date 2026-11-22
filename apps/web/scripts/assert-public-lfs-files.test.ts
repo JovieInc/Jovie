@@ -62,10 +62,13 @@ describe('assert-public-lfs-files', () => {
   it('fails a CI build and only warns locally or on Vercel', () => {
     const { publicDir } = fixture();
     expect(() =>
-      assertPublicLfsFiles({ publicDir, ci: 'true', vercel: undefined })
+      assertPublicLfsFiles({ publicDir, ci: 'true', vercel: '' })
     ).toThrow(/2 file\(s\) .* are Git LFS pointers/);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    expect(assertPublicLfsFiles({ publicDir, ci: undefined })).toHaveLength(2);
+    // An undefined option falls back to process.env, which is CI=true in CI.
+    expect(
+      assertPublicLfsFiles({ publicDir, ci: '', vercel: '' })
+    ).toHaveLength(2);
     expect(
       assertPublicLfsFiles({ publicDir, ci: '1', vercel: '1' })
     ).toHaveLength(2);
