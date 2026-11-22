@@ -1,5 +1,4 @@
 import { Card, type CardIntent } from '@jovie/ui';
-import { cva, type VariantProps } from 'class-variance-authority';
 import {
   type ComponentPropsWithoutRef,
   type ElementType,
@@ -7,28 +6,31 @@ import {
 } from 'react';
 import { cn } from '@/lib/utils';
 
-const contentSurfaceCardVariants = cva(
-  'border border-(--app-shell-border) shadow-none',
-  {
-    variants: {
-      surface: {
-        default: 'rounded-xl bg-surface-1',
-        details: 'rounded-xl bg-surface-1',
-        marketing: 'rounded-xl bg-surface-1',
-        nested: 'rounded-lg bg-surface-0',
-        settings: 'rounded-xl bg-surface-1',
-        table: 'rounded-xl bg-surface-1',
-      },
-    },
-    defaultVariants: {
-      surface: 'default',
-    },
-  }
-);
+const CONTENT_SURFACE_BASE = 'border border-(--app-shell-border) shadow-none';
+
+const CONTENT_SURFACE_CLASSES = {
+  default: 'rounded-xl bg-surface-1',
+  details: 'rounded-xl bg-surface-1',
+  marketing: 'rounded-xl bg-surface-1',
+  nested: 'rounded-lg bg-surface-0',
+  settings: 'rounded-xl bg-surface-1',
+  table: 'rounded-xl bg-surface-1',
+} as const;
+
+type ContentSurface = keyof typeof CONTENT_SURFACE_CLASSES;
+
+/** Surface class lookup. A plain map, not an inline cva, so Card is not restyled by a variant table. */
+const contentSurfaceCardVariants = (props?: {
+  readonly surface?: ContentSurface | null;
+}) =>
+  `${CONTENT_SURFACE_BASE} ${CONTENT_SURFACE_CLASSES[props?.surface ?? 'default']}`;
 
 export interface ContentSurfaceCardProps
   extends Omit<ComponentPropsWithoutRef<'div'>, 'children'>,
-    VariantProps<typeof contentSurfaceCardVariants> {
+    Pick<
+      NonNullable<Parameters<typeof contentSurfaceCardVariants>[0]>,
+      'surface'
+    > {
   readonly children?: ComponentPropsWithoutRef<'div'>['children'];
   readonly as?: ElementType;
   /** Why this box is a card. See "Card intent" in .claude/rules/ui.md. */
