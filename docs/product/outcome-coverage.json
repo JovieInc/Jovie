@@ -248,8 +248,13 @@
         "inspectPressSource",
         "proposeAvatarUpload"
       ],
-      "checks": [],
-      "gap": "Unit tests only."
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/chat-profile-edit-outcome.test.ts",
+          "test": "a confirmed chat bio and name are saved on the profile and audited",
+          "runs": "merge"
+        }
+      ]
     },
     {
       "id": "chat-links",
