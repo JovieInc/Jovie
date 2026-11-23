@@ -1,7 +1,7 @@
 'use client';
 
 import { PlainButton } from '@jovie/ui';
-import type { OStrokePose } from '@jovie/ui/brand';
+import type { OStrokeProps } from '@jovie/ui/brand/OStroke';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
@@ -15,7 +15,8 @@ import './SidebarOPresence.css';
 // for it. Until it arrives the button shows today's glyph, which is the same
 // circle (OStroke's rest pose matches it), so nothing shifts or flashes.
 const OStroke = dynamic(
-  () => import('@jovie/ui/brand').then(mod => ({ default: mod.OStroke })),
+  () =>
+    import('@jovie/ui/brand/OStroke').then(mod => ({ default: mod.OStroke })),
   {
     loading: () => (
       <BrandLogo
@@ -28,6 +29,8 @@ const OStroke = dynamic(
     ),
   }
 );
+
+type OStrokePose = NonNullable<OStrokeProps['pose']>;
 
 export const SIDEBAR_O_PRESENCE_TEST_ID = 'sidebar-o-presence';
 export const SIDEBAR_O_STATUS_TEST_ID = 'sidebar-o-status';

@@ -14,6 +14,7 @@
     ".": "./index.ts",
     "./atoms/*": "./atoms/*",
     "./brand": "./brand/index.ts",
+    "./brand/OStroke": "./brand/OStroke.tsx",
     "./brand/geometry.gen": "./brand/geometry.gen.ts",
     "./brand/jovie-o-geometry": "./brand/jovie-o-geometry.ts",
     "./brand/*": "./brand/*",
