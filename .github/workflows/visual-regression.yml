@@ -854,6 +854,35 @@ jobs:
             echo "Uploaded ${#oids[@]} objects for files on main matching \`$LFS_GLOB\`."
           } >> "$GITHUB_STEP_SUMMARY"
 
+  report-outcome:
+    # Nothing fails without a repair or a success (Tim 2026-11-22): a red run
+    # opens or updates one remediation issue that the lanes remediation loop
+    # picks up, and the next green resolves it. Branch and manual runs report
+    # nothing.
+    name: Report outcome
+    needs: [visual-baseline-setup, visual-regression, publish-baselines]
+    if: ${{ always() && github.ref == 'refs/heads/main' && github.event_name != 'workflow_dispatch' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .github/actions
+            .nvmrc
+            packages/api-client
+            scripts/lib
+            scripts/remediation-signal-intake.mjs
+          sparse-checkout-cone-mode: false
+      - uses: ./.github/actions/report-outcome
+        with:
+          results: ${{ toJSON(needs) }}
+          linear-api-key: ${{ secrets.LINEAR_API_KEY }}
+          intake-disabled: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+
   report-scheduled-failure:
     # Nothing fails silently (docs/design-system/GOVERNANCE.md): a red scheduled
     # run opens or updates one standing issue, deduped by title. Not required.

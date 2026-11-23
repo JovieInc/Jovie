@@ -536,10 +536,11 @@ describe('ChatEntityRightPanelHost', () => {
 
     const registeredPanel = mockUseRegisterRightPanel.mock.calls.at(-1)?.[0];
     render(registeredPanel as React.ReactElement);
-
     expect(
-      screen.getByTestId('chat-rail-entity-card-release')
-    ).toBeInTheDocument();
+      screen
+        .getByTestId('chat-rail-entity-card-release')
+        .closest('[data-rail-context-occupied="true"]')
+    ).not.toBeNull();
     expect(screen.getByText('Single Context')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Dismiss Release Context' })

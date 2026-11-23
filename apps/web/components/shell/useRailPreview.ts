@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SHELL_RAIL_PREVIEW_GRACE_MS } from './rail-motion';
+import { isAvailable } from './useRailFocusReturn';
+
+const RIGHT_SLOT = '[data-testid="app-shell-right-rail"]';
+const RIGHT_PEEK =
+  '[data-testid="app-shell-right-rail"] [data-rail-presentation="overlay"]';
 
 // Radix places interactive overlays outside their trigger's DOM subtree. Follow
 // open ARIA controls only, including submenu controls, rather than all portals.
@@ -62,6 +67,7 @@ export function useRailPreview({
   const pointerTarget = useRef<EventTarget | null>(null);
   const pointerPoint = useRef<{ x: number; y: number } | null>(null);
   const pressedToggle = useRef<Element | null>(null);
+  const focusedRightPeek = useRef<HTMLElement | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const intentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelIntent = useCallback(() => {
@@ -76,6 +82,7 @@ export function useRailPreview({
     cancel();
     cancelIntent();
     blocked.current = true;
+    focusedRightPeek.current = null;
     setIsPreview(false);
   }, [cancel, cancelIntent]);
 
@@ -84,6 +91,7 @@ export function useRailPreview({
     cancelIntent();
     setIsPreview(false);
     setPresentationMode('pinned');
+    focusedRightPeek.current = null;
     blocked.current = false;
   }, [cancel, cancelIntent, resetKey, enabled]);
 
@@ -102,6 +110,22 @@ export function useRailPreview({
   useEffect(() => {
     if (!enabled) return;
     const selector = `[data-rail-toggle="${side}"]:not([data-rail-preview-trigger="false"]), [data-rail-preview-region="${side}"]`;
+    const contextOccupiesRightSlot = () =>
+      side === 'right' &&
+      Boolean(
+        document.querySelector(
+          `${RIGHT_SLOT} [data-rail-context-occupied="true"]`
+        )
+      );
+    const rightSlotOccupied = () =>
+      contextOccupiesRightSlot() ||
+      (side === 'right' &&
+        !isPreview &&
+        Boolean(
+          document.querySelector(
+            `${RIGHT_SLOT} [data-rail-phase][aria-hidden="false"]`
+          )
+        ));
     const inside = (target: EventTarget | null) =>
       target instanceof Element &&
       target.isConnected &&
@@ -124,6 +148,17 @@ export function useRailPreview({
       }, SHELL_RAIL_PREVIEW_GRACE_MS);
     };
     const enter = (event: Event) => {
+      const target = event.target;
+      if (side === 'right' && isPreview && event.type === 'focusin') {
+        focusedRightPeek.current =
+          target instanceof HTMLElement &&
+          (target.closest(RIGHT_PEEK) ||
+            ownedRailOverlays(RIGHT_PEEK).some(overlay =>
+              overlay.contains(target)
+            ))
+            ? target
+            : null;
+      }
       // Re-entry can arrive from move() after an explicit close. It is still
       // pointer intent: keep the dwell and touch guard instead of treating
       // movement as immediate keyboard focus and moving the toggle mid-click.
@@ -158,19 +193,12 @@ export function useRailPreview({
         pressedToggle.current.contains(event.target)
       )
         return;
-      // An entity inspector already owns the right surface. Hover must not
-      // reinterpret it as an unsolicited artist-profile preview.
-      if (
-        side === 'right' &&
-        document.querySelector(
-          '[data-testid="app-shell-right-rail"] [data-rail-phase][aria-hidden="false"]'
-        ) &&
-        !isPreview
-      )
-        return;
+      // An inspector or in-flow context stack already owns the right slot.
+      if (rightSlotOccupied()) return;
       cancel();
       if (blocked.current) return;
       const open = () => {
+        if (!isPreview) focusedRightPeek.current = null;
         setPresentationMode('preview');
         setIsPreview(true);
       };
@@ -183,7 +211,8 @@ export function useRailPreview({
       if (intentTimer.current !== null) return;
       intentTimer.current = setTimeout(() => {
         intentTimer.current = null;
-        if (pointerInside.current && !blocked.current) open();
+        if (pointerInside.current && !blocked.current && !rightSlotOccupied())
+          open();
       }, enterIntentMs);
     };
     const leave = (event: MouseEvent | FocusEvent) => {
@@ -258,13 +287,40 @@ export function useRailPreview({
             ?.focus();
       }
     };
+    const yieldToContext = () => {
+      if (
+        !contextOccupiesRightSlot() ||
+        document.querySelector(
+          '[data-rail-toggle="right"][data-rail-pinned="true"]'
+        )
+      )
+        return false;
+
+      const active = document.activeElement;
+      const prior = focusedRightPeek.current;
+      const lostPreviewFocus =
+        prior &&
+        (active === prior || (active === document.body && !prior.isConnected));
+      dismissPreview();
+      // The whole shared slot must relinquish floating placement now,
+      // not after the ordinary preview exit finishes.
+      setPresentationMode('pinned');
+      if (lostPreviewFocus) {
+        Array.from(
+          document.querySelectorAll<HTMLElement>('[data-rail-toggle="right"]')
+        )
+          .find(isAvailable)
+          ?.focus({ preventScroll: true });
+      }
+      return true;
+    };
     const observer = new MutationObserver(() => {
-      if (!isPreview) return;
+      if (!isPreview || yieldToContext()) return;
       // A hovered portal may detach without delivering pointerout.
       pointerInside.current = inside(pointerTarget.current);
       scheduleLeave();
     });
-    if (isPreview && !pinned)
+    if (isPreview && !pinned && !yieldToContext())
       observer.observe(document.body, {
         subtree: true,
         childList: true,
@@ -275,6 +331,7 @@ export function useRailPreview({
           'aria-hidden',
           'hidden',
           'data-state',
+          'data-rail-context-occupied',
           'id',
         ],
       });

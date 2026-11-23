@@ -1,8 +1,9 @@
 'use client';
 
 import { PlainButton } from '@jovie/ui';
-import { Loader2, Pause, Play } from 'lucide-react';
+import { Loader2, Pause } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
+import { PlayIcon } from '@/components/atoms/PlayIcon';
 import { SeekBar } from '@/components/atoms/SeekBar';
 import { toast } from '@/components/feedback';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
@@ -123,7 +124,7 @@ export function SmartLinkAudioPreview({
           ) : isPlaying ? (
             <Pause className='h-3.5 w-3.5' aria-hidden='true' />
           ) : (
-            <Play className='h-3.5 w-3.5 translate-x-px' aria-hidden='true' />
+            <PlayIcon size={14} aria-hidden='true' />
           )}
         </PlainButton>
 

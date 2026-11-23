@@ -15,7 +15,6 @@ const meta = {
   args: {
     userId: 'dock-bridge-story',
     collapsed: false,
-    children: () => null,
     fetchImpl: async () =>
       Response.json({
         version: 1,

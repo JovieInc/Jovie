@@ -483,4 +483,17 @@ describe('SidebarDock', () => {
     expect(measure.mock.calls.length).toBeGreaterThan(mounted);
     measure.mockRestore();
   });
+
+  it('reports the icon-rail status once per label change', () => {
+    const onStatusChange = vi.fn();
+    const props = { userId: 'one', collapsed: true, updateControl: update };
+    const { rerender } = render(
+      <SidebarDock {...props} onStatusChange={onStatusChange} />
+    );
+    rerender(<SidebarDock {...props} onStatusChange={onStatusChange} />);
+    expect(onStatusChange).toHaveBeenCalledTimes(1);
+    expect(onStatusChange).toHaveBeenCalledWith(
+      expect.objectContaining({ label: 'Update available' })
+    );
+  });
 });

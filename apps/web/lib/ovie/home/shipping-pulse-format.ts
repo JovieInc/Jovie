@@ -25,3 +25,8 @@ export function shippingSnapshotCaption(at: string | null | undefined): string {
     ? `Snapshot ${new Date(timestamp).toISOString().slice(0, 16).replace('T', ' ')} UTC`
     : 'Snapshot time unknown';
 }
+
+/** The measured 7-day count itself, or null when not measured. */
+export function weekCount(measurement: CountMeasurement): number | null {
+  return measurement.state === 'not-measured' ? null : measurement.value;
+}

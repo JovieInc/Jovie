@@ -12,12 +12,12 @@ import {
   Megaphone,
   Pause,
   PencilLine,
-  Play,
   Radio,
 } from 'lucide-react';
 import type { ComponentType, ReactNode } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
+import { PlayIcon } from '@/components/atoms/PlayIcon';
 import { CreditList } from '@/components/molecules/CreditList';
 import {
   DrawerAsyncToggle,
@@ -340,7 +340,10 @@ export function ReleaseEntityHeader({
                 {isPlaying ? (
                   <Pause className='h-4 w-4 text-on-media drop-shadow-sm' />
                 ) : (
-                  <Play className='h-4 w-4 translate-x-px text-on-media drop-shadow-sm' />
+                  <PlayIcon
+                    size={16}
+                    className='text-on-media drop-shadow-sm'
+                  />
                 )}
               </PlainButton>
             </div>
