@@ -4,7 +4,8 @@ import { Checkbox } from '@jovie/ui';
 import { alignment } from '@/components/organisms/table/table.styles';
 import { cn } from '@/lib/utils';
 export interface AudienceRowSelectionCellProps {
-  readonly rowNumber: number;
+  /** Admin/debug tables only. User-facing tables never show a row number. */
+  readonly rowNumber?: number;
   readonly isChecked: boolean;
   readonly displayName: string | null;
   readonly onToggle: () => void;
@@ -32,19 +33,23 @@ export function AudienceRowSelectionCell({
         onClick={event => event.stopPropagation()}
         onKeyDown={event => event.stopPropagation()}
       >
-        <span
-          className={cn(
-            'select-none text-2xs tabular-nums text-tertiary-token transition-opacity',
-            isChecked ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
-          )}
-          aria-hidden='true'
-        >
-          {rowNumber}
-        </span>
+        {rowNumber === undefined ? null : (
+          <span
+            className={cn(
+              'select-none text-2xs tabular-nums text-tertiary-token transition-opacity',
+              isChecked ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
+            )}
+            aria-hidden='true'
+          >
+            {rowNumber}
+          </span>
+        )}
         <div
           className={cn(
             'absolute inset-0 flex items-center justify-center transition-opacity',
-            isChecked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            isChecked
+              ? 'opacity-100'
+              : 'opacity-0 focus-within:opacity-100 group-hover:opacity-100'
           )}
         >
           <Checkbox

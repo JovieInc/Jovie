@@ -12,10 +12,11 @@
 export const SIDEBAR_WIDTH = 360; // px
 
 /**
- * Standard table row heights — unified 40px baseline across all tables.
+ * Fallback table row height (px) for tables that name no `rowMode`. It equals
+ * `TABLE_ROW_MODES.compact.rowHeight`; the row-mode custom property is the
+ * single source of truth when a mode is set.
  */
 export const TABLE_ROW_HEIGHTS = {
-  COMPACT: 40,
   STANDARD: 40,
 } as const;
 
