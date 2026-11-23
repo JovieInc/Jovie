@@ -747,7 +747,6 @@
   "apps/web/tests/unit/components/features/admin/hud/OvieShippingStateCard.test.tsx": 1002,
   "apps/web/tests/unit/components/organisms/AppShellFrame.test.tsx": 573,
   "apps/web/tests/unit/components/organisms/DesktopTitlebar.test.tsx": 718,
-  "apps/web/tests/unit/components/organisms/UnifiedSidebar.library.test.tsx": 922,
   "apps/web/tests/unit/cookie-banner-fixes.test.tsx": 802,
   "apps/web/tests/unit/dashboard/CatalogHealthSection.test.tsx": 535,
   "apps/web/tests/unit/dashboard/ReleaseProviderMatrix.test.tsx": 1204,

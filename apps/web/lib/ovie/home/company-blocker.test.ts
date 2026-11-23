@@ -6,7 +6,11 @@ import {
   type CompanyStateSnapshot,
   REVENUE_CONE_STEPS,
 } from '@/lib/ovie/company-state';
-import { companyBlocker, homeConstraint } from './company-blocker';
+import {
+  companyBlocker,
+  homeConstraint,
+  NEXT_STEP_COPY,
+} from './company-blocker';
 
 const NOW = new Date('2026-11-08T23:00:00.000Z');
 
@@ -191,16 +195,51 @@ describe('companyBlocker', () => {
           {
             id: 'certification:public_profile',
             firstObservedAt: '2026-11-07T10:00:00.000Z',
-            nextAction: 'Re-run prod-cert after the profile fix deploys',
+            cause: 'product_failure',
+            nextAction:
+              'Trace the affected cohort through x; separate abandonment, UI, technical, identity, eligibility, and event loss.',
           } as Input['investigations'][number],
         ],
       }),
       NOW
     );
     expect(blocker?.since).toBe('2026-11-07T10:00:00.000Z');
-    expect(blocker?.nextAction).toBe(
-      'Re-run prod-cert after the profile fix deploys'
-    );
+    expect(blocker?.nextAction).toBe(NEXT_STEP_COPY.product_failure);
+  });
+
+  it('says what is next in founder words for every reason code, never agent runbook jargon', () => {
+    const causes = [
+      'analytics_event_loss',
+      'failed_persistence',
+      'failed_reader',
+      'failed_scheduler',
+      'missing_instrumentation',
+      'product_failure',
+      'stale_evidence',
+    ] as const;
+    expect(Object.keys(NEXT_STEP_COPY).sort()).toEqual([...causes].sort());
+    for (const cause of causes) {
+      const blocker = companyBlocker(
+        snapshot({
+          activeConstraint: 'certification:public_profile',
+          cone: { public_profile: 'unknown' },
+          investigations: [
+            {
+              id: 'certification:public_profile',
+              firstObservedAt: '2026-11-07T10:00:00.000Z',
+              cause,
+              nextAction:
+                'Repair the existing acquisition-eligibility detector or reader and persist a source-bound receipt.',
+            } as Input['investigations'][number],
+          ],
+        }),
+        NOW
+      );
+      expect(blocker?.nextAction).toBe(NEXT_STEP_COPY[cause]);
+      expect(blocker?.nextAction).not.toMatch(
+        /detector|receipt|producer|reader|source-bound|persist|instrument/i
+      );
+    }
   });
 
   it('ignores an id it cannot name', () => {

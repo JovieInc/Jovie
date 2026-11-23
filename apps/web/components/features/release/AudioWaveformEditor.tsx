@@ -2,7 +2,7 @@
 
 // @coverage-via apps/web/tests/components/features/release/ReleaseAudioAssetPanel.test.tsx
 
-import { Loader2, Pause, Play, RotateCcw } from 'lucide-react';
+import { Loader2, Pause, RotateCcw } from 'lucide-react';
 import {
   type PointerEvent as ReactPointerEvent,
   useCallback,
@@ -12,6 +12,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { PlayIcon } from '@/components/atoms/PlayIcon';
 import {
   pausePlaybackForInterruption,
   resumePlaybackAfterInterruption,
@@ -253,7 +254,6 @@ export function AudioWaveformEditor({
   const handleTogglePlayback = useCallback(async () => {
     const audio = audioRef.current;
     if (!audio) return;
-
     if (isPlaying) {
       audio.pause();
       if (holdsGlobalFocusRef.current) {
@@ -409,7 +409,7 @@ export function AudioWaveformEditor({
           {isPlaying ? (
             <Pause className='h-3.5 w-3.5' strokeWidth={2.5} />
           ) : (
-            <Play className='h-3.5 w-3.5 translate-x-px' strokeWidth={2.5} />
+            <PlayIcon size={14} strokeWidth={2.5} />
           )}
         </button>
         <div className='min-w-0 text-right text-2xs text-tertiary-token tabular-nums'>

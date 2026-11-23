@@ -80,7 +80,7 @@ export function YouTubeChannelPilotPanel({
   return (
     <AppShellContentPanel
       frame='content-container'
-      contentPadding='compact'
+      contentPadding='default'
       scroll='page'
       toolbar={toolbar}
       data-testid='youtube-channel-pilot'

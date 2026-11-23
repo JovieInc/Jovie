@@ -5,6 +5,7 @@
 import { randomUUID } from 'node:crypto';
 import { createUIMessageStream, createUIMessageStreamResponse } from 'ai';
 import { captureError } from '@/lib/error-tracking';
+import { type OvieTurnTiming, ovieTimingLogLine } from '@/lib/ovie/chat-timing';
 import { isSummerOpsCard } from '@/lib/ovie/ops-card';
 import {
   type SummerFailureHop,
@@ -13,6 +14,7 @@ import {
 } from '@/lib/ovie/summer-failure';
 import type { SummerTurnEvent } from '@/lib/ovie/summer-transport';
 import { fileSummerTurnRepair } from '@/lib/ovie/summer-turn-repair';
+import { logger } from '@/lib/utils/logger';
 
 export async function createSummerAssistantStreamResponse(input: {
   readonly events: AsyncIterable<SummerTurnEvent>;
@@ -20,6 +22,7 @@ export async function createSummerAssistantStreamResponse(input: {
   readonly corsHeaders: Record<string, string>;
   readonly headers?: Record<string, string>;
   readonly metadata?: Record<string, unknown>;
+  readonly timing?: OvieTurnTiming;
 }): Promise<Response> {
   const messageId = randomUUID();
   const textId = randomUUID();
@@ -28,6 +31,7 @@ export async function createSummerAssistantStreamResponse(input: {
       let metadata: Record<string, unknown> = { ...input.metadata };
       let hasVisibleContent = false;
       let textStarted = false;
+      let timingReported = false;
       let failureState: (SummerTurnEvent & { type: 'state' }) | undefined;
       let terminalState: string | undefined;
       let lastNotice: { text: string; code: string } | undefined;
@@ -45,6 +49,20 @@ export async function createSummerAssistantStreamResponse(input: {
           writer.write({ type: 'text-start', id: textId });
         }
         writer.write({ type: 'text-delta', id: textId, delta });
+        if (input.timing && !timingReported) {
+          timingReported = true;
+          input.timing.markFirstToken();
+          const hops = input.timing.snapshot();
+          // Transient: lets the browser read connect/first-token ms, never saved.
+          writer.write({
+            type: 'data-ovie-timing',
+            data: hops,
+            transient: true,
+          });
+          const line = ovieTimingLogLine(hops);
+          logger.info(line);
+          if (!logger.enabled) console.info(line);
+        }
       };
       for await (const event of input.events) {
         if (event.type === 'text-delta' && event.text) {

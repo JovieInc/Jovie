@@ -1,8 +1,16 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { gitTouched } from '../../golden-path-cert-reuse.mjs';
+import { decideCarry } from '../golden-path-cert-reuse.mjs';
 import {
   changedPathsBetween,
   loadStepScopeConfig,
@@ -127,6 +135,25 @@ beforeAll(() => {
 
 afterAll(() => rmSync(repo, { recursive: true, force: true }));
 
+/** The carry plan for `served`, with every step last passed on the base. */
+function carryTo(served) {
+  const pass = {
+    sha: shas.base,
+    endedAt: '2026-11-01T00:00:00.000Z',
+    runUrl: null,
+  };
+  return decideCarry({
+    servedSha: served,
+    ledger: {
+      servedSha: shas.base,
+      surfaces: Object.fromEntries(
+        SURFACE_IDS.map(id => [id, { lastPassed: { ...pass } }])
+      ),
+    },
+    touched: gitTouched({ root: repo, servedSha: served, head: served }),
+  });
+}
+
 describe('step scope closure (JOV-14402)', () => {
   it('follows a page through its layouts and imports', () => {
     const landing = stepScope(repo, 'landing');
@@ -246,39 +273,87 @@ describe('touchedSteps fails closed', () => {
   });
 });
 
-describe('changedPathsBetween', () => {
+describe('carry versus re-certify through git', () => {
+  const recertified = plan => plan.recertify.map(r => r.surface);
+  const carried = plan => plan.carried.map(c => c.surface);
+
   it('lists both sides of a change, deletes included', () => {
     expect(changedPathsBetween(repo, shas.base, shas.deleted).sort()).toEqual([
       'apps/web/lib/chat/helper.ts',
       'apps/web/lib/chat/reply.ts',
     ]);
     expect(changedPathsBetween(repo, shas.base, shas.base)).toEqual([]);
-    expect(() => changedPathsBetween(repo, 'HEAD', shas.base)).toThrow(
-      /40-hex/u
-    );
   });
 
-  it('reads each tree for a touched file, a lockfile and a delete', () => {
-    const touched = served =>
-      withTree(repo, shas.base, oldTree =>
-        withTree(repo, served, newTree =>
-          touchedSteps(changedPathsBetween(repo, shas.base, served), [
-            oldTree,
-            newTree,
+  it('re-certifies only the step a touched file belongs to', () => {
+    const plan = carryTo(shas.hero);
+    expect(recertified(plan)).toEqual(['landing']);
+    expect(carried(plan)).toEqual(SURFACE_IDS.filter(id => id !== 'landing'));
+    expect(plan.carried[0].from.sha).toBe(shas.base);
+  });
+
+  it('re-certifies every step for a lockfile change', () => {
+    const plan = carryTo(shas.lockfile);
+    expect(recertified(plan)).toEqual([...SURFACE_IDS]);
+    expect(plan.recertify[0].why).toContain('pnpm-lock.yaml');
+  });
+
+  it('re-certifies the step a deleted file belonged to', () => {
+    const plan = carryTo(shas.deleted);
+    expect(recertified(plan)).toEqual(['chat']);
+    expect(carried(plan)).toHaveLength(SURFACE_IDS.length - 1);
+  });
+
+  it('carries every step across a change that touches none of them', () => {
+    const plan = carryTo(shas.docs);
+    expect(recertified(plan)).toEqual([]);
+    expect(carried(plan)).toEqual([...SURFACE_IDS]);
+  });
+
+  it('re-certifies every step for an unknown path or an unresolved import', () => {
+    expect(recertified(carryTo(shas.unknown))).toEqual([...SURFACE_IDS]);
+    expect(recertified(carryTo(shas.unresolved))).toEqual([...SURFACE_IDS]);
+  });
+
+  it('re-certifies every step when the certification code changed', () => {
+    // Head is the checkout that runs the producer; a scope config change
+    // since the step's release re-certifies everything.
+    const changedConfig = branchFromBase('producer', {
+      [STEP_SCOPE_FILE]: readFileSync(
+        join(repo, STEP_SCOPE_FILE),
+        'utf8'
+      ).replace('"pnpm-lock.yaml"', '"pnpm-lock.yaml", "turbo.json"'),
+    });
+    git('checkout', '-q', 'main');
+    const plan = decideCarry({
+      servedSha: shas.hero,
+      ledger: {
+        servedSha: shas.base,
+        surfaces: Object.fromEntries(
+          SURFACE_IDS.map(id => [
+            id,
+            {
+              lastPassed: {
+                sha: shas.base,
+                endedAt: '2026-11-01T00:00:00.000Z',
+                runUrl: null,
+              },
+            },
           ])
-        )
-      );
-    expect(touched(shas.hero)).toMatchObject({
-      all: false,
-      steps: ['landing'],
+        ),
+      },
+      touched: gitTouched({
+        root: repo,
+        servedSha: shas.hero,
+        head: changedConfig,
+      }),
     });
-    expect(touched(shas.lockfile).all).toBe(true);
-    expect(touched(shas.deleted)).toMatchObject({
-      all: false,
-      steps: ['chat'],
-    });
-    expect(touched(shas.docs)).toMatchObject({ all: false, steps: [] });
-    expect(touched(shas.unknown).all).toBe(true);
-    expect(touched(shas.unresolved).all).toBe(true);
+    expect(recertified(plan)).toEqual([...SURFACE_IDS]);
+    expect(plan.recertify[0].why).toContain('certification code changed');
+  });
+
+  it('re-certifies every step when a commit is missing', () => {
+    const plan = carryTo('f'.repeat(40));
+    expect(recertified(plan)).toEqual([...SURFACE_IDS]);
   });
 });

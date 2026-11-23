@@ -2,8 +2,9 @@
 """Incrementally index public YC prior art into the existing GBrain store.
 
 The refresher discovers the YC Library sitemap, relevant YC blog entries, and
-the public YC YouTube feed. It stores provenance, a bounded excerpt and, for YC
-Library talks, the full embedded transcript for internal retrieval only
+the YC YouTube channel (yc_youtube: public feed plus, with a Data API key, every
+upload). It stores provenance, a bounded excerpt and the full transcript, from the
+YC Library page or the video's public captions, for internal retrieval only
 (yc_transcript). A daily lane tick starts one bounded refresh;
 content hashes prevent unchanged pages from being written or re-embedded.
 """
@@ -48,6 +49,7 @@ SEEDS = ("https://www.ycombinator.com/blog/startup-library",
 
 from yc_catalog import PLAYBOOKS, TOPICS  # noqa: E402,F401  (re-exported for tests)
 import yc_transcript  # noqa: E402
+import yc_youtube  # noqa: E402
 
 
 class SelftestEffectRefused(RuntimeError):
@@ -249,7 +251,7 @@ def fetch_url(url: str, headers: dict | None = None) -> dict:
     raise RuntimeError(f"fetch attempts exhausted for {url}")
 
 
-def discover(fetch=fetch_url, warnings: list[str] | None = None) -> list[dict]:
+def discover(fetch=fetch_url, warnings: list[str] | None = None, catalog: list[dict] = ()) -> list[dict]:
     warnings = warnings if warnings is not None else []
     candidates = {url: {"url": url, "priority": 0} for url in SEEDS}
     sitemap = fetch(LIBRARY_SITEMAP)
@@ -271,15 +273,19 @@ def discover(fetch=fetch_url, warnings: list[str] | None = None) -> list[dict]:
             video_id = entry.findtext("yt:videoId", namespaces=ns)
             if not video_id:
                 continue
-            url = f"https://www.youtube.com/watch?v={video_id}"
-            candidates[url] = {"url": url, "priority": 3, "feed": {
-                "url": url, "title": entry.findtext("a:title", default="YC video", namespaces=ns),
-                "author": entry.findtext("a:author/a:name", default="Y Combinator", namespaces=ns),
-                "publishedAt": entry.findtext("a:published", namespaces=ns), "updatedAt": entry.findtext("a:updated", namespaces=ns),
-                "contentType": "video", "transcriptProvenance": "unavailable-public-feed-metadata-only",
-                "youtubeId": video_id, "excerpt": "Public YC YouTube catalog metadata; transcript was not available from the feed.",
-                "relatedUrls": [], "tags": classify_topics(entry.findtext("a:title", default="", namespaces=ns)),
-            }}
+            title = entry.findtext("a:title", default="YC video", namespaces=ns)
+            description = entry.findtext("media:group/media:description", default="",
+                                         namespaces={"media": "http://search.yahoo.com/mrss/"} | ns)
+            candidates[yc_youtube.watch_url(video_id)] = {"url": yc_youtube.watch_url(video_id), "priority": 3,
+                                                          "feed": yc_youtube.feed_entry(
+                video_id, title, entry.findtext("a:author/a:name", default="Y Combinator", namespaces=ns),
+                entry.findtext("a:published", namespaces=ns), entry.findtext("a:updated", namespaces=ns),
+                description, classify_topics(f"{title} {description}"))}
+    for video in catalog:
+        candidates.setdefault(yc_youtube.watch_url(video["id"]), {
+            "url": yc_youtube.watch_url(video["id"]), "priority": 3, "catalog": True, "feed": yc_youtube.feed_entry(
+                video["id"], video["title"], "Y Combinator", video.get("publishedAt"), None, video.get("description", ""),
+                classify_topics(f"{video['title']} {video.get('description', '')}"))})
     try:
         blog = fetch(BLOG_FEED)
     except Exception as error:
@@ -347,7 +353,7 @@ def write_state(path: Path, state: dict) -> None:
 
 
 def refresh(state_path: Path, limit: int = DEFAULT_LIMIT, fetch=fetch_url, put=gbrain_put,
-            allowed=robots_allowed, now: float | None = None) -> dict:
+            allowed=robots_allowed, now: float | None = None, youtube_key: str | None = None) -> dict:
     now = now or time.time()
     retrieved_at = now_iso(now)
     state = read_state(state_path)
@@ -356,8 +362,11 @@ def refresh(state_path: Path, limit: int = DEFAULT_LIMIT, fetch=fetch_url, put=g
     canonical = state.setdefault("canonical", {})
     failures: list[str] = []
     changed = unchanged = skipped = 0
+    robots: dict = {}
+    videos, state["youtubeCatalog"] = yc_youtube.refresh_catalog(state.get("youtubeCatalog", {}), fetch, now,
+                                                                  youtube_key, allowed, robots)
     try:
-        candidates = discover(fetch, failures)
+        candidates = discover(fetch, failures, videos)
     except Exception as error:
         result = {"status": "failed", "at": retrieved_at, "changed": 0, "unchanged": 0,
                   "skipped": 0, "failures": [f"discovery: {type(error).__name__}: {error}"]}
@@ -367,18 +376,32 @@ def refresh(state_path: Path, limit: int = DEFAULT_LIMIT, fetch=fetch_url, put=g
         return result
 
     stale = {item["url"] for item in candidates if yc_transcript.needs_render(documents.get(item["url"], {}))}
+    unseen = {item["url"] for item in candidates if item.get("catalog") and item["url"] not in documents}
+    captions_left, captions_denied = yc_youtube.CAPTION_BUDGET, False
     candidates.sort(key=lambda item: (item["url"] not in stale, documents.get(item["url"], {}).get("checkedAt", ""),
                                       item["priority"], item["url"]))
-    robots: dict = {}
-    for candidate in candidates[:max(1, yc_transcript.effective_limit(limit, len(stale)))]:
+    for candidate in candidates[:max(1, yc_transcript.effective_limit(limit, len(stale | unseen)))]:
         url = candidate["url"]
         previous = documents.get(url, {})
         if url in stale:  # older renderer: re-fetch and re-render regardless of 304 or source hash
             previous = {key: value for key, value in previous.items() if key not in {"etag", "lastModified", "sourceHash"}}
         try:
+            captions = {key: previous[key] for key in ("captions", "captionsCheckedAt") if key in previous}
             if "feed" in candidate:
                 source = {**candidate["feed"], "retrievedAt": retrieved_at}
                 response = {"etag": None, "lastModified": None}
+                covered = canonical.get("youtube:" + source["youtubeId"], {}).get("priority", 9) < candidate["priority"]
+                if previous.get("captions") == "ok" and url not in stale or covered and previous.get("slug") is None:
+                    documents[url] = {**previous, "checkedAt": retrieved_at, "status": previous.get("status", "duplicate")}
+                    unchanged += 1
+                    continue
+                if not covered and not captions_denied and (url in stale or yc_youtube.captions_due(previous, now)):
+                    if captions_left <= 0:
+                        continue  # leave it for a run with caption budget, so it is written once, whole
+                    source, status = yc_youtube.with_captions(source, fetch, allowed, robots)
+                    captions = {"captions": status, "captionsCheckedAt": now}
+                    captions_denied = status == "robots-denied"
+                    captions_left = 0 if status == "throttled" else captions_left - 1
             else:
                 if not allowed(url, robots, fetch):
                     documents[url] = {**previous, "checkedAt": retrieved_at, "status": "robots-denied"}
@@ -429,7 +452,7 @@ def refresh(state_path: Path, limit: int = DEFAULT_LIMIT, fetch=fetch_url, put=g
                     canonical[key] = {"slug": slug, "priority": candidate["priority"]}
             documents[url] = {"checkedAt": retrieved_at, "status": "indexed" if ok else "gbrain-failed",
                               "etag": response.get("etag"), "lastModified": response.get("lastModified"),
-                              "contentHash": digest, "slug": slug,
+                              "contentHash": digest, "slug": slug, **captions,
                               **({"sourceHash": source_digest, "render": yc_transcript.RENDER} if ok else {})}
         except Exception as error:
             failures.append(f"{url}: {type(error).__name__}: {error}")
@@ -492,7 +515,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         with lifecycle.Guard(args.state.parent):
-            result = refresh(args.state, args.max_documents)
+            result = refresh(args.state, args.max_documents, youtube_key=yc_youtube.api_key())
             print(json.dumps(result, indent=2))
             return 0 if result["status"] == "ok" else 1
     except lifecycle.AdmissionHeld as error:
