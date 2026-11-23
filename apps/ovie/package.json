@@ -23,9 +23,9 @@
     "@jovie/web": "workspace:*",
     "@tailwindcss/postcss": "^4.3.5",
     "tailwindcss": "^4.3.5",
-    "autoprefixer": "^10.6.2",
+    "autoprefixer": "^10.7.0",
     "@statsig/statsig-node-core": "^0.24.0",
-    "workflow": "4.8.16"
+    "workflow": "4.8.17"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
