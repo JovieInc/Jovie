@@ -9,6 +9,7 @@ import {
   type StoryFirstGlancePulse,
   type StoryFirstStageBucket,
 } from '@/lib/ovie/home/story-first';
+import { OVIE_METRICS_SYNCING_NOTICE } from '@/lib/ovie/metrics-presentation';
 import { cn } from '@/lib/utils';
 import type { HomeLoopSectionStatus } from './HomeLoopSection';
 
@@ -342,6 +343,9 @@ export function StoryFirstCanvas({
   stagesStatus = 'ready',
   onRetryStages,
 }: StoryFirstCanvasProps) {
+  const visibleGlance = glance.filter(pulse => pulse.measured);
+  const glanceSyncing = !glanceLoading && visibleGlance.length < glance.length;
+
   return (
     <div
       className='@container flex w-full flex-col gap-10 lg:h-full lg:min-h-0'
@@ -358,7 +362,12 @@ export function StoryFirstCanvas({
             className='flex w-full shrink-0 flex-col divide-y divide-subtle lg:w-48'
             data-testid='story-first-glance'
           >
-            {glance.map(pulse => (
+            {glanceSyncing ? (
+              <p className='py-2 text-2xs text-tertiary-token'>
+                {OVIE_METRICS_SYNCING_NOTICE}
+              </p>
+            ) : null}
+            {(glanceLoading ? glance : visibleGlance).map(pulse => (
               <GlancePulse
                 key={pulse.key}
                 pulse={pulse}
