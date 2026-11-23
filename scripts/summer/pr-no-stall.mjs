@@ -14,6 +14,8 @@
 
 import { spawnSync } from 'node:child_process';
 
+import { listOpenPrs } from './pr-no-stall-list.mjs';
+
 export const SCHEMA = 'jovie-summer-pr-no-stall/v1';
 export const DEFAULT_IDLE_HOURS = 6;
 export const DEFAULT_APPLY_LIMIT = 5;
@@ -411,22 +413,19 @@ export function main(argv = process.argv.slice(2), deps = {}) {
     );
     return 0;
   }
+  let rollupErrors = 0;
+  let rollupSkipped = 0;
   const listPrs =
     deps.listPrs ??
-    (() =>
-      ghJson(
-        [
-          'pr',
-          'list',
-          '--state',
-          'open',
-          '--limit',
-          '100',
-          '--json',
-          'number,title,isDraft,author,headRefName,updatedAt,url,labels,mergeable,mergeStateStatus,autoMergeRequest,statusCheckRollup,isCrossRepository,headRepository',
-        ],
-        deps.run
-      ));
+    (() => {
+      const listed = listOpenPrs(args => ghJson(args, deps.run), {
+        idleHours: args.idleHours,
+        nowMs: deps.nowMs,
+      });
+      rollupErrors = listed.rollupErrors;
+      rollupSkipped = listed.rollupSkipped;
+      return listed.prs;
+    });
   const inventory = inventoryOpenPrs(listPrs(), {
     nowMs: deps.nowMs,
     idleHours: args.idleHours,
@@ -452,7 +451,7 @@ export function main(argv = process.argv.slice(2), deps = {}) {
     }
   }
 
-  const report = { ...inventory, applied };
+  const report = { ...inventory, rollupErrors, rollupSkipped, applied };
   if (args.json) {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
   } else {

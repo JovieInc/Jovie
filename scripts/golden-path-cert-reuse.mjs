@@ -1,335 +1,164 @@
 #!/usr/bin/env node
 /**
- * Certify each served production build once (JOV-12639).
+ * Decide which Golden Path steps the served release re-certifies (JOV-14402).
  *
- *   node scripts/golden-path-cert-reuse.mjs lookup --served-sha SHA
- *     [--force true] [--github-output FILE]
- *   node scripts/golden-path-cert-reuse.mjs adopt --served-sha SHA
- *     --source-run-id N --artifact-id N --out FILE
- *   node scripts/golden-path-cert-reuse.mjs stamp --receipts FILE
- *     --expected-sha SHA --out FILE [--github-output FILE]
+ *   node scripts/golden-path-cert-reuse.mjs decide --served-sha SHA
+ *     --ledger ledger.json [--force true] [--plan-out FILE]
+ *     [--github-output FILE]
  *
- * lookup looks for a certified stamp for the served SHA (exact-name artifact
- * prod-cert-certified-<sha>), checks the run that wrote it, downloads it and
- * applies decideCertReuse. It fails open: any GitHub error means certify
- * again, and it always exits 0.
+ * --ledger is the body of GET /api/internal/ovie/golden-path-evidence. For
+ * each step with a pass on an earlier release, the step's scope is diffed
+ * from the SHA that actually exercised it to the served SHA (both trees, so
+ * deletes and renames count), and the certification producer is diffed from
+ * that SHA to this checkout. Untouched steps carry forward; touched ones
+ * re-certify; steps that already passed on the served SHA need nothing.
  *
- * adopt re-reads that one artifact, judges it again and writes the source
- * receipts with a reuse block naming the source run to --out. It exits 1 when
- * the receipt no longer qualifies, so a reuse is never claimed without one.
- *
- * stamp writes the certified stamp beside a run's receipts only when every
- * surface passed on the expected SHA, so a later run can reuse them.
+ * It fails toward certifying: an unreadable ledger, a missing commit or any
+ * error re-certifies every step. It always exits 0 so a decision problem
+ * never fails the resolver job (that would page).
  */
 import { spawnSync } from 'node:child_process';
-import {
-  appendFileSync,
-  chmodSync,
-  closeSync,
-  mkdirSync,
-  mkdtempSync,
-  openSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import {
-  certifiedArtifactName,
-  certifiedStamp,
-  decideCertReuse,
-  producerDigest,
-  REUSE_MAX_AGE_MS,
-  reusedReceiptDocument,
+  allCurrent,
+  decideCarry,
+  readLedgerCertifications,
 } from './lib/golden-path-cert-reuse.mjs';
-import { createGitHubTransport } from './postdeploy-probe-admission.mjs';
+import {
+  changedPathsBetween,
+  loadStepScopeConfig,
+  producerScope,
+  touchedSteps,
+  withTree,
+} from './lib/golden-path-step-scope.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const WRAPPER = fileURLToPath(
-  new URL('./lib/github-rate-limit.mjs', import.meta.url)
-);
-export const RECEIPTS_FILE = 'prod-cert-receipts.json';
-export const STAMP_FILE = 'prod-cert-certified.json';
-const MAX_ZIP_BYTES = 8 * 1024 * 1024;
-const MAX_FILE_BYTES = 16 * 1024 * 1024;
-const MAX_CANDIDATES = 3;
 
-/**
- * Download one artifact zip and return its two JSON members.
- * @param {string} repository @param {number} artifactId
- * @param {{ execute?: typeof spawnSync, env?: NodeJS.ProcessEnv }} [deps]
- */
-export function downloadCertifiedArtifact(
-  repository,
-  artifactId,
-  { execute = spawnSync, env = process.env } = {}
-) {
-  const root = mkdtempSync(join(tmpdir(), 'prod-cert-reuse-'));
-  chmodSync(root, 0o700);
-  const archive = join(root, 'artifact.zip');
+/** @param {string | undefined} path */
+function readLedgerFile(path) {
+  if (!path) return null;
   try {
-    const fd = openSync(archive, 'wx', 0o600);
-    let result;
-    try {
-      result = execute(
-        process.execPath,
-        [
-          WRAPPER,
-          'run',
-          '--max-wait-seconds',
-          '2',
-          '--attempts',
-          '2',
-          '--',
-          'gh',
-          'api',
-          `repos/${repository}/actions/artifacts/${artifactId}/zip`,
-        ],
-        {
-          env: { ...env, TMPDIR: root },
-          stdio: ['ignore', fd, 'pipe'],
-          timeout: 30_000,
-        }
-      );
-    } finally {
-      closeSync(fd);
-    }
-    if (result.error || result.status !== 0)
-      throw new Error('artifact download failed');
-    if (statSync(archive).size > MAX_ZIP_BYTES)
-      throw new Error('artifact zip exceeds bound');
-    const unzip = (/** @type {string[]} */ args) => {
-      const out = execute('unzip', args, {
-        encoding: 'utf8',
-        timeout: 10_000,
-        maxBuffer: MAX_FILE_BYTES + 1,
-      });
-      if (out.error || out.status !== 0) throw new Error('unzip failed');
-      return String(out.stdout ?? '');
-    };
-    const members = unzip(['-Z1', archive]).trim().split('\n').sort();
-    if (members.join(',') !== [RECEIPTS_FILE, STAMP_FILE].sort().join(','))
-      throw new Error('artifact must hold only the receipts and the stamp');
-    return {
-      document: JSON.parse(unzip(['-p', archive, RECEIPTS_FILE])),
-      stamp: JSON.parse(unzip(['-p', archive, STAMP_FILE])),
-    };
-  } finally {
-    rmSync(root, { recursive: true, force: true });
+    return readLedgerCertifications(JSON.parse(readFileSync(path, 'utf8')));
+  } catch {
+    return null;
   }
 }
 
-/**
- * @typedef {{ getJson: (endpoint: string) => any }} Transport
- * @typedef {{ repository: string, servedSha: string, nowMs?: number, digest?: string, transport?: Transport, download?: typeof downloadCertifiedArtifact }} LookupBase
- */
-
-/**
- * Judge one certified artifact row: its run, its stamp and its receipts.
- * @param {any} row @param {Required<LookupBase>} base
- */
-function judgeRow(row, base) {
-  const { repository, transport, download } = base;
-  const run = transport.getJson(
-    `repos/${repository}/actions/runs/${row.workflow_run.id}`
-  );
-  const files = download(repository, row.id);
-  return decideCertReuse({
-    servedSha: base.servedSha,
-    repository,
-    producerDigest: base.digest,
-    nowMs: base.nowMs,
-    candidates: [
-      {
-        runId: row.workflow_run.id,
-        runUrl: typeof run?.html_url === 'string' ? run.html_url : undefined,
-        artifactId: row.id,
-        run,
-        ...files,
-      },
-    ],
+/** @param {string} root */
+function headSha(root) {
+  const result = spawnSync('git', ['rev-parse', 'HEAD'], {
+    cwd: root,
+    encoding: 'utf8',
   });
-}
-
-/** @param {LookupBase} input @returns {Required<LookupBase>} */
-function withDefaults({
-  repository,
-  servedSha,
-  nowMs = Date.now(),
-  digest = producerDigest(ROOT),
-  transport = createGitHubTransport(),
-  download = downloadCertifiedArtifact,
-}) {
-  return { repository, servedSha, nowMs, digest, transport, download };
-}
-
-const rowValid = (row, name) =>
-  row?.name === name &&
-  row.expired === false &&
-  Number.isSafeInteger(row.id) &&
-  Number.isSafeInteger(row.workflow_run?.id) &&
-  row.size_in_bytes > 0 &&
-  row.size_in_bytes <= MAX_ZIP_BYTES;
-
-/**
- * @param {LookupBase & { runId: number, force: boolean }} input
- * @returns {import('./lib/golden-path-cert-reuse.mjs').ReuseDecision}
- */
-export function lookupReuse({ runId, force, ...input }) {
-  const base = withDefaults(input);
-  const first = decideCertReuse({
-    servedSha: base.servedSha,
-    repository: base.repository,
-    producerDigest: base.digest,
-    nowMs: base.nowMs,
-    force,
-  });
-  if (force || first.reason !== 'no fresh certified receipt for the served SHA')
-    return first;
-  const name = certifiedArtifactName(base.servedSha);
-  const index = base.transport.getJson(
-    `repos/${base.repository}/actions/artifacts?name=${encodeURIComponent(name)}&per_page=30`
-  );
-  const since = base.nowMs - REUSE_MAX_AGE_MS - 60 * 60 * 1000;
-  const rows = (Array.isArray(index?.artifacts) ? index.artifacts : [])
-    .filter(
-      row =>
-        rowValid(row, name) &&
-        row.workflow_run.id !== runId &&
-        Date.parse(row.created_at) >= since
-    )
-    .sort((a, b) => b.workflow_run.id - a.workflow_run.id)
-    .slice(0, MAX_CANDIDATES);
-  const rejected = [];
-  for (const row of rows) {
-    const decision = judgeRow(row, base);
-    if (decision.reuse) return { ...decision, rejected };
-    rejected.push(...decision.rejected);
-  }
-  return { ...first, rejected };
+  if (result.status !== 0) throw new Error('git rev-parse failed');
+  return result.stdout.trim();
 }
 
 /**
- * Re-read the one artifact lookup chose and judge it again.
- * @param {LookupBase & { sourceRunId: number, artifactId: number }} input
- * @returns {import('./lib/golden-path-cert-reuse.mjs').ReuseDecision}
+ * Which steps changed between `fromSha` (the step's exercised release) and
+ * the served release, or since then in the certification producer.
+ * @param {{ root: string, servedSha: string, head: string }} input
+ * @returns {(fromSha: string) => import('./lib/golden-path-cert-reuse.mjs').Touched}
  */
-export function adoptReuse({ sourceRunId, artifactId, ...input }) {
-  const base = withDefaults(input);
-  const row = base.transport.getJson(
-    `repos/${base.repository}/actions/artifacts/${artifactId}`
+export function gitTouched({ root, servedSha, head }) {
+  const producer = new Set(
+    producerScope(root, { config: loadStepScopeConfig(root) })
   );
-  if (
-    !rowValid(row, certifiedArtifactName(base.servedSha)) ||
-    row.id !== artifactId ||
-    row.workflow_run.id !== sourceRunId
-  )
-    return { reuse: false, reason: 'chosen artifact changed', rejected: [] };
-  return judgeRow(row, base);
+  return fromSha => {
+    const changedProducer = changedPathsBetween(root, fromSha, head).find(
+      path => producer.has(path)
+    );
+    if (changedProducer)
+      return {
+        all: true,
+        steps: [],
+        reason: `certification code changed since ${fromSha.slice(0, 8)} (${changedProducer})`,
+      };
+    const changed = changedPathsBetween(root, fromSha, servedSha);
+    return withTree(root, fromSha, oldTree =>
+      withTree(root, servedSha, newTree =>
+        touchedSteps(changed, [oldTree, newTree], { configRoot: root })
+      )
+    );
+  };
 }
 
-function emit(path, lines) {
-  if (path) appendFileSync(path, `${lines.join('\n')}\n`);
+/**
+ * @param {import('./lib/golden-path-cert-reuse.mjs').CarryPlan} plan
+ * @returns {string[]}
+ */
+export function planLines(plan) {
+  const short = plan.servedSha.slice(0, 8);
+  if (allCurrent(plan))
+    return [
+      `Golden Path: every step is already certified on ${short}; nothing to run.`,
+    ];
+  return [
+    `Golden Path on ${short}: ${plan.recertify.length} to certify, ${plan.carried.length} carried, ${plan.current.length} already certified.`,
+    ...plan.recertify.map(r => `- certify ${r.surface}: ${r.why}`),
+    ...plan.carried.map(
+      c =>
+        `- carry ${c.surface} from ${c.from.sha.slice(0, 8)} (${c.from.runUrl ?? 'run unknown'})`
+    ),
+    ...plan.current.map(id => `- ${id} already certified on ${short}`),
+  ];
 }
 
-function main(argv = process.argv.slice(2), env = process.env) {
+/** @param {string[]} [argv] @param {NodeJS.ProcessEnv} [env] */
+export function main(argv = process.argv.slice(2), env = process.env) {
   const [command, ...rest] = argv;
+  if (command !== 'decide') {
+    process.stderr.write('usage: golden-path-cert-reuse.mjs decide ...\n');
+    return 64;
+  }
   const { values } = parseArgs({
     args: rest,
     options: {
       'served-sha': { type: 'string' },
-      'expected-sha': { type: 'string' },
-      receipts: { type: 'string' },
+      ledger: { type: 'string' },
       force: { type: 'string', default: 'false' },
-      'source-run-id': { type: 'string' },
-      'artifact-id': { type: 'string' },
-      out: { type: 'string' },
+      'plan-out': { type: 'string' },
       'github-output': { type: 'string' },
     },
   });
-  const runId = Number(env.GITHUB_RUN_ID);
-  const runUrl = env.GITHUB_RUN_ID
-    ? `${env.GITHUB_SERVER_URL}/${env.GITHUB_REPOSITORY}/actions/runs/${env.GITHUB_RUN_ID}`
-    : null;
-  if (command === 'stamp') {
-    const document = JSON.parse(readFileSync(String(values.receipts), 'utf8'));
-    const stamp = certifiedStamp(document, {
-      expectedSha: String(values['expected-sha']),
-      runId,
-      producerDigest: producerDigest(ROOT),
-    });
-    if (stamp)
-      writeFileSync(String(values.out), `${JSON.stringify(stamp, null, 2)}\n`);
-    emit(values['github-output'], [`stamped=${stamp !== null}`]);
-    console.log(
-      stamp
-        ? `certified stamp written for ${stamp.servedSha}`
-        : 'not certified: no stamp, nothing to reuse'
-    );
-    return 0;
-  }
-  if (command === 'adopt') {
-    const decision = adoptReuse({
-      repository: String(env.GITHUB_REPOSITORY),
-      servedSha: String(values['served-sha']),
-      sourceRunId: Number(values['source-run-id']),
-      artifactId: Number(values['artifact-id']),
-    });
-    if (!decision.reuse) {
-      const why = decision.rejected[0]?.why ?? decision.reason;
-      console.log(
-        `::error::The chosen receipt no longer qualifies for reuse (${why}); the next trigger certifies again.`
-      );
-      return 1;
-    }
-    const out = String(values.out);
-    mkdirSync(dirname(out), { recursive: true });
-    const document = reusedReceiptDocument(decision, { runId, runUrl });
-    writeFileSync(out, `${JSON.stringify(document, null, 2)}\n`);
-    const line = `Golden Path certification reused from run ${decision.source?.runId} (certified ${decision.source?.certifiedAt}); no new certification ran and nothing was posted again.`;
-    console.log(line);
-    if (env.GITHUB_STEP_SUMMARY)
-      appendFileSync(env.GITHUB_STEP_SUMMARY, `${line}\n`);
-    return 0;
-  }
-  if (command !== 'lookup') {
-    process.stderr.write(
-      'usage: golden-path-cert-reuse.mjs lookup|adopt|stamp ...\n'
-    );
-    return 64;
-  }
-  let decision;
+  const servedSha = String(values['served-sha'] ?? '');
+  let plan;
   try {
-    decision = lookupReuse({
-      repository: String(env.GITHUB_REPOSITORY),
-      servedSha: String(values['served-sha']),
-      runId,
+    plan = decideCarry({
+      servedSha,
+      ledger: readLedgerFile(values.ledger),
       force: values.force === 'true',
+      touched: gitTouched({ root: ROOT, servedSha, head: headSha(ROOT) }),
     });
   } catch (error) {
-    // Fail open: a lookup that cannot finish certifies again.
     console.log(
-      `::warning::Receipt reuse lookup failed (${error instanceof Error ? error.message : 'unknown'}); certifying again.`
+      `::warning::Carry decision failed (${error instanceof Error ? error.message : 'unknown'}); certifying every step.`
     );
-    decision = { reuse: false, reason: 'lookup failed', rejected: [] };
+    plan = decideCarry({
+      servedSha,
+      ledger: null,
+      touched: () => ({ all: true, steps: [] }),
+    });
   }
-  for (const r of decision.rejected)
-    console.log(`not reused: run ${r.runId}: ${r.why}`);
-  const line = decision.reuse
-    ? `Golden Path certification will reuse run ${decision.source?.runId} (certified ${decision.source?.certifiedAt}).`
-    : `Golden Path certification runs: ${decision.reason}.`;
-  console.log(line);
+  const lines = planLines(plan);
+  for (const line of lines) console.log(line);
   if (env.GITHUB_STEP_SUMMARY)
-    appendFileSync(env.GITHUB_STEP_SUMMARY, `${line}\n`);
-  emit(values['github-output'], [
-    `reuse=${decision.reuse}`,
-    `source_run_id=${decision.source?.runId ?? ''}`,
-    `source_artifact_id=${decision.source?.artifactId ?? ''}`,
-  ]);
+    appendFileSync(env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
+  const json = JSON.stringify(plan);
+  if (values['plan-out']) writeFileSync(values['plan-out'], `${json}\n`);
+  if (values['github-output'])
+    appendFileSync(
+      values['github-output'],
+      `${[
+        `all_current=${allCurrent(plan)}`,
+        `recertify=${plan.recertify.map(r => r.surface).join(' ')}`,
+        `carried=${plan.carried.map(c => c.surface).join(' ')}`,
+        `plan_b64=${Buffer.from(json).toString('base64')}`,
+      ].join('\n')}\n`
+    );
   return 0;
 }
 

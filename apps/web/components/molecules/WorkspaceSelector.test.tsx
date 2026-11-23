@@ -74,30 +74,25 @@ describe('WorkspaceSelector', () => {
     }
   );
 
-  it('cancels its padding so the brand mark sits on the nav icon column', () => {
+  it('cancels its padding so the label sits on the nav icon column', () => {
     render(
       <WorkspaceSelector currentWorkspaceId='ov' workspaces={workspaces} />
     );
     const trigger = screen.getByRole('button', { name: /^Switch Workspace: / });
-    // -ml-1.5 cancels px-1.5: the mark starts at the 12px sidebar inset.
+    // -ml-1.5 cancels px-1.5: the label starts at the 12px sidebar inset.
     expect(trigger).toHaveClass('-ml-1.5', 'px-1.5');
     expect(trigger.className).not.toMatch(/(?:^|\s)px-2\.5(?:\s|$)/);
-    // The collapsed rail centres the mark instead.
-    expect(trigger).toHaveClass('group-data-[collapsible=icon]:ml-0');
   });
 
-  it('renders the active workspace in a stable selector trigger', () => {
+  it('renders the active workspace as text and a chevron, with no glyph', () => {
     render(
       <WorkspaceSelector currentWorkspaceId='ov' workspaces={workspaces} />
     );
 
     const trigger = screen.getByRole('button', { name: /^Switch Workspace: / });
     expect(trigger).toHaveTextContent('OV');
-    expect(trigger.querySelector('svg.lucide-chevron-down')).toBeNull();
-    expect(trigger.querySelector('[data-brand-mark-size]')).toHaveAttribute(
-      'data-brand-mark-size',
-      '20'
-    );
+    expect(trigger.querySelector('svg.lucide-chevron-down')).not.toBeNull();
+    expect(trigger.querySelector('[data-brand-variant]')).toBeNull();
   });
 
   it('stages the trigger label exit on the shared rail-motion contract', () => {
@@ -160,25 +155,5 @@ describe('WorkspaceSelector', () => {
     );
 
     expect(container).toBeEmptyDOMElement();
-  });
-
-  it('rests on the brand mark and keeps the workspace name in the reveal box', () => {
-    render(
-      <WorkspaceSelector
-        currentWorkspaceId='customer'
-        workspaces={workspaces}
-      />
-    );
-    const trigger = screen.getByRole('button', {
-      name: 'Switch Workspace: Jovie',
-    });
-    // globals.css hides `.sidebar-wordmark` at rest and grows it on hover,
-    // focus-visible or while the menu is open.
-    expect(trigger).toHaveClass('sidebar-wordmark-reveal');
-    const wordmark = trigger.querySelector('.sidebar-wordmark');
-    expect(wordmark).toHaveClass('overflow-hidden');
-    expect(wordmark).toHaveTextContent('Jovie');
-    // No flex gap: the hidden name must not pad the resting trigger.
-    expect(trigger.className).not.toMatch(/(?:^|\s)gap-/);
   });
 });

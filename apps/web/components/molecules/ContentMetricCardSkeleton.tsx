@@ -6,9 +6,14 @@ import {
   contentMetricCardValueVariants,
   contentMetricCardVariants,
 } from '@/components/molecules/ContentMetricCard';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { cn } from '@/lib/utils';
+
+/**
+ * Loading states are always flat: no fill, no visible border, no shadow. The
+ * transparent border keeps the loaded card's frame geometry so nothing shifts.
+ */
+const FLAT_FRAME = 'border border-transparent bg-transparent shadow-none';
 
 export interface ContentMetricCardSkeletonProps {
   readonly layout?: ContentMetricCardProps['layout'];
@@ -40,9 +45,10 @@ export function ContentMetricCardSkeleton({
     ) : null;
 
     return (
-      <ContentSurfaceCard
+      <div
         className={cn(
           contentMetricCardVariants({ layout, density }),
+          FLAT_FRAME,
           className
         )}
         aria-hidden='true'
@@ -77,13 +83,17 @@ export function ContentMetricCardSkeleton({
             />
           ) : null}
         </div>
-      </ContentSurfaceCard>
+      </div>
     );
   }
 
   return (
-    <ContentSurfaceCard
-      className={cn(contentMetricCardVariants({ layout, density }), className)}
+    <div
+      className={cn(
+        contentMetricCardVariants({ layout, density }),
+        FLAT_FRAME,
+        className
+      )}
       aria-hidden='true'
     >
       <div className={contentMetricCardDefaultClasses.bodyClassName}>
@@ -124,6 +134,6 @@ export function ContentMetricCardSkeleton({
           </div>
         ) : null}
       </div>
-    </ContentSurfaceCard>
+    </div>
   );
 }

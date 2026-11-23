@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { HudStatusPill } from '@/app/app/(shell)/admin/ops/HudStatusPill';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { type FleetVerdict, fleetVerdict } from '@/lib/ovie/home/fleet-verdict';
+import { OVIE_METRICS_SYNCING_NOTICE } from '@/lib/ovie/metrics-presentation';
 import type { DeliveryLanes } from '@/lib/ovie/shipping-state/contract';
 import {
   SHIPPING_STATE_REFETCH_MS,
@@ -21,7 +22,7 @@ const LEVEL_LABEL = {
   healthy: 'Healthy',
   degraded: 'Degraded',
   down: 'Not reporting',
-  unknown: 'Not measured',
+  unknown: 'Syncing',
 } as const;
 
 function reasonCounts(lanes: DeliveryLanes): readonly [string, number][] {
@@ -106,7 +107,7 @@ export function FleetVerdictPanel() {
           level: 'unknown',
           headline: query.isError
             ? 'Fleet health unavailable: the shipping read failed. Refresh to retry.'
-            : 'Fleet health not measured',
+            : OVIE_METRICS_SYNCING_NOTICE,
           reasons: [],
           capacity: null,
         }}

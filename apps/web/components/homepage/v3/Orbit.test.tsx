@@ -15,9 +15,21 @@ describe('Orbit', () => {
     // The arc sits on the 1400 ring: radius 700 in the path.
     expect(arc?.getAttribute('d')).toMatch(/A700 700 0 0 1/);
     expect(arc).toHaveAttribute('stroke', 'url(#t)');
-    expect(container.querySelector('.hv3-orbit__light')).not.toBeNull();
+    // Light is a hairline arc and one small point: no wash, no bloom.
+    expect(container.querySelector('.hv3-orbit__point')).not.toBeNull();
+    expect(container.querySelector('.hv3-orbit__light')).toBeNull();
+    expect(container.querySelector('.hv3-orbit__bloom')).toBeNull();
     expect(container.firstElementChild).toHaveAttribute('aria-hidden', 'true');
     await expectNoA11yViolations(container);
+  });
+
+  it('takes one accent from the pack, or none to inherit the section', () => {
+    const { container, rerender } = render(
+      <Orbit id='a' rings={[400]} arc={[0, 30]} accent='ultra' />
+    );
+    expect(container.firstElementChild).toHaveAttribute('data-accent', 'ultra');
+    rerender(<Orbit id='a' rings={[400]} arc={[0, 30]} />);
+    expect(container.firstElementChild).not.toHaveAttribute('data-accent');
   });
 
   it('draws a closed ring with no lit arc and no key light', async () => {
@@ -26,7 +38,7 @@ describe('Orbit', () => {
     );
     expect(container.querySelector('.hv3-orbit__closed')).not.toBeNull();
     expect(container.querySelector('.hv3-orbit__arc')).toBeNull();
-    expect(container.querySelector('.hv3-orbit__light')).toBeNull();
+    expect(container.querySelector('.hv3-orbit__point')).toBeNull();
     await expectNoA11yViolations(container);
   });
 });

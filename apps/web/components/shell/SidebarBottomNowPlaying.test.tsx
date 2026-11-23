@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -268,5 +270,18 @@ describe('SidebarBottomNowPlaying', () => {
     ).toHaveClass('size-7');
     expect(container.querySelector('.lucide-audio-lines')).toBeInTheDocument();
     expect(screen.queryByText('Bahamas')).not.toBeInTheDocument();
+  });
+});
+
+describe('SidebarBottomNowPlaying play glyph', () => {
+  it('draws the play triangle through PlayIcon (JOV-12568)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './SidebarBottomNowPlaying.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain('<PlayIcon');
+    expect(source).toContain("from '@/components/atoms/PlayIcon'");
+    expect(source).not.toContain('translate-x-px');
   });
 });

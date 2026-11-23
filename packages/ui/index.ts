@@ -94,10 +94,12 @@ export type {
   CardDescriptionProps,
   CardFooterProps,
   CardHeaderProps,
+  CardIntent,
   CardProps,
   CardTitleProps,
 } from './atoms/card';
 export {
+  CARD_INTENTS,
   Card,
   CardContent,
   CardDescription,

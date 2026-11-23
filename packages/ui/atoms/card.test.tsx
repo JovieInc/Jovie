@@ -3,6 +3,7 @@ import * as React from 'react';
 import { describe, expect, it } from 'vitest';
 
 import {
+  CARD_INTENTS,
   Card,
   CardContent,
   CardDescription,
@@ -432,5 +433,34 @@ describe('Card composition', () => {
     const title = screen.getByTestId('title');
     expect(title).toHaveAttribute('data-content-length', 'long');
     expect(title.className).toContain('line-clamp-2');
+  });
+
+  it('records the card intent and omits it when none is given', () => {
+    render(
+      <>
+        <Card intent='collection' data-testid='typed'>
+          Release
+        </Card>
+        <Card data-testid='untyped'>Legacy</Card>
+      </>
+    );
+
+    expect(screen.getByTestId('typed')).toHaveAttribute(
+      'data-card-intent',
+      'collection'
+    );
+    expect(screen.getByTestId('untyped')).not.toHaveAttribute(
+      'data-card-intent'
+    );
+  });
+
+  it('lists exactly the five allowed card intents', () => {
+    expect(CARD_INTENTS).toEqual([
+      'transient',
+      'movable',
+      'collection',
+      'selectable',
+      'floating',
+    ]);
   });
 });

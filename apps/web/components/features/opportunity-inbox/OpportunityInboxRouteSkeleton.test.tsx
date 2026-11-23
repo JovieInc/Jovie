@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { expectFlatState } from '@/tests/utils/flat-state';
 import {
   OpportunityInboxLoadingCards,
   OpportunityInboxRouteSkeleton,
@@ -53,5 +54,11 @@ describe('OpportunityInboxRouteSkeleton', () => {
       </main>
     );
     await expectNoA11yViolations(container);
+  });
+
+  it('draws the placeholder cards flat, with no fill or border', () => {
+    const { container } = render(<OpportunityInboxLoadingCards />);
+
+    expectFlatState(container);
   });
 });

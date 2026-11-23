@@ -6,6 +6,7 @@ import {
   type ComponentPropsWithoutRef,
   forwardRef,
   type ReactNode,
+  useEffect,
 } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -21,6 +22,10 @@ import {
   SIDEBAR_IDENTITY_SPLIT_FIXTURE_TEST_ID,
   SidebarIdentitySplitLayoutFixture,
 } from '@/components/organisms/sidebar-identity-group/fixtures/split-layout';
+import {
+  SidebarDockStatusProvider,
+  usePublishSidebarDockStatus,
+} from '@/components/shell/sidebar-dock-status';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 const pathnameMock = vi.hoisted(() => vi.fn(() => '/app'));
@@ -448,5 +453,24 @@ describe('SidebarIdentityGroup accessibility', () => {
     expect(profileLink).toHaveFocus();
     expect(profileLink).toHaveAttribute('aria-current', 'page');
     await expectNoA11yViolations(container);
+  });
+
+  it('shows the status the footer dock publishes when no prop is passed', () => {
+    function Footer() {
+      const publish = usePublishSidebarDockStatus();
+      useEffect(() => {
+        publish({ label: 'Update available', badges: null });
+      }, [publish]);
+      return null;
+    }
+    render(
+      <SidebarDockStatusProvider>
+        <SidebarIdentityGroup profileHref={undefined} />
+        <Footer />
+      </SidebarDockStatusProvider>
+    );
+    expect(screen.getByTestId('user-button')).toHaveAccessibleName(
+      'Update available'
+    );
   });
 });

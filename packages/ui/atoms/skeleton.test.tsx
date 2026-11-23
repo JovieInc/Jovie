@@ -79,6 +79,20 @@ describe('Skeleton', () => {
       expect(skeleton.className).toContain('rounded-lg');
     });
 
+    it('applies xl rounded variant', () => {
+      render(<Skeleton rounded='xl' data-testid='skeleton' />);
+      expect(screen.getByTestId('skeleton').className).toContain('rounded-xl');
+    });
+
+    it('applies the height prop alongside className', () => {
+      render(
+        <Skeleton height='min-h-28' className='w-full' data-testid='skeleton' />
+      );
+      const tokens = screen.getByTestId('skeleton').className.split(/\s+/);
+      expect(tokens).toContain('min-h-28');
+      expect(tokens).toContain('w-full');
+    });
+
     it('applies full rounded variant', () => {
       render(<Skeleton rounded='full' data-testid='skeleton' />);
       const skeleton = screen.getByTestId('skeleton');

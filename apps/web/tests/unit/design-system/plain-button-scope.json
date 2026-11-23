@@ -134,7 +134,6 @@
     "components/features/profile/AboutSection.tsx",
     "components/features/profile/AlertsSettingsView.tsx",
     "components/features/profile/DesktopQrOverlay.tsx",
-    "components/features/profile/ProfileAboutShare.tsx",
     "components/features/profile/ProfileContactDrawerContent.tsx",
     "components/features/profile/ProfileDrawerShell.tsx",
     "components/features/profile/ProfileHeroCard.tsx",

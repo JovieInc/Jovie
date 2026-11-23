@@ -2689,6 +2689,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/dashboard/first-ready/route.ts",
+      "kind": "handler",
+      "route": "/api/dashboard/first-ready",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/dashboard/jovie-work/recent/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/jovie-work/recent",
@@ -5001,6 +5009,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/views/[token]/save/route.ts",
+      "kind": "handler",
+      "route": "/api/views/[token]/save",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/visibility-audit/offer/route.ts",
       "kind": "handler",
       "route": "/api/visibility-audit/offer",
@@ -6802,6 +6818,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/app/(shell)/dashboards/page.tsx",
+      "kind": "page",
+      "route": "/app/dashboards",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/app/(shell)/earnings/page.tsx",
       "kind": "page",
       "route": "/app/earnings",
@@ -7858,6 +7882,14 @@
       "source": "apps/web/app/unavailable/page.tsx",
       "kind": "page",
       "route": "/unavailable",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/v/[token]/page.tsx",
+      "kind": "page",
+      "route": "/v/[token]",
       "methods": [],
       "surface": "deferred",
       "classification": "C"
