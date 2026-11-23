@@ -197,7 +197,7 @@ describe('DashboardAudienceTableUnified', () => {
     await expectNoA11yViolations(populated.container);
   });
 
-  it('renders members on the 32px dense people row with a face', () => {
+  it('renders members on the 40px compact people row with a face', () => {
     const member: AudienceMember = {
       id: 'm1',
       type: 'email',
@@ -239,7 +239,7 @@ describe('DashboardAudienceTableUnified', () => {
     );
 
     expect(
-      document.querySelector('table[data-table-row-mode="dense"]')
+      document.querySelector('table[data-table-row-mode="compact"]')
     ).not.toBeNull();
     const person = document.querySelector('table [data-table-person-cell]');
     expect(person).toHaveTextContent('Maya Okaformaya@example.com');

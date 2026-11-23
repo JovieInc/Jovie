@@ -21,7 +21,15 @@ import {
   AudienceLastCell,
   AudienceStateCell,
 } from './cells';
+import { canMessageAudienceMember } from './row-contract';
 import { SelectCell } from './utils/column-renderers';
+
+function hasAudienceAlerts(member: AudienceMember): boolean {
+  return (
+    Boolean(member.hasActiveAlerts) &&
+    (member.activeAlertChannels?.length ?? 0) > 0
+  );
+}
 
 const memberColumnHelper = createColumnHelper<AudienceMember>();
 
@@ -37,7 +45,7 @@ export const AUDIENCE_TABLE_SKELETON_COLUMN_CONFIG: Array<{
   { width: '4.5rem', variant: 'badge' as const },
   { width: '4rem', variant: 'meta' as const },
   { width: '3rem', variant: 'meta' as const },
-  // Actions fit the 24px dense content height; a 32px button bar would shift.
+  // Actions fit the 32px compact content height; a taller button bar would shift.
   { width: '5.5rem', variant: 'badge' as const },
 ];
 
@@ -98,10 +106,11 @@ export function buildAudienceMemberColumns(mode: 'members' | 'subscribers') {
       enableSorting: false,
       meta: {
         priority: 1,
+        hideWhenEmpty: true,
+        hasValue: hasAudienceAlerts,
         minWidth: AUDIENCE_FIT.alerts,
         compact: member =>
-          member.hasActiveAlerts &&
-          (member.activeAlertChannels?.length ?? 0) > 0 ? (
+          hasAudienceAlerts(member) ? (
             <AudienceAlertsCell member={member} />
           ) : null,
       },
@@ -150,6 +159,8 @@ export function buildAudienceMemberColumns(mode: 'members' | 'subscribers') {
       meta: {
         className: 'text-right',
         minWidth: AUDIENCE_FIT.action,
+        hideWhenEmpty: true,
+        hasValue: canMessageAudienceMember,
         actionVisibility: 'contextual',
       },
     }),

@@ -59,6 +59,11 @@
       "reason": "Sentry setup sample, reserved system route"
     },
     {
+      "prefix": "/[username]/profile-miss",
+      "exact": true,
+      "reason": "branded profile 404 the publication gate rewrites unknown or withdrawn handles to; it always calls notFound() (app/[username]/profile-miss/page.tsx)"
+    },
+    {
       "prefix": "/spinner-test",
       "reason": "development spinner test"
     }

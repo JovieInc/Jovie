@@ -1,46 +1,23 @@
 'use client';
 
 import { memo } from 'react';
+import { RelativeTimeCell } from '@/components/organisms/table/cells/RelativeTimeCell';
 import { isSsrNowMs, useNowMs } from './NowMsContext';
 
 export interface AudienceLastCellProps {
   readonly lastSeenAt: string | null;
 }
 
-const MS_PER_MINUTE = 60_000;
-const MS_PER_HOUR = 60 * MS_PER_MINUTE;
-const MS_PER_DAY = 24 * MS_PER_HOUR;
-
-function formatCompact(ms: number): string {
-  if (ms < MS_PER_MINUTE) return 'now';
-  if (ms < MS_PER_HOUR) return `${Math.floor(ms / MS_PER_MINUTE)}m`;
-  if (ms < MS_PER_DAY) return `${Math.floor(ms / MS_PER_HOUR)}h`;
-  return `${Math.floor(ms / MS_PER_DAY)}d`;
-}
-
+/** Maps audience data to the kit's RelativeTimeCell; no styling of its own. */
 export const AudienceLastCell = memo(function AudienceLastCell({
   lastSeenAt,
 }: AudienceLastCellProps) {
   const nowMs = useNowMs();
-
-  if (!lastSeenAt) {
-    return <span className='text-2xs text-tertiary-token tabular-nums'>—</span>;
-  }
-
-  const seenMs = Date.parse(lastSeenAt);
-  if (Number.isNaN(seenMs)) {
-    return <span className='text-2xs text-tertiary-token tabular-nums'>—</span>;
-  }
-
-  // During SSR we don't have a stable clock; render an em dash so the row
-  // does not flicker through "now → 5d" on hydration. Post-mount the real
-  // compact form takes over.
-  if (isSsrNowMs(nowMs)) {
-    return <span className='text-2xs text-tertiary-token tabular-nums'>—</span>;
-  }
-  const compact = formatCompact(Math.max(0, nowMs - seenMs));
-
+  // SSR has no stable clock: a dash avoids a "now -> 5d" flicker on hydration.
   return (
-    <span className='text-2xs text-tertiary-token tabular-nums'>{compact}</span>
+    <RelativeTimeCell
+      value={lastSeenAt}
+      nowMs={isSsrNowMs(nowMs) ? null : nowMs}
+    />
   );
 });

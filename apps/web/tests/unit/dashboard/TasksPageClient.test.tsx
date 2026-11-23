@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
@@ -2357,5 +2359,23 @@ describe('TasksPageClient', () => {
 
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
     expect(screen.getByTestId('mobile-task-list')).toBeInTheDocument();
+  });
+});
+
+describe('TasksPageClient metadata controls (JOV-12567)', () => {
+  it('draws stage and priority pills at the 28px control height on their column', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../components/features/dashboard/tasks/TasksPageClient.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain(
+      '-mx-2 relative inline-flex h-7 min-w-0 items-center rounded-full px-2'
+    );
+    expect(source).toContain('sm:before:h-7 sm:before:min-w-0');
+    expect(source).not.toContain('-mx-1 relative inline-flex h-8');
   });
 });

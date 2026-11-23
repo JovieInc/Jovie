@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -95,5 +97,17 @@ describe('shared Presence status vocabulary', () => {
   it('does not invent evidence for an empty signal list', () => {
     render(<PresenceSignalList signals={[]} />);
     expect(screen.getByTestId('presence-signal-list')).toBeEmptyDOMElement();
+  });
+});
+
+describe('PresenceStatusParts control heights (JOV-12567)', () => {
+  it('sits on the 28px control and 44px bar contract', () => {
+    const source = readFileSync(
+      resolve(__dirname, './PresenceStatusParts.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain("'min-h-7 sm:before:min-h-7 sm:before:min-w-0'");
+    expect(source).not.toContain('min-h-8 sm:before:min-h-8');
   });
 });

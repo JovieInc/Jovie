@@ -121,6 +121,7 @@ export {
 } from './atoms/TableEmptyState';
 export type { TableHeaderCellProps } from './atoms/TableHeaderCell';
 export { TableHeaderCell } from './atoms/TableHeaderCell';
+export * from './cells';
 export type { TaskProjectionListRowProps } from './molecules/TaskProjectionListRow';
 export { TaskProjectionListRow } from './molecules/TaskProjectionListRow';
 
