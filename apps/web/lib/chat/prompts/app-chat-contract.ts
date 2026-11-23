@@ -107,7 +107,9 @@ export function checkAppChatPromptContract(prompt: string) {
     requiresRefuseThenDraftHold: includesAll(
       'refusing an unasked send, post, auto-DM, scrape, or spend',
       'name the release or artifact from the ask',
+      // ASS-102 one-rec + ASS-103 safety: keep both needles.
       'one concrete next move this turn',
+      'draft and hold for their yes or confirm',
       'Never a generic draft-hold line',
       // ASS-103 live 45268223488: blank refuse + paste-ready post without hold.
       'Never leave blank artist-facing text on these refuses',
