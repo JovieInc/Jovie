@@ -2759,6 +2759,8 @@
       "offline": "The link never fetches: pending work arrives from the server as availability, and an unreadable status falls back to the plain Inbox bell (StatusUnavailable). Opening it is a normal navigation. The detector matched the pending flag."
     },
     "apps/web/components/shell/SidebarOPresence.tsx": {
+      "loading": "The one lazy part is the OStroke chunk, and its loading fallback is the same rest glyph the O draws everywhere else, so nothing shows or shifts while it loads; SidebarOPresence.test.tsx waits for the chunk before asserting the pose.",
+      "offline": "The O and its title button never fetch: playback and the updater are owned upstream and arrive as props, so a lost connection changes nothing here.",
       "empty": "The O is one link and a fixed status slot with no collection; the idle story is its empty face and the slot is always laid out. The detector matched the items-center layout classes.",
       "partial": "It takes a few flags, a link and an optional player and has no partially loaded data; a title with no artist is the one partial player and is covered by its test. Updating shows the one partial state it has.",
       "permission-denied": "The link and the status carry no gated action or permission input; the detector matched role='status', which only announces updater work.",

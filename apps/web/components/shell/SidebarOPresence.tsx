@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import type { OStrokePose } from '@jovie/ui/brand';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -116,15 +117,14 @@ export function SidebarOPresence({
       className='flex h-8 shrink-0 items-center gap-2 px-(--app-shell-sidebar-inset) py-1'
     >
       {player ? (
-        <button
-          type='button'
+        <PlainButton
           aria-label={`${player.isPlaying ? 'Pause' : 'Play'} ${player.title}`}
           data-sidebar-o-button=''
           onClick={player.onToggle}
           className={buttonClass}
         >
           <OStroke pose={drawnPose} size={20} />
-        </button>
+        </PlainButton>
       ) : (
         <Link
           href={href}
@@ -143,8 +143,7 @@ export function SidebarOPresence({
         </Link>
       )}
       {player ? (
-        <button
-          type='button'
+        <PlainButton
           data-audio-expand-player='true'
           onClick={player.onExpand}
           className='flex h-6 min-w-0 flex-1 items-center truncate rounded-sm text-left text-2xs text-sidebar-muted outline-none focus-visible:bg-sidebar-accent'
@@ -155,7 +154,7 @@ export function SidebarOPresence({
               : player.title}
           </span>
           <span className='sr-only'>Show Player</span>
-        </button>
+        </PlainButton>
       ) : (
         <span
           data-testid={SIDEBAR_O_STATUS_TEST_ID}
