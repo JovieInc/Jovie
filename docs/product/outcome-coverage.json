@@ -233,8 +233,13 @@
         "reorderMerchCards",
         "optimizeMerchCards"
       ],
-      "checks": [],
-      "gap": "Unit tests only."
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/chat-merch-manage-outcome.test.ts",
+          "test": "a picked design becomes a merch card that pauses and removes",
+          "runs": "merge"
+        }
+      ]
     },
     {
       "id": "chat-profile-edit",
