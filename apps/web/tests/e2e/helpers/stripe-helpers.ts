@@ -15,7 +15,7 @@ import {
 } from '@/lib/stripe/test-price-contract';
 import {
   getBillingStatus,
-  isNavigatedHttpPage,
+  stripeWebhookTarget,
   vercelProtectionBypassHeaders,
 } from './billing-status';
 
@@ -162,15 +162,7 @@ export async function postStripeWebhook(
   webhook: SignedStripeWebhook,
   signature = webhook.signature
 ): Promise<APIResponse> {
-  // Navigated pages post to their own origin (the public alias after OTP).
-  // An un-navigated synthetic page has none (`about:blank` parses to origin
-  // "null"), so fall back to the relative path, which `page.request` resolves
-  // against the verified test baseURL (JOV-8805).
-  const pageUrl = page.url();
-  const target = isNavigatedHttpPage(pageUrl)
-    ? `${new URL(pageUrl).origin}/api/stripe/webhooks`
-    : '/api/stripe/webhooks';
-  return page.request.post(target, {
+  return page.request.post(stripeWebhookTarget(page.url()), {
     data: webhook.payload,
     headers: {
       'stripe-signature': signature,

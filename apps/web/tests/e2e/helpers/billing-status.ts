@@ -104,3 +104,15 @@ export async function getBillingStatus(page: Page): Promise<BillingStatus> {
   });
   return parseBillingStatusPayload(response);
 }
+
+/**
+ * Stripe webhook target for the page's state: a navigated page posts to its
+ * own origin (the public alias after OTP); an un-navigated synthetic page has
+ * none (`about:blank` parses to origin "null"), so use the relative path,
+ * which `page.request` resolves against the test `baseURL` (JOV-8805).
+ */
+export function stripeWebhookTarget(pageUrl: string): string {
+  return isNavigatedHttpPage(pageUrl)
+    ? `${new URL(pageUrl).origin}/api/stripe/webhooks`
+    : '/api/stripe/webhooks';
+}

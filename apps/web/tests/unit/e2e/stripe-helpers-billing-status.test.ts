@@ -4,6 +4,7 @@ import {
   getBillingStatus,
   isNavigatedHttpPage,
   parseBillingStatusPayload,
+  stripeWebhookTarget,
   vercelProtectionBypassHeaders,
 } from '@/tests/e2e/helpers/billing-status';
 
@@ -146,5 +147,14 @@ describe('getBillingStatus request routing', () => {
       },
     } as unknown as Page;
     await expect(getBillingStatus(page)).rejects.toThrow(/non-JSON/);
+  });
+});
+
+describe('stripeWebhookTarget', () => {
+  it('posts to the page origin when navigated, baseURL-relative when not', () => {
+    expect(stripeWebhookTarget('https://jov.ie/billing/success')).toBe(
+      'https://jov.ie/api/stripe/webhooks'
+    );
+    expect(stripeWebhookTarget('about:blank')).toBe('/api/stripe/webhooks');
   });
 });
