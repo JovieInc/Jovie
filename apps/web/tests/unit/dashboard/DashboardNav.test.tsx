@@ -396,10 +396,9 @@ describe('DashboardNav', () => {
     expect(getByRole('link', { name: 'Unread answer, Unread' })).toHaveClass(
       'text-primary-token'
     );
-    expect(getByRole('link', { name: 'Running task, Running' })).toHaveAttribute(
-      'href',
-      `${APP_ROUTES.CHAT}/conv-running`
-    );
+    expect(
+      getByRole('link', { name: 'Running task, Running' })
+    ).toHaveAttribute('href', `${APP_ROUTES.CHAT}/conv-running`);
     expect(container.querySelector('.anim-calm-breath')).toBeTruthy();
   });
 
