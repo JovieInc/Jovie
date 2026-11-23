@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -54,13 +55,11 @@ test('real canonical public exports survive Vercel relocation and bind exact ima
     .filter(line => line.startsWith('120000 '))
     .map(line => line.split('\t')[1]);
   assert.ok(names.length >= 6);
-  // Catalog images are Git LFS files; a checkout that did not pull them holds
-  // pointers, which materializeStatic refuses. Stand in distinct bytes then.
+  // Unpulled LFS catalog targets are pointers materializeStatic refuses.
   const bytesOf = name => {
-    const data = readFileSync(resolve(repo, name));
-    return isLfsPointerFile(resolve(repo, name))
-      ? Buffer.from(`image bytes for ${name}`)
-      : data;
+    const target = realpathSync(resolve(repo, name));
+    if (!isLfsPointerFile(target)) return readFileSync(target);
+    return Buffer.from(`image bytes for ${name}`);
   };
   for (const name of names) {
     const source = resolve(repo, name);
