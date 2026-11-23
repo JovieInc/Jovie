@@ -38,6 +38,18 @@ export const SIDEBAR_O_STATUS_TEST_ID = 'sidebar-o-status';
 export const SIDEBAR_O_UPDATING_DELAY_MS = 400;
 /** Once revealed, the status stays at least this long so it never flickers. */
 export const SIDEBAR_O_UPDATING_MIN_MS = 600;
+/** A real update waits this long before it shows, so a burst reads as one. */
+export const SIDEBAR_O_UPDATE_REVEAL_MS = SIDEBAR_O_UPDATING_DELAY_MS;
+/** An update stays at least this long before a newer one replaces it. */
+export const SIDEBAR_O_UPDATE_MIN_MS = SIDEBAR_O_UPDATING_MIN_MS;
+/** An update holds this long after it shows, then fades. */
+export const SIDEBAR_O_SYNCED_HOLD_MS = 2400;
+
+export interface SidebarOUpdate {
+  readonly id: number;
+  readonly label: string;
+  readonly href?: string | undefined;
+}
 
 /** The O as the mini player: set while a track is loaded. */
 export interface SidebarOPlayer {
@@ -58,6 +70,10 @@ export interface SidebarOPresenceProps {
   /** Main chat page; the O navigates here. No panel, no popover. */
   readonly href?: string;
   readonly variant?: BrandVariant;
+  /** A real change that landed (from `useOUpdates`). Shown as a link. */
+  readonly update?: SidebarOUpdate | null;
+  /** Called once the update has faded, so the next change starts clean. */
+  readonly onUpdateDone?: () => void;
 }
 
 /**
@@ -72,9 +88,17 @@ export function SidebarOPresence({
   updating = false,
   href = APP_ROUTES.CHAT,
   variant = 'jovie',
+  update = null,
+  onUpdateDone,
 }: SidebarOPresenceProps) {
   const [revealed, setRevealed] = useState(false);
   const revealedAt = useRef(0);
+  const { painted, visible: updateVisible } = useUpdateReveal(
+    update,
+    onUpdateDone
+  );
+  const showUpdate = updateVisible && !revealed;
+  const slotVisible = revealed || showUpdate;
 
   useEffect(() => {
     if (updating) {
@@ -170,16 +194,36 @@ export function SidebarOPresence({
       ) : (
         <span
           data-testid={SIDEBAR_O_STATUS_TEST_ID}
-          data-state={revealed ? 'visible' : 'hidden'}
+          data-state={slotVisible ? 'visible' : 'hidden'}
           className='sidebar-o-status flex h-4 min-w-0 flex-1 items-center gap-1.5 truncate text-2xs text-sidebar-muted'
         >
-          {/* The label stays painted while fading out so the slot never reflows. */}
-          <span aria-hidden='true' className='flex items-center gap-1.5'>
+          {/* Both labels stay painted while fading so the slot never reflows. */}
+          <span
+            aria-hidden='true'
+            hidden={!revealed}
+            className='flex items-center gap-1.5'
+          >
             <span className='size-1 shrink-0 rounded-full bg-primary' />
             <span className='truncate'>Updating</span>
           </span>
+          <Link
+            href={painted?.href ?? href}
+            prefetch={false}
+            data-sidebar-o-update=''
+            hidden={revealed}
+            tabIndex={showUpdate ? undefined : -1}
+            aria-hidden={showUpdate ? undefined : true}
+            className='flex min-w-0 items-center gap-1.5 truncate rounded-sm text-sidebar-muted outline-none hover:text-primary-token focus-visible:text-primary-token focus-visible:underline'
+          >
+            <span className='size-1 shrink-0 rounded-full bg-primary' />
+            <span className='truncate'>{painted?.label ?? ''}</span>
+          </Link>
           <span role='status' aria-live='polite' className='sr-only'>
-            {revealed ? 'Updating' : ''}
+            {revealed
+              ? 'Updating'
+              : showUpdate && painted
+                ? `Updated: ${painted.label}`
+                : ''}
           </span>
         </span>
       )}
@@ -189,4 +233,59 @@ export function SidebarOPresence({
 
 function playPose(player: SidebarOPlayer): OStrokePose {
   return player.isPlaying ? 'pause' : 'triangle';
+}
+
+/**
+ * Reveal a real update: wait the reveal delay, show, hold, then fade. A newer
+ * update replaces the text once the current one has shown its minimum, and
+ * restarts the hold. The text it paints survives the fade.
+ */
+function useUpdateReveal(
+  update: SidebarOUpdate | null,
+  onDone: (() => void) | undefined
+) {
+  const [painted, setPainted] = useState<SidebarOUpdate | null>(null);
+  const [visible, setVisible] = useState(false);
+  const shownAt = useRef(0);
+  const done = useRef(onDone);
+  const latest = useRef(update);
+  const visibleRef = useRef(false);
+  const hold = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    done.current = onDone;
+    latest.current = update;
+    visibleRef.current = visible;
+  });
+  const id = update?.id;
+
+  useEffect(() => {
+    const next = latest.current;
+    if (id === undefined || !next) return;
+    const delay = visibleRef.current
+      ? Math.max(0, SIDEBAR_O_UPDATE_MIN_MS - (Date.now() - shownAt.current))
+      : SIDEBAR_O_UPDATE_REVEAL_MS;
+    const show = setTimeout(() => {
+      shownAt.current = Date.now();
+      setPainted(next);
+      setVisible(true);
+      // Each paint restarts the hold; the hold outlives a cleared update so
+      // a shown line always fades instead of sticking.
+      if (hold.current) clearTimeout(hold.current);
+      hold.current = setTimeout(() => {
+        hold.current = undefined;
+        setVisible(false);
+        done.current?.();
+      }, SIDEBAR_O_SYNCED_HOLD_MS);
+    }, delay);
+    return () => clearTimeout(show);
+  }, [id]);
+
+  useEffect(
+    () => () => {
+      if (hold.current) clearTimeout(hold.current);
+    },
+    []
+  );
+
+  return { painted, visible };
 }

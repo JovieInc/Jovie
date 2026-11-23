@@ -1,6 +1,7 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
+import { renderWithQueryClient as render } from '@/tests/utils/test-utils';
 import {
   requestFullAudioPlayer,
   resetAudioChromeSnapshot,

@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildLyricsRoute } from '@/constants/routes';
+import { renderWithQueryClient as render } from '@/tests/utils/test-utils';
 import {
   getAudioChromeSnapshot,
   publishMediaCanvasTransport,

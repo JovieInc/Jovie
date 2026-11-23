@@ -12,6 +12,7 @@ vi.mock('@/lib/ovie/summer-production-pin', () => ({
   SummerPinInvalidError: class SummerPinInvalidError extends Error {
     readonly code = 'summer_pin_invalid';
   },
+  logSummerBridgeEvent: vi.fn(),
 }));
 
 import type { SummerOpsCard } from './ops-card';
