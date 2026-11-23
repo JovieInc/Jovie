@@ -5,7 +5,7 @@
  * them. Three routes have none on any real profile, so the crawl reported
  * them as uncovered:
  *
- *   /[username]/[slug]/download   promo download gate (Pro + active file)
+ *   /[username]/[slug]/download   promo download gate (non-free plan + active file)
  *   /[username]/merch/[cardId]    public merch card
  *   /a/[handle]/[slug]            public library asset share
  *
@@ -173,7 +173,11 @@ export function buildCrawlFixtureMerchSnapshots(): {
 /* ------------------------------------------------------------------------ */
 
 export interface CrawlContentObservedState {
-  readonly user: { readonly id: string } | null;
+  readonly user: {
+    readonly id: string;
+    /** Non-free plan that billing reconciliation leaves alone. */
+    readonly hasDownloadPlan: boolean;
+  } | null;
   readonly profile: {
     readonly id: string;
     readonly userId: string | null;
@@ -253,6 +257,34 @@ export function assertCrawlContentOwnership(
   }
 }
 
+/**
+ * The download gate needs a non-free plan. A paid plan with no Stripe
+ * subscription is downgraded by billing reconciliation (it selects
+ * is_pro = true without a subscription), so the fixture holds a trial that
+ * never lapses instead: plan 'trial', is_pro false, no Stripe ids. Nothing
+ * bills, and reconciliation never selects it.
+ */
+export const CRAWL_FIXTURE_PLAN = 'trial';
+export const CRAWL_FIXTURE_TRIAL_ENDS_AT = new Date('2099-12-31T00:00:00.000Z');
+
+export function crawlFixtureUserHasDownloadPlan(
+  user: {
+    readonly plan: string | null;
+    readonly isPro: boolean | null;
+    readonly trialEndsAt: Date | null;
+    readonly stripeSubscriptionId: string | null;
+  },
+  now: Date = new Date()
+): boolean {
+  return (
+    user.plan === CRAWL_FIXTURE_PLAN &&
+    user.isPro !== true &&
+    user.stripeSubscriptionId === null &&
+    user.trialEndsAt !== null &&
+    user.trialEndsAt > now
+  );
+}
+
 export function planCrawlContentFixture(
   state: CrawlContentObservedState,
   fixture: CrawlContentFixture = CRAWL_CONTENT_FIXTURE
@@ -269,7 +301,7 @@ export function planCrawlContentFixture(
   // Every existing row is re-asserted on apply (content columns are fixed),
   // so "none" only means the row already carries the fields the page needs.
   return [
-    step('user', state.user !== null, true),
+    step('user', state.user !== null, state.user?.hasDownloadPlan === true),
     step(
       'profile',
       state.profile !== null,
