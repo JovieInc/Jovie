@@ -50,7 +50,7 @@ export function assertPublicLfsFiles({
   if (pointers.length === 0) return pointers;
   const message =
     `${pointers.length} file(s) under ${publicDir} are Git LFS pointers; ` +
-    'run `git lfs pull --include "apps/web/screenshot-catalog/current/*.png"` ' +
+    'run `git lfs pull --include "apps/web/screenshot-catalog/current/*.png,apps/web/public/demo/jovie-demo.mp4"` ' +
     '(in CI: the .github/actions/lfs-pull step) before the build: ' +
     pointers.slice(0, 5).join(', ');
   if (ci && ci !== 'false' && !vercel) throw new Error(message);

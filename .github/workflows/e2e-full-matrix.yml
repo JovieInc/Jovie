@@ -48,7 +48,7 @@ jobs:
       - name: Pull product screenshots (Git LFS)
         uses: ./.github/actions/lfs-pull
         with:
-          include: apps/web/screenshot-catalog/current/*.png
+          include: 'apps/web/screenshot-catalog/current/*.png,apps/web/public/demo/jovie-demo.mp4'
           cache: 'true'
       - name: Build production-mode standalone server
         run: pnpm turbo build --filter=@jovie/web

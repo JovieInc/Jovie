@@ -9,6 +9,8 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = resolve(__dirname, '../../../../..');
 const CATALOG = 'apps/web/screenshot-catalog/current/*.png';
+const DEMO_VIDEO = 'apps/web/public/demo/jovie-demo.mp4';
+const SERVED_LFS = `${CATALOG},${DEMO_VIDEO}`;
 
 type Step = {
   name?: string;
@@ -31,7 +33,7 @@ function expectCatalogPullBefore(path: string, buildStep: string) {
   expect(build, `${path}: ${buildStep}`).toBeGreaterThan(0);
   const pull = all[build - 1];
   expect(pull.uses).toBe('./.github/actions/lfs-pull');
-  expect(pull.with?.include).toBe(CATALOG);
+  expect(pull.with?.include).toBe(SERVED_LFS);
   return pull;
 }
 
@@ -45,6 +47,9 @@ describe('product screenshot catalog in Git LFS', () => {
       expect(attributes).toContain(
         `apps/web/screenshot-catalog/current/${name}.png -filter -diff -merge binary`
       );
+    expect(attributes).toContain(
+      `${DEMO_VIDEO} filter=lfs diff=lfs merge=lfs -text`
+    );
   });
 
   it('pulls the catalog before every Vercel build', () => {
@@ -78,7 +83,7 @@ describe('product screenshot catalog in Git LFS', () => {
         for (const step of job.steps ?? []) {
           if (
             (step.uses === './.github/actions/lfs-pull' &&
-              step.with?.include === CATALOG) ||
+              step.with?.include === SERVED_LFS) ||
             (step.uses === './.github/actions/setup-playwright' &&
               String(step.with?.product_screenshots ?? 'true') !== 'false')
           )
@@ -113,7 +118,7 @@ describe('product screenshot catalog in Git LFS', () => {
       step => step.name === 'Pull product screenshots (Git LFS)'
     );
     expect(pull?.uses).toBe('./.github/actions/lfs-pull');
-    expect(pull?.with?.include).toBe(CATALOG);
+    expect(pull?.with?.include).toBe(SERVED_LFS);
     expect(pull?.with?.cache).toBe('${{ inputs.cache }}');
   });
 

@@ -37,3 +37,6 @@ docs/screenshots/ui-escape-holdout/*.png filter=lfs diff=lfs merge=lfs -text
 apps/web/screenshot-catalog/current/*.png filter=lfs diff=lfs merge=lfs -text
 apps/web/screenshot-catalog/current/onboarding-dsp-desktop.png -filter -diff -merge binary
 apps/web/screenshot-catalog/current/onboarding-handle-desktop.png -filter -diff -merge binary
+# Public demo video fallback (/demo/jovie-demo.mp4 when DEMO_VIDEO_URL is
+# unset). Pulled with the catalog by the same lfs-pull steps.
+apps/web/public/demo/jovie-demo.mp4 filter=lfs diff=lfs merge=lfs -text

@@ -352,7 +352,8 @@ export function assertOriginalJobsRetained(current, baseline) {
     assert.equal(build?.name, 'Build exact PR head');
     assert.equal(coverageSteps[pull].uses, './.github/actions/lfs-pull');
     assert.deepEqual(coverageSteps[pull].with, {
-      include: 'apps/web/screenshot-catalog/current/*.png',
+      include:
+        'apps/web/screenshot-catalog/current/*.png,apps/web/public/demo/jovie-demo.mp4',
       cache: 'restore',
     });
     assert.equal(coverageSteps[pull].if, build?.if);

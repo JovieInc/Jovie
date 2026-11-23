@@ -278,7 +278,7 @@ jobs:
       - name: Pull product screenshots (Git LFS)
         uses: ./.github/actions/lfs-pull
         with:
-          include: apps/web/screenshot-catalog/current/*.png
+          include: 'apps/web/screenshot-catalog/current/*.png,apps/web/public/demo/jovie-demo.mp4'
           cache: 'true'
       - name: Build (preview target for staging verification)
         timeout-minutes: 10
@@ -980,7 +980,7 @@ jobs:
         if: ${{ steps.mutation-head.outputs.is_current == 'true' }}
         uses: ./.github/actions/lfs-pull
         with:
-          include: apps/web/screenshot-catalog/current/*.png
+          include: 'apps/web/screenshot-catalog/current/*.png,apps/web/public/demo/jovie-demo.mp4'
           cache: 'true'
       - name: Build and stage production deployment
         id: stage-production
