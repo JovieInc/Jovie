@@ -316,7 +316,14 @@ describe('live public profile lock', () => {
       expect(screen.queryByText('Events')).not.toBeInTheDocument();
       expect(screen.getAllByText('About').length).toBeGreaterThan(0);
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Release credits' }));
+    // Desktop credits open from the Menu popover, once (no duplicate pill).
+    expect(
+      screen.queryByRole('button', { name: 'Release credits' })
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Release credits' })
+    );
     expect(
       await screen.findByRole('heading', { name: 'Credits' })
     ).toBeInTheDocument();

@@ -1,7 +1,7 @@
 'use client';
 
 import { EmptyCell } from '@/components/atoms/EmptyCell';
-import { TableBadge } from '@/components/organisms/table/atoms/TableBadge';
+import { StatusCell } from '@/components/organisms/table/cells/StatusCell';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import type { LinkRow } from './links-model';
 
@@ -11,7 +11,7 @@ import type { LinkRow } from './links-model';
  * only own content, width and numeric alignment.
  */
 
-export const LINKS_ROW_MODE = 'dense' as const;
+export const LINKS_ROW_MODE = 'compact' as const;
 
 const STATUS_LABELS: Record<LinkRow['status'], string> = {
   active: 'Active',
@@ -20,14 +20,14 @@ const STATUS_LABELS: Record<LinkRow['status'], string> = {
   archived: 'Archived',
 };
 
-const STATUS_VARIANTS: Record<
+const STATUS_TONES: Record<
   LinkRow['status'],
-  'primary' | 'secondary' | 'success' | 'warning'
+  'positive' | 'attention' | 'neutral'
 > = {
-  active: 'success',
-  draft: 'secondary',
-  scheduled: 'warning',
-  archived: 'secondary',
+  active: 'positive',
+  draft: 'neutral',
+  scheduled: 'attention',
+  archived: 'neutral',
 };
 
 export function LinkStatusBadge({
@@ -36,9 +36,7 @@ export function LinkStatusBadge({
   readonly status: LinkRow['status'];
 }) {
   return (
-    <TableBadge variant={STATUS_VARIANTS[status]}>
-      {STATUS_LABELS[status]}
-    </TableBadge>
+    <StatusCell tone={STATUS_TONES[status]}>{STATUS_LABELS[status]}</StatusCell>
   );
 }
 

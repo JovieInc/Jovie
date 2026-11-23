@@ -4,7 +4,7 @@ import { ViewTable } from './ViewTable';
 
 describe('ViewTable', () => {
   it('renders headers and cells as text', () => {
-    render(
+    const { container } = render(
       <ViewTable
         caption='Fans'
         columns={[
@@ -17,5 +17,9 @@ describe('ViewTable', () => {
     expect(screen.getByText('City')).toBeInTheDocument();
     expect(screen.getByText('<b>LA</b>')).toBeInTheDocument();
     expect(screen.getByText('120')).toBeInTheDocument();
+    // New tables use the shared compact rows; dense is a shrinking legacy set.
+    expect(
+      container.querySelector('[data-table-row-mode="compact"]')
+    ).not.toBeNull();
   });
 });

@@ -63,8 +63,10 @@ describe('workspace page optical seam contract', () => {
     const tableStyles = read('components/organisms/table/table.styles.ts');
 
     expect(pageToolbar).not.toContain('px-3.5 py-2');
-    expect(tableStyles).toContain("cellPadding: 'px-3 py-1'");
-    expect(tableStyles).toContain("headerPadding: 'px-3 py-1.5'");
+    expect(tableStyles).toContain("cellPadding: 'px-3',");
+    expect(tableStyles).toContain("headerPadding: 'px-3',");
+    expect(tableStyles).not.toMatch(/cellPadding: 'px-3 py-/);
+    expect(tableStyles).not.toMatch(/headerPadding: 'px-3 py-/);
   });
 
   it('routes table cell seams through the canonical table presets', () => {

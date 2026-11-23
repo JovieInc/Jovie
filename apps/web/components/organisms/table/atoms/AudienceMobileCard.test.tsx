@@ -81,4 +81,22 @@ describe('AudienceMobileCard', () => {
     expect(onTap).toHaveBeenCalledWith(anonymous);
     await expectNoA11yViolations(container);
   });
+
+  it('shows the state as a quiet StatusCell dot, not a filled pill', () => {
+    const { container } = render(
+      <AudienceMobileCard
+        member={{ ...member, intentLevel: 'high' }}
+        mode='members'
+        onTap={vi.fn()}
+      />
+    );
+    const status = container.querySelector('[data-status-cell]');
+    expect(status).not.toBeNull();
+    expect(status?.className).not.toMatch(/(^|\s)(bg-|ring-|border)/);
+    expect(status?.querySelector('[aria-hidden="true"]')).toHaveClass(
+      'size-1.5',
+      'rounded-full'
+    );
+    expect(status?.textContent?.trim().length).toBeGreaterThan(0);
+  });
 });

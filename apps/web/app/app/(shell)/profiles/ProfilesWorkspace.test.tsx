@@ -1346,7 +1346,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     ).toBeInTheDocument();
   });
 
-  it('locks Presence controls to 32px desktop geometry with the 44px hit target on mobile only', () => {
+  it('locks Presence controls to their desktop geometry with the 44px hit target on mobile only', () => {
     renderWorkspace(data);
 
     // Row overflow: shared TableRowOverflowTrigger = IconButton sm (KEEP 28)
@@ -1358,7 +1358,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(rowAction.className).toMatch(/before:h-11/);
     expect(rowAction.className).not.toContain('sm:h-7');
 
-    // Status pill renders at the locked 32px minimum.
+    // Status pill (a badge, not a control) keeps its 32px row minimum.
     const spotifyRow = rowAction.closest('tr');
     const status = within(spotifyRow as HTMLElement)
       .getAllByText('Limit Reached')[0]
@@ -1372,7 +1372,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
 
     // Text controls collapse both hit-target axes on desktop, not just height.
     expect(PRESENCE_BUTTON_DESKTOP_DENSITY.split(' ')).toEqual(
-      expect.arrayContaining(['sm:before:min-h-8', 'sm:before:min-w-0'])
+      expect.arrayContaining(['sm:before:min-h-7', 'sm:before:min-w-0'])
     );
   });
 

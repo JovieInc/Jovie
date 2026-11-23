@@ -41,3 +41,15 @@ test('every production-blocked app/demo page is listed closed', () => {
     );
   assert.equal(isClosedInProduction('/demo/video', closed), false);
 });
+
+// The publication gate rewrites unknown handles to this route, which always
+// answers the branded 404, so the crawl must expect 404 there, not flag it.
+test('the branded profile-miss 404 is listed closed while it always 404s', () => {
+  const page = readFileSync(
+    join(ROOT, 'apps/web/app/[username]/profile-miss/page.tsx'),
+    'utf8'
+  );
+  assert.match(page, /\bnotFound\(\)/);
+  assert.equal(isClosedInProduction('/[username]/profile-miss', closed), true);
+  assert.equal(isClosedInProduction('/[username]', closed), false);
+});
