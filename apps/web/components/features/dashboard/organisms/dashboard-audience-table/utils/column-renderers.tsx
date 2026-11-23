@@ -204,10 +204,8 @@ export function renderEmailCell({
 export function SelectCell({ row }: CellContext<AudienceMember, unknown>) {
   const { selectedIds } = useAudienceTableVolatileContext();
   const { toggleSelect } = useAudienceTableStableContext();
-  const rowNumber = row.index + 1;
   return (
     <AudienceRowSelectionCell
-      rowNumber={rowNumber}
       isChecked={selectedIds.has(row.original.id)}
       displayName={row.original.displayName}
       onToggle={() => toggleSelect(row.original.id)}

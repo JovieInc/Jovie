@@ -179,6 +179,13 @@ describe('ProfileCompactTemplate states', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('has no Release credits pill in the desktop top chrome', async () => {
+    renderTemplate({});
+
+    await screen.findByTestId('profile-compact-surface');
+    expect(screen.queryByTestId('profile-release-credits')).toBeNull();
+  });
+
   it('canonicalizes ?mode=tour to Home when there are no upcoming events (JOV-14241)', async () => {
     window.history.replaceState(null, '', '/tim?mode=tour&source=qr');
     const pushSpy = vi.spyOn(window.history, 'pushState');

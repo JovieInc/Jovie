@@ -151,6 +151,13 @@ describe('AuthShell', () => {
     expect(mocks.audioAction).toHaveBeenCalledTimes(actions + 1);
   });
 
+  it('mounts exactly one audio bar through the shared lazy wrapper', async () => {
+    render(<Shell />);
+    expect(
+      await screen.findAllByRole('button', { name: 'Audio playback toggle' })
+    ).toHaveLength(1);
+  });
+
   it('pins a collapsed sidebar from the header toggle and reports the change', async () => {
     const user = userEvent.setup();
     const onSidebarOpenChange = vi.fn();

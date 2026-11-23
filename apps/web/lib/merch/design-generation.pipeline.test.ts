@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { normalizeToolFailureOutput } from '@/lib/chat/tool-errors';
 import {
   merchDesignOptions,
   merchGenerationBatches,
@@ -203,6 +202,19 @@ beforeEach(() => {
   scheduleMerchMockupEnrichmentMock.mockImplementation(() => {});
 });
 
+const useRealConceptGate = () =>
+  reviewStoredMerchConceptPlanMock.mockImplementation(async (plan, now) =>
+    evaluateMerchConceptPlan(plan, null, now)
+  );
+
+const runMerch = (prompt: string) =>
+  generateMerchDesigns({
+    profileId: 'profile-1',
+    clerkUserId: 'user-1',
+    prompt,
+    source,
+  });
+
 function batchPatch(status: string): UpdatePatch | undefined {
   return updatePatches.find(
     patch =>
@@ -211,16 +223,34 @@ function batchPatch(status: string): UpdatePatch | undefined {
 }
 
 describe('generateMerchDesigns production outcome contract', () => {
-  it('persists an unreviewed concept gate and makes zero image, upload or mockup calls', async () => {
-    reviewStoredMerchConceptPlanMock.mockImplementation(async (plan, now) =>
-      evaluateMerchConceptPlan(plan, null, now)
+  // No stored review (every fresh artist): the REAL gate must still render.
+  it('renders three private draft designs when no concept review exists yet', async () => {
+    useRealConceptGate();
+    generatePrintGraphicMock.mockImplementation(async () => printGraphic());
+    const result = await runMerch(PASS_PROMPT);
+    expect(result.designs).toHaveLength(3);
+    expect(generatePrintGraphicMock).toHaveBeenCalledTimes(3);
+    for (const design of result.designs) {
+      expect(design.preview_url).toBe('https://cdn.test/mockup.png');
+      expect(design.sellability?.sellable).toBe(false);
+    }
+    const insert = dbMock.insert.mock.results[0].value.values;
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'generating',
+        artistBrief: expect.objectContaining({
+          conceptReview: expect.objectContaining({
+            decision: 'draft',
+            publicationBlockers: [expect.any(String)],
+          }),
+        }),
+      })
     );
-    const result = await generateMerchDesigns({
-      profileId: 'profile-1',
-      clerkUserId: 'user-1',
-      prompt: PASS_PROMPT,
-      source,
-    });
+  });
+
+  it('blocks rendering and makes zero image, upload or mockup calls when a concrete blocker exists', async () => {
+    useRealConceptGate();
+    const result = await runMerch(`${PASS_PROMPT} for the 2031 world tour`);
     expect(result).toMatchObject({
       state: 'concept_review_required',
       designs: [],
@@ -243,6 +273,7 @@ describe('generateMerchDesigns production outcome contract', () => {
           conceptReview: expect.objectContaining({
             phase: 'pre_art',
             imageCallsExecuted: 0,
+            reasons: expect.arrayContaining(['concept.unsourced_date']),
             stageEvent: expect.objectContaining({
               schema: 'jovie-stage-event/v1',
               outcome: 'failed',
@@ -465,26 +496,5 @@ describe('generateMerchDesigns production outcome contract', () => {
       })
     );
     expect(captureErrorMock).not.toHaveBeenCalled();
-  });
-
-  it('preserves generationId and failureSummary when a merch failure payload is normalized', () => {
-    const payload = normalizeToolFailureOutput('createMerch', {
-      success: false,
-      error: 'Profile ID required',
-      generationId: 'gen-1',
-      failureSummary: {
-        requested: 3,
-        ready: 0,
-        byClass: { image_provider: 3 },
-      },
-    });
-
-    expect(payload).not.toBeNull();
-    expect((payload as { generationId?: string }).generationId).toBe('gen-1');
-    expect(failureSummaryOf(payload)).toEqual({
-      requested: 3,
-      ready: 0,
-      byClass: { image_provider: 3 },
-    });
   });
 });

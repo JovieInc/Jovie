@@ -47,6 +47,7 @@
     "desktop-dogfood.yml": {"runsPerMergedPr":0.9,"triggers":["workflow_dispatch","workflow_run:CI"]},
     "desktop-release.yml": {"runsPerMergedPr":0.9,"triggers":["workflow_dispatch","workflow_run:Production Controller"]},
     "doc-gardening-agent.yml": {"runsPerMergedPr":0,"triggers":["push","workflow_dispatch"]},
+    "dogfood-feed-bind.yml": {"runsPerMergedPr":0,"triggers":["workflow_dispatch"]},
     "e2e-full-matrix.yml": {"runsPerMergedPr":0.1,"triggers":["repository_dispatch:clock_e2e_full_matrix","workflow_dispatch"]},
     "eve-pilot.yml": {"runsPerMergedPr":0,"triggers":["pull_request","push","workflow_dispatch"]},
     "fixed-runner-canary.yml": {"runsPerMergedPr":0,"triggers":["workflow_dispatch"]},
