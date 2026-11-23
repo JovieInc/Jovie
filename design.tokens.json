@@ -349,11 +349,11 @@
       "$type": "dimension"
     },
     "row-default": {
-      "$value": "{size.row.compact}",
+      "$value": "40px",
       "$type": "dimension"
     },
     "row-comfortable": {
-      "$value": "{size.row.list}",
+      "$value": "44px",
       "$type": "dimension"
     },
     "cell-padding-x": {

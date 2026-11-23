@@ -162,14 +162,15 @@ test('Figma snapshot: matching passes, drift fails (deliberate red)', () => {
   assert.equal(compareSnapshot(dark, flat).findings.length, 1);
 });
 
-test('grid tokens: new sizes, and existing row modes reused by alias', () => {
+test('grid tokens: DataGrid ladder is literal (tables are dense-only)', () => {
   const flat = flatExport();
   const px = name => flat[name].values.dark;
   assert.equal(px('grid/row-compact'), 36);
-  assert.equal(px('grid/row-default'), px('size/row/compact'));
   assert.equal(px('grid/row-default'), 40);
-  assert.equal(px('grid/row-comfortable'), px('size/row/list'));
   assert.equal(px('grid/row-comfortable'), 44);
+  assert.equal(px('size/row/dense'), 32);
+  assert.equal(flat['size/row/compact'], undefined);
+  assert.equal(flat['size/row/list'], undefined);
   assert.equal(px('grid/cell-padding-x'), 12);
   assert.equal(px('grid/avatar'), 24);
   assert.equal(px('grid/status-dot'), 8);
