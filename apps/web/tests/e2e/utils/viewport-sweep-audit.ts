@@ -271,6 +271,25 @@ export async function auditViewport(
       );
       footer = madeWith?.closest<HTMLElement>('a') ?? madeWith ?? null;
     }
+    // Shell chrome: when the footer lives in an inner scroller (the profile's
+    // app shell), elements laid out outside that scroller, such as the pinned
+    // bottom tab bar, are chrome, not page content after the footer.
+    let contentScroller: HTMLElement | null = null;
+    for (
+      let current = footer?.parentElement ?? null;
+      current && current !== document.body;
+      current = current.parentElement
+    ) {
+      const overflowY = getComputedStyle(current).overflowY;
+      if (overflowY === 'auto' || overflowY === 'scroll') {
+        contentScroller = current;
+        break;
+      }
+    }
+    const isShellChrome = (element: Element): boolean =>
+      contentScroller !== null &&
+      !contentScroller.contains(element) &&
+      !element.contains(contentScroller);
     if (footer) {
       const footerBottom = footer.getBoundingClientRect().bottom;
       const after = Array.from(
@@ -278,7 +297,7 @@ export async function auditViewport(
       ).filter(element => {
         if (footer?.contains(element) || element.contains(footer)) return false;
         if (!isVisible(element) || hasHiddenAncestor(element)) return false;
-        if (isFixedLike(element)) return false;
+        if (isFixedLike(element) || isShellChrome(element)) return false;
         const rect = element.getBoundingClientRect();
         if (isSrOnly(rect)) return false;
         if (rect.top < footerBottom - 1) return false;
@@ -411,7 +430,7 @@ export async function auditViewport(
       )
         .filter(element => {
           if (!isVisible(element) || hasHiddenAncestor(element)) return false;
-          if (isFixedLike(element)) return false;
+          if (isFixedLike(element) || isShellChrome(element)) return false;
           const rect = element.getBoundingClientRect();
           if (isSrOnly(rect) || rect.right < 0 || rect.left > vw) return false;
           const ownText = Array.from(element.childNodes).some(
