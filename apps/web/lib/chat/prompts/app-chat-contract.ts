@@ -59,11 +59,19 @@ export function checkAppChatPromptContract(prompt: string) {
       'ad copy',
       'write the draft body in this turn',
       'Never reply with only a promise to draft',
+      'even when the promise names the release',
       'Do not grill for a positioning line'
     ),
     requiresRefuseDraftHoldOnlyForUnasked: includesAll(
       'refusing an unasked send, post, auto-DM, scrape, or spend',
       'That refuse→draft-hold line is only for unasked'
+    ),
+    // ASS-102 live 45268223488: named promise alone still next_action≤1.
+    requiresRefuseConcreteNextMove: includesAll(
+      'one concrete next move this turn',
+      'short draft body',
+      'spend-cap ask',
+      'A named promise alone'
     ),
     keepsGroundingToPromptOrTools: includesAll(
       'must come from this prompt or from a tool result in this turn',
@@ -99,7 +107,7 @@ export function checkAppChatPromptContract(prompt: string) {
     requiresRefuseThenDraftHold: includesAll(
       'refusing an unasked send, post, auto-DM, scrape, or spend',
       'name the release or artifact from the ask',
-      'draft and hold for their yes or confirm',
+      'one concrete next move this turn',
       'Never a generic draft-hold line',
       // ASS-103 live 45268223488: blank refuse + paste-ready post without hold.
       'Never leave blank artist-facing text on these refuses',
