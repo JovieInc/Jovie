@@ -51,14 +51,42 @@ export function parseBillingStatusPayload(input: {
 }
 
 /**
+ * True when the page sits on an http(s) origin, so a relative in-page `fetch`
+ * can resolve. `about:blank` (or any non-http document) rejects a relative
+ * URL with `TypeError: Failed to parse URL`.
+ */
+export function canFetchRelativeInPage(url: string): boolean {
+  return /^https?:/i.test(url);
+}
+
+/**
  * Fetch current billing status via the app's API on the page's current origin.
  *
  * Uses in-page `fetch` (same pattern as `createCheckoutSession`) so the request
  * stays on whatever host the browser actually authenticated against — usually
  * the public `jov.ie` alias after OTP — instead of Playwright `baseURL` which
  * stays pinned to the protected exact deployment URL during postdeploy.
+ *
+ * JOV-8806: callers also run this before any navigation (e.g. `ensureUserIsFree`
+ * in the claim dogfood), where the page is still `about:blank` and a relative
+ * in-page fetch cannot resolve. There the request falls back to the
+ * `baseURL`-pinned `page.request`, which shares the browser context's cookies.
  */
 export async function getBillingStatus(page: Page): Promise<BillingStatus> {
+  if (!canFetchRelativeInPage(page.url())) {
+    const res = await page.request.get('/api/billing/status', {
+      headers: {
+        Accept: 'application/json',
+        ...vercelProtectionBypassHeaders(),
+      },
+    });
+    return parseBillingStatusPayload({
+      ok: res.ok(),
+      status: res.status(),
+      contentType: res.headers()['content-type'] ?? '',
+      text: await res.text(),
+    });
+  }
   const response = await page.evaluate(async () => {
     const res = await fetch('/api/billing/status', {
       headers: { Accept: 'application/json' },

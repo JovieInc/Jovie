@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canFetchRelativeInPage,
   parseBillingStatusPayload,
   vercelProtectionBypassHeaders,
 } from '@/tests/e2e/helpers/billing-status';
+
+describe('canFetchRelativeInPage', () => {
+  it('rejects an un-navigated about:blank page (JOV-8806 dogfood regression)', () => {
+    expect(canFetchRelativeInPage('about:blank')).toBe(false);
+  });
+
+  it('accepts http(s) origins where a relative fetch resolves', () => {
+    expect(canFetchRelativeInPage('http://localhost:3260/claim')).toBe(true);
+    expect(canFetchRelativeInPage('https://jov.ie/billing/success')).toBe(true);
+  });
+});
 
 describe('vercelProtectionBypassHeaders', () => {
   it('returns the automation bypass header when the Playwright secret is set', () => {
