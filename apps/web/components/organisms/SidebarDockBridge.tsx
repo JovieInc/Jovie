@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useState } from 'react';
+import { type ComponentProps, useEffect, useState } from 'react';
 import {
   SidebarDock,
   type SidebarDockUpdateControl,
@@ -20,10 +20,11 @@ import {
   type WhatsNewEntry,
   type WhatsNewUserState,
 } from '@/lib/whats-new';
+import { requestFullAudioPlayer } from './audio-chrome-state';
 import {
-  requestFullAudioPlayer,
-  useAudioChromeSnapshot,
-} from './audio-chrome-state';
+  OPresenceProvider,
+  useOPresence,
+} from './o-presence/OPresenceProvider';
 import {
   selectNowPlaying,
   useTrackAudioActions,
@@ -59,7 +60,17 @@ const UPDATE_CONTROL_NOTICE: Record<
  * status to the identity row through context, so nothing above the footer
  * re-renders with it.
  */
-export function SidebarDockBridge({
+export function SidebarDockBridge(
+  props: ComponentProps<typeof SidebarDockBridgeInner>
+) {
+  return (
+    <OPresenceProvider>
+      <SidebarDockBridgeInner {...props} />
+    </OPresenceProvider>
+  );
+}
+
+function SidebarDockBridgeInner({
   userId,
   collapsed,
   fetchImpl = fetch,
@@ -95,9 +106,9 @@ export function SidebarDockBridge({
           ),
         };
   const pwa = usePWAInstall();
-  const audioChrome = useAudioChromeSnapshot();
-  const playbackState = useTrackAudioSnapshot(selectNowPlaying);
-  const { stop, toggleTrack } = useTrackAudioActions();
+  const { state: oState, nowPlaying } = useOPresence();
+  const { activeTrackId, trackTitle } = useTrackAudioSnapshot(selectNowPlaying);
+  const { toggleTrack } = useTrackAudioActions();
   const [release, setRelease] = useState<WhatsNewEntry | null>(null);
 
   useEffect(() => {
@@ -118,7 +129,6 @@ export function SidebarDockBridge({
 
   const updating =
     updateControlKind === 'checking' || updateControlKind === 'downloading';
-  const activeTrack = playbackState.activeTrackId && playbackState.trackTitle;
   return (
     <>
       <SidebarDock
@@ -129,30 +139,6 @@ export function SidebarDockBridge({
           release && userState && isWhatsNewActionComplete(release, userState)
             ? null
             : release
-        }
-        audio={
-          activeTrack
-            ? {
-                track: {
-                  trackTitle: playbackState.trackTitle,
-                  artistName: playbackState.artistName,
-                  artworkUrl: playbackState.artworkUrl,
-                },
-                isPlaying: playbackState.isPlaying,
-                reserved:
-                  audioChrome.fullPlayerVisible &&
-                  audioChrome.activeTrackId === playbackState.activeTrackId,
-                onPlay: () => {
-                  if (playbackState.activeTrackId && playbackState.trackTitle)
-                    void toggleTrack({
-                      id: playbackState.activeTrackId,
-                      title: playbackState.trackTitle,
-                    }).catch(() => {});
-                },
-                onDismiss: stop,
-                onExpand: requestFullAudioPlayer,
-              }
-            : undefined
         }
         install={
           pwa.canPrompt && !pwa.isInstalled
@@ -169,7 +155,29 @@ export function SidebarDockBridge({
         }
         onStatusChange={publishStatus}
       />
-      <SidebarOPresence updating={updating} variant={variant} href={oHref} />
+      <SidebarOPresence
+        updating={updating}
+        variant={variant}
+        href={oHref}
+        inert={oState.sidebarInert}
+        player={
+          nowPlaying
+            ? {
+                title: nowPlaying.title,
+                artist: nowPlaying.artist,
+                isPlaying: nowPlaying.isPlaying,
+                onToggle: () => {
+                  if (activeTrackId && trackTitle)
+                    void toggleTrack({
+                      id: activeTrackId,
+                      title: trackTitle,
+                    }).catch(() => {});
+                },
+                onExpand: requestFullAudioPlayer,
+              }
+            : undefined
+        }
+      />
     </>
   );
 }

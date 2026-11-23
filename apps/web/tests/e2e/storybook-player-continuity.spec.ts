@@ -30,6 +30,11 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByTestId('continuity-state')).toContainText(
     '"duration":1'
   );
+  // A user-started play lands in the mini; these tests drive the full player.
+  await page.getByRole('button', { name: /Show Player/ }).click();
+  await expect(
+    page.getByRole('button', { name: 'Hide Player', exact: true })
+  ).toBeVisible();
 });
 
 test('hidden waveform cannot take keyboard focus or pointer input', async ({

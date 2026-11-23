@@ -1,5 +1,6 @@
 import '../../styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { fn } from 'storybook/test';
 import { SidebarOPresence } from './SidebarOPresence';
 
 const meta = {
@@ -28,3 +29,35 @@ export const Updating: Story = { args: { updating: true } };
 export const Ovie: Story = {
   args: { variant: 'ov', href: '/app/ov' },
 };
+
+const player = {
+  title: 'Never Say A Word',
+  artist: 'Tim White',
+  isPlaying: true,
+  onToggle: fn(),
+  onExpand: fn(),
+};
+
+/** A track is loaded and playing: the O is the pause button, title beside it. */
+export const Playing: Story = { args: { player } };
+
+/** Paused: the O is the play glyph. */
+export const Paused: Story = {
+  args: { player: { ...player, isPlaying: false } },
+};
+
+/** A long title truncates inside the same slot; the row never grows. */
+export const LongContent: Story = {
+  args: {
+    player: {
+      ...player,
+      title:
+        'Midnight Drive Through the Neon City (Extended Club Mix featuring the Late Night Strings)',
+      artist:
+        'The Long Weekend Collective, Avery Stone and the Northern Lights',
+    },
+  },
+};
+
+/** The full player is the transport: the O stays, inert and hidden. */
+export const FullPlayerOpen: Story = { args: { player, inert: true } };

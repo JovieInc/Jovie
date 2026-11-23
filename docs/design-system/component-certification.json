@@ -2760,10 +2760,9 @@
     },
     "apps/web/components/shell/SidebarOPresence.tsx": {
       "empty": "The O is one link and a fixed status slot with no collection; the idle story is its empty face and the slot is always laid out. The detector matched the items-center layout classes.",
-      "partial": "It takes two booleans and a link and has no partially loaded data. Updating shows the one partial state it has.",
-      "long-content": "Every visible string is fixed copy ('Open Chat', 'Updating') and the slot truncates, so no caller text can grow; the box is asserted identical hidden and shown in SidebarOPresence.test.tsx.",
+      "partial": "It takes a few flags, a link and an optional player and has no partially loaded data; a title with no artist is the one partial player and is covered by its test. Updating shows the one partial state it has.",
       "permission-denied": "The link and the status carry no gated action or permission input; the detector matched role='status', which only announces updater work.",
-      "rtl-overflow": "Its only copy is the fixed English 'Updating' in a truncating flex slot that mirrors with the sidebar's direction; the row uses logical spacing and no left or right offsets."
+      "rtl-overflow": "Its copy is the fixed English 'Updating' and a track title, both in a truncating flex slot that mirrors with the sidebar's direction; the row uses logical spacing and no left or right offsets."
     },
     "apps/web/components/shell/Sparkline.tsx": {
       "error": "The chart takes points from its caller and never loads anything; the detector matched the var(--color-error-text) stroke token for the down trend.",

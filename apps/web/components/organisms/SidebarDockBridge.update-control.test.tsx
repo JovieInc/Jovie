@@ -20,6 +20,7 @@ vi.mock('./release-sidebar/useTrackAudioSnapshot', () => ({
 }));
 vi.mock('./audio-chrome-state', () => ({
   useAudioChromeSnapshot: () => ({ fullPlayerVisible: false }),
+  useMediaCanvasTransport: () => null,
   requestFullAudioPlayer: vi.fn(),
 }));
 vi.mock('@/lib/desktop/electron-bridge', () => ({
