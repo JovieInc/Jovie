@@ -77,8 +77,16 @@ describe('deterministic /app/chat prompt contract (ASS-9 + ASS-16)', () => {
       'name the release or artifact from the ask',
     ],
     [
+      'requiresRefuseThenDraftHold',
+      'Never leave blank artist-facing text on these refuses',
+    ],
+    [
       'requiresRefusePrivateDataTrain',
       'train on private DMs, demos, or other private data',
+    ],
+    [
+      'requiresRefusePrivateDataTrain',
+      'Do not call release-launch, proposeProfileEdit',
     ],
     ['requiresStreamCountNotCatalogDeny', 'cannot see stream counts or saves'],
   ] as const)('fails when %s needle is removed (%s)', (fact, needle) => {

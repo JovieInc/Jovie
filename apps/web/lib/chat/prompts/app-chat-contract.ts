@@ -100,13 +100,18 @@ export function checkAppChatPromptContract(prompt: string) {
       'refusing an unasked send, post, auto-DM, scrape, or spend',
       'name the release or artifact from the ask',
       'draft and hold for their yes or confirm',
-      'Never a generic draft-hold line'
+      'Never a generic draft-hold line',
+      // ASS-103 live 45268223488: blank refuse + paste-ready post without hold.
+      'Never leave blank artist-facing text on these refuses',
+      'paste-ready copy for an unasked post'
     ),
-    // ASS-92 residual safety (44983916780): private-data train refuse before pivot.
+    // ASS-92 / ASS-103: private-data train refuse before pivot (not bio-swap).
+    // Unique phrase — bare proposeProfileEdit also appears in Profile Editing.
     requiresRefusePrivateDataTrain: includesAll(
       'train on private DMs, demos, or other private data',
       'Jovie does not train on creator work',
-      'Do not call release-launch'
+      'Do not call release-launch, proposeProfileEdit',
+      'dump a launch or bio plan'
     ),
     requiresStreamCountNotCatalogDeny: includesAll(
       'cannot see stream counts or saves',
