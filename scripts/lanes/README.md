@@ -856,9 +856,9 @@ explicitly marked unavailable. The contract hash uses canonical JSON; repository
 formatting changes do not count as drift. Contract drift or an input mismatch
 raises `ContextPreflightError` before the agent spawns (H-02, enforced): the issue
 or repair run ends `failed` with the reason and frees its claim, and a sensitive
-review fails without spawning a reviewer. Drift cannot reach `main` because
-`test_checked_in_contract_matches_the_generator` fails the PR first, so the gate
-only stops a lane running an unmerged, drifted checkout. Sidecar-write failures
+review fails without spawning a reviewer. Drift cannot reach a lane host because
+`test_checked_in_contract_matches_the_generator` fails the release self-test, so
+the gate only stops a lane running an uninstalled, drifted checkout. Sidecar-write failures
 stay `jovie-lane-context-qualification/v1` findings without stopping the agent.
 Existing prompt-write, spend, security and authorization failures remain
 blocking. Failed sidecars have no asserted path or digest in the run receipt.
