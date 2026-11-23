@@ -381,10 +381,7 @@ export function ProfileCompactSurface({
       ? 'profile'
       : requestedPrimaryTab;
   const hasTourDates = tourDates.length > 0;
-  // JOV-14241: empty Events is not a destination; rewrite mode to home.
-  useEffect(() => {
-    if (activeMode === 'tour' && !hasTourDates) onModeSelect('profile');
-  }, [activeMode, hasTourDates, onModeSelect]);
+  // JOV-14241: useCanonicalProfileMode owns the URL rewrite; render Home.
   const activeVisiblePrimaryTab =
     (!allowFanCapture && activePrimaryTab === 'subscribe') ||
     (activePrimaryTab === 'tour' && !hasTourDates)
@@ -908,7 +905,7 @@ export function ProfileCompactSurface({
             aboveNav={
               proofClaimCta ? (
                 <div
-                  className='pointer-events-auto mb-2 md:hidden'
+                  className='pointer-events-auto mb-3 md:hidden'
                   data-testid='profile-proof-claim-bar'
                 >
                   <ProofClaimCtaLink

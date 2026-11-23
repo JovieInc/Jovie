@@ -40,7 +40,15 @@ import { useProjectedSourceFact } from './useProjectedSourceFact';
 
 const HOVER_OPEN_DELAY_MS = 200;
 const HOVER_CLOSE_DELAY_MS = 120;
-let activeInspection: { owner: object; close: () => void } | null = null;
+type InspectionIntent = 'hover' | 'engaged';
+
+// One transcript inspection at a time. A hover can replace another hover,
+// but must not dismiss a preview the user is operating by keyboard or click.
+let activeInspection: {
+  owner: object;
+  intent: InspectionIntent;
+  close: () => void;
+} | null = null;
 let lastInspectionAt = 0;
 
 interface EntityChipPopoverProps {
@@ -55,19 +63,7 @@ interface EntityChipPopoverProps {
   readonly tone?: EntityChipTone;
 }
 
-/**
- * Wraps a presentational `EntityChip` (transcript variant) in a focusable
- * popover trigger. The chip itself stays a non-interactive `<span>`; this
- * component owns all interaction semantics:
- *
- * - click / Enter / Space → toggle popover
- * - hover (pointer-aware devices only) → open after 200ms, close after 120ms
- * - Escape → close (Radix Popover handles by default)
- * - focus visible ring on the trigger
- *
- * Popover content renders the canonical compact `EntityCard` (same component
- * as the chat right rail) so every entity surface shares one anatomy.
- */
+/** Transcript chip disclosure, using the same compact EntityCard as the rail. */
 export function EntityChipPopover({
   kind,
   id,
@@ -94,10 +90,8 @@ export function EntityChipPopover({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const inspectionOwner = useRef({});
   const contentRef = useRef<HTMLDivElement>(null);
-  const suppressFocus = useRef(false);
   const pointerDown = useRef(false);
   const restoreFocus = useRef(false);
-  const openedByHover = useRef(false);
   const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -130,9 +124,14 @@ export function EntityChipPopover({
     }
   }, []);
 
-  useEffect(() => {
-    return clearTimers;
-  }, [clearTimers]);
+  useEffect(
+    () => () => {
+      clearTimers();
+      if (activeInspection?.owner === inspectionOwner.current)
+        activeInspection = null;
+    },
+    [clearTimers]
+  );
 
   const closeInspection = useCallback(() => {
     clearTimers();
@@ -140,35 +139,34 @@ export function EntityChipPopover({
       activeInspection = null;
     setOpen(false);
   }, [clearTimers]);
-  const openInspection = useCallback(() => {
-    clearTimers();
-    activeInspection?.close();
-    activeInspection = {
-      owner: inspectionOwner.current,
-      close: closeInspection,
-    };
-    lastInspectionAt = Date.now();
-    setOpen(true);
-  }, [clearTimers, closeInspection]);
-  useEffect(
-    () => () => {
-      if (activeInspection?.owner === inspectionOwner.current)
-        activeInspection = null;
+  const openInspection = useCallback(
+    (intent: InspectionIntent) => {
+      clearTimers();
+      if (activeInspection?.owner === inspectionOwner.current) {
+        if (intent === 'engaged') activeInspection.intent = intent;
+        return;
+      }
+      if (intent === 'hover' && activeInspection?.intent === 'engaged') return;
+
+      activeInspection?.close();
+      activeInspection = {
+        owner: inspectionOwner.current,
+        intent,
+        close: closeInspection,
+      };
+      lastInspectionAt = Date.now();
+      setOpen(true);
     },
-    [closeInspection]
+    [clearTimers, closeInspection]
   );
 
   const handlePointerEnter = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
-      // Pointer-aware devices only — touch fires synthetic mouse events but
-      // we want tap to use the click path, not the hover path.
+      // Touch uses the tap path, not hover.
       if (event.pointerType !== 'mouse' || mobile) return;
       clearTimers();
       openTimerRef.current = setTimeout(
-        () => {
-          openedByHover.current = true;
-          openInspection();
-        },
+        () => openInspection('hover'),
         activeInspection || Date.now() - lastInspectionAt < 300
           ? 0
           : HOVER_OPEN_DELAY_MS
@@ -178,29 +176,29 @@ export function EntityChipPopover({
   );
 
   const handlePointerLeave = useCallback(
-    (event: ReactPointerEvent<HTMLButtonElement>) => {
+    (event: ReactPointerEvent<HTMLElement>) => {
       if (event.pointerType !== 'mouse') return;
       clearTimers();
-      closeTimerRef.current = setTimeout(() => {
-        if (
-          !contentRef.current?.contains(document.activeElement) &&
-          document.activeElement !== triggerRef.current
-        )
-          closeInspection();
-      }, HOVER_CLOSE_DELAY_MS);
+      if (activeInspection?.owner !== inspectionOwner.current) return;
+      if (activeInspection.intent === 'hover')
+        closeTimerRef.current = setTimeout(
+          closeInspection,
+          HOVER_CLOSE_DELAY_MS
+        );
     },
     [clearTimers, closeInspection]
   );
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLButtonElement>) => {
-      // Radix Popover handles Space/Enter on the trigger natively, but we
-      // also need to cancel hover timers so they don't compete with intent.
+      // Enter and Space cancel queued hover before focusing actions.
       if (event.key === 'Enter' || event.key === ' ') {
         clearTimers();
         if (open) {
           event.preventDefault();
-          contentRef.current?.querySelector<HTMLElement>('a, button')?.focus();
+          contentRef.current
+            ?.querySelector<HTMLElement>('a, button')
+            ?.focus({ preventScroll: true });
         }
       }
     },
@@ -208,16 +206,8 @@ export function EntityChipPopover({
   );
 
   const handleOpenChange = useCallback(
-    (next: boolean) => {
-      clearTimers();
-      if (next) openInspection();
-      else {
-        if (activeInspection?.owner === inspectionOwner.current)
-          activeInspection = null;
-        setOpen(false);
-      }
-    },
-    [clearTimers, openInspection]
+    (next: boolean) => (next ? openInspection('engaged') : closeInspection()),
+    [closeInspection, openInspection]
   );
 
   const handleOpenEntityPanel = useCallback(() => {
@@ -229,15 +219,23 @@ export function EntityChipPopover({
       source: 'manual',
       focusKey,
     });
-    setOpen(false);
-  }, [canOpenEntityPanel, entityPanel, entityPanelKind, id, label, focusKey]);
+    closeInspection();
+  }, [
+    canOpenEntityPanel,
+    entityPanel,
+    entityPanelKind,
+    id,
+    label,
+    focusKey,
+    closeInspection,
+  ]);
 
   const handleOpenProfilePreview = useCallback(() => {
     if (!previewPanel) return;
     entityPanel?.close();
     previewPanel.open();
-    setOpen(false);
-  }, [entityPanel, previewPanel]);
+    closeInspection();
+  }, [entityPanel, previewPanel, closeInspection]);
 
   const Root = mobile ? Sheet : Popover;
   const Trigger = mobile ? SheetTrigger : PopoverTrigger;
@@ -259,12 +257,18 @@ export function EntityChipPopover({
   );
   const handleCloseAutoFocus = (event: Event) => {
     event.preventDefault();
-    if (restoreFocus.current) {
-      suppressFocus.current = true;
-      triggerRef.current?.focus({ preventScroll: true });
-      suppressFocus.current = false;
-      restoreFocus.current = false;
+    const trigger = triggerRef.current;
+    const focused = trigger?.ownerDocument.activeElement ?? null;
+    if (
+      restoreFocus.current &&
+      trigger?.isConnected &&
+      !activeInspection &&
+      (focused === trigger.ownerDocument.body ||
+        (event.target instanceof Node && event.target.contains(focused)))
+    ) {
+      trigger.focus({ preventScroll: true });
     }
+    restoreFocus.current = false;
   };
   return (
     <Root open={open} onOpenChange={handleOpenChange}>
@@ -272,9 +276,16 @@ export function EntityChipPopover({
         <PlainButton
           ref={triggerRef}
           onClickCapture={event => {
-            if (open && openedByHover.current) event.preventDefault();
-            openedByHover.current = false;
             clearTimers();
+            if (
+              activeInspection?.owner === inspectionOwner.current &&
+              activeInspection.intent === 'hover'
+            ) {
+              // First click commits a preview already opened by hover. A
+              // second click follows the normal Radix toggle-to-close path.
+              event.preventDefault();
+              openInspection('engaged');
+            }
           }}
           aria-haspopup='dialog'
           aria-expanded={open}
@@ -288,8 +299,8 @@ export function EntityChipPopover({
             pointerDown.current = false;
           }}
           onFocus={() => {
-            if (!mobile && !pointerDown.current && !suppressFocus.current)
-              openInspection();
+            if (!mobile && !pointerDown.current && !restoreFocus.current)
+              openInspection('engaged');
           }}
           onBlur={event => {
             if (!mobile && !contentRef.current?.contains(event.relatedTarget))
@@ -341,8 +352,12 @@ export function EntityChipPopover({
           onOpenAutoFocus={event => event.preventDefault()}
           onCloseAutoFocus={handleCloseAutoFocus}
           onEscapeKeyDown={() => {
-            restoreFocus.current = true;
+            // Closing an incidental hover must not move focus out of the
+            // composer (or any other control the user never left).
+            restoreFocus.current =
+              contentRef.current?.contains(document.activeElement) ?? false;
           }}
+          onFocusCapture={() => openInspection('engaged')}
           onFocusOutside={event => {
             if (event.target === triggerRef.current) event.preventDefault();
           }}
@@ -358,19 +373,8 @@ export function EntityChipPopover({
               '--jovie-entity-accent': `var(${ENTITY_KIND_ACCENT_VAR[kind]})`,
             } as CSSProperties
           }
-          onPointerEnter={() => {
-            clearTimers();
-          }}
-          onPointerLeave={event => {
-            if (event.pointerType !== 'mouse') return;
-            closeTimerRef.current = setTimeout(() => {
-              if (
-                !contentRef.current?.contains(document.activeElement) &&
-                document.activeElement !== triggerRef.current
-              )
-                closeInspection();
-            }, HOVER_CLOSE_DELAY_MS);
-          }}
+          onPointerEnter={clearTimers}
+          onPointerLeave={handlePointerLeave}
         >
           {body}
         </PopoverContent>

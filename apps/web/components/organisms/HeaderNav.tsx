@@ -37,6 +37,7 @@ import {
   getNavLinkVariantClass,
   shouldOpenFlyoutOnKey,
 } from './header-nav-variants';
+import { useMarketingNativePopover } from './use-marketing-native-popover';
 
 // Linear header structure: full-width header with centered ~1000px content
 // Linear uses ~224px margins on 1440px viewport = ~984px content width
@@ -262,13 +263,6 @@ function HeaderNavLink({
   );
 }
 
-function supportsNativePopover(): boolean {
-  return (
-    typeof HTMLElement !== 'undefined' &&
-    typeof HTMLElement.prototype.showPopover === 'function'
-  );
-}
-
 /** Native popover + anchor flyout; class toggle fallback when unsupported. */
 function MarketingGlassFlyout({
   menu,
@@ -277,22 +271,8 @@ function MarketingGlassFlyout({
   menu: HeaderFlyoutMultiMenu;
   open: boolean;
 }>) {
-  const panelRef = useRef<HTMLDivElement | null>(null);
+  const { panelRef, nativePopover } = useMarketingNativePopover(open);
   const compact = menu.links.every(link => !link.description);
-  const nativePopover = supportsNativePopover();
-
-  useEffect(() => {
-    const panel = panelRef.current;
-    if (!panel || !nativePopover) {
-      return;
-    }
-
-    if (open && !panel.matches(':popover-open')) {
-      panel.showPopover();
-    } else if (!open && panel.matches(':popover-open')) {
-      panel.hidePopover();
-    }
-  }, [nativePopover, open]);
 
   return (
     <div

@@ -1127,3 +1127,18 @@ describe('ShellReleasesView', () => {
     expect(sidebar).toHaveAttribute('data-show-credits', 'false');
   });
 });
+
+describe('ShellReleasesView seam', () => {
+  it('puts its content on the 12px workspace seam (JOV-12565)', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../../../../../components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain("'py-1.5 space-y-px'");
+    expect(source).not.toContain("'py-1.5 space-y-px px-2'");
+  });
+});

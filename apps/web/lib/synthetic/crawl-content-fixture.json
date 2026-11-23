@@ -1,0 +1,23 @@
+{
+  "schema": "jovie.crawl-content-fixture/v1",
+  "version": 1,
+  "email": "browse-ready+crawl-fixture@jov.ie",
+  "clerkId": "system_crawl_content_fixture",
+  "handle": "jovie-crawl-fixture",
+  "displayName": "Jovie Crawl Fixture",
+  "release": {
+    "id": "40b29fcf-b40b-4c43-80c3-3cf5bbdb0b9d",
+    "slug": "crawl-fixture-single",
+    "title": "Crawl Fixture Single"
+  },
+  "promoDownload": {
+    "id": "ef009688-4dfc-4a5d-945f-8fa2b3634365",
+    "slug": "crawl-fixture-promo",
+    "title": "Crawl Fixture Promo",
+    "fileName": "crawl-fixture-promo.mp3"
+  },
+  "merchCard": {
+    "id": "ab35795b-84e8-45ca-a610-508b71ee6f48",
+    "title": "Crawl Fixture Tee"
+  }
+}

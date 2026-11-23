@@ -35,14 +35,14 @@ describe('FleetVerdictPanelView', () => {
       <FleetVerdictPanelView
         verdict={{
           level: 'unknown',
-          headline: 'Fleet health not measured',
+          headline: 'Some signals are still syncing.',
           reasons: [],
           capacity: null,
         }}
         lanes={null}
       />
     );
-    expect(screen.getByText('Not measured')).toBeInTheDocument();
+    expect(screen.getByText('Syncing')).toBeInTheDocument();
     expect(screen.queryByText('Healthy')).toBeNull();
   });
 });

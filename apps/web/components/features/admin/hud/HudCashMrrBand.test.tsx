@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type {
   HudMetricSourceKey,
@@ -143,9 +143,8 @@ describe('HudCashMrrBand', () => {
     expect(screen.getByTestId('ovie-ceo-overview')).toBeInTheDocument();
     expect(screen.getByText('Company Now')).toBeInTheDocument();
     expect(screen.getByText('Alive')).toHaveClass('text-7xl');
-    for (const value of screen.getAllByText('Not Measured')) {
-      expect(value).toHaveClass('text-4xl');
-    }
+    expect(screen.queryByText('Not Measured')).toBeNull();
+    expect(screen.getByTestId('ovie-ceo-syncing')).toBeInTheDocument();
   });
 
   it('forwards retry actions for degraded financial telemetry', () => {
@@ -172,8 +171,7 @@ describe('HudCashMrrBand', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Retry/i }));
-
-    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: /Retry/i })).toBeNull();
+    expect(onRetry).not.toHaveBeenCalled();
   });
 });

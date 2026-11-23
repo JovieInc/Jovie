@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
@@ -103,5 +105,18 @@ describe('AudioPlayButton', () => {
     );
     expect(onClick).toHaveBeenCalledOnce();
     await expectNoA11yViolations(container);
+  });
+});
+
+describe('AudioPlayControl play glyph', () => {
+  it('draws the play triangle through PlayIcon (JOV-12568)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './AudioPlayControl.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain('<PlayIcon');
+    expect(source).toContain("from '@/components/atoms/PlayIcon'");
+    expect(source).not.toContain('translate-x-px');
   });
 });
