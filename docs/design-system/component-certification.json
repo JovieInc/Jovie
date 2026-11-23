@@ -2837,6 +2837,10 @@
       "empty": "Button renders one label slot and never a collection; the only .map( is over the morph face's two fixed edges ('left', 'right'), so there is no empty-data state.",
       "offline": "Button never fetches or mutates; its owner sets loading or disabled while a request is unavailable, which the Loading and PermissionDenied stories already show."
     },
+    "packages/ui/atoms/card.tsx": {
+      "loading": "By the card intent contract (.claude/rules/ui.md, Card intent) a loading state never renders a card: skeletons sit flat on their surface. The partial state (PartialData story) covers cached content that is refreshing.",
+      "error": "By the card intent contract an error state never renders a card: error copy and its retry sit flat on the surface. Card holds no error branch; the offline content state is the only failure face it carries."
+    },
     "packages/ui/atoms/close-button.tsx": {
       "empty": "CloseButtonIcon always renders the same X glyph and sr-only 'Close' text and takes no collection; the detector matched the items-center utility class.",
       "partial": "CloseButtonIcon has no data inputs; its only optional props are size and className, both styling with defaults, so there is no partially-loaded state."

@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { EmptyState } from '@/components/molecules/EmptyState';
+import { expectFlatState } from '@/tests/utils/flat-state';
 
 vi.mock('next/link', () => {
   return {
@@ -232,7 +233,7 @@ describe('EmptyState (canonical molecule API)', () => {
     expect(description.className).toContain('mb-0');
   });
 
-  it('frames the workspace presentation as one hairline focal card with left-aligned content', () => {
+  it('lays the workspace presentation out flat with left-aligned content', () => {
     const { container } = render(
       <EmptyState
         heading='No Releases Yet'
@@ -242,14 +243,15 @@ describe('EmptyState (canonical molecule API)', () => {
       />
     );
 
-    const card = container.querySelector('[data-empty-state-card]');
-    expect(card).not.toBeNull();
-    expect(card).toHaveClass('rounded-md');
-    expect(card).toHaveClass('border-subtle');
-    expect(card).toHaveClass('bg-surface-0');
-    expect(card).toHaveClass('text-left');
-    // The single primary action row leads left inside the card.
-    const actionRow = card?.querySelector('div');
+    expect(container.querySelector('[data-empty-state-card]')).toBeNull();
+    expectFlatState(container);
+    const content = container.querySelector(
+      '[data-empty-state-content="workspace"]'
+    );
+    expect(content).not.toBeNull();
+    expect(content).toHaveClass('text-left');
+    // The single primary action row leads left, flat on the surface.
+    const actionRow = content?.querySelector('div');
     expect(actionRow).not.toBeNull();
     expect(actionRow).toHaveClass('items-start');
     // The non-workspace presentation stays centered with no card.

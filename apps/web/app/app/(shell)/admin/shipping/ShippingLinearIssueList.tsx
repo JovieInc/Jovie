@@ -40,6 +40,7 @@ export function ShippingLinearIssueList({
   const showRows = rows.length > 0;
   return (
     <ContentSurfaceCard
+      intent='collection'
       aria-label='Linear Issues'
       data-testid='ovie-shipping-linear-issues'
       className='overflow-hidden'
