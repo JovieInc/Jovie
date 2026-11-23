@@ -56,3 +56,17 @@ describe('IconBtn PlainButton', () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 });
+
+describe('IconBtn shape (JOV-12568)', () => {
+  it.each([false, true])(
+    'is a circle at rest and never animates its radius (active %s)',
+    active => {
+      renderBtn({ active });
+      const button = screen.getByRole('button', { name: 'Play' });
+      expect(button).toHaveClass('rounded-full');
+      expect(button.className).not.toContain('rounded-md');
+      expect(button.className).not.toContain('hover:rounded-full');
+      expect(button.className).not.toContain('border-radius');
+    }
+  );
+});

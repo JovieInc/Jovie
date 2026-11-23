@@ -2,7 +2,6 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import type { HomeCanvasState } from '@/components/jovie/types';
 import {
   type HomeLoopSectionStatus,
   StoryFirstCanvas,
@@ -99,17 +98,12 @@ interface OvieHomeBlockerResponse {
 /**
  * Ovie Home — Story First flat (Tim 2026-11-21): bottleneck owns the fold,
  * three glance pulses as a right rail, stage buckets + one highlight, docked
- * composer with melt-to-chat on typing. Shipping from `ovie.shipping-state.v1`;
+ * composer; typing never moves the board. Shipping from `ovie.shipping-state.v1`;
  * revenue blocker from company-state. Needs You and the metric wall stay off
  * the first fold (Inbox / Shipping own them). Answers never render on Home:
  * once a turn starts the chat takes over the surface (Tim 2026-11-22).
  */
-export interface OvieHomeCanvasProps {
-  /** Shell chat state; absent when Home renders outside the composer slot. */
-  readonly chat?: HomeCanvasState;
-}
-
-export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
+export function OvieHomeCanvas() {
   const shipping = useHudShippingStateQuery(null);
 
   // The one revenue blocker, from the cached company snapshot (no
@@ -255,15 +249,12 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     [snapshot, company.data, home]
   );
 
-  const melting = Boolean(chat?.composerHasIntent || chat?.isStreaming);
-
   return (
     <StoryFirstCanvas
       bottleneck={bottleneck}
       glance={glance}
       stages={buckets}
       inFlightHref={APP_ROUTES.ADMIN_SHIPPING}
-      melting={melting}
       glanceLoading={company.isPending || loopStatus === 'loading'}
       stagesStatus={loopStatus}
       onRetryStages={() => void shipping.refetch()}

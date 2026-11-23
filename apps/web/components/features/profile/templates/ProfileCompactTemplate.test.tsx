@@ -178,4 +178,26 @@ describe('ProfileCompactTemplate states', () => {
     ).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
+
+  it('canonicalizes ?mode=tour to Home when there are no upcoming events (JOV-14241)', async () => {
+    window.history.replaceState(null, '', '/tim?mode=tour&source=qr');
+    const pushSpy = vi.spyOn(window.history, 'pushState');
+    try {
+      renderTemplate({ mode: 'tour', tourDates: [] });
+
+      expect(
+        await screen.findByTestId('profile-compact-surface')
+      ).toBeInTheDocument();
+      // useCanonicalProfileMode replaces the entry in place and keeps source.
+      await waitFor(() =>
+        expect(window.location.pathname + window.location.search).toBe(
+          '/tim?source=qr'
+        )
+      );
+      expect(pushSpy).not.toHaveBeenCalled();
+    } finally {
+      pushSpy.mockRestore();
+      window.history.replaceState(null, '', '/');
+    }
+  });
 });

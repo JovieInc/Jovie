@@ -1074,6 +1074,9 @@ def intake_body(event: dict) -> str:
         f"Subject: `{event.get('subject')}`",
         f"Evidence: {evidence.get('url') or 'n/a'}",
         str(evidence.get("excerpt") or "")[:1500],
+        # Acceptance criteria: priority admission promotes this from Backlog only when it has some.
+        "## Definition of done",
+        f"- `{event.get('fingerprint')}` is green on main: the check that raised it passes again. Verify on its next run.",
         f"<!-- {INTAKE_LABEL} fingerprint={event.get('fingerprint')} -->",
     ])
 
@@ -1644,9 +1647,9 @@ def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, no
                 row["running"] = False
                 events[fingerprint] = row
                 continue
-            todo = row.get("todoStateId") or _state_id(canonical, "Todo")
-            if todo and _note(row, f"reopen:{opener.get('id')}"):
-                reopens.append({"id": canonical.get("id"), "stateId": todo})
+            backlog = _state_id(canonical, "Backlog")  # admission alone writes Backlog -> Todo
+            if backlog and _note(row, f"reopen:{opener.get('id')}"):
+                reopens.append({"id": canonical.get("id"), "stateId": backlog})
                 comments.append({
                     "id": canonical.get("id"),
                     "body": (f"Symphony remediation: `{LABEL_PREFIX}{fingerprint}` recurred. "

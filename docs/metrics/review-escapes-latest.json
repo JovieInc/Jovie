@@ -1,17 +1,17 @@
 {
   "schema": "jovie-review-escapes/v1",
   "windowDays": 30,
-  "mergedPrs": 970,
-  "escapedPrs": 30,
-  "escapeRate": 0.0309,
+  "mergedPrs": 965,
+  "escapedPrs": 29,
+  "escapeRate": 0.0301,
   "byLayer": {
     "preflight": 0,
-    "unit_test": 10,
-    "ci_guard": 15,
+    "unit_test": 9,
+    "ci_guard": 14,
     "risk_tier_review": 4,
-    "production_cert": 2
+    "production_cert": 3
   },
-  "guardRate": 0.9677,
+  "guardRate": 0.9667,
   "unguarded": [
     {
       "originPr": 23990,
@@ -20,6 +20,30 @@
     }
   ],
   "escapes": [
+    {
+      "originPr": 26196,
+      "fixPr": 26499,
+      "kind": "fix",
+      "hours": 29.1,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
+    {
+      "originPr": 26464,
+      "fixPr": 26582,
+      "kind": "fix",
+      "hours": 4.1,
+      "layer": "production_cert",
+      "guardAdded": true
+    },
+    {
+      "originPr": 26516,
+      "fixPr": 26522,
+      "kind": "fix",
+      "hours": 1,
+      "layer": "ci_guard",
+      "guardAdded": true
+    },
     {
       "originPr": 26159,
       "fixPr": 26276,
@@ -235,39 +259,7 @@
       "hours": 2.7,
       "layer": "ci_guard",
       "guardAdded": true
-    },
-    {
-      "originPr": 22711,
-      "fixPr": 22808,
-      "kind": "fix",
-      "hours": 3,
-      "layer": "unit_test",
-      "guardAdded": true
-    },
-    {
-      "originPr": 22656,
-      "fixPr": 22521,
-      "kind": "fix",
-      "hours": 2.9,
-      "layer": "ci_guard",
-      "guardAdded": true
-    },
-    {
-      "originPr": 22766,
-      "fixPr": 22741,
-      "kind": "fix",
-      "hours": 2.5,
-      "layer": "ci_guard",
-      "guardAdded": true
-    },
-    {
-      "originPr": 22739,
-      "fixPr": 22735,
-      "kind": "fix",
-      "hours": 0.6,
-      "layer": "ci_guard",
-      "guardAdded": true
     }
   ],
-  "generatedAt": "2026-11-21T15:22:42.468Z"
+  "generatedAt": "2026-11-23T19:18:55.987Z"
 }

@@ -28,6 +28,23 @@ const SOURCE_PATH = join(
   'design-system.css'
 );
 const OUTPUT_PATH = join(REPO_ROOT, 'design.tokens.json');
+const RADIUS_CSS_PATH = join(
+  REPO_ROOT,
+  'apps',
+  'web',
+  'styles',
+  'generated',
+  'design-tokens.css'
+);
+const TABLE_STYLES_PATH = join(
+  REPO_ROOT,
+  'apps',
+  'web',
+  'components',
+  'organisms',
+  'table',
+  'table.styles.ts'
+);
 
 /**
  * Export token name -> Noir Ion anchor var in design-system.css.
@@ -92,8 +109,61 @@ export function loadAnchors(css = readFileSync(SOURCE_PATH, 'utf8')) {
   return anchors;
 }
 
+/** `1.25rem` / `12px` / `0` -> pixel number (16px root). Null when not a length. */
+export function toPx(raw) {
+  const text = String(raw).trim();
+  if (text === '0') return 0;
+  const match = text.match(/^(-?[\d.]+)(px|rem)$/);
+  if (!match) return null;
+  const n = Number(match[1]);
+  return Math.round((match[2] === 'rem' ? n * 16 : n) * 100) / 100;
+}
+
+/**
+ * First declaration of every `--<prefix>-*` custom property in `css`, as
+ * { name-without-prefix: px }. Later redeclarations are ignored.
+ */
+export function loadScale(css, prefix) {
+  /** @type {Record<string, number>} */
+  const scale = {};
+  const pattern = new RegExp(`^\\s*--${prefix}-([\\w-]+):\\s*([^;]+);`, 'gm');
+  for (const match of css.matchAll(pattern)) {
+    const px = toPx(match[2]);
+    if (px !== null && !(match[1] in scale)) scale[match[1]] = px;
+  }
+  return scale;
+}
+
+/** TABLE_ROW_MODES + layoutStability.headerHeight from table.styles.ts. */
+export function loadTableSizes(
+  source = readFileSync(TABLE_STYLES_PATH, 'utf8')
+) {
+  const block = source.match(/TABLE_ROW_MODES\s*=\s*\{([\s\S]*?)\}\s*as const/);
+  if (!block) throw new Error('TABLE_ROW_MODES not found in table.styles.ts');
+  /** @type {Record<string, {rowHeight: number, contentHeight: number}>} */
+  const rowModes = {};
+  for (const m of block[1].matchAll(
+    /['"]?([\w-]+)['"]?:\s*\{\s*rowHeight:\s*(\d+),\s*contentHeight:\s*(\d+)\s*\}/g
+  )) {
+    rowModes[m[1]] = { rowHeight: Number(m[2]), contentHeight: Number(m[3]) };
+  }
+  if (Object.keys(rowModes).length === 0) {
+    throw new Error('No row modes parsed from TABLE_ROW_MODES');
+  }
+  const header = source.match(/headerHeight:\s*'(\d+)px'/);
+  if (!header) throw new Error('layoutStability.headerHeight not found');
+  return { rowModes, headerHeight: Number(header[1]) };
+}
+
+const dimension = px => ({ $value: `${px}px`, $type: 'dimension' });
+
 /** @returns {string} serialized design.tokens.json */
-export function generate(anchors = loadAnchors()) {
+export function generate(
+  anchors = loadAnchors(),
+  css = readFileSync(SOURCE_PATH, 'utf8'),
+  radiusCss = readFileSync(RADIUS_CSS_PATH, 'utf8'),
+  tableSizes = loadTableSizes()
+) {
   const color = {};
   for (const [tokenName, cssVar] of Object.entries(TOKEN_MAP)) {
     const value = anchors[cssVar];
@@ -109,6 +179,37 @@ export function generate(anchors = loadAnchors()) {
     $description:
       'Canonical Jovie design tokens, dark-first. Generated from the Noir Ion anchors (--noir-ion-*) in apps/web/styles/design-system.css by scripts/generate-design-tokens-export.mjs — do not edit by hand. Rebuild: pnpm design:tokens:export. Used by importers (e.g. Magic Patterns) instead of scraping raw repo colors.',
     color,
+    space: Object.fromEntries(
+      Object.entries(loadScale(css, 'space')).map(([k, v]) => [k, dimension(v)])
+    ),
+    fontSize: Object.fromEntries(
+      Object.entries(loadScale(css, 'text')).map(([k, v]) => [k, dimension(v)])
+    ),
+    radius: Object.fromEntries(
+      Object.entries(loadScale(radiusCss, 'radius')).map(([k, v]) => [
+        k,
+        dimension(v),
+      ])
+    ),
+    // Grid tokens for the DataGrid. row-default and row-comfortable reuse the
+    // existing size.row.compact (40) and size.row.list (44) row modes by alias.
+    grid: {
+      'row-compact': dimension(36),
+      'row-default': { $value: '{size.row.compact}', $type: 'dimension' },
+      'row-comfortable': { $value: '{size.row.list}', $type: 'dimension' },
+      'cell-padding-x': dimension(12),
+      avatar: dimension(24),
+      'status-dot': dimension(8),
+    },
+    size: {
+      headerHeight: dimension(tableSizes.headerHeight),
+      ...Object.fromEntries(
+        Object.entries(tableSizes.rowModes).flatMap(([mode, h]) => [
+          [`row.${mode}`, dimension(h.rowHeight)],
+          [`rowContent.${mode}`, dimension(h.contentHeight)],
+        ])
+      ),
+    },
   };
   return `${JSON.stringify(doc, null, 2)}\n`;
 }

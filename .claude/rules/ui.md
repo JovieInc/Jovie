@@ -216,16 +216,42 @@ export function MyComponent({ title, children, onAction }: MyComponentProps) {
 - Follow existing design tokens in `tailwind.config.ts`
 - Mobile-first responsive design
 
+### Card intent: no extra carding
+
+A card is any box that sets content apart with its own fill, border or shadow. The default is no card: content sits flat on its surface and is grouped by spacing, type and hairline dividers. A card is allowed only when the box says something true about the object inside it. The five allowed intents:
+
+1. `transient`: it appears and goes away (toast, popover, menu, dialog, hover preview, inline notice the user dismisses).
+2. `movable`: the user drags, reorders, pins or dismisses the object (kanban card, sortable row, draggable chip).
+3. `collection`: one of a set of peer objects the user browses or compares (carousel, gallery, grid of releases or artists, pricing tiers, opportunity cards).
+4. `selectable`: the whole box is one target that opens or selects one entity (option card, link card).
+5. `floating`: a live object layered over the page (chat composer, sticky player).
+
+Banned, whatever the reason:
+
+- Empty, loading and error states: always flat, no card, no fill, no border.
+- A card around a page section, settings group, form, single chart, single stat or single table just to give it structure.
+- A card inside a card, or inside a drawer, sheet or dialog body.
+- A card used as a heading or hierarchy device.
+
+The test: if removing the box loses nothing the user can do with, or understand about, the object, the box goes.
+
+Enforcement:
+
+- Card primitives (`Card`, `ContentSurfaceCard`, `DrawerSurfaceCard`) take an `intent` prop typed as `CardIntent` (the five intents above). Set it on every card you add or touch; it renders as `data-card-intent`.
+- `node scripts/invariants/card-intent-ratchet.mjs` (wired into `pnpm invariants:check`) counts card-primitive usages without an `intent` against `scripts/invariants/card-intent-ratchet.baseline.json`. The count may only go down: add an intent or remove the card, and run the script with `--write` to lock the lower floor. Never raise the baseline.
+- The same script fails if any empty, loading or error-state component (a file named `*Empty*`, `*Loading*`, `*Skeleton*`, `*Error*`, or a route `loading.tsx` / `error.tsx`) renders a card primitive, with or without an intent. Those states have no baseline: they are always flat.
+- Tests for empty, loading and error states assert flatness with `expectFlatState` from `apps/web/tests/utils/flat-state.ts`.
+
 ### Surface Elevation Rules (Card/Background Consistency)
 
 The main content area (`<main>`) uses `bg-(--app-shell-content-surface)`, the shell-owned canvas tone. In dark mode it must stay distinct from both recessed wells (`bg-surface-0`) and shared cards (`bg-surface-1`).
 
 **Allowed patterns:**
-- Card on app-shell canvas parent → `bg-surface-1` for shared cards and panels
-- Recessed/"well" element inside the shell or a card → `bg-surface-0` (e.g., skeleton containers, empty states, input wells)
+- A card that passes the intent test above, on the app-shell canvas parent → `bg-surface-1`
+- Recessed/"well" element for an input or code block → `bg-surface-0`. Empty, loading and error states are never wells: they sit flat
 - Sticky shell chrome (toolbars, table headers, shell frame) → `bg-(--app-shell-content-surface)`
 - Card with elevation → `Card` component as-is (has `bg-surface-1 border border-subtle shadow-card`)
-- Nested card inside card → `bg-surface-0` for the inner element
+- A card inside a card is banned (see "Card intent"); the inner element is flat. A recessed well for an input is not a card
 - Table/workspace routes → consume the shell-owned canvas by default. A nested bordered `LINEAR_SURFACE.contentContainer` canvas is allowed only when the screen declares `canvasOwner: 'screen'` in the app-screen canvas manifest (`apps/web/data/appScreens/canvas.ts`); undeclared nested canvases are rejected by the canvas-ownership guardrail
 
 **Banned patterns (will cause invisible cards):**
@@ -236,6 +262,7 @@ The main content area (`<main>`) uses `bg-(--app-shell-content-surface)`, the sh
 - `Card className='border-0 shadow-none'` — strips all elevation from a surface-1 card, making it invisible on surface-1 parent
 - `bg-surface-0/XX` (semi-transparent) — use solid `bg-surface-0` instead
 - Card-within-card nesting (e.g., `DrawerSurfaceCard variant='card'` inside another card) — use `variant='flat'` for inner elements
+- A card of any kind in an empty, loading or error state, or around a section, form, chart, stat or table to give it structure (see "Card intent")
 
 **Quick test:** If removing the element would cause no visual change, it's an elevation bug.
 
@@ -353,10 +380,14 @@ Hard product and marketing rules from `DESIGN.md`. Not aesthetic taste.
   consume instances. Do not create route-local masters.
 - Founder review contains only canonical masters and intentional variants. Put
   receipts, duplicates, mappings, and process copy in operator artifacts.
-- Pen (+ZiaWI for color) is the publishable design SoT. Unmapped Pen nodes stay
-  proposal until source identity, save/readback, and persistence contracts
-  pass. Visual similarity is not source backing. Figma/Paper are never
-  publishable SoT; Figma MCP is an optional bridge only.
+- Figma is the canonical design canvas (remote MCP). Code tokens are the
+  source: `pnpm design:tokens-export` writes Figma variables to
+  `docs/design/figma/` (semantic palette only, see
+  `docs/design/FIGMA_VARIABLES.md`); never edit Figma variables by hand.
+  Figma frames come back into code 1:1, and CI compares the export with the
+  committed Figma variables snapshot. Unmapped Figma nodes stay proposal until
+  source identity, save/readback, and persistence contracts pass. Visual
+  similarity is not source backing. Paper is scratch/reference only.
 - Marketing pages share one spine and one type ramp: sections use
   `ArtistProfileSectionShell`, heroes use `.ap-section-container`, and type
   uses `.marketing-type-display` / `-section` / `-lede`.

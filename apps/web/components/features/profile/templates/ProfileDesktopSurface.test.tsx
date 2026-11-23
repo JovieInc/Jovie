@@ -368,8 +368,8 @@ describe('ProfileDesktopSurface', () => {
       within(navigation).queryByRole('button', { name: 'Get updates' })
     ).not.toBeInTheDocument();
     expect(
-      screen.getByTestId('profile-desktop-cover-accent-line')
-    ).toBeInTheDocument();
+      screen.queryByTestId('profile-desktop-cover-accent-line')
+    ).not.toBeInTheDocument();
 
     const listenCta = screen.getByRole('button', { name: 'Listen' });
     expect(listenCta).toHaveClass('h-auto', 'min-h-7');

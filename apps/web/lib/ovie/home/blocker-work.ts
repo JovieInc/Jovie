@@ -16,7 +16,10 @@ const ACTIVATION_WORK = /activation|dashboard|first.?use/i;
 
 /** Words a shipping row's title uses when it works on a blocker step. */
 const BLOCKER_WORK: Readonly<Record<CompanyBlocker['step'], RegExp>> = {
-  public_profile: /profile/i,
+  // A bare "profile" also names dashboard queries and settings; only the
+  // public profile page's own words count.
+  public_profile:
+    /public.?profile|artist.?profile|profile (?:page|url|link|route|render)|\((?:public-)?profile\)/i,
   homepage_entry: ENTRY_WORK,
   onboarding_auth_claim: ONBOARDING_WORK,
   checkout_payment_entitlement: CHECKOUT_WORK,

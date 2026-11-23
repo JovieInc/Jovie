@@ -379,6 +379,16 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // JOV-14474: every chat tool and core mutation names an outcome check.
+    // No fetch: a --depth=1 fetch re-shallowed CI's unshallowed checkout.
+    id: 'outcome-coverage',
+    command:
+      'node scripts/outcome-coverage.mjs --check && node --test scripts/outcome-coverage.test.mjs',
+    inputs:
+      /^(?:apps\/web\/lib\/chat\/chat-tool-inventory\.ts$|docs\/product\/(?:outcome-coverage\.json$|generated\/artist-launch-inventory\.json$)|scripts\/outcome-coverage|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     // Compliance: no third-party tracker component on routes where people type
     // (CIPA wiretap exposure). Canon: gbrain decisions/company/privacy-tracking-compliance-guidelines-2026-10-31.
     id: 'privacy-input-route-trackers',
@@ -431,7 +441,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command:
       'node --test --experimental-test-coverage --test-coverage-include=scripts/installation-budget-sentinel.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 scripts/installation-budget-sentinel.test.mjs && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/automation-registry.test.mjs scripts/lib/__tests__/automation-liveness*.test.mjs lib/__tests__/red-monitor-owner-gate.test.mjs lib/__tests__/workers-inventory.test.mjs',
     inputs:
-      /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:apps\/[^/]+\/)?vercel\.json|workers\/[^/]+\/wrangler[\w.-]*\.(?:toml|jsonc?)|scripts\/lanes\/continuity_clock\.py|canon\/(?:automation-registry\.jsonl|monitor-incidents\.jsonl|deployed-workers\.json|schedulers\.json)|scripts\/(?:automation-liveness\.mjs|installation-budget-sentinel(?:\.test)?\.mjs)|scripts\/lib\/(?:automation-registry\.mjs|github-json-read\.mjs|red-monitor-owner-gate\.mjs|workers-inventory\.mjs|__tests__\/(?:automation-(?:registry|liveness[\w-]*)|red-monitor-owner-gate|workers-inventory)\.test\.mjs))/u,
+      /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:apps\/[^/]+\/)?vercel\.json|workers\/[^/]+\/wrangler[\w.-]*\.(?:toml|jsonc?)|scripts\/lanes\/continuity_clock\.py|\.github\/actions\/report-outcome\/|canon\/(?:automation-registry\.jsonl|monitor-incidents\.jsonl|deployed-workers\.json|schedulers\.json|outcome-coverage-baseline\.json)|scripts\/(?:automation-liveness\.mjs|installation-budget-sentinel(?:\.test)?\.mjs|remediation-signal-intake\.mjs)|scripts\/lib\/(?:automation-registry\.mjs|github-json-read\.mjs|red-monitor-owner-gate\.mjs|workers-inventory\.mjs|outcome-coverage\.mjs|remediation-recurrence\.mjs|ci-trigger-registry\.mjs|__tests__\/(?:automation-(?:registry|liveness[\w-]*)|red-monitor-owner-gate|workers-inventory)\.test\.mjs))/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -1013,6 +1023,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/pr-open-priority.test.mjs',
   'scripts/pr-open-win.test.mjs',
   'scripts/pr-body-lint.test.mjs',
+  'scripts/done-check.test.mjs',
   'scripts/lib/__tests__/sources-of-truth.test.mjs',
   'scripts/invariants/duplicate-literals.test.mjs',
   'scripts/invariants/jump-policy-pin.test.mjs',
@@ -1260,14 +1271,14 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
   'scripts/lib/__tests__/changed-test-coverage-diagnostics.test.mjs',
-  'scripts/lib/__tests__/automation-liveness-lost-state-recovery.test.mjs',
+  'scripts/lib/__tests__/automation-liveness-lost-state-recovery.test.mjs scripts/lib/__tests__/summer-pr-age-rule.test.mjs',
   'scripts/lib/__tests__/canonical-profile-json-handoff.test.mjs',
   'scripts/lib/__tests__/merge-group-shard-failure-hold.test.mjs',
   'scripts/lib/__tests__/ci-structural-shards.test.mjs',
   'scripts/lib/__tests__/merge-group-sibling-burn-contract.test.mjs',
   'scripts/lib/__tests__/gh-api-hold-retry.test.mjs',
   'scripts/lib/__tests__/prod-cert.test.mjs',
-  'scripts/lib/__tests__/prod-cert-skew.test.mjs',
+  'scripts/lib/__tests__/prod-cert-skew.test.mjs scripts/lib/__tests__/prod-cert-carry.test.mjs',
   'scripts/lib/__tests__/prod-cone-cases.test.mjs scripts/lib/__tests__/prod-cone-scoreboard-clobber.test.mjs',
   'scripts/lib/__tests__/cert-bottleneck.test.mjs',
   'scripts/lib/__tests__/self-hosted-workspace-reset-contract.test.mjs',
@@ -1381,7 +1392,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/postdeploy-probe-transport.test.mjs',
   'scripts/lib/__tests__/postdeploy-probe-workflow-admission.test.mjs',
   'scripts/lib/__tests__/postdeploy-crawl-receipt.test.mjs',
-  'scripts/lib/__tests__/golden-path-cert-reuse.test.mjs',
+  'scripts/lib/__tests__/golden-path-cert-reuse.test.mjs scripts/lib/__tests__/golden-path-step-scope.test.mjs',
   'scripts/lib/__tests__/postdeploy-cert-after-pen.test.mjs',
   'scripts/lib/__tests__/pr-preparation-safety.test.mjs',
   'scripts/lib/__tests__/production-environment-secrets.test.mjs',
@@ -1586,7 +1597,7 @@ const LANES = [
     id: 'design-governance-enforcement',
     name: 'Design governance enforcement',
     nextLocalCommand:
-      'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel && pnpm --filter @jovie/web run lint:composite-field && pnpm --filter @jovie/web run lint:design-noise',
+      'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:tokens-export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel && pnpm --filter @jovie/web run lint:composite-field && pnpm --filter @jovie/web run lint:design-noise',
     run: runDesignGovernanceEnforcement,
   },
   {

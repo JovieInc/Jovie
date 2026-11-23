@@ -87,7 +87,7 @@ export function SpecsChapter() {
     <section
       id='specs'
       data-pen-section='specs'
-      data-accent='ion'
+      data-accent='pulse'
       className='hv3 hv3-chapter hv3-specs'
     >
       <div className='hv3-rule'>

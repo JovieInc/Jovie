@@ -192,7 +192,9 @@ class RefillTests(unittest.TestCase):
         self.mirror([row(1, labels=("hold",)), row(2, description="short")])
         receipt = br.refill(self.lane, self.host, self.binding, FakeClient(), now=1010.0)
         self.assertEqual(receipt["promoted"], [])
-        self.assertEqual(receipt["short"], 4)
+        # Every sub-lane under its depth is short: product 4 (two per seat), activation 3, remediation 3, small 2, infra 2.
+        self.assertEqual(receipt["short"], 4 + 3 + 3 + 2 + 2)
+        self.assertEqual(receipt["codeSubLanes"]["product"]["target"], 4)
         self.assertEqual(receipt["skipped"], {"LYB-1": "label:hold", "LYB-2": "thin-description"})
 
 

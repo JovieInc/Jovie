@@ -341,8 +341,8 @@ export function EmptyState({
     >
       {isWorkspacePresentation ? (
         <div
-          data-empty-state-card=''
-          className='w-full max-w-md rounded-md border border-subtle bg-surface-0 p-6 text-left'
+          data-empty-state-content='workspace'
+          className='w-full max-w-md text-left'
         >
           {content}
         </div>
