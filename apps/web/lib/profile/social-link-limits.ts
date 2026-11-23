@@ -71,6 +71,10 @@ export function capProfileLinkInputs<
   const socialSlots = Math.max(0, MAX_PROFILE_LINKS - modeKeep.length);
   const socialKeep = social.slice(0, socialSlots);
 
+  // Only DSP and social links are capped. Websites, earnings and custom
+  // links pass through: PUT replaces every non-ingested link, so dropping
+  // them here deleted an artist's site on every save.
+  const capped = new Set([...mode, ...social].map(item => item.index));
   const keep = new Set([...modeKeep, ...socialKeep].map(item => item.index));
-  return links.filter((_, index) => keep.has(index));
+  return links.filter((_, index) => !capped.has(index) || keep.has(index));
 }

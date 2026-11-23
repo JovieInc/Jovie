@@ -77,6 +77,22 @@ describe('social link limits', () => {
       'twitter',
     ]);
   });
+
+  it('keeps website links when saving, so an added site reads back', () => {
+    const payload = capProfileLinkInputs([
+      { platform: 'spotify', url: 'https://open.spotify.com/artist/1' },
+      { platform: 'website', url: 'https://example.com/jovie-prodcert-1' },
+      { platform: 'instagram', url: 'https://instagram.com/artist' },
+      { platform: 'website', url: 'https://artist.example.org' },
+    ]);
+
+    expect(payload.map(link => link.url)).toEqual([
+      'https://open.spotify.com/artist/1',
+      'https://example.com/jovie-prodcert-1',
+      'https://instagram.com/artist',
+      'https://artist.example.org',
+    ]);
+  });
 });
 
 describe('context-aware link ordering', () => {
