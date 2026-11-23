@@ -6,7 +6,10 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { type FleetVerdict, fleetVerdict } from '@/lib/ovie/home/fleet-verdict';
 import { OVIE_METRICS_SYNCING_NOTICE } from '@/lib/ovie/metrics-presentation';
 import type { DeliveryLanes } from '@/lib/ovie/shipping-state/contract';
-import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
+import {
+  SHIPPING_STATE_REFETCH_MS,
+  shippingStateQueryOptions,
+} from '@/lib/queries/shipping-state';
 
 const LEVEL_TONE = {
   healthy: 'good',
@@ -80,7 +83,13 @@ export function FleetVerdictPanelView({
 }
 
 export function FleetVerdictPanel() {
-  const query = useQuery(shippingStateQueryOptions);
+  const query = useQuery({
+    ...shippingStateQueryOptions,
+    // Same key and cadence as the Shipping observer: React Query dedupes into
+    // one request, and a cold-instance "not measured" answer heals itself.
+    refetchInterval: SHIPPING_STATE_REFETCH_MS,
+    refetchIntervalInBackground: false,
+  });
   const lanes = query.data?.delivery?.lanes ?? null;
   if (query.isPending) {
     return (

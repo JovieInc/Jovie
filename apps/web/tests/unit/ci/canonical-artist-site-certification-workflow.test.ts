@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { load as parseYaml } from 'js-yaml';
@@ -39,6 +39,7 @@ const parsedCi = parseYaml(ci) as {
         name?: string;
         run?: string;
         if?: string;
+        env?: Record<string, string>;
         'continue-on-error'?: boolean;
       }[];
     }
@@ -69,6 +70,51 @@ describe('JOV-6572 canonical artist-site certification workflow', () => {
       1440
     );
     expect(nightly).toContain('workflow run ci.yml');
+  });
+
+  it('keeps journey keyframes when later Playwright runs clear their output', () => {
+    // Playwright deletes its outputDir at the start of every run. The surfaces
+    // run after the journey suite wiped test-results, including the keyframe
+    // manifest the visual review reads (runs 44988834237, 44989470204).
+    const journey = parsedCi.jobs['ci-golden-path']?.steps?.find(
+      step => step.id === 'canonical_journey'
+    );
+    const keyframes = relative(
+      '${{ github.workspace }}/apps/web',
+      journey?.env?.GOLDEN_PATH_KEYFRAME_DIR ?? ''
+    );
+    expect(keyframes).toBe('test-results/golden-path-keyframes/first');
+    const config = readFileSync(
+      resolve(repoRoot, 'apps/web/playwright.config.ts'),
+      'utf8'
+    );
+    // No config outputDir, so a run without --output clears test-results.
+    expect(config).not.toMatch(/\boutputDir\s*:/);
+    const scripts = [
+      ...(journey?.run ?? '').matchAll(
+        /pnpm --filter @jovie\/web run (test:e2e:golden-path:\S+)/g
+      ),
+    ].map(match => match[1]);
+    expect(scripts).toEqual([
+      'test:e2e:golden-path:ci',
+      'test:e2e:golden-path:surfaces',
+    ]);
+    for (const script of scripts.slice(1)) {
+      const command = packageJson.scripts[script] ?? '';
+      const outputDir =
+        command.match(/--output[= ](\S+)/)?.[1] ?? 'test-results';
+      const kept = relative(outputDir, keyframes);
+      expect(
+        kept === '' || (!kept.startsWith('..') && !isAbsolute(kept)),
+        `${script} clears ${outputDir}, which holds the journey keyframes`
+      ).toBe(false);
+      const json =
+        command.match(/PLAYWRIGHT_JSON_OUTPUT_FILE=(\S+)/)?.[1] ??
+        'test-results/results.json';
+      expect(json, `${script} overwrites the journey JSON report`).not.toBe(
+        'test-results/results.json'
+      );
+    }
   });
 
   it('provides an ephemeral signing key before starting the claim server (JOV-8550)', () => {

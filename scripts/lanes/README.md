@@ -26,7 +26,7 @@ The harness, not the model, owns:
 | Claim (serialised, `flock`), one PR per issue across hosts (GitHub is the truth), priority aging after each 24h wait | `worker()`, `pick_issue()`, `in_flight_issues()` |
 | Execution attempts: stable action phases fence boundary replay. The dual-format reader supports immutable candidate ownership and terminal recovery; its incompatible writer remains disabled pending verified reader/writer readiness. Enabled recovery publishes only the reserved winner and seals unknown boundaries without another attempt or grant | `execution_attempt.py` |
 | One open PR per issue: branch or `linear-issue-id` marker; an unreadable PR list claims nothing | `in_flight_issues()` |
-| No open-PR ceiling (Tim 2026-10-12): new-issue intake is bounded only by real limits in autoscale (compute, credits, quotas); `new_issue_budget()` reports counts, never refuses | `new_issue_budget()` |
+| Per-agent WIP cap (Tim 2026-11-22, finish before starting; supersedes the 2026-10-12 no-ceiling rule): a lane whose unheld open PRs fill its `pr-wip-policy.json` cap takes no new issue (`wip-cap`, with the PRs to land first) and spends its seats on repairs, which never consult the cap; `claude/` is capped on the lane's own dated PRs. Quota and CI capacity still gate first | `new_issue_budget()`, `pr_wip.admit()` |
 | Workstreams: one classifier for intake and backlog (`ws:<key>` label override, else ordered rules); exact normalized-title duplicates admit only the oldest (`duplicate-candidate:<JOV>`); order = explicit Urgent → dispatch-next in the admitted pool → tier (aged or CI/Symphony-throughput) → aged priority → workstream rank → age | `workstreams.py`, `pool_rejections()`, `admission_order()` |
 | File-overlap admission: declared paths, then the workstream map, are compared with the cached open-PR inventory and In Progress lane tasks; hot control-plane and duplicate migration-number collisions wait, shared/generated files sequence, other overlaps flag | `file_overlap.py`, `overlap_inventory()` |
 | Hotspot admission (JOV-7708): an issue whose predicted touch set (named file paths, else its workstream area; Symphony-throughput = the lanes harness) hits a hotspot an open, non-parked PR holds waits as `hotspot-held:<path>#<pr>`. Hotspots = a static seed (lanes harness, `code-flags.ts`, command/product-truth registries, `node-environment-files.json`, `destructive-red-drift.baseline.json`) plus any file two open PRs touch; an unreadable file list admits ungated | `pool_rejections()`, `hotspot_holds()`, `open_hotspot_holds()` |
@@ -323,8 +323,11 @@ Gaps closed after the first week (no PR may sit unowned):
   merge intent. `hold:dependency` applies while a named dependency is open; a landed
   dependency releases the draft to the lanes. `hold` and human branches are never reclaimed,
   and nothing here grants authority to discard the branch.
-  JOV-INV-011 requires an explicit `duplicate` label before automatic retirement; age and
-  exhaustion never close a PR. Parked work is requeued instead (JOV-7708): an agent-owned PR
+  Age closes a PR only through the old-PR rule (JOV-INV-011 v5, Tim 2026-11-22): at 7 days
+  an agent PR gets one last repair try (`last-repair-try` + `lane-fix-stale`, main merged in),
+  and at 10 days it is closed and its Linear issue goes back to Backlog
+  (`scripts/summer/pr-age-rule.mjs`, policy `ageRule` in `pr-wip-policy.json`). Exhaustion alone
+  never closes a PR. Parked work is requeued instead (JOV-7708): an agent-owned PR
   carrying `lane-fix-exhausted` or `queue-poison` for more than 48h (measured from the label's
   latest `labeled` event) sends its issue to Todo + `agent-ready` with a rebuild-from-main note,
   unless the issue is done or another open PR carries it. The PR stays open and gets
@@ -445,8 +448,18 @@ receipt separates sourced precedent, internal evidence, inference, and new learn
 explicit answer to what is materially different about Jovie's case.
 
 The same minute tick schedules `yc_corpus.py refresh` at most daily. Each run rotates through at most
-40 public YC Library/blog/YouTube records, respects robots, writes metadata plus bounded excerpts into
-the existing GBrain store, and content-hash skips unchanged source and derived-playbook pages. Refresh
+40 public YC Library/blog/YouTube records, respects robots, writes metadata, a bounded excerpt and, for
+YC Library talks, the full embedded transcript (`yc_transcript.py`, internal retrieval only, never
+republished) into the existing GBrain store, and content-hash skips unchanged source and derived-playbook
+pages. Bumping `yc_transcript.RENDER` re-fetches every stored page past ETag/304, up to 200 a run.
+`yc_youtube.py` adds the whole YC channel: with `YOUTUBE_DATA_API_KEY` in the lane env or
+`~/.config/jovie-lanes/youtube.env` it lists every upload weekly; without one it reads the public uploads
+playlist page (the newest ~100, kept and merged week to week, `youtubeCatalog.status: keyless-newest-100`),
+because older uploads load only through YouTube's internal browse API, which robots.txt closes. It reads each video's published caption track the
+way a browser does, only where youtube.com's robots.txt allows, at most 150 a run. A video is written once
+it has had its caption attempt; Library-covered videos are skipped without a fetch. A discovery, spawn
+or GBrain write failure, or three days without a finished run, raises the doctor's `yc-corpus-refresh`
+alert, which opens a repair issue. Refresh
 health is recorded under `ycCorpus` in `tick.json`; it never silently converts an outage into a miss.
 A release self-test (`LANES_SELFTEST`) never schedules the refresh, and its default fetch and `gbrain`
 helpers refuse to run there; every self-test process carries a per-run `JOVIE_SELFTEST_RUN` marker and

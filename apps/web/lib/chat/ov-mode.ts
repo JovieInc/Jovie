@@ -35,9 +35,12 @@ export async function canUseOvChatMode(
   userId: string | null
 ): Promise<boolean> {
   if (!userId) return false;
+  // The role lookup and the fresh session read are independent: overlap them.
+  const freshAuth = getFreshAuth();
+  freshAuth.catch(() => undefined);
   if (!(await isAdmin(userId))) return false;
   try {
-    const auth = await getFreshAuth();
+    const auth = await freshAuth;
     if (auth.userId !== userId || !auth.sessionId) return false;
     await assertOviePrivacyUnlocked({ userId, sessionId: auth.sessionId });
     return true;

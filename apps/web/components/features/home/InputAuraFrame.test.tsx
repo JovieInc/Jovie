@@ -63,10 +63,10 @@ describe('InputAuraFrame', () => {
     // The frame never paints focus; the input fills the pill and rings it.
     expect(frameCss).not.toContain(':has(:focus-visible)');
     expect(homeCss).toMatch(
-      /\.homepage-name-search__input:focus-visible\s*\{[^}]*box-shadow:\s*inset/
+      /\.homepage-name-search__field input:focus-visible\s*\{[^}]*box-shadow:\s*inset/
     );
     expect(homeCss).toMatch(
-      /\.homepage-name-search__field \.homepage-name-search__input\s*\{[^}]*inset:\s*0;/
+      /\.homepage-name-search__field input\s*\{[^}]*inset:\s*0;/
     );
   });
 });

@@ -2,9 +2,17 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { expectFlatState } from '@/tests/utils/flat-state';
 import { SettingsErrorState } from './SettingsErrorState';
 
 describe('SettingsErrorState', () => {
+  it('sits flat with no card, fill, border or shadow', () => {
+    const { container } = render(<SettingsErrorState onRetry={vi.fn()} />);
+
+    expectFlatState(container);
+    expect(container.firstElementChild).toHaveClass('text-center');
+  });
+
   it('shows the default copy with no retry', async () => {
     const { container } = render(<SettingsErrorState />);
 

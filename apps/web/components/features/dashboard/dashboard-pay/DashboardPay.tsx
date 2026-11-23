@@ -168,7 +168,7 @@ export function DashboardPay() {
       <PageShell
         frame='none'
         maxWidth='wide'
-        contentPadding='compact'
+        contentPadding='default'
         data-testid='dashboard-earnings-workspace'
       >
         <div

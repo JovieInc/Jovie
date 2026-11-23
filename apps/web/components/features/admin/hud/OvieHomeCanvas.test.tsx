@@ -1,9 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { HomeCanvasState } from '@/components/jovie/types';
 import { APP_ROUTES } from '@/constants/routes';
-import { SUMMER_OPS_CARD_SCHEMA } from '@/lib/ovie/ops-card';
 import { emptyDeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import { OvieHomeCanvas } from './OvieHomeCanvas';
 import { COMPANY_RESPONSES, snapshot } from './OvieHomeCanvas.test-fixtures';
@@ -42,83 +40,15 @@ vi.mock('./useHudShippingStateQuery', () => ({
       : { isPending: true, isFetching: true, refetch: shipping.refetch },
 }));
 
-function renderCanvas(chat?: HomeCanvasState) {
+function renderCanvas() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  const view = render(
+  return render(
     <QueryClientProvider client={client}>
-      <OvieHomeCanvas chat={chat} />
+      <OvieHomeCanvas />
     </QueryClientProvider>
   );
-  return {
-    ...view,
-    rerenderChat: (next: HomeCanvasState) =>
-      view.rerender(
-        <QueryClientProvider client={client}>
-          <OvieHomeCanvas chat={next} />
-        </QueryClientProvider>
-      ),
-  };
-}
-
-function renderThenAsk(chat: HomeCanvasState) {
-  const view = renderCanvas({ ...chat, messages: [] });
-  view.rerenderChat(chat);
-  return view;
-}
-
-function opsCard(kind: 'shipping' | 'revenue', title: string) {
-  return {
-    card: {
-      schema: SUMMER_OPS_CARD_SCHEMA,
-      kind,
-      title,
-      state: 'fresh',
-      observedAt: '2026-10-20T18:00:00.000Z',
-      facts: [{ label: 'Value', value: '12' }],
-    },
-  };
-}
-
-function chatState(overrides: Partial<HomeCanvasState> = {}): HomeCanvasState {
-  return {
-    isStreaming: false,
-    onOpenTranscript: vi.fn(),
-    composerHasIntent: false,
-    messages: [
-      { id: 'u1', role: 'user', parts: [{ type: 'text', text: 'Revenue?' }] },
-      {
-        id: 'a1',
-        role: 'assistant',
-        parts: [
-          { type: 'text', text: 'MRR is up.' },
-          {
-            type: 'tool-summerOpsData',
-            toolCallId: 't1',
-            state: 'output-available',
-            input: {},
-            output: opsCard('revenue', 'Monthly Revenue'),
-          },
-        ],
-      },
-      { id: 'u2', role: 'user', parts: [{ type: 'text', text: 'Shipping?' }] },
-      {
-        id: 'a2',
-        role: 'assistant',
-        parts: [
-          {
-            type: 'tool-summerOpsData',
-            toolCallId: 't2',
-            state: 'output-available',
-            input: {},
-            output: opsCard('shipping', 'Shipping Now'),
-          },
-        ],
-      },
-    ],
-    ...overrides,
-  };
 }
 
 describe('OvieHomeCanvas Story First flat', () => {
@@ -148,7 +78,6 @@ describe('OvieHomeCanvas Story First flat', () => {
     renderCanvas();
     const canvas = await screen.findByTestId('story-first-canvas');
     expect(canvas).toBeVisible();
-    expect(canvas).toHaveAttribute('data-melting', 'false');
 
     const bottleneck = await screen.findByTestId('story-first-bottleneck');
     await vi.waitFor(() =>
@@ -184,42 +113,13 @@ describe('OvieHomeCanvas Story First flat', () => {
     expect(
       screen.getByTestId('story-first-stage-investigating')
     ).toHaveAttribute('data-highlighted', 'true');
+    // Plain title only: the issue key stays out of the founder view.
     expect(
       screen.getByTestId('story-first-stage-investigating')
-    ).toHaveTextContent('JOV-1');
+    ).not.toHaveTextContent('JOV-1');
     expect(
       screen.getByTestId('story-first-stage-investigating')
     ).toHaveTextContent('Blocked task');
-  });
-
-  it('melts the board when the composer carries intent', async () => {
-    renderCanvas(chatState({ composerHasIntent: true, messages: [] }));
-    const canvas = await screen.findByTestId('story-first-canvas');
-    expect(canvas).toHaveAttribute('data-melting', 'true');
-    expect(screen.getByTestId('story-first-board')).toHaveAttribute(
-      'aria-hidden',
-      'true'
-    );
-  });
-
-  it('melts while a turn is streaming', async () => {
-    renderCanvas(
-      chatState({
-        isStreaming: true,
-        composerHasIntent: false,
-        messages: [
-          {
-            id: 'u1',
-            role: 'user',
-            parts: [{ type: 'text', text: 'Status?' }],
-          },
-        ],
-      })
-    );
-    expect(await screen.findByTestId('story-first-canvas')).toHaveAttribute(
-      'data-melting',
-      'true'
-    );
   });
 
   it('shows loading stages while shipping state has not arrived', () => {
@@ -297,56 +197,37 @@ describe('OvieHomeCanvas Story First flat', () => {
     ).toHaveTextContent('Blocked task');
   });
 
-  it('opens on the Story First board, not an earlier conversation', async () => {
-    renderCanvas(chatState());
-    await screen.findByTestId('story-first-canvas');
-    expect(screen.queryByTestId('home-loop-answer')).toBeNull();
+  it('keeps the board crisp and interactive (no melt, no inert)', async () => {
+    renderCanvas();
+    const board = await screen.findByTestId('story-first-board');
+    expect(board).not.toHaveAttribute('inert');
+    expect(board).not.toHaveAttribute('aria-hidden');
+    expect(board.className).not.toMatch(/blur|opacity|translate/);
   });
 
-  it('renders the latest turn in place and restores earlier canvas states', async () => {
-    const chat = chatState();
-    renderThenAsk(chat);
-    await screen.findByTestId('story-first-canvas');
-
-    const answer = screen.getByTestId('home-loop-answer');
-    // Story First melt keeps the answer editorial (no card chrome).
-    expect(answer).toHaveAttribute('data-surface', 'flat');
-    expect(answer).toHaveTextContent('Shipping?');
-    expect(answer).toHaveTextContent('2 of 2');
-    expect(answer).toHaveTextContent('Shipping Now');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Previous Answer' }));
-    expect(screen.getByTestId('home-loop-answer')).toHaveTextContent(
-      'MRR is up.'
+  it('shows no Moving work when no in-flight row works on the revenue blocker', async () => {
+    companyResponses['/api/ovie/home/blocker'] = {
+      generatedAt: '2026-11-08T23:00:00.000Z',
+      blocker: {
+        schema: 'jovie.company-blocker/v1',
+        id: 'certification:checkout_payment_entitlement',
+        kind: 'certification',
+        step: 'checkout_payment_entitlement',
+        tone: 'warn',
+        text: "Checkout isn't fully measured yet, so we can't confirm anyone can pay",
+        detailsHref: APP_ROUTES.ADMIN_CERTIFICATIONS,
+        since: null,
+        nextAction: null,
+        observedAt: '2026-11-08T23:00:00.000Z',
+      },
+    };
+    renderCanvas();
+    const hero = await screen.findByTestId('story-first-bottleneck');
+    await vi.waitFor(() =>
+      expect(hero).toHaveTextContent("we can't confirm anyone can pay")
     );
-    expect(screen.getByTestId('home-loop-answer')).toHaveTextContent(
-      'Monthly Revenue'
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open Conversation' }));
-    expect(chat.onOpenTranscript).toHaveBeenCalledOnce();
-
-    fireEvent.click(screen.getByTestId('home-loop-answer-home'));
-    expect(screen.queryByTestId('home-loop-answer')).toBeNull();
-  });
-
-  it('reserves the answer slot while a reply streams', async () => {
-    renderThenAsk(
-      chatState({
-        isStreaming: true,
-        messages: [
-          {
-            id: 'u1',
-            role: 'user',
-            parts: [{ type: 'text', text: 'Status?' }],
-          },
-        ],
-      })
-    );
-    expect(await screen.findByTestId('home-loop-answer')).toHaveAttribute(
-      'data-state',
-      'pending'
-    );
+    expect(hero).not.toHaveTextContent('Moving');
+    expect(hero).not.toHaveTextContent('Blocked task');
   });
 
   it('does not invent a company metric wall when sources are empty', async () => {

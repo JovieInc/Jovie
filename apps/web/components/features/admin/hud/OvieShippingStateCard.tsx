@@ -88,8 +88,13 @@ function formatLanes(lanes: Delivery['lanes']): string | null {
 
 function formatRepoSplit(byRepo: Delivery['merges']['byRepo']): string | null {
   const parts = [byRepo.Jovie, byRepo.LogYourBody, byRepo['summer-config']];
-  if (parts.some(part => part.value === null)) return null;
-  return parts.map(part => formatCount(part)!).join(' / ');
+  const values: string[] = [];
+  for (const part of parts) {
+    const text = formatCount(part);
+    if (text === null) return null;
+    values.push(text);
+  }
+  return values.join(' / ');
 }
 
 function formatWeek(merges: Delivery['merges']): string | null {
@@ -233,7 +238,10 @@ function ShippingStateBody({
       ],
     ];
   const nowMs = Date.now();
-  const measuredRows = rows.filter(([, , text]) => hasKnownMetricText(text));
+  const measuredRows = rows.filter(
+    (row): row is readonly [string, string, string, boolean?] =>
+      hasKnownMetricText(row[2])
+  );
   const syncingNotice =
     isPending || view.truth === 'unknown' || measuredRows.length < rows.length;
 
@@ -260,7 +268,7 @@ function ShippingStateBody({
                 <MetricValue
                   view={view}
                   sourceId={sourceId}
-                  text={text!}
+                  text={text}
                   stale={stale}
                   nowMs={nowMs}
                 />

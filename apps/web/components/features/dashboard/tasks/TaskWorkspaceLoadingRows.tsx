@@ -14,7 +14,7 @@ export function TaskWorkspaceLoadingRows() {
     <div
       role='status'
       aria-busy='true'
-      className='flex min-h-0 flex-1 flex-col gap-1.5 px-2.5 pb-2 pt-0.5 max-sm:px-4 max-sm:pb-4 max-sm:pt-2'
+      className='flex min-h-0 flex-1 flex-col gap-1.5 pb-2 pt-0.5 max-sm:px-4 max-sm:pb-4 max-sm:pt-2'
       data-testid='task-workspace-loading-rows'
     >
       <span className='sr-only'>Loading tasks</span>
