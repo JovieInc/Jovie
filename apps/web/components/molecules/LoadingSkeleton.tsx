@@ -206,7 +206,7 @@ export function AuthFormSkeleton() {
 export function CardSkeleton() {
   return (
     <div
-      className='w-full rounded-lg border border-subtle p-4'
+      className='w-full p-4'
       role='status'
       aria-busy='true'
       aria-live='polite'
@@ -259,7 +259,7 @@ export function TableSkeleton({
 
   return (
     <div
-      className='w-full overflow-hidden rounded-lg border border-subtle'
+      className='w-full overflow-hidden'
       role='status'
       aria-busy='true'
       aria-live='polite'
@@ -267,7 +267,7 @@ export function TableSkeleton({
       aria-label='Loading Table'
     >
       {/* Header */}
-      <div className='flex border-b border-subtle bg-surface-1'>
+      <div className='flex border-b border-subtle'>
         {headerKeys.map(key => (
           <div key={key} className='flex-1 p-3'>
             <Skeleton className='h-5' />

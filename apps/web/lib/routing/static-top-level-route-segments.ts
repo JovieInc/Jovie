@@ -114,6 +114,7 @@ export const STATIC_TOP_LEVEL_ROUTE_SEGMENTS: ReadonlySet<string> = new Set([
   'theme-init.js',
   'ui',
   'unavailable',
+  'v',
   'videos',
   'voice',
   'waitlist',

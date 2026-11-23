@@ -612,10 +612,10 @@ export function PersistentAudioBar() {
               data-testid='audio-surface-expanded-shell'
               data-shell-audio-surface='persistent-expanded'
               aria-hidden={!playerOpen}
-              className='flex items-center gap-3 px-4 py-1.5 lg:px-6'
+              className='flex items-end gap-3 px-4 py-1.5 lg:px-6'
             >
               <div
-                className='flex w-56 min-w-0 shrink-0 items-center gap-3'
+                className='flex h-11 w-56 min-w-0 shrink-0 items-center gap-3'
                 data-testid='desktop-player-track'
               >
                 {playbackState.artworkUrl && !imgError ? (
@@ -673,9 +673,9 @@ export function PersistentAudioBar() {
                 }
                 onLyricsIntent={prefetchLyricsRoute}
                 track={shellTrack}
-                className='min-w-0 flex-1 px-0 py-0'
+                className='min-w-0 flex-1 px-0'
               />
-              <div className='flex shrink-0 items-center gap-1'>
+              <div className='flex h-11 shrink-0 items-center gap-1'>
                 <PlayerVisibilityToggle
                   open={playerOpen}
                   onClick={() => setPlayerOpen(value => !value)}

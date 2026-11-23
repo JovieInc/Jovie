@@ -68,6 +68,10 @@ import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
 import { ProfileDesktopSurface } from './ProfileDesktopSurface';
 import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
+import {
+  getModeFromUrl,
+  useCanonicalProfileMode,
+} from './useCanonicalProfileMode';
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
@@ -216,15 +220,6 @@ function getInitialIsDesktopLayout(): boolean {
   return false;
 }
 
-function getModeFromUrl(): ProfileMode {
-  if (globalThis.window === undefined) {
-    return 'profile';
-  }
-
-  const modeParam = new URLSearchParams(globalThis.location.search).get('mode');
-  return modeParam === null ? 'profile' : getProfileMode(modeParam);
-}
-
 function getModeFromDrawerView(view: DrawerView): ProfileMode | null {
   switch (view) {
     case 'about':
@@ -355,6 +350,7 @@ export function ProfileCompactTemplate({
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
     getInitialModeFromLocation(mode, false)
   );
+  useCanonicalProfileMode(requestedMode, setRequestedMode, tourDates.length);
   // Strip detector wake for the history effect below (see the effect).
   const [historyWakeTick, setHistoryWakeTick] = useState(0);
   const revealNotificationsRef = useRef<(() => void) | null>(null);

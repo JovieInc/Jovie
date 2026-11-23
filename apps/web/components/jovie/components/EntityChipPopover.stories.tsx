@@ -1,3 +1,4 @@
+import { Textarea } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { EntityChip } from './EntityChip';
 import { EntityChipPopover } from './EntityChipPopover';
@@ -94,4 +95,27 @@ export const RtlTitle: Story = {
       </div>
     ),
   ],
+};
+
+/** Two adjacent references simulate keyboard and pointer crossing in chat. */
+export const AdjacentReferences: Story = {
+  render: () => (
+    <div className='flex flex-col gap-4'>
+      <Textarea label='Draft' />
+      <div className='flex gap-4'>
+        {['Sober', 'Midnight Drive'].map((label, index) => {
+          const data = {
+            kind: 'release' as const,
+            id: `fixture_${index}`,
+            label,
+          };
+          return (
+            <EntityChipPopover key={data.id} {...data} entity={data}>
+              <EntityChip data={data} variant='transcript' />
+            </EntityChipPopover>
+          );
+        })}
+      </div>
+    </div>
+  ),
 };

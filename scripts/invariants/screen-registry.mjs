@@ -59,7 +59,7 @@ web.root-not-found|web|root-not-found|apps/web/app/not-found.tsx|desktop,mobile
 web.marketing-shell|web|marketing-shell|apps/web/app/(marketing)/layout.tsx|desktop,mobile
 web.marketing-about|web|marketing-about|apps/web/app/(marketing)/about/page.tsx|desktop,mobile
 web.marketing-solutions|web|marketing-solutions|apps/web/app/(marketing)/solutions/|desktop,mobile
-web.marketing-support|web|marketing-support|apps/web/app/(marketing)/support/page.tsx|desktop,mobile
+web.marketing-support|web|marketing-support|apps/web/app/(marketing)/support/page.tsx,apps/web/app/(marketing)/support/loading.tsx|desktop,mobile
 web.marketing-integrations|web|marketing-integrations|apps/web/app/(marketing)/integrations/page.tsx|desktop,mobile
 web.artist-profiles|web|marketing-artist-profiles|apps/web/app/(marketing)/artist-profiles/|desktop,mobile
 web.artist-profile|web|marketing-artist-profile|apps/web/app/(marketing)/artist-profile/page.tsx|desktop,mobile
@@ -99,10 +99,10 @@ web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/
 web.smartlink-release|web|release-landing|apps/web/app/[username]/[...slug]/page.tsx,apps/web/app/[username]/[slug]/page.tsx,apps/web/app/[username]/[slug]/not-found.tsx|desktop,mobile
 web.smartlink-sounds|web|release-landing|apps/web/app/[username]/[slug]/sounds/page.tsx|desktop,mobile
 web.smartlink-track|web|release-landing|apps/web/app/[username]/[slug]/[trackSlug]/page.tsx|desktop,mobile
-web.out-link|web|wrapped-link-interstitial|apps/web/app/out/[id]/page.tsx|desktop,mobile
+web.out-link|web|wrapped-link-interstitial|apps/web/app/out/[id]/page.tsx,apps/web/app/out/[id]/loading.tsx|desktop,mobile
 web.report|web|abuse-report-intake|apps/web/app/report/page.tsx|desktop,mobile
 web.dashboard-releases|web|dashboard-releases|apps/web/app/app/(shell)/dashboard/releases/page.tsx|desktop,mobile
-web.dashboard-presence|web|dashboard-presence|apps/web/app/app/(shell)/dashboard/presence/page.tsx|desktop,mobile
+web.dashboard-presence|web|dashboard-presence|apps/web/app/app/(shell)/dashboard/presence/page.tsx,apps/web/app/app/(shell)/dashboard/presence/loading.tsx|desktop,mobile
 web.dashboard-contacts|web|dashboard-contacts|apps/web/app/app/(shell)/dashboard/contacts/|desktop,mobile
 web.contacts|web|contacts|apps/web/app/app/(shell)/contacts/page.tsx,apps/web/app/api/dashboard/contacts/route.ts,apps/web/app/api/dashboard/contacts/_lib/screen-cert-fixture.ts,apps/web/lib/screen-cert/app-shell-fixture-gate.ts|desktop,mobile
 web.tasks|web|tasks|apps/web/app/app/(shell)/tasks/page.tsx,apps/web/app/app/(shell)/tasks/TasksRoute.tsx,apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts,apps/web/app/app/(shell)/dashboard/tasks/_lib/screen-cert-fixture.ts,apps/web/lib/screen-cert/app-shell-fixture-gate.ts|desktop,mobile
@@ -112,8 +112,10 @@ web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
 web.links|web|links|apps/web/app/app/(shell)/links/page.tsx,apps/web/app/app/(shell)/dashboard/links/page.tsx|desktop,mobile
 web.tour-dates|web|tour-dates|apps/web/app/app/(shell)/tour-dates/page.tsx|desktop,mobile
 web.chats|web|chats|apps/web/app/app/(shell)/chats/page.tsx|desktop,mobile
-web.insights|web|insights|apps/web/app/app/(shell)/insights/page.tsx|desktop,mobile
+web.insights|web|insights|apps/web/app/app/(shell)/insights/page.tsx,apps/web/app/app/(shell)/insights/loading.tsx|desktop,mobile
 web.library-private-share|web|library-asset-share|apps/web/app/p/[token]/|desktop,mobile
+web.dashboards|web|dashboards|apps/web/app/app/(shell)/dashboards/page.tsx|desktop,mobile
+web.shared-view|web|shared-view|apps/web/app/v/[token]/|desktop,mobile
 web.settings-admin-redirect|web|settings-admin-redirect|apps/web/app/app/(shell)/settings/admin/page.tsx|desktop,mobile
 web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/profile/page.tsx,apps/web/app/app/(shell)/settings/artist-profile/page.tsx,apps/web/app/app/(shell)/tipping/page.tsx|desktop,mobile
 web.settings-referral|web|settings-referral|apps/web/app/app/(shell)/settings/referral/page.tsx,apps/web/app/app/(shell)/settings/referral/ReferralCodeCopyClient.tsx|desktop,mobile
@@ -148,11 +150,11 @@ web.admin-visibility-audit|web|admin-visibility-audit|apps/web/app/app/(shell)/a
 web.hud-isolated|web|ovie-ops-isolated|apps/web/app/hud/page.tsx,apps/web/app/hud/layout.tsx|desktop,mobile
 web.hud-tv|web|ovie-ops-isolated|apps/web/app/hud-tv/page.tsx|desktop,mobile
 web.hud-wiki|web|admin-wiki|apps/web/app/hud/wiki/|desktop,mobile
-web.youtube-channel-pilot|web|screen.youtube.channel-pilot|apps/web/app/app/(shell)/youtube/page.tsx|desktop,mobile
+web.youtube-channel-pilot|web|screen.youtube.channel-pilot|apps/web/app/app/(shell)/youtube/page.tsx,apps/web/app/app/(shell)/youtube/loading.tsx|desktop,mobile
 web.shipping-statistics|web|shipping-statistics|apps/web/app/app/(shell)/admin/shipping/page.tsx|desktop,mobile
 web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx,apps/web/app/(dynamic)/start/layout.tsx|desktop,mobile
 web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
-web.chat|web|screen.chat|apps/web/app/app/(shell)/chat/page.tsx|desktop,mobile
+web.chat|web|screen.chat|apps/web/app/app/(shell)/chat/page.tsx,apps/web/app/app/(shell)/chat/error.tsx|desktop,mobile
 web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
 web.settings-audience|web|screen.settings.audience|apps/web/app/app/(shell)/settings/audience/page.tsx|desktop,mobile
 web.settings-account|web|screen.settings.account|apps/web/app/app/(shell)/settings/account/page.tsx|desktop,mobile
@@ -165,6 +167,7 @@ web.settings-connectors|web|settings-connectors|apps/web/app/app/(shell)/setting
 web.settings|web|screen.settings|apps/web/app/app/(shell)/settings/layout.tsx|desktop,mobile
 web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout/page.tsx,apps/web/app/onboarding/checkout/loading.tsx|desktop,mobile
 web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx,apps/web/app/billing/success/loading.tsx|desktop,mobile
+web.billing-cancel|web|billing-cancel|apps/web/app/billing/cancel/page.tsx,apps/web/app/billing/cancel/loading.tsx|desktop,mobile
 web.billing-youtube-thumbnails|web|billing-youtube-thumbnails|apps/web/app/billing/youtube-thumbnails/page.tsx|desktop,mobile
 web.billing-youtube-thumbnails-success|web|billing-youtube-thumbnails-success|apps/web/app/billing/youtube-thumbnails/success/page.tsx|desktop,mobile
 web.billing-shell|web|billing-shell|apps/web/app/billing/layout.tsx|desktop,mobile

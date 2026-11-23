@@ -23,4 +23,25 @@ export {
   JOVIE_O_TIMING,
   type JovieOState,
 } from './jovie-o-motion';
+export { OStroke, type OStrokeProps } from './OStroke';
+export {
+  createSpinPlayer,
+  planSpin,
+  SPIN,
+  type SpinCurve,
+  type SpinPlan,
+  type SpinPlayer,
+  type SpinState,
+  sampleSpin,
+  spinAt,
+  spinCurve,
+  useOSpin,
+} from './oSpin';
+export {
+  OSTROKE_POINTS,
+  OSTROKE_POSES,
+  type OStrokePose,
+  poseState,
+  strokeFrame,
+} from './ostroke-poses';
 export { OVIE_EYES_TIMING } from './ovie-eyes';

@@ -321,8 +321,7 @@ module.exports = [
       'import/no-cycle': 'off',
     },
   },
-  // NOTE: Test file overrides for @typescript-eslint/no-explicit-any removed
-  // - Biome already disables suspicious/noExplicitAny for test files
+  // NOTE: test-file no-explicit-any overrides removed; Biome disables suspicious/noExplicitAny there
   // Enforce type-only exports in admin types barrel file
   {
     files: ['lib/admin/types.ts'],
@@ -356,6 +355,7 @@ module.exports = [
       'components/atoms/TableErrorFallback.tsx',
       'components/atoms/AvatarUploadOverlay.tsx',
       'components/atoms/ReleaseArtworkThumb.tsx',
+      'components/atoms/AnimatedIconSwap.tsx', // hooks predate the rule (JOV-14411)
     ],
     rules: {
       'no-restricted-syntax': [

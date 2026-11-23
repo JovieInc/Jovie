@@ -89,12 +89,13 @@ describe('DashboardAudienceTableUnified', () => {
       />
     );
 
-    const card = document.querySelector('[data-empty-state-card]');
-    expect(card).not.toBeNull();
-    expect(card).toHaveClass('rounded-md');
-    expect(card).toHaveClass('border-subtle');
-    expect(card).toHaveClass('bg-surface-0');
-    expect(card).toHaveClass('text-left');
+    expect(document.querySelector('[data-empty-state-card]')).toBeNull();
+    const content = document.querySelector(
+      '[data-empty-state-content="workspace"]'
+    );
+    expect(content).not.toBeNull();
+    expect(content).toHaveClass('text-left');
+    expect(content).not.toHaveClass('border-subtle', 'bg-surface-0');
   });
 
   it('renders the empty members view', () => {

@@ -4,7 +4,7 @@
 
 import { PlainButton } from '@jovie/ui';
 import { QueryClientContext } from '@tanstack/react-query';
-import { Clock, ExternalLink, Lock, Pause, Play } from 'lucide-react';
+import { Clock, ExternalLink, Lock, Pause } from 'lucide-react';
 import Link from 'next/link';
 import {
   type ComponentPropsWithoutRef,
@@ -16,6 +16,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { PlayIcon } from '@/components/atoms/PlayIcon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 import { toast } from '@/components/feedback';
@@ -182,8 +183,8 @@ const ArtworkCell = memo(function ArtworkCell({
               aria-hidden='true'
             />
           ) : (
-            <Play
-              className='h-3.5 w-3.5 translate-x-px'
+            <PlayIcon
+              size={14}
               strokeWidth={2.5}
               fill='currentColor'
               aria-hidden='true'
@@ -223,12 +224,16 @@ const SmartLinkCell = memo(function SmartLinkCell({
         }
         data-shell-release-smart-link-locked='true'
         data-shell-release-smart-link-lock-reason={smartLinkLockReason}
-        className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token cursor-not-allowed'
+        className='shrink-0 h-7 w-7 rounded-full grid place-items-center text-quaternary-token cursor-not-allowed'
       >
         {isScheduled ? (
-          <Clock className='h-3 w-3' strokeWidth={2.25} aria-hidden='true' />
+          <Clock
+            className='h-3.5 w-3.5'
+            strokeWidth={2.25}
+            aria-hidden='true'
+          />
         ) : (
-          <Lock className='h-3 w-3' strokeWidth={2.25} aria-hidden='true' />
+          <Lock className='h-3.5 w-3.5' strokeWidth={2.25} aria-hidden='true' />
         )}
       </span>
     );
@@ -243,9 +248,9 @@ const SmartLinkCell = memo(function SmartLinkCell({
       onClick={e => e.stopPropagation()}
       title={`Open smart link · ${smartLinkPath}`}
       aria-label={`Open smart link for ${release.title}`}
-      className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-colors duration-subtle ease-subtle'
+      className='shrink-0 h-7 w-7 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-colors duration-subtle ease-subtle'
     >
-      <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
+      <ExternalLink className='h-3.5 w-3.5' strokeWidth={2.25} />
     </Link>
   );
 });
