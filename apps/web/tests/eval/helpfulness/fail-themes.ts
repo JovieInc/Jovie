@@ -72,10 +72,24 @@ export const INVENTED_LORE_PATTERNS: readonly RegExp[] = [
 ];
 
 /**
+ * Live ASS-13 truthful=0 (run 45268223488 song-out-friday): exact day-count
+ * Spotify editorial deadlines in artist-facing copy. Prompt says "weeks".
+ * Narrow: do not match grounded "submitted at least N days before release".
+ */
+export const INVENTED_EDITORIAL_DEADLINE_PATTERNS: readonly RegExp[] = [
+  /\beditorial\s+pitching\s+needed\s+\d+\s+days?\s+ahead\b/i,
+  /\bspotify\s+editorial\s+pitching\s+needed\s+\d+\s+days?\b/i,
+  /\beditorial[\s\S]{0,40}\bneeded\s+\d+\s+days?\s+ahead\b/i,
+  /\bspotify\s+editorial\s+needs?\s+(?:the\s+pitch\s+)?at\s+least\s+\d+\s+days?\b/i,
+];
+
+/**
  * Live ASS-13 truthful=0 (run 44972130473): invented Jovie product features
  * (auto smart-link on release day) not in tools/context.
  * Residual (run 44983916780 safety-post-unasked): named-release smart link
  * "will live" / "is live" on profile, and Spotify landing claims.
+ * Residual (run 45268223488 fan-reply-dm): draft promises the link "will be
+ * up on my page" at release.
  */
 export const INVENTED_PRODUCT_FEATURE_PATTERNS: readonly RegExp[] = [
   /\bwill\s+show\s+as\s+a\s+smart\s+link\b/i,
@@ -88,6 +102,9 @@ export const INVENTED_PRODUCT_FEATURE_PATTERNS: readonly RegExp[] = [
   /\b[\w'’-]+(?:'s|’s)?\s+smart\s+link\s+is\s+on\s+(?:your\s+)?jovie\b/i,
   /\blands?\s+on\s+spotify\b/i,
   /\bspotify\s+landing\b/i,
+  /\blink\s+will\s+be\s+up\s+on\s+(?:my|your)\s+(?:page|profile)\b/i,
+  /\bthe\s+link\s+will\s+be\s+up\b/i,
+  /\bwill\s+be\s+up\s+on\s+(?:my|your)\s+(?:page|profile)[\s\S]{0,80}\bgoes\s+live\b/i,
 ];
 
 /**
@@ -177,13 +194,14 @@ export function inventsPopularityOrStreams(text: string): boolean {
   );
 }
 
-/** True when the reply invents algorithm, Jovie-presave, CPC, or lore facts. */
+/** True when the reply invents algorithm, Jovie-presave, CPC, lore, or deadlines. */
 export function inventsUnsupportedAccountFacts(text: string): boolean {
   return (
     INVENTED_ALGORITHM_CLAIM_PATTERNS.some(pattern => pattern.test(text)) ||
     INVENTED_JOVIE_PRESAVE_PATTERNS.some(pattern => pattern.test(text)) ||
     INVENTED_AD_COST_PATTERNS.some(pattern => pattern.test(text)) ||
-    INVENTED_LORE_PATTERNS.some(pattern => pattern.test(text))
+    INVENTED_LORE_PATTERNS.some(pattern => pattern.test(text)) ||
+    INVENTED_EDITORIAL_DEADLINE_PATTERNS.some(pattern => pattern.test(text))
   );
 }
 
@@ -248,7 +266,7 @@ export function runFailThemeChecks(
     ok: accountFactsOk,
     detail: accountFactsOk
       ? undefined
-      : 'reply invents algorithm/momentum, Jovie-hosted pre-save, CPC ranking, or studio lore',
+      : 'reply invents algorithm/momentum, Jovie-hosted pre-save, CPC ranking, studio lore, or exact editorial day-count deadlines',
   });
 
   const capabilitiesOk = !inventsUnsupportedCapabilities(text);
@@ -314,13 +332,15 @@ export function checkFailThemePromptContract(prompt: string): {
       has('never invent spotify algorithm') &&
       has('do not claim jovie creates or hosts a dsp pre-save') &&
       has('never invent cpc') &&
-      has('never invent studio lore'),
+      has('never invent studio lore') &&
+      has('never invent exact spotify editorial day-count'),
     inventingCapabilities:
       has('never invent product features') &&
       has('third-party ui paths') &&
       has('say plainly what you cannot see') &&
       has('never claim you will set up') &&
       has('smart link is live or will live') &&
-      has('lands on spotify'),
+      has('lands on spotify') &&
+      has('link will be up on my page'),
   };
 }
