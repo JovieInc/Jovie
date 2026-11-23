@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { render, screen, within } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockAdminSystemMap, mockRequireAccess, mockReadRoom } = vi.hoisted(
@@ -18,16 +20,20 @@ vi.mock('@/components/features/admin/layout/AdminPage', () => ({
     title,
     testId,
     tabs,
+    actions,
   }: {
     children: ReactNode;
     title: string;
     testId: string;
-    tabs: { value: string };
+    tabs?: { value: string };
+    actions?: ReactElement<{ value?: string; param?: string }>;
   }) => (
     <section
       data-testid={testId}
       data-page-title={title}
-      data-active-tab={tabs.value}
+      data-active-tab={actions?.props.value ?? ''}
+      data-filter-param={actions?.props.param ?? ''}
+      data-tabs-prop={tabs ? 'yes' : 'no'}
     >
       {children}
     </section>
@@ -86,6 +92,14 @@ describe('AdminSystemPage', () => {
       'data-active-tab',
       'roster'
     );
+    expect(screen.getByTestId('admin-system-page')).toHaveAttribute(
+      'data-filter-param',
+      'tab'
+    );
+    expect(screen.getByTestId('admin-system-page')).toHaveAttribute(
+      'data-tabs-prop',
+      'no'
+    );
     expect(screen.getByTestId('agent-roster')).toBeVisible();
     const rosterRows = screen.getAllByTestId('agent-room-agent');
     expect(within(rosterRows[0]).getByText('Summer')).toBeInTheDocument();
@@ -134,6 +148,28 @@ describe('AdminSystemPage', () => {
       AdminSystemPage({ searchParams: Promise.resolve({ tab: 'tools' }) })
     ).rejects.toThrow('Admin access required');
     expect(mockAdminSystemMap).not.toHaveBeenCalled();
+  });
+});
+
+describe('admin system shell boundary', () => {
+  it('imports the view select from the system page, not the shared shell', () => {
+    const page = readFileSync(
+      path.join(
+        import.meta.dirname,
+        '../../../app/app/(shell)/admin/system/page.tsx'
+      ),
+      'utf8'
+    );
+    const shell = readFileSync(
+      path.join(
+        import.meta.dirname,
+        '../../../components/features/admin/layout/AdminPage.tsx'
+      ),
+      'utf8'
+    );
+    expect(page).toContain('AdminQueryTabsSelect');
+    expect(page).not.toMatch(/\btabs=\{/);
+    expect(shell).not.toContain('AdminQueryTabsSelect');
   });
 });
 
