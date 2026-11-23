@@ -211,8 +211,13 @@
         "selectMerchDesign",
         "createMerchAlternativeItem"
       ],
-      "checks": [],
-      "gap": "Only the passive daily chat judge (lib/eval/turn-outcome.ts). Needs a test-account run that asserts three designs exist."
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/chat-merch-outcome.test.ts",
+          "test": "a fresh artist asking \"make merch\" gets three designs saved, not a question",
+          "runs": "merge"
+        }
+      ]
     },
     {
       "id": "chat-merch-manage",
