@@ -34,7 +34,10 @@ import {
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { logger } from '@/lib/utils/logger';
 import { resolveMerchCatalogSelection } from './catalog';
-import { resolveMerchConceptCount } from './concept-review';
+import {
+  canRenderMerchConcept,
+  resolveMerchConceptCount,
+} from './concept-review';
 import { getMerchConceptFeedback } from './concept-review-store';
 import {
   MERCH_CONTENT_CONTRACT_VERSION,
@@ -505,7 +508,7 @@ export async function generateMerchDesigns(params: {
       ...input,
     });
 
-  if (conceptReceipt.decision !== 'eligible') {
+  if (!canRenderMerchConcept(conceptReceipt.decision)) {
     for (const [index, candidate] of conceptPlan.candidates.entries()) {
       await persistRejectedOption({
         optionId: randomUUID(),
