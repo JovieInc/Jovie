@@ -136,10 +136,10 @@ describe('EarningsTab', () => {
     expect(screen.getAllByRole('term')).toHaveLength(3);
   });
 
-  it('hands tippers to the shared table in the dense people row', () => {
+  it('hands tippers to the shared table in the compact people row', () => {
     renderTab();
     expect(screen.getByTestId('tippers-table')).toBeInTheDocument();
-    expect(tableProps.last?.rowMode).toBe('dense');
+    expect(tableProps.last?.rowMode).toBe('compact');
     expect(tableProps.last?.caption).toBe('Tips');
   });
 
