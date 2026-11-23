@@ -379,6 +379,16 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // JOV-14474: every chat tool and core mutation names an outcome check.
+    // No fetch: a --depth=1 fetch re-shallowed CI's unshallowed checkout.
+    id: 'outcome-coverage',
+    command:
+      'node scripts/outcome-coverage.mjs --check && node --test scripts/outcome-coverage.test.mjs',
+    inputs:
+      /^(?:apps\/web\/lib\/chat\/chat-tool-inventory\.ts$|docs\/product\/(?:outcome-coverage\.json$|generated\/artist-launch-inventory\.json$)|scripts\/outcome-coverage|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     // Compliance: no third-party tracker component on routes where people type
     // (CIPA wiretap exposure). Canon: gbrain decisions/company/privacy-tracking-compliance-guidelines-2026-10-31.
     id: 'privacy-input-route-trackers',
@@ -1013,6 +1023,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/pr-open-priority.test.mjs',
   'scripts/pr-open-win.test.mjs',
   'scripts/pr-body-lint.test.mjs',
+  'scripts/done-check.test.mjs',
   'scripts/lib/__tests__/sources-of-truth.test.mjs',
   'scripts/invariants/duplicate-literals.test.mjs',
   'scripts/invariants/jump-policy-pin.test.mjs',
@@ -1259,14 +1270,14 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
   'scripts/lib/__tests__/changed-test-coverage-diagnostics.test.mjs',
-  'scripts/lib/__tests__/automation-liveness-lost-state-recovery.test.mjs',
+  'scripts/lib/__tests__/automation-liveness-lost-state-recovery.test.mjs scripts/lib/__tests__/summer-pr-age-rule.test.mjs',
   'scripts/lib/__tests__/canonical-profile-json-handoff.test.mjs',
   'scripts/lib/__tests__/merge-group-shard-failure-hold.test.mjs',
   'scripts/lib/__tests__/ci-structural-shards.test.mjs',
   'scripts/lib/__tests__/merge-group-sibling-burn-contract.test.mjs',
   'scripts/lib/__tests__/gh-api-hold-retry.test.mjs',
   'scripts/lib/__tests__/prod-cert.test.mjs',
-  'scripts/lib/__tests__/prod-cert-skew.test.mjs',
+  'scripts/lib/__tests__/prod-cert-skew.test.mjs scripts/lib/__tests__/prod-cert-carry.test.mjs',
   'scripts/lib/__tests__/prod-cone-cases.test.mjs scripts/lib/__tests__/prod-cone-scoreboard-clobber.test.mjs',
   'scripts/lib/__tests__/cert-bottleneck.test.mjs',
   'scripts/lib/__tests__/self-hosted-workspace-reset-contract.test.mjs',

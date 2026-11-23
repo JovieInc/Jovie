@@ -1,30 +1,56 @@
 import type { OvieInbox } from '@/lib/ovie/inbox';
 import { INTERACTION_CASE_CONTRACT } from '@/lib/ovie/interaction-case';
-import { emptyDeliverySummary } from '@/lib/ovie/shipping-state/contract';
+import {
+  type DeliverySummary,
+  emptyDeliverySummary,
+  measuredCount,
+} from '@/lib/ovie/shipping-state/contract';
+import type { HudShippingSnapshot } from './useHudShippingStateQuery';
 
-export function snapshot() {
-  const delivery = emptyDeliverySummary();
+/** Connected shipping read for Home canvas tests (measured glance + stage rail). */
+export function snapshot(): HudShippingSnapshot {
+  const observedAt = '2026-10-20T18:00:00.000Z';
+  const empty = emptyDeliverySummary();
+  const delivery: DeliverySummary = {
+    ...empty,
+    lanes: {
+      ...empty.lanes,
+      running: measuredCount(7),
+      slots: measuredCount(9),
+      idle: measuredCount(2),
+      pool: measuredCount(186),
+      lastLandingAgeSeconds: measuredCount(85),
+      diskFreePct: 28.4,
+      publishedAt: observedAt,
+      stale: false,
+    },
+    merges: {
+      ...empty.merges,
+      since: '2026-10-20T07:00:00.000Z',
+      today: measuredCount(3),
+      last7Days: measuredCount(98),
+      prior7Days: measuredCount(70),
+      byRepo: {
+        Jovie: measuredCount(80),
+        LogYourBody: measuredCount(10),
+        'summer-config': measuredCount(8),
+      },
+    },
+  };
   return {
     operationalRequestState: 'idle',
     view: {
       connection: 'connected',
-      delivery: {
-        ...delivery,
-        merges: {
-          ...delivery.merges,
-          since: '2026-10-20T07:00:00.000Z',
-          today: { state: 'measured-nonzero', value: 3 },
-        },
-      },
-    },
+      delivery,
+    } as HudShippingSnapshot['view'],
     operationalTasks: {
       canonicalSource: 'linear',
       cacheMode: 'local-reconciled',
       syncState: 'fresh',
       sourceId: 'lane-pull-requests',
-      observedAt: null,
-      lastSyncedAt: null,
-      freshnessDeadline: null,
+      observedAt,
+      lastSyncedAt: observedAt,
+      freshnessDeadline: '2026-10-20T19:00:00.000Z',
       deltas: [],
       tasks: [
         {

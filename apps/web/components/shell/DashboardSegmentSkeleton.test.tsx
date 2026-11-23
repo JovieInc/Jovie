@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { expectFlatState } from '@/tests/utils/flat-state';
 import {
   DashboardSegmentSkeleton,
   type DashboardSegmentSkeletonVariant,
@@ -166,4 +167,12 @@ describe('DashboardSegmentSkeleton route variants', () => {
       expect(geometrySignature(container)).toEqual(first);
     }
   );
+
+  it.each(ROUTE_VARIANTS)('keeps the %s skeleton flat', variant => {
+    const { container } = render(
+      <DashboardSegmentSkeleton variant={variant} />
+    );
+
+    expectFlatState(container);
+  });
 });

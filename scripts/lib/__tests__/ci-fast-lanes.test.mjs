@@ -2472,6 +2472,7 @@ describe('source-read guard selection', () => {
       'capacity-forecast',
       'native-design-system',
       'artist-launch-contract',
+      'outcome-coverage',
       'privacy-input-route-trackers',
       'privacy-compliance',
       'artist-profile-conformance',
@@ -2563,8 +2564,10 @@ describe('source-read guard selection', () => {
         ).toContain("from 'node:test'");
         continue;
       }
-      if (guard.id === 'artist-launch-contract') {
-        expect(guard.command).toContain('node scripts/artist-');
+      if (['artist-launch-contract', 'outcome-coverage'].includes(guard.id)) {
+        expect(guard.command).toMatch(
+          /node scripts\/(?:artist-|outcome-coverage\.mjs --check)/u
+        );
         expect(
           readFileSync(join(REPO_ROOT, `scripts/${guard.id}.test.mjs`), 'utf8')
         ).toContain("from 'node:test'");

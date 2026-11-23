@@ -240,6 +240,7 @@ export const EXPECTED_BROWSER_CHECKS = Object.freeze({
   'public-profile': [
     'owned-profile-renders-publicly',
     'profile-edit-save-readback',
+    'profile-links-save-readback',
   ],
   smartlink: ['click-analytics-capture'],
   // fresh-user-checkout-entry blocked until walked; cone-checkout-*=JOV-9826 TEST.

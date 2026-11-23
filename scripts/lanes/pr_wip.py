@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-"""Observed-capacity admission, diagnostic PR census and idle expiry.
+"""Observed-capacity admission, enforced per-agent WIP caps, PR census and idle expiry.
 
-New work uses matched caller quota and fresh runner backlog. Historical producer caps
-in pr-wip-policy.json describe census pressure, never admission. Existing PR repairs
-retain their separate request priority, custody and checks. Unknown observations permit
-only the existing bounded execution/request path, never additional autoscale capacity.
+New work needs matched caller quota, fresh runner backlog AND room under the producer's
+WIP cap (Tim 2026-11-22, "finish before starting": an agent at its cap lands, repairs or
+hands off its own open PRs before it takes new work; this supersedes the 2026-10-12
+no-ceiling rule). Producers listed in `perSession` (many concurrent sessions share one
+branch prefix, e.g. `claude/`) are capped per session through the
+`<!-- agent-session: ID -->` body marker pr-open writes. Existing PR repairs never consult
+the cap. Unknown observations permit only the existing bounded path, never more capacity.
 
 api-budget: github-user-graphql 12/hr - CLI report/admit/expire, one paginated open-PR read (<=5 pages) per run
+api-budget: github-search 12/hr - admit --session, one search call per pr-open of a per-session producer
 api-budget: github-user-core 20/hr - expire --apply closes at most maxClosesPerTick PRs per run
 """
 from __future__ import annotations
@@ -95,18 +99,44 @@ def owned(prs: list[dict], producer: str) -> list[dict]:
     return [pr for pr in prs if producer_of(pr.get("headRefName")) == producer and not held(pr)]
 
 
-def admit(prs: list[dict] | None, producer: str, policy: dict | None = None, *, capacity: dict | None = None) -> dict:
+SESSION_MARKER = "<!-- agent-session: {session} -->"
+
+
+def session_cap(policy: dict) -> int | None:
+    value = (policy or {}).get("perSessionCap")
+    return None if value is None else max(1, int(value))
+
+
+def per_session(producer: str, policy: dict) -> bool:
+    return producer in set((policy or {}).get("perSession") or [])
+
+
+def _oldest_first(prs: list[dict]) -> list[int]:
+    return [pr["number"] for pr in sorted(prs, key=lambda pr: _epoch(pr.get("createdAt")) or 0)]
+
+
+def admit(prs: list[dict] | None, producer: str, policy: dict | None = None, *, capacity: dict | None = None,
+          session_prs: list[dict] | None = None) -> dict:
     """Prospective admission; actual calls reserve quota at the shared client.
 
-    PR counts remain diagnostic. Unknown capacity is explicitly provisional: existing
-    provider/host seats and request gates still bound execution; autoscale cannot grow.
-    No estimate of a whole future PR's API or CI cost is reserved here.
+    Refuses `wip-cap` when the producer's unheld open PRs (or, for a per-session producer
+    with a known session, that session's) fill the cap; `landFirst` names them oldest
+    first. Capacity exhaustion wins over the cap. An unreadable inventory fails open with
+    `wipKnown: false` so the caller can say so; it never invents a count.
     """
     policy = load_policy() if policy is None else policy
-    cap = cap_for(producer, policy)
     capacity = capacity or {"allowed": True, "known": False, "reason": "capacity-unknown", "unknown": ["quota", "ci"]}
-    return {**capacity, "producer": producer, "used": None if prs is None else len(owned(prs, producer)),
-            "cap": cap, "reservation": "at-request"}
+    mine = None if prs is None else owned(prs, producer)
+    scope, cap, counted = "producer", cap_for(producer, policy), mine
+    if session_prs is not None and per_session(producer, policy):
+        scope, cap, counted = "session", session_cap(policy), [pr for pr in session_prs if not held(pr)]
+    decision = {**capacity, "producer": producer, "used": None if mine is None else len(mine),
+                "cap": cap_for(producer, policy), "reservation": "at-request", "wipScope": scope,
+                "wipUsed": None if counted is None else len(counted), "wipCap": cap, "wipKnown": counted is not None}
+    if capacity.get("allowed") is not False and cap is not None and counted is not None and len(counted) >= cap:
+        decision.update(allowed=False, reason="wip-cap", capacityReason=capacity.get("reason"), landFirst=_oldest_first(counted)[:10],
+                        nextAction="land, repair or hand off (label lane-fix-escalating) these PRs, then retry")
+    return decision
 
 
 # These are the existing measured runner-backlog policy, shared with autoscale.
@@ -348,6 +378,24 @@ def fetch_open_prs(run_gh=None) -> list[dict] | None:
     return rows
 
 
+def fetch_session_prs(session: str, run_gh=None) -> list[dict] | None:
+    """Open PRs whose body carries this session's marker: one search call, None if unreadable."""
+    if not session or not all(ch.isalnum() or ch in "-_" for ch in session):
+        return None
+    if run_gh is None:
+        sys.path.insert(0, str(HERE.parent))
+        from apiclient import run_gh  # noqa: PLC0415
+    query = f'repo:{REPO_SLUG} is:pr is:open in:body "agent-session: {session}"'
+    result = run_gh(["api", "-X", "GET", "search/issues", "-f", f"q={query}", "-f", "per_page=50",
+                     "--jq", ".items[] | {number, createdAt: .created_at, labels} | tojson"], priority="report")
+    if result.get("code") != 0:
+        return None
+    try:
+        return [json.loads(line) for line in (result.get("stdout") or "").splitlines() if line.strip()]
+    except ValueError:
+        return None
+
+
 def safe_inventory(read) -> list[dict] | None:
     """`read()` open PRs, or None when unreadable (admission fails open; in-flight fails closed elsewhere)."""
     try:
@@ -382,15 +430,22 @@ def main(argv: list[str] | None = None) -> int:
     gate = sub.add_parser("admit")
     gate.add_argument("--branch", required=True)
     gate.add_argument("--priority", choices=("default", "repair"), default="default")
+    gate.add_argument("--session", default=os.environ.get("AGENT_SESSION_ID") or os.environ.get("CLAUDE_CODE_SESSION_ID")
+                      or os.environ.get("CODEX_SESSION_ID") or "")
     run = sub.add_parser("expire")
     run.add_argument("--apply", action="store_true")
     args = parser.parse_args(argv)
     policy, now = load_policy(), time.time()
     if args.cmd == "admit":
-        # Counts do not participate in admission, so avoid the paginated PR census.
-        decision = admit(None, producer_of(args.branch), policy, capacity=observe_capacity(refresh=True, priority=args.priority))
+        producer = producer_of(args.branch)
+        capacity = observe_capacity(refresh=True, priority=args.priority)
+        exempt = cap_for(producer, policy) is None and not per_session(producer, policy)
+        prs = None if exempt or capacity.get("allowed") is False else safe_inventory(fetch_open_prs)
+        sessions = (fetch_session_prs(args.session) if args.session and per_session(producer, policy)
+                    and capacity.get("allowed") is not False else None)
+        decision = admit(prs, producer, policy, capacity=capacity, session_prs=sessions)
         print(json.dumps(decision))
-        return 0 if decision["allowed"] else 75
+        return 0 if decision["allowed"] else 3 if decision["reason"] == "wip-cap" else 75
     prs = fetch_open_prs()
     if prs is None:
         print(json.dumps({"error": "open-prs-unreadable"}))

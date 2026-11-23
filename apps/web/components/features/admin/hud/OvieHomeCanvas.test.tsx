@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import { emptyDeliverySummary } from '@/lib/ovie/shipping-state/contract';
@@ -85,9 +85,13 @@ describe('OvieHomeCanvas Story First flat', () => {
     );
     expect(bottleneck).toHaveTextContent('Shipping off target');
 
-    expect(screen.getByTestId('story-first-glance-shipping')).toBeVisible();
-    expect(screen.getByTestId('story-first-glance-revenue')).toBeVisible();
-    expect(screen.getByTestId('story-first-glance-users')).toBeVisible();
+    expect(
+      await screen.findByTestId('story-first-glance-shipping')
+    ).toBeVisible();
+    expect(
+      await screen.findByTestId('story-first-glance-revenue')
+    ).toBeVisible();
+    expect(await screen.findByTestId('story-first-glance-users')).toBeVisible();
 
     expect(screen.getByTestId('story-first-stages')).toBeVisible();
     expect(screen.getByTestId('story-first-stage-investigating')).toBeVisible();
@@ -109,9 +113,10 @@ describe('OvieHomeCanvas Story First flat', () => {
     expect(
       screen.getByTestId('story-first-stage-investigating')
     ).toHaveAttribute('data-highlighted', 'true');
+    // Plain title only: the issue key stays out of the founder view.
     expect(
       screen.getByTestId('story-first-stage-investigating')
-    ).toHaveTextContent('JOV-1');
+    ).not.toHaveTextContent('JOV-1');
     expect(
       screen.getByTestId('story-first-stage-investigating')
     ).toHaveTextContent('Blocked task');
@@ -153,6 +158,8 @@ describe('OvieHomeCanvas Story First flat', () => {
         operationalTasks: {
           ...base.operationalTasks,
           syncState: 'syncing',
+          observedAt: null,
+          lastSyncedAt: null,
           tasks: [],
         },
       };
@@ -219,7 +226,6 @@ describe('OvieHomeCanvas Story First flat', () => {
     await vi.waitFor(() =>
       expect(hero).toHaveTextContent("we can't confirm anyone can pay")
     );
-    // The lead shipping row (JOV-1 "Blocked task") isn't checkout work.
     expect(hero).not.toHaveTextContent('Moving');
     expect(hero).not.toHaveTextContent('Blocked task');
   });
@@ -240,11 +246,10 @@ describe('OvieHomeCanvas Story First flat', () => {
       operationalTasks: { ...snapshot().operationalTasks, tasks: [] },
     };
     renderCanvas();
-    await screen.findByTestId('story-first-glance-shipping');
+    await waitFor(() => {
+      expect(screen.queryByTestId('story-first-glance-shipping')).toBeNull();
+    });
+    expect(screen.getByText('Some signals are still syncing.')).toBeVisible();
     expect(screen.queryByTestId('home-loop-tile-runway')).toBeNull();
-    expect(screen.getByTestId('story-first-glance-shipping')).toHaveAttribute(
-      'data-tone',
-      'neutral'
-    );
   });
 });

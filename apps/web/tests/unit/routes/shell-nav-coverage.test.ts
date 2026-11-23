@@ -26,6 +26,8 @@ const CONTACTS_CLIENT_PATH = path.join(
 const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app': 'Shell root entry page',
   '/app/chats': 'Canonical chat index reached from the sidebar link',
+  '/app/dashboards':
+    'Saved shared views reached from the shared view page and by direct link; sidebar placement is owned by the nav work',
   '/app/chat': 'New Chat utility and contextual Identity link editor',
   '/app/chat/[id]': 'Thread detail is reached from chat history',
   '/app/ov/chat': 'Deep-link alias that renders Ovie Home (/app/ov)',

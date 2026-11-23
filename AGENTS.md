@@ -85,7 +85,7 @@ onboarding, canonical tokens, and generated files.
 
 ## Finish line
 
-Done means the user's outcome works, not that a PR exists.
+Done means the outcome works live: `pnpm done:check --pr N`.
 
 1. First write the done-check (what a user sees when it works) and reproduce
    the problem.
