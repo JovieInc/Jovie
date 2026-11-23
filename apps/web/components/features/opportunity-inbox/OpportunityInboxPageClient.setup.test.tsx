@@ -269,7 +269,7 @@ describe('data-backed Home setup', () => {
     ).toBeVisible();
     expect(screen.getByText('2 of 3 complete')).toBeVisible();
     expect(
-      screen.queryByRole('toolbar', { name: 'Inbox View' })
+      screen.queryByRole('toolbar', { name: 'Home View' })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Add Notes' })
