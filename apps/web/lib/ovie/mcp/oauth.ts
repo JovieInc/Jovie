@@ -1,4 +1,9 @@
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import {
+  createHash,
+  createHmac,
+  randomBytes,
+  timingSafeEqual,
+} from 'node:crypto';
 import {
   acceptedMcpRedirectUris,
   isAllowedMcpRedirectUri,
@@ -22,6 +27,12 @@ export {
 export const OVIE_FALLBACK_SECRET =
   'jovie-non-production-better-auth-fallback-secret';
 
+/** Access token lifetime for MCP OAuth (refresh extends sessions without re-auth). */
+export const OVIE_ACCESS_TOKEN_TTL_SEC = 60 * 60;
+
+/** Refresh token lifetime; each refresh rotates to a new refresh token. */
+export const OVIE_REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
 export function ovieIssuerSecret(): string {
   return process.env.BETTER_AUTH_SECRET || OVIE_FALLBACK_SECRET;
 }
@@ -36,6 +47,8 @@ export type OvieIssuedToken = {
   readonly token_type: 'Bearer';
   readonly expires_in: number;
   readonly scope: string;
+  readonly refresh_token?: string;
+  readonly refresh_expires_in?: number;
 };
 
 export type OvieAccessClaims = {
@@ -58,6 +71,16 @@ type CodeClaims = {
   readonly scopes: string[];
   readonly exp: number;
 };
+type RefreshClaims = {
+  readonly t: 'r';
+  readonly c: string;
+  readonly sub: string;
+  readonly email?: string;
+  readonly admin: boolean;
+  readonly scopes: string[];
+  readonly exp: number;
+  readonly jti: string;
+};
 
 export class OvieOAuthIssuer {
   constructor(private readonly secret: string) {}
@@ -73,7 +96,7 @@ export class OvieOAuthIssuer {
       // behind OVIE_MCP_DYNAMIC_CLIENT_REGISTRATION.
       registration_endpoint: `${issuer}/register`,
       response_types_supported: ['code'],
-      grant_types_supported: ['authorization_code'],
+      grant_types_supported: ['authorization_code', 'refresh_token'],
       code_challenge_methods_supported: ['S256'],
       token_endpoint_auth_methods_supported: ['none'],
       scopes_supported: [...OVIE_OAUTH_SCOPES],
@@ -158,20 +181,59 @@ export class OvieOAuthIssuer {
     if (pkceS256(input.codeVerifier) !== pending.ch) {
       throw new Error('invalid code_verifier');
     }
-    const exp = Math.floor(Date.now() / 1000) + 15 * 60;
-    const scopes = pending.scopes;
-    return {
-      access_token: signPayload(this.secret, {
-        sub: pending.sub,
-        email: pending.email,
-        isAdmin: pending.admin,
-        scopes,
-        exp,
-      } satisfies OvieAccessClaims),
-      token_type: 'Bearer',
-      expires_in: 15 * 60,
-      scope: scopes.join(' '),
-    };
+    return this.issueTokenPair({
+      clientId: input.clientId,
+      subject: pending.sub,
+      email: pending.email,
+      isAdmin: pending.admin,
+      scopes: pending.scopes,
+    });
+  }
+
+  refreshAccessToken(input: {
+    refreshToken: string;
+    clientId: string;
+  }): OvieIssuedToken {
+    const pending = verifyPayload<RefreshClaims>(
+      this.secret,
+      input.refreshToken
+    );
+    if (!pending || pending.t !== 'r' || pending.exp < Date.now()) {
+      throw new Error('invalid refresh_token');
+    }
+    if (pending.c !== input.clientId) throw new Error('invalid client');
+    if (!pending.admin) throw new Error('founder authorization required');
+    return this.issueTokenPair({
+      clientId: input.clientId,
+      subject: pending.sub,
+      email: pending.email,
+      isAdmin: pending.admin,
+      scopes: pending.scopes,
+    });
+  }
+
+  /**
+   * Founder-only offline mint for cloud agents (BETTER_AUTH_SECRET). No HTTP route.
+   */
+  mintFounderRefreshGrant(input: {
+    clientId: string;
+    subject?: string;
+    email?: string;
+    scopes?: readonly string[];
+  }): OvieIssuedToken {
+    this.assertRegisteredClient(input.clientId);
+    const gate = authorizeSummerControl({
+      authenticated: true,
+      isAdmin: true,
+    });
+    if (!gate.ok) throw new Error('founder authorization required');
+    return this.issueTokenPair({
+      clientId: input.clientId,
+      subject: input.subject ?? 'ovie-cloud-agent',
+      email: input.email,
+      isAdmin: true,
+      scopes: [...(input.scopes ?? OVIE_OAUTH_SCOPES)],
+    });
   }
 
   verifyAccessToken(token: string): OvieAccessClaims | null {
@@ -184,6 +246,53 @@ export class OvieOAuthIssuer {
       return null;
     }
     return claims;
+  }
+
+  private assertRegisteredClient(clientId: string): void {
+    const client = verifyPayload<ClientClaims>(this.secret, clientId);
+    if (!client || client.t !== 'c' || !Array.isArray(client.u)) {
+      throw new Error('invalid client');
+    }
+  }
+
+  private issueTokenPair(input: {
+    clientId: string;
+    subject: string;
+    email?: string;
+    isAdmin: boolean;
+    scopes: readonly string[];
+  }): OvieIssuedToken {
+    const gate = authorizeSummerControl({
+      authenticated: true,
+      isAdmin: input.isAdmin,
+    });
+    if (!gate.ok) throw new Error('founder authorization required');
+    const scopes = [...input.scopes];
+    const accessExp = Math.floor(Date.now() / 1000) + OVIE_ACCESS_TOKEN_TTL_SEC;
+    const refreshExp = Date.now() + OVIE_REFRESH_TOKEN_TTL_MS;
+    return {
+      access_token: signPayload(this.secret, {
+        sub: input.subject,
+        email: input.email,
+        isAdmin: input.isAdmin,
+        scopes,
+        exp: accessExp,
+      } satisfies OvieAccessClaims),
+      token_type: 'Bearer',
+      expires_in: OVIE_ACCESS_TOKEN_TTL_SEC,
+      scope: scopes.join(' '),
+      refresh_token: signPayload(this.secret, {
+        t: 'r',
+        c: input.clientId,
+        sub: input.subject,
+        email: input.email,
+        admin: input.isAdmin,
+        scopes,
+        exp: refreshExp,
+        jti: randomBytes(16).toString('base64url'),
+      } satisfies RefreshClaims),
+      refresh_expires_in: Math.floor(OVIE_REFRESH_TOKEN_TTL_MS / 1000),
+    };
   }
 }
 
