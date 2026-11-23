@@ -1851,7 +1851,7 @@ jobs:
       - name: Build homepage for rendered snapshot compare
         if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
         run: pnpm turbo build --filter=@jovie/web
-        env:
+        env: &web-visual-build-env
           # Still reads the restored cache but skips persisting it (13-55s of
           # cache write + compaction per run); this job never saves it.
           TURBO_ENGINE_READ_ONLY: '1'
@@ -1891,6 +1891,10 @@ jobs:
             fi
           done
           echo "Visual compare build verified: $(du -sh apps/web/.next | cut -f1)"
+      - name: Write visual build manifest
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
+        run: node scripts/ci/web-build-env-hash.mjs write visual
+        env: *web-visual-build-env
       - name: Package visual compare build
         if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
         # Ship only what the standalone server needs. The restored Turbopack
@@ -1947,7 +1951,7 @@ jobs:
         if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: visual-compare-build-${{ github.run_id }}
+          name: visual-compare-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/visual-compare-build.tar
           retention-days: 1
           if-no-files-found: error
@@ -1993,10 +1997,13 @@ jobs:
       - name: Download visual compare build
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: visual-compare-build-${{ github.run_id }}
+          name: visual-compare-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/visual-compare-build-download
       - name: Extract visual compare build
         run: tar -xf "$RUNNER_TEMP/visual-compare-build-download/visual-compare-build.tar" -C apps/web
+      - name: Verify visual build manifest
+        run: node scripts/ci/web-build-env-hash.mjs verify visual
+        env: *web-visual-build-env
       - name: Render and compare homepage snapshots
         if: needs.ci-path-changes.outputs.run_homepage_visual == 'true'
         run: |
@@ -2100,7 +2107,7 @@ jobs:
       - name: Download visual compare build
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: visual-compare-build-${{ github.run_id }}
+          name: visual-compare-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/visual-compare-build-download
       - name: Extract visual compare build
         run: tar -xf "$RUNNER_TEMP/visual-compare-build-download/visual-compare-build.tar" -C apps/web
@@ -2115,6 +2122,9 @@ jobs:
       # module-level certification state (output root, taste baseline) that
       # stays sequential for deterministic DOM evidence. Job-level parallelism
       # against the homepage and marketing-routes siblings is the speedup.
+      - name: Verify visual build manifest
+        run: node scripts/ci/web-build-env-hash.mjs verify visual
+        env: *web-visual-build-env
       - name: Certify marketing route DOM invariants
         if: needs.ci-path-changes.outputs.run_marketing_dom == 'true'
         run: |
@@ -2206,7 +2216,7 @@ jobs:
       - name: Download visual compare build
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: visual-compare-build-${{ github.run_id }}
+          name: visual-compare-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/visual-compare-build-download
       - name: Extract visual compare build
         run: tar -xf "$RUNNER_TEMP/visual-compare-build-download/visual-compare-build.tar" -C apps/web
@@ -2217,6 +2227,9 @@ jobs:
       # downloaded build, for every PR and merge-group head that selects
       # marketing inputs. No route or axe check is skipped; the spec is
       # unchanged.
+      - name: Verify visual build manifest
+        run: node scripts/ci/web-build-env-hash.mjs verify visual
+        env: *web-visual-build-env
       - name: Capture exact marketing routes (marketing-routes.spec.ts)
         if: needs.ci-path-changes.outputs.run_marketing_dom == 'true'
         run: |
@@ -4023,6 +4036,7 @@ jobs:
         # Any value, even empty, sets read-only.
         run: |
           [ "$GITHUB_EVENT_NAME" = push ] || export TURBO_ENGINE_READ_ONLY=1
+          node scripts/ci/web-build-env-hash.mjs hash build-layout
           pnpm turbo build --filter=@jovie/web
         env:
           # Nothing reads this job's turbo cache; writing .next outputs to it
@@ -4863,7 +4877,8 @@ jobs:
       - name: Build app (public routes only — no secrets needed)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm turbo build --filter=@jovie/web
-        env:
+        env: &web-public-build-env
+          DATABASE_URL: ''
           NEXT_PUBLIC_APP_URL: http://localhost:3100
           NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3100
           # This shared artifact feeds bypass-based smoke/mobile evidence. The
@@ -4892,9 +4907,13 @@ jobs:
           done
           echo "Build output verified: $(du -sh apps/web/.next | cut -f1)"
 
+      - name: Write public build manifest
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: node scripts/ci/web-build-env-hash.mjs write public
+        env: *web-public-build-env
       - name: Package build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: tar -cf "${{ runner.temp }}/nextjs-build.tar" -C apps/web .next
+        run: tar -cf "${{ runner.temp }}/nextjs-build.tar" --exclude='.next/cache' -C apps/web .next
 
       - name: Upload build artifact
         id: upload_artifact
@@ -4906,7 +4925,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: nextjs-build-${{ github.run_id }}
+          name: nextjs-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/nextjs-build.tar
           retention-days: 1
           if-no-files-found: error
@@ -4971,18 +4990,21 @@ jobs:
 
       - name: Download build artifact
         id: download
-        continue-on-error: true
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-optional-web-build
         with:
-          name: nextjs-build-${{ github.run_id }}
+          name: nextjs-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
-        if: steps.download.outcome == 'success'
+        if: steps.download.outputs.found == 'true'
         run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
+      - name: Verify public build manifest
+        if: steps.download.outputs.found == 'true'
+        run: node scripts/ci/web-build-env-hash.mjs verify public
+        env: *web-public-build-env
       - name: Run deterministic layout behavior guard
-        if: steps.download.outcome == 'success'
+        if: steps.download.outputs.found == 'true'
         run: |
           set -euo pipefail
           cd apps/web
@@ -5136,21 +5158,26 @@ jobs:
 
       - name: Download build artifact
         id: download-build
-        continue-on-error: true
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-optional-web-build
         with:
-          name: nextjs-build-${{ github.run_id }}
+          name: nextjs-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
-        if: steps.download-build.outcome == 'success'
+        if: steps.download-build.outputs.found == 'true'
         run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
+      - name: Verify public build manifest
+        if: steps.download-build.outputs.found == 'true'
+        run: node scripts/ci/web-build-env-hash.mjs verify public
+        env: *web-public-build-env
       - name: Build app fallback
-        if: steps.download-build.outcome != 'success'
+        if: steps.download-build.outputs.found != 'true'
         # Do not accept a remote artifact from the shared mock build. The
         # real-Clerk lane has a different compile-time auth contract.
-        run: pnpm turbo build --filter=@jovie/web --force
+        run: |
+          echo "::warning::Web build artifact absent; rebuilding exact head."
+          pnpm turbo build --filter=@jovie/web --force
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
@@ -5356,19 +5383,24 @@ jobs:
 
       - name: Download build artifact
         id: download-build
-        continue-on-error: true
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-optional-web-build
         with:
-          name: nextjs-build-${{ github.run_id }}
+          name: nextjs-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
-        if: steps.download-build.outcome == 'success'
+        if: steps.download-build.outputs.found == 'true'
         run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
+      - name: Verify public build manifest
+        if: steps.download-build.outputs.found == 'true'
+        run: node scripts/ci/web-build-env-hash.mjs verify public
+        env: *web-public-build-env
       - name: Build app fallback for public Lighthouse
-        if: steps.download-build.outcome != 'success'
-        run: pnpm --filter=@jovie/web run build
+        if: steps.download-build.outputs.found != 'true'
+        run: |
+          echo "::warning::Web build artifact absent; rebuilding exact head."
+          pnpm --filter=@jovie/web run build
         env:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
@@ -5620,14 +5652,13 @@ jobs:
       - name: Download build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.lighthouse-baseline.outputs.built != 'true'
         id: download-build
-        continue-on-error: true
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-optional-web-build
         with:
-          name: nextjs-build-${{ github.run_id }}
+          name: nextjs-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
-        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outcome == 'success' && steps.lighthouse-baseline.outputs.built != 'true'
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outputs.found == 'true' && steps.lighthouse-baseline.outputs.built != 'true'
         run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
       # Same command and env as the base build, so the two differ only by the
@@ -5636,9 +5667,13 @@ jobs:
       # status file is written atomically (tmp + mv) and the wait step fails
       # closed on a nonzero status, a process that died without one, or a
       # timeout.
+      - name: Verify public build manifest
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.download-build.outputs.found == 'true' && steps.lighthouse-baseline.outputs.built != 'true'
+        run: node scripts/ci/web-build-env-hash.mjs verify public
+        env: *web-public-build-env
       - name: Start fallback build in background
         id: background-build-start
-        if: steps.check_changes.outputs.run_full_ci == 'true' && (steps.download-build.outcome != 'success' || steps.lighthouse-baseline.outputs.built == 'true')
+        if: steps.check_changes.outputs.run_full_ci == 'true' && (steps.download-build.outputs.found != 'true' || steps.lighthouse-baseline.outputs.built == 'true')
         shell: bash
         env:
           NEXT_IGNORE_ESLINT: '1'
@@ -5646,6 +5681,8 @@ jobs:
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
           SKIP_SKILLS_CATALOG_SYNC: '1'
         run: |
+          node scripts/ci/web-build-env-hash.mjs hash lighthouse-relative
+          echo "::warning::Building separate head profile: artifact absent or relative-budget baseline requires matching env."
           set -euo pipefail
           log="$RUNNER_TEMP/next-build-fallback.log"
           exit_file="$RUNNER_TEMP/next-build-fallback.exit"
@@ -5666,7 +5703,7 @@ jobs:
       # operations lanes. Run the helper contracts here, on the path that
       # launches the build, while that build compiles.
       - name: Run background-build helper contract tests
-        if: steps.check_changes.outputs.run_full_ci == 'true' && (steps.download-build.outcome != 'success' || steps.lighthouse-baseline.outputs.built == 'true')
+        if: steps.check_changes.outputs.run_full_ci == 'true' && (steps.download-build.outputs.found != 'true' || steps.lighthouse-baseline.outputs.built == 'true')
         shell: bash
         run: >-
           pnpm --filter @jovie/web exec vitest run
@@ -5966,19 +6003,25 @@ jobs:
       - name: Download build artifact
         if: steps.lighthouse-identity.outputs.available == 'true'
         id: download-build
-        continue-on-error: true
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-optional-web-build
         with:
-          name: nextjs-build-${{ github.run_id }}
+          name: nextjs-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
-        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.download-build.outcome == 'success')
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.download-build.outputs.found == 'true')
         run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
+      - name: Verify public build manifest
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.download-build.outputs.found == 'true')
+        run: node scripts/ci/web-build-env-hash.mjs verify public
+        env: *web-public-build-env
       - name: Build app fallback for onboarding Lighthouse
-        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.download-build.outcome != 'success')
-        run: pnpm --filter=@jovie/web run build
+        if: steps.lighthouse-identity.outputs.available == 'true' && (steps.download-build.outputs.found != 'true')
+        run: |
+          node scripts/ci/web-build-env-hash.mjs hash lighthouse-onboarding
+          echo "::warning::Web build artifact absent; rebuilding exact head."
+          pnpm --filter=@jovie/web run build
         env:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
@@ -6097,19 +6140,24 @@ jobs:
 
       - name: Download build artifact
         id: download-build
-        continue-on-error: true
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-optional-web-build
         with:
-          name: nextjs-build-${{ github.run_id }}
+          name: nextjs-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
-        if: steps.download-build.outcome == 'success'
+        if: steps.download-build.outputs.found == 'true'
         run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
+      - name: Verify public build manifest
+        if: steps.download-build.outputs.found == 'true'
+        run: node scripts/ci/web-build-env-hash.mjs verify public
+        env: *web-public-build-env
       - name: Build app fallback for admin Lighthouse
-        if: steps.download-build.outcome != 'success'
-        run: pnpm --filter=@jovie/web run build
+        if: steps.download-build.outputs.found != 'true'
+        run: |
+          echo "::warning::Web build artifact absent; rebuilding exact head."
+          pnpm --filter=@jovie/web run build
         env:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
@@ -6228,19 +6276,24 @@ jobs:
 
       - name: Download build artifact
         id: download-build
-        continue-on-error: true
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-optional-web-build
         with:
-          name: nextjs-build-${{ github.run_id }}
+          name: nextjs-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
-        if: steps.download-build.outcome == 'success'
+        if: steps.download-build.outputs.found == 'true'
         run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
+      - name: Verify public build manifest
+        if: steps.download-build.outputs.found == 'true'
+        run: node scripts/ci/web-build-env-hash.mjs verify public
+        env: *web-public-build-env
       - name: Build app fallback for chat Lighthouse
-        if: steps.download-build.outcome != 'success'
-        run: pnpm --filter=@jovie/web run build
+        if: steps.download-build.outputs.found != 'true'
+        run: |
+          echo "::warning::Web build artifact absent; rebuilding exact head."
+          pnpm --filter=@jovie/web run build
         env:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
@@ -6443,6 +6496,7 @@ jobs:
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
         run: |
+          node scripts/ci/web-build-env-hash.mjs hash blog
           set -euo pipefail
           started=$(date +%s)
           pnpm turbo build --filter=@jovie/web
@@ -7173,13 +7227,17 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: nextjs-build-${{ github.run_id }}
+          name: nextjs-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
+      - name: Verify public build manifest
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: node scripts/ci/web-build-env-hash.mjs verify public
+        env: *web-public-build-env
       - name: Run migrations (ephemeral Neon)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm --filter=@jovie/web run drizzle:migrate:ci
@@ -7313,20 +7371,27 @@ jobs:
       - name: Download build artifact
         id: download
         if: env.DATABASE_URL != ''
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-optional-web-build
         with:
-          name: nextjs-build-${{ github.run_id }}
+          name: nextjs-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/nextjs-build-download
-        continue-on-error: true
 
       - name: Extract or rebuild
         if: env.DATABASE_URL != ''
         run: |
-          if [ -f "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" ]; then
+          set -euo pipefail
+          if [ -d "$RUNNER_TEMP/nextjs-build-download" ]; then
             tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
+            node scripts/ci/web-build-env-hash.mjs verify public
           else
-            pnpm turbo build --filter=@jovie/web
+            echo "::warning::Web build artifact absent; rebuilding exact head with the original fallback env."
           fi
+        env: *web-public-build-env
+      - name: Rebuild absent public artifact
+        if: env.DATABASE_URL != '' && steps.download.outputs.found != 'true'
+        run: |
+          pnpm turbo build --filter=@jovie/web
+          node scripts/ci/web-build-env-hash.mjs hash a11y-fallback
         env:
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
@@ -7486,13 +7551,17 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: nextjs-build-${{ github.run_id }}
+          name: nextjs-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/nextjs-build-download
 
       - name: Extract build artifact
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
 
+      - name: Verify public build manifest
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: node scripts/ci/web-build-env-hash.mjs verify public
+        env: *web-public-build-env
       - name: Materialize standalone assets (manual smoke)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
@@ -9627,25 +9696,26 @@ jobs:
 
       - name: Download build artifact from ci-build
         id: download-build
-        if: ${{ needs.ci-path-changes.outputs.run_build == 'true' }}
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        uses: ./.github/actions/download-optional-web-build
         with:
-          name: nextjs-build-${{ github.run_id }}
+          name: nextjs-build-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/nextjs-build-download
-        continue-on-error: true
 
       - name: Extract or rebuild for smoke tests
         run: |
-          if [ -f "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" ]; then
-            echo "Reusing build artifact (saves ~3-4 min)"
+          set -euo pipefail
+          if [ -d "$RUNNER_TEMP/nextjs-build-download" ]; then
             tar -xf "$RUNNER_TEMP/nextjs-build-download/nextjs-build.tar" -C apps/web
+            node scripts/ci/web-build-env-hash.mjs verify public
           else
-            echo "Build artifact not available, building from scratch"
-            pnpm turbo build --filter=@jovie/web
+            echo "::warning::Web build artifact absent; rebuilding exact head with the original fallback env."
           fi
-          # Standalone output needs static assets alongside server.js
-          cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
-          cp -r apps/web/public apps/web/.next/standalone/apps/web/public
+        env: *web-public-build-env
+      - name: Rebuild absent public artifact
+        if: steps.download-build.outputs.found != 'true'
+        run: |
+          pnpm turbo build --filter=@jovie/web
+          node scripts/ci/web-build-env-hash.mjs hash smoke-fallback
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NEXT_PUBLIC_APP_URL: http://localhost:3260
@@ -9660,6 +9730,10 @@ jobs:
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
 
+      - name: Materialize extended smoke standalone assets
+        run: |
+          cp -r apps/web/.next/static apps/web/.next/standalone/apps/web/.next/static
+          cp -r apps/web/public apps/web/.next/standalone/apps/web/public
       - name: Run Required Smoke Tests
         run: |
           cd apps/web

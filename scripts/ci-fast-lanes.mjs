@@ -52,11 +52,13 @@ export {
 import {
   escapeAnnotationMessage,
   escapeAnnotationProperty,
+  formatLaneDuration,
 } from './lib/ci-fast-annotations.mjs';
 
 export {
   escapeAnnotationMessage,
   escapeAnnotationProperty,
+  formatLaneDuration,
 } from './lib/ci-fast-annotations.mjs';
 
 export { orderSourceGuardsByFailureRate } from './lib/source-guard-order.mjs';
@@ -995,6 +997,8 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   ...STRUCTURAL_PYTEST_PARTS,
 ]);
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/lib/__tests__/web-build-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/web-build-env-hash.test.mjs',
   'scripts/lib/__tests__/source-docs-scope.test.mjs',
   'scripts/ios-certification-config.test.mjs',
   'scripts/schedule-trigger-guard.test.mjs', // JOV-12720 event-driven guard.
@@ -1437,6 +1441,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-to-live.test.mjs',
   'scripts/lib/__tests__/scope-governor.test.mjs',
   'scripts/lib/__tests__/scripts-typecheck-default-options.test.mjs',
+  'scripts/lib/__tests__/scripts-typecheck-yaml-repair.test.mjs',
   'scripts/lib/__tests__/scripts-typecheck.test.mjs',
   'scripts/lib/__tests__/seo-certify-workflow-contract.test.mjs',
   'scripts/lib/__tests__/sparse-checkout-import-closure.test.mjs',
@@ -3259,11 +3264,6 @@ function annotateFailure(lane, logExcerpt) {
   // Keep annotation body short; full log is in the step output.
   const short = failureAnnotationMessage(lane, logExcerpt);
   if (short) console.error(`::error::${short}`);
-}
-
-/** @param {number} ms */
-export function formatLaneDuration(ms) {
-  return `${(Math.max(0, ms) / 1000).toFixed(1)}s`;
 }
 
 function writeSummary(results, groupId, timingTables = []) {

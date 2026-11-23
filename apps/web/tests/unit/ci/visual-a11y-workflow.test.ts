@@ -318,7 +318,7 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
       entry.uses?.includes('actions/download-artifact@')
     );
     expect(download?.with?.name).toBe(
-      'visual-compare-build-${{ github.run_id }}'
+      'visual-compare-build-${{ github.run_id }}-${{ github.run_attempt }}'
     );
     const origin = 'http://localhost:3230';
     for (const entry of [build.step, render.step])

@@ -12,3 +12,11 @@ export function escapeAnnotationProperty(text) {
     .replaceAll(':', '%3A')
     .replaceAll(',', '%2C');
 }
+
+/**
+ * Format a lane duration in seconds for logs and the step summary.
+ * @param {number} ms
+ */
+export function formatLaneDuration(ms) {
+  return `${(Math.max(0, ms) / 1000).toFixed(1)}s`;
+}
