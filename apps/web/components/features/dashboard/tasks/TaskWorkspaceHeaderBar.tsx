@@ -19,23 +19,23 @@ import {
 import { cn } from '@/lib/utils';
 
 const TASK_DESKTOP_CONTROL_HIT_TARGET_CLASSNAME =
-  'sm:before:h-8 sm:before:min-w-0';
+  'sm:before:h-7 sm:before:min-w-0';
 
 const TASK_FILTER_TAB_CLASSNAME = cn(
-  'relative h-8 gap-1.5 px-2 text-xs',
+  'relative h-7 gap-1.5 px-2 text-xs',
   'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
   TASK_DESKTOP_CONTROL_HIT_TARGET_CLASSNAME
 );
 
 const TASK_TOOLBAR_TEXT_BUTTON_CLASSNAME = cn(
-  'h-8 px-2.5',
+  'h-7 px-2.5',
   TASK_DESKTOP_CONTROL_HIT_TARGET_CLASSNAME
 );
 
 const TASK_TOOLBAR_ICON_BUTTON_CLASSNAME = cn(
-  'h-8 w-8 px-0',
+  'h-7 w-7 px-0',
   TASK_DESKTOP_CONTROL_HIT_TARGET_CLASSNAME,
-  'sm:before:w-8'
+  'sm:before:w-7'
 );
 
 export type TaskSubviewId = 'all' | 'mine' | 'jovie';
@@ -117,7 +117,7 @@ export function TaskWorkspaceHeaderBar({
           onChange={event => onDraftTitleChange(event.target.value)}
           placeholder='Draft press release, update bio, pitch sync supervisor...'
           aria-label='New Task Name'
-          className='h-8 max-w-lg min-w-0'
+          className='h-7 max-w-lg min-w-0'
         />
       </form>
     ) : (

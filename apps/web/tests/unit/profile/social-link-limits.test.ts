@@ -77,6 +77,45 @@ describe('social link limits', () => {
       'twitter',
     ]);
   });
+
+  it('keeps the website and earnings links the profile editors offer', () => {
+    // The production cert (JOV-14474) saves a website marker exactly like
+    // this and reads it back; the cap used to drop these categories while
+    // the save route still answered 200 (JOV-14551).
+    const payload = capProfileLinkInputs([
+      { platform: 'instagram', url: 'https://instagram.com/artist' },
+      { platform: 'website', url: 'https://example.com/jovie-prodcert-check' },
+      { platform: 'venmo', url: 'https://venmo.com/artist' },
+    ]);
+
+    expect(payload.map(link => link.platform)).toEqual([
+      'instagram',
+      'website',
+      'venmo',
+    ]);
+  });
+
+  it('shares non-mode slots across categories in payload order at the cap', () => {
+    const payload = capProfileLinkInputs([
+      { platform: 'spotify', url: 'https://open.spotify.com/artist/1' },
+      { platform: 'apple_music', url: 'https://music.apple.com/us/artist/1' },
+      { platform: 'soundcloud', url: 'https://soundcloud.com/artist-1' },
+      { platform: 'bandcamp', url: 'https://artist.bandcamp.com' },
+      { platform: 'instagram', url: 'https://instagram.com/artist' },
+      { platform: 'website', url: 'https://example.com/site' },
+      { platform: 'venmo', url: 'https://venmo.com/artist' },
+    ]);
+
+    expect(payload).toHaveLength(6);
+    expect(payload.map(link => link.platform)).toEqual([
+      'spotify',
+      'apple_music',
+      'soundcloud',
+      'bandcamp',
+      'instagram',
+      'website',
+    ]);
+  });
 });
 
 describe('context-aware link ordering', () => {

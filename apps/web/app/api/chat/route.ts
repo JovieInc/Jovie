@@ -152,7 +152,10 @@ import { socialLinks } from '@/lib/db/schema/links';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
-import { scheduleOnlineScoring } from '@/lib/eval/scorers/online';
+import {
+  scheduleOnlineScoring,
+  scheduleTurnOutcomeCheck,
+} from '@/lib/eval/scorers/online';
 import { checkGatesForUser } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
@@ -2774,6 +2777,14 @@ export async function POST(req: Request) {
             userPrompt: userText,
             assistantResponse: assistantText,
             plan: userPlan,
+          });
+        }
+        if (!isAborted) {
+          scheduleTurnOutcomeCheck({
+            traceId: requestId,
+            userText,
+            assistantText,
+            toolEvents: toolCalls ?? [],
           });
         }
       },

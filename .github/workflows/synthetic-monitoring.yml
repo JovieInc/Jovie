@@ -664,6 +664,49 @@ jobs:
           DOGFOOD_TRUTH_JSON="$(cat "$RUNNER_TEMP/dogfood-truth.json")" \
             node scripts/dogfood-truth-intake.mjs
 
+  chat-outcome-judge:
+    # Daily chat outcome judge: real artist asks (make merch, create a task,
+    # set up a release, write a bio) that ended without the action. One Linear
+    # repair issue per stalled intent lands in Todo; the next day's run is the
+    # verification that resolves it.
+    name: Chat outcome judge
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '47 7 * * *' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Install Doppler CLI
+        uses: ./.github/actions/setup-doppler
+      - name: Resolve CRON_SECRET
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: node .github/scripts/resolve-synthetic-secrets.mjs --name CRON_SECRET
+      - name: Judge the last day of chats and file or resolve repairs
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET missing from GitHub secrets and Doppler jovie-web/prd"
+            exit 1
+          fi
+          curl --silent --show-error --fail --connect-timeout 10 --max-time 60 \
+            -H "Authorization: Bearer ${CRON_SECRET}" https://jov.ie/api/cron/chat-outcome-judge > "$RUNNER_TEMP/chat-outcome.json"
+          node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(JSON.stringify({checks:r.checks,totals:r.totals,findings:(r.findings||[]).map(f=>f.key)}))' "$RUNNER_TEMP/chat-outcome.json"
+          CHAT_OUTCOME_JSON="$(cat "$RUNNER_TEMP/chat-outcome.json")" \
+            node scripts/chat-outcome-intake.mjs
+
   docs-deploy-jovie:
     name: jovie-docs deploy signal
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '47 7 * * *' }}

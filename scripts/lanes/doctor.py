@@ -637,6 +637,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "rejectedIssues": dict(sorted(rejected_issues.items())[:20]),
         "designGate": design_census,
         "fileOverlap": file_overlap.doctor_view(state),
+        "ycCorpusState": yc_corpus_observation(state),
         **automation_observation(host, lane, now),
         "outcomeQueue": read_json(state / "outcome-queue.json", {}),
         "integrationProbes": integration_probes.observe(state, lane.HOST, now),
@@ -1157,7 +1158,17 @@ INSTALL_LAG_ALERT_S = 90 * 60
 # Gem sat three days on one release while `install-lag` stayed a degraded alert nobody acted on).
 INSTALL_LAG_P0_S = 2 * 3600
 # The YC corpus refresh is daily; three days without a finished run is a broken loop (JOV-14457).
-YC_CORPUS_STALE_S = 3 * 24 * 3600
+YC_CORPUS_STALE_S = 50 * 3600  # a daily refresh that missed two runs
+
+
+def yc_corpus_observation(state: Path) -> dict | None:
+    """The YC refresher's own state file, so a tick that never reached it still shows its age."""
+    data = read_json(state / "yc-corpus.json", None)
+    if not isinstance(data, dict):
+        return None
+    last = data.get("lastRun") if isinstance(data.get("lastRun"), dict) else {}
+    return {"lastRun": {"status": last.get("status"), "at": last.get("at"),
+                        "failures": list(last.get("failures") or [])[:5]}}
 
 
 def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
@@ -1166,14 +1177,20 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     tick = obs.get("tick") or {}
     if tick.get("error"):
         alerts["tick-error"] = f"last dispatch tick failed: {tick['error'][:140]}"
-    yc, yc_last = tick.get("ycCorpus") or {}, (tick.get("ycCorpus") or {}).get("lastRun") or {}
+    # The tick reaches the YC refresher last, so a held tick (disk admission, code-prep error)
+    # skips it; the refresher's own state file still shows how long it has been (JOV-14457).
+    yc, yc_file = tick.get("ycCorpus") or {}, obs.get("ycCorpusState") or {}
+    yc_last = yc.get("lastRun") or yc_file.get("lastRun") or {}
     yc_broken = [failure for failure in yc_last.get("failures") or []  # page fetch misses retry next run
                  if failure.startswith(("discovery:", "spawn:")) or "gbrain" in failure]
-    yc_age = age_s(yc_last.get("at"), obs["now"]) if yc.get("status") in {"current", "scheduled"} else None
+    yc_watched = yc.get("status") in {"current", "scheduled"} or (not yc and bool(yc_file))
+    yc_age = age_s(yc_last.get("at"), obs["now"]) if yc_watched else None
     if tick.get("ycCorpusError") or yc_broken or (yc_age or 0) > YC_CORPUS_STALE_S:
+        held = tick.get("admissionDenied") or tick.get("error")
         alerts["yc-corpus-refresh"] = ("YC knowledge refresh into GBrain is failing: " +
                                        (tick.get("ycCorpusError") or "; ".join(yc_broken) or
-                                        f"last run {int(yc_age // 3600)}h ago"))[:200]
+                                        f"last run {int(yc_age // 3600)}h ago" +
+                                        (f", skipped while the tick is held ({str(held)[:80]})" if not yc and held else "")))[:200]
     if tick.get("uncleanPreviousRun"):
         # A run-intent marker survived its own tick: that tick was killed (crash, SIGKILL,
         # power loss). Its bounded recovery already refunded stranded fix-attempt charges.

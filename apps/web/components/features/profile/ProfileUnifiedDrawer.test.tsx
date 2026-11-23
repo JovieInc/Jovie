@@ -13,6 +13,7 @@ vi.mock('@/features/profile/ProfileDrawerShell', () => ({
     navigationLevel,
     floating,
     onBack,
+    anchorRef,
   }: {
     readonly children: React.ReactNode;
     readonly dataTestId?: string;
@@ -20,6 +21,7 @@ vi.mock('@/features/profile/ProfileDrawerShell', () => ({
     readonly navigationLevel?: string;
     readonly floating?: boolean;
     readonly onBack?: () => void;
+    readonly anchorRef?: unknown;
   }) => (
     <div
       data-testid={dataTestId ?? 'profile-drawer-shell'}
@@ -27,6 +29,7 @@ vi.mock('@/features/profile/ProfileDrawerShell', () => ({
       data-navigation-level={navigationLevel}
       data-floating={String(Boolean(floating))}
       data-has-back={String(Boolean(onBack))}
+      data-has-anchor={String(Boolean(anchorRef))}
     >
       {children}
     </div>
@@ -187,6 +190,21 @@ describe('ProfileUnifiedDrawer', () => {
     expect(screen.getByTestId('public-share-action-list')).toHaveAttribute(
       'data-drawer-header',
       'direct'
+    );
+  });
+
+  it('passes the desktop anchor through so the menu opens as a popover', () => {
+    render(
+      <ProfileUnifiedDrawer
+        {...baseProps}
+        view='menu'
+        anchorRef={{ current: null }}
+      />
+    );
+
+    expect(screen.getByTestId('profile-menu-drawer')).toHaveAttribute(
+      'data-has-anchor',
+      'true'
     );
   });
 

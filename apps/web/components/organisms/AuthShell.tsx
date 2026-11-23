@@ -2,7 +2,6 @@
 
 // @coverage-via apps/web/tests/unit/components/organisms/AuthShell.flag.test.tsx
 
-import dynamic from 'next/dynamic';
 import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
@@ -15,19 +14,13 @@ import { useRightPanel } from '@/contexts/RightPanelContext';
 import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
 import { MobileProfileDrawer } from '@/features/dashboard/organisms/MobileProfileDrawer';
+import { PersistentAudioBarLazy } from '@/lib/app-shell/PersistentAudioBarLazy';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-runtime';
 import type { AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
 import { OperatorMobileNavigation } from './OperatorMobileNavigation';
 
-// The idle dock has no server markup. Keep its client-only transport UI out
-// of every route's initial shell bundle, while mounting it once for the shell.
-const PersistentAudioBar = dynamic(
-  () =>
-    import('./PersistentAudioBar').then(module => module.PersistentAudioBar),
-  { ssr: false }
-);
 export interface AuthShellProps {
   readonly section: AppShellSection;
   readonly breadcrumbs: DashboardBreadcrumbItem[];
@@ -111,7 +104,7 @@ function AuthShellInner({
       ) : null,
     [section, showCustomerMobileTabs]
   );
-  const audioPlayer = useMemo(() => <PersistentAudioBar />, []);
+  const audioPlayer = useMemo(() => <PersistentAudioBarLazy />, []);
 
   // Memoize the header element. AuthShellInner re-renders on every sidebar
   // context change (hover peek included); a rebuilt element would defeat the
