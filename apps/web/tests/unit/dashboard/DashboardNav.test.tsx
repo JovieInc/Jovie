@@ -393,10 +393,10 @@ describe('DashboardNav', () => {
     });
 
     fireEvent.click(getByRole('button', { name: 'Chat History' }));
-    expect(getByRole('link', { name: 'Unread answer' })).toHaveClass(
+    expect(getByRole('link', { name: 'Unread answer, Unread' })).toHaveClass(
       'text-primary-token'
     );
-    expect(getByRole('link', { name: 'Running task' })).toHaveAttribute(
+    expect(getByRole('link', { name: 'Running task, Running' })).toHaveAttribute(
       'href',
       `${APP_ROUTES.CHAT}/conv-running`
     );
