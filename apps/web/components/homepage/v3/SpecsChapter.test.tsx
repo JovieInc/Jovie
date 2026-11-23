@@ -20,6 +20,13 @@ vi.mock('next/image', () => ({
 }));
 
 describe('homepage v3 specs', () => {
+  it('carries one pack accent for its section light', () => {
+    const { container } = render(<SpecsChapter />);
+    expect(
+      container.querySelector('[data-pen-section="specs"]')
+    ).toHaveAttribute('data-accent', 'pulse');
+  });
+
   it('shows the registry counts and one meter segment per recognised service', async () => {
     const { container } = render(<SpecsChapter />);
     expect(

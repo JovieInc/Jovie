@@ -98,4 +98,23 @@ describe('DrawerSurfaceCard', () => {
     expect(screen.getByText('سطح الدرج')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
+
+  it('passes the card intent through as data-card-intent', () => {
+    render(
+      <>
+        <DrawerSurfaceCard variant='card' intent='movable' testId='typed'>
+          Pinned
+        </DrawerSurfaceCard>
+        <DrawerSurfaceCard testId='untyped'>Flat</DrawerSurfaceCard>
+      </>
+    );
+
+    expect(screen.getByTestId('typed')).toHaveAttribute(
+      'data-card-intent',
+      'movable'
+    );
+    expect(screen.getByTestId('untyped')).not.toHaveAttribute(
+      'data-card-intent'
+    );
+  });
 });

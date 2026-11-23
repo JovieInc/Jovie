@@ -13,12 +13,10 @@ import {
 } from '@/lib/desktop/desktop-updates.test-utils';
 import { SidebarDockBridge } from './SidebarDockBridge';
 
-vi.mock('./release-sidebar/useTrackAudioPlayer', () => ({
-  useTrackAudioPlayer: () => ({
-    playbackState: { activeTrackId: null, trackTitle: null },
-    stop: vi.fn(),
-    toggleTrack: vi.fn(),
-  }),
+vi.mock('./release-sidebar/useTrackAudioSnapshot', () => ({
+  selectNowPlaying: () => ({}),
+  useTrackAudioSnapshot: () => ({ activeTrackId: null, trackTitle: null }),
+  useTrackAudioActions: () => ({ stop: vi.fn(), toggleTrack: vi.fn() }),
 }));
 vi.mock('./audio-chrome-state', () => ({
   useAudioChromeSnapshot: () => ({ fullPlayerVisible: false }),
@@ -38,7 +36,6 @@ const props = {
   userId: 'one',
   collapsed: false,
   fetchImpl: vi.fn(async () => Response.json(null)),
-  children: () => null,
 };
 
 beforeEach(() => {

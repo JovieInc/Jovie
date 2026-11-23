@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { expectFlatState } from '@/tests/utils/flat-state';
 import {
   createStepContext,
   SPARSE_SNAPSHOT,
@@ -66,6 +67,10 @@ describe('OnboardingV2StepContent', () => {
         })}
       />
     );
+    // The result list is a popover that goes away, so its card is transient.
+    expect(
+      container.querySelector('[data-card-intent="transient"]')
+    ).not.toBeNull();
     await user.click(screen.getByRole('button', { name: /Avery Stone/ }));
     expect(connectArtist).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'artist-1', name: 'Avery Stone' })
@@ -76,7 +81,7 @@ describe('OnboardingV2StepContent', () => {
     const user = userEvent.setup();
     const advanceFromStep = vi.fn();
     const navigateTo = vi.fn();
-    render(
+    const { container } = render(
       <OnboardingV2StepContent
         ctx={createStepContext({
           advanceFromStep,
@@ -87,6 +92,11 @@ describe('OnboardingV2StepContent', () => {
       />
     );
 
+    // The import summary sits flat: no card wraps it just to give it structure.
+    expect(container.querySelector('[data-card-intent]')).toBeNull();
+    expectFlatState(
+      screen.getByText('Your import is ready.').parentElement as HTMLElement
+    );
     await user.click(screen.getByRole('button', { name: 'Continue Free' }));
     expect(advanceFromStep).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: 'Upgrade Now' }));

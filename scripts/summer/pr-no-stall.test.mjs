@@ -292,3 +292,89 @@ describe('pr-no-stall classifier', () => {
     );
   });
 });
+
+describe('open PR listing (JOV-13876)', () => {
+  /** Fake gh: 130 open PRs; records every call. */
+  function fakeGh(calls) {
+    const prs = Array.from({ length: 130 }, (_, i) => ({
+      number: i + 1,
+      isDraft: i % 2 === 1,
+      mergeable: 'MERGEABLE',
+      mergeStateStatus: 'BLOCKED',
+      headRefName: `cursor/pr-${i + 1}`,
+      updatedAt: '2026-11-11T20:00:00Z',
+      labels: [{ name: 'lane-fix-red' }],
+    }));
+    return (cmd, args) => {
+      calls.push([cmd, ...args]);
+      if (args[0] === 'pr' && args[1] === 'list') {
+        const limit = Number(args[args.indexOf('--limit') + 1]);
+        return {
+          status: 0,
+          stdout: JSON.stringify(prs.slice(0, limit)),
+          stderr: '',
+        };
+      }
+      if (args[0] === 'pr' && args[1] === 'view') {
+        return {
+          status: 0,
+          stdout: JSON.stringify({ statusCheckRollup: GREEN_ROLLUP }),
+          stderr: '',
+        };
+      }
+      return { status: 0, stdout: '', stderr: '' };
+    };
+  }
+
+  it('sees every open PR, not the first 100, and keeps the list call light', async () => {
+    const { main } = await import('./pr-no-stall.mjs');
+    const calls = [];
+    const out = [];
+    const write = process.stdout.write;
+    process.stdout.write = chunk => (out.push(String(chunk)), true);
+    try {
+      assert.equal(main(['--json'], { run: fakeGh(calls), nowMs: NOW }), 0);
+    } finally {
+      process.stdout.write = write;
+    }
+    const report = JSON.parse(out.join(''));
+    assert.equal(report.openCount, 130);
+    const list = calls.find(c => c[1] === 'pr' && c[2] === 'list');
+    assert.ok(
+      !list.join(' ').includes('statusCheckRollup'),
+      'list call must not ask for check rollups'
+    );
+    // Idle ready PRs get their rollup one at a time, capped to the token budget.
+    assert.equal(report.byClass['admission-deadlock'], 6);
+    assert.equal(report.rollupSkipped, 59);
+    assert.equal(calls.filter(c => c[2] === 'view').length, 6);
+  });
+
+  it('a failed rollup read fails closed for that PR only', async () => {
+    const { listOpenPrs } = await import('./pr-no-stall-list.mjs');
+    const calls = [];
+    const base = fakeGh(calls);
+    const run = (cmd, args) =>
+      args[1] === 'view' && args[2] === '1'
+        ? { status: 1, stdout: '', stderr: 'HTTP 504' }
+        : base(cmd, args);
+    const gh = runner => args => {
+      const done = runner('gh', args);
+      if (done.status !== 0) throw new Error(done.stderr);
+      return JSON.parse(done.stdout);
+    };
+    const { prs, rollupErrors } = listOpenPrs(gh(run), {
+      idleHours: 6,
+      nowMs: NOW,
+    });
+    assert.equal(prs.length, 130);
+    assert.equal(rollupErrors, 1);
+    assert.equal(prs[0].statusCheckRollup, undefined);
+    assert.equal(requiredChecksSettledGreen(prs[0]), false);
+    assert.equal(requiredChecksSettledGreen(prs[2]), true);
+    // Fresh heads are not read at all.
+    const fresh = listOpenPrs(gh(fakeGh([])), { idleHours: 1000, nowMs: NOW });
+    assert.equal(fresh.rollupSkipped, 0);
+    assert.equal(fresh.prs.filter(pr => pr.statusCheckRollup).length, 0);
+  });
+});
