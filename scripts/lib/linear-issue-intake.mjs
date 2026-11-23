@@ -3,7 +3,7 @@ import { linearRequest } from './linear-cooldown.mjs';
 
 export const JOVIE_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
 
-async function linearGraphql(
+export async function linearGraphql(
   { query, variables, apiKey, fetchImpl = fetch },
   caller
 ) {
