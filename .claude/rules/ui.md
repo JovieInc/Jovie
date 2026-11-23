@@ -671,3 +671,9 @@ When building or iterating on the Artist Profiles landing page:
 - Honor the marketing registry's above-the-fold hero contract: do not use a
   full-height hero shell that pushes the first proof element below the fold.
   Keep the opening proof in the composition without decorative inset cards.
+- An affordance never outruns its contents. A disclosure caret, flyout trigger,
+  or count badge renders only when something is behind it: zero items render
+  nothing (or a plain label), one item renders a plain link, a count of 0 hides
+  its badge. Derive the caret from non-empty children by type, not a flag
+  (`apps/web/components/organisms/headerNavEntries.ts`). Enforced by the
+  shrink-only `scripts/invariants/art-direction/empty-affordance.mjs`.

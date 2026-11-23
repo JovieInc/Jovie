@@ -39,7 +39,7 @@ describe('NewLandingPage', () => {
       'href',
       '/product'
     );
-    expect(screen.getByRole('button', { name: /Customers/ })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Customers' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /For/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Tools/ })).toBeNull();
     expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(

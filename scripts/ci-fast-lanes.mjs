@@ -511,13 +511,13 @@ export const SOURCE_GUARDS = Object.freeze([
   Object.freeze({
     // Art-direction ratchets (one accent, hue, plates, surface media, hero
     // scroll, shadow vision judges). prOnly: merge groups run the same
-    // checks via web unit tests. Path-filtered so product-only diffs skip it.
+    // checks via web unit tests. Any component diff runs it (empty affordance).
     // The glob wires every art-direction unit test, including ones added later.
     id: 'art-direction',
     command:
       'node scripts/invariants/art-direction/run.mjs && node --test scripts/invariants/art-direction/*.test.mjs',
     inputs:
-      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage)\/|apps\/web\/public\/assets\/generated\/|docs\/design-system\/taste-labels\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|docs\/design-system\/motion-effects\.json$|scripts\/invariants\/art-direction\/)/u,
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/|apps\/web\/public\/assets\/generated\/|docs\/design-system\/taste-labels\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|docs\/design-system\/motion-effects\.json$|scripts\/invariants\/art-direction\/)/u,
     prOnly: true,
   }),
   Object.freeze({
@@ -895,7 +895,7 @@ export function webCiContractTestsCommand(
   return `pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci${excludes}`;
 }
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-source-guard-pool.test.mjs lib/__tests__/ci-source-guard-pool.path-gates.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs lib/__tests__/ci-fast-merge-queue-compatibility.test.mjs lib/__tests__/ci-fast-shard-fanin-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-fast-public-openapi-guard.test.mjs lib/__tests__/ci-source-guard-pool.test.mjs lib/__tests__/ci-source-guard-pool.path-gates.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs lib/__tests__/ci-fast-merge-queue-compatibility.test.mjs lib/__tests__/ci-fast-shard-fanin-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 
 /**
  * Script contracts that no other CI command ran (orphan sweep). The
