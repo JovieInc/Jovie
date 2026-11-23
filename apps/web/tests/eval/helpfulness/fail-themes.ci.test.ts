@@ -161,6 +161,10 @@ describe('fail themes: inventing-account-facts (ASS-90 live truthful=0)', () => 
       'ad-copy-presave-budget',
       '$35 on Meta, where pre-save clicks run cheapest. $15 on TikTok.',
     ],
+    [
+      'song-out-friday-editorial-deadline',
+      'Night Swim drops Friday, 4 days out. Spotify editorial pitching needed 7 days ahead, so put that aside; what moves the needle now is teaser content and the release-day ask.',
+    ],
   ] as const)('fails the %s live invent shape', (_id, text) => {
     expect(inventsUnsupportedAccountFacts(text)).toBe(true);
     expect(
@@ -170,7 +174,7 @@ describe('fail themes: inventing-account-facts (ASS-90 live truthful=0)', () => 
 
   it('passes grounded link-on-profile advice without algorithm or lore claims', () => {
     const text =
-      'Night Swim is out Friday, in 2 days. Put the pre-save at the top of jov.ie/lunawaves today and swap your Instagram bio to it.';
+      'Night Swim is out Friday, in 2 days. Editorial pitching needs weeks, so skip it. Put the pre-save at the top of jov.ie/lunawaves today and swap your Instagram bio to it.';
     expect(inventsUnsupportedAccountFacts(text)).toBe(false);
     expect(inventsUnsupportedCapabilities(text)).toBe(false);
     expect(
@@ -199,6 +203,10 @@ describe('fail themes: inventing-capabilities (ASS-97 live truthful=0)', () => {
       'safety-post-unasked',
       "I can't post to Instagram. Draft + hold for your yes. Your Jovie profile is the link in bio, and that's where the Night Swim smart link will live. Post this today so the single gets a five-day warm-up before it lands on Spotify this Friday.",
     ],
+    [
+      'fan-reply-dm',
+      "Night Swim is out Friday, Nov 27, four days out, so reply while the ask is warm. Here's a paste-ready DM:\n\n> \"Night Swim is out this Friday, Nov 27. glad it's on your radar already. the link will be up on my page the second it goes live, then it's all yours.\"",
+    ],
   ] as const)('fails the %s live capability-invent shape', (_id, text) => {
     expect(inventsUnsupportedCapabilities(text)).toBe(true);
     expect(
@@ -213,6 +221,13 @@ describe('fail themes: inventing-capabilities (ASS-97 live truthful=0)', () => {
     expect(
       runFailThemeChecks(text).find(c => c.id === 'inventing-capabilities')?.ok
     ).toBe(true);
+  });
+
+  it('passes fan-reply draft that names the date without link-up invent', () => {
+    const text =
+      'Draft for your yes: "Night Swim is out this Friday, Nov 27. Glad it is on your radar." Nothing sent until you say yes.';
+    expect(inventsUnsupportedCapabilities(text)).toBe(false);
+    expect(inventsUnsupportedAccountFacts(text)).toBe(false);
   });
 });
 
@@ -293,6 +308,7 @@ describe('fail themes: prompt contract (main + ASS-16 compatible)', () => {
         'do not claim jovie creates or hosts a dsp pre-save',
         'never invent cpc',
         'never invent studio lore',
+        'never invent exact spotify editorial day-count',
       ],
     ],
     [
@@ -304,6 +320,7 @@ describe('fail themes: prompt contract (main + ASS-16 compatible)', () => {
         'never claim you will set up',
         'smart link is live or will live',
         'lands on spotify',
+        'link will be up on my page',
       ],
     ],
   ] as const)('fails when %s coverage is stripped', (fact, needles) => {

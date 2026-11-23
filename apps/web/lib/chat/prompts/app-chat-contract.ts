@@ -37,7 +37,8 @@ export function checkAppChatPromptContract(prompt: string) {
       'Never invent Spotify algorithm',
       'Do not claim Jovie creates or hosts a DSP pre-save',
       'Never invent CPC',
-      'Never invent studio lore'
+      'Never invent studio lore',
+      'Never invent exact Spotify editorial day-count'
     ),
     forbidsInventedCapabilities: includesAll(
       'Never invent product features',
@@ -45,7 +46,8 @@ export function checkAppChatPromptContract(prompt: string) {
       'say plainly what you cannot see',
       'Never claim you will set up',
       'smart link is live or will live',
-      'lands on Spotify'
+      'lands on Spotify',
+      'link will be up on my page'
     ),
     requiresDraftHoldOutbound: includesAll(
       'Draft every outbound artifact',
