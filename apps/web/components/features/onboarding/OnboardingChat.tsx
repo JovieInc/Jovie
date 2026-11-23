@@ -27,7 +27,11 @@ import {
   ChatEmptyStateComposerRegion,
   ChatInput,
 } from '@/components/jovie/components';
-import { useChatJankMonitor, useStickToBottom } from '@/components/jovie/hooks';
+import {
+  pinTranscriptToLatest,
+  useChatJankMonitor,
+  useStickToBottom,
+} from '@/components/jovie/hooks';
 import {
   composeMessage,
   useChipTray,
@@ -1343,7 +1347,8 @@ export function OnboardingChat({
     if (!shouldDockComposer || userTurnCount === 0) return;
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
-    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    // ONB-27: prefer AuthShell anchor so Reserve/Claim h1 clears top-fade.
+    pinTranscriptToLatest(scrollContainer);
     setStuckToBottom(true);
   }, [scrollContainerRef, setStuckToBottom, shouldDockComposer, userTurnCount]);
 

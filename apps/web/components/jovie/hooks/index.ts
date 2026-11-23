@@ -11,6 +11,7 @@ export { useChatJankMonitor } from './useChatJankMonitor';
 export { useJovieChat, useJovieChatController } from './useJovieChat';
 export { useSpeechRecognition } from './useSpeechRecognition';
 export {
+  pinTranscriptToLatest,
   useStickToBottom,
   useStickToBottomController,
 } from './useStickToBottom';

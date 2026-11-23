@@ -117,4 +117,13 @@ describe('ChatProposeNextStepCard waitlist truthfulness', () => {
       'waitlist'
     );
   });
+
+  it('marks the AuthShell card as an onboarding auth scroll anchor (ONB-27)', () => {
+    const { container } = render(
+      <ChatProposeNextStepCard payload={waitlistPayload} />
+    );
+    expect(
+      container.querySelector('[data-onboarding-auth-anchor]')
+    ).not.toBeNull();
+  });
 });
