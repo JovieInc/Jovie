@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { AlertTriangle, Inbox, Lock } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { expectFlatState } from '@/tests/utils/flat-state';
 import { EmptyState } from './EmptyState';
 
 describe('EmptyState', () => {
@@ -138,7 +139,7 @@ describe('EmptyState', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('wraps workspace content in its card', async () => {
+  it('lays workspace content out flat, with no card', async () => {
     const { container } = render(
       <EmptyState
         presentation='workspace'
@@ -148,7 +149,8 @@ describe('EmptyState', () => {
       />
     );
 
-    expect(container.querySelector('[data-empty-state-card]')).not.toBeNull();
+    expect(container.querySelector('[data-empty-state-card]')).toBeNull();
+    expectFlatState(container);
     expect(
       screen.getByRole('button', { name: 'Enable alerts' })
     ).toBeInTheDocument();

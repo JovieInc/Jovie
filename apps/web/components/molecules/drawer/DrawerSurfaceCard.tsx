@@ -1,4 +1,4 @@
-import { Card } from '@jovie/ui';
+import { Card, type CardIntent } from '@jovie/ui';
 import {
   type ComponentPropsWithoutRef,
   type ElementType,
@@ -15,6 +15,8 @@ export interface DrawerSurfaceCardProps
   readonly as?: ElementType;
   readonly testId?: string;
   readonly variant?: 'card' | 'flat';
+  /** Why this box is a card. Only meaningful with variant='card'. */
+  readonly intent?: CardIntent;
   readonly 'data-right-rail-section'?: string;
 }
 
@@ -28,13 +30,14 @@ export const DrawerSurfaceCard = forwardRef<
     className,
     testId,
     variant = 'flat',
+    intent,
     'data-right-rail-section': rightRailSection,
     ...props
   },
   ref
 ) {
   return (
-    <Card asChild unstyled>
+    <Card asChild unstyled intent={intent}>
       <Component
         ref={ref}
         className={cn(

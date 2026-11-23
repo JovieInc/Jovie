@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ThreadVideoCard } from './ThreadVideoCard';
@@ -52,5 +54,18 @@ describe('ThreadVideoCard accessible name (JOV-8873)', () => {
     expect(
       screen.getByRole('button', { name: 'Play clip — 1:34' })
     ).toBeInTheDocument();
+  });
+});
+
+describe('ThreadVideoCard play glyph', () => {
+  it('draws the play triangle through PlayIcon (JOV-12568)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './ThreadVideoCard.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain('<PlayIcon');
+    expect(source).toContain("from '@/components/atoms/PlayIcon'");
+    expect(source).not.toContain('translate-x-px');
   });
 });

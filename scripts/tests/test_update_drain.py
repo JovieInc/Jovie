@@ -6,12 +6,16 @@ import time
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/lanes"))
 import lane_runner as lane  # noqa: E402
+import doctor  # noqa: E402
+import doctor_sweep_hold  # noqa: E402
 import lifecycle  # noqa: E402
 import update_drain as drain  # noqa: E402
+import worktree_sweep as sweeper  # noqa: E402
 
 
 def iso(epoch):
@@ -146,6 +150,141 @@ class SingleFlightUpdateTest(unittest.TestCase):
             install.assert_called_once()
             self.assertTrue(json.loads((host.state / "update.json").read_text())["ok"])
 
+
+class HoldLedgerRegressionTest(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name).resolve()
+        self.repo = self.root / "repo"
+        (self.repo / ".git").mkdir(parents=True)
+        self.state = self.root / "state"
+        self.state.mkdir()
+        self.path = self.root / "checkout"
+        self.path.mkdir()
+        self.stamp = self.state / sweeper.SWEEP_REPORT
+        self.row = {"name": "checkout", "path": str(self.path), "reason": "fixture-hold"}
+
+    def sweep(self, *, inventory_error=None, **kwargs):
+        with patch.object(sweeper, "live_paths", return_value=set()), patch.object(
+            sweeper, "linked_worktrees", return_value=[(self.path, "branch")], side_effect=inventory_error,
+        ):
+            return sweeper.sweep([self.repo], [self.root], [], state=self.state,
+                                 run=lambda *_args, **_kwargs: None, **kwargs)
+
+    def truncated(self):
+        clock = iter([0.0, 100.0])
+        return self.sweep(budget_s=60, clock=lambda: next(clock))
+
+    def test_sweep_uses_verified_owner_after_ordinary_mutations_and_only_daily(self):
+        linear = Mock()
+        key = doctor_sweep_hold.KEY
+        tracker = Mock()
+        tracker.close.side_effect = lambda *_: actions.append("close") or True
+        tracker.open.side_effect = lambda *_: actions.append("open") or "new-ordinary"
+        tracker.last_writing_report = None
+        actions = []
+        right = {"id": "canonical", "identifier": "JOV-14452", "team": {"key": "JOV"}}
+        matches, comments = [{**right, "identifier": "JOV-6"}], []
+        def gql(query, variables):
+            if "commentCreate" in query:
+                self.assertIn("doNotSubscribeToIssue:true", query)
+                comments.append(variables)
+                actions.append("note")
+                return {"commentCreate": {"success": True}}
+            self.assertIn("number:{eq:$n}", query)
+            self.assertEqual(variables["n"], 14452)
+            return {"issues": {"nodes": matches}}
+        linear.gql.side_effect = gql
+        def run(now, prior, ordinary):
+            def deliver(text):
+                return doctor_sweep_hold.note(linear, "gem", self.state, now, text, ["checkout"])
+            return doctor.reconcile({**ordinary, key: "held"}, prior, tracker, now, sweep_delivery=deliver)
+
+        state = {"issues": {key: {"id": "wrong-cached", "closedAt": None},
+                             "old-ordinary": {"id": "ordinary", "closedAt": None}}}
+        state = run(1000, state, {"new-ordinary": "genuine"})
+        self.assertEqual(actions, ["open", "close"])
+        self.assertIsNone(state["issues"][key]["id"])
+        self.assertEqual(comments, [])
+        matches[:] = [right]
+        state = run(1001, state, {"new-ordinary": "genuine", "next-ordinary": "also genuine"})
+        self.assertEqual(actions, ["open", "close", "open", "note"])
+        self.assertEqual(state["issues"][key]["id"], "canonical")
+        ordinary = {"new-ordinary": "genuine", "next-ordinary": "also genuine"}
+        cleared = doctor.reconcile(ordinary, state, tracker, 1002)
+        state = run(4600, cleared, ordinary)
+        self.assertEqual(state["issues"][key]["pendingAction"], "note")
+        state = run(87_400, state, ordinary)
+        self.assertEqual(state["issues"][key]["pendingAction"], "note")
+        state = run(87_401, state, ordinary)
+        self.assertNotIn("pendingAction", state["issues"][key])
+        self.assertEqual([comment["id"] for comment in comments], ["canonical", "canonical"])
+        linear.comment.assert_not_called()
+        linear.move.assert_not_called()
+
+    def test_launch_preserves_previous_hold_report(self):
+        report = {"startedAt": 5, "secretHeld": [self.row]}
+        self.stamp.write_text(json.dumps(report))
+        with patch.object(sweeper.subprocess, "Popen"):
+            self.assertEqual(sweeper.maybe_spawn(self.state, self.repo, 50, now=10_000), "spawned")
+            self.assertEqual(sweeper.maybe_spawn(self.state, self.repo, 50, now=10_001), "not-due")
+        self.assertEqual(json.loads(self.stamp.read_text()), report)
+
+    def test_unvisited_busy_and_unreadable_checkouts_remain_held(self):
+        missing = {**self.row, "path": str(self.root / "missing")}
+        self.stamp.write_text(json.dumps({"secretHeld": [self.row, missing]}))
+        self.assertEqual(self.truncated()["secretHeld"], [self.row])
+        keep = self.path / ".sweep-keep"
+        keep.touch()
+        self.assertEqual(self.sweep()["secretHeld"], [self.row])
+        keep.unlink()
+        with patch.object(sweeper, "inspect", side_effect=OSError("inspection fixture")):
+            self.assertEqual(self.sweep()["secretHeld"], [self.row])
+        with patch.object(sweeper, "inspect", return_value={"activity": 100, "dirty": 0, "unpushed": "0"}):
+            self.assertEqual(self.sweep(now=100)["secretHeld"], [])
+
+    def test_prior_known_hold_cleared_before_budget_still_is_not_complete(self):
+        unvisited = self.root / "unvisited"
+        unvisited.mkdir()
+        self.stamp.write_text(json.dumps({"secretHeld": [self.row], "secretHeldCoverage": "known"}))
+        clock = iter((0.0, 0.0, 0.0, 100.0))
+        with patch.object(sweeper, "live_paths", return_value=set()), patch.object(
+            sweeper, "linked_worktrees", return_value=[(self.path, "branch"), (unvisited, "branch-two")],
+        ), patch.object(sweeper, "inspect", return_value={"activity": 100, "dirty": 0, "unpushed": "0"}) as inspect:
+            report = sweeper.sweep([self.repo], [self.root], [], state=self.state, now=100,
+                                   budget_s=60, clock=lambda: next(clock))
+        inspect.assert_called_once()
+        self.assertEqual(report["secretHeld"], [])
+        self.assertEqual(report["secretHeldCoverage"], "unknown")
+        self.stamp.write_text(json.dumps(report))
+        prior = {"alerts": {doctor_sweep_hold.KEY: "prior active hold"}}
+        self.assertEqual(doctor_sweep_hold.alert(doctor_sweep_hold.observe(self.state), prior), "prior active hold")
+
+    def test_unknown_ledger_is_not_cleared_until_a_verified_sweep(self):
+        for data in ("malformed JSON", '{"secretHeld":[42]}', '{"secretHeld":[],"budgetSpent":true}'):
+            with self.subTest(data=data):
+                self.stamp.write_text(data)
+                prior = {"alerts": {doctor_sweep_hold.KEY: "prior active hold"}}
+                self.assertEqual(doctor_sweep_hold.alert(doctor_sweep_hold.observe(self.state), prior), "prior active hold")
+                report = self.truncated()
+                self.assertEqual(report["secretHeld"], [])
+                self.assertEqual(report["secretHeldCoverage"], "unknown")
+                self.stamp.write_text(json.dumps(report))
+                observed = doctor_sweep_hold.observe(self.state)
+                self.assertEqual(doctor_sweep_hold.alert(observed, prior), "prior active hold")
+                report = self.sweep(inventory_error=OSError("enumeration fixture"))
+                self.assertEqual(report["secretHeldCoverage"], "unknown")
+                with patch.object(sweeper, "inspect", return_value=None):
+                    self.assertEqual(self.sweep()["secretHeldCoverage"], "unknown")
+                with patch.object(sweeper, "inspect", return_value={
+                    "activity": 100, "dirty": 0, "unpushed": "0",
+                }):
+                    recovered = self.sweep(now=100)
+                self.assertEqual(recovered["secretHeld"], [])
+                self.assertEqual(recovered["secretHeldCoverage"], "known")
+                self.stamp.write_text(json.dumps(recovered))
+                self.assertIsNone(doctor_sweep_hold.alert(doctor_sweep_hold.observe(self.state), prior))
 
 if __name__ == "__main__":
     unittest.main()

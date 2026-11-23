@@ -2,9 +2,21 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { expectFlatState } from '@/tests/utils/flat-state';
 import { ReleaseTaskEmptyState } from './ReleaseTaskEmptyState';
 
 describe('ReleaseTaskEmptyState', () => {
+  it('sits flat with no card around the empty state', () => {
+    const { container } = render(
+      <ReleaseTaskEmptyState onSetUp={vi.fn()} isLoading={false} />
+    );
+
+    expectFlatState(container);
+    expect(
+      screen.getByTestId('release-task-empty-state-content')
+    ).toBeInTheDocument();
+  });
+
   it('generates the release plan on request', async () => {
     const onSetUp = vi.fn();
     const user = userEvent.setup();

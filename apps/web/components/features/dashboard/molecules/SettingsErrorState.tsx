@@ -2,7 +2,6 @@
 
 import { Button } from '@jovie/ui';
 import { AlertCircle } from 'lucide-react';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 interface SettingsErrorStateProps {
   readonly title?: string;
@@ -16,19 +15,15 @@ export function SettingsErrorState({
   onRetry,
 }: SettingsErrorStateProps) {
   return (
-    <ContentSurfaceCard className='overflow-hidden'>
-      <div className='px-4 py-3'>
-        <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-surface-0 px-6 py-8 text-center'>
-          <AlertCircle className='h-6 w-6 text-destructive' aria-hidden />
-          <p className='text-app font-caption text-primary-token'>{title}</p>
-          <p className='text-app text-secondary-token'>{message}</p>
-          {onRetry ? (
-            <Button variant='ghost' size='sm' onClick={onRetry}>
-              Try Again
-            </Button>
-          ) : null}
-        </ContentSurfaceCard>
-      </div>
-    </ContentSurfaceCard>
+    <div className='flex flex-col items-center justify-center gap-2 px-6 py-8 text-center'>
+      <AlertCircle className='h-6 w-6 text-destructive' aria-hidden />
+      <p className='text-app font-caption text-primary-token'>{title}</p>
+      <p className='text-app text-secondary-token'>{message}</p>
+      {onRetry ? (
+        <Button variant='ghost' size='sm' onClick={onRetry}>
+          Try Again
+        </Button>
+      ) : null}
+    </div>
   );
 }

@@ -7,7 +7,7 @@ import {
   DropdownMenuTrigger,
   PlainButton,
 } from '@jovie/ui';
-import { Check } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -39,36 +39,23 @@ export function WorkspaceSelector<Id extends string>({
           data-electron-no-drag='true'
           style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
           className={cn(
-            // The mark sits on the rail's icon column (12px inset), like every nav
-            // icon below it. The hover fill bleeds 6px past the mark instead of
-            // pushing it inward, and the trigger hugs its label.
-            // Mark only at rest: `sidebar-wordmark-reveal` (globals.css) grows
-            // the workspace name on hover, keyboard focus or while the menu
-            // is open, the same reveal as the customer Ask Jovie mark.
-            'sidebar-wordmark-reveal -ml-1.5 flex h-7 w-fit max-w-full items-center rounded-lg px-1.5 transition-colors duration-subtle ease-subtle hover:bg-sidebar-accent/55 focus-visible:outline-none focus-visible:bg-sidebar-accent/55',
-            'group-data-[collapsible=icon]:ml-0 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
+            // Text and a chevron: the sidebar's one O docks in the footer.
+            // The hover fill bleeds 6px past the label and the trigger hugs it.
+            '-ml-1.5 flex h-7 w-fit max-w-full items-center rounded-lg px-1.5 transition-colors duration-subtle ease-subtle hover:bg-sidebar-accent/55 focus-visible:outline-none focus-visible:bg-sidebar-accent/55'
           )}
         >
-          <BrandLogo
-            size='chrome'
-            tone='auto'
-            variant={currentWorkspace.brandVariant}
-            rounded={false}
-            className='shrink-0 rounded-sm'
-            aria-hidden
-          />
-          {/* The mark-to-name gap lives inside the clip so the resting
-              trigger hugs the mark. */}
-          <span className='sidebar-wordmark min-w-0 overflow-hidden'>
-            <span
-              className={cn(
-                'truncate ps-1.5 text-left text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
-                SHELL_RAIL_LABEL
-              )}
-            >
-              {currentWorkspace.label}
-            </span>
+          <span
+            className={cn(
+              'truncate text-left text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
+              SHELL_RAIL_LABEL
+            )}
+          >
+            {currentWorkspace.label}
           </span>
+          <ChevronDown
+            aria-hidden='true'
+            className='ms-1 size-3.5 shrink-0 text-sidebar-item-icon'
+          />
         </PlainButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='start' sideOffset={4} className='w-48'>

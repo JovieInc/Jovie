@@ -1010,7 +1010,7 @@ jobs:
           fi
 
           # Isolated DB certification: database, authz, migration, harness, dependency inputs.
-          NEON_PATTERN='^(apps/web/drizzle/|apps/web/lib/(db|queries|auth)/|apps/web/scripts/(drizzle-migrate|verify-db-migrations)\.ts|apps/web/tests/(integration/|setup-db\.ts)|apps/web/vitest\.config\.integration\.mts|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|.*\.sql$|apps/web/app/api/cron/|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'
+          NEON_PATTERN='^(apps/web/drizzle/|apps/web/lib/(db|queries|auth)/|apps/web/scripts/(drizzle-migrate|verify-db-migrations)\.ts|apps/web/tests/(integration/|setup-db\.ts)|apps/web/lib/domain/releases\.ts|apps/web/lib/ai/tools/create-release\.ts|apps/web/lib/chat/tools/tasks\.ts|apps/web/app/app/\(shell\)/dashboard/tasks/task-actions\.ts|apps/web/vitest\.config\.integration\.mts|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|.*\.sql$|apps/web/app/api/cron/|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'
           if echo "$CHANGED_FILES" | grep -q -E "$NEON_PATTERN"; then
             echo "run_neon=true" >> "$GITHUB_OUTPUT"
           else
@@ -2774,7 +2774,6 @@ jobs:
           {
             echo "spotify=false"
             echo "kbd=false"
-            echo "crawler=false"
             echo "overlay=false"
             echo "privacy=false"
             echo "tasks=false"
@@ -2789,7 +2788,6 @@ jobs:
           fi
           SPOTIFY_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog(\.stories)?\.tsx|components/features/dashboard/organisms/release-provider-matrix/releases-empty-state/hooks/useSpotifyConnect\.ts|app/api/spotify/search/.*|tests/e2e/storybook-spotify-connect\.spec\.ts)$'
           KBD_STORYBOOK_PATTERN='^(packages/ui/atoms/kbd(\.stories)?\.tsx|apps/web/\.storybook/(motion-fixtures\.ts|preview\.tsx|preview-head\.html|main\.ts)|apps/web/tests/e2e/storybook-kbd-motion\.spec\.ts)$'
-          CRAWLER_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/organisms/ai-crawler/AiCrawler(DetailPanel|IntelligenceCard)(\.stories)?\.tsx|tests/e2e/storybook-ai-crawler\.spec\.ts)$'
           TASKS_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/tasks/(Task(DataTable|ListRow)(\.stories)?\.tsx|TasksPageClient\.tsx)|components/organisms/table/(atoms/TableCell\.tsx|table\.types\.ts|organisms/VirtualizedTableRow\.tsx|molecules/TaskProjectionListRow\.tsx)|tests/e2e/storybook-task-row-geometry\.spec\.ts)$'
           DESKTOP_UPDATE_STORYBOOK_PATTERN='^apps/web/(components/organisms/desktop-update/DesktopUpdate(Modal|Control)(\.stories)?\.tsx|lib/desktop/desktop-update-control-state\.ts|tests/e2e/storybook-desktop-update-(modal|control)\.spec\.ts)$'
           DSP_STORYBOOK_PATTERN='^apps/web/(components/shell/DspAvatarStack(\.mobile-drawer)?(\.stories|\.test)?\.tsx|components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow(\.stories)?\.tsx|components/organisms/release-sidebar/ReleaseSidebarSections\.tsx|components/molecules/drawer/RightDrawer\.tsx|lib/a11y/modal-focus-boundary\.ts|tests/e2e/storybook-dsp-details\.spec\.ts)$'
@@ -2812,12 +2810,6 @@ jobs:
           if grep -qE "$KBD_STORYBOOK_PATTERN" "$changed_files"; then
             {
               echo "kbd=true"
-              echo "run=true"
-            } >> "$GITHUB_OUTPUT"
-          fi
-          if grep -qE "$CRAWLER_STORYBOOK_PATTERN" "$changed_files"; then
-            {
-              echo "crawler=true"
               echo "run=true"
             } >> "$GITHUB_OUTPUT"
           fi
@@ -2939,7 +2931,6 @@ jobs:
         env:
           RUN_SPOTIFY: ${{ steps.storybook-browser.outputs.spotify }}
           RUN_KBD: ${{ steps.storybook-browser.outputs.kbd }}
-          RUN_CRAWLER: ${{ steps.storybook-browser.outputs.crawler }}
           RUN_OVERLAY: ${{ steps.storybook-browser.outputs.overlay }}
           RUN_PRIVACY: ${{ steps.storybook-browser.outputs.privacy }}
           RUN_TASKS: ${{ steps.storybook-browser.outputs.tasks }}
@@ -2960,9 +2951,6 @@ jobs:
           fi
           if [[ "$RUN_KBD" == 'true' ]]; then
             specs+=(tests/e2e/storybook-kbd-motion.spec.ts)
-          fi
-          if [[ "$RUN_CRAWLER" == 'true' ]]; then
-            specs+=(tests/e2e/storybook-ai-crawler.spec.ts)
           fi
           if [[ "$RUN_OVERLAY" == 'true' ]]; then
             specs+=(tests/e2e/storybook-overlay-collisions.spec.ts)

@@ -1,46 +1,31 @@
 /**
- * Certify each served production build once (JOV-12639).
+ * Golden Path certification carry-forward (JOV-14402).
  *
- * Golden Path certification ran about 2.4 times per served SHA: every
- * superseded Production Controller completion and every 12 h clock tick
- * re-certified a build that already had a passing receipt. This module holds
- * the pure rule for when a prior receipt stands in for a new run:
+ * A certification belongs to the release SHA it passed on. It does not decay
+ * with time (the 24 h window and JOV-12639's 11 h exact-SHA reuse are gone).
+ * For the served release, each step is one of:
  *
- * - only a fully certified receipt (every surface passed) counts;
- * - only for the exact 40-hex SHA production serves now;
- * - only when the same certification producer wrote it (producer digest);
- * - only while its oldest surface receipt is younger than REUSE_MAX_AGE_MS;
- * - never a receipt that was itself reused, and never when forced.
+ * - current: it already passed on this exact SHA, so nothing runs (the 12 h
+ *   clock tick on unchanged code certifies nothing again);
+ * - carried: it passed on an earlier release and nothing between that
+ *   release and this one touches the step's files, routes or deps, so its
+ *   certification carries forward and a carried receipt is posted for this
+ *   SHA naming where it came from;
+ * - recertify: anything else. The release touches the step, the step never
+ *   passed, a failure since then cleared its pass (new evidence, not decay),
+ *   the ledger could not be read, or the run was forced.
  *
- * REUSE_MAX_AGE_MS keeps the 12 h clock honest: consumers need every surface
- * green within 24 h (certificationVerdict), so a receipt reused at age 11 h is
- * at most ~23 h old when the next tick re-certifies it.
+ * The rule is pure here; scripts/golden-path-cert-reuse.mjs feeds it the
+ * ledger and a git diff, and golden-path-step-scope.mjs decides "touches".
  */
-import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, normalize, relative } from 'node:path';
-import { certificationVerdict, SURFACE_IDS } from './prod-cert.mjs';
+import { SURFACE_IDS } from './prod-cert.mjs';
 
-export const CERT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-export const CLOCK_INTERVAL_MS = 12 * 60 * 60 * 1000;
-const CLOCK_MARGIN_MS = 60 * 60 * 1000;
-export const REUSE_MAX_AGE_MS =
-  CERT_MAX_AGE_MS - CLOCK_INTERVAL_MS - CLOCK_MARGIN_MS;
-// A receipt timestamped ahead of the runner clock by more than this is bogus.
-const CLOCK_SKEW_MS = 5 * 60 * 1000;
-
-export const STAMP_SCHEMA = 'jovie.prod-cert-certified/v1';
-export const REUSE_SCHEMA = 'jovie.prod-cert-reuse/v1';
+export const CARRY_SCHEMA = 'jovie.golden-path-carry/v1';
+export const CERTIFIED_SCHEMA = 'jovie.prod-golden-path-certified/v1';
 export const WORKFLOW_PATH = '.github/workflows/postdeploy-probes.yml';
 const SHA = /^[0-9a-f]{40}$/u;
-const DIGEST = /^[0-9a-f]{64}$/u;
-
-/** Exact-name artifact namespace: one per served SHA, many runs. */
-export function certifiedArtifactName(servedSha) {
-  if (!SHA.test(String(servedSha)))
-    throw new Error('served SHA must be 40 lowercase hex');
-  return `prod-cert-certified-${servedSha}`;
-}
 
 // Entry points whose relative-import closure decides a certification.
 export const PRODUCER_ENTRIES = Object.freeze([
@@ -60,7 +45,8 @@ const RELATIVE_IMPORT =
 
 /**
  * Sorted repo-relative files of the certification producer: the entries, every
- * module they reach by relative import, and the data files.
+ * module they reach by relative import, and the data files. A change to any of
+ * them re-certifies every step.
  * @param {string} root
  * @returns {string[]}
  */
@@ -85,188 +71,196 @@ export function producerFiles(root) {
 }
 
 /**
- * One digest over the producer files' paths and contents. A receipt written
- * by other certification code never stands in for this code's verdict.
- * @param {string} root
+ * @typedef {{ sha: string, endedAt: string, runUrl: string | null }} PassRef
+ * @typedef {PassRef & { carriedFrom?: PassRef | null }} LastPassed
+ * @typedef {{ servedSha: string | null, surfaces: Record<string, { lastPassed: LastPassed | null }> }} LedgerCertifications
  */
-export function producerDigest(root) {
-  const hash = createHash('sha256');
-  for (const file of producerFiles(root)) {
-    const body = createHash('sha256')
-      .update(readFileSync(join(root, file)))
-      .digest('hex');
-    hash.update(`${file}\0${body}\n`);
-  }
-  return hash.digest('hex');
+
+const isIso = (/** @type {unknown} */ value) =>
+  typeof value === 'string' && !Number.isNaN(Date.parse(value));
+
+/** @param {any} value @returns {value is PassRef} */
+function isPassRef(value) {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    SHA.test(String(value.sha)) &&
+    isIso(value.endedAt) &&
+    (value.runUrl === null || typeof value.runUrl === 'string')
+  );
 }
 
 /**
- * @typedef {{ schema?: string, servedSha?: string, runId?: number, producerDigest?: string }} CertStamp
- * @typedef {{ servedSha?: string, receipts?: any[], reuse?: unknown }} ReceiptDocument
- * @typedef {{ path?: string, head_branch?: string, head_repository?: { full_name?: string } }} RunRecord
- * @typedef {{ runId: number, runUrl?: string, artifactId: number, run?: RunRecord, stamp?: CertStamp, document?: ReceiptDocument }} ReuseCandidate
- * @typedef {{ reuse: boolean, reason: string, source?: ReuseCandidate & { certifiedAt: string, ageMs: number }, rejected: { runId: number, why: string }[] }} ReuseDecision
+ * Read the ledger GET body (golden-path-evidence route.ts). Anything that is
+ * not the current shape returns null, and null re-certifies every step: a
+ * build that predates per-surface certifications carries nothing.
+ * @param {any} body
+ * @returns {LedgerCertifications | null}
  */
-
-/**
- * Why a candidate cannot stand in for a new certification, or null.
- * @param {ReuseCandidate} candidate
- * @param {{ servedSha: string, repository: string, producerDigest: string, nowMs: number, maxAgeMs: number }} expected
- * @returns {{ why: string } | { certifiedAt: string, ageMs: number }}
- */
-export function judgeCandidate(candidate, expected) {
-  const { run, stamp, document } = candidate;
+export function readLedgerCertifications(body) {
   if (
-    run?.path !== WORKFLOW_PATH ||
-    run?.head_branch !== 'main' ||
-    run?.head_repository?.full_name !== expected.repository
+    typeof body !== 'object' ||
+    body === null ||
+    body.schema !== CERTIFIED_SCHEMA ||
+    body.ledger !== 'present' ||
+    typeof body.surfaces !== 'object' ||
+    body.surfaces === null
   )
-    return { why: 'not a main post-deploy probes run' };
-  if (stamp?.schema !== STAMP_SCHEMA || stamp.runId !== candidate.runId)
-    return { why: 'no certified stamp from that run' };
-  if (stamp.servedSha !== expected.servedSha)
-    return { why: 'stamp is for another SHA' };
-  if (stamp.producerDigest !== expected.producerDigest)
-    return { why: 'certified by other certification code' };
-  if (!document || document.reuse !== undefined)
-    return { why: 'receipt was itself reused' };
-  if (document.servedSha !== expected.servedSha)
-    return { why: 'receipt is for another SHA' };
-  const receipts = Array.isArray(document.receipts) ? document.receipts : [];
-  const surfaces = receipts.map(r => r?.surface);
-  if (
-    receipts.length !== SURFACE_IDS.length ||
-    new Set(surfaces).size !== SURFACE_IDS.length ||
-    !SURFACE_IDS.every(id => surfaces.includes(id))
-  )
-    return { why: 'receipt does not cover every surface exactly once' };
-  if (receipts.some(r => r.status !== 'passed' || r.sha !== expected.servedSha))
-    return { why: 'not every surface passed on this SHA' };
-  const ended = receipts.map(r => Date.parse(r.endedAt));
-  if (
-    ended.some(
-      ms => !Number.isFinite(ms) || ms > expected.nowMs + CLOCK_SKEW_MS
-    )
-  )
-    return { why: 'receipt time is missing or in the future' };
-  const oldest = Math.min(...ended);
-  const ageMs = expected.nowMs - oldest;
-  if (ageMs > expected.maxAgeMs) return { why: 'receipt is stale' };
-  const verdict = certificationVerdict(receipts, {
-    servedSha: expected.servedSha,
-    nowMs: expected.nowMs,
-    maxAgeMs: expected.maxAgeMs,
-  });
-  if (!verdict.certified) return { why: 'certification verdict is not green' };
-  return { certifiedAt: new Date(oldest).toISOString(), ageMs };
-}
-
-/**
- * Reuse the newest candidate that passes every rule; otherwise certify.
- * @param {{ servedSha: string, repository: string, producerDigest: string, force?: boolean, nowMs?: number, maxAgeMs?: number, candidates?: ReuseCandidate[] }} input
- * @returns {ReuseDecision}
- */
-export function decideCertReuse({
-  servedSha,
-  repository,
-  producerDigest,
-  force = false,
-  nowMs = Date.now(),
-  maxAgeMs = REUSE_MAX_AGE_MS,
-  candidates = [],
-}) {
-  if (force) return { reuse: false, reason: 'forced', rejected: [] };
-  if (!SHA.test(String(servedSha)))
-    return { reuse: false, reason: 'no exact served SHA', rejected: [] };
-  if (!DIGEST.test(String(producerDigest)))
-    return { reuse: false, reason: 'no producer digest', rejected: [] };
-  const rejected = [];
-  const ordered = [...candidates].sort((a, b) => b.runId - a.runId);
-  for (const candidate of ordered) {
-    const judged = judgeCandidate(candidate, {
-      servedSha,
-      repository,
-      producerDigest,
-      nowMs,
-      maxAgeMs,
-    });
-    if ('why' in judged) {
-      rejected.push({ runId: candidate.runId, why: judged.why });
+    return null;
+  /** @type {LedgerCertifications['surfaces']} */
+  const surfaces = {};
+  for (const id of SURFACE_IDS) {
+    const last = body.surfaces[id]?.lastPassed ?? null;
+    if (last === null) {
+      surfaces[id] = { lastPassed: null };
       continue;
     }
-    return {
-      reuse: true,
-      reason: 'fresh certified receipt for the served SHA',
-      source: { ...candidate, ...judged },
-      rejected,
+    const from = last.carriedFrom ?? null;
+    if (!isPassRef(last) || (from !== null && !isPassRef(from))) return null;
+    surfaces[id] = {
+      lastPassed: {
+        sha: last.sha,
+        endedAt: last.endedAt,
+        runUrl: last.runUrl,
+        carriedFrom: from,
+      },
     };
   }
   return {
-    reuse: false,
-    reason: 'no fresh certified receipt for the served SHA',
-    rejected,
+    servedSha: SHA.test(String(body.servedSha)) ? body.servedSha : null,
+    surfaces,
   };
 }
 
 /**
- * The receipts file a reusing run uploads: the source receipts unchanged
- * (each keeps its own runUrl and times) plus a reuse block naming the run.
- * @param {ReuseDecision} decision
- * @param {{ runId: number, runUrl?: string | null, nowMs?: number, maxAgeMs?: number }} by
+ * The run that actually exercised a step: a carried pass names it in
+ * carriedFrom, so a chain of carries always diffs from the real evidence.
+ * @param {LastPassed} last
+ * @returns {PassRef}
  */
-export function reusedReceiptDocument(
-  decision,
-  { runId, runUrl = null, nowMs = Date.now(), maxAgeMs = REUSE_MAX_AGE_MS }
-) {
-  const source = decision.source;
-  if (!decision.reuse || !source?.document)
-    throw new Error('only a reuse decision has a reused receipt');
-  return {
-    ...source.document,
-    reuse: {
-      schema: REUSE_SCHEMA,
-      reused: true,
-      fromRunId: source.runId,
-      fromRunUrl: source.runUrl ?? null,
-      fromArtifactId: source.artifactId,
-      certifiedAt: source.certifiedAt,
-      ageMs: source.ageMs,
-      maxAgeMs,
-      decidedAt: new Date(nowMs).toISOString(),
-      decidedByRunId: runId,
-      decidedByRunUrl: runUrl,
-      note: 'No new certification ran. These receipts are the source run’s, unchanged, and were not posted to the ledger again.',
-    },
-  };
+export function exercisedPass(last) {
+  const from = last.carriedFrom ?? last;
+  return { sha: from.sha, endedAt: from.endedAt, runUrl: from.runUrl };
 }
 
 /**
- * The stamp a certifying run uploads beside its receipts, only when every
- * surface passed on the expected SHA. Returns null otherwise.
- * @param {ReceiptDocument} document
- * @param {{ expectedSha: string, runId: number, producerDigest: string, nowMs?: number }} input
+ * @typedef {{ all: boolean, steps: readonly string[], why?: Record<string, string>, reason?: string | null }} Touched
+ * @typedef {{ schema: string, servedSha: string, decidedAt: string, current: string[], carried: { surface: string, from: PassRef }[], recertify: { surface: string, why: string }[] }} CarryPlan
  */
-export function certifiedStamp(
-  document,
-  { expectedSha, runId, producerDigest, nowMs = Date.now() }
-) {
+
+/**
+ * Decide, per step, whether the served release is already certified, carries
+ * a certification forward, or re-certifies.
+ * @param {{
+ *   servedSha: string,
+ *   ledger: LedgerCertifications | null,
+ *   touched: (fromSha: string) => Touched,
+ *   force?: boolean,
+ *   nowMs?: number,
+ * }} input
+ * @returns {CarryPlan}
+ */
+export function decideCarry({
+  servedSha,
+  ledger,
+  touched,
+  force = false,
+  nowMs = Date.now(),
+}) {
+  /** @type {CarryPlan} */
+  const plan = {
+    schema: CARRY_SCHEMA,
+    servedSha,
+    decidedAt: new Date(nowMs).toISOString(),
+    current: [],
+    carried: [],
+    recertify: [],
+  };
+  const everyStep = (/** @type {string} */ why) => {
+    plan.recertify = SURFACE_IDS.map(surface => ({ surface, why }));
+    return plan;
+  };
+  if (!SHA.test(String(servedSha))) return everyStep('no exact served SHA');
+  if (force) return everyStep('forced');
+  if (!ledger) return everyStep('the certification ledger was not readable');
+  /** @type {Map<string, Touched>} */
+  const diffs = new Map();
+  for (const surface of SURFACE_IDS) {
+    const last = ledger.surfaces[surface]?.lastPassed ?? null;
+    if (!last) {
+      plan.recertify.push({
+        surface,
+        why: 'no pass to carry (never passed, or failed since)',
+      });
+      continue;
+    }
+    if (last.sha === servedSha) {
+      plan.current.push(surface);
+      continue;
+    }
+    const from = exercisedPass(last);
+    let diff = diffs.get(from.sha);
+    if (!diff) {
+      try {
+        diff = touched(from.sha);
+      } catch (error) {
+        diff = {
+          all: true,
+          steps: SURFACE_IDS,
+          reason: `diff from ${from.sha.slice(0, 8)} unavailable (${error instanceof Error ? error.message : 'unknown'})`,
+        };
+      }
+      diffs.set(from.sha, diff);
+    }
+    if (diff.all || diff.steps.includes(surface)) {
+      plan.recertify.push({
+        surface,
+        why:
+          diff.why?.[surface] ??
+          diff.reason ??
+          `touched since ${from.sha.slice(0, 8)}`,
+      });
+      continue;
+    }
+    plan.carried.push({ surface, from });
+  }
+  return plan;
+}
+
+/** True when every step already passed on the served SHA. */
+export function allCurrent(/** @type {CarryPlan} */ plan) {
+  return plan.current.length === SURFACE_IDS.length;
+}
+
+/**
+ * Check a plan read back from a file or a workflow output before it is used
+ * to post receipts. Anything off returns null, and the caller certifies every
+ * step instead.
+ * @param {any} plan
+ * @returns {CarryPlan | null}
+ */
+export function parseCarryPlan(plan) {
   if (
-    !SHA.test(String(expectedSha)) ||
-    !DIGEST.test(String(producerDigest)) ||
-    document?.servedSha !== expectedSha ||
-    document.reuse !== undefined
+    typeof plan !== 'object' ||
+    plan === null ||
+    plan.schema !== CARRY_SCHEMA ||
+    !SHA.test(String(plan.servedSha)) ||
+    !Array.isArray(plan.current) ||
+    !Array.isArray(plan.carried) ||
+    !Array.isArray(plan.recertify)
   )
     return null;
-  const verdict = certificationVerdict(document.receipts ?? [], {
-    servedSha: expectedSha,
-    nowMs,
-  });
-  if (!verdict.certified) return null;
-  return {
-    schema: STAMP_SCHEMA,
-    servedSha: expectedSha,
-    runId,
-    producerDigest,
-    stampedAt: new Date(nowMs).toISOString(),
-  };
+  const named = [
+    ...plan.current,
+    ...plan.carried.map(c => c?.surface),
+    ...plan.recertify.map(r => r?.surface),
+  ];
+  if (
+    named.length !== SURFACE_IDS.length ||
+    new Set(named).size !== SURFACE_IDS.length ||
+    !SURFACE_IDS.every(id => named.includes(id)) ||
+    !plan.carried.every(c => isPassRef(c.from) && c.from.sha !== plan.servedSha)
+  )
+    return null;
+  return plan;
 }

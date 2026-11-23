@@ -16,7 +16,8 @@ import lane_runner as lane  # noqa: E402
 
 NOW = 1790860000.0
 TEAM = {"id": "team-1", "key": "JOV", "states": {"nodes": [
-    {"id": "s-todo", "name": "Todo", "type": "unstarted"}, {"id": "s-done", "name": "Done", "type": "completed"}]}}
+    {"id": "s-todo", "name": "Todo", "type": "unstarted"}, {"id": "s-backlog", "name": "Backlog", "type": "backlog"},
+    {"id": "s-done", "name": "Done", "type": "completed"}]}}
 
 
 def plan(*children, summary="Two slices."):
@@ -185,14 +186,14 @@ class PlanTest(unittest.TestCase):
         self.assertEqual([row["title"] for row in created], ["Ship the UI"])
         [given] = linear.created
         self.assertEqual((given["teamId"], given["stateId"], given["parentId"], given["priority"]),
-                         ("team-1", "s-todo", "e1", 2))
+                         ("team-1", "s-backlog", "e1", 2))  # admission promotes it from Backlog
         self.assertNotIn("labelIds", given)
         self.assertIn("## Goal", given["description"])
         self.assertIn("## Definition of done\n- Ship the UI is tested", given["description"])
         with self.assertRaisesRegex(RuntimeError, "readback"):
             epics.apply_plan(FakeLinear(create_ok=False), {"team": TEAM, "children": {"nodes": []}},
                              epic_issue(), parsed, "claude")
-        with self.assertRaisesRegex(RuntimeError, "Todo"):
+        with self.assertRaisesRegex(RuntimeError, "Backlog"):
             epics.create_child(linear, {"team": {**TEAM, "states": {"nodes": []}}}, epic_issue(),
                                parsed["children"][0], "claude", 0)
 

@@ -67,7 +67,10 @@ function ChatHistoryRowContent({ row }: { readonly row: ChatHistoryRow }) {
         className='flex w-2 shrink-0 items-center justify-center'
       >
         {row.unread ? (
-          <span className='size-1.5 rounded-full bg-accent' />
+          <span
+            className='size-1 rounded-full bg-accent/70'
+            data-testid='chat-history-unread-dot'
+          />
         ) : null}
       </span>
       <span className='min-w-0 flex-1 truncate'>{row.title}</span>

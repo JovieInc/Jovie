@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 export const TASK_DATA_TABLE_CLASSNAME = 'text-app';
 
 export const TASK_DATA_TABLE_CONTAINER_CLASSNAME =
-  'h-full overflow-y-auto overflow-x-hidden px-2.5 pb-2 pt-0.5';
+  'h-full overflow-y-auto overflow-x-hidden pb-2 pt-0.5';
 
 export const TASK_DATA_TABLE_ROW_CLASSNAME = 'group/row group/task-row';
 

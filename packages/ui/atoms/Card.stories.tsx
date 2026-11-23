@@ -343,6 +343,21 @@ export const InlineOffline: Story = {
   },
 };
 
+export const Offline: Story = {
+  args: {
+    contentState: 'offline',
+    className: 'max-w-md',
+    children: (
+      <CardHeader>
+        <CardTitle>Offline</CardTitle>
+        <CardDescription>
+          Showing the last saved copy until your connection returns.
+        </CardDescription>
+      </CardHeader>
+    ),
+  },
+};
+
 export const CustomStyling: Story = {
   args: {
     className: 'max-w-md border-blue-200 bg-blue-50',
