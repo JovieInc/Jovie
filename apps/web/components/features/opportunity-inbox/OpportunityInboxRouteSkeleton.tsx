@@ -40,7 +40,7 @@ export function OpportunityInboxLoadingCards() {
         <div
           key={card.key}
           data-testid='opportunity-inbox-loading-card'
-          className='flex flex-col gap-2 rounded-xl border border-subtle bg-surface-0 p-4'
+          className='flex flex-col gap-2 py-4'
         >
           <Bar height='h-3' width='w-20' rounded='full' />
           <Bar height='h-4' width={card.titleWidth} />

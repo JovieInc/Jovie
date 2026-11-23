@@ -264,3 +264,57 @@ describe('newDogfoodWalkEmail', () => {
     }
   });
 });
+
+describe('prodcert-run family against PostgreSQL', () => {
+  const run = (id: string) => `browse-ready+synthetic-prodcert-${id}@jov.ie`;
+
+  it('removes only expired per-run users and never the fixed canaries', async () => {
+    const old = await seed(run('450005871301'), { ageDays: 3 });
+    const fresh = await seed(run('450005871302'), { ageDays: 1 });
+    const claim = await seed('browse-ready+synthetic-prodcert-claim@jov.ie', {
+      ageDays: 30,
+    });
+    const returning = await seed('browse-ready+clerk_test@jov.ie', {
+      ageDays: 30,
+    });
+    const paying = await seed(run('450005871303'), {
+      ageDays: 3,
+      subscriptionId: 'sub_test',
+    });
+
+    const report = await runDogfoodTmpCleanup(cleanupDb(), {
+      apply: true,
+      family: 'prodcert-run',
+      now,
+    });
+
+    expect(report).toMatchObject({
+      mode: 'apply',
+      removed: 1,
+      skippedBilling: 1,
+    });
+    expect(report.sample).toEqual(['run-450005871301']);
+    expect(await state(old.id, old.baId)).toMatchObject({
+      deleted: true,
+      profiles: 0,
+      identity: 0,
+      sessions: 0,
+    });
+    for (const kept of [fresh, claim, returning, paying]) {
+      expect(await state(kept.id, kept.baId)).toMatchObject(KEPT);
+    }
+  });
+
+  it('dry run counts without writing, and the tmp family ignores them', async () => {
+    const old = await seed(run('450005871304'), { ageDays: 5 });
+    const dry = await runDogfoodTmpCleanup(cleanupDb(), {
+      apply: false,
+      family: 'prodcert-run',
+      now,
+    });
+    expect(dry).toMatchObject({ mode: 'dry-run', matched: 1, removed: 0 });
+    const tmp = await runDogfoodTmpCleanup(cleanupDb(), { apply: true, now });
+    expect(tmp.candidates).toBe(0);
+    expect(await state(old.id, old.baId)).toMatchObject(KEPT);
+  });
+});

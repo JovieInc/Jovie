@@ -845,7 +845,7 @@ def linear_issue(identifier, fingerprint, *, state="unstarted", title="", descri
         "url": f"https://linear.app/jov/{identifier}",
         "state": {"name": name, "type": state},
         "team": {"key": team, "states": {"nodes": [
-            {"id": f"todo-{team}", "name": "Todo", "type": "unstarted"},
+            {"id": f"todo-{team}", "name": "Todo", "type": "unstarted"}, {"id": f"backlog-{team}", "name": "Backlog"},
             {"id": f"ip-{team}", "name": "In Progress", "type": "started"},
         ]}},
         "labels": {"nodes": [{"id": "lab-" + fingerprint, "name": f"remediation:{fingerprint}"}]},
@@ -1095,7 +1095,7 @@ class LabeledEventTest(unittest.TestCase):
         finally:
             os.environ.pop("LANES_ESCALATION", None)
         self.assertEqual(recur["events"]["e2e-login-timeout"]["identifier"], "JOV-1")
-        self.assertEqual(recur["reopens"], [{"id": "id-JOV-1", "stateId": "todo-JOV"}])
+        self.assertEqual(recur["reopens"], [{"id": "id-JOV-1", "stateId": "backlog-JOV"}], "reopened into Backlog for admission")
 
     def test_stuck_pr_ladder_is_on_and_sweep_labels_are_ordinary_events(self):
         os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)

@@ -1,0 +1,391 @@
+{
+  "$description": "Jovie design tokens, dark mode, as Figma variables (W3C DTCG). Generated from apps/web/styles/design-system.css by scripts/design/design-token-export.mjs. Never edit by hand: change the code token and run pnpm design:tokens-export.",
+  "surface": {
+    "canvas": {
+      "$type": "color",
+      "$value": "#030406"
+    },
+    "shell": {
+      "$type": "color",
+      "$value": "#07080a"
+    },
+    "card": {
+      "$type": "color",
+      "$value": "#131417"
+    },
+    "elevated": {
+      "$type": "color",
+      "$value": "#1a1b1e"
+    },
+    "floating": {
+      "$type": "color",
+      "$value": "#232427"
+    }
+  },
+  "text": {
+    "primary": {
+      "$type": "color",
+      "$value": "#f5f7fb"
+    },
+    "secondary": {
+      "$type": "color",
+      "$value": "#a0a5af"
+    },
+    "tertiary": {
+      "$type": "color",
+      "$value": "#9da2ac"
+    },
+    "disabled": {
+      "$type": "color",
+      "$value": "#77839d"
+    },
+    "3xs": {
+      "$type": "dimension",
+      "$value": "10px"
+    },
+    "2xs": {
+      "$type": "dimension",
+      "$value": "12px"
+    },
+    "xs": {
+      "$type": "dimension",
+      "$value": "12px"
+    },
+    "app": {
+      "$type": "dimension",
+      "$value": "12px"
+    },
+    "sm": {
+      "$type": "dimension",
+      "$value": "14px"
+    },
+    "mid": {
+      "$type": "dimension",
+      "$value": "14px"
+    },
+    "base": {
+      "$type": "dimension",
+      "$value": "16px"
+    },
+    "lg": {
+      "$type": "dimension",
+      "$value": "16px"
+    },
+    "xl": {
+      "$type": "dimension",
+      "$value": "20px"
+    },
+    "2xl": {
+      "$type": "dimension",
+      "$value": "24px"
+    },
+    "3xl": {
+      "$type": "dimension",
+      "$value": "32px"
+    },
+    "4xl": {
+      "$type": "dimension",
+      "$value": "40px"
+    },
+    "5xl": {
+      "$type": "dimension",
+      "$value": "48px"
+    }
+  },
+  "border": {
+    "subtle": {
+      "$type": "color",
+      "$value": "#a8b0c31a"
+    },
+    "default": {
+      "$type": "color",
+      "$value": "#a8b0c329"
+    },
+    "strong": {
+      "$type": "color",
+      "$value": "#c7edff42"
+    },
+    "focus": {
+      "$type": "color",
+      "$value": "#11afff"
+    }
+  },
+  "accent": {
+    "ion": {
+      "$type": "color",
+      "$value": "#11afff"
+    },
+    "ion-soft": {
+      "$type": "color",
+      "$value": "#11afff1f"
+    },
+    "ultra": {
+      "$type": "color",
+      "$value": "#8e56f5"
+    },
+    "ultra-soft": {
+      "$type": "color",
+      "$value": "#8e56f51f"
+    },
+    "pulse": {
+      "$type": "color",
+      "$value": "#f52bb5"
+    },
+    "pulse-soft": {
+      "$type": "color",
+      "$value": "#f52bb51f"
+    },
+    "mint": {
+      "$type": "color",
+      "$value": "#3ffa8b"
+    },
+    "mint-soft": {
+      "$type": "color",
+      "$value": "#3ffa8b1f"
+    },
+    "orange": {
+      "$type": "color",
+      "$value": "#ff7800"
+    },
+    "orange-soft": {
+      "$type": "color",
+      "$value": "#ff78001f"
+    },
+    "red": {
+      "$type": "color",
+      "$value": "#f72a36"
+    },
+    "red-soft": {
+      "$type": "color",
+      "$value": "#f72a361f"
+    }
+  },
+  "space": {
+    "0": {
+      "$type": "dimension",
+      "$value": "0px"
+    },
+    "1": {
+      "$type": "dimension",
+      "$value": "4px"
+    },
+    "2": {
+      "$type": "dimension",
+      "$value": "8px"
+    },
+    "3": {
+      "$type": "dimension",
+      "$value": "12px"
+    },
+    "4": {
+      "$type": "dimension",
+      "$value": "16px"
+    },
+    "5": {
+      "$type": "dimension",
+      "$value": "20px"
+    },
+    "6": {
+      "$type": "dimension",
+      "$value": "24px"
+    },
+    "7": {
+      "$type": "dimension",
+      "$value": "28px"
+    },
+    "8": {
+      "$type": "dimension",
+      "$value": "32px"
+    },
+    "9": {
+      "$type": "dimension",
+      "$value": "36px"
+    },
+    "10": {
+      "$type": "dimension",
+      "$value": "40px"
+    },
+    "11": {
+      "$type": "dimension",
+      "$value": "44px"
+    },
+    "12": {
+      "$type": "dimension",
+      "$value": "48px"
+    },
+    "16": {
+      "$type": "dimension",
+      "$value": "64px"
+    },
+    "20": {
+      "$type": "dimension",
+      "$value": "80px"
+    },
+    "24": {
+      "$type": "dimension",
+      "$value": "96px"
+    },
+    "28": {
+      "$type": "dimension",
+      "$value": "112px"
+    },
+    "32": {
+      "$type": "dimension",
+      "$value": "128px"
+    },
+    "40": {
+      "$type": "dimension",
+      "$value": "160px"
+    },
+    "px": {
+      "$type": "dimension",
+      "$value": "1px"
+    },
+    "0-5": {
+      "$type": "dimension",
+      "$value": "2px"
+    },
+    "1-5": {
+      "$type": "dimension",
+      "$value": "6px"
+    },
+    "2-5": {
+      "$type": "dimension",
+      "$value": "10px"
+    },
+    "3-5": {
+      "$type": "dimension",
+      "$value": "14px"
+    }
+  },
+  "radius": {
+    "none": {
+      "$type": "dimension",
+      "$value": "0px"
+    },
+    "xs": {
+      "$type": "dimension",
+      "$value": "2px"
+    },
+    "default": {
+      "$type": "dimension",
+      "$value": "4px"
+    },
+    "sm": {
+      "$type": "dimension",
+      "$value": "8px"
+    },
+    "md": {
+      "$type": "dimension",
+      "$value": "10px"
+    },
+    "lg": {
+      "$type": "dimension",
+      "$value": "12px"
+    },
+    "xl": {
+      "$type": "dimension",
+      "$value": "16px"
+    },
+    "2xl": {
+      "$type": "dimension",
+      "$value": "20px"
+    },
+    "3xl": {
+      "$type": "dimension",
+      "$value": "24px"
+    },
+    "pill": {
+      "$type": "dimension",
+      "$value": "9999px"
+    },
+    "full": {
+      "$type": "dimension",
+      "$value": "9999px"
+    }
+  },
+  "size": {
+    "headerHeight": {
+      "$type": "dimension",
+      "$value": "32px"
+    },
+    "row": {
+      "dense": {
+        "$type": "dimension",
+        "$value": "32px"
+      },
+      "compact": {
+        "$type": "dimension",
+        "$value": "40px"
+      },
+      "list": {
+        "$type": "dimension",
+        "$value": "44px"
+      },
+      "two-line": {
+        "$type": "dimension",
+        "$value": "56px"
+      },
+      "description": {
+        "$type": "dimension",
+        "$value": "72px"
+      },
+      "controls": {
+        "$type": "dimension",
+        "$value": "96px"
+      }
+    },
+    "rowContent": {
+      "dense": {
+        "$type": "dimension",
+        "$value": "24px"
+      },
+      "compact": {
+        "$type": "dimension",
+        "$value": "32px"
+      },
+      "list": {
+        "$type": "dimension",
+        "$value": "36px"
+      },
+      "two-line": {
+        "$type": "dimension",
+        "$value": "48px"
+      },
+      "description": {
+        "$type": "dimension",
+        "$value": "64px"
+      },
+      "controls": {
+        "$type": "dimension",
+        "$value": "88px"
+      }
+    }
+  },
+  "grid": {
+    "row-compact": {
+      "$type": "dimension",
+      "$value": "36px"
+    },
+    "row-default": {
+      "$type": "dimension",
+      "$value": "{size.row.compact}"
+    },
+    "row-comfortable": {
+      "$type": "dimension",
+      "$value": "{size.row.list}"
+    },
+    "cell-padding-x": {
+      "$type": "dimension",
+      "$value": "12px"
+    },
+    "avatar": {
+      "$type": "dimension",
+      "$value": "24px"
+    },
+    "status-dot": {
+      "$type": "dimension",
+      "$value": "8px"
+    }
+  }
+}

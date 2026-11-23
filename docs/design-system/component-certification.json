@@ -561,15 +561,6 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/features/profile/ProfileAeoProofClaimCard.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
     "apps/web/components/features/profile/ProfileFooter.tsx": [
       "ds-owner",
       "tokens",
@@ -2101,9 +2092,6 @@
     "apps/web/components/features/profile/DesktopQrOverlayClient.tsx": {
       "loading": "The wrapper renders null on the server and on first paint by design (JOV-2273, no CSR bailout), then shows the icon once matchMedia resolves in an effect, so there is no loading chrome to capture; DesktopQrOverlayClient.test.tsx asserts the empty server render."
     },
-    "apps/web/components/features/profile/ProfileAeoProofClaimCard.tsx": {
-      "empty": "The proof claim card renders no collection: one heading, one note and one CTA, all required props; the detector matched the items-start class."
-    },
     "apps/web/components/features/profile/ProfilePrimaryTabPanel.tsx": {
       "offline": "The panel fetches nothing itself: releases, tour dates and the catalog result arrive as props from the server-rendered profile, and a failed catalog read arrives as catalogLoadFailed (ErrorCatalogLoadFailed, whose Try Again reloads the page). The detector matched the word skeleton in the visitorAssignmentResolved doc comment, which LoadingAlertsAssignment shows."
     },
@@ -2770,6 +2758,13 @@
     "apps/web/components/shell/SidebarInboxLink.tsx": {
       "offline": "The link never fetches: pending work arrives from the server as availability, and an unreadable status falls back to the plain Inbox bell (StatusUnavailable). Opening it is a normal navigation. The detector matched the pending flag."
     },
+    "apps/web/components/shell/SidebarOPresence.tsx": {
+      "empty": "The O is one link and a fixed status slot with no collection; the idle story is its empty face and the slot is always laid out. The detector matched the items-center layout classes.",
+      "partial": "It takes two booleans and a link and has no partially loaded data. Updating shows the one partial state it has.",
+      "long-content": "Every visible string is fixed copy ('Open Chat', 'Updating') and the slot truncates, so no caller text can grow; the box is asserted identical hidden and shown in SidebarOPresence.test.tsx.",
+      "permission-denied": "The link and the status carry no gated action or permission input; the detector matched role='status', which only announces updater work.",
+      "rtl-overflow": "Its only copy is the fixed English 'Updating' in a truncating flex slot that mirrors with the sidebar's direction; the row uses logical spacing and no left or right offsets."
+    },
     "apps/web/components/shell/Sparkline.tsx": {
       "error": "The chart takes points from its caller and never loads anything; the detector matched the var(--color-error-text) stroke token for the down trend.",
       "permission-denied": "A sparkline has no account, role or gated action; the detector matched role='img' on the chart svg."
@@ -2841,6 +2836,10 @@
     "packages/ui/atoms/button.tsx": {
       "empty": "Button renders one label slot and never a collection; the only .map( is over the morph face's two fixed edges ('left', 'right'), so there is no empty-data state.",
       "offline": "Button never fetches or mutates; its owner sets loading or disabled while a request is unavailable, which the Loading and PermissionDenied stories already show."
+    },
+    "packages/ui/atoms/card.tsx": {
+      "loading": "By the card intent contract (.claude/rules/ui.md, Card intent) a loading state never renders a card: skeletons sit flat on their surface. The partial state (PartialData story) covers cached content that is refreshing.",
+      "error": "By the card intent contract an error state never renders a card: error copy and its retry sit flat on the surface. Card holds no error branch; the offline content state is the only failure face it carries."
     },
     "packages/ui/atoms/close-button.tsx": {
       "empty": "CloseButtonIcon always renders the same X glyph and sr-only 'Close' text and takes no collection; the detector matched the items-center utility class.",

@@ -41,7 +41,10 @@ function SearchResults({
   if (results.length === 0) return null;
 
   return (
-    <ContentSurfaceCard className='absolute top-full right-0 left-0 z-10 mt-2'>
+    <ContentSurfaceCard
+      intent='transient'
+      className='absolute top-full right-0 left-0 z-10 mt-2'
+    >
       <ul className='max-h-80 overflow-y-auto p-1'>
         {results.map(artist => {
           const followerLabel = artist.followers
@@ -311,17 +314,15 @@ export function OnboardingV2EarlyStep({
             </>
           }
         >
-          <ContentSurfaceCard>
-            <div className='p-5'>
-              <p className='text-sm font-semibold text-primary-token'>
-                Your import is ready.
-              </p>
-              <p className='mt-2 text-sm leading-6 text-secondary-token'>
-                Upgrade unlocks album art, pitch tools, and advanced AI. After
-                checkout, you&apos;ll return here to finish setup.
-              </p>
-            </div>
-          </ContentSurfaceCard>
+          <div className='p-5'>
+            <p className='text-sm font-semibold text-primary-token'>
+              Your import is ready.
+            </p>
+            <p className='mt-2 text-sm leading-6 text-secondary-token'>
+              Upgrade unlocks album art, pitch tools, and advanced AI. After
+              checkout, you&apos;ll return here to finish setup.
+            </p>
+          </div>
         </StepFrame>
       );
 

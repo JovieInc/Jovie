@@ -125,6 +125,73 @@ describe('daily changelog receipt compaction (repo-size budget)', () => {
     });
   });
 
+  it('keeps the duplicate-publication and reprocessing guards after compaction', () => {
+    const marker = sha => ({
+      sha,
+      deploymentId: 'dpl_1',
+      controllerRun: '123',
+      controllerAttempt: '1',
+      authSmoke: 'passed',
+      terminalReason: 'promoted',
+      selectedLanes: ['web'],
+    });
+    const buildInfo = sha => ({
+      commitSha: sha,
+      deploymentId: 'dpl_1',
+      environment: 'production',
+    });
+    const controller = { verified: true, runId: 123, attempt: 1 };
+    const body = `<!-- customer-changelog/v1 ${JSON.stringify(note)} -->`;
+    const first = planDailyPublication({
+      markdown: `# Changelog\n\n## [Unreleased]\n\n## [2026-10-01]\n\n- Old.\n\n${receiptComment(legacy)}\n`,
+      marker: marker(HEAD),
+      buildInfo: buildInfo(HEAD),
+      controller,
+      candidates: [candidate(1, body), candidate(2, '')],
+      windowKey: '2026-10-02',
+      observedAt: '2026-10-02T12:00:00Z',
+    });
+    // Give the receipt just written a legacy audit array, as every receipt
+    // on main had before the writer compacted, then compact it so the story
+    // and source ids the guards read have both gone through compaction.
+    const legacyDay = first.content.replace(
+      /<!-- daily-changelog-receipt\/v1 (\{.*"2026-10-02".*\}) -->/,
+      (_, json) =>
+        receiptComment({
+          ...JSON.parse(json),
+          audit: [{ id: 'JovieInc/Jovie#2', reason: 'missing-metadata' }],
+        })
+    );
+    expect(legacyDay).not.toBe(first.content);
+    const markdown = compactDailyReceipts(legacyDay);
+    expect(
+      extractDailyReceipts(markdown).some(receipt => 'audit' in receipt)
+    ).toBe(false);
+    const next = (candidates, sha = HEAD) =>
+      planDailyPublication({
+        markdown,
+        marker: marker(sha),
+        buildInfo: buildInfo(sha),
+        controller,
+        candidates,
+        windowKey: '2026-10-03',
+        observedAt: '2026-10-03T12:00:00Z',
+      });
+    // Reprocessing: the merged PR already in a compacted receipt is skipped.
+    const rerun = next([candidate(1, body)]);
+    expect(rerun.status).toBe('no-change');
+    expect(rerun.content).toBe(markdown);
+    expect(rerun.audit).toEqual([]);
+    // Duplicate publication: a new PR claiming the same outcome still fails.
+    const duplicate = {
+      ...candidate(3, body),
+      pr: { ...candidate(3, body).pr, mergeCommit: { oid: 'c'.repeat(40) } },
+    };
+    expect(() => next([duplicate])).toThrow(
+      'Customer outcome profile-claim was already published in 2026-10-02'
+    );
+  });
+
   it('refuses a publish whose receipt outgrows the refill cap', () => {
     const big = receiptComment({
       schema: DAILY_RECEIPT_SCHEMA,
