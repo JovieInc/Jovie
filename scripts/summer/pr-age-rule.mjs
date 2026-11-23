@@ -185,6 +185,23 @@ export async function applyAgeRule(
   }
 ) {
   const out = { tried: [], closed: [], failed: [] };
+  // Adding a label the repo lacks fails, so create it first; the force flag makes this idempotent.
+  if (plan.tries.length > 0)
+    gh(
+      [
+        'label',
+        'create',
+        LAST_TRY_LABEL,
+        '--repo',
+        repo,
+        '--color',
+        'd93f0b',
+        '--description',
+        'Old-PR rule: last repair try before the 10-day close',
+        '--force',
+      ],
+      run
+    );
   for (const pr of plan.tries) {
     const label = gh(
       [
@@ -199,7 +216,11 @@ export async function applyAgeRule(
       run
     );
     if (!label.ok) {
-      out.failed.push({ pr: pr.number, step: 'label' });
+      out.failed.push({
+        pr: pr.number,
+        step: 'label',
+        error: label.stderr.trim().slice(0, 200),
+      });
       continue;
     }
     // A conflict makes update-branch fail; the lane's conflict repair takes it from there.

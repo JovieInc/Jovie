@@ -21,6 +21,7 @@ import {
   normalizeButtonVariantContract,
   resolveButtonPenMaster,
 } from './button-contract';
+import { warnDeprecatedButtonValue } from './button-deprecations';
 import { Spinner } from './spinner';
 
 const BUTTON_VARIANT_CLASSES: Record<ButtonVariant, string> = {
@@ -33,6 +34,13 @@ const BUTTON_VARIANT_CLASSES: Record<ButtonVariant, string> = {
   ghost:
     'border border-transparent bg-transparent text-tertiary-token shadow-none hover:bg-interactive-hover hover:text-primary-token active:bg-interactive-active',
   link: 'h-auto border-0 bg-transparent p-0 text-primary underline-offset-4 shadow-none hover:underline',
+  // Glass family: shared frosted material (IconButton projects through these).
+  frosted:
+    'border border-subtle bg-icon-button-frosted text-primary-token shadow-none backdrop-blur-sm hover:bg-icon-button-frosted-hover',
+  'frosted-ghost':
+    'border border-transparent bg-transparent text-tertiary-token shadow-none backdrop-blur-sm hover:bg-interactive-hover hover:text-primary-token active:bg-interactive-active',
+  'frosted-outline':
+    'border border-subtle bg-transparent text-secondary-token shadow-none backdrop-blur-sm hover:bg-icon-button-frosted hover:text-primary-token',
 };
 
 // 44px minimum hit target for icon buttons below 44px (WCAG 2.5.5 / Apple HIG),
@@ -103,35 +111,13 @@ const DESTRUCTIVE_CLASSES: Record<ButtonVariant, string> = {
   tertiary: 'text-error-text hover:bg-error-subtle hover:text-error-text',
   ghost: 'text-error-text hover:bg-error-subtle hover:text-error-text',
   link: 'text-error-text hover:text-error-text',
+  frosted:
+    'border-error-subtle bg-error-subtle text-error-text hover:bg-error-subtle hover:text-error-text',
+  'frosted-ghost':
+    'text-error-text hover:bg-error-subtle hover:text-error-text',
+  'frosted-outline':
+    'border-error-subtle text-error-text hover:bg-error-subtle hover:text-error-text',
 };
-
-const warnedDeprecatedValues = new Set<string>();
-
-function isProductionEnvironment(): boolean {
-  return (
-    (
-      globalThis as {
-        readonly process?: {
-          readonly env?: { readonly NODE_ENV?: string };
-        };
-      }
-    ).process?.env?.NODE_ENV === 'production'
-  );
-}
-
-function warnDeprecatedButtonValue(
-  kind: 'variant' | 'size',
-  value: string,
-  replacement: string
-): void {
-  if (isProductionEnvironment()) return;
-  const key = `${kind}:${value}`;
-  if (warnedDeprecatedValues.has(key)) return;
-  warnedDeprecatedValues.add(key);
-  console.warn(
-    `[Button] ${kind}="${value}" is deprecated. Use ${kind}="${replacement}" instead.`
-  );
-}
 
 function normalizeButtonVariant({
   variant,
@@ -382,9 +368,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   }
 );
 Button.displayName = 'Button';
-
-export type { ButtonSize, ButtonVariant };
-export { BUTTON_SIZE_NAMES, BUTTON_VARIANT_NAMES, Button, buttonVariants };
 
 interface ButtonMorphProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -679,3 +662,6 @@ const ButtonMorph = React.forwardRef<HTMLButtonElement, ButtonMorphProps>(
     );
   }
 );
+
+export type { ButtonSize, ButtonVariant };
+export { BUTTON_SIZE_NAMES, BUTTON_VARIANT_NAMES, Button, buttonVariants };

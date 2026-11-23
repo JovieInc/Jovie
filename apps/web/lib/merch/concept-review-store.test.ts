@@ -69,14 +69,14 @@ beforeEach(() => {
 });
 
 describe('reviewStoredMerchConceptPlan', () => {
-  it('requires review when the immutable store has no matching row', async () => {
+  it('allows only a private draft when the immutable store has no matching row', async () => {
     const result = await reviewStoredMerchConceptPlan(plan, now);
 
     expect(database.select).toHaveBeenCalledWith({
       review: merchCandidateQaReviews,
     });
-    expect(result.decision).toBe('review_required');
-    expect(result.reasons).toContain('concept.review_required');
+    expect(result.decision).toBe('draft');
+    expect(result.reasons).toEqual(['concept.review_required']);
     expect(result.reviewId).toBeNull();
     expect(result.imageCallsExecuted).toBe(0);
   });

@@ -1,6 +1,8 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/features/release/ReleaseCreditsDialog.test.tsx
 import {
+  Button,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -10,7 +12,6 @@ import {
 import Link from 'next/link';
 import { useState } from 'react';
 import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
-import { FrostedButton } from '@/components/atoms/FrostedButton';
 import { Icon } from '@/components/atoms/Icon';
 import {
   Dialog,
@@ -72,17 +73,16 @@ export function ReleaseCreditsDialog({
   }
 
   const trigger = (
-    <FrostedButton
+    <Button
       type='button'
-      tone='ghost'
+      variant='frosted-ghost'
       size='sm'
-      aria-label='View credits'
+      aria-label='View Credits'
       onClick={() => setOpen(true)}
-      className='inline-flex w-auto items-center justify-center gap-1.5 px-3.5 text-foreground/80 hover:text-foreground'
     >
       <Icon name='Users' className='h-3.5 w-3.5' aria-hidden='true' />
-      <span>View credits</span>
-    </FrostedButton>
+      <span>View Credits</span>
+    </Button>
   );
 
   if (isMobile) {
@@ -90,17 +90,20 @@ export function ReleaseCreditsDialog({
       <>
         {trigger}
         <Sheet open={open} onOpenChange={setOpen}>
-          <SheetContent
-            side='bottom'
-            className='overflow-hidden rounded-t-2xl px-5 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]'
-          >
-            <SheetHeader className='border-b border-subtle pb-3 text-left'>
-              <SheetTitle className='text-app font-semibold text-primary-token'>
-                Credits
-              </SheetTitle>
-              <SheetDescription className='sr-only'>
-                View all credited collaborators for this release
-              </SheetDescription>
+          {/*
+            Bottom SheetContent already owns `p-5` (sheetSurfaceStyles) and
+            `rounded-t-2xl` (bottom side variant). Do not nest a second px-5 or
+            restyle radius/padding here — that double-pads and trips the
+            shrink-only no-restyle gate.
+          */}
+          <SheetContent side='bottom' className='overflow-hidden'>
+            <SheetHeader>
+              <div className='border-b border-subtle pb-3 text-left'>
+                <SheetTitle>Credits</SheetTitle>
+                <SheetDescription className='sr-only'>
+                  View all credited collaborators for this release
+                </SheetDescription>
+              </div>
             </SheetHeader>
             <div className='mt-4 rounded-xl bg-white/5 p-4 ring-1 ring-inset ring-white/[0.06]'>
               {content}
@@ -114,23 +117,18 @@ export function ReleaseCreditsDialog({
   return (
     <>
       {trigger}
-      <Dialog
-        open={open}
-        onClose={() => setOpen(false)}
-        size='sm'
-        className='mx-4 max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] overflow-hidden sm:mx-auto sm:w-full'
-      >
-        <DialogTitle className='text-app font-semibold text-primary-token'>
-          Credits
-        </DialogTitle>
-        <DialogDescription className='sr-only'>
-          View all credited collaborators for this release
-        </DialogDescription>
-        <DialogBody className='mt-2'>
-          <div className='rounded-xl bg-white/5 p-4 ring-1 ring-inset ring-white/[0.06]'>
-            {content}
-          </div>
-        </DialogBody>
+      <Dialog open={open} onClose={() => setOpen(false)} size='sm'>
+        <div className='mx-4 max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] overflow-hidden sm:mx-auto sm:w-full'>
+          <DialogTitle>Credits</DialogTitle>
+          <DialogDescription className='sr-only'>
+            View all credited collaborators for this release
+          </DialogDescription>
+          <DialogBody className='mt-2'>
+            <div className='rounded-xl bg-white/5 p-4 ring-1 ring-inset ring-white/[0.06]'>
+              {content}
+            </div>
+          </DialogBody>
+        </div>
       </Dialog>
     </>
   );

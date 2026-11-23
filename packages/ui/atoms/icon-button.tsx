@@ -38,7 +38,8 @@ const ICON_BUTTON_VARIANT_TO_BUTTON_VARIANT: Record<
   ButtonVariant
 > = {
   surface: 'secondary',
-  frosted: 'ghost',
+  // Project through Button's first-class frosted glass variant (Drift T2.3).
+  frosted: 'frosted',
   ghost: 'ghost',
   secondary: 'ghost',
   outline: 'secondary',
@@ -72,13 +73,8 @@ const iconButtonVariants = cva(
           'shadow-sm',
           'hover:bg-surface-2 hover:text-primary-token hover:shadow-md'
         ),
-        // Frosted - glassmorphic with backdrop blur
-        frosted: cn(
-          CIRCLE_CHROME_CLASSNAME,
-          'border border-subtle bg-icon-button-frosted text-primary-token backdrop-blur-sm',
-          'shadow-sm',
-          'hover:bg-icon-button-frosted-hover'
-        ),
+        // Frosted — circular chrome only; glass fill/blur lives on Button.
+        frosted: cn(CIRCLE_CHROME_CLASSNAME, 'shadow-sm'),
         // Ghost - transparent with hover background
         ghost: cn(
           CIRCLE_CHROME_CLASSNAME,

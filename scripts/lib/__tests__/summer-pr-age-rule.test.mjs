@@ -202,10 +202,39 @@ describe('old-PR rule apply', () => {
     assert.deepEqual(out.failed, []);
     assert.deepEqual(out.tried, [{ pr: 2, mainMerged: true }]);
     assert.equal(out.closed[0].linear, 'JOV-3');
-    assert.ok(calls[0].includes(`${LAST_TRY_LABEL},${REPAIR_LABEL}`));
+    assert.deepEqual(calls[0].slice(0, 3), ['label', 'create', LAST_TRY_LABEL]);
+    assert.ok(calls[0].includes('--force'));
+    assert.ok(calls[1].includes(`${LAST_TRY_LABEL},${REPAIR_LABEL}`));
     assert.ok(calls.some(a => a.includes('repos/o/r/pulls/2/update-branch')));
     const close = calls.find(a => a[1] === 'close');
     assert.match(close.at(-1), /Linear issue JOV-3 is back in Backlog/);
+  });
+
+  it('creates no label when there is nothing to try', async () => {
+    const { calls, run } = fakeGh();
+    await applyAgeRule(
+      { tries: [], closes: [] },
+      { repo: 'o/r', rule: policy.ageRule, run }
+    );
+    assert.deepEqual(calls, []);
+  });
+
+  it('records why a label step failed', async () => {
+    const run = (/** @type {string} */ _bin, /** @type {string[]} */ args) =>
+      args[1] === 'edit'
+        ? {
+            status: 1,
+            stdout: '',
+            stderr: "could not add label: 'x' not found\n",
+          }
+        : { status: 0, stdout: '', stderr: '' };
+    const out = await applyAgeRule(
+      { tries: [{ ...pr(2, 8), ageDays: 8 }], closes: [] },
+      { repo: 'o/r', rule: policy.ageRule, run }
+    );
+    assert.deepEqual(out.failed, [
+      { pr: 2, step: 'label', error: "could not add label: 'x' not found" },
+    ]);
   });
 
   it('reports a failed close so the run asks for a repair', async () => {

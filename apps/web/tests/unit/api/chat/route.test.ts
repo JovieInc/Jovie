@@ -150,6 +150,7 @@ vi.mock('@/lib/error-tracking', () => ({
 
 vi.mock('@/lib/eval/scorers/online', () => ({
   scheduleOnlineScoring: vi.fn(),
+  scheduleTurnOutcomeCheck: vi.fn(),
 }));
 
 vi.mock('@/lib/services/album-art/provider-xai', () => ({
