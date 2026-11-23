@@ -37,6 +37,8 @@ export interface SidebarDockProps {
     readonly onDismiss: () => void;
   };
   readonly children?: (status: SidebarDockStatus | undefined) => ReactNode;
+  /** Called when the icon-rail status label changes, for a row elsewhere. */
+  readonly onStatusChange?: (status: SidebarDockStatus | undefined) => void;
 }
 
 export interface SidebarDockUpdateControl {
@@ -62,6 +64,7 @@ export function SidebarDock({
   audio,
   install,
   children,
+  onStatusChange,
 }: SidebarDockProps) {
   const regionRef = useRef<HTMLElement>(null);
   const positions = useRef(new Map<string, number>());
@@ -239,6 +242,15 @@ export function SidebarDock({
           ),
         }
       : undefined;
+
+  const statusRef = useRef(badgeStatus);
+  useEffect(() => {
+    statusRef.current = badgeStatus;
+  });
+  const statusLabel = badgeStatus?.label;
+  useEffect(() => {
+    onStatusChange?.(statusRef.current);
+  }, [onStatusChange, statusLabel]);
 
   return (
     <>

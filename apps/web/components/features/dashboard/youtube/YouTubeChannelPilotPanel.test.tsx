@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { YouTubeChannelPilotPanel } from './YouTubeChannelPilotPanel';
@@ -115,5 +117,17 @@ describe('YouTubeChannelPilotPanel', () => {
     expect(
       screen.getByTestId('youtube-channel-awaiting-sync')
     ).toBeInTheDocument();
+  });
+});
+
+describe('YouTubeChannelPilotPanel seam', () => {
+  it('puts its content on the 12px workspace seam (JOV-12565)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './YouTubeChannelPilotPanel.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain("contentPadding='default'");
+    expect(source).not.toContain("contentPadding='compact'");
   });
 });

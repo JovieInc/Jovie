@@ -4,7 +4,7 @@ import * as React from 'react';
 
 import { cn } from '../lib/utils';
 
-type RoundedVariant = 'none' | 'sm' | 'md' | 'lg' | 'full';
+type RoundedVariant = 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
 
 export interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
   /**
@@ -12,6 +12,12 @@ export interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
    * @default 'sm'
    */
   readonly rounded?: RoundedVariant;
+  /**
+   * Height utility (Tailwind class such as 'h-4' or 'min-h-28'). A skeleton
+   * exists to take a shape, so its height is a prop, like LoadingSkeleton's,
+   * not a call-site className restyle. Width and placement stay in className.
+   */
+  readonly height?: string;
   /**
    * When true, applies the canonical shimmer animation and loading state attrs.
    * @default true
@@ -24,6 +30,7 @@ const roundedClasses: Record<RoundedVariant, string> = {
   sm: 'rounded-sm',
   md: 'rounded-md',
   lg: 'rounded-lg',
+  xl: 'rounded-xl',
   full: 'rounded-full',
 };
 
@@ -63,6 +70,7 @@ function withoutReservedGeometry(className: string | undefined): string {
 export function Skeleton({
   className,
   rounded = 'sm',
+  height,
   shimmer = true,
   ...props
 }: SkeletonProps) {
@@ -73,6 +81,7 @@ export function Skeleton({
         shimmer && 'skeleton motion-reduce:animate-none motion-reduce:bg-none',
         !shimmer && 'bg-surface-1 motion-reduce:animate-none',
         roundedClasses[rounded],
+        height,
         className
       )}
       data-state={shimmer ? 'shimmer' : 'static'}

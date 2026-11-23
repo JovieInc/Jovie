@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { expectFlatState } from '@/tests/utils/flat-state';
 import { ReleaseActionErrorCard } from './ReleaseActionErrorCard';
 
 describe('ReleaseActionErrorCard', () => {
@@ -21,6 +22,7 @@ describe('ReleaseActionErrorCard', () => {
     );
 
     expect(screen.getByTestId('publish-error')).toBeInTheDocument();
+    expectFlatState(container);
     expect(screen.getByText('Publish failed')).toBeInTheDocument();
     expect(screen.getByText("Couldn't publish this release.")).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Retry' }));
@@ -45,7 +47,8 @@ describe('ReleaseActionErrorCard', () => {
     );
 
     const card = screen.getByTestId('inline-error');
-    expect(card).toHaveClass('rounded-lg');
+    expect(card).toHaveClass('flex', 'items-start');
+    expectFlatState(container);
     expect(screen.getAllByRole('button')).toHaveLength(1);
     expect(screen.queryByRole('button', { name: 'Dismiss' })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Try Again' }));

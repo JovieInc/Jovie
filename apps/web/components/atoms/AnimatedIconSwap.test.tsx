@@ -123,4 +123,18 @@ describe('AnimatedIconSwap', () => {
     expect(source).toContain("initial={hasMounted ? 'hidden' : false}");
     expect(source).not.toContain("initial='hidden'");
   });
+
+  it('loads the motion engine lazily so it stays out of first-load JS', () => {
+    const source = readFileSync(
+      resolve(__dirname, './AnimatedIconSwap.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain("import * as m from 'motion/react-m'");
+    expect(source).toContain('<LazyDomAnimationMotion>');
+    expect(source).not.toMatch(
+      /import\s*\{[^}]*\bmotion\b[^}]*\}\s*from\s*'motion\/react'/
+    );
+    expect(source).not.toContain('<motion.');
+  });
 });

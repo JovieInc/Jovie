@@ -8,6 +8,7 @@ import {
   ACCEPTED_SCHEMA,
   applyAccepted,
   extractAccepted,
+  formatBiomeJson,
   loadAccepted,
   pointManifest,
   stillNode,
@@ -220,4 +221,52 @@ test('loadAccepted reads only accepted records, in name order', () => {
     ['a', 'b']
   );
   assert.deepEqual(loadAccepted(join(dir, 'missing')), []);
+});
+
+test('formatBiomeJson matches biome 2.x JSON formatting (expand: auto)', () => {
+  // non-empty objects always expanded, empty containers inline, LF at end
+  assert.equal(
+    formatBiomeJson({ a: 1, b: {}, c: [], d: { e: 'x' } }),
+    '{\n  "a": 1,\n  "b": {},\n  "c": [],\n  "d": {\n    "e": "x"\n  }\n}\n'
+  );
+  // arrays that fit stay on one line, including nested ones
+  assert.equal(
+    formatBiomeJson({ a: [1, 'b', null, [true, []]] }),
+    '{\n  "a": [1, "b", null, [true, []]]\n}\n'
+  );
+  // arrays of objects break, one element per line
+  assert.equal(
+    formatBiomeJson({ a: [{ x: 1 }, { y: [1, 2] }] }),
+    '{\n  "a": [\n    {\n      "x": 1\n    },\n    {\n      "y": [1, 2]\n    }\n  ]\n}\n'
+  );
+  // escapes are JSON.stringify's
+  assert.equal(
+    formatBiomeJson({ 'k"q': 'a\\b\n' }),
+    '{\n  "k\\"q": "a\\\\b\\n"\n}\n'
+  );
+});
+
+test('formatBiomeJson honours the 80-column limit, trailing comma included', () => {
+  // `  "a": [` + str + `]` + comma: the comma counts toward the width
+  const fits = (len, comma) => {
+    const o = { a: ['x'.repeat(len - 2)] };
+    if (comma) o.b = 1;
+    return !formatBiomeJson(o).includes('[\n');
+  };
+  // line = 2 + 5 + 2 + len(+1 for comma) -> len 71 last, 70 with comma
+  assert.equal(fits(71, false), true);
+  assert.equal(fits(72, false), false);
+  assert.equal(fits(70, true), true);
+  assert.equal(fits(71, true), false);
+});
+
+test('formatBiomeJson fills long number arrays and round-trips', () => {
+  const nums = Array.from({ length: 30 }, (_, i) => i * 1000);
+  const out = formatBiomeJson({ n: nums });
+  const lines = out.split('\n');
+  assert.ok(lines.every(l => l.length <= 80));
+  assert.ok(lines.length < 30, 'numbers share lines');
+  assert.deepEqual(JSON.parse(out), { n: nums });
+  const mixed = { a: [[1, 2], [{ b: 'x'.repeat(90) }]], c: [{}], d: [] };
+  assert.deepEqual(JSON.parse(formatBiomeJson(mixed)), mixed);
 });
