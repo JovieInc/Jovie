@@ -764,8 +764,8 @@ nodes:
       - label
       - push
       - workflow_dispatch
-    terminalReceipt: job:report-outcome
-    jobCount: 3
+    terminalReceipt: job:sweep
+    jobCount: 2
   - name: Linear Sync on Merge
     path: .github/workflows/linear-sync-on-merge.yml
     active: true
