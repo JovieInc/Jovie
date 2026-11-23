@@ -257,8 +257,13 @@
       "core": true,
       "entryPoints": [],
       "chatTools": ["proposeSocialLink", "proposeSocialLinkRemoval"],
-      "checks": [],
-      "gap": "Schema tests only."
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/chat-links-outcome.test.ts",
+          "test": "a confirmed chat link is saved on the profile, and a confirmed removal takes it off",
+          "runs": "merge"
+        }
+      ]
     },
     {
       "id": "chat-release",
