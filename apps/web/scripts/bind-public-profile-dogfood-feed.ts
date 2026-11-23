@@ -75,9 +75,16 @@ async function main(): Promise<number> {
     values['artifact-dir'] ??
     join(process.cwd(), '.cache', 'public-profile-dogfood-artifacts');
 
-  const observation = values.observe
-    ? await observePublicProfile({ origin, path, artifactDir })
-    : parseObservation(JSON.parse(readFileSync(observationPath, 'utf8')));
+  let observation;
+  if (values.observe) {
+    observation = await observePublicProfile({ origin, path, artifactDir });
+  } else if (typeof observationPath !== 'string') {
+    process.stderr.write('Provide --observe or --observation <file>\n');
+    return 64;
+  } else {
+    const observationJson = readFileSync(observationPath, { encoding: 'utf8' });
+    observation = parseObservation(JSON.parse(observationJson));
+  }
 
   if (values['write-observation']) {
     writeFileSync(
