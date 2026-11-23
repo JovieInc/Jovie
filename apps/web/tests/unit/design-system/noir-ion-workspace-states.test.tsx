@@ -137,7 +137,7 @@ describe('Noir Ion D — workspace state surfaces (JOV-4648)', () => {
 
   it('preserves table density and keyboard focus geometry', () => {
     expect(DESIGN_SYSTEM_CSS).toContain(
-      ':where(.system-b-table-row-height) {\n  height: 40px;'
+      ':where(.system-b-table-row-height) {\n  height: var(--table-row-height, 40px);'
     );
     expect(layoutStability.rowHeight).toBe('40px');
     expect(layoutStability.skeletonRowHeight).toBe('40px');
