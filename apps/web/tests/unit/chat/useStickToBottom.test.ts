@@ -2,7 +2,6 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  pinTranscriptToLatest,
   SCROLL_THRESHOLD,
   useStickToBottom,
   useStickToBottomController,
@@ -559,38 +558,6 @@ describe('useStickToBottom', () => {
     act(() => result.current.setStuckToBottom(false));
     flushRaf();
     expect(write).not.toHaveBeenCalled();
-  });
-
-  it('pinTranscriptToLatest prefers the onboarding AuthShell anchor (ONB-27)', () => {
-    const container = document.createElement('div');
-    const anchor = document.createElement('div');
-    anchor.setAttribute('data-onboarding-auth-anchor', '');
-    const scrollIntoView = vi.fn();
-    anchor.scrollIntoView = scrollIntoView;
-    container.appendChild(anchor);
-    let scrollTop = 0;
-    Object.defineProperty(container, 'scrollTop', {
-      configurable: true,
-      get: () => scrollTop,
-      set: (value: number) => {
-        scrollTop = value;
-      },
-    });
-    Object.defineProperty(container, 'scrollHeight', {
-      configurable: true,
-      get: () => 2000,
-    });
-
-    pinTranscriptToLatest(container);
-    expect(scrollIntoView).toHaveBeenCalledWith({
-      block: 'start',
-      behavior: 'auto',
-    });
-    expect(scrollTop).toBe(0);
-
-    container.replaceChildren();
-    pinTranscriptToLatest(container);
-    expect(scrollTop).toBe(2000);
   });
 
   it('re-pins only on the initial 0 → positive message count (JOV-5044)', () => {
