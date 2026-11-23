@@ -613,14 +613,14 @@ test.describe('central runtime notifications', () => {
 });
 
 test.describe('sidebar attention and Settings header', () => {
-  test('legacy admin keeps its default-flags fallback Inbox link', async ({
+  test('legacy admin keeps its default-flags fallback Home bell', async ({
     page,
   }) => {
     await openStory(page, 'organisms-unifiedsidebar--legacy-admin', 'light');
+    // Search-slot bell uses a qualified Home name (never bare exact "Home").
     await expect(
       page.locator('[data-sidebar-search-slot]').getByRole('link', {
-        name: 'Home',
-        exact: true,
+        name: /Home —/,
       })
     ).toHaveAttribute('href', '/app');
     await expect(page.locator('[data-sidebar-search-divider]')).toHaveCount(0);
@@ -673,9 +673,8 @@ test.describe('sidebar attention and Settings header', () => {
     expect(
       Math.abs(line.x - trigger.x - trigger.width - gap)
     ).toBeLessThanOrEqual(2);
-    await expect(
-      slot.getByRole('link', { name: 'Home', exact: true })
-    ).toBeVisible();
+    // Qualified Home bell shares the search slot (same contract as brand row).
+    await expect(slot.getByRole('link', { name: /Home —/ })).toBeVisible();
   });
 
   test('headerless media routes retain a window-control safe area', async ({

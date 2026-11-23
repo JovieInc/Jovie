@@ -92,4 +92,18 @@ describe('storybook-elevation sidebar expectations match the navigation config',
       }
     }
   );
+
+  // The search-slot bell always ships a qualified accessible name
+  // (`Home — …`). Exact `Home` there fails Storybook Surface Matrix in
+  // merge groups (PR #26136 lane-form-red, 2026-11-22).
+  it('qualifies search-slot Home bell assertions', () => {
+    expect(
+      SPEC.includes(
+        "locator('[data-sidebar-search-slot]').getByRole('link', {\n        name: 'Home',\n        exact: true,"
+      ) ||
+        SPEC.includes("slot.getByRole('link', { name: 'Home', exact: true })"),
+      'search-slot Home must use /Home —/ (qualified), not exact "Home"'
+    ).toBe(false);
+    expect(SPEC).toContain('name: /Home —/');
+  });
 });
