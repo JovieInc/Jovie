@@ -285,8 +285,8 @@ export function EntitySidebarShell({
                       title={resolvedHeaderTitle}
                       actions={titleBarActions}
                       className={cn(
-                        isMinimalHeader &&
-                          'min-h-9 px-2.5 py-1 lg:min-h-9 lg:px-3'
+                        'min-h-(--app-shell-header-height)',
+                        isMinimalHeader && 'px-3'
                       )}
                     />
                   ) : null}
