@@ -151,9 +151,6 @@ vi.mock('@/components/jovie/components/ChatMessage', () => ({
 }));
 
 vi.mock('@/components/jovie/hooks', () => ({
-  pinTranscriptToLatest: (el: HTMLElement) => {
-    el.scrollTop = el.scrollHeight;
-  },
   useChatJankMonitor: () => ({
     onSend: vi.fn(),
   }),

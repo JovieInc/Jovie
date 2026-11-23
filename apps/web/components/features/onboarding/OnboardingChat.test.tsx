@@ -63,13 +63,15 @@ vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
 vi.mock('@/lib/flags/client', () => ({ useAppFlag: () => false }));
 
 // ONB-27: OnboardingChat re-pins via pinTranscriptToLatest so AuthShell h1
-// clears the chat top-fade. Spy the export without replacing stick-to-bottom.
+// clears the chat top-fade. Spy the deep import without replacing stick-to-bottom.
 const pinTranscript = vi.hoisted(() => ({
   pinTranscriptToLatest: vi.fn(),
 }));
-vi.mock('@/components/jovie/hooks', async importOriginal => {
+vi.mock('@/components/jovie/hooks/useStickToBottom', async importOriginal => {
   const actual =
-    await importOriginal<typeof import('@/components/jovie/hooks')>();
+    await importOriginal<
+      typeof import('@/components/jovie/hooks/useStickToBottom')
+    >();
   pinTranscript.pinTranscriptToLatest.mockImplementation(
     actual.pinTranscriptToLatest
   );

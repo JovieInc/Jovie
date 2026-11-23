@@ -27,15 +27,12 @@ import {
   ChatEmptyStateComposerRegion,
   ChatInput,
 } from '@/components/jovie/components';
-import {
-  pinTranscriptToLatest,
-  useChatJankMonitor,
-  useStickToBottom,
-} from '@/components/jovie/hooks';
+import { useChatJankMonitor, useStickToBottom } from '@/components/jovie/hooks';
 import {
   composeMessage,
   useChipTray,
 } from '@/components/jovie/hooks/useChipTray';
+import { pinTranscriptToLatest } from '@/components/jovie/hooks/useStickToBottom';
 import type { ChatError, MessagePart } from '@/components/jovie/types';
 import {
   extractErrorMetadata,
