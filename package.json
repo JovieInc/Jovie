@@ -406,7 +406,7 @@
     "turbo": "^2.11.10",
     "typescript": "^6.0.3",
     "vercel": "56.3.2",
-    "vitest": "5.1.0"
+    "vitest": "5.1.1"
   },
   "lint-staged": {
     "apps/web/drizzle/migrations/**/*.{sql,ts}": [
