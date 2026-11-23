@@ -9,10 +9,7 @@
  * Store refresh_token in Cursor Project MCP OAuth config; the client refreshes hourly.
  */
 import { parseArgs } from 'node:util';
-import {
-  getOvieOAuthIssuer,
-  ovieIssuerSecret,
-} from '@/lib/ovie/mcp/oauth';
+import { getOvieOAuthIssuer, ovieIssuerSecret } from '@/lib/ovie/mcp/oauth';
 
 const { values } = parseArgs({
   options: {
