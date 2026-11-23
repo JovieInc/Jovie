@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 export interface AudioTrackSource {
   readonly id: string;
@@ -29,7 +29,7 @@ export interface ToggleTrackOptions {
   readonly queue?: readonly AudioTrackSource[];
 }
 
-interface PlaybackState {
+export interface PlaybackState {
   readonly activeTrackId: string | null;
   readonly isPlaying: boolean;
   readonly playbackStatus: 'idle' | 'loading' | 'playing' | 'paused' | 'error';
@@ -606,17 +606,17 @@ export function syncPlayingReleaseMetadata(release: PlayingReleasePatch): void {
   });
 }
 
-export function useTrackAudioPlayer() {
-  const [playbackState, setPlaybackState] = useState<PlaybackState>(state);
-
-  useEffect(() => {
-    const listener = () => setPlaybackState(state);
-    listeners.add(listener);
-    setPlaybackState(state);
-    return () => {
-      listeners.delete(listener);
-    };
-  }, []);
+export const getTrackAudioState = () => state;
+export const subscribeTrackAudio = (listener: () => void) => {
+  listeners.add(listener);
+  return () => void listeners.delete(listener);
+};
+export function useTrackAudioPlayer(watch = true) {
+  const playbackState = useSyncExternalStore(
+    watch ? subscribeTrackAudio : () => () => {},
+    getTrackAudioState,
+    getTrackAudioState
+  );
 
   const toggleTrack = useCallback(
     async (track: AudioTrackSource, options?: ToggleTrackOptions) => {

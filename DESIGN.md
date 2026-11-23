@@ -32,16 +32,16 @@ instructions, use this order:
    skills. These are implementation aids or historical evidence, never
    authority over the sources above.
 
-**Pen is the only publishable design SoT** (canvas and art direction). Color:
-Pen node **ZiaWI** (`ziawi-color-sot-v1` in
-`apps/web/design/ziawi-color-sot.json`). React tokens, OKLCH projections, and
-CSS emitters must match ZiaWI (ion `#11AFFF`, ultra/pulse/mint/orange/red,
-exactly 5 elevations). No parallel React-only color root. Figma/Paper are
-scratch/reference; Figma MCP is an optional bridge, never design authority.
+**Figma is the canonical design canvas**. Code tokens are the
+source and export to Figma variables (`docs/design/FIGMA_VARIABLES.md`); Figma
+frames come back into code 1:1. Color: ZiaWI `ziawi-color-sot-v1`
+(`apps/web/design/ziawi-color-sot.json`, Figma Tokens board). Tokens must match
+it (ion `#11AFFF`, ultra/pulse/mint/orange/red, exactly 5 elevations). No
+parallel React-only color root. Paper is scratch/reference.
 
-Unmapped Pen components are not source-backed until their identity maps to the
-current source registry and the required save/readback evidence exists. Source
-identities do not become Pen masters by visual resemblance. Keep one canonical
+Unmapped Figma components are not source-backed until their identity maps to
+the current source registry and the required save/readback evidence exists.
+Source identities do not become Figma masters by visual resemblance. Keep one canonical
 master or family per source concept; express supported states as variants and
 consume them as instances.
 
@@ -161,12 +161,12 @@ unless linked below.
 | `@jovie/ui-feel` | `off` | L | No | None (enforced by the UI-feel ratchet below) |
 | `arbitrary-radius` | `error` | S + G | Yes | 14 occurrences; 8 files |
 | `arbitrary-values` | `error` | G + I | Yes | 1651 |
-| `component-family` | `error` | G | Yes | button=27; emptyState=6; entityHeader=1; palette=4; shell=21; status=9 |
+| `component-family` | `error` | G | Yes | button=26; emptyState=6; entityHeader=1; palette=4; shell=21; status=9 |
 | `contrast (computed pairs)` | `error` | S + G | Yes | No count baseline; 4.5:1 normal text, 3:1 large text/UI |
 | `contrast (raw colors)` | `error` | S | Yes | arbitraryHex=0; bareBgBlack=0; bareBgWhite=0; bareTextBlack=0; bareTextWhite=0 |
-| `deprecated-button-alias` | `error` | G | Yes | 91 |
+| `deprecated-button-alias` | `error` | G | Yes | 83 |
 | `linear-namespace` | `error` | G + I | Yes | 661 |
-| `shadcn/no-restyle` | `error` | L + G | Yes | 212 files; 2991 messages (grandfathered) |
+| `shadcn/no-restyle` | `error` | L + G | Yes | 211 files; 2981 messages (grandfathered) |
 | `off-scale-step` | `error` | G + I | Yes | None; vs base |
 | `source-identity` | `error` | I | Yes | 1847 |
 | `spacing-scale (conservative)` | `error` | S + G | Yes | 587; armed=true; marketing=46; packages/ui=11; web-other=289; web-shell=241 |

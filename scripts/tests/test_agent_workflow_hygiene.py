@@ -1039,6 +1039,21 @@ def test_full_matrix_supersedes_stale_runs_cleanly() -> None:
     assert "cancel-in-progress: true" not in concurrency
 
 
+def test_visual_regression_branch_dispatches_get_their_own_lane() -> None:
+    """A baseline dispatch on one design branch must not cancel another
+    branch's run (2026-11-22: one global group made design PRs queue and
+    cancel each other). Main refresh and the schedule share one lane because
+    they open the single baseline PR."""
+    workflow = (WORKFLOWS / "visual-regression.yml").read_text(encoding="utf-8")
+    concurrency = workflow.split("\nconcurrency:\n", 1)[1].split(
+        "\njobs:\n", 1
+    )[0]
+    assert "format('visual-regression-branch-{0}', github.ref)" in concurrency
+    assert "github.ref != 'refs/heads/main'" in concurrency
+    assert "'visual-regression-baseline-refresh'" in concurrency
+    assert "cancel-in-progress: true" in concurrency
+
+
 def test_nightly_unit_suite_fetches_storybook_provenance_history() -> None:
     """Storybook provenance receipts need more than the depth-1 HEAD commit."""
     job = _job_block("nightly-tests.yml", "unit-tests")

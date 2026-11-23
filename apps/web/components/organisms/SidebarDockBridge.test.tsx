@@ -1,10 +1,4 @@
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   installDesktopUpdateBridge,
@@ -12,6 +6,7 @@ import {
 } from '@/lib/desktop/desktop-updates.test-utils';
 import { WHATS_NEW_PATH } from '@/lib/whats-new';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { renderWithQueryClient as render } from '@/tests/utils/test-utils';
 import { SidebarDockBridge } from './SidebarDockBridge';
 
 const mocks = vi.hoisted(() => ({
@@ -25,9 +20,10 @@ const mocks = vi.hoisted(() => ({
     isPlaying: true,
   },
 }));
-vi.mock('./release-sidebar/useTrackAudioPlayer', () => ({
-  useTrackAudioPlayer: () => ({
-    playbackState: mocks.track,
+vi.mock('./release-sidebar/useTrackAudioSnapshot', () => ({
+  selectNowPlaying: () => ({}),
+  useTrackAudioSnapshot: () => mocks.track,
+  useTrackAudioActions: () => ({
     stop: mocks.stop,
     toggleTrack: mocks.toggleTrack,
   }),
@@ -57,11 +53,12 @@ const entry = {
 const fetchFeed = vi.fn(async () =>
   Response.json({ version: 1, changelogUrl: '/changelog', entries: [entry] })
 );
+// The O is also a link; the release card's link is the one that is not it.
+const releaseLink = { name: /^(?!Open Chat$)/ };
 const props = {
   userId: 'one',
   collapsed: false,
   fetchImpl: fetchFeed,
-  children: () => null,
 };
 
 beforeEach(() => {
@@ -83,7 +80,7 @@ it('queues the newest release behind the updater while preserving audio actions'
   mocks.track.trackTitle = 'Never Say A Word';
   render(<SidebarDockBridge {...props} />);
   await waitFor(() => expect(fetchFeed).toHaveBeenCalledOnce());
-  expect(screen.queryByRole('link')).toBeNull();
+  expect(screen.queryByRole('link', releaseLink)).toBeNull();
   expect(fetchFeed).toHaveBeenCalledWith(
     WHATS_NEW_PATH,
     expect.objectContaining({ signal: expect.any(AbortSignal) })
@@ -100,7 +97,10 @@ it('queues the newest release behind the updater while preserving audio actions'
   fireEvent.click(screen.getByRole('button', { name: 'Dismiss Player' }));
   expect(mocks.stop).toHaveBeenCalledOnce();
   act(() => emit({ state: 'not-available' }));
-  expect(await screen.findByRole('link')).toHaveAttribute('href', '/changelog');
+  expect(await screen.findByRole('link', releaseLink)).toHaveAttribute(
+    'href',
+    '/changelog'
+  );
   expect(screen.queryByRole('button', { name: 'Download update' })).toBeNull();
 });
 
@@ -110,7 +110,7 @@ it.each([null, { version: 2 }])(
     const fetchImpl = vi.fn(async () => Response.json(value));
     render(<SidebarDockBridge {...props} fetchImpl={fetchImpl} />);
     await waitFor(() => expect(fetchImpl).toHaveBeenCalledOnce());
-    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.queryByRole('link', releaseLink)).toBeNull();
   }
 );
 
@@ -139,7 +139,7 @@ function installEvent() {
 describe('PWA install within the shared dock', () => {
   it('persists dismissal through the existing PWA store across remounts', async () => {
     const first = render(<SidebarDockBridge {...props} />);
-    await screen.findByRole('link');
+    await screen.findByRole('link', releaseLink);
     act(() => {
       window.dispatchEvent(installEvent());
     });
@@ -158,7 +158,7 @@ describe('PWA install within the shared dock', () => {
 
   it('invokes the browser install prompt and removes the installed card', async () => {
     render(<SidebarDockBridge {...props} />);
-    await screen.findByRole('link');
+    await screen.findByRole('link', releaseLink);
     const event = installEvent();
     act(() => {
       window.dispatchEvent(event);
@@ -195,7 +195,7 @@ it('suppresses a what-is-new entry whose action the user already completed', asy
       userState={{ hasClaimedHandle: false }}
     />
   );
-  expect(await screen.findByRole('link')).toBeInTheDocument();
+  expect(await screen.findByRole('link', releaseLink)).toBeInTheDocument();
   unmount();
 
   render(
@@ -207,7 +207,7 @@ it('suppresses a what-is-new entry whose action the user already completed', asy
   );
   await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2));
   await new Promise(resolve => setTimeout(resolve, 50));
-  expect(screen.queryByRole('link')).toBeNull();
+  expect(screen.queryByRole('link', releaseLink)).toBeNull();
 });
 
 describe('SidebarDockBridge accessibility', () => {
@@ -230,7 +230,7 @@ describe('SidebarDockBridge accessibility', () => {
     const { container } = render(
       <SidebarDockBridge {...props} fetchImpl={feedWith(title)} />
     );
-    expect(await screen.findByRole('link')).toHaveAttribute(
+    expect(await screen.findByRole('link', releaseLink)).toHaveAttribute(
       'href',
       '/changelog'
     );
@@ -243,7 +243,7 @@ describe('SidebarDockBridge accessibility', () => {
         <SidebarDockBridge {...props} fetchImpl={feedWith('أحدث إصداراتك')} />
       </div>
     );
-    expect(await screen.findByRole('link')).toBeInTheDocument();
+    expect(await screen.findByRole('link', releaseLink)).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 
@@ -256,7 +256,7 @@ describe('SidebarDockBridge accessibility', () => {
       <SidebarDockBridge {...props} fetchImpl={fetchImpl} />
     );
     await waitFor(() => expect(fetchImpl).toHaveBeenCalledOnce());
-    expect(screen.queryByRole('link')).toBeNull();
+    expect(screen.queryByRole('link', releaseLink)).toBeNull();
     await expectNoA11yViolations(container);
   });
 });

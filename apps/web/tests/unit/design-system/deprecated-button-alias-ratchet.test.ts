@@ -7,11 +7,12 @@ import { describe, expect, it } from 'vitest';
  * Deprecated Button alias ratchet (JOV-5601).
  *
  * `packages/ui/atoms/button-contract.ts` still normalizes legacy variant
- * aliases (`outline`, `whitePill`, `frosted`, …) onto the canonical Button
- * variants for migration compatibility. Live app callsites should name the
- * canonical variant directly so one CTA language survives. This ratchet
- * counts `variant='<alias>'` selections across the web surfaces; the count
- * may only go DOWN. When you retire aliases, lower `count` in
+ * aliases (`outline`, `whitePill`, …) onto the canonical Button variants for
+ * migration compatibility. Frosted glass is first-class on Button (Drift
+ * T2.3) — not an alias. Live app callsites should name the canonical variant
+ * directly so one CTA language survives. This ratchet counts
+ * `variant='<alias>'` selections across the web surfaces; the count may only
+ * go DOWN. When you retire aliases, lower `count` in
  * deprecated-button-alias.baseline.json in the SAME PR.
  *
  * Sibling of raw-button-ratchet.test.ts — same committed-baseline shape.
@@ -28,9 +29,6 @@ export const DEPRECATED_BUTTON_VARIANT_ALIASES = [
   'accent',
   'outline',
   'destructive',
-  'frosted',
-  'frosted-ghost',
-  'frosted-outline',
   'whitePill',
 ] as const;
 
@@ -56,7 +54,7 @@ function walk(dir: string, out: string[]): void {
       walk(full, out);
     } else if (
       SOURCE_EXT.test(entry) &&
-      !/\.(test|stories|probe)\.[tj]sx?$/.test(entry) &&
+      !/\.(test|stories)\.[tj]sx?$/.test(entry) &&
       !full.includes(`${sep}__tests__${sep}`)
     ) {
       out.push(full);
@@ -77,15 +75,7 @@ export function countDeprecatedAliasSelections(
   const byFile = new Map<string, number>();
   let total = 0;
   for (const file of files) {
-    let source: string;
-    try {
-      source = readFileSync(file, 'utf8');
-    } catch (error) {
-      // Parallel suite probes (*.probe.tsx) can vanish between walk and read.
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
-      throw error;
-    }
-    const matches = source.match(ALIAS_SELECTION);
+    const matches = readFileSync(file, 'utf8').match(ALIAS_SELECTION);
     if (!matches) continue;
     total += matches.length;
     byFile.set(relative(WEB_ROOT, file), matches.length);
@@ -142,7 +132,7 @@ describe('deprecated Button alias ratchet', () => {
       .join(', ');
     expect(
       total,
-      `Deprecated Button alias selections grew (${total} > ${baseline.count}). Name the canonical variant instead (outline→secondary, whitePill/accent/destructive→primary, frosted→secondary, frosted-ghost→ghost). Heaviest files: ${top}`
+      `Deprecated Button alias selections grew (${total} > ${baseline.count}). Name the canonical variant instead (outline→secondary, whitePill/accent/destructive→primary). Heaviest files: ${top}`
     ).toBeLessThanOrEqual(baseline.count);
   });
 });

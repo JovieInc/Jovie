@@ -69,6 +69,16 @@ describe('OvieComposerDock', () => {
     expect(screen.getByTestId('ovie-composer-dock-reject')).toBeEnabled();
   });
 
+  it('says plainly what Approve and Reject each do', async () => {
+    mount([makeCase('one')], () => json({ ok: true }));
+    expect(
+      await screen.findByTestId('ovie-composer-dock-approve-does')
+    ).toHaveTextContent('Approve: Use owned capacity');
+    expect(
+      screen.getByTestId('ovie-composer-dock-reject-does')
+    ).toHaveTextContent('Reject: it does not go ahead.');
+  });
+
   it('has no accessibility violations', async () => {
     mount([makeCase('one')], () => json({ ok: true }));
     await screen.findByText('Decision one');

@@ -73,8 +73,8 @@ describe('JOV-INV-024 harness contract', () => {
     assert.equal(first.schema, HARNESS_RECEIPT_SCHEMA);
     assert.equal(first.invariant, HARNESS_CONTRACT_INVARIANT_ID);
     assert.equal(first.principles, 9);
-    assert.equal(first.enforced, 3);
-    assert.equal(first.partial, 6);
+    assert.equal(first.enforced, 5);
+    assert.equal(first.partial, 4);
     assert.deepEqual(first.overhead, {
       addedProcesses: 0,
       addedCiJobs: 0,
@@ -194,14 +194,14 @@ describe('JOV-INV-024 harness contract', () => {
 
   it('deliberate red: an expired exception fails closed and a live one passes', () => {
     const expired = clone();
-    harnessPrinciple(expired, 'H-02').exception.expires = '2026-08-01';
-    const gate = harnessPrinciple(expired, 'H-02').gate.path;
+    harnessPrinciple(expired, 'H-03').exception.expires = '2026-08-01';
+    const gate = harnessPrinciple(expired, 'H-03').gate.path;
     const errors = validateHarnessContract(
       expired,
       passFs({ changedPaths: [gate] })
     );
     assert.ok(
-      errors.some(error => error.includes('harness-exception-expired:H-02'))
+      errors.some(error => error.includes('harness-exception-expired:H-03'))
     );
     const viaContract = validateHarnessContract(
       expired,
@@ -209,19 +209,19 @@ describe('JOV-INV-024 harness contract', () => {
     );
     assert.ok(
       viaContract.some(error =>
-        error.includes('harness-exception-expired:H-02')
+        error.includes('harness-exception-expired:H-03')
       )
     );
 
     const live = clone();
-    harnessPrinciple(live, 'H-02').exception.expires = '2026-09-30';
+    harnessPrinciple(live, 'H-03').exception.expires = '2026-09-30';
     assert.deepEqual(validateHarnessContract(live, passFs()), []);
 
     const wrongOwner = clone();
-    harnessPrinciple(wrongOwner, 'H-02').exception.owner = 'Gem';
+    harnessPrinciple(wrongOwner, 'H-03').exception.owner = 'Gem';
     assert.ok(
       validateHarnessContract(wrongOwner, passFs()).some(error =>
-        error.includes('harness-exception-owner:H-02')
+        error.includes('harness-exception-owner:H-03')
       )
     );
   });
@@ -433,7 +433,7 @@ describe('H-06 repeated-feedback linkage', () => {
 
   it('an expired exception warns, not blocks, outside its scope (2026-11-01 queue outage)', () => {
     const expired = clone();
-    harnessPrinciple(expired, 'H-02').exception.expires = '2026-08-01';
+    harnessPrinciple(expired, 'H-03').exception.expires = '2026-08-01';
     for (const changedPaths of [['apps/web/app/page.tsx'], [], undefined]) {
       const { errors, warnings } = evaluateHarnessContract(
         expired,
@@ -442,7 +442,7 @@ describe('H-06 repeated-feedback linkage', () => {
       assert.deepEqual(errors, []);
       assert.ok(
         warnings.some(warning =>
-          warning.includes('harness-exception-expired-out-of-scope:H-02')
+          warning.includes('harness-exception-expired-out-of-scope:H-03')
         )
       );
     }
@@ -450,26 +450,26 @@ describe('H-06 repeated-feedback linkage', () => {
 
   it('warns inside the 72h expiry window and stays quiet before it', () => {
     const soon = clone();
-    harnessPrinciple(soon, 'H-02').exception.expires = '2026-09-05';
+    harnessPrinciple(soon, 'H-03').exception.expires = '2026-09-05';
     const near = evaluateHarnessContract(soon, passFs());
     assert.deepEqual(near.errors, []);
     assert.ok(
       near.warnings.some(warning =>
-        warning.includes('harness-exception-expiring:H-02')
+        warning.includes('harness-exception-expiring:H-03')
       )
     );
     const sameDay = clone();
-    harnessPrinciple(sameDay, 'H-02').exception.expires = NOW;
+    harnessPrinciple(sameDay, 'H-03').exception.expires = NOW;
     assert.ok(
       evaluateHarnessContract(sameDay, passFs()).warnings.some(warning =>
-        warning.includes('harness-exception-expiring:H-02')
+        warning.includes('harness-exception-expiring:H-03')
       )
     );
     const later = clone();
-    harnessPrinciple(later, 'H-02').exception.expires = '2026-09-06';
+    harnessPrinciple(later, 'H-03').exception.expires = '2026-09-06';
     assert.deepEqual(
       evaluateHarnessContract(later, passFs()).warnings.filter(warning =>
-        warning.includes(':H-02:')
+        warning.includes(':H-03:')
       ),
       []
     );

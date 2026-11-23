@@ -498,7 +498,7 @@ describe('lane-pull-requests (open devin/ and codex/ PRs)', () => {
       )
     );
     // glm/opus/grok/cursor lanes were invisible when only devin+codex were searched.
-    for (const lane of ['glm', 'opus', 'grok', 'cursor']) {
+    for (const lane of ['glm', 'opus', 'grok', 'cursor', 'claude']) {
       expect(queries).toContain(
         `repo:JovieInc/Jovie is:pr is:open head:${lane}/`
       );

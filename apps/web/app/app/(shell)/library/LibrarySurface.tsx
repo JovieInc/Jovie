@@ -255,10 +255,10 @@ const LIBRARY_CARD_FOCUS_CLASS =
 const LIBRARY_BUTTON_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface) outline-none';
 const LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS =
-  'h-8 min-h-8 lg:before:h-8 lg:before:min-w-0';
+  'h-7 min-h-7 lg:before:h-7 lg:before:min-w-0';
 const LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS = cn(
   LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS,
-  'w-8 min-w-8'
+  'w-7 min-w-7'
 );
 
 type LibraryPresetId = LibraryView;

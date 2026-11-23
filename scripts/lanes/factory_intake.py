@@ -12,9 +12,9 @@ handoff, flaky/red-check class, the factory-audit synthesis, rework rate) drops 
 
 `plan` turns each into an issue body with a Goal, Definition of done and a Verification section
 naming the fleet metric that must move (a factory change counts only when it does). `apply` files
-the ones with no open issue carrying the label `factory-fp:<fingerprint>` in Todo with labels
-`factory` and `ws:symphony-throughput`, so the existing lanes admission (workstream rank) runs
-them like any other issue. The doctor pass files them (run_pass); the CLI only prints the plan. Open work dedupes by label;
+the ones with no open issue carrying the label `factory-fp:<fingerprint>` in Backlog with labels
+`factory` and `ws:symphony-throughput`, so the existing lanes admission (the infra code sub-lane)
+promotes them like any other issue. The doctor pass files them (run_pass); the CLI only prints the plan. Open work dedupes by label;
 terminal issues dedupe only evidence already covered by that work. `factory-intake.json` records
 observations consumed while an issue is open; old installs also reconcile terminal issue bodies.
 """
@@ -229,7 +229,7 @@ def apply(linear, items: list[dict], limit: int = MAX_PER_PASS, *, covered=None,
             save(covered)
 
     team = linear.gql(TEAM, {})["teams"]["nodes"][0]
-    todo = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Todo")
+    backlog = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Backlog")  # admission promotes it
     labels = {l["name"]: l["id"] for l in team["labels"]["nodes"]}
     results = []
     filed = 0
@@ -270,7 +270,7 @@ def apply(linear, items: list[dict], limit: int = MAX_PER_PASS, *, covered=None,
                 made = linear.gql(LABEL_CREATE, {"i": {"teamId": team["id"], "name": name}})["issueLabelCreate"]
                 labels[name] = made["issueLabel"]["id"]
             ids.append(labels[name])
-        data = linear.gql(CREATE, {"i": {"teamId": team["id"], "stateId": todo, "labelIds": ids, "priority": 2,
+        data = linear.gql(CREATE, {"i": {"teamId": team["id"], "stateId": backlog, "labelIds": ids, "priority": 2,
                                          "title": item["title"], "description": item["description"]}})
         created = data["issueCreate"]
         if created.get("success") is not True or not (created.get("issue") or {}).get("identifier"):

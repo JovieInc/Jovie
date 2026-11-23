@@ -336,11 +336,12 @@ function rowsOf<T>(result: unknown): T[] {
 export async function getDelightInput(since: Date): Promise<DelightInput> {
   const empty: DelightInput = {
     timeToWowSeconds: null,
+    timeToFirstDashboardSeconds: null,
     wowReach: null,
     turnsBeforeWow: null,
   };
   try {
-    const [wowResult, turnsResult] = await Promise.all([
+    const [wowResult, turnsResult, firstDashboardResult] = await Promise.all([
       db.execute(drizzleSql`
         WITH journeys AS (
           SELECT s.acquisition_id,
@@ -379,6 +380,21 @@ export async function getDelightInput(since: Date): Promise<DelightInput> {
                percentile_cont(0.95) WITHIN GROUP (ORDER BY turns) AS p95
         FROM sessions
       `),
+      db.execute(drizzleSql`
+        WITH loads AS (
+          SELECT (${serverAnalyticsEvents.properties}->>'duration_ms')::numeric / 1000 AS seconds
+          FROM ${serverAnalyticsEvents}
+          WHERE ${serverAnalyticsEvents.eventName} = 'first_dashboard_ready'
+            AND ${serverAnalyticsEvents.occurredAt} >= ${since}
+            AND ${serverAnalyticsEvents.properties}->>'outcome' = 'reached'
+            AND ${serverAnalyticsEvents.properties}->>'cohort' = 'customer'
+            AND ${serverAnalyticsEvents.properties}->>'duration_ms' ~ '^[0-9]+$'
+        )
+        SELECT count(*)::int AS samples,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY seconds) AS p50,
+               percentile_cont(0.95) WITHIN GROUP (ORDER BY seconds) AS p95
+        FROM loads
+      `),
     ]);
     const wow = rowsOf<
       DistributionRow & { started: number | string; reached: number | string }
@@ -392,6 +408,9 @@ export async function getDelightInput(since: Date): Promise<DelightInput> {
           }
         : null,
       turnsBeforeWow: toDistribution(rowsOf<DistributionRow>(turnsResult)[0]),
+      timeToFirstDashboardSeconds: toDistribution(
+        rowsOf<DistributionRow>(firstDashboardResult)[0]
+      ),
     };
   } catch {
     return empty;

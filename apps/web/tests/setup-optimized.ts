@@ -261,30 +261,29 @@ function createInertMotionValue<T>(initial: T) {
   };
 }
 
-vi.mock('motion/react', async () => {
-  const React = await import('react');
-  // Table tags have to stay real elements. Dropping the wrapper (the default
-  // for every other motion tag) removes the cell and breaks row semantics.
-  const tableTags = new Set([
-    'caption',
-    'col',
-    'colgroup',
-    'table',
-    'tbody',
-    'td',
-    'tfoot',
-    'th',
-    'thead',
-    'tr',
-  ]);
-  const passthrough = ({ children }: { children?: unknown }) =>
-    children ?? null;
-  const tableComponents = new Map<string, typeof passthrough>();
-  return {
-    MotionGlobalConfig: { skipAnimations: false },
-    AnimatePresence: ({ children }: { children: unknown }) => children,
-    LazyMotion: ({ children }: { children: unknown }) => children,
-    motion: new Proxy(
+// Shared inert stand-in for `motion.*` and the lazy `m.*` entry.
+const motionMock = vi.hoisted(() => ({
+  proxy: null as unknown,
+  build(React: typeof import('react')) {
+    if (this.proxy) return this.proxy;
+    // Table tags have to stay real elements. Dropping the wrapper (the default
+    // for every other motion tag) removes the cell and breaks row semantics.
+    const tableTags = new Set([
+      'caption',
+      'col',
+      'colgroup',
+      'table',
+      'tbody',
+      'td',
+      'tfoot',
+      'th',
+      'thead',
+      'tr',
+    ]);
+    const passthrough = ({ children }: { children?: unknown }) =>
+      children ?? null;
+    const tableComponents = new Map<string, typeof passthrough>();
+    const motionProxy = new Proxy(
       {},
       {
         get: (_target, tag) => {
@@ -323,7 +322,21 @@ vi.mock('motion/react', async () => {
           return MotionTable;
         },
       }
-    ),
+    );
+    this.proxy = motionProxy;
+    return motionProxy;
+  },
+}));
+
+vi.mock('motion/react', async () => {
+  const React = await import('react');
+  const motionProxy = motionMock.build(React);
+  return {
+    MotionGlobalConfig: { skipAnimations: false },
+    AnimatePresence: ({ children }: { children: unknown }) => children,
+    LazyMotion: ({ children }: { children: unknown }) => children,
+    motion: motionProxy,
+    m: motionProxy,
     useReducedMotion: () => false,
     // Motion-value hooks return inert stand-ins; the proxied `motion.*`
     // components above never read them.
@@ -332,6 +345,24 @@ vi.mock('motion/react', async () => {
     useTransform: () => createInertMotionValue(undefined),
     useVelocity: () => createInertMotionValue(0),
   };
+});
+
+// `motion/react-m` is the lazy `m.*` entry (see lib/animation/LazyMotionFeatures).
+vi.mock('motion/react-m', async () => {
+  const React = await import('react');
+  const motionProxy = motionMock.build(React) as Record<string, unknown>;
+  // The factory result is awaited, so `then` must stay undefined or the
+  // proxy reads as a thenable and the import never settles.
+  return new Proxy(
+    {},
+    {
+      get: (_target, key) =>
+        key === 'then' || typeof key === 'symbol'
+          ? undefined
+          : motionProxy[key],
+      has: (_target, key) => key !== 'then' && typeof key === 'string',
+    }
+  );
 });
 
 vi.mock('@headlessui/react', async () => {

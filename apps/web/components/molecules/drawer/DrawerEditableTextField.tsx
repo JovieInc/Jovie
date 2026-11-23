@@ -203,7 +203,7 @@ export const DrawerEditableTextField = React.memo(
               placeholder={placeholder ?? emptyLabel}
               aria-label={`Edit ${label}`}
               className={cn(
-                'h-8 w-full rounded-lg border-(--app-shell-frame-seam) bg-surface-0 px-2.5 text-app text-primary-token',
+                'h-7 w-full rounded-lg border-(--app-shell-frame-seam) bg-surface-0 px-2.5 text-app text-primary-token',
                 monospace && 'font-mono tracking-wider',
                 inputClassName
               )}
@@ -222,7 +222,7 @@ export const DrawerEditableTextField = React.memo(
                     // text area so editable and static rows share the same
                     // visual grid.
                     'h-auto px-0 py-0 rounded-md hover:bg-surface-0'
-                  : 'h-8 rounded-lg px-2.5 hover:bg-surface-0',
+                  : 'h-7 rounded-lg px-2.5 hover:bg-surface-0',
                 density === 'inline' ? undefined : inputClassName,
                 'border border-transparent bg-transparent shadow-none',
                 !hasValue && 'text-tertiary-token'

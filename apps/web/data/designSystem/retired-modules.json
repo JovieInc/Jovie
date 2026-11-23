@@ -31,6 +31,17 @@
       "replacementSource": "components/features/dashboard/organisms/DashboardFeedbackModal.tsx",
       "reason": "Analytics wrapper around DashboardFeedbackModal with no consumers.",
       "retired": "2026-09-26"
+    },
+    {
+      "specifiers": [
+        "@/components/atoms/FrostedButton",
+        "@/components/atoms/FrostedButton.tsx"
+      ],
+      "source": "components/atoms/FrostedButton.tsx",
+      "replacement": "@jovie/ui Button variant frosted | frosted-ghost | frosted-outline",
+      "replacementSource": "../../packages/ui/atoms/button.tsx",
+      "reason": "Drift T2.3: folded into Button glass variants; no twin vocabulary.",
+      "retired": "2026-11-20"
     }
   ],
   "exports": [
@@ -40,6 +51,20 @@
       "replacement": "contentSurfaceCardVariants()",
       "reason": "Precomputed default-variant class string; call the CVA recipe instead.",
       "retired": "2026-09-26"
+    },
+    {
+      "name": "FrostedButton",
+      "source": "components/atoms/FrostedButton.tsx",
+      "replacement": "Button variant=\"frosted\" | \"frosted-ghost\" | \"frosted-outline\"",
+      "reason": "Drift T2.3: retire twin export; glass material is a Button variant.",
+      "retired": "2026-11-20"
+    },
+    {
+      "name": "FrostedButtonProps",
+      "source": "components/atoms/FrostedButton.tsx",
+      "replacement": "ButtonProps",
+      "reason": "Drift T2.3: twin props type retired with the component.",
+      "retired": "2026-11-20"
     }
   ]
 }

@@ -110,6 +110,8 @@ export const GOLDEN_PATH_PATH_PREFIXES = Object.freeze([
   'scripts/lib/prod-cert',
   'scripts/golden-path-cert-reuse.mjs',
   'scripts/lib/golden-path-cert-reuse.mjs',
+  'scripts/lib/golden-path-step-scope.mjs',
+  'docs/pen-stills/golden-path/step-scope.json',
   'scripts/lib/golden-path-lock.mjs',
   'scripts/golden-path-lock.mjs',
   '.github/workflows/golden-path-prod-autofix.yml',

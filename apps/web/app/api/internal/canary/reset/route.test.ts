@@ -6,9 +6,11 @@ const mocks = vi.hoisted(() => ({
   cronAuth: vi.fn(),
   passageGrant: vi.fn(),
   limiter: vi.fn(),
+  count: vi.fn(),
   execute: vi.fn(),
 }));
 
+vi.mock('@sentry/nextjs', () => ({ metrics: { count: mocks.count } }));
 vi.mock('@/lib/env-server', () => ({ env: mocks.env }));
 vi.mock('@/lib/cron/auth', () => ({
   verifyCronRequest: mocks.cronAuth,
@@ -42,6 +44,7 @@ describe('POST /api/internal/canary/reset', () => {
       claims: { run: 'run-1', sub: 'x' },
     });
     mocks.limiter.mockResolvedValue({ success: true });
+    mocks.count.mockReset();
     mocks.execute.mockResolvedValue({
       ok: true,
       summary: 'claims=1 profiles=1',
@@ -75,6 +78,7 @@ describe('POST /api/internal/canary/reset', () => {
     const response = await POST(postRequest());
     expect(response.status).toBe(401);
     expect(mocks.execute).not.toHaveBeenCalled();
+    expect(mocks.count).not.toHaveBeenCalled();
     expect(mocks.passageGrant).toHaveBeenCalledWith(
       expect.objectContaining({ get: expect.any(Function) }),
       'canary_reset',
@@ -82,8 +86,33 @@ describe('POST /api/internal/canary/reset', () => {
     );
   });
 
-  it('fails closed when the 6/hour reset budget is exhausted', async () => {
-    mocks.limiter.mockResolvedValue({ success: false });
+  it.each([
+    [false, 'budget_exhausted'],
+    [true, 'limiter_unavailable'],
+  ] as const)(
+    'fails closed and records only the denial reason (unavailable=%s)',
+    async (unavailable, reason) => {
+      mocks.limiter.mockResolvedValue({ success: false, unavailable });
+      const response = await POST(postRequest());
+      expect(response.status).toBe(429);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(await response.json()).toEqual({
+        error: 'Canary reset rate limit exceeded',
+      });
+      expect(mocks.execute).not.toHaveBeenCalled();
+      expect(mocks.count).toHaveBeenCalledExactlyOnceWith(
+        'synthetic.canary_reset.denied',
+        1,
+        { attributes: { reason } }
+      );
+    }
+  );
+
+  it('preserves fail-closed behavior if denial telemetry throws', async () => {
+    mocks.limiter.mockResolvedValue({ success: false, unavailable: true });
+    mocks.count.mockImplementation(() => {
+      throw new Error('metrics unavailable');
+    });
     const response = await POST(postRequest());
     expect(response.status).toBe(429);
     expect(mocks.execute).not.toHaveBeenCalled();
@@ -103,5 +132,6 @@ describe('POST /api/internal/canary/reset', () => {
     expect(body.run).toBe('run-1');
     expect(body.summary).toBe('claims=1 profiles=1');
     expect(mocks.execute).toHaveBeenCalledTimes(1);
+    expect(mocks.count).not.toHaveBeenCalled();
   });
 });

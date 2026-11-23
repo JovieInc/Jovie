@@ -625,11 +625,6 @@ export function ProfileDesktopSurface({
           </div>
           <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(5,6,8,0.14)_0%,rgba(7,8,10,0.38)_42%,rgba(7,8,10,0.98)_100%)]' />
           <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.06),transparent_22%)]' />
-          <div
-            className='pointer-events-none absolute inset-x-7 bottom-0 h-px bg-(--profile-cover-accent-line)'
-            aria-hidden='true'
-            data-testid='profile-desktop-cover-accent-line'
-          />
           <div className='@container relative z-10 flex h-full flex-col justify-between p-7'>
             <div aria-hidden='true' />
             <div className='space-y-5'>
@@ -1055,6 +1050,8 @@ export function ProfileDesktopSurface({
                     data-testid={`profile-primary-tab-${tab.id}`}
                     className={cn(
                       'inline-flex h-11 min-w-0 items-center gap-2 rounded-full px-3 text-app font-medium tracking-tight transition-colors duration-subtle active:bg-white/[0.08]',
+                      // Ring on keyboard focus only (:focus-visible), never after a click.
+                      'focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [&:focus:not(:focus-visible)]:shadow-none',
                       isActive
                         ? 'text-white dark:text-white'
                         : 'text-white/50 hover:text-white/78'

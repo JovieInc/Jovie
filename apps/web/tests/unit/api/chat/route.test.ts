@@ -8,8 +8,6 @@ import {
   it,
   vi,
 } from 'vitest';
-import type { ChatAccountContext } from '@/lib/chat/account-context';
-import { getEntitlements } from '@/lib/entitlements/registry';
 import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
 import { ovieSummerTurnId } from '@/lib/ovie/summer-conversation';
 import {
@@ -17,6 +15,7 @@ import {
   resetSummerTransportRuntime,
 } from '@/lib/ovie/summer-transport';
 import { PRODCERT_CHAT_HEALTH_CANARY_EMAIL } from '@/lib/synthetic/prodcert-identities';
+import { makeAccountContext } from './chat-account-context.fixture';
 
 const hoisted = vi.hoisted(() => ({
   tryHandleAnonymousOnboardingChatMock: vi.fn(),
@@ -151,6 +150,7 @@ vi.mock('@/lib/error-tracking', () => ({
 
 vi.mock('@/lib/eval/scorers/online', () => ({
   scheduleOnlineScoring: vi.fn(),
+  scheduleTurnOutcomeCheck: vi.fn(),
 }));
 
 vi.mock('@/lib/services/album-art/provider-xai', () => ({
@@ -279,77 +279,6 @@ vi.mock('@/lib/discography/slug', () => ({
 
 const PROFILE_ID = '550e8400-e29b-41d4-a716-446655440000';
 
-function makeAccountContext(
-  overrides: Partial<{
-    plan: 'free' | 'pro' | 'max';
-    billingVerification: 'verified' | 'unavailable';
-    email: string;
-  }> = {}
-): ChatAccountContext {
-  const billingVerification = overrides.billingVerification ?? 'verified';
-  const plan =
-    billingVerification === 'unavailable' ? 'free' : (overrides.plan ?? 'pro');
-  const planLimits = getEntitlements(plan);
-  const isPro = plan !== 'free';
-  const merchAvailable = billingVerification === 'verified' && isPro;
-  const displayPlan =
-    billingVerification === 'unavailable'
-      ? 'Unverified'
-      : plan === 'max'
-        ? 'Max'
-        : plan === 'pro'
-          ? 'Pro'
-          : 'Free';
-  return {
-    email: overrides.email ?? 'artist@example.com',
-    plan,
-    displayPlan,
-    isPro,
-    billingVerification,
-    planMismatch: null,
-    usage: null,
-    entitlements: {
-      aiCanUseTools: planLimits.booleans.aiCanUseTools,
-      canAccessMerchCreation: planLimits.booleans.canAccessMerchCreation,
-      canGenerateAlbumArt: planLimits.booleans.canGenerateAlbumArt,
-      canAccessAdvancedAnalytics:
-        planLimits.booleans.canAccessAdvancedAnalytics,
-    },
-    flags: { merchMvp: false },
-    billing: {
-      hasStripeCustomer: isPro,
-      hasStripeSubscription: isPro,
-    },
-    merchAccess: {
-      available: merchAvailable,
-      reason:
-        billingVerification === 'unavailable'
-          ? 'billing_unavailable'
-          : merchAvailable
-            ? 'available'
-            : 'plan_unavailable',
-    },
-    planLimits,
-    userEntitlements: {
-      userId: 'user_123',
-      email: 'artist@example.com',
-      isAuthenticated: true,
-      isAdmin: false,
-      plan,
-      isPro,
-      hasAdvancedFeatures: false,
-      isTrialing: false,
-      trialEndsAt: null,
-      trialDaysRemaining: null,
-      billingVerification,
-      hasStripeCustomer: isPro,
-      hasStripeSubscription: isPro,
-      ...planLimits.booleans,
-      ...planLimits.limits,
-    },
-  };
-}
-
 function chatRequest(body: Record<string, unknown>) {
   return new Request('http://localhost:3000/api/chat', {
     method: 'POST',
@@ -359,6 +288,10 @@ function chatRequest(body: Record<string, unknown>) {
     },
     body: JSON.stringify(body),
   });
+}
+
+function userMessages(text: string) {
+  return [{ id: 'm1', role: 'user', parts: [{ type: 'text', text }] }];
 }
 
 function validBody(overrides: Record<string, unknown> = {}) {
@@ -680,13 +613,7 @@ describe('POST /api/chat guard wiring', () => {
       chatRequest(
         validBody({
           chatMode: 'ov',
-          messages: [
-            {
-              id: 'm1',
-              role: 'user',
-              parts: [{ type: 'text', text: 'research eval dogfood' }],
-            },
-          ],
+          messages: userMessages('research eval dogfood'),
         })
       )
     );
@@ -759,13 +686,7 @@ describe('POST /api/chat guard wiring', () => {
           chatMode: 'ov',
           profileId: undefined,
           clientTurnId: 'ov-turn-1',
-          messages: [
-            {
-              id: 'm1',
-              role: 'user',
-              parts: [{ type: 'text', text: 'status of the kanban' }],
-            },
-          ],
+          messages: userMessages('status of the kanban'),
         })
       )
     );
@@ -783,6 +704,12 @@ describe('POST /api/chat guard wiring', () => {
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
     expect(hoisted.reserveChatTurnMock).not.toHaveBeenCalled();
     expect(hoisted.fetchSummerShadowMock).toHaveBeenCalledTimes(2);
+    // First-token path: no artist-only context, flags or preflights for OV.
+    expect(hoisted.resolveChatAccountContextMock).not.toHaveBeenCalled();
+    expect(hoisted.getAppFlagValueMock).not.toHaveBeenCalled();
+    const serverTiming = response.headers.get('server-timing') ?? '';
+    expect(serverTiming).toMatch(/auth;dur=\d/);
+    expect(serverTiming).toMatch(/preflight;dur=\d/);
   });
 
   it('rejects OV turns without a stable client turn id before Eve dispatch', async () => {
@@ -792,13 +719,7 @@ describe('POST /api/chat guard wiring', () => {
       chatRequest(
         validBody({
           chatMode: 'ov',
-          messages: [
-            {
-              id: 'm1',
-              role: 'user',
-              parts: [{ type: 'text', text: 'status of the kanban' }],
-            },
-          ],
+          messages: userMessages('status of the kanban'),
         })
       )
     );
@@ -823,18 +744,18 @@ describe('POST /api/chat guard wiring', () => {
         validBody({
           chatMode: 'ov',
           clientTurnId: 'ov-turn-not-founder',
-          messages: [
-            {
-              id: 'm1',
-              role: 'user',
-              parts: [{ type: 'text', text: 'private founder status' }],
-            },
-          ],
+          messages: userMessages('private founder status'),
         })
       )
     );
 
     expect(response.status).toBe(403);
+    // The operator sees a plain sentence, not the generic chat fallback.
+    expect(await response.json()).toMatchObject({
+      error: 'Founder Summer access required',
+      errorCode: 'SUMMER_FOUNDER_ACCESS_REQUIRED',
+      message: "This account isn't Summer's founder account.",
+    });
     expect(hoisted.fetchSummerShadowMock).not.toHaveBeenCalled();
     expect(hoisted.getOvieOperatingStoreMock).not.toHaveBeenCalled();
   });
@@ -848,18 +769,20 @@ describe('POST /api/chat guard wiring', () => {
         validBody({
           chatMode: 'ov',
           clientTurnId: 'ov-turn-unconfigured',
-          messages: [
-            {
-              id: 'm1',
-              role: 'user',
-              parts: [{ type: 'text', text: 'private founder status' }],
-            },
-          ],
+          messages: userMessages('private founder status'),
         })
       )
     );
 
     expect(response.status).toBe(503);
+    // The operator sees a plain sentence, not the generic chat fallback.
+    const body = await response.json();
+    expect(body).toMatchObject({
+      error: 'Founder Summer identity is not configured',
+      errorCode: 'SUMMER_FOUNDER_IDENTITY_UNCONFIGURED',
+      message: "Summer isn't connected on this environment yet.",
+    });
+    expect(typeof body.requestId).toBe('string');
     expect(hoisted.fetchSummerShadowMock).not.toHaveBeenCalled();
   });
 });
