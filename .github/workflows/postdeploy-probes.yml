@@ -736,6 +736,9 @@ jobs:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
 
       # JOV-9826: canary claim→checkout→activation (Stripe TEST only). Soft-skip if spec missing.
+      # Paid walk targets the Stripe TEST-safe Preview alias (staging.jov.ie), not
+      # Production (pk_live / live price). Fail closed unless public JS is pk_test
+      # and pricing-options allowlists the dogfood TEST price — no live money.
       - name: Run canary claim checkout walk (JOV-9826)
         id: canary-checkout
         if: steps.check-creds.outputs.skip != 'true'
@@ -745,11 +748,56 @@ jobs:
             echo "::notice::Landed build predates canary-claim-checkout.spec.ts; JOV-9826 walk skipped for it."
             exit 0
           fi
-          PRODUCTION_BASE_URL="$(printf '%s' "$PRODUCTION_BASE_URL_B64" | base64 --decode)"
-          [[ "$PRODUCTION_BASE_URL" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]] || {
-            echo "::error::Exact production deployment URL is missing or invalid."
-            exit 1
+          CANARY_BASE_URL='https://staging.jov.ie'
+          CANARY_TEST_PRICE='price_1USkjzASl9B9udHvEYkZLYZp'
+          # Fail-closed TEST surface probe (node already provisioned in this job).
+          CANARY_EXPECTED_COMMIT_SHA="$(
+            CANARY_BASE_URL="$CANARY_BASE_URL" CANARY_TEST_PRICE="$CANARY_TEST_PRICE" node - <<'NODE'
+          const host = process.env.CANARY_BASE_URL.replace(/\/$/, '');
+          const price = process.env.CANARY_TEST_PRICE;
+          const get = async (path) => {
+            const res = await fetch(`${host}${path}`, { signal: AbortSignal.timeout(30_000) });
+            if (!res.ok) throw new Error(`${path} HTTP ${res.status}`);
+            return res;
+          };
+          const html = await (await get('/')).text();
+          const srcs = [...html.matchAll(/\/_next\/static\/[^"']+\.js/g)].map((m) => m[0]).slice(0, 60);
+          const mode = new Set();
+          for (const src of srcs) {
+            try {
+              const body = await (await get(src)).text();
+              if (body.includes('pk_test_')) mode.add('pk_test');
+              if (body.includes('pk_live_')) mode.add('pk_live');
+            } catch {
+              /* ignore chunk fetch errors */
+            }
           }
+          if (!mode.has('pk_test') || mode.has('pk_live')) {
+            console.error(
+              `::error::Canary TEST surface is not pk_test-only (saw ${[...mode].sort().join(',') || 'none'}); refusing paid walk.`
+            );
+            process.exit(1);
+          }
+          const options = await (await get('/api/stripe/pricing-options')).json();
+          const ids = (options.pricingOptions || []).map((o) => o.priceId);
+          if (!ids.includes(price)) {
+            console.error(
+              `::error::Canary TEST surface pricing-options missing dogfood TEST price ${price}; refusing paid walk.`
+            );
+            process.exit(1);
+          }
+          const bi = await (await get('/api/health/build-info')).json();
+          const sha = bi.commitSha || '';
+          if (!sha) {
+            console.error('::error::Canary TEST surface build-info missing commitSha.');
+            process.exit(1);
+          }
+          console.error(
+            `canary_test_surface_ok origin=${host} sha=${sha} env=${bi.environment} price=${price}`
+          );
+          process.stdout.write(sha);
+          NODE
+          )"
           cd apps/web
           # Stripe TEST fixtures match claim-checkout-dogfood.yml (not Doppler):
           # price + test account are public fixtures; keys come from GH secrets.
@@ -757,9 +805,10 @@ jobs:
           doppler run --project jovie-web --config prd \
             --only-secrets=CRON_SECRET,DATABASE_URL \
             --no-fallback -- env -u DOPPLER_TOKEN \
-              CI=true BASE_URL="$PRODUCTION_BASE_URL" PLAYWRIGHT_TEST_BASE_URL="$PRODUCTION_BASE_URL" E2E_SKIP_WEB_SERVER=1 \
-              EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$PRODUCTION_BASE_URL" \
-              EXPECTED_VERCEL_ENVIRONMENT=production \
+              CI=true BASE_URL="$CANARY_BASE_URL" PLAYWRIGHT_TEST_BASE_URL="$CANARY_BASE_URL" E2E_SKIP_WEB_SERVER=1 \
+              EXPECTED_VERCEL_DEPLOYMENT_ORIGIN="$CANARY_BASE_URL" \
+              EXPECTED_VERCEL_ENVIRONMENT=preview \
+              EXPECTED_COMMIT_SHA="$CANARY_EXPECTED_COMMIT_SHA" \
               PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
               STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
               STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \
@@ -768,11 +817,9 @@ jobs:
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
                 pnpm exec playwright test tests/e2e/canary-claim-checkout.spec.ts --project=chromium --reporter=line --workers=1
         env:
-          EXPECTED_COMMIT_SHA: ${{ needs.resolve-target.outputs.commit_sha }}
           PROD_CERT_STEPS_FILE: ${{ runner.temp }}/prod-cert-steps.jsonl
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-          PRODUCTION_BASE_URL_B64: ${{ needs.resolve-target.outputs.deployment_url_b64 }}
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
