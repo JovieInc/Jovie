@@ -381,46 +381,6 @@
     "rowContent.dense": {
       "$value": "24px",
       "$type": "dimension"
-    },
-    "row.compact": {
-      "$value": "40px",
-      "$type": "dimension"
-    },
-    "rowContent.compact": {
-      "$value": "32px",
-      "$type": "dimension"
-    },
-    "row.list": {
-      "$value": "44px",
-      "$type": "dimension"
-    },
-    "rowContent.list": {
-      "$value": "36px",
-      "$type": "dimension"
-    },
-    "row.two-line": {
-      "$value": "56px",
-      "$type": "dimension"
-    },
-    "rowContent.two-line": {
-      "$value": "48px",
-      "$type": "dimension"
-    },
-    "row.description": {
-      "$value": "72px",
-      "$type": "dimension"
-    },
-    "rowContent.description": {
-      "$value": "64px",
-      "$type": "dimension"
-    },
-    "row.controls": {
-      "$value": "96px",
-      "$type": "dimension"
-    },
-    "rowContent.controls": {
-      "$value": "88px",
-      "$type": "dimension"
     }
   }
 }
