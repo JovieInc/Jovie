@@ -4,6 +4,7 @@ import { type ComponentProps, useLayoutEffect, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetComposerDraftStoreForTests } from '@/lib/chat/composer-draft-store';
 import { getDesktopWorkState } from '@/lib/desktop/session-work-state';
+import { enterComposerScreenshot } from '@/tests/unit/chat/composer-attachment-input.fixture';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 import type { ChatInputProps } from './components/ChatInput';
 import { observeComposerRender } from './composer-render-test-utils';
@@ -123,6 +124,7 @@ vi.mock('@/components/jovie/components', async importOriginal => {
           aria-label='Draft'
           value={value}
           onChange={event => onChange(event.target.value)}
+          onPaste={props.onPaste}
           onKeyDown={event => {
             if (event.key === 'Enter') onSubmit();
           }}
@@ -164,6 +166,30 @@ describe('composer draft ownership', () => {
     );
   });
   afterEach(() => vi.unstubAllGlobals());
+
+  it.each(['drop', 'paste', 'picker change'] as const)(
+    'shows a founder attachment error on %s and keeps the draft sendable',
+    async entry => {
+      renderWithQueryClient(<JovieChat chatMode='ov' />);
+      await act(async () => {});
+      const input = screen.getByRole('textbox', { name: 'Draft' });
+      fireEvent.change(input, { target: { value: 'Here is what I saw' } });
+
+      enterComposerScreenshot(entry, input);
+
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'The file couldn’t be attached. Paste the relevant text into your message.'
+      );
+      expect(h.inputProps?.onFileAttach).toBeUndefined();
+      expect(h.inputProps?.onAudioAttach).toBeUndefined();
+      expect(input).toHaveValue('Here is what I saw');
+      expect(h.send).not.toHaveBeenCalled();
+
+      await act(async () => fireEvent.keyDown(input, { key: 'Enter' }));
+      expect(h.send).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('alert')).toBeNull();
+    }
+  );
 
   it('publishes draft safety before a sibling committed layout reads it', async () => {
     const observed: (boolean | undefined)[] = [];

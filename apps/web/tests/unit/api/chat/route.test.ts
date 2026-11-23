@@ -629,6 +629,43 @@ describe('POST /api/chat guard wiring', () => {
     expect(hoisted.checkAiChatRateLimitForPlanMock).not.toHaveBeenCalled();
   });
 
+  it.each(['', 'What do you see?', '@summer'])(
+    'rejects an attachment before founder turn intake with text %j',
+    async text => {
+      hoisted.isAdminMock.mockResolvedValue(true);
+      const response = await POST(
+        chatRequest(
+          validBody({
+            ...(text === '@summer' ? {} : { chatMode: 'ov' }),
+            clientTurnId: 'founder-screenshot',
+            messages: [
+              {
+                id: 'm1',
+                role: 'user',
+                parts: [
+                  { type: 'text', text },
+                  {
+                    type: 'file',
+                    mediaType: 'image/png',
+                    url: 'data:image/png;base64,AA==',
+                  },
+                ],
+              },
+            ],
+          })
+        )
+      );
+
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({
+        errorCode: 'FOUNDER_CHAT_ATTACHMENTS_UNAVAILABLE',
+      });
+      expect(hoisted.getOvieOperatingStoreMock).not.toHaveBeenCalled();
+      expect(hoisted.fetchSummerShadowMock).not.toHaveBeenCalled();
+      expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+    }
+  );
+
   it('returns the Summer unavailable state without an artist profile when transport is disabled', async () => {
     hoisted.isAdminMock.mockResolvedValue(true);
     disableSummerTransport();

@@ -85,7 +85,8 @@ interface UseChatFileAttachmentsOptions {
     readonly inference: import('@/lib/chat/infer-audio-entity').AudioEntityInference;
     readonly prompt: string;
   }) => void;
-  readonly disabled?: boolean;
+  /** A string disables attachments and explains attempted file input. */
+  readonly disabled?: boolean | string;
   /** Clears drag-over when the thread or route identity changes. */
   readonly resetKey?: string | null;
 }
@@ -121,10 +122,6 @@ export interface UseChatFileAttachmentsReturn {
 
 function generateId(): string {
   return crypto.randomUUID();
-}
-
-function detectKind(file: File): FileKind {
-  return detectChatFileKind(file);
 }
 
 function buildKindLabel(file: File, kind: FileKind): string {
@@ -484,7 +481,7 @@ async function buildPendingCandidate(
   file: File,
   seenHashes: Map<string, string>
 ): Promise<{ candidate: PendingFile; file: File }> {
-  const kind = detectKind(file);
+  const kind = detectChatFileKind(file);
   // Named failing rule + CTA for both audio (audio-contracts) and files (file
   // policy) so nothing is skipped silently (JOV-3688).
   const validation =
@@ -717,12 +714,14 @@ export function useChatFileAttachments({
 
   const addFiles = useCallback(
     (files: FileList | File[]) => {
-      if (disabled) return;
-      const fileArray = Array.from(files);
-      if (fileArray.length === 0) return;
-      processBatch(fileArray).catch(() => setIsUploading(false));
+      if (!files.length) return;
+      if (disabled) {
+        if (typeof disabled === 'string') onError(disabled);
+        return;
+      }
+      processBatch(Array.from(files)).catch(() => setIsUploading(false));
     },
-    [disabled, processBatch]
+    [disabled, onError, processBatch]
   );
 
   useEffect(() => {
@@ -824,7 +823,7 @@ export function useChatFileAttachments({
     const onDragEnter = (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      if (!disabled && (e.dataTransfer?.types.includes('Files') ?? false)) {
+      if (!disabled && e.dataTransfer?.types.includes('Files')) {
         setIsDragOver(true);
       }
     };
@@ -844,7 +843,6 @@ export function useChatFileAttachments({
       e.preventDefault();
       e.stopPropagation();
       setIsDragOver(false);
-      if (disabled) return;
       const { files } = e.dataTransfer ?? {};
       if (files?.length) addFilesRef.current(files);
     };

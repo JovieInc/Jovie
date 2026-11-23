@@ -73,6 +73,7 @@ import { fetchArtistContext } from '@/lib/chat/artist-context.server';
 import { resolveChatRelease } from '@/lib/chat/catalog-query';
 import { fetchCatalogTrackTitlesForChat } from '@/lib/chat/catalog-titles';
 import { assertChatToolsRegistered } from '@/lib/chat/chat-tool-inventory';
+import { FOUNDER_CHAT_ATTACHMENT_ERROR } from '@/lib/chat/founder-attachment-copy';
 import {
   buildLockedToolPromptInfo,
   buildLockedToolSet,
@@ -1963,6 +1964,23 @@ export async function POST(req: Request) {
         }
       );
     }
+  }
+
+  if (
+    chatMode === 'ov' &&
+    uiMessages
+      .findLast(message => message.role === 'user')
+      ?.parts.some(part => part.type === 'file')
+  ) {
+    return NextResponse.json(
+      {
+        error: FOUNDER_CHAT_ATTACHMENT_ERROR,
+        message: FOUNDER_CHAT_ATTACHMENT_ERROR,
+        errorCode: 'FOUNDER_CHAT_ATTACHMENTS_UNAVAILABLE',
+        requestId,
+      },
+      { status: 422, headers: { ...corsHeaders, 'x-request-id': requestId } }
+    );
   }
 
   // OV turns use the account-bound Summer door, including its unavailable

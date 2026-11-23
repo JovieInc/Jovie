@@ -268,6 +268,21 @@ function renderComposerSurface({
 }
 
 describe('draft-connected composer sections', () => {
+  it('shows the attachment alert alongside the current draft', () => {
+    const draft = createComposerDraft('Screenshot context');
+    const view = renderComposerSurface({ draft });
+    const input = screen.getByRole('textbox', { name: 'Chat Message Input' });
+
+    view.rerenderSurface({
+      attachmentNotice: <p role='alert'>File declined</p>,
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('File declined');
+    expect(input).toHaveValue('Screenshot context');
+    expect(input).toBeEnabled();
+    view.rerenderSurface();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('skips unchanged parent props but keeps draft and control changes live through memo', () => {
     const memoSurface =
       ChatDraftComposerSurface as typeof ChatDraftComposerSurface & {
