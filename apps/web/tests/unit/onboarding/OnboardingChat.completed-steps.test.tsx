@@ -96,6 +96,10 @@ vi.mock('@/components/jovie/components/ChatMessage', () => ({
 }));
 
 vi.mock('@/components/jovie/hooks', () => ({
+  // Match production fallback when no AuthShell anchor is present.
+  pinTranscriptToLatest: (el: HTMLElement) => {
+    el.scrollTop = el.scrollHeight;
+  },
   useChatJankMonitor: () => ({ onSend: vi.fn() }),
   useStickToBottom: () => ({
     isStuckToBottom: true,

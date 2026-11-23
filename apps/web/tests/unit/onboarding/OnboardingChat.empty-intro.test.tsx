@@ -59,6 +59,9 @@ vi.mock('@/lib/flags/client', () => ({
 }));
 
 vi.mock('@/components/jovie/hooks', () => ({
+  pinTranscriptToLatest: (el: HTMLElement) => {
+    el.scrollTop = el.scrollHeight;
+  },
   useChatJankMonitor: () => ({ onSend: vi.fn() }),
   useStickToBottom: () => ({
     isStuckToBottom: true,
