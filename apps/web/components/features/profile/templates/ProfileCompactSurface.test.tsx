@@ -319,7 +319,7 @@ describe('ProfileCompactSurface', () => {
 
       const bar = screen.getByTestId('profile-proof-claim-bar');
       const cta = screen.getByTestId('profile-proof-claim-bar-cta');
-      expect(bar).toHaveClass('md:hidden');
+      expect(bar).toHaveClass('md:hidden', 'mb-3'); // 12px gap + 44px bar = 56px
       expect(cta).toHaveAttribute('href', '/start');
       expect(cta).toHaveClass('text-on-media/88', 'hover:text-on-media');
       // WCAG 2.5.3 label-content-name-mismatch: name starts with jov.ie/you.
@@ -620,9 +620,10 @@ describe('ProfileCompactSurface', () => {
   });
 
   it('falls home when Events is empty (JOV-14241)', () => {
-    const onModeSelect = vi.fn();
-    renderSurface({ activeMode: 'tour', tourDates: [], onModeSelect });
-    expect(onModeSelect).toHaveBeenCalledWith('profile');
+    const { container } = renderSurface({ activeMode: 'tour', tourDates: [] });
+    const homeMode = container.querySelector('[data-mode]');
+    expect(homeMode).toHaveAttribute('data-mode', 'profile');
+    expect(container.querySelector('[data-mode=tour]')).toBeNull();
   });
 
   it('reserves dock clearance from the content column on every compact mode', () => {

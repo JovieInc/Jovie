@@ -21,6 +21,7 @@ import {
   effectiveCompanyMetricStatus,
   REVENUE_CONE_STEPS,
   type RevenueConeStep,
+  type UnknownCause,
 } from '@/lib/ovie/company-state';
 
 export const COMPANY_BLOCKER_SCHEMA = 'jovie.company-blocker/v1' as const;
@@ -53,15 +54,10 @@ export interface CompanyBlocker {
  */
 const CONE_COPY: Readonly<
   Record<
-    RevenueConeStep,
+    Exclude<RevenueConeStep, 'public_profile'>,
     { readonly name: string; readonly why: string; readonly unproven: string }
   >
 > = {
-  public_profile: {
-    name: 'The public profile',
-    why: 'no artist can be sent their profile yet',
-    unproven: "we can't confirm an artist can be sent their profile",
-  },
   homepage_entry: {
     name: 'The homepage entry',
     why: "visitors can't be trusted to reach sign-up",
@@ -94,6 +90,13 @@ function certificationText(
   metric: CompanyStateSnapshot['certification'][RevenueConeStep],
   status: string
 ): string {
+  if (step === 'public_profile') {
+    // This projection carries a contract version, not a serving release or
+    // check ID. Attribute the result without claiming current product impact.
+    return status === 'red'
+      ? 'The latest available public profile certification report shows a failed check. See Certifications for details.'
+      : 'Public profile certification is not confirmed. See Certifications for the latest evidence.';
+  }
   const copy = CONE_COPY[step];
   if (status === 'red')
     return `${copy.name} fails certification, so ${copy.why}`;
@@ -101,6 +104,25 @@ function certificationText(
     return `${copy.name}'s certification is out of date, so ${copy.unproven}`;
   return `${copy.name} isn't fully measured yet, so ${copy.unproven}`;
 }
+
+/**
+ * What Ovie is doing about a blocker, in founder words. Keyed by the
+ * investigation's reason code: the investigation's own `nextAction` is a
+ * runbook line for agents (detectors, receipts, producers) and never reaches
+ * Home.
+ */
+export const NEXT_STEP_COPY: Readonly<Record<UnknownCause, string>> = {
+  missing_instrumentation:
+    "We don't measure this yet. Ovie is adding the measurement.",
+  failed_reader: 'The check on this broke. Ovie is fixing it.',
+  stale_evidence: 'The last check is out of date. Ovie is re-running it.',
+  product_failure:
+    'People are dropping off here. Ovie is tracing where they leave.',
+  analytics_event_loss:
+    'Some tracking events are getting lost. Ovie is fixing it.',
+  failed_persistence: "Results aren't being saved. Ovie is fixing it.",
+  failed_scheduler: "A scheduled check didn't run. Ovie is restarting it.",
+};
 
 const FUNNEL_COPY: Readonly<Record<CompanyFunnelStep, string>> = {
   visits: 'real visits',
@@ -209,7 +231,7 @@ export function companyBlocker(
     schema: COMPANY_BLOCKER_SCHEMA,
     id,
     since: investigation?.firstObservedAt ?? null,
-    nextAction: investigation?.nextAction ?? null,
+    nextAction: investigation ? NEXT_STEP_COPY[investigation.cause] : null,
     observedAt: snapshot.generatedAt,
   };
   if (kind === 'certification' && isConeStep(step)) {

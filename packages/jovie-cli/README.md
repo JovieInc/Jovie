@@ -33,6 +33,7 @@ automated install. A repository build is not proof that npm has the package.
 | `api openapi` | `GET /api/v1/openapi.json` |
 | `docs llms` | `GET /llms.txt` (`--full` for `/llms-full.txt`) |
 | `report bug\|feedback --title <text> --details <text>` | `POST /api/agents/feedback`; returns `reportId` |
+| `view publish --file <path> \| --spec <json> [--id <viewId>]` | Publish a `jovie.view.v1` spec through `/api/ovie/mcp` and print the share link; requires `JOVIE_OVIE_TOKEN` in the environment (never a flag), HTTPS only except loopback |
 | `mcp` | Serve the commands above as MCP tools over stdio |
 | `init` | Install `jovie/SKILL.md` into each installed agent (Claude, Codex, OpenClaw, Hermes) |
 | `skill` | Print the skill |

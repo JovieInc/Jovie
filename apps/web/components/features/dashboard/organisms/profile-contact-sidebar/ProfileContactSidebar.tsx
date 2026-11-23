@@ -258,16 +258,18 @@ function getConflictVersion(error: unknown): number | undefined {
  * Live badge, a More dropdown (open / copy / UTM builder), live view/click stats
  * + copy URL, and an Edit profile button that flips the rail into edit mode.
  */
-export function ProfileContactSidebar() {
+export function ProfileContactSidebar({
+  contextOccupied = false,
+}: {
+  readonly contextOccupied?: boolean;
+} = {}) {
   const { isOpen, isFloating, close } = usePreviewPanelState();
-  // Props shared by every rail state. A hover/focus preview floats over the
-  // route (placement outlives visibility, so its exit stays an overlay too);
-  // an open or pinned rail pushes it, and pinning makes the route yield in step.
+  // Only an unoccupied passive preview floats; an occupied slot stays in flow.
   const railProps = {
     id: 'shell-artist-profile-rail',
     onClose: close,
     isOpen,
-    presentation: isFloating ? 'overlay' : 'push',
+    presentation: isFloating && !contextOccupied ? 'overlay' : 'push',
     workspaceSurface: 'raised',
     headerMode: 'minimal',
     hideMinimalHeaderBar: true,

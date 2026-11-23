@@ -35,7 +35,7 @@
     },
     {
       "sectionId": "claim/claim",
-      "penNodeId": "pending-no-design",
+      "penNodeId": "MrTeG",
       "stillPath": "docs/pen-stills/golden-path/claim.claim.dark.1440.png",
       "viewport": 1440,
       "mode": "dark",
@@ -91,7 +91,7 @@
     },
     {
       "sectionId": "checkout/billing-success",
-      "penNodeId": "pending-no-design",
+      "penNodeId": "Ugndh",
       "stillPath": "docs/pen-stills/golden-path/checkout.billing-success.dark.1440.png",
       "viewport": 1440,
       "mode": "dark",

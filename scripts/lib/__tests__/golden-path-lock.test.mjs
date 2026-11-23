@@ -752,21 +752,26 @@ describe('golden-path Linear-only intake', () => {
       JSON.stringify({
         data: {
           team: {
-            states: { nodes: [{ id: 'todo-state', name: 'Todo' }] },
+            states: {
+              nodes: [
+                { id: 'todo-state', name: 'Todo' },
+                { id: 'backlog-state', name: 'Backlog' },
+              ],
+            },
           },
           issues: { nodes: [] },
         },
       })
     );
 
-  it('creates exactly one canonical Linear record straight into Todo (JOV-5966)', async () => {
+  it('creates exactly one canonical Linear record in Backlog, where admission takes it (JOV-5966)', async () => {
     const fetchImpl = vi.fn(async (_input, init) => {
       const payload = JSON.parse(String(init.body));
       if (payload.query.includes('FindIssueByFingerprint')) {
         return searchEmpty();
       }
       expect(payload.query).toContain('mutation CreateDedupedLinearIssue');
-      expect(payload.variables).toMatchObject({ stateId: 'todo-state' });
+      expect(payload.variables).toMatchObject({ stateId: 'backlog-state' });
       expect(payload.variables.title).toContain('golden-path-lock:prod:test');
       return new Response(
         JSON.stringify({

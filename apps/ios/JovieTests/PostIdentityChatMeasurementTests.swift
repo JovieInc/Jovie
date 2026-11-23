@@ -1,7 +1,12 @@
 import Foundation
+import JovieKit
 import Testing
 @testable import Jovie
 
+/// `.serialized`: these tests swap process-global state (`Observability` provider and the
+/// `FirstValueLandingPolicy` / `PostIdentityChatMeasurement` defaults overrides). Swift Testing
+/// runs tests in a suite concurrently, so unserialized they clobber each other's overrides.
+@Suite(.serialized)
 struct PostIdentityChatMeasurementTests {
   @Test func postIdentityChatEventsUseDistinctStableNames() {
     #expect(ObservabilityEvent.identityFirstValueSeen.rawValue == "identity_first_value_seen")
