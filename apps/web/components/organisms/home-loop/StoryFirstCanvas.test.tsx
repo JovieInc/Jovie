@@ -236,7 +236,7 @@ describe('StoryFirstCanvas colour and honesty', () => {
     expect(container.querySelectorAll('.text-accent')).toHaveLength(0);
   });
 
-  it('says why a pulse is not measured instead of a bare Not measured wall', () => {
+  it('hides unmeasured pulses instead of a reason or Not measured wall', () => {
     render(
       <StoryFirstCanvas
         bottleneck={bottleneck}
@@ -253,9 +253,11 @@ describe('StoryFirstCanvas colour and honesty', () => {
         stages={[]}
       />
     );
+    expect(screen.queryByTestId('story-first-glance-shipping')).toBeNull();
     expect(
-      screen.getByTestId('story-first-glance-shipping-reason')
-    ).toHaveTextContent("GitHub's merge count didn't load");
+      screen.queryByTestId('story-first-glance-shipping-reason')
+    ).toBeNull();
+    expect(screen.getByText('Some signals are still syncing.')).toBeVisible();
   });
 
   it('labels the In Flight scope as open agent PRs', () => {
