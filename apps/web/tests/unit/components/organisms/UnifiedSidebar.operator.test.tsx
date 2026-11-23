@@ -182,13 +182,15 @@ describe('UnifiedSidebar operator navigation', () => {
     );
   });
 
-  it('exposes Inbox while Tools is collapsed and selects only Inbox', () => {
+  it('exposes Operator Inbox while Tools is collapsed and selects only it', () => {
     globalThis.localStorage?.removeItem('ovie.nav.tools-open.v1');
     renderUnifiedSidebar({ pathname: APP_ROUTES.ADMIN_INBOX, section: 'ov' });
     const navigation = screen.getByRole('navigation', {
       name: 'OV Navigation',
     });
-    const inbox = within(navigation).getByRole('link', { name: 'Inbox' });
+    const inbox = within(navigation).getByRole('link', {
+      name: 'Operator Inbox',
+    });
     expect(inbox).toBeVisible();
     expect(inbox).toHaveAttribute('href', APP_ROUTES.ADMIN_INBOX);
     expect(inbox).toHaveAttribute('aria-current', 'page');
