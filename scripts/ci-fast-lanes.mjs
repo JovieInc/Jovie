@@ -319,10 +319,10 @@ export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
   'tests=""',
   'for m in $(printf "%s\\n" $cand | sort -u); do if [ -f "$m" ] && grep -q "\\"$m\\"" scripts/lanes/lane_runner.py; then tests="$tests $m"; fi; done',
   // Any scripts/lanes/*.py edit also runs the atomic-state ratchet and UpdateTest, which stage the
-  // lanes tree the way the release self-test does (#23232), and ContextManifestTest (H-02 drift).
-  'lanes_py=0; for f in $files; do case "$f" in scripts/lanes/*.py|scripts/lanes/context-manifest.json) lanes_py=1;; esac; done',
+  // lanes tree the way the release self-test does (#23232: a truncating state write in a new module).
+  'lanes_py=0; for f in $files; do case "$f" in scripts/lanes/*.py) lanes_py=1;; esac; done',
   'extra=""',
-  'if [ "$lanes_py" = 1 ]; then case " $tests " in *" scripts/tests/test_lanes_atomic_state.py "*) ;; *) tests="$tests scripts/tests/test_lanes_atomic_state.py";; esac; extra="scripts.tests.test_lane_runner.UpdateTest scripts.tests.test_lane_runner.ContextManifestTest"; fi',
+  'if [ "$lanes_py" = 1 ]; then case " $tests " in *" scripts/tests/test_lanes_atomic_state.py "*) ;; *) tests="$tests scripts/tests/test_lanes_atomic_state.py";; esac; extra="scripts.tests.test_lane_runner.UpdateTest"; fi',
   // Worktree setup also runs in the issue runner; catch fixture and dispatch regressions before release.
   'if printf "%s\\n" "$files" | grep -Fxq "scripts/lanes/worktree_pool.py"; then case " $tests " in *" scripts/tests/test_lane_runner.py "*) ;; *) extra="$extra scripts.tests.test_lane_runner.RunIssueTest";; esac; fi',
   // A changed release test also runs inside the staged release bundle (UpdateTest). Tests that read repo
