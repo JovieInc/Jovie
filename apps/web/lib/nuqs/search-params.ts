@@ -179,7 +179,7 @@ export const audienceSortParser =
 /**
  * Valid secondary panels in the audience workspace.
  */
-export const audiencePanels = ['contact', 'analytics', 'ai-crawlers'] as const;
+export const audiencePanels = ['contact', 'analytics'] as const;
 
 export type AudiencePanel = (typeof audiencePanels)[number];
 

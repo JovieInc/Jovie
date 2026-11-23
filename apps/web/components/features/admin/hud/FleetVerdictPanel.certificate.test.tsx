@@ -42,7 +42,7 @@ describe('FleetVerdictPanel certificate', () => {
     vi.stubGlobal('fetch', fetchMock);
     const { container } = renderPanel();
     expect(await screen.findByText(UNAVAILABLE)).toBeInTheDocument();
-    expect(screen.getByText('Not measured')).toBeInTheDocument();
+    expect(screen.getByText('Syncing')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/hud/shipping-state',
       expect.objectContaining({ cache: 'no-store' })

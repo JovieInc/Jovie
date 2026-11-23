@@ -16,8 +16,6 @@ import { UnfazedProfileClient } from '@/components/features/profile/UnfazedProfi
 import { BASE_URL } from '@/constants/app';
 import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
 import { assertLiveProfileRoute } from '@/features/profile/live-profile-lock';
-import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
-import { ProfileAeoProofClaimCard } from '@/features/profile/ProfileAeoProofClaimCard';
 // Artist-paid audience data (view, pixels, funnel) must fire right after
 // hydration with no idle or interaction gate, so these stay in the entry
 // bundle; only heavy, non-revenue islands are lazy (JOV-10246).
@@ -446,19 +444,6 @@ async function ArtistPageContent({
     artists: creditedArtists,
   };
 
-  // Generate structured data for SEO (after tour dates resolve)
-  const structuredData = generateProfileStructuredData(
-    profile,
-    genres,
-    links,
-    tourDates,
-    entityLinks,
-    collectEntityMentions(entityMentionContext).map(mention => ({
-      kind: mention.kind,
-      name: mention.name,
-      url: new URL(mention.href, BASE_URL).toString(),
-    }))
-  );
   const aeoContent = buildProfileAeoContent({
     artist,
     genres,
@@ -470,6 +455,21 @@ async function ArtistPageContent({
     releaseCollaborators,
     entityMentions: entityMentionContext,
   });
+
+  // Generate structured data for SEO (after tour dates resolve)
+  const structuredData = generateProfileStructuredData(
+    profile,
+    genres,
+    links,
+    tourDates,
+    entityLinks,
+    collectEntityMentions(entityMentionContext).map(mention => ({
+      kind: mention.kind,
+      name: mention.name,
+      url: new URL(mention.href, BASE_URL).toString(),
+    })),
+    aeoContent.description.join(' ')
+  );
 
   return (
     <>
@@ -558,22 +558,6 @@ async function ArtistPageContent({
         catalogLoadFailed={catalogLoadFailed}
         merchCards={merchCards}
       />
-      <ProfileAeoContent
-        content={aeoContent}
-        claimHref={
-          !isProofProfile && !isClaimed && directClaimSupported
-            ? `/${encodeURIComponent(artist.handle)}/claim?next=auth`
-            : undefined
-        }
-      />
-      {isProofProfile ? (
-        <ProfileAeoProofClaimCard
-          artistName={aeoContent.artistName}
-          href={proofClaim.href}
-          label={proofClaim.label}
-          note={proofClaim.note}
-        />
-      ) : null}
       {isPublicNoAuthSmoke ? null : (
         <>
           <DesktopQrOverlayClient handle={artist.handle} />

@@ -1142,6 +1142,13 @@
       "when": 1794913980043,
       "tag": "0183_price_locks",
       "breakpoints": true
+    },
+    {
+      "idx": 163,
+      "version": "7",
+      "when": 1795329448322,
+      "tag": "0184_dashboard_views",
+      "breakpoints": true
     }
   ]
 }

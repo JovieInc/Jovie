@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { expectFlatState } from '@/tests/utils/flat-state';
 import { ErrorBoundary } from './ErrorBoundary';
 
 const { captureErrorInSentry, toastError } = vi.hoisted(() => ({
@@ -59,6 +60,7 @@ describe('ErrorBoundary', () => {
     );
 
     expect(screen.getByRole('alert')).toHaveTextContent('Something Went Wrong');
+    expectFlatState(container);
     expect(onError).toHaveBeenCalledTimes(1);
     expect(captureErrorInSentry).toHaveBeenCalledTimes(1);
     expect(toastError).toHaveBeenCalledWith(

@@ -1,0 +1,30 @@
+/*
+ * The O's status slot. Keep these off Tailwind arbitrary values so the slot
+ * moves by opacity and transform only, on the motion tokens, without raising
+ * the design-system ratchet. The box never changes between hidden and shown.
+ */
+.sidebar-o-status {
+  opacity: 0;
+  transform: translateX(-0.25rem);
+  transition:
+    opacity var(--duration-slow) var(--ease-out),
+    transform var(--duration-slow) var(--ease-out);
+}
+
+.sidebar-o-status[data-state="visible"] {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Duration tokens resolve to 0 here; the slot also drops its travel. */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-o-status {
+    transform: none;
+    transition: none;
+  }
+}
+
+/* The collapsed rail has no room for a status; the O keeps its tooltip. */
+.group[data-collapsible="icon"] .sidebar-o-status {
+  display: none;
+}

@@ -30,7 +30,7 @@ export function MetaPill({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 h-6 px-2 rounded-md text-2xs border whitespace-nowrap',
+        'inline-flex items-center gap-1.5 h-5 px-2 rounded text-2xs border whitespace-nowrap',
         'border-transparent bg-transparent transition-[background-color,border-color] duration-subtle ease-subtle cursor-default',
         tone === 'amber'
           ? 'text-warning-text/85 hover:border-warning/30 hover:bg-warning/10'

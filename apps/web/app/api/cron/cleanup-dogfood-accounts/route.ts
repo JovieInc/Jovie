@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { runDogfoodTmpCleanup } from '@/lib/accounts/dogfood-tmp-cleanup';
+import {
+  runDogfoodTmpCleanup,
+  type TestAccountCleanupFamily,
+} from '@/lib/accounts/dogfood-tmp-cleanup';
 import { type AccessPolicy, defineRoute } from '@/lib/api/route-pipeline';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { verifyCronRequest } from '@/lib/cron/auth';
@@ -27,11 +30,17 @@ const cronAccess: AccessPolicy<null> = {
  * Removes ephemeral founder dogfood accounts (`+dogfood-tmp-<id>`) older than
  * seven days. Cron-secret guarded. Dry run unless `?apply=1`; the report is
  * counts and redacted tmp ids only. Long-lived dogfood accounts never match.
+ * `?family=prodcert-run` sweeps the per-run production certification users
+ * (older than two days) instead; the fixed canaries never match either.
  */
 export const GET = defineRoute(
   { route: ROUTE, access: cronAccess },
   async ({ request, responseHeaders }) => {
     const apply = request.nextUrl.searchParams.get('apply') === '1';
+    const family: TestAccountCleanupFamily =
+      request.nextUrl.searchParams.get('family') === 'prodcert-run'
+        ? 'prodcert-run'
+        : 'dogfood-tmp';
     try {
       const report = await runDogfoodTmpCleanup(
         {
@@ -44,6 +53,7 @@ export const GET = defineRoute(
         },
         {
           apply,
+          family,
           // Same cache busting as account deletion: freed handles show as
           // available and removed profiles stop serving.
           afterRemoval: async handles => {
@@ -56,6 +66,7 @@ export const GET = defineRoute(
       );
       logger.info('Dogfood tmp account cleanup complete', {
         mode: report.mode,
+        family,
         matched: report.matched,
         removed: report.removed,
       });

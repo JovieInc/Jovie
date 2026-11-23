@@ -16,7 +16,7 @@ run happens inside a seat a provider worker already holds, so the host's autosca
 (compute and credits) are the only concurrency limit unless a binding sets `concurrency`.
 Jovie-only holds (new-intake budget, hotspots, file overlap, routing) do not apply, and no
 binding state holds Jovie. No open-PR ceiling limits a binding's intake (Tim 2026-10-12: only
-real limits); a per-PR lease keeps two seats off one PR. Linear and GitHub reads go through lane_runner.shared(), on the
+real limits; Jovie's own lanes are WIP-capped since 2026-11-22, bindings are not yet); a per-PR lease keeps two seats off one PR. Linear and GitHub reads go through lane_runner.shared(), on the
 same TTLs as the Jovie claim scan. The binding's own CI is the gate: the harness opens a
 ready PR and moves the issue to In Review; the repo's required checks and native merge queue
 land it. It never runs Jovie's gate against another repo.

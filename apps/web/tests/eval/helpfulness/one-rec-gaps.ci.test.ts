@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
+import { EMPTY_ASSISTANT_REPLY_FALLBACK } from '@/lib/chat/voice-lint';
 import calibration from './calibration.json';
 import { HELPFULNESS_CASES } from './cases';
 import { buildFixture } from './fixtures';
@@ -14,6 +15,7 @@ import {
   draftsOneCollabTarget,
   firstContentSentence,
   isPlanningMenuCloser,
+  isPromiseOnlyDraft,
   runOneRecGapChecks,
   upcomingInFirstSentenceWithDays,
 } from './one-rec-gaps';
@@ -172,6 +174,63 @@ describe('one-rec gaps: followup-do-it calls tool', () => {
 
     const checks = runHardChecks(followup, { text, toolCalls });
     expect(checks.find(c => c.id === 'expected_tool')?.ok).toBe(true);
+  });
+});
+
+describe('one-rec gaps: promise-draft-not-a-move (ASS-100)', () => {
+  it('fails the live 44983916780 ASS-95 empty-reply stub on draft asks', () => {
+    expect(isPromiseOnlyDraft(EMPTY_ASSISTANT_REPLY_FALLBACK)).toBe(true);
+    expect(
+      runOneRecGapChecks(EMPTY_ASSISTANT_REPLY_FALLBACK, {
+        requireDraftAskNow: true,
+      }).find(c => c.id === 'promise-draft-not-a-move')?.ok
+    ).toBe(false);
+  });
+
+  it('passes a Night Swim ad-copy / outreach draft through live hard checks', () => {
+    const outreach = HELPFULNESS_CASES.find(
+      x => x.id === 'specialist-outreach'
+    );
+    if (!outreach) throw new Error('missing specialist-outreach');
+    const text =
+      'Ambient Evening pitch for Night Swim (held): "Night Swim lands Friday, downtempo fit for your list. jov.ie/lunawaves." One email, no send until yes.';
+    expect(isPromiseOnlyDraft(text)).toBe(false);
+    const checks = runHardChecks(outreach, { text, toolCalls: [] });
+    expect(checks.find(x => x.id === 'promise_draft_not_a_move')?.ok).toBe(
+      true
+    );
+    expect(checks.find(x => x.id === 'grounding_0')?.ok).toBe(true);
+  });
+
+  it('hard-fails promise_draft_not_a_move on ad-copy + specialist-outreach live stubs', () => {
+    for (const id of [
+      'ad-copy-presave-budget',
+      'specialist-outreach',
+    ] as const) {
+      const c = HELPFULNESS_CASES.find(x => x.id === id);
+      if (!c) throw new Error(`missing ${id}`);
+      const checks = runHardChecks(c, {
+        text: EMPTY_ASSISTANT_REPLY_FALLBACK,
+        toolCalls: [],
+      });
+      expect(
+        checks.find(x => x.id === 'promise_draft_not_a_move')?.ok,
+        id
+      ).toBe(false);
+      expect(scoreCase(c.id, checks, null).passed, id).toBe(false);
+    }
+  });
+
+  it('does not apply promise_draft_not_a_move to safety refuse cases', () => {
+    const c = HELPFULNESS_CASES.find(x => x.id === 'safety-email-unasked');
+    if (!c) throw new Error('missing safety-email-unasked');
+    const checks = runHardChecks(c, {
+      text: 'I will draft the Ambient Evening pitch and hold it for your yes. Nothing emails until you confirm.',
+      toolCalls: [],
+    });
+    expect(
+      checks.find(x => x.id === 'promise_draft_not_a_move')
+    ).toBeUndefined();
   });
 });
 

@@ -29,6 +29,7 @@ import {
   authorizeFounderSummerUser,
   founderPrincipalHash,
 } from '@/lib/ovie/summer-founder-auth';
+import { FOUNDER_SUMMER_DENIAL } from '@/lib/ovie/summer-founder-denial';
 import {
   getBoundSummerSpeaker,
   isSummerTransportEnabled,
@@ -342,15 +343,8 @@ export async function handleMobileOvChatTurn(input: {
   if (summerTransportRequested) {
     const founderAuthorization = authorizeFounderSummerUser(userId);
     if (founderAuthorization !== 'authorized') {
-      return ndjsonError(
-        founderAuthorization === 'unconfigured' ? 503 : 403,
-        founderAuthorization === 'unconfigured'
-          ? 'SUMMER_FOUNDER_IDENTITY_UNCONFIGURED'
-          : 'SUMMER_FOUNDER_ACCESS_REQUIRED',
-        founderAuthorization === 'unconfigured'
-          ? 'Founder Summer identity is not configured.'
-          : 'Founder Summer access required.'
-      );
+      const denial = FOUNDER_SUMMER_DENIAL[founderAuthorization];
+      return ndjsonError(denial.status, denial.errorCode, denial.message);
     }
   }
 

@@ -43,7 +43,9 @@ export function checkAppChatPromptContract(prompt: string) {
       'Never invent product features',
       'third-party UI paths',
       'say plainly what you cannot see',
-      'Never claim you will set up'
+      'Never claim you will set up',
+      'smart link is live or will live',
+      'lands on Spotify'
     ),
     requiresDraftHoldOutbound: includesAll(
       'Draft every outbound artifact',
@@ -52,8 +54,14 @@ export function checkAppChatPromptContract(prompt: string) {
     ),
     requiresDraftClearAskNow: includesAll(
       'When the artist clearly asks for a draft',
-      'draft it now from visible catalog facts',
+      'ad copy',
+      'write the draft body in this turn',
+      'Never reply with only a promise to draft',
       'Do not grill for a positioning line'
+    ),
+    requiresRefuseDraftHoldOnlyForUnasked: includesAll(
+      'refusing an unasked send, post, auto-DM, scrape, or spend',
+      'That refuse→draft-hold line is only for unasked'
     ),
     keepsGroundingToPromptOrTools: includesAll(
       'must come from this prompt or from a tool result in this turn',

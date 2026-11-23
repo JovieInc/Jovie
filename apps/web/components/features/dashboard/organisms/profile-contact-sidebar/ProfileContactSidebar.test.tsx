@@ -308,7 +308,7 @@ vi.mock('@/features/dashboard/organisms/dsp-matches/hooks', () => ({
   }),
 }));
 
-function renderSidebar() {
+function renderSidebar(contextOccupied = false) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -318,7 +318,7 @@ function renderSidebar() {
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <ProfileContactSidebar />
+      <ProfileContactSidebar contextOccupied={contextOccupied} />
     </QueryClientProvider>
   );
 }
@@ -456,6 +456,15 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     expect(screen.getByTestId('profile-contact-sidebar')).toHaveAttribute(
       'data-presentation',
       'overlay'
+    );
+  });
+
+  it('keeps an occupied chat context column in flow while a passive preview closes', () => {
+    mockState.isFloating = true;
+    renderSidebar(true);
+    expect(screen.getByTestId('profile-contact-sidebar')).toHaveAttribute(
+      'data-presentation',
+      'push'
     );
   });
 
