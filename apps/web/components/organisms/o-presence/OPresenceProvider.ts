@@ -1,6 +1,12 @@
 'use client';
 
-import { createContext, type ReactNode, useContext, useMemo } from 'react';
+import {
+  createContext,
+  createElement,
+  type ReactNode,
+  useContext,
+  useMemo,
+} from 'react';
 import {
   useAudioChromeSnapshot,
   useMediaCanvasTransport,
@@ -82,11 +88,7 @@ export function OPresenceProvider({
     track.artistName,
   ]);
 
-  return (
-    <OPresenceContext.Provider value={value}>
-      {children}
-    </OPresenceContext.Provider>
-  );
+  return createElement(OPresenceContext.Provider, { value }, children);
 }
 
 export function useOPresence(): OPresenceValue {
