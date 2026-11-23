@@ -9,8 +9,24 @@ export async function POST(request: Request): Promise<NextResponse> {
     ? Object.fromEntries(new URLSearchParams(await request.text()))
     : ((await request.json().catch(() => ({}))) as Record<string, string>);
 
+  const grantType = params.grant_type ?? 'authorization_code';
+  const issuer = getOvieOAuthIssuer(ovieIssuerSecret());
+
   try {
-    const issued = getOvieOAuthIssuer(ovieIssuerSecret()).exchangeToken({
+    if (grantType === 'refresh_token') {
+      const issued = issuer.refreshAccessToken({
+        refreshToken: params.refresh_token ?? '',
+        clientId: params.client_id ?? '',
+      });
+      return NextResponse.json(issued);
+    }
+    if (grantType !== 'authorization_code') {
+      return NextResponse.json(
+        { error: 'unsupported_grant_type' },
+        { status: 400 }
+      );
+    }
+    const issued = issuer.exchangeToken({
       clientId: params.client_id ?? '',
       redirectUri: params.redirect_uri ?? '',
       code: params.code ?? '',
