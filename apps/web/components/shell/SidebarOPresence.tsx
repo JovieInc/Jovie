@@ -1,6 +1,6 @@
 'use client';
 
-import { PlainButton } from '@jovie/ui';
+import { Button } from '@jovie/ui';
 import type { OStrokeProps } from '@jovie/ui/brand/OStroke';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -120,14 +120,17 @@ export function SidebarOPresence({
       className='flex h-8 shrink-0 items-center gap-2 px-(--app-shell-sidebar-inset) py-1'
     >
       {player ? (
-        <PlainButton
+        <Button
+          type='button'
+          variant='ghost'
+          size='icon-sm'
           aria-label={`${player.isPlaying ? 'Pause' : 'Play'} ${player.title}`}
           data-sidebar-o-button=''
           onClick={player.onToggle}
-          className={buttonClass}
+          className='shrink-0'
         >
           <OStroke pose={drawnPose} size={20} />
-        </PlainButton>
+        </Button>
       ) : (
         <Link
           href={href}
@@ -146,18 +149,24 @@ export function SidebarOPresence({
         </Link>
       )}
       {player ? (
-        <PlainButton
+        <Button
+          type='button'
+          variant='ghost'
+          size='sm'
           data-audio-expand-player='true'
           onClick={player.onExpand}
-          className='flex h-6 min-w-0 flex-1 items-center truncate rounded-sm text-left text-2xs text-sidebar-muted outline-none focus-visible:bg-sidebar-accent'
+          className='min-w-0 flex-1 justify-start'
         >
-          <span key={player.title} className='sidebar-o-title truncate'>
+          <span
+            key={player.title}
+            className='sidebar-o-title truncate text-2xs text-sidebar-muted'
+          >
             {player.artist
               ? `${player.title} · ${player.artist}`
               : player.title}
           </span>
           <span className='sr-only'>Show Player</span>
-        </PlainButton>
+        </Button>
       ) : (
         <span
           data-testid={SIDEBAR_O_STATUS_TEST_ID}

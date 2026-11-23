@@ -75,9 +75,13 @@ describe('SidebarOPresence as the mini player', () => {
     expect(layoutClasses(screen.getByTestId(SIDEBAR_O_PRESENCE_TEST_ID))).toBe(
       idleRow
     );
-    expect(layoutClasses(screen.getByRole('button', { name: /^Pause/ }))).toBe(
-      idleButton
-    );
+    // Idle O is a 28px link (size-7); the player O is Button icon-sm, which
+    // is the same 28px box, so the slot does not move when play starts.
+    expect(idleButton.split(' ')).toContain('size-7');
+    const playerButton = screen
+      .getByRole('button', { name: /^Pause/ })
+      .className.split(' ');
+    expect(playerButton).toEqual(expect.arrayContaining(['h-7', 'w-7']));
     expect(container.querySelectorAll('svg')).toHaveLength(1);
   });
 
