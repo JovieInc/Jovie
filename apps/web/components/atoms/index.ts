@@ -32,8 +32,6 @@ export { DSP_LOGO_CONFIG, DspLogo, VIDEO_LOGO_CONFIG } from './DspLogo';
 export { EmptyCell } from './EmptyCell';
 export type { FooterLinkProps } from './FooterLink';
 export { FooterLink } from './FooterLink';
-export type { FrostedButtonProps } from './FrostedButton';
-export { FrostedButton } from './FrostedButton';
 export type { GradientTextProps } from './GradientText';
 export { GradientText } from './GradientText';
 export type { IconName, IconProps } from './Icon';

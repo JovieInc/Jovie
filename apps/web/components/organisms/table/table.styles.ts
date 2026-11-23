@@ -21,8 +21,8 @@ export const alignment = {
   checkboxCell: 'flex items-center justify-center', // Center checkbox
   numberCell: 'flex items-center justify-end tabular-nums', // Right-align numbers
   rowHeight: 'system-b-table-row-height', // Comfortable density with room for two-line cells
-  cellPadding: 'px-3 py-1', // Shared page seam
-  headerPadding: 'px-3 py-1.5', // Shared page seam
+  cellPadding: 'px-3', // Shared page seam; vertical space comes from the row mode content height
+  headerPadding: 'px-3', // Shared page seam; header row height is fixed (h-8)
   checkboxSize: 'h-3.5 w-3.5', // 14px checkbox
 } as const;
 
@@ -182,7 +182,7 @@ export const presets = {
 
 /** Fixed content budgets shared by real rows, loading rows, and virtualization. */
 export const TABLE_ROW_MODES = {
-  /** Linear-scale single-line rows: people, records, and other dense lists. */
+  /** 32px. Admin/debug/dev-only surfaces. Not Linear-scale: Linear's list is 40-44px, so user-facing tables use `compact` or `list`. */
   dense: { rowHeight: 32, contentHeight: 24 },
   compact: { rowHeight: 40, contentHeight: 32 },
   /** Measured Linear issue list: 88 backing pixels at Retina 2x. */

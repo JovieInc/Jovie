@@ -48,7 +48,9 @@ interface ChatProposeNextStepCardProps {
   readonly payload: NextStepCardPayload;
   /**
    * Handle the conversation settled on. Passed to AuthShell so its
-   * "Claim @handle" heading never falls back to a stale homepage `?handle=`.
+   * heading never falls back to a stale homepage `?handle=`. Waitlist
+   * decisions bind `accessKind="waitlist"` (Reserve @handle); instant
+   * access keeps Claim @handle (JOV-8052 / ONB-23).
    */
   readonly claimHandle?: string | null;
 }
@@ -272,6 +274,7 @@ export function ChatProposeNextStepCard({
           mode='sign-up'
           compact
           claimHandle={claimHandle ?? undefined}
+          accessKind='waitlist'
           fallbackRedirectUrl={APP_ROUTES.START}
         />
         <PostKeepEnrichmentChips />

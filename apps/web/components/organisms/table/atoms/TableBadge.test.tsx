@@ -35,4 +35,14 @@ describe('TableBadge', () => {
     expect(badge.className).toContain('break-words');
     expect(badge.className).not.toContain('line-clamp-1');
   });
+
+  it.each(['primary', 'secondary', 'success', 'warning', 'error'] as const)(
+    'always renders the outline Badge and records the %s tone',
+    variant => {
+      render(<TableBadge variant={variant}>Tag</TableBadge>);
+      const badge = screen.getByText('Tag');
+      expect(badge).toHaveAttribute('data-table-badge', variant);
+      expect(badge).toHaveAttribute('data-variant', 'outline');
+    }
+  );
 });

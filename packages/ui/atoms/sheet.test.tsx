@@ -167,6 +167,7 @@ describe('Sheet', () => {
       render(<TestSheet open={true} side='bottom' />);
       const content = screen.getByTestId('sheet-content');
       expect(content.className).toContain('bottom-0');
+      expect(content.className).toContain('rounded-t-2xl');
       expect(content.className).toContain('max-h-sheet-viewport');
     });
   });

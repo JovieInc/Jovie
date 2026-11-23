@@ -39,3 +39,20 @@ describe('TaskWorkspaceHeaderBar focus', () => {
     );
   });
 });
+
+describe('TaskWorkspaceHeaderBar control heights (JOV-12567)', () => {
+  it('sits on the 28px control and 44px bar contract', () => {
+    const source = readFileSync(
+      resolve(__dirname, './TaskWorkspaceHeaderBar.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain("'relative h-7 gap-1.5 px-2 text-xs'");
+    expect(source).toContain("'h-7 px-2.5'");
+    expect(source).toContain("'h-7 w-7 px-0'");
+    expect(source).toContain("'h-7 max-w-lg min-w-0'");
+    expect(source).not.toContain("'h-8 px-2.5'");
+    expect(source).not.toContain("'h-8 w-8 px-0'");
+    expect(source).not.toContain('sm:before:h-8');
+  });
+});

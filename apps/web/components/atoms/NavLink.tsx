@@ -49,7 +49,7 @@ export const NavLink = React.forwardRef<HTMLAnchorElement, NavLinkProps>(
     if (variant === 'primary') {
       // Button-styled nav CTA: Button owns the primary visual contract
       // (asChild), the canonical Link primitive composes the Next.js anchor
-      // underneath it — same Slot chain as FrostedButton. `static` keeps the
+      // underneath it — same Slot chain as Button asChild + Link. `static` keeps the
       // legacy no-press-scale behavior. Do NOT inline buttonVariants' primary
       // classes here: duplicating their --linear-* token references grows the
       // shrink-only linear-namespace ratchet (JOV #12009).

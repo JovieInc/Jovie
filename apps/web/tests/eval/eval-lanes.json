@@ -11,6 +11,7 @@
         "vitest",
         "run",
         "--config=vitest.config.mts",
+        "tests/unit/chat/useChatJankMonitor.test.tsx",
         "lib/chat/tools/onboarding-access-eval.test.ts",
         "lib/connectors/eval/precision.test.ts",
         "lib/eval/assistants-ratchet/gate.test.ts",
@@ -20,14 +21,13 @@
         "lib/eval/leak-guard.test.ts",
         "lib/eval/promote-trace.test.ts",
         "lib/eval/scorers/scorers.test.ts",
+        "lib/eval/turn-outcome-report.test.ts",
+        "lib/eval/turn-outcome.test.ts",
         "tests/unit/chat/jank-monitor.test.ts",
-        "tests/unit/chat/onboarding-transcript-quality.eval.test.ts",
-        "tests/unit/chat/useChatJankMonitor.test.tsx"
+        "tests/unit/chat/onboarding-transcript-quality.eval.test.ts"
       ]
     ],
     "files": [
-      "scripts/run-deterministic-promptfoo-evals.sh",
-      "scripts/run-golden-eval-set-ci.sh",
       "lib/chat/tools/onboarding-access-eval.test.ts",
       "lib/connectors/eval/precision.test.ts",
       "lib/eval/assistants-ratchet/gate.test.ts",
@@ -37,6 +37,10 @@
       "lib/eval/leak-guard.test.ts",
       "lib/eval/promote-trace.test.ts",
       "lib/eval/scorers/scorers.test.ts",
+      "lib/eval/turn-outcome-report.test.ts",
+      "lib/eval/turn-outcome.test.ts",
+      "scripts/run-deterministic-promptfoo-evals.sh",
+      "scripts/run-golden-eval-set-ci.sh",
       "tests/eval/golden/golden-eval-set.ci.test.ts",
       "tests/eval/helpfulness/fail-themes.ci.test.ts",
       "tests/eval/helpfulness/failure-delta.ci.test.ts",

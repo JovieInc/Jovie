@@ -1,5 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { captureError } from '@/lib/error-tracking';
+import {
+  isTurnOutcomeFailure,
+  judgeTurnOutcome,
+  type TurnOutcome,
+  type TurnToolEvent,
+} from '../turn-outcome';
 import type {
   OnlineScoringInput,
   OnlineScoringResult,
@@ -269,6 +275,54 @@ export function scheduleOnlineScoring(input: OnlineScoringInput): void {
     console.warn(
       JSON.stringify({
         event: 'online_scorer_failed',
+        traceId: input.traceId,
+        error: error instanceof Error ? error.message : 'unknown',
+      })
+    );
+  });
+}
+
+/**
+ * Outcome check on EVERY turn (not sampled): an action ask that ended without
+ * the action is enqueued for review as `action-stall`, and logged so the daily
+ * transcript judge and Sentry can see it. Deterministic, no model call.
+ */
+export async function runTurnOutcomeCheck(input: {
+  readonly traceId: string;
+  readonly userText: string;
+  readonly assistantText: string;
+  readonly toolEvents: readonly TurnToolEvent[];
+}): Promise<TurnOutcome> {
+  const outcome = judgeTurnOutcome(input);
+  if (isTurnOutcomeFailure(outcome)) {
+    console.warn(
+      JSON.stringify({
+        event: 'chat_turn_action_stall',
+        traceId: input.traceId,
+        intent: outcome.intent,
+        verdict: outcome.verdict,
+        reasons: outcome.reasons,
+      })
+    );
+    await enqueueEvalReview({
+      traceId: input.traceId,
+      caseName: `prod-outcome:${input.traceId}`,
+      userPrompt: input.userText,
+      assistantResponse: input.assistantText,
+      failureModes: ['action-stall'],
+    });
+  }
+  return outcome;
+}
+
+export function scheduleTurnOutcomeCheck(
+  input: Parameters<typeof runTurnOutcomeCheck>[0]
+): void {
+  if (process.env.CI === 'true' || process.env.NODE_ENV === 'test') return;
+  void runTurnOutcomeCheck(input).catch(error => {
+    console.warn(
+      JSON.stringify({
+        event: 'turn_outcome_check_failed',
         traceId: input.traceId,
         error: error instanceof Error ? error.message : 'unknown',
       })

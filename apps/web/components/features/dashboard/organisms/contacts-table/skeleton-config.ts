@@ -1,6 +1,6 @@
 /**
  * Loading geometry for the contacts table, shared by the route's loading.tsx
- * and the client table so both paint the same 32px dense rows.
+ * and the client table so both paint the same 40px compact rows.
  * Order: name, role, territories, email, phone, actions.
  */
 export const CONTACTS_SKELETON_COLUMN_CONFIG = [

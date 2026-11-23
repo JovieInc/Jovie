@@ -648,6 +648,15 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("last run 96h ago", judged(stale)["yc-corpus-refresh"])
         self.assertIn("Boom", judged(ycCorpusError="RuntimeError: Boom")["yc-corpus-refresh"])
 
+    def test_a_held_tick_that_never_reaches_the_yc_refresher_still_alerts_from_its_state(self):
+        last = lambda age: {"lastRun": {"status": "ok", "at": doctor.epoch_iso(1_000_000 - age), "failures": []}}
+        held = doctor.judge(obs(ycCorpusState=last(3 * 86400), tick={"at": "x", "error": None, "admissionDenied": "disk-critical"}))
+        self.assertIn("72h ago, skipped while the tick is held (disk-critical)", held["yc-corpus-refresh"])
+        self.assertNotIn("yc-corpus-refresh", doctor.judge(obs(ycCorpusState=last(3600))))
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "yc-corpus.json").write_text(json.dumps({"lastRun": {"at": "t", "failures": list("abcdefg")}}))
+            self.assertEqual(doctor.yc_corpus_observation(Path(tmp))["lastRun"]["failures"], list("abcde"))
+
     def test_repairs_spent_without_work_name_their_infrastructure_causes(self):
         quiet = doctor.judge(obs(noWorkRepairs24h={"target-state-unavailable": doctor.NO_WORK_REPAIR_ALERT - 1}))
         self.assertNotIn("repairs-without-work", quiet)

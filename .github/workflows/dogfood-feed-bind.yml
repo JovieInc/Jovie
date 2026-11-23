@@ -1,0 +1,180 @@
+name: Dogfood Feed Bind
+# accountable-writer: Summer
+# necessary-trust-boundary: workflow_dispatch only on canonical JovieInc/Jovie
+#   refs/heads/main under GitHub environment "Production – jovie". Writes solely
+#   to ovie_operating_kv key jovie:certification:v1:dogfood-receipts via existing
+#   CAS helpers and Doppler jovie-web/prd DATABASE_URL. No deploy, alias, marker,
+#   merge, or GitHub mutation. Never mounts a raw DATABASE_URL or CRON_SECRET
+#   repository secret. Does not change metrics route auth. Not a
+#   postdeploy-probes observer step and does not join the production-mutation FIFO.
+# removal-trigger: Fold into Production Controller evidence packets once they
+#   emit dogfood-feed bindings after each landed production generation.
+#
+# JOV-7200 / VER-5: one-shot production public-profile dogfood feed bind.
+# Observes the live origin, persists source=production binding + an honest
+# non-passing HTTP/CLI regression receipt (never the synthetic fixture).
+
+on:
+  workflow_dispatch:
+    inputs:
+      origin:
+        description: Production origin to observe and bind (allowlisted; canonicalized to https://jov.ie)
+        required: true
+        type: string
+        default: https://jov.ie
+      path:
+        description: Same-origin public profile path (relative; no absolute/protocol-relative URLs)
+        required: true
+        type: string
+        default: /tim
+      dry_run:
+        description: Observe and print plan only (no DATABASE_URL write)
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dogfood-feed-bind
+  cancel-in-progress: false
+
+jobs:
+  bind:
+    name: Observe and bind public-profile dogfood feed
+    if: ${{ github.repository == 'JovieInc/Jovie' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: Production – jovie
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-doppler
+
+      - name: Canonicalize and validate dispatch inputs
+        id: inputs
+        env:
+          RAW_ORIGIN: ${{ inputs.origin }}
+          RAW_PATH: ${{ inputs.path }}
+        run: |
+          set -euo pipefail
+          # Strip trailing slash; only the production public origin is allowed.
+          origin="${RAW_ORIGIN%/}"
+          test "$origin" = "https://jov.ie"
+          # Same-origin relative path only — reject absolute and protocol-relative.
+          case "$RAW_PATH" in
+            http://*|https://*|//*|*:*)
+              echo "::error::path must be a same-origin relative profile path"
+              exit 1
+              ;;
+          esac
+          [[ "$RAW_PATH" =~ ^/[A-Za-z0-9._~-]+$ ]]
+          {
+            echo "origin=$origin"
+            echo "path=$RAW_PATH"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Resolve served production identity
+        id: build
+        env:
+          ORIGIN: ${{ steps.inputs.outputs.origin }}
+        run: |
+          set -euo pipefail
+          info="$(curl -fsS --max-time 30 "$ORIGIN/api/health/build-info")"
+          echo "$info" | tee "$RUNNER_TEMP/build-info.json"
+          sha="$(jq -r '.commitSha' "$RUNNER_TEMP/build-info.json")"
+          dpl="$(jq -r '.deploymentId' "$RUNNER_TEMP/build-info.json")"
+          env_name="$(jq -r '.environment // empty' "$RUNNER_TEMP/build-info.json")"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+          test -n "$dpl"
+          # Absent environment is not production — require the exact label.
+          test "$env_name" = "production"
+          {
+            echo "commit_sha=$sha"
+            echo "deployment_id=$dpl"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Prove react-server CLI import path (DATABASE_URL-scoped)
+        if: ${{ !inputs.dry_run }}
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+        run: |
+          set -euo pipefail
+          test -n "${DOPPLER_TOKEN:-}"
+          # Repo-pinned tsx compiles -e as CJS; top-level await fails. Use a
+          # promise chain (not top-level await) under react-server conditions.
+          doppler run --project jovie-web --config prd \
+            --only-secrets=DATABASE_URL \
+            --no-fallback -- env -u DOPPLER_TOKEN \
+              pnpm --filter=@jovie/web exec \
+                env NODE_OPTIONS=--conditions=react-server \
+                tsx -e "void import('@/lib/ovie/mcp/postgres-backend.ts').then((m)=>{if(typeof m.postgresRecordBackend!=='function')process.exit(1);console.log('postgres-backend-import-ok')}).catch((e)=>{console.error(e);process.exit(1)})"
+
+      - name: Dry-run observe (no write)
+        if: ${{ inputs.dry_run }}
+        env:
+          ORIGIN: ${{ steps.inputs.outputs.origin }}
+          PROFILE_PATH: ${{ steps.inputs.outputs.path }}
+          EXPECTED_SHA: ${{ steps.build.outputs.commit_sha }}
+          ARTIFACT_DIR: ${{ runner.temp }}/public-profile-dogfood-artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p "$ARTIFACT_DIR"
+          # No standalone `--` after the script name: pnpm 9.15.9 forwards it
+          # literally and node:util parseArgs rejects `--origin` as positional.
+          pnpm --filter=@jovie/web dogfood:bind-public-profile \
+            --origin "$ORIGIN" \
+            --observe \
+            --path "$PROFILE_PATH" \
+            --expected-sha "$EXPECTED_SHA" \
+            --artifact-dir "$ARTIFACT_DIR" \
+            --write-observation "$RUNNER_TEMP/public-profile-dogfood-observation.json" \
+            --write-result "$RUNNER_TEMP/public-profile-dogfood-bind.json"
+
+      - name: Observe and persist dogfood feed bind
+        if: ${{ !inputs.dry_run }}
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          ORIGIN: ${{ steps.inputs.outputs.origin }}
+          PROFILE_PATH: ${{ steps.inputs.outputs.path }}
+          EXPECTED_SHA: ${{ steps.build.outputs.commit_sha }}
+          ARTIFACT_DIR: ${{ runner.temp }}/public-profile-dogfood-artifacts
+        run: |
+          set -euo pipefail
+          test -n "${DOPPLER_TOKEN:-}"
+          mkdir -p "$ARTIFACT_DIR"
+          doppler run --project jovie-web --config prd \
+            --only-secrets=DATABASE_URL \
+            --no-fallback -- env -u DOPPLER_TOKEN \
+              pnpm --filter=@jovie/web dogfood:bind-public-profile \
+                --origin "$ORIGIN" \
+                --observe \
+                --path "$PROFILE_PATH" \
+                --expected-sha "$EXPECTED_SHA" \
+                --artifact-dir "$ARTIFACT_DIR" \
+                --write-observation "$RUNNER_TEMP/public-profile-dogfood-observation.json" \
+                --write-result "$RUNNER_TEMP/public-profile-dogfood-bind.json" \
+                --apply
+          echo "### Public-profile dogfood feed bind (JOV-7200)" >> "$GITHUB_STEP_SUMMARY"
+          jq -r '"- commitSha: `\(.binding.commitSha // "n/a")`\n- deploymentId: `\(.binding.deploymentId // "n/a")`\n- receiptId: `\(.receiptId // "n/a")`\n- bind: \(.bindResult.status // "n/a")\n- receipt: \(.receiptResult.status // "n/a")\n- receiptOutcome: \(.receiptOutcome // "n/a")\n- provesOutcome: \(.provesOutcome // "n/a")\n- dogfoodFeed.status: \(.feed.status // "n/a")\n- dogfoodFeed.receiptCount: \(.feed.receiptCount // "n/a")\n- readback.bindingOk: \(.readback.bindingOk // "n/a")\n- readback.receiptOk: \(.readback.receiptOk // "n/a")\n- commissioning.feedConnected: \(.commissioning.feedConnected // "n/a")\n- commissioning.receiptPersisted: \(.commissioning.receiptPersisted // "n/a")\n- note: knownGoodDeploymentIds includes binder IDs and is not product certification"' \
+            "$RUNNER_TEMP/public-profile-dogfood-bind.json" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload dogfood feed bind evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: public-profile-dogfood-feed-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/build-info.json
+            ${{ runner.temp }}/public-profile-dogfood-observation.json
+            ${{ runner.temp }}/public-profile-dogfood-bind.json
+            ${{ runner.temp }}/public-profile-dogfood-artifacts
+          retention-days: 30
+          if-no-files-found: ignore

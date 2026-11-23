@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 // Drift T2.1: IconButton alias retirement — callsite migration coverage.
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -138,5 +140,19 @@ describe('DrawerEditableTextField', () => {
       'data-slot',
       'plain-button'
     );
+  });
+});
+
+describe('DrawerEditableTextField control heights (JOV-12567)', () => {
+  it('sits on the 28px control and 44px bar contract', () => {
+    const source = readFileSync(
+      resolve(__dirname, './DrawerEditableTextField.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain("'h-7 w-full rounded-lg");
+    expect(source).toContain("'h-7 rounded-lg px-2.5 hover:bg-surface-0'");
+    expect(source).not.toContain("'h-8 w-full");
+    expect(source).not.toContain("'h-8 rounded-lg");
   });
 });
