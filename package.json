@@ -68,7 +68,7 @@
       "js-cookie": "3.0.7",
       "ws": "8.23.0",
       "devalue": "5.9.3",
-      "postcss": "8.5.30",
+      "postcss": "8.5.32",
       "@lhci/cli>uuid": "11.1.1",
       "braintrust>uuid": "11.1.1",
       "exceljs>uuid": "11.1.1",
