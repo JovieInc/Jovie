@@ -24,12 +24,18 @@ test.describe('sticky table header occlusion (JOV-9079)', () => {
         await expect(header).toBeVisible();
         const initialBounds = await header.boundingBox();
         // Dense 32px rows (DRI-21) shrink total scroll vs the old 40px fixture
-        // budget (~2000). Scroll to the container max so occlusion still fires.
+        // budget (~2000). Scroll mid-range under the sticky header — exact
+        // maxScroll leaves body rows flush below the sticky band, so the
+        // geometric overlap guard never fires.
         const scrolled = await table.evaluate(element => {
           const root = element.parentElement!;
           const maxScroll = Math.max(0, root.scrollHeight - root.clientHeight);
-          root.scrollTop = maxScroll;
-          return { maxScroll, scrollTop: root.scrollTop };
+          const target = Math.min(
+            maxScroll,
+            Math.max(400, Math.floor(maxScroll / 2))
+          );
+          root.scrollTop = target;
+          return { maxScroll, target, scrollTop: root.scrollTop };
         });
         expect(
           scrolled.maxScroll,
@@ -39,7 +45,7 @@ test.describe('sticky table header occlusion (JOV-9079)', () => {
           .poll(() =>
             table.evaluate(element => element.parentElement!.scrollTop)
           )
-          .toBe(scrolled.maxScroll);
+          .toBe(scrolled.target);
         const bounds = await header.boundingBox();
         expect(bounds!.y).toBe(initialBounds!.y);
         // Prove that content actually lies beneath the sticky header, so this
@@ -381,5 +387,6 @@ test('keeps default table cell content at its canonical single-line height', asy
   const cellHeight = await cellContent.evaluate(
     element => element.getBoundingClientRect().height
   );
-  expect(cellHeight).toBe(32);
+  // Dense sole mode: row 32px, stable cell content band 24px (TABLE_ROW_MODES).
+  expect(cellHeight).toBe(24);
 });
