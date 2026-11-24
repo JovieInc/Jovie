@@ -245,7 +245,13 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
       await waitForProductionDashboardContent(page);
 
       // Payment authority ordering: BEFORE any payment the canary is free.
-      await ensureUserIsFree(page, stripeClient);
+      // The personaEmail sweep is load-bearing for the canary (JOV-8805
+      // class, red 45369972300): a previous walk whose teardown died — or
+      // whose reset 401/429'd — leaves the subscription active Stripe-side
+      // while the canary reset clears the local rows, and the next checkout
+      // is then answered with the already-subscribed billing-portal session
+      // (`bps_...`) instead of a checkout session.
+      await ensureUserIsFree(page, stripeClient, PRODCERT_CLAIM_CANARY_EMAIL);
       await detachCustomerPaymentMethods(
         stripeClient,
         PRODCERT_CLAIM_CANARY_EMAIL
@@ -282,6 +288,23 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
         source: 'onboarding',
         returnTo: '/chat?from=onboarding',
       });
+
+      // A non-`cs_` session id here means the checkout route found an
+      // already-subscribed canary and answered with the billing-portal
+      // session (`bps_...`) — a Stripe-side orphan subscription survived
+      // teardown (JOV-8805 class, red 45369972300). Retrieving it with
+      // checkout.sessions.retrieve dies with Stripe's opaque "No such
+      // checkout.session: bps_..."; name the class and fail instead — the
+      // walk never skips, and the red must say "orphan subscription",
+      // not a Stripe lookup error.
+      if (!sessionId.startsWith('cs_')) {
+        blockConeWalk(
+          `Checkout returned a non-checkout session id (${sessionId.slice(0, 4)}...): the canary is already subscribed Stripe-side - an orphan subscription survived teardown (JOV-8805 class); the walk never skips`
+        );
+        throw new Error(
+          `canary checkout returned a non-checkout session id (${sessionId.slice(0, 8)}...): already-subscribed billing-portal session (JOV-8805 orphan-subscription class, red 45369972300)`
+        );
+      }
 
       const session = await stripeClient.checkout.sessions.retrieve(sessionId);
       expect(session.livemode).toBe(false);
@@ -448,10 +471,12 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
       );
     } finally {
       // The canary returns to its exact pre-claim state: subscription
-      // canceled Stripe-side (with webhook), test payment methods detached,
-      // then the canary-reset endpoint unclaims the reserved handle.
+      // canceled Stripe-side (with the persona orphan sweep so no
+      // provider-only subscription survives the local reset), test payment
+      // methods detached, then the canary-reset endpoint unclaims the
+      // reserved handle.
       try {
-        await ensureUserIsFree(page, stripeClient);
+        await ensureUserIsFree(page, stripeClient, PRODCERT_CLAIM_CANARY_EMAIL);
       } finally {
         try {
           await detachCustomerPaymentMethods(
