@@ -6758,7 +6758,6 @@ function evaluateAlbumArtProviderContract(vars: EvalVars) {
   const gatewayAuthSourcePath = 'lib/ai/gateway-availability.ts';
   const modelSourcePath = 'lib/constants/ai-models.ts';
   const chatRouteSourcePath = 'app/api/chat/route.ts';
-  const albumArtToolSourcePath = 'lib/chat/tools/album-art.ts';
   const storageSourcePath = 'lib/services/album-art/storage.ts';
   const providerSource = readFileSync(
     resolve(process.cwd(), providerSourcePath),
@@ -6772,15 +6771,10 @@ function evaluateAlbumArtProviderContract(vars: EvalVars) {
     resolve(process.cwd(), modelSourcePath),
     'utf8'
   );
-  const chatRouteSource = readFileSync(
-    resolve(process.cwd(), chatRouteSourcePath),
-    'utf8'
-  );
-  // The tool's guards live in its own module; the route only wires it in.
-  const albumArtToolSource = readFileSync(
-    resolve(process.cwd(), albumArtToolSourcePath),
-    'utf8'
-  );
+  const [chatRouteSource, toolSource] = [
+    chatRouteSourcePath,
+    'lib/chat/tools/album-art.ts',
+  ].map(path => readFileSync(resolve(process.cwd(), path), 'utf8'));
   const storageSource = readFileSync(
     resolve(process.cwd(), storageSourcePath),
     'utf8'
@@ -6856,19 +6850,16 @@ function evaluateAlbumArtProviderContract(vars: EvalVars) {
     exposesGenerateAlbumArtTool: chatRouteSource.includes(
       'generateAlbumArt: createGenerateAlbumArtTool'
     ),
-    checksProfileBeforeGeneration: sourceHasOrderedFragments(
-      albumArtToolSource,
-      [
-        'if (!params.profileId)',
-        'const generated = await generateAlbumArtBackgrounds',
-      ]
-    ),
-    checksPlanBeforeGeneration: sourceHasOrderedFragments(albumArtToolSource, [
+    checksProfileBeforeGeneration: sourceHasOrderedFragments(toolSource, [
+      'if (!params.profileId)',
+      'const generated = await generateAlbumArtBackgrounds',
+    ]),
+    checksPlanBeforeGeneration: sourceHasOrderedFragments(toolSource, [
       'if (!params.canGenerateAlbumArt)',
       'const generated = await generateAlbumArtBackgrounds',
     ]),
     checksProviderBeforeReleaseFetchAndRateLimits: sourceHasOrderedFragments(
-      albumArtToolSource.replaceAll(/\s+/g, ' '),
+      toolSource.replaceAll(/\s+/g, ' '),
       [
         'if (!isAlbumArtGatewayConfigured())',
         'const target = await resolveAlbumArtReleaseTarget( params.profileId, params.releases, {',
@@ -6876,39 +6867,34 @@ function evaluateAlbumArtProviderContract(vars: EvalVars) {
         'const generated = await generateAlbumArtBackgrounds',
       ]
     ),
-    appliesBurstBeforeDailyLimit: sourceHasOrderedFragments(
-      albumArtToolSource,
-      [
-        'const burstLimit = await albumArtGenerationBurstLimiter.limit',
-        'const dailyLimit = await albumArtGenerationLimiter.limit',
-      ]
-    ),
+    appliesBurstBeforeDailyLimit: sourceHasOrderedFragments(toolSource, [
+      'const burstLimit = await albumArtGenerationBurstLimiter.limit',
+      'const dailyLimit = await albumArtGenerationLimiter.limit',
+    ]),
     asksForReleaseTargetBeforeGeneration: sourceHasOrderedFragments(
-      albumArtToolSource,
+      toolSource,
       [
         "target.status === 'needs_target'",
         'const generated = await generateAlbumArtBackgrounds',
       ]
     ),
     buildsProviderPromptBeforeGeneration: sourceHasOrderedFragments(
-      albumArtToolSource,
+      toolSource,
       [
         'const providerPrompt = buildAlbumArtBackgroundPrompt',
         'const generated = await generateAlbumArtBackgrounds',
       ]
     ),
-    capsToolCandidatesAtThree: albumArtToolSource.includes(
-      'if (index >= 2) break;'
-    ),
+    capsToolCandidatesAtThree: toolSource.includes('if (index >= 2) break;'),
     uploadsManifestAfterCandidateUploads: sourceHasOrderedFragments(
-      albumArtToolSource,
+      toolSource,
       [
         'const urls = await uploadAlbumArtCandidate',
         'await uploadAlbumArtManifest',
       ]
     ),
     treatsMissingKeyAsUnavailableWithoutSentry: sourceHasOrderedFragments(
-      albumArtToolSource,
+      toolSource,
       [
         'if (error instanceof AlbumArtGatewayUnconfiguredError)',
         "error: 'Album art generation is temporarily unavailable.'",
