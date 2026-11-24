@@ -1,8 +1,5 @@
 import { getCachedCurrentUser } from '@/lib/auth/cached';
-import {
-  mergePostKeepEnrichmentOntoWaitlistEntry,
-  pickWaitlistPrimarySocialUrl,
-} from '@/lib/onboarding/apply-post-keep-enrichment';
+import { pickWaitlistPrimarySocialUrl } from '@/lib/onboarding/apply-post-keep-enrichment';
 import { deriveClaimedOnboardingStateFromMessageRows } from '@/lib/onboarding/claimed-state';
 import type { PostKeepEnrichmentNotes } from '@/lib/onboarding/post-keep-enrichment-notes';
 import { normalizeEmail } from '@/lib/utils/email';
@@ -13,6 +10,7 @@ import {
 } from '@/lib/waitlist/access-request';
 import { scoreAdmissionCandidate } from '@/lib/waitlist/admission-score';
 import { decideGoldenPathAdmissionForArtist } from '@/lib/waitlist/golden-path-admission.server';
+import { mergePostKeepEnrichmentOntoWaitlistEntry } from '@/lib/waitlist/post-keep-enrichment';
 
 export class WaitlistPersistenceError extends Error {
   readonly cause: unknown;

@@ -1,9 +1,5 @@
-import { sql as drizzleSql, eq } from 'drizzle-orm';
-import { db } from '@/lib/db';
-import { waitlistEntries } from '@/lib/db/schema/waitlist';
+import type { PostKeepEnrichmentNotes } from '@/lib/onboarding/post-keep-enrichment-notes';
 import {
-  enrichmentQualificationPatch,
-  type PostKeepEnrichmentNotes,
   postKeepEnrichmentNotesSchema,
   resolvePrimarySocialUrlForWaitlist,
 } from '@/lib/onboarding/post-keep-enrichment-notes';
@@ -27,21 +23,4 @@ export function pickWaitlistPrimarySocialUrl(params: {
     fallbackUrl: params.stateSocialUrl ?? params.artistUrl,
     enrichment: params.enrichment,
   });
-}
-
-/** Merge chip notes onto the durable waitlist row after receipt create. */
-export async function mergePostKeepEnrichmentOntoWaitlistEntry(params: {
-  readonly entryId: string;
-  readonly enrichment: PostKeepEnrichmentNotes | null;
-}): Promise<void> {
-  const patch = enrichmentQualificationPatch(params.enrichment);
-  if (!patch) return;
-  const patchJson = JSON.stringify(patch);
-  await db
-    .update(waitlistEntries)
-    .set({
-      qualificationInputs: drizzleSql`coalesce(${waitlistEntries.qualificationInputs}, '{}'::jsonb) || ${patchJson}::jsonb`,
-      updatedAt: new Date(),
-    })
-    .where(eq(waitlistEntries.id, params.entryId));
 }
