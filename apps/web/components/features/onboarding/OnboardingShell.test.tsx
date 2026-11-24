@@ -314,7 +314,7 @@ describe('OnboardingShell status', () => {
     ).toBeVisible();
   });
 
-  it('renders the claim-error status with the error token, not raw red-* (JOV-6773)', () => {
+  it('renders claim-error with error token (JOV-6773; ONB-36 handoff publishes same status)', () => {
     render(<OnboardingShell sessionLabel='pending' />);
 
     const alert = screen.getByRole('alert');
