@@ -129,7 +129,6 @@ export function ImageAttachmentChip({
       </PopoverTrigger>
       <PopoverContent
         size='bare'
-        className='z-150'
         sideOffset={6}
         align='start'
         testId='image-attachment-popover-content'

@@ -82,7 +82,9 @@ describe('ImageAttachmentChip', () => {
     await waitFor(() =>
       expect(trigger.getAttribute('aria-expanded')).toBe('true')
     );
-    expect(screen.getByTestId('image-attachment-popover-content')).toBeTruthy();
+    expect(
+      screen.getByTestId('image-attachment-popover-content').className
+    ).toContain('z-popover');
   });
 
   it('uses the chat overlay tier with a System B popover surface', async () => {
@@ -95,9 +97,10 @@ describe('ImageAttachmentChip', () => {
       'image-attachment-popover-content'
     );
 
+    expect(content.className).toContain('z-popover');
     expect(
-      content.querySelector('.system-b-image-attachment-popover')
-    ).toBeTruthy();
+      content.querySelector('.system-b-image-attachment-popover')?.className
+    ).toContain('system-b-image-attachment-popover');
   });
 
   it('opens on keyboard Enter and closes on Escape', async () => {
