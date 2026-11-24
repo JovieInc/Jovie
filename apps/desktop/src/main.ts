@@ -171,6 +171,12 @@ import {
 } from './renderer-recovery';
 import { createRecoveryUnlatchController } from './renderer-recovery-unlatch';
 import {
+  createRecoverAfterWake,
+  DESKTOP_LOAD_FAILURE_DOCUMENT_MARKER,
+  recoverDesktopWindowAfterWake,
+  scheduleWakeRendererRecovery,
+} from './renderer-wake-recovery';
+import {
   createSummerRuntimeBridge,
   type SummerRuntimeBridge,
 } from './summer-runtime-bridge';
@@ -451,6 +457,7 @@ const rendererBootControllers = new Map<
   {
     readonly markBooted: () => void;
     readonly beginRecoveryUnlatch: () => void;
+    readonly recoverAfterWake: () => void;
     readonly dispose: () => void;
   }
 >();
@@ -1481,7 +1488,11 @@ function buildDesktopShellHtml(input: {
   readonly body: string;
   readonly actions?: string;
   readonly identityHtml?: string;
+  readonly mainAttributes?: string;
 }): string {
+  const mainAttributes = input.mainAttributes
+    ? ` ${input.mainAttributes}`
+    : '';
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -1506,7 +1517,7 @@ function buildDesktopShellHtml(input: {
     </style>
   </head>
   <body>
-    <main class="shell" role="main">
+    <main class="shell" role="main"${mainAttributes}>
       <svg class="mark" viewBox="0 0 353.68 347.97" aria-hidden="true">
         <path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/>
       </svg>
@@ -1528,6 +1539,7 @@ function buildDesktopLoadFailureUrl(failure: DesktopLoadFailureView): string {
     title: 'Jovie Desktop',
     heading: failure.heading,
     body: failure.body,
+    mainAttributes: DESKTOP_LOAD_FAILURE_DOCUMENT_MARKER,
     actions: `<div class="actions">
         <a class="primary" href="${retryUrl}">Retry</a>
         <a class="secondary" href="${appOrigin}">Open Jovie</a>
@@ -2171,6 +2183,9 @@ function attachRendererRecovery(
       return;
     }
 
+    // Hard hosted docs must re-prove app-booted (JOV-14765).
+    rendererEverBooted = false;
+
     loadWatchdogTimer = setTimeout(() => {
       loadWatchdogTimer = null;
       expireWatchdog('load', url);
@@ -2205,9 +2220,26 @@ function attachRendererRecovery(
     recoveryUnlatch.stop();
   };
 
+  const recoverAfterWake = createRecoverAfterWake({
+    isDestroyed: () => win.isDestroyed(),
+    getCurrentUrl: () => win.webContents.getURL(),
+    isRendererBooted: () => rendererBooted,
+    isRendererCrashed: () => win.webContents.isCrashed(),
+    appOrigin: APP_ORIGIN,
+    beginUnlatch: () => {
+      recoveryUnlatch.begin();
+      if (win === mainWindow) showWindowNow(win);
+    },
+    reloadHosted: () => {
+      void win.loadURL(lastHostedUrl || APP_ENTRY_URL);
+      if (win === mainWindow) showWindowNow(win);
+    },
+  });
+
   rendererBootControllers.set(webContentsId, {
     markBooted: markRendererBooted,
     beginRecoveryUnlatch: recoveryUnlatch.begin,
+    recoverAfterWake,
     dispose: () => {
       clearAllWatchdogs();
       localHostedLoadRecovery.dispose();
@@ -2854,6 +2886,14 @@ function scheduleDesktopAutoUpdate(): void {
   };
   powerMonitor.on('resume', checkAfterWake);
   powerMonitor.on('unlock-screen', checkAfterWake);
+}
+
+function recoverMainWindowAfterWake(): void {
+  recoverDesktopWindowAfterWake({
+    isAuthHandoffInteractive,
+    getMainWindow: () => mainWindow,
+    getController: id => rendererBootControllers.get(id),
+  });
 }
 
 /** Restart into a downloaded update when idle with no work at risk. */
@@ -3757,6 +3797,7 @@ app.whenReady().then(async () => {
   if (directProfileUrl) showPublicProfilePreview(directProfileUrl);
   pendingLegacyAuthReturnRoute = null;
   scheduleNightlyUpdateLaunchAgent();
+  scheduleWakeRendererRecovery({ powerMonitor, recover: recoverMainWindowAfterWake });
   scheduleDesktopAutoUpdate();
   scheduleHudBuildAutoReload();
 
