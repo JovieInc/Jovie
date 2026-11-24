@@ -1,18 +1,12 @@
-/** Deliberate-red: dead warm keys that consumers do not read (ASR-043). */
-import type { QueryClient } from '@tanstack/react-query';
+/** Deliberate-red sample text for ASR-043 (not a typechecked module). */
+// Matcher targets: dead warm keys consumers do not read.
+export const deadAudienceWarm =
+  'queryKeys.audience.members(profileId)';
+export const deadPresenceWarm =
+  'queryKeys.dspEnrichment.presence(profileId)';
 
-declare const queryKeys: {
-  audience: { members: (id: string) => unknown[] };
-  dspEnrichment: { presence: (id: string) => unknown[] };
-};
-
-export function warmDead(queryClient: QueryClient, profileId: string) {
-  queryClient.prefetchQuery({
-    queryKey: queryKeys.audience.members(profileId),
-    queryFn: async () => [],
-  });
-  queryClient.prefetchQuery({
-    queryKey: queryKeys.dspEnrichment.presence(profileId),
-    queryFn: async () => [],
-  });
+export function warmDead() {
+  // Illustrative only — scanned as source text by the contract runner.
+  void deadAudienceWarm;
+  void deadPresenceWarm;
 }
