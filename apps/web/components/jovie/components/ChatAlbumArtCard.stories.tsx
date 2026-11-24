@@ -90,6 +90,109 @@ export const GeneratedCandidates: Story = {
   },
 };
 
+export const LoadingApplyPending: Story = {
+  args: {
+    result: {
+      ...generatedResult,
+      candidates: [generatedResult.candidates[0]!],
+    },
+  },
+  decorators: [
+    Story => {
+      globalThis.localStorage.setItem(ALBUM_ART_SWIPE_PREFERENCE_KEY, 'off');
+      return <Story />;
+    },
+  ],
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Apply/create mutations expose isPending; certificate scores loading from that path.',
+      },
+    },
+  },
+};
+
+export const EmptyCandidates: Story = {
+  args: {
+    result: {
+      ...generatedResult,
+      candidates: [],
+    },
+  },
+  decorators: [
+    Story => {
+      globalThis.localStorage.setItem(ALBUM_ART_SWIPE_PREFERENCE_KEY, 'off');
+      return <Story />;
+    },
+  ],
+};
+
+export const LongContentReleaseTitle: Story = {
+  args: {
+    result: {
+      ...generatedResult,
+      releaseTitle:
+        'Final International Tour Deluxe Edition Master — Midnight City Lights Remastered Anniversary Collection',
+      candidates: [
+        {
+          ...generatedResult.candidates[0]!,
+          styleLabel: 'Dream Pop Extended Label For Overflow',
+        },
+      ],
+    },
+  },
+  decorators: [
+    Story => {
+      globalThis.localStorage.setItem(ALBUM_ART_SWIPE_PREFERENCE_KEY, 'off');
+      return (
+        <div className='w-56'>
+          <Story />
+        </div>
+      );
+    },
+  ],
+};
+
+export const OfflineDisconnected: Story = {
+  args: {
+    result: failedResult,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Offline/disconnected apply path shares the failed artifact surface (retryable tool error).',
+      },
+    },
+  },
+};
+
+export const RtlOverflowTitle: Story = {
+  args: {
+    result: {
+      ...generatedResult,
+      releaseTitle: 'ألبوم الأحلام الليلية للإصدار النهائي',
+      candidates: [
+        {
+          ...generatedResult.candidates[0]!,
+          styleLabel: 'بوب الأحلام',
+        },
+      ],
+    },
+  },
+  decorators: [
+    Story => {
+      globalThis.localStorage.setItem(ALBUM_ART_SWIPE_PREFERENCE_KEY, 'off');
+      return (
+        <div dir='rtl' className='w-56'>
+          <Story />
+        </div>
+      );
+    },
+  ],
+};
+
 export const SwipeReviewOnboarding: Story = {
   args: {
     result: generatedResult,
