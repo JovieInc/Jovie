@@ -90,8 +90,19 @@ describe('ChatProposeNextStepCard states', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('keeps enrichment chips subordinate and local-only under auth', async () => {
+  it('keeps enrichment chips subordinate and carries notes under auth', async () => {
     const user = userEvent.setup();
+    const store = new Map<string, string>();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      },
+    });
+
     render(
       <ChatProposeNextStepCard
         payload={payload('instant_access')}
@@ -114,6 +125,7 @@ describe('ChatProposeNextStepCard states', () => {
     expect(
       screen.getByTestId('onboarding-enrichment-social-chip')
     ).toHaveTextContent('Instagram / TikTok Noted');
+    expect(store.get('jovie:onboarding:enrichment:v1')).toContain('instagram');
 
     await user.click(screen.getByTestId('onboarding-enrichment-audience-chip'));
     await user.click(
@@ -122,9 +134,11 @@ describe('ChatProposeNextStepCard states', () => {
     expect(
       screen.getByTestId('onboarding-enrichment-audience-chip')
     ).toHaveTextContent('Audience Noted');
+    expect(store.get('jovie:onboarding:enrichment:v1')).toContain('5k_to_50k');
 
     // Primary auth surface remains after optional notes.
     expect(screen.getByTestId('signup-surface')).toBeInTheDocument();
+    vi.unstubAllGlobals();
   });
 
   it('keeps the instant-access copy when the auth surface cannot render', async () => {

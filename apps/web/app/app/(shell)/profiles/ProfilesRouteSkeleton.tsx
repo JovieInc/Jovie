@@ -99,7 +99,7 @@ export function ProfilesRouteSkeleton() {
         columns={PROFILES_TABLE_SKELETON_COLUMNS}
         skeletonColumnConfig={[...PROFILES_SKELETON_CONFIG]}
         skeletonRows={8}
-        rowMode='list'
+        rowMode='dense'
         containerClassName='min-h-0 flex-1'
         minWidth='0'
         className={styles.table}

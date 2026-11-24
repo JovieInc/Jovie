@@ -77,7 +77,7 @@ export function AudienceTableLoadingShell() {
               columns={AUDIENCE_LOADING_COLUMNS}
               skeletonRows={SKELETON_ROW_COUNT.TABLE}
               skeletonColumnConfig={AUDIENCE_TABLE_SKELETON_COLUMN_CONFIG}
-              rowMode='compact'
+              rowMode='dense'
               minWidth='800px'
               className='text-app'
               containerClassName={AUDIENCE_TABLE_CONTAINER_CLASS}

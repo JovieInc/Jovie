@@ -298,4 +298,14 @@ export { useTableGrouping } from './utils/useTableGrouping';
 // Styles
 // =============================================================================
 
-export { cn, contextualAction, presets, rowState } from './table.styles';
+export {
+  cn,
+  contextualAction,
+  presets,
+  resolveTableRowHeightPx,
+  rowState,
+  TABLE_CANONICAL_ROW_MODE,
+  TABLE_ROW_MODES,
+  type TableRowMode,
+  tableRowModeStyle,
+} from './table.styles';

@@ -2730,8 +2730,9 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     // actionlint reads only checked-out workflows, so it runs unconditionally
     // in the idle wait for the background base-branch fetch.
+    // Wave 1a: actionlint once-work runs on shard 2 (not stacked on shard 1).
     expect(remaining).toMatch(
-      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Set up Go for source-pinned actionlint\n\s+if: \$\{\{ success\(\) && matrix.shard == 1 \}\}\n\s+uses: actions\/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\.0\.0\n\s+with:\n\s+go-version: '1\.26\.10'\n\s+cache: false\n\s+- name: Run actionlint\n\s+if: \$\{\{ success\(\) && matrix.shard == 1 \}\}\n\s+env:\n(?:\s+#.*\n)+\s+RELEASE_DOWNLOAD_TOKEN: \$\{\{ github\.token \}\}\n\s+PINNED_DOWNLOAD_CACHE_DIR: \/tmp\/jovie-pinned-downloads\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
+      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Set up Go for source-pinned actionlint\n\s+if: \$\{\{ success\(\) && matrix.shard == 2 \}\}\n\s+uses: actions\/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\.0\.0\n\s+with:\n\s+go-version: '1\.26\.10'\n\s+cache: false\n\s+- name: Run actionlint\n\s+if: \$\{\{ success\(\) && matrix.shard == 2 \}\}\n\s+env:\n(?:\s+#.*\n)+\s+RELEASE_DOWNLOAD_TOKEN: \$\{\{ github\.token \}\}\n\s+PINNED_DOWNLOAD_CACHE_DIR: \/tmp\/jovie-pinned-downloads\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
     );
     expect(
       remaining.match(/bash \.github\/scripts\/run-actionlint\.sh/g)

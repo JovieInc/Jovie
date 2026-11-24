@@ -29,7 +29,7 @@ export function TaskDataTable<TData extends RowData>({
   getRowClassName,
   hideHeader = true,
   minWidth = '100%',
-  rowHeight = 56,
+  rowMode = 'dense',
   skeletonRows = 8,
   ...props
 }: Readonly<TaskDataTableProps<TData>>) {
@@ -51,7 +51,7 @@ export function TaskDataTable<TData extends RowData>({
       getRowClassName={mergedRowClassName}
       hideHeader={hideHeader}
       minWidth={minWidth}
-      rowHeight={rowHeight}
+      rowMode={rowMode}
       skeletonRows={skeletonRows}
     />
   );

@@ -84,10 +84,7 @@ import {
 } from '@/lib/chat/message-text';
 import { canUseOvChatMode, parseChatMode } from '@/lib/chat/ov-mode';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
-import {
-  updateOwnedReleaseGeneratedPitches,
-  updateOwnedReleaseMetadata,
-} from '@/lib/chat/release-writes';
+import { updateOwnedReleaseGeneratedPitches } from '@/lib/chat/release-writes';
 import { fetchReleaseCatalogForChat } from '@/lib/chat/releases';
 import {
   extractUIMessageText,
@@ -115,7 +112,10 @@ import {
   preparePersistedToolEventsForTurnFinish,
   resolvePersistedToolEventsForDisplay,
 } from '@/lib/chat/tool-events';
-import { createCheckCanvasStatusTool } from '@/lib/chat/tools/canvas-status';
+import {
+  createCheckCanvasStatusTool,
+  createMarkCanvasUploadedTool,
+} from '@/lib/chat/tools/canvas-status';
 import { proposeMerchAction } from '@/lib/chat/tools/merch-propose';
 import {
   createMerchAlternativeTool,
@@ -222,7 +222,6 @@ import type {
   AlbumArtCandidate,
   AlbumArtStyleId,
 } from '@/lib/services/album-art/types';
-import { buildCanvasMetadata } from '@/lib/services/canvas/service';
 import { getInsightsSummary } from '@/lib/services/insights/lifecycle';
 import {
   buildPitchInput,
@@ -1062,68 +1061,6 @@ function createShowTopInsightsTool(
         totalActive: summary.totalActive,
         insights: summary.insights,
         relevant: true,
-      };
-    },
-  });
-}
-
-/**
- * Creates the markCanvasUploaded tool.
- * Lets artists self-report that they've uploaded a canvas to Spotify for Artists.
- * Since Spotify has no public API for canvas status, this is the only reliable way to track it.
- */
-function createMarkCanvasUploadedTool(
-  profileId: string | null,
-  releases: ReleaseContext[]
-) {
-  return tool({
-    description:
-      "Mark a release as having a Spotify Canvas video uploaded. Use this when the artist confirms they've already set a canvas for a track/release in Spotify for Artists, or when they tell you a canvas is already uploaded.",
-    inputSchema: chatToolSchema({
-      releaseTitle: z
-        .string()
-        .describe('The title of the release that has a canvas uploaded'),
-    }),
-    execute: async ({ releaseTitle }) => {
-      if (!profileId) {
-        return { success: false, error: 'Profile ID required' };
-      }
-
-      const release = await resolveChatRelease(profileId, releases, {
-        releaseTitle,
-      });
-
-      if (!release) {
-        return {
-          success: false,
-          error: `Release "${releaseTitle}" not found. Available releases: ${formatAvailableReleases(releases)}`,
-        };
-      }
-
-      const updated = await updateOwnedReleaseMetadata({
-        releaseId: release.id,
-        creatorProfileId: profileId,
-        metadata: {
-          ...release.metadata,
-          ...buildCanvasMetadata('uploaded'),
-        },
-      });
-
-      if (!updated) {
-        return {
-          success: false,
-          error: 'Release not found or unauthorized',
-        };
-      }
-
-      return {
-        success: true,
-        release: {
-          title: release.title,
-          previousStatus: release.canvasStatus,
-          newStatus: 'uploaded',
-        },
-        message: `Marked "${release.title}" as having a Spotify Canvas uploaded.`,
       };
     },
   });
@@ -2732,7 +2669,11 @@ export async function POST(req: Request) {
         // Copy floor (canon/VOICE.md) and artist rules: a streamed reply can't
         // be blocked mid-flight, so gate the completed text before it persists.
         // A violation swaps in a safe fallback and logs the rules that fired.
-        const gatedReply = gateAssistantReply(assistantText, artistContext);
+        const gatedReply = gateAssistantReply(assistantText, {
+          artistRules: artistContext.artistRules,
+          ask: userText,
+          namedReleases: releases.map(release => release.title),
+        });
         if (gatedReply.violations.length > 0) {
           const emptyReply = gatedReply.violations.some(
             violation => violation.rule === 'empty-reply'

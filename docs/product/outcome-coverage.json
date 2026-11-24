@@ -67,7 +67,7 @@
       "checks": [
         {
           "file": "apps/web/tests/e2e/canary-claim-checkout.spec.ts",
-          "test": "reset → claim → test-mode payment → activation → reset",
+          "test": "reset \u2192 claim \u2192 test-mode payment \u2192 activation \u2192 reset",
           "runs": "prod-postdeploy"
         }
       ]
@@ -181,8 +181,13 @@
       "core": true,
       "entryPoints": ["apps/web/app/api/account/delete/route.ts#POST"],
       "chatTools": [],
-      "checks": [],
-      "gap": "Unit tests only. Needs a throwaway test account per run."
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/account-delete-outcome.test.ts",
+          "test": "a confirmed delete erases the account and its profile, and leaves others alone",
+          "runs": "merge"
+        }
+      ]
     },
     {
       "id": "fan-capture",
@@ -211,8 +216,13 @@
         "selectMerchDesign",
         "createMerchAlternativeItem"
       ],
-      "checks": [],
-      "gap": "Only the passive daily chat judge (lib/eval/turn-outcome.ts). Needs a test-account run that asserts three designs exist."
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/chat-merch-outcome.test.ts",
+          "test": "a fresh artist asking \"make merch\" gets three designs saved, not a question",
+          "runs": "merge"
+        }
+      ]
     },
     {
       "id": "chat-merch-manage",
@@ -228,8 +238,13 @@
         "reorderMerchCards",
         "optimizeMerchCards"
       ],
-      "checks": [],
-      "gap": "Unit tests only."
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/chat-merch-manage-outcome.test.ts",
+          "test": "a picked design becomes a merch card that pauses and removes",
+          "runs": "merge"
+        }
+      ]
     },
     {
       "id": "chat-profile-edit",
@@ -243,8 +258,13 @@
         "inspectPressSource",
         "proposeAvatarUpload"
       ],
-      "checks": [],
-      "gap": "Unit tests only."
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/chat-profile-edit-outcome.test.ts",
+          "test": "a confirmed chat bio and name are saved on the profile and audited",
+          "runs": "merge"
+        }
+      ]
     },
     {
       "id": "chat-links",
@@ -252,8 +272,13 @@
       "core": true,
       "entryPoints": [],
       "chatTools": ["proposeSocialLink", "proposeSocialLinkRemoval"],
-      "checks": [],
-      "gap": "Schema tests only."
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/chat-links-outcome.test.ts",
+          "test": "a confirmed chat link is saved on the profile, and a confirmed removal takes it off",
+          "runs": "merge"
+        }
+      ]
     },
     {
       "id": "chat-release",
@@ -284,8 +309,22 @@
       ]
     },
     {
+      "id": "chat-canvas",
+      "label": "Chat: Spotify Canvas status",
+      "core": true,
+      "entryPoints": [],
+      "chatTools": ["checkCanvasStatus", "markCanvasUploaded"],
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/chat-canvas-outcome.test.ts",
+          "test": "marking a canvas uploaded is what the next turn reports",
+          "runs": "merge"
+        }
+      ]
+    },
+    {
       "id": "chat-creative",
-      "label": "Chat: album art, retouch, pitch, promo and canvas",
+      "label": "Chat: album art, retouch, pitch, promo and video",
       "core": true,
       "entryPoints": [],
       "chatTools": [
@@ -294,8 +333,6 @@
         "retouchImage",
         "voicePromo",
         "formatLyrics",
-        "checkCanvasStatus",
-        "markCanvasUploaded",
         "proposeVideoRecording"
       ],
       "checks": [],

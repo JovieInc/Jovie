@@ -398,6 +398,18 @@ def automation_observation(host, lane, now: float) -> dict:
         watch = automation_watch(automation_registry(host.repo), lane.HOST, now)
     except Exception as error:  # observability never takes the doctor down
         watch = {"known": False, "silent": {}, "error": type(error).__name__}
+    # gem:waste-loop: capacity SHARE historically omitted waste.py (#23933). Heal from
+    # origin/main into SHARE and re-check so silence clears inside the same observe.
+    if "gem:waste-loop" in (watch.get("silent") or {}):
+        try:
+            import waste_loop_heal
+            heal = waste_loop_heal.heal(host)
+            watch["wasteLoopHeal"] = heal
+            if heal.get("status") == "ok":
+                watch = automation_watch(automation_registry(host.repo), lane.HOST, now)
+                watch["wasteLoopHeal"] = heal
+        except Exception as error:  # noqa: BLE001
+            watch["wasteLoopHeal"] = {"status": "error", "error": type(error).__name__}
     try:
         liveness = automation_liveness(lane, now)
     except Exception as error:

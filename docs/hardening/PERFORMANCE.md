@@ -86,3 +86,39 @@ authenticated focused-composer launch instrumentation and the real Mac workload
 matrix. **Then:** set measured regression budgets, including input/paint and
 conversation-switch latency. This collector's source tests do not close the
 open Electron runtime-evidence rows above.
+
+## Installed Mac performance certification (JOV-7463)
+
+The charter budgets are executable in
+`apps/desktop/scripts/performance-contract.mjs`. CI-safe self-test:
+
+```bash
+pnpm desktop:performance:cert
+# or: pnpm --filter @jovie/desktop run performance:cert --mode contract-check
+pnpm --filter @jovie/desktop run test:performance
+```
+
+`contract-check` proves the evaluator rejects over-budget values and keeps
+`LIVE_CERT=blocked` off-Mac. It is not installed-app proof.
+
+On a supported Apple Silicon Mac with an authenticated production install,
+score launch readiness + idle resource baseline + interaction measurements:
+
+```bash
+# 1) Quit/relaunch the production app; reach authenticated usable composer.
+# 2) Capture idle resource baseline (see above).
+# 3) Certify against the charter contract:
+pnpm desktop:performance:cert -- --mode live \
+  --readiness "$HOME/Library/Application Support/Jovie/desktop-launch-readiness.json" \
+  --baseline artifacts/desktop-test-results/production-baseline/<timestamp>/metadata.json \
+  --measurements path/to/interaction-measurements.json
+```
+
+Charter budgets (reject on overrun when measured): warm launch ≤500ms, cached
+nav ≤100ms, cold usable ≤1.5s, typing ≤16ms, command palette ≤50ms, idle CPU
+≤1%, unintended layout shifts = 0, lost drafts = 0. Missing metrics keep
+`LIVE_CERT=blocked`; regressions exit nonzero. Cold usable maps from launch
+readiness `composerVisibleEditableAfterPaintOpportunityMs`; idle CPU maps from
+an idle `pnpm desktop:performance` baseline. Warm launch, navigation, typing,
+palette, layout-shift, and draft metrics still need supplied measurement JSON
+until dedicated probes land.

@@ -839,8 +839,8 @@ nodes:
       - Mac Lane Route
     triggeringStateTransition:
       - workflow_call
-    terminalReceipt: job:startup-budget
-    jobCount: 3
+    terminalReceipt: job:performance-cert
+    jobCount: 4
   - name: Main Health
     path: .github/workflows/main-health.yml
     active: true
