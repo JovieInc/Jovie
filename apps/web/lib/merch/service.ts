@@ -40,7 +40,7 @@ import {
   resolveMerchCatalogSelection,
 } from './catalog';
 import {
-  getMerchContentReviewBlockers,
+  getMerchPersonContentReviewBlockers,
   MERCH_PERSON_CONTENT_PUBLISH_BLOCKER,
 } from './content-contract';
 import { MERCH_DEFAULT_PRINTFUL_PRODUCT } from './default-catalog';
@@ -1056,7 +1056,9 @@ export async function selectMerchDesign(params: {
       'This older merch option cannot be selected because its source and no-people safety contract were not verified. Regenerate from a confirmed catalog source.'
     );
   }
-  const contentReviewBlockers = getMerchContentReviewBlockers(
+  // A pick makes a private draft card. Only person-content blockers stop it;
+  // the concept rights gate still blocks publish via getDesignOptionSellability.
+  const contentReviewBlockers = getMerchPersonContentReviewBlockers(
     rawSelected.qualityReview
   );
   if (contentReviewBlockers.length > 0 || rawSelected.status === 'rejected') {

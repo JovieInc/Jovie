@@ -94,7 +94,7 @@ function RowModeScrollFixture() {
           artist: 'Fixture artist',
         }))}
         columns={columns}
-        rowMode='two-line'
+        rowMode='dense'
         isLoading={loading}
         skeletonRows={7}
         enableVirtualization

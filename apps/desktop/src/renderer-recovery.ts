@@ -670,8 +670,7 @@ export function decideRendererWatchdogExpiry(input: {
   if (input.windowDestroyed || input.booted || input.skipForAuthHandoff) {
     return 'ignore';
   }
-  // A session that already painted must not be replaced by a false offline
-  // page because a later HMR or in-app navigation missed a second ping.
+  // Soft/HMR may miss a second ping; hard nav clears everBooted in the shell.
   if (input.reason === 'boot' && input.everBooted) {
     return 'ignore';
   }

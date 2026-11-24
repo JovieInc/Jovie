@@ -16,7 +16,8 @@ function source(relativePath: string): string {
 }
 
 describe('desktop list density', () => {
-  it('keeps the shared dense row at the 32px desktop scale', () => {
+  it('keeps the shared dense row at the 32px desktop scale as the sole mode', () => {
+    expect(Object.keys(TABLE_ROW_MODES)).toEqual(['dense']);
     expect(TABLE_ROW_MODES.dense).toEqual({
       rowHeight: 32,
       contentHeight: 24,

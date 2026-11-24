@@ -108,3 +108,9 @@ export const capacityHorizonSchema = z.object({
 export type CapacityHorizon = z.infer<typeof capacityHorizonSchema>;
 export type CapacityHorizonLease = CapacityHorizon['leases'][number];
 export type CapacityDrainMode = CapacityHorizonLease['mode'];
+
+/**
+ * Usage-limit pool facts for Fleet/Ovie are projected read-only from
+ * `scripts/lib/usage-ledger.mjs` (`jovie.usage-ledger-ovie-projection/v1`).
+ * Do not scrape provider CLIs into this horizon schema; extend the ledger instead.
+ */

@@ -104,8 +104,11 @@ function startup(nightlyUpdateLaunch = false, extra = {}) {
       }
     },
     scheduleNightlyUpdateLaunchAgent() {},
+    scheduleWakeRendererRecovery() {},
     scheduleDesktopAutoUpdate() {},
     scheduleHudBuildAutoReload() {},
+    powerMonitor: { on() {} },
+    recoverMainWindowAfterWake() {},
     ...extra,
   };
   runInNewContext(compile(ready.getText(ast)), context);

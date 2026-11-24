@@ -23,6 +23,94 @@ export interface CanaryResetContext {
   readonly runTag: string;
 }
 
+/** Verdict of the preflight probe against the target surface's Redis. */
+export type CanaryResetSurfacePreflight =
+  | { readonly ready: true; readonly detail: string }
+  | { readonly ready: false; readonly detail: string };
+
+/**
+ * Classify GET /api/health/redis on the target surface (pure; unit-tested).
+ *
+ * The reset endpoint's passage-token consume path is Redis-only and fails
+ * closed (passage-token.server.ts: limiter requireRedis + jti replay guard),
+ * so a surface without Redis denies EVERY reset with an opaque 401 —
+ * postdeploy run 45311864925: staging.jov.ie (Vercel preview) selects the
+ * in-memory store by policy (redis-store.ts), and all three walk attempts
+ * died on `canary reset HTTP 401` in under four seconds. The health route is
+ * bearer-gated (CRON_SECRET) and probes Redis operability without consuming
+ * anything, so the walk asks it first and names the gap instead.
+ */
+export function classifyCanaryResetSurfaceProbe(
+  status: number,
+  body: string
+): CanaryResetSurfacePreflight {
+  if (status === 200) {
+    return { ready: true, detail: 'surface Redis is operable' };
+  }
+  if (status === 404 || status === 405) {
+    // Landed build predates /api/health/redis; the reset endpoint itself
+    // remains the authority, as before this preflight existed.
+    return {
+      ready: true,
+      detail: `surface predates /api/health/redis (HTTP ${status}); deferring to the reset endpoint`,
+    };
+  }
+  if (status === 503 && /not_configured|unavailable/iu.test(body)) {
+    return {
+      ready: false,
+      detail:
+        'surface has no Redis (Vercel preview selects the in-memory store by policy), so it cannot consume canary passage tokens; wire a non-production Upstash instance to the project env (JOV-9826)',
+    };
+  }
+  if (status === 401 || status === 403) {
+    return {
+      ready: false,
+      detail:
+        'surface rejected the CRON_SECRET bearer on /api/health/redis — the CRON_SECRET in this run (Doppler jovie-web/prd) does not match the target surface env, so the reset bearer check will fail too',
+    };
+  }
+  return {
+    ready: false,
+    detail: `surface Redis probe returned HTTP ${status}: ${body.slice(0, 200)}`,
+  };
+}
+
+/**
+ * Fail fast, with a named reason, when the target surface cannot consume
+ * canary passage tokens. Bearer-gated probe only: no token is minted or
+ * consumed, no state is touched. Legacy builds without the health route
+ * pass through so the reset endpoint stays the judge (never weaker).
+ */
+export async function assertCanaryResetSurfaceReady({
+  request,
+  origin,
+}: {
+  readonly request: APIRequestContext;
+  readonly origin: string;
+}): Promise<CanaryResetSurfacePreflight> {
+  const cronSecret = process.env.CRON_SECRET ?? '';
+  if (!cronSecret) {
+    throw new Error('CRON_SECRET is not provided to this run');
+  }
+  const bypassSecret = process.env.PLAYWRIGHT_VERCEL_BYPASS_SECRET;
+  const response = await request.get(`${origin}/api/health/redis`, {
+    headers: {
+      authorization: `Bearer ${cronSecret}`,
+      ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
+    },
+    timeout: 15_000,
+  });
+  const status = response.status();
+  const body = (await response.text()).slice(0, 500);
+  const verdict = classifyCanaryResetSurfaceProbe(status, body);
+  if (!verdict.ready) {
+    throw new Error(
+      `canary reset preflight: ${origin} cannot run the JOV-9826 walk — ${verdict.detail}`
+    );
+  }
+  return verdict;
+}
+
 export interface CanaryResetEnv {
   readonly CRON_SECRET?: string;
   readonly SYNTHETIC_PASSAGE_KEY?: string;

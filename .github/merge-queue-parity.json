@@ -253,20 +253,6 @@
       "reason": "Database certification on an isolated Neon branch runs only in the queue, path-gated on DB changes; the PR runs the static migration guard only.",
       "createdOn": "2026-11-11",
       "expiresOn": "2027-02-09"
-    },
-    {
-      "job": "ci.yml#ci-lighthouse-dashboard-pr",
-      "kind": "gap",
-      "reason": "The Lighthouse dashboard gate never runs on a PR (about 80 queue failures in 7 days); the Lighthouse lane owns closing it.",
-      "createdOn": "2026-11-11",
-      "expiresOn": "2027-02-09"
-    },
-    {
-      "job": "ci.yml#ci-lighthouse-onboarding-pr",
-      "kind": "gap",
-      "reason": "The Lighthouse onboarding gate never runs on a PR; the Lighthouse lane owns closing it.",
-      "createdOn": "2026-11-11",
-      "expiresOn": "2027-02-09"
     }
   ],
   "prOnlyInputs": [

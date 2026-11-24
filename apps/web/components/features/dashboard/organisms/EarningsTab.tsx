@@ -317,7 +317,7 @@ export function EarningsTab() {
         <UnifiedTable
           data={tippers}
           columns={TIPPER_COLUMNS}
-          rowMode='compact'
+          rowMode='dense'
           caption='Tips'
           isLoading={isEarningsLoading}
           getRowId={row => row.id}

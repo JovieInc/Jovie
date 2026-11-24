@@ -347,6 +347,18 @@ test('automatic update checks defer initial work while manual and nightly checks
     mainSource,
     /powerMonitor\.on\('unlock-screen', checkAfterWake\)/
   );
+  assert.match(mainSource, /scheduleWakeRendererRecovery\(\{/);
+  assert.match(mainSource, /recoverMainWindowAfterWake/);
+  assert.match(mainSource, /createRecoverAfterWake\(/);
+  assert.match(mainSource, /DESKTOP_LOAD_FAILURE_DOCUMENT_MARKER/);
+  assert.match(mainSource, /rendererEverBooted = false/);
+  const wakeSource = await readFile(
+    join(desktopRoot, 'src/renderer-wake-recovery.ts'),
+    'utf8'
+  );
+  assert.match(wakeSource, /export function decideWakeRendererRecovery\(/);
+  assert.match(wakeSource, /export function scheduleWakeRendererRecovery\(/);
+  assert.match(wakeSource, /export function createRecoverAfterWake\(/);
   assert.match(mainSource, /shouldInstallDownloadedUpdateWhileRunning\(/);
   assert.match(mainSource, /autoUpdater\.quitAndInstall\(true, true\)/);
   const schedule = mainSource.match(
@@ -502,6 +514,8 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /describeDesktopLoadFailure/);
   assert.match(mainSource, /decideHostedLoadRetry/);
   assert.match(mainSource, /rendererEverBooted/);
+  assert.match(mainSource, /recoverAfterWake/);
+  assert.match(mainSource, /from '\.\/renderer-wake-recovery'/);
   assert.match(mainSource, /function isAppOriginReachable\(\)/);
   assert.match(mainSource, /function findReachableHostedUrl\(/);
   assert.match(mainSource, /beginRecoveryUnlatch/);

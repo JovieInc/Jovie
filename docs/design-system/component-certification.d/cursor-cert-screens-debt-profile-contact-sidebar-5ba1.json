@@ -1,0 +1,20 @@
+{
+  "waivers": {
+    "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileContactSidebar.tsx": {
+      "error": "Save and remove failures paint through the internal mutation-status slot (Retry). Stories cannot inject that ledger without rewriting the rail; ProfileContactSidebar.test.tsx covers error and retry.",
+      "offline": "There is no distinct offline UI. Network failures surface as the same mutation-status error path covered in ProfileContactSidebar.test.tsx.",
+      "permission-denied": "The rail has no role or plan gate. The detector matched role='status' on the mutation live region."
+    }
+  },
+  "gates": {
+    "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileContactSidebar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  }
+}

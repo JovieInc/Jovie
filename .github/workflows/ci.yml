@@ -1010,7 +1010,7 @@ jobs:
           fi
 
           # Isolated DB certification: database, authz, migration, harness, dependency inputs.
-          NEON_PATTERN='^(apps/web/drizzle/|apps/web/lib/(db|queries|auth)/|apps/web/scripts/(drizzle-migrate|verify-db-migrations)\.ts|apps/web/tests/(integration/|setup-db\.ts)|apps/web/lib/domain/releases\.ts|apps/web/lib/ai/tools/create-release\.ts|apps/web/lib/chat/tools/tasks\.ts|apps/web/app/app/\(shell\)/dashboard/tasks/task-actions\.ts|apps/web/vitest\.config\.integration\.mts|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|.*\.sql$|apps/web/app/api/cron/|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'
+          NEON_PATTERN='^(apps/web/drizzle/|apps/web/lib/(db|queries|auth)/|apps/web/scripts/(drizzle-migrate|verify-db-migrations)\.ts|apps/web/tests/(integration/|setup-db\.ts)|apps/web/lib/domain/releases\.ts|apps/web/lib/ai/tools/create-release\.ts|apps/web/lib/chat/tools/(tasks|merch-tools|canvas-status)\.ts|apps/web/app/api/(chat/confirm-[a-z-]+|account/delete)/|apps/web/lib/domain/profile\.ts|apps/web/lib/merch/(design-generation|concept-review(-store)?|generation-concepts|generation-quarantine|source-candidates|service)\.ts|apps/web/app/app/\(shell\)/dashboard/tasks/task-actions\.ts|apps/web/vitest\.config\.integration\.mts|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|.*\.sql$|apps/web/app/api/cron/|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'
           if echo "$CHANGED_FILES" | grep -q -E "$NEON_PATTERN"; then
             echo "run_neon=true" >> "$GITHUB_OUTPUT"
           else
@@ -2456,6 +2456,9 @@ jobs:
 
   ci-fast-remaining-shards:
     name: ci-fast (remaining shard ${{ matrix.shard }}/3)
+    # Wave 1a (CI-36): actionlint + cheap-lane start/await once-work runs on
+    # shard 2 so it does not stack on shard 1 with the heavy structural slice
+    # (merge-group-failure-hold vitest). Same 3 runners; fan-in name unchanged.
     # JOV-4477: the structural Docker/Python actions stay isolated to the
     # remaining group, where their path-gated lane can actually run.
     # JOV-5454: live Storybook certification needs Chromium plus bounded
@@ -2547,7 +2550,7 @@ jobs:
       # 2026-11-08 and 2026-11-10). Read-only here; every entry is re-verified
       # against its sha256 pin before use, so an older key is safe to restore.
       - name: Restore pinned actionlint downloads
-        if: ${{ success() && matrix.shard == 1 }}
+        if: ${{ success() && matrix.shard == 2 }}
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: /tmp/jovie-pinned-downloads
@@ -2565,13 +2568,13 @@ jobs:
       # structural lane (10s of merge-group run 36270458408's critical path).
       # Unconditional: a strict superset of the former structural-only gate.
       - name: Set up Go for source-pinned actionlint
-        if: ${{ success() && matrix.shard == 1 }}
+        if: ${{ success() && matrix.shard == 2 }}
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.26.10'
           cache: false
       - name: Run actionlint
-        if: ${{ success() && matrix.shard == 1 }}
+        if: ${{ success() && matrix.shard == 2 }}
         env:
           # Read-only token for the release-download fallback.
           RELEASE_DOWNLOAD_TOKEN: ${{ github.token }}
@@ -2629,7 +2632,7 @@ jobs:
             echo "Pinned origin/${BASE_BRANCH} to the checkout merge base $(git rev-parse --short 'HEAD^1')."
           fi
       - name: Validate CI/release incident prevention contract
-        if: ${{ success() && matrix.shard == 1 }}
+        if: ${{ success() && matrix.shard == 2 }}
         # This is intentionally outside the path-gated Structural Contract.
         # The required prevention receipt must exist for every source PR and
         # exact merge-group head, even when no contract file changed.
@@ -2638,7 +2641,7 @@ jobs:
         # JOV-6689: a PR closing an `incident` issue must ship or link a
         # post-mortem. The label lookup is the only non-deterministic piece,
         # so it stays in this step; the check below is pure file/text.
-        if: github.event_name == 'pull_request' && matrix.shard == 1
+        if: github.event_name == 'pull_request' && matrix.shard == 2
         shell: bash
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
@@ -2667,7 +2670,7 @@ jobs:
           echo "POSTMORTEM_INCIDENT_ISSUES=$incident" >> "$GITHUB_ENV"
           echo "Incident-labeled references: ${incident:-none}"
       - name: Post-mortem linkage and frontmatter check
-        if: ${{ success() && matrix.shard == 1 }}
+        if: ${{ success() && matrix.shard == 2 }}
         # Same always-on placement as the incident contract above: every
         # source PR and merge-group head, dependency-free (JOV-6689).
         env:
@@ -2675,7 +2678,7 @@ jobs:
           POSTMORTEM_PR_BODY: ${{ github.event.pull_request.body }}
         run: node scripts/postmortem-linkage-check.mjs
       - name: Verify Node and tsx seed-loader compatibility
-        if: ${{ success() && matrix.shard == 1 }}
+        if: ${{ success() && matrix.shard == 2 }}
         shell: bash
         run: |
           if ! output=$(node --import tsx --import ./apps/web/tests/eval/promptfoo/server-only-preload.mjs -e 'console.log("seed-loader-runtime-ok")' 2>&1); then
@@ -2757,7 +2760,7 @@ jobs:
       # slice storybook-browser → Start ci-fast lanes stay hermetic.
       - name: Decide typecheck/lint reuse
         id: reuse
-        if: ${{ success() && github.event_name == 'merge_group' && matrix.shard == 1 }}
+        if: ${{ success() && github.event_name == 'merge_group' && matrix.shard == 2 }}
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_HEAD_SHA: ${{ needs.ci-merge-group-admission.outputs.source_head_sha }}
@@ -2766,7 +2769,7 @@ jobs:
       # dependency/Chromium setup below. The merge-group matrix still runs the
       # complete Storybook surface set on the combined head.
       - name: Select Storybook browser proof
-        if: ${{ success() && matrix.shard == 1 }}
+        if: ${{ success() && matrix.shard == 2 }}
         id: storybook-browser
         shell: bash
         run: |
@@ -2859,7 +2862,7 @@ jobs:
       # installs and the structural lane runs; "Await ci-fast lanes" fails
       # closed on their status after the structural lane.
       - name: Start ci-fast lanes
-        if: ${{ success() && matrix.shard == 1 }}
+        if: ${{ success() && matrix.shard == 2 }}
         id: lanes-start
         shell: bash
         env:
@@ -4792,8 +4795,12 @@ jobs:
 
   ci-product-lane-receipt:
     name: Product Lane Receipt
+    # Wave 1 (CI-36): Storybook stays off this receipt wait/aggregate so MG
+    # PR Ready is not wall-bound on it. Prod fail-close is MG workflow
+    # conclusion → main-queue-provenance → Main Release Ready fallback
+    # (ci-storybook-surfaces must not use continue-on-error).
     needs:
-      [ci-path-changes, ci-merge-group-admission, ci-risk-classifier, ci-fast, ci-blog-content, ci-unit-tests, ci-build-layout, ci-build-ovie, ci-typecheck-ovie, ci-storybook-surfaces, ci-ios, ci-macos, ci-cross-product-integration]
+      [ci-path-changes, ci-merge-group-admission, ci-risk-classifier, ci-fast, ci-blog-content, ci-unit-tests, ci-build-layout, ci-build-ovie, ci-typecheck-ovie, ci-ios, ci-macos, ci-cross-product-integration]
     if: >-
       always() &&
       needs.ci-path-changes.result == 'success' &&
@@ -4818,7 +4825,6 @@ jobs:
           WEB_BUILD: ${{ needs.ci-build-layout.result }}
           WEB_OVIE: ${{ needs.ci-build-ovie.result }}
           WEB_OVIE_TYPECHECK: ${{ needs.ci-typecheck-ovie.result }}
-          WEB_STORYBOOK: ${{ needs.ci-storybook-surfaces.result }}
           IOS: ${{ needs.ci-ios.result }}
           MAC: ${{ needs.ci-macos.result }}
           CROSS: ${{ needs.ci-cross-product-integration.result }}
@@ -4841,7 +4847,7 @@ jobs:
           if [[ "$GITHUB_EVENT_NAME" == merge_group && "$BLOG_CONTENT_ONLY" == true ]]; then
             web_results="[\"$BLOG\",\"$FAST\"]"
           else
-            web_results="[\"$(lane_result "$RUN_WEB" "$WEB_UNIT")\",\"$(lane_result "$RUN_WEB" "$WEB_BUILD")\",\"$(lane_result "$RUN_WEB" "$WEB_OVIE")\",\"$(lane_result "$RUN_WEB" "$WEB_OVIE_TYPECHECK")\",\"$(lane_result "$RUN_WEB" "$WEB_STORYBOOK")\",\"$(lane_result "$RUN_WEB" "$FAST")\"]"
+            web_results="[\"$(lane_result "$RUN_WEB" "$WEB_UNIT")\",\"$(lane_result "$RUN_WEB" "$WEB_BUILD")\",\"$(lane_result "$RUN_WEB" "$WEB_OVIE")\",\"$(lane_result "$RUN_WEB" "$WEB_OVIE_TYPECHECK")\",\"$(lane_result "$RUN_WEB" "$FAST")\"]"
           fi
           jq -n \
             --argjson ios "[\"$(lane_result "$RUN_IOS" "$IOS")\",\"$(lane_result "$RUN_IOS" "$FAST")\"]" \
@@ -8909,6 +8915,11 @@ jobs:
   ci-merge-group-ready:
     name: ${{ github.event_name == 'merge_group' && 'PR Ready' || 'PR Ready (merge-group inactive)' }}
     # DB-risk heads reuse expiring Neon; browser preview lanes remain manual/post-merge.
+    # Wave 1 (CI-36): Storybook + MG Lighthouse stay scheduled but are not in
+    # this fan-in. Prod stay fail-closed: LH via production-controller
+    # lighthouse-ci → Production Verified (high); Storybook via MG workflow
+    # conclusion → main-queue-provenance → Main Release Ready fallback
+    # (no continue-on-error on those jobs).
     needs:
       [
         ci-path-changes,
@@ -8921,7 +8932,6 @@ jobs:
         ci-build-layout,
         ci-build-ovie,
         ci-typecheck-ovie,
-        ci-storybook-surfaces,
         ci-ios,
         ci-macos,
         ci-cross-product-integration,
@@ -8936,8 +8946,6 @@ jobs:
         ci-visual-marketing-routes,
         drizzle-migration-guard,
         neon-db,
-        ci-lighthouse-dashboard-pr,
-        ci-lighthouse-onboarding-pr,
       ]
     if: ${{ always() && github.event_name == 'merge_group' }}
     # Merge-gate pool (docs/ci/merge-queue-alternatives.md): hosted by default;
@@ -8965,7 +8973,6 @@ jobs:
           BUILD_LAYOUT_RESULT="${{ needs.ci-build-layout.result }}"
           OVIE_BUILD_RESULT="${{ needs.ci-build-ovie.result }}"
           OVIE_TYPECHECK_RESULT="${{ needs.ci-typecheck-ovie.result }}"
-          STORYBOOK_SURFACES_RESULT="${{ needs.ci-storybook-surfaces.result }}"
           IOS_RESULT="${{ needs.ci-ios.result }}"
           MACOS_RESULT="${{ needs.ci-macos.result }}"
           CROSS_PRODUCT_RESULT="${{ needs.ci-cross-product-integration.result }}"
@@ -8982,8 +8989,6 @@ jobs:
           RUN_MARKETING_DOM="${{ needs.ci-path-changes.outputs.run_marketing_dom }}"
           MIGRATION_RESULT="${{ needs.drizzle-migration-guard.result }}"
           DATABASE_CERTIFICATION_RESULT="${{ needs.neon-db.result }}"
-          DASHBOARD_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-dashboard-pr.result }}"
-          ONBOARDING_LIGHTHOUSE_RESULT="${{ needs.ci-lighthouse-onboarding-pr.result }}"
           NOOP_GROUP="${{ needs.ci-path-changes.outputs.is_noop_merge_group }}"
           RUN_JOVIE_PRODUCT="${{ needs.ci-path-changes.outputs.run_jovie_product }}"
           RUN_WEB="${{ needs.ci-path-changes.outputs.run_web }}"
@@ -8996,7 +9001,6 @@ jobs:
           RUN_PROMPTFOO="${{ needs.ci-path-changes.outputs.run_promptfoo_evals }}"
           RUN_GOLDEN_EVAL="${{ needs.ci-path-changes.outputs.run_golden_eval_set }}"
           RUN_NEON="${{ needs.ci-path-changes.outputs.run_neon }}"
-          RUN_LAUNCH_GATE="${{ needs.ci-path-changes.outputs.run_golden_path }}"
           {
             echo "### Merge group ready"
             echo
@@ -9023,7 +9027,6 @@ jobs:
             echo "| Build + Layout | $BUILD_LAYOUT_RESULT |"
             echo "| Ovie Build | $OVIE_BUILD_RESULT |"
             echo "| Ovie Typecheck | $OVIE_TYPECHECK_RESULT |"
-            echo "| Storybook Surface Matrix | $STORYBOOK_SURFACES_RESULT |"
             echo "| iOS Fast Unit + Coverage | $IOS_RESULT |"
             echo "| Mac Build + Test | $MACOS_RESULT |"
             echo "| Cross-Product Integration | $CROSS_PRODUCT_RESULT |"
@@ -9038,9 +9041,8 @@ jobs:
             echo "| Visual Snapshot Compare (marketing routes) | $VISUAL_MARKETING_ROUTES_RESULT |"
             echo "| Migration Guard | $MIGRATION_RESULT |"
             echo "| Database Certification (isolated Neon) | $DATABASE_CERTIFICATION_RESULT |"
-            echo "| Dashboard Lighthouse (launch-gate paths) | $DASHBOARD_LIGHTHOUSE_RESULT |"
-            echo "| Onboarding Lighthouse (launch-gate paths) | $ONBOARDING_LIGHTHOUSE_RESULT |"
             echo
+            echo "Storybook Surface Matrix and MG Lighthouse run off this fan-in (Wave 1); they still fail-close prod via provenance/Main Release Ready and production-controller lighthouse-ci."
             echo "Only risk-selected database changes provision expiring Neon; preview/A11y evidence remains explicit opt-in or post-merge."
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -9092,7 +9094,6 @@ jobs:
             "Web Build + Layout:$RUN_WEB:$BUILD_LAYOUT_RESULT" \
             "Web Ovie Build:$RUN_WEB:$OVIE_BUILD_RESULT" \
             "Web Ovie Typecheck:$RUN_WEB:$OVIE_TYPECHECK_RESULT" \
-            "Web Storybook Surface Matrix:$RUN_WEB:$STORYBOOK_SURFACES_RESULT" \
             "iOS Fast Unit + Coverage:$RUN_IOS:$IOS_RESULT" \
             "Mac Build + Test:$RUN_MACOS:$MACOS_RESULT" \
             "Cross-Product Integration:$RUN_CROSS_PRODUCT:$CROSS_PRODUCT_RESULT"; do
@@ -9124,9 +9125,7 @@ jobs:
             "Golden Eval Set:$RUN_GOLDEN_EVAL:$GOLDEN_EVAL_RESULT" \
             "Homepage Visual Compare:$RUN_HOMEPAGE_VISUAL:$VISUAL_HOMEPAGE_RESULT" \
             "Marketing DOM Certification:$RUN_MARKETING_DOM:$VISUAL_MARKETING_DOM_RESULT" \
-            "Marketing Route Capture:$RUN_MARKETING_DOM:$VISUAL_MARKETING_ROUTES_RESULT" \
-            "Dashboard Lighthouse:$RUN_LAUNCH_GATE:$DASHBOARD_LIGHTHOUSE_RESULT" \
-            "Onboarding Lighthouse:$RUN_LAUNCH_GATE:$ONBOARDING_LIGHTHOUSE_RESULT"; do
+            "Marketing Route Capture:$RUN_MARKETING_DOM:$VISUAL_MARKETING_ROUTES_RESULT"; do
             name="${selected_gate%%:*}"
             selection_and_result="${selected_gate#*:}"
             selected="${selection_and_result%%:*}"

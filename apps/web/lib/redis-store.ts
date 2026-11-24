@@ -4,8 +4,11 @@
  * Production (VERCEL_ENV=production, or NODE_ENV=production outside CI, E2E,
  * tests, and Vercel preview) keeps Upstash and fail-closed limiters.
  * Everywhere else uses an in-memory store, or local Redis when REDIS_URL
- * points at localhost. The production Upstash host is refused outside
- * production unless JOVIE_ALLOW_PRODUCTION_UPSTASH=1.
+ * points at localhost — except a Vercel preview that holds its OWN
+ * (non-production) Upstash REST credentials, which selects them so
+ * Redis-fail-closed paths like the JOV-9826 canary reset can run there.
+ * The production Upstash host is refused outside production unless
+ * JOVIE_ALLOW_PRODUCTION_UPSTASH=1.
  */
 
 export const PRODUCTION_UPSTASH_HOST = 'nice-walleye-308423.upstash.io';
@@ -116,6 +119,25 @@ export function selectRedisStore(env: RedisStoreEnv): RedisStoreDecision {
     };
   }
 
+  // JOV-9826: a Vercel preview may hold credentials for its OWN Upstash
+  // database (never the production host — that refusal above stands). The
+  // canary reset's single-use jti guard and its limiter are Redis-only and
+  // fail closed, so on the in-memory store every POST
+  // /api/internal/canary/reset 401s (postdeploy run 45311864925) and the
+  // JOV-9826 walk can never run on staging. Select the preview-scoped
+  // instance when the project env provides one; everything else keeps the
+  // in-memory store exactly as before.
+  const previewRestUrl = env.UPSTASH_REDIS_REST_URL?.trim();
+  if (
+    env.VERCEL_ENV === 'preview' &&
+    previewRestUrl &&
+    previewRestUrl.startsWith('https://') &&
+    env.UPSTASH_REDIS_REST_TOKEN &&
+    !isProductionUpstashHost(previewRestUrl)
+  ) {
+    return { kind: 'upstash', blockProductionUpstash: false };
+  }
+
   if (localRedisUrl) {
     return {
       kind: 'local-redis',
@@ -166,8 +188,10 @@ export function resetRedisStoreWarningForTests(): void {
 
 /**
  * Direct Upstash REST clients (seeders, E2E cleanup) must use this gate.
- * Non-production runtimes do not receive credentials, even when Doppler or
- * CI still injects the production URL.
+ * Non-production runtimes do not receive PRODUCTION credentials, even when
+ * Doppler or CI still injects the production URL (the host refusal in
+ * selectRedisStore); a Vercel preview receives only its own scoped
+ * instance, when the project env provides one (JOV-9826).
  */
 export function productionUpstashCredentials(
   source: RedisStoreSource = process.env

@@ -2,6 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { PRODCERT_CLAIM_CANARY_EMAIL } from '@/lib/synthetic/prodcert-identities';
 import {
+  assertCanaryResetSurfaceReady,
   ClaimCanaryNotProvisionedError,
   canaryResetConfigured,
   resetClaimCanary,
@@ -172,6 +173,16 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
       throw new Error(
         'Canary reset secrets (CRON_SECRET/SYNTHETIC_PASSAGE_KEY) are not provided to this run; the JOV-9826 checkout walk cannot run'
       );
+    }
+
+    // Fail fast with a named reason when the target surface cannot consume
+    // canary passage tokens (no Redis → fail-closed 401 on every reset —
+    // postdeploy run 45311864925). Still a visible red, never a skip.
+    try {
+      await assertCanaryResetSurfaceReady({ request: page.request, origin });
+    } catch (error) {
+      blockConeWalk(`Canary reset surface preflight failed: ${String(error)}`);
+      throw error;
     }
 
     try {

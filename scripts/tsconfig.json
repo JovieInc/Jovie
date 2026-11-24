@@ -48,6 +48,11 @@
     // scripts/, so checkJs reports TS2307 from this fixture path. Same
     // exclusion as the other non-typechecked fixture trees above.
     "lib/__tests__/fixtures/promotion-gate-ci.e806124.mjs",
+    // Deliberate-red / legitimate counterexample text for ASR-042..046. The
+    // contract runner (rsi-prevention/contract.test.mjs) reads these as UTF-8
+    // samples; they intentionally mention `ai` / `@tanstack/react-query` and
+    // are not Node scripts. Do not baseline-absorb — keep them out of tsc.
+    "anti-slop/rsi-prevention/fixtures",
     // Operator script that runs under tsx from apps/web and imports the web
     // app's `@/` modules; this nodenext config cannot resolve them (TS2307).
     // The web typecheck covers the spec it consumes.

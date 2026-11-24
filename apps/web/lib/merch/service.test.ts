@@ -5,6 +5,7 @@ import {
   CLERK_USER_ID,
   dbHarness,
   GENERATION_ID,
+  generation,
   makeCard,
   makeOption,
   makePrintfulSnapshot,
@@ -106,6 +107,42 @@ describe('selectMerchDesign one-card-per-option', () => {
     expect(result.merchCardId).toBe(CARD_ID);
     expect(dbHarness.countCalls('insert')).toBe(1);
     expect(dbHarness.countCalls('onConflictDoNothing')).toBe(1);
+  });
+});
+
+describe('selectMerchDesign with a concept-reviewed design', () => {
+  beforeEach(() => {
+    dbHarness.reset();
+  });
+
+  it('makes a private draft card and never publishes it', async () => {
+    // Every chat-made design carries a concept review. Picking one used to
+    // throw the rights blocker, so no chat-made design could become a draft.
+    const conceptOption = makeOption({
+      qualityReview: { conceptReview: { status: 'approved' } },
+    });
+    dbHarness.queue([conceptOption]);
+    dbHarness.queue([generation]);
+    dbHarness.queue([]); // no existing card
+    dbHarness.queue([profile]);
+    dbHarness.queue([{ id: OTHER_OPTION_ID }]); // rejected siblings
+    dbHarness.queue([makeCard()]); // insert().returning() -> won
+    queuePostClaimWrites();
+
+    const result = await selectMerchDesign({
+      generationId: GENERATION_ID,
+      clerkUserId: CLERK_USER_ID,
+      optionId: OPTION_ID,
+      catalogProductId: CATALOG_PRODUCT_ID,
+      publish: true,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.merchCardId).toBe(CARD_ID);
+    const inserted = dbHarness.methodArgs('values') as Array<{
+      status?: string;
+    }>;
+    expect(inserted[0]?.status).toBe('draft');
   });
 });
 

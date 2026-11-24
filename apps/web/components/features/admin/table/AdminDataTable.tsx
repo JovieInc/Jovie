@@ -21,7 +21,7 @@ export function AdminDataTable<TData extends RowData>({
   className,
   enableVirtualization = true,
   rowHeight,
-  rowMode = rowHeight === undefined ? 'compact' : undefined,
+  rowMode = 'dense',
   containerClassName,
   minWidth = `${TABLE_MIN_WIDTHS.MEDIUM}px`,
   columnSnap = false,
