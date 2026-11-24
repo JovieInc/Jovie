@@ -140,7 +140,7 @@ export class ClaimCanaryNotProvisionedError extends Error {
 }
 
 /**
- * The reset endpoint's dedicated 6/hour budget (shared across all runs in
+ * The reset endpoint's dedicated hourly budget (shared across all runs in
  * the Redis window) is exhausted. Retrying the walk cannot help until the
  * window clears — every retry that reaches reset would burn the budget
  * again (post-fix red 45336880733 retry #2). Named so the cert red is a
