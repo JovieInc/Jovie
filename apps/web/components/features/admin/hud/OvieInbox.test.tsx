@@ -222,6 +222,31 @@ describe('Ovie Inbox', () => {
     expect(summary).not.toHaveTextContent('Marketing component');
     expect(disclosure.querySelectorAll('li')).toHaveLength(27);
   });
+  it('keeps Refresh and decisions enabled during a background refetch', async () => {
+    let resolvePoll!: (response: Response) => void;
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(response([item]))
+      .mockImplementationOnce(
+        () => new Promise<Response>(resolve => (resolvePoll = resolve))
+      );
+    vi.stubGlobal('fetch', fetcher);
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <OvieInbox />
+      </QueryClientProvider>
+    );
+    await screen.findByText('First decision');
+    // A poll, not a click: the query refetches with nobody asking.
+    void client.refetchQueries();
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeEnabled();
+    resolvePoll(response([item]));
+  });
   it('keeps the requested case across a reordered refresh', async () => {
     const other = { ...item, id: 'summer:other', title: 'Other decision' };
     mountRequested(item.id, response([item, other]), response([other, item]));
