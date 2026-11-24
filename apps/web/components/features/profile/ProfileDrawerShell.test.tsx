@@ -44,6 +44,27 @@ describe('ProfileDrawerShell', () => {
     expect(card).toHaveClass('w-full');
   });
 
+  it('sizes the embedded menu card to its content above the tab bar', () => {
+    render(
+      <ProfileDrawerShell
+        open
+        onOpenChange={vi.fn()}
+        title='Menu'
+        presentation='embedded'
+        dataTestId='profile-drawer'
+      >
+        <p>Share Profile</p>
+      </ProfileDrawerShell>
+    );
+    const surface = screen.getByTestId('profile-drawer').firstElementChild;
+    // profile-drawer-floating clears --profile-bottom-nav-height; the body
+    // class sizes to content instead of the fixed docked-sheet height.
+    expect(surface).toHaveClass('profile-drawer-floating');
+    expect(
+      screen.getByText('Share Profile').closest('.profile-drawer-floating-body')
+    ).not.toBeNull();
+  });
+
   it('has no axe violations with a long truncated title', async () => {
     const title =
       'A very long drawer title that should truncate cleanly across the header';
