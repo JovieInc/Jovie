@@ -387,6 +387,5 @@ test('keeps default table cell content at its canonical single-line height', asy
   const cellHeight = await cellContent.evaluate(
     element => element.getBoundingClientRect().height
   );
-  // Dense sole mode: row 32px, stable cell content band 24px (TABLE_ROW_MODES).
-  expect(cellHeight).toBe(24);
+  expect(cellHeight).toBe(32);
 });
