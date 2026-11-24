@@ -247,11 +247,11 @@ describe('ProfileDrawerShell', () => {
     // Embedded is the 768-1179px presentation. An edge-to-edge sheet there
     // filled ~90% of the frame (Tim, jov.ie/tim); it is a detached card
     // capped at popover width instead.
-    const dialog = screen.getByTestId('embedded-drawer');
-    expect(dialog.className).toContain('inset-x-3');
-    expect(dialog.className).toContain('bottom-3');
-    expect(dialog.className).toContain('max-w-96');
-    expect(dialog.className).not.toContain('max-w-none');
+    const lane = screen.getByTestId('embedded-drawer').parentElement;
+    expect(lane).toHaveAttribute('data-sheet-container');
+    expect(lane?.className).toContain('inset-x-3 bottom-3');
+    expect(lane?.className).toContain('max-w-96');
+    expect(screen.getByTestId('embedded-drawer')).toHaveClass('w-full');
     const backdrop = screen.getByRole('button', {
       name: 'Close Drawer Overlay',
     });
