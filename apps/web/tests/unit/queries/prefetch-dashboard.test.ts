@@ -6,7 +6,9 @@ import { prefetchForRoute } from '@/lib/queries/prefetch-dashboard';
 import { DEFAULT_TASK_WORKSPACE_FILTERS } from '@/lib/tasks/query-defaults';
 
 const mocks = vi.hoisted(() => ({
-  fetchWithTimeout: vi.fn(async () => []),
+  fetchWithTimeout: vi.fn(
+    async (_url: string, _init?: { signal?: AbortSignal }) => [] as unknown[]
+  ),
   getTasks: vi.fn(async () => ({ nextCursor: null, tasks: [] })),
   loadTourDates: vi.fn(async () => []),
   loadReleaseMatrix: vi.fn(async (profileId: string) => [
@@ -116,7 +118,7 @@ describe('prefetchForRoute', () => {
       );
     });
 
-    const warmUrl = String(mocks.fetchWithTimeout.mock.calls[0]?.[0] ?? '');
+    const warmUrl = String(mocks.fetchWithTimeout.mock.calls.at(0)?.[0] ?? '');
     expect(warmUrl).toContain('sort=lastSeen');
     expect(warmUrl).toContain('direction=desc');
     expect(warmUrl).toContain('view=all');
