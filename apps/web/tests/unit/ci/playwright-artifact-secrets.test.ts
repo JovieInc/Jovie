@@ -116,7 +116,7 @@ const producerStageExempt = new Set([
 ]);
 // Jobs that must keep the receipt even if their uploads move elsewhere.
 const producerStageRequired = [
-  ...'ci-fast-remaining-shards ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-lighthouse-dashboard-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'
+  ...'ci-fast-remaining-shards ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-lighthouse-dashboard-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-profile-viewport-sweep ci-admin-smoke ci-e2e-tests ci-smoke-required'
     .split(' ')
     .map(job => `ci.yml:${job}`),
   'e2e-full-matrix.yml:e2e-full-matrix',
@@ -134,6 +134,8 @@ const imageAllowedJobs = new Set([
   'ci.yml:ci-fast-remaining-shards',
   'ci.yml:ci-golden-path',
   'ci.yml:ci-lighthouse-pr',
+  // Failing-width screenshots of the public profile fixture renders.
+  'ci.yml:ci-profile-viewport-sweep',
   'ci.yml:ci-storybook-surfaces',
   'ci.yml:ci-visual-snapshot-homepage',
   'ci.yml:ci-visual-marketing-dom',

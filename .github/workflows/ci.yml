@@ -3173,6 +3173,8 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (github.event_name != 'merge_group' || (needs.ci-merge-group-workspace.result == 'success' &&
       needs.ci-merge-group-admission.result == 'success' && needs.ci-merge-group-admission.outputs.admitted == 'true'))
+    env:
+      PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
