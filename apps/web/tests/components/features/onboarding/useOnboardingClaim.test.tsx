@@ -1,6 +1,9 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useOnboardingClaim } from '@/components/features/onboarding/useOnboardingClaim';
+import {
+  CLAIM_TIMEOUT_MS,
+  useOnboardingClaim,
+} from '@/components/features/onboarding/useOnboardingClaim';
 
 const { replaceMock } = vi.hoisted(() => ({
   replaceMock: vi.fn(),
@@ -388,6 +391,46 @@ describe('useOnboardingClaim', () => {
       expect(screen.getByTestId('claim-status')).toHaveTextContent('error')
     );
     expect(replaceMock).not.toHaveBeenCalled();
+  });
+
+  it('settles to error when claim fetch hangs past timeout (ONB-42)', async () => {
+    const fetchMock = vi.fn(
+      (_url: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          const signal = init?.signal;
+          if (!signal) {
+            reject(new Error('expected AbortSignal on claim fetch'));
+            return;
+          }
+          if (signal.aborted) {
+            reject(new DOMException('Aborted', 'AbortError'));
+            return;
+          }
+          signal.addEventListener(
+            'abort',
+            () => reject(new DOMException('Aborted', 'AbortError')),
+            { once: true }
+          );
+        })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const timeoutSpy = vi
+      .spyOn(AbortSignal, 'timeout')
+      .mockImplementation((ms: number) => {
+        expect(ms).toBe(CLAIM_TIMEOUT_MS);
+        const controller = new AbortController();
+        queueMicrotask(() => controller.abort());
+        return controller.signal;
+      });
+
+    render(renderClaimHarness(0));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('claim-status')).toHaveTextContent('error')
+    );
+    expect(replaceMock).not.toHaveBeenCalled();
+    expect(timeoutSpy).toHaveBeenCalledWith(CLAIM_TIMEOUT_MS);
+    timeoutSpy.mockRestore();
   });
 
   it('fires exactly one POST per unique claimTrigger and does not fire again for the same trigger after completion', async () => {

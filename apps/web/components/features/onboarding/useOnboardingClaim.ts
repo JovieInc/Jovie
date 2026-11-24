@@ -81,6 +81,8 @@ interface ClaimResponse {
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1_500;
+/** Bound hung claim fetches so Keep card can settle to error recovery (ONB-42). */
+export const CLAIM_TIMEOUT_MS = 20_000;
 
 export function useOnboardingClaim(
   claimTrigger = 0,
@@ -127,6 +129,9 @@ export function useOnboardingClaim(
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify(enrichment ? { enrichment } : {}),
+          // ONB-42: hung claim must not leave forever-receipt / Linking with
+          // no recovery. Abort settles to existing error Keep-card copy.
+          signal: AbortSignal.timeout(CLAIM_TIMEOUT_MS),
         });
       } catch {
         if (!cancelled) {
