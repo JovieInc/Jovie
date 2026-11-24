@@ -262,34 +262,9 @@ jobs:
           ROUTE_QA_OUTPUT_DIR: nightly-route-qa
           E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
 
-      - name: Run full surface chaos sweep
-        if: ${{ github.event_name == 'repository_dispatch' || (github.event.inputs.test_filter == '' && github.event.inputs.suite != 'design-v1') }}
-        continue-on-error: true
-        run: |
-          cd apps/web
-          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- bash -c "
-            pnpm playwright test tests/e2e/nightly/full-surface-chaos.spec.ts --config=playwright.config.nightly.ts --project=chromium
-            status=\$?
-            if [ -f test-results/nightly-results.json ]; then
-              cp test-results/nightly-results.json test-results/full-surface-chaos-report.json || exit \$?
-            fi
-            exit \"\$status\"
-          "
-        env:
-          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
-          NODE_ENV: test
-          BASE_URL: http://127.0.0.1:3100
-          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
-          E2E_USE_TEST_AUTH_BYPASS: '1'
-          E2E_FAST_ONBOARDING: '1'
-          E2E_TEST_AUTH_PERSONA: creator
-          E2E_SKIP_SEED: '1'
-          E2E_SKIP_WARMUP: '1'
-          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
-          # Retry error-context.md is scanned and redacted. Without this the
-          # producer treats those files as unknown-binary and poisons the stage.
-          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
-
+      # Astra 6.2 / JOV-14767: publish the required browser verdict before
+      # advisory chaos on the same build, server, and seed. Goal is earlier
+      # time-to-verdict, not a shorter whole-job wall or a gate change.
       - name: Run nightly E2E tests
         id: nightly-e2e
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.suite != 'design-v1' }}
@@ -309,6 +284,60 @@ jobs:
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+          # Keep required evidence off the chaos blob/JSON paths.
+          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/nightly-results.json
+          PLAYWRIGHT_OUTPUT_DIR: test-results/required-playwright-output
+
+      - name: Record required browser verdict timing
+        if: ${{ always() && steps.nightly-e2e.outcome != 'skipped' }}
+        env:
+          NIGHTLY_E2E_OUTCOME: ${{ steps.nightly-e2e.outcome }}
+        run: |
+          # Surface skip/cancel/failure distinctly for the Astra 6.2 receipt;
+          # do not rewrite the step conclusion.
+          echo "required_browser_verdict_outcome=${NIGHTLY_E2E_OUTCOME}"
+          echo "::notice title=Required browser verdict::outcome=${NIGHTLY_E2E_OUTCOME} (published before advisory chaos)"
+
+      - name: Run full surface chaos sweep
+        id: full-surface-chaos
+        # always(): keep advisory chaos after a required red; continue-on-error
+        # keeps the job conclusion owned by the required step. Manual filters
+        # and design-v1 still exclude chaos.
+        if: ${{ always() && (github.event_name == 'repository_dispatch' || (github.event.inputs.test_filter == '' && github.event.inputs.suite != 'design-v1')) }}
+        continue-on-error: true
+        run: |
+          cd apps/web
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+            pnpm playwright test tests/e2e/nightly/full-surface-chaos.spec.ts \
+              --config=playwright.config.nightly.ts --project=chromium
+        env:
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+          NODE_ENV: test
+          BASE_URL: http://127.0.0.1:3100
+          E2E_CLERK_USER_ID: ${{ secrets.E2E_CLERK_USER_ID }}
+          E2E_USE_TEST_AUTH_BYPASS: '1'
+          E2E_FAST_ONBOARDING: '1'
+          E2E_TEST_AUTH_PERSONA: creator
+          E2E_SKIP_SEED: '1'
+          E2E_SKIP_WARMUP: '1'
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          # Retry error-context.md is scanned and redacted. Without this the
+          # producer treats those files as unknown-binary and poisons the stage.
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+          # Isolated from required nightly-results.json / required-playwright-output
+          # so this run cannot wipe or misroute the required verdict evidence.
+          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/full-surface-chaos-report.json
+          PLAYWRIGHT_OUTPUT_DIR: test-results/chaos-playwright-output
+
+      - name: Record advisory chaos outcome
+        if: ${{ always() }}
+        env:
+          CHAOS_OUTCOME: ${{ steps.full-surface-chaos.outcome }}
+          REQUIRED_OUTCOME: ${{ steps.nightly-e2e.outcome }}
+        run: |
+          echo "advisory_chaos_outcome=${CHAOS_OUTCOME:-skipped}"
+          echo "required_browser_outcome_at_chaos=${REQUIRED_OUTCOME:-skipped}"
+          echo "::notice title=Advisory chaos outcome::chaos=${CHAOS_OUTCOME:-skipped} required=${REQUIRED_OUTCOME:-skipped}"
 
       - name: Stop route QA bypass server
         if: always()
@@ -352,7 +381,10 @@ jobs:
           retention-days: 7
 
       - name: Upload full surface chaos report
-        if: ${{ always() && (github.event_name == 'repository_dispatch' || (github.event.inputs.test_filter == '' && github.event.inputs.suite != 'design-v1')) && hashFiles('apps/web/test-results/full-surface-chaos-report.json') != '' }}
+        # Prefer step outcome over event filters alone: isolated chaos JSON
+        # stays in workspace after the required run (separate outputDir), so
+        # hashFiles can see it. Skip when chaos itself was skipped/cancelled.
+        if: ${{ always() && steps.full-surface-chaos.outcome != 'skipped' && steps.full-surface-chaos.outcome != 'cancelled' && hashFiles('apps/web/test-results/full-surface-chaos-report.json') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: full-surface-chaos-${{ github.run_id }}
