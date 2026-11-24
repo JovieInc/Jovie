@@ -1159,7 +1159,7 @@ describe('ProfileDesktopSurface', () => {
       '[@media(min-width:1180px)]:grid-cols-[minmax(420px,520px)_minmax(0,1fr)_320px]'
     );
     expect(screen.getByTestId('profile-desktop-side-rail')).toHaveClass(
-      '[@media(min-width:1180px)]:col-start-3'
+      '[@media(min-width:1180px)]:col-start-3 content-start' // rows not stretched
     );
 
     const secondary = screen.getByTestId('profile-desktop-secondary-grid');

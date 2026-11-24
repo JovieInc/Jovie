@@ -2050,6 +2050,9 @@
       "offline": "It fetches nothing; Continue is a client route link to the checkout page, which owns its own network states.",
       "permission-denied": "It has no gated mode: the onboarding chat shows it only to the person in that chat, and the checkout page decides access."
     },
+    "apps/web/components/features/onboarding/ChatProposeNextStepCard.tsx": {
+      "permission-denied": "The detector matched role='alert' on terminal claim-handoff copy (ONB-36). The card has no permission, role, or entitlement gate; identity-conflict is a claim ownership conflict shown as the same alert surface, covered by ChatProposeNextStepCard.test.tsx."
+    },
     "apps/web/components/features/onboarding/OnboardingSecurityCheckRecovery.tsx": {
       "empty": "OnboardingSecurityCheckRecovery always renders one fixed heading, one status line and the retry button, and never a collection; the detector matched the items-start and items-center classes."
     },
@@ -2088,6 +2091,10 @@
     },
     "apps/web/components/features/profile/ClaimBanner.tsx": {
       "empty": "ClaimBanner renders no collection: it always shows one ownership message and at most one CTA; the detector matched the items-center class. The no-CTA variant is PartialNoClaimAction."
+    },
+    "apps/web/components/features/profile/DesktopQrOverlay.tsx": {
+      "empty": "The overlay owns no collection; it draws one QR card or one reopen icon. The detector matched the items-center layout class. Hidden mode returns null.",
+      "error": "The only catch guards location.origin when reopening the card; failure logs and keeps the previous url, so there is no error face to draw."
     },
     "apps/web/components/features/profile/DesktopQrOverlayClient.tsx": {
       "loading": "The wrapper renders null on the server and on first paint by design (JOV-2273, no CSR bailout), then shows the icon once matchMedia resolves in an effect, so there is no loading chrome to capture; DesktopQrOverlayClient.test.tsx asserts the empty server render."
@@ -2331,6 +2338,10 @@
     "apps/web/components/jovie/components/SlashCommandMenu.tsx": {
       "error": "The menu has no error branch and submits nothing: a commit calls the composer's onSelectSkill, onSelectEntity or onSelectPrompt. The detector matched the word submit in the IME-composition comment of its key handler.",
       "permission-denied": "The menu draws no denied face: a skill the account cannot use (album art without the capability) is left out of the list, so there is nothing locked to show. The detector matched role='combobox' on the filter field."
+    },
+    "apps/web/components/jovie/components/TeleprompterShowcaseInterstitial.tsx": {
+      "empty": "The interstitial owns no collection; it draws one title, one script and fixed actions. The detector matched the items-center layout classes. Closed shows the null face.",
+      "permission-denied": "The showcase has no gated action or permission input; anyone who sees it can start recording or dismiss. The detector matched role='dialog' on the modal."
     },
     "apps/web/components/jovie/merch-tool-artifacts.tsx": {
       "error": "It never draws its own failure. The only submit signal is the jovie-chat-submit-prompt event it dispatches, and the chat that receives it owns the request and its errors. A failed tool event returns null so the shared failure card draws it. The detector matched submit in that event name.",
@@ -2754,6 +2765,10 @@
       "offline": "The provider never fetches: whether an update exists comes from useVersionMonitor and the desktop updater, and applying reloads the page or restarts the app, so connectivity has no face of its own here.",
       "permission-denied": "An app update has no account, role or gated action: every signed-in or signed-out viewer gets the same pill and status line. The detector matched the sr-only role='status' line.",
       "rtl-overflow": "Its visible UI is RuntimeUpdatePill, pinned with the logical end-4 offset and a truncating label, so a right-to-left document moves it to the opposite corner without overflow; the status line is sr-only."
+    },
+    "apps/web/components/shell/ScrubGradient.tsx": {
+      "empty": "The scrub bar owns no collection; cues are optional markers drawn as fixed SVG dots. The detector matched the items-center layout class. AwaitingMetadata shows the zero-duration face.",
+      "partial": "Optional cues, loopMode and loopSection only change overlays; ReadOnly omits the seek control and Default shows the full bar. There is no half-loaded data face."
     },
     "apps/web/components/shell/SidebarDock.tsx": {
       "partial": "Every card renders from complete props its owner builds (the updater control, the changelog entry, the install prompt). The one partial input was a track with only a title, and audio no longer renders here: it lives in the sidebar O, whose own test covers a title with no artist."

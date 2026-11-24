@@ -53,7 +53,7 @@ describe('ProfileDesktopSurface layout contract', () => {
     for (const stack of [
       "className='grid min-h-0 min-w-0 grid-cols-1 gap-3.5 [@media(min-width:1180px)]:contents'",
       "className='grid min-h-0 min-w-0 grid-cols-1 content-start gap-3.5 [@media(min-width:1180px)]:col-start-2 [@media(min-width:1180px)]:row-start-1'",
-      "'min-h-0 min-w-0 grid-cols-1 gap-3.5',",
+      "'min-h-0 min-w-0 grid-cols-1 content-start gap-3.5',",
     ]) {
       expect(source).toContain(stack);
     }

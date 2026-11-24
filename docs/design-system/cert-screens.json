@@ -69,26 +69,21 @@
     "apps/web/components/atoms/JovieMarkElectric.tsx": "a11y,states,tokens",
     "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens",
     "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/SuggestedDspMatches.tsx": "a11y,ds-owner,frontend-rules,states,tests",
-    "apps/web/components/features/profile/DesktopQrOverlay.tsx": "a11y,ds-owner,states,tests,tokens",
     "apps/web/components/features/profile/ProfileDrawerShell.tsx": "a11y,ds-owner,states,tests,tokens",
     "apps/web/components/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA.tsx": "a11y,ds-owner,states,tests,tokens",
     "apps/web/components/features/profile/artist-notifications-cta/ProfileMobileNotificationsFlow.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens",
     "apps/web/components/features/profile/artist-notifications-cta/shared.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens",
-    "apps/web/components/features/profile/notifications/CountrySelector.tsx": "a11y,ds-owner,states,tokens",
     "apps/web/components/features/profile/pac/ProfilePacCard.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens",
     "apps/web/components/features/profile/templates/ProfileDesktopSurface.tsx": "a11y,ds-owner,states,tokens",
     "apps/web/components/features/profile/views/ReleasesView.tsx": "a11y,frontend-rules,states,tests,tokens",
     "apps/web/components/jovie/JovieChat.tsx": "a11y,ds-owner,frontend-rules,states,tests",
-    "apps/web/components/jovie/components/ChatAlbumArtCard.tsx": "a11y,ds-owner,states,tokens",
     "apps/web/components/jovie/components/ChatAvatarUploadCard.tsx": "a11y,ds-owner,frontend-rules,states,tests",
     "apps/web/components/jovie/components/ChatInput.tsx": "a11y,ds-owner,frontend-rules,states,tests",
-    "apps/web/components/jovie/components/TeleprompterShowcaseInterstitial.tsx": "a11y,ds-owner,states,tokens",
     "apps/web/components/molecules/GenrePicker.tsx": "a11y,ds-owner,frontend-rules,states,tests",
     "apps/web/components/molecules/LocationPicker.tsx": "a11y,ds-owner,forced-caps,frontend-rules,states,tests",
     "apps/web/components/molecules/drawer/SidebarLinkRow.tsx": "states,tokens",
     "apps/web/components/organisms/AvatarUploadable.tsx": "a11y,ds-owner,frontend-rules,states,tests",
     "apps/web/components/organisms/CmdKPalette.tsx": "a11y,ds-owner,frontend-rules,states",
-    "apps/web/components/organisms/UnifiedSidebar.tsx": "a11y,ds-owner,states,tests",
-    "apps/web/components/shell/ScrubGradient.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens"
+    "apps/web/components/organisms/UnifiedSidebar.tsx": "a11y,ds-owner,states,tests"
   }
 }

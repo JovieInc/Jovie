@@ -1,0 +1,24 @@
+/* Always-dark showcase surface. Scenic paint lives here so the TSX
+   stays on semantic tokens for chrome; the interstitial is intentionally
+   dark in both themes and remaps local semantic vars for that face. */
+
+.teleprompter-showcase-surface {
+  background: radial-gradient(
+    120% 100% at 50% -8%,
+    color-mix(in oklab, var(--color-accent-blue) 36%, #101020) 0%,
+    #0a0a12 58%
+  );
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.5);
+  --color-text-primary-token: #ffffff;
+  --color-text-secondary-token: rgba(255, 255, 255, 0.75);
+  --color-text-tertiary-token: rgba(255, 255, 255, 0.65);
+  --color-bg-surface-1: rgba(255, 255, 255, 0.08);
+  --color-bg-surface-2: rgba(255, 255, 255, 0.14);
+  --color-interactive-hover: rgba(255, 255, 255, 0.1);
+  --color-border-subtle: rgba(255, 255, 255, 0.12);
+  --color-border-focus: rgba(255, 255, 255, 0.55);
+  --color-bg-page: #0a0a12;
+  --color-btn-primary-bg: #ffffff;
+  --color-btn-primary-fg: #000000;
+  --color-btn-primary-hover: rgba(255, 255, 255, 0.92);
+}
