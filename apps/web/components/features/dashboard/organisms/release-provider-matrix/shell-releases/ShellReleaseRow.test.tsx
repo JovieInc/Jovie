@@ -136,7 +136,10 @@ describe('ShellReleaseRow', () => {
 
 describe('ShellReleaseRow optical fixes (JOV-12568)', () => {
   it('keeps 28px circle actions, 14px glyphs and an ellipsised title', () => {
-    const row = readFileSync(resolve(__dirname, './ShellReleaseRow.tsx'), 'utf8');
+    const row = readFileSync(
+      resolve(__dirname, './ShellReleaseRow.tsx'),
+      'utf8'
+    );
     const cells = readFileSync(
       resolve(__dirname, './shell-release-row-cells.tsx'),
       'utf8'

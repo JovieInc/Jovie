@@ -216,9 +216,10 @@ export async function assertRowAlignment(
     after.firstRowCells.length
   );
   for (let i = 0; i < pairCount; i++) {
-    expect(
-      Math.abs(after.firstRowCells[i]!.left - before.firstRowCells[i]!.left)
-    ).toBeLessThanOrEqual(1);
+    const afterCell = after.firstRowCells[i];
+    const beforeCell = before.firstRowCells[i];
+    if (!afterCell || !beforeCell) continue;
+    expect(Math.abs(afterCell.left - beforeCell.left)).toBeLessThanOrEqual(1);
   }
 
   expect(

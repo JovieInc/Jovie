@@ -52,14 +52,12 @@ describe('shell-release-row-cells', () => {
   });
 
   it('right-aligns weekly streams as a numeric app-table cell', () => {
-    const { container } = render(
-      <WeeklyStreamsCell weeklyStreams={12_400} />
-    );
+    const { container } = render(<WeeklyStreamsCell weeklyStreams={12_400} />);
     const cell = container.querySelector('[data-app-table-cell="numeric"]');
     expect(cell).toBeTruthy();
     expect(cell?.className).toContain('justify-end');
-    expect(screen.getByTestId('shell-release-weekly-streams')).toHaveTextContent(
-      /\/ wk/
-    );
+    expect(
+      screen.getByTestId('shell-release-weekly-streams')
+    ).toHaveTextContent(/\/ wk/);
   });
 });

@@ -79,9 +79,7 @@ describe('TableRowActionBar', () => {
   });
 
   it('lets dense catalog rows shrink the overflow trigger to xs', () => {
-    render(
-      <TableRowOverflowTrigger size='xs' ariaLabel='Actions for title' />
-    );
+    render(<TableRowOverflowTrigger size='xs' ariaLabel='Actions for title' />);
     const trigger = screen.getByRole('button', { name: 'Actions for title' });
     expect(trigger.className).toMatch(/h-6|size-6|h-\[24px\]/);
   });
