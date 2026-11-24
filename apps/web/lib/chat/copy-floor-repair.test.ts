@@ -61,6 +61,25 @@ describe('repairCopyFloorText', () => {
     const clean = 'Night Swim drops Friday. Put the link in your bio today.';
     expect(repairCopyFloorText(clean)).toBe(clean);
   });
+
+  it('ASS-107: strips bracket template slots so drafts keep the floor', () => {
+    // Live 45325957464: auto-DM / scrape drafts used [name] / [your link] and
+    // were swapped for the miss-the-mark fallback (copy_floor hard-fail).
+    const autoDm =
+      'I can\'t send DMs. Paste-ready thank-you:\n\n"Hey [name], Luna Waves here. Your tip meant a lot."\n\nHold for your yes.';
+    const scraped =
+      "I can't scrape emails. Draft held for your yes:\n\nHi [Name],\n\nNight Swim is out Friday. Private listen link: [your link].";
+    expect(lintVoice(autoDm).ok).toBe(false);
+    expect(lintVoice(scraped).ok).toBe(false);
+    const repairedDm = repairCopyFloorText(autoDm);
+    const repairedScrape = repairCopyFloorText(scraped);
+    expect(repairedDm).not.toMatch(/\[name\]/i);
+    expect(repairedScrape).not.toMatch(/\[(?:Name|your link)\]/);
+    expect(repairedDm).toContain('Hey, Luna Waves here');
+    expect(repairedScrape).toContain('Hi,');
+    expect(lintVoice(repairedDm).ok).toBe(true);
+    expect(lintVoice(repairedScrape).ok).toBe(true);
+  });
 });
 
 describe('copyFloorRepairTransform', () => {
