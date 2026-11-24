@@ -408,8 +408,17 @@ describe('ActionDial edge cases', () => {
     );
     expect(container).toBeEmptyDOMElement();
   });
-  it('shows a lone service without a reel, listbox, or swipe hint', async () => {
-    const { container } = render(<Fixture options={OPTIONS.slice(0, 1)} />);
+  it('shows a lone service without a reel or listbox', async () => {
+    const { container } = render(
+      <ActionDial
+        options={OPTIONS.slice(0, 1)}
+        selectedId='spotify'
+        onSelect={vi.fn()}
+        actionLabel='Stream Now'
+        groupLabel='Choose a streaming service'
+        hint={null}
+      />
+    );
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('action-dial-icon-track')
