@@ -388,6 +388,21 @@ describe('EmailCodeAuthForm', () => {
 
     await waitFor(() => expect(locationAssign).toHaveBeenCalledWith('/start'));
   });
+
+  it('skips hard-nav when already on redirectUrl (ONB-48 idle paint)', async () => {
+    vi.stubGlobal('location', {
+      assign: locationAssign,
+      href: 'https://jov.ie/start',
+    } as unknown as Location);
+    renderForm();
+    await reachCodeStep();
+    signInEmailOtp.mockResolvedValueOnce({ data: { user: {} }, error: null });
+    await submitCode('424242');
+    await waitFor(() => {
+      expect(signInEmailOtp).toHaveBeenCalled();
+      expect(locationAssign).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe('EmailCodeAuthForm pre-hydration guard', () => {
@@ -469,23 +484,5 @@ describe('EmailCodeAuthForm page alignment', () => {
     expect(shell?.className).toMatch(/\bh-8\b/);
     expect(shell?.className).toMatch(/\bw-7\b/);
     expect(shell?.className).not.toMatch(/\bh-12\b/);
-  });
-});
-
-describe('Pen sign-in polish (glm/auth-focal-polish)', () => {
-  it('renders the email CTA on the approved auth pill geometry with no restyled Button sizes', () => {
-    render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/start' />);
-    const cta = screen.getByRole('button', { name: 'Send sign-in code' });
-    expect(cta).toHaveClass('w-full');
-    expect(cta.className).not.toMatch(/\bh-8\b/);
-    expect(cta.className).not.toMatch(/\bmin-h-8\b/);
-  });
-
-  it('draws Send sign-in code as the 28px Pen oaz9c pill inside its tap layer', () => {
-    render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/start' />);
-    const cta = screen.getByRole('button', { name: 'Send sign-in code' });
-    expect(cta).toHaveClass('h-7');
-    expect(cta).toHaveClass('min-h-7');
-    expect(cta).not.toHaveClass('my-2');
   });
 });

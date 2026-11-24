@@ -24,6 +24,7 @@ import {
   isSpentCodeError,
   reportUnmappedVerifyError,
 } from '@/lib/auth/email-code-errors';
+import { isSameDocumentRedirect } from '@/lib/auth/same-document-redirect';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -230,7 +231,11 @@ export function EmailCodeAuthForm({
         // `signIn.emailOtp({ email, otp })` verifies the code and finalizes
         // the session. Auto-creates the user if not existing (plan design
         // row 17 — waitlist gates downstream). On success the session cookie
-        // is set and we hard-navigate to `redirectUrl`.
+        // is set and we hard-navigate to `redirectUrl` — unless we are already
+        // there. A same-document assign remounts OnboardingSessionBoundary and
+        // skips the anonymous→account freeze shell, so idle preparing copy
+        // never paints on Keep→OTP (ONB-48 / JOV-14952). Stay put and let
+        // the in-tab session update drive freeze + claim.
         // Better Auth client calls resolve with `{ data, error }` instead of
         // throwing — an unchecked error here navigates away signed-out, so a
         // wrong or rate-limited code looks like a successful signup.
@@ -240,7 +245,9 @@ export function EmailCodeAuthForm({
         });
         if (verifyError) throw verifyError;
 
-        globalThis.location?.assign(redirectUrl);
+        if (!isSameDocumentRedirect(redirectUrl)) {
+          globalThis.location?.assign(redirectUrl);
+        }
       } catch (error) {
         if (isMaxAttemptsError(error)) {
           setStep('locked');
