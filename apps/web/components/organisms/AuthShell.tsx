@@ -39,6 +39,12 @@ export interface AuthShellProps {
   readonly isChatRoute?: boolean;
   readonly onSidebarOpenChange?: (open: boolean) => void;
   readonly sidebarDefaultOpen?: boolean;
+  /**
+   * Streamed fallback render: AppShellFrame drops the live frame landmark
+   * (`data-app-shell-frame`, `#main-content`) so a still-mounted fallback
+   * cannot collide with the resolved shell (JOV-14936).
+   */
+  readonly framePlaceholder?: boolean;
   readonly children: ReactNode;
 }
 
@@ -58,6 +64,7 @@ function AuthShellInner({
   isTableRoute = false,
   isLyricsRoute = false,
   isChatRoute = false,
+  framePlaceholder = false,
   children,
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { isMobile, open: sidebarPinned } = useSidebar();
@@ -154,6 +161,7 @@ function AuthShellInner({
     <RuntimeUpdateProvider>
       <AppShellFrame
         brandVariant={section === 'ov' ? 'ov' : 'jovie'}
+        placeholder={framePlaceholder}
         sidebar={sidebar}
         header={header}
         // Ovie Home and dashboards share one flat shell canvas.

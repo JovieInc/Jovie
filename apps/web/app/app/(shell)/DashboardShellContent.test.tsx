@@ -190,6 +190,12 @@ describe('DashboardShellContent privacy decision', () => {
         (tree as { type?: unknown }).type === Symbol.for('react.suspense')
     ).toBe(true);
     expect(JSON.stringify(tree)).toContain('Contacts page');
+    // The streamed fallback still mounts while the resolved shell streams in,
+    // so it must not carry the live frame landmark — two frames collide and
+    // Playwright's strict shell locator aborts (JOV-14936).
+    expect(JSON.stringify(tree)).not.toContain('data-app-shell-frame');
+    expect(JSON.stringify(tree)).not.toContain('"id":"main-content"');
+    expect(JSON.stringify(tree)).toContain('data-app-shell-placeholder');
     expect(mocks.shellDashboard).toHaveBeenCalledOnce();
   });
 

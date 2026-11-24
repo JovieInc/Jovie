@@ -87,6 +87,7 @@ function renderShellFrame({
   privacyEnabled,
   lockedUntil,
   useEssentialShell,
+  framePlaceholder,
   children,
 }: {
   readonly userId: string;
@@ -99,6 +100,14 @@ function renderShellFrame({
   readonly privacyEnabled: boolean;
   readonly lockedUntil: string | null;
   readonly useEssentialShell: boolean;
+  /**
+   * Stream the fallback shell without the live frame landmark. The fallback
+   * and the resolved shell can both be in the DOM while the streamed chunk
+   * swaps in, so a landmark-carrying fallback collides with the resolved
+   * shell (JOV-14936) — the same still-mounted-fallback rule AppShellFrame's
+   * `placeholder` prop documents.
+   */
+  readonly framePlaceholder: boolean;
   readonly children: React.ReactNode;
 }) {
   const showOperatorChrome = shouldRenderOperatorChrome(mode, {
@@ -131,6 +140,7 @@ function renderShellFrame({
         lockedUntil={lockedUntil}
         persistSidebarCollapsed={setSidebarCollapsed}
         sidebarDefaultOpen={sidebarDefaultOpen}
+        framePlaceholder={framePlaceholder}
         previewPanelDefaultOpen={shouldDefaultOpenShellPreview(
           pathname,
           useEssentialShell
@@ -229,6 +239,7 @@ export async function EssentialShellReady({
     privacyEnabled,
     lockedUntil,
     useEssentialShell: true,
+    framePlaceholder: false,
     children,
   });
 }
@@ -346,6 +357,10 @@ export async function DashboardShellContent({
           privacyEnabled,
           lockedUntil,
           useEssentialShell: true,
+          // The fallback streams a full frame while the resolved shell is
+          // still pending; it must not carry the live frame landmark or the
+          // two shells collide during the streaming swap (JOV-14936).
+          framePlaceholder: true,
           children,
         })}
       >
@@ -397,6 +412,7 @@ export async function DashboardShellContent({
     privacyEnabled,
     lockedUntil,
     useEssentialShell,
+    framePlaceholder: false,
     children,
   });
 }

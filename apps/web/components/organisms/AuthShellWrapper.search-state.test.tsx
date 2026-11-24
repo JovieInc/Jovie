@@ -555,3 +555,34 @@ describe('main-plane Search route recovery', () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe('streamed shell frame placeholder (JOV-14936)', () => {
+  it('drops the live frame landmark on the fallback shell and keeps it on the real shell', () => {
+    const view = render(
+      <DashboardDataProvider value={dashboard}>
+        <AuthShellWrapper mode='customer' framePlaceholder>
+          <RouteDocument />
+        </AuthShellWrapper>
+      </DashboardDataProvider>
+    );
+    expect(document.querySelector('[data-app-shell-frame]')).toBeNull();
+    expect(
+      document.querySelector('[data-app-shell-placeholder="true"]')
+    ).not.toBeNull();
+    view.unmount();
+
+    render(
+      <DashboardDataProvider value={dashboard}>
+        <AuthShellWrapper mode='customer'>
+          <RouteDocument />
+        </AuthShellWrapper>
+      </DashboardDataProvider>
+    );
+    expect(
+      document.querySelector('[data-app-shell-frame="true"]')
+    ).not.toBeNull();
+    expect(
+      document.querySelector('[data-app-shell-placeholder="true"]')
+    ).toBeNull();
+  });
+});

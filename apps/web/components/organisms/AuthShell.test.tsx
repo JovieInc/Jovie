@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   headerRenders: 0,
   togglePreviewPanel: () => {},
   audioAction: vi.fn(),
+  framePlaceholder: false,
 }));
 
 vi.mock('@/hooks/useBreakpoint', () => ({
@@ -28,21 +29,26 @@ vi.mock('./AppShellFrame', () => ({
     main,
     mobileBottomNav,
     audioPlayer,
+    placeholder,
   }: {
     sidebar: ReactNode;
     header?: ReactNode;
     main: ReactNode;
     mobileBottomNav?: ReactNode;
     audioPlayer?: ReactNode;
-  }) => (
-    <div data-testid='auth-shell-frame'>
-      {sidebar}
-      {header}
-      <main>{main}</main>
-      {mobileBottomNav}
-      {audioPlayer}
-    </div>
-  ),
+    placeholder?: boolean;
+  }) => {
+    mocks.framePlaceholder = placeholder ?? false;
+    return (
+      <div data-testid='auth-shell-frame'>
+        {sidebar}
+        {header}
+        <main>{main}</main>
+        {mobileBottomNav}
+        {audioPlayer}
+      </div>
+    );
+  },
 }));
 vi.mock('@/components/organisms/UnifiedSidebar', () => ({
   UnifiedSidebar: ({ section }: { section: string }) => (
@@ -108,12 +114,14 @@ function Shell({
   breadcrumbs = [{ label: 'Releases' }],
   sidebarDefaultOpen = true,
   onSidebarOpenChange,
+  framePlaceholder,
   children = <p>Customer shell content</p>,
 }: {
   readonly section?: AppShellSection;
   readonly breadcrumbs?: DashboardBreadcrumbItem[];
   readonly sidebarDefaultOpen?: boolean;
   readonly onSidebarOpenChange?: (open: boolean) => void;
+  readonly framePlaceholder?: boolean;
   readonly children?: ReactNode;
 }) {
   return (
@@ -123,6 +131,7 @@ function Shell({
         breadcrumbs={breadcrumbs}
         sidebarDefaultOpen={sidebarDefaultOpen}
         onSidebarOpenChange={onSidebarOpenChange}
+        framePlaceholder={framePlaceholder}
         showMobileTabs
       >
         {children}
@@ -132,6 +141,15 @@ function Shell({
 }
 
 describe('AuthShell', () => {
+  it('keeps the live frame landmark off the streamed fallback and on the real shell (JOV-14936)', () => {
+    const fallback = render(<Shell framePlaceholder />);
+    expect(mocks.framePlaceholder).toBe(true);
+    fallback.unmount();
+
+    render(<Shell />);
+    expect(mocks.framePlaceholder).toBe(false);
+  });
+
   it('retains the loaded audio controls and focus through route updates', async () => {
     const user = userEvent.setup();
     const { rerender } = render(<Shell />);
