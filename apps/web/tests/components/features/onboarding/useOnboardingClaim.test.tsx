@@ -177,17 +177,17 @@ describe('useOnboardingClaim', () => {
   });
 
   it.each([
-    [{ claimed: 1 }, 'claimed'],
-    [{ claimed: 0, alreadyClaimed: true }, 'claimed'],
+    [{ claimed: 1 }, 'no-op'],
+    [{ claimed: 0, alreadyClaimed: true }, 'no-op'],
     [
       {
         claimed: 1,
         profile: { profileId: null, handle: null, status: 'skipped' },
       },
-      'claimed',
+      'no-op',
     ],
   ] as const)(
-    'stays on /start when the claim returns ownership without a terminal handoff (JOV-8068): %j',
+    'stays on /start when the claim returns ownership without a terminal handoff (JOV-8068 / ONB-38): %j',
     async (body, expectedStatus) => {
       const fetchMock = vi.fn().mockResolvedValue(jsonResponse(body));
       vi.stubGlobal('fetch', fetchMock);
@@ -212,8 +212,9 @@ describe('useOnboardingClaim', () => {
     const { rerender } = render(renderClaimHarness(0));
 
     // The founder-reported mount claim must not redirect to checkout.
+    // ONB-38: ownership-without-handoff is labeled no-op (stalled honesty).
     await waitFor(() =>
-      expect(screen.getByTestId('claim-status')).toHaveTextContent('claimed')
+      expect(screen.getByTestId('claim-status')).toHaveTextContent('no-op')
     );
     expect(replaceMock).not.toHaveBeenCalled();
 
@@ -257,11 +258,11 @@ describe('useOnboardingClaim', () => {
     rerender(renderClaimHarness(0));
     rerender(renderClaimHarness(0));
 
-    // Resolve the pending fetch.
+    // Resolve the pending fetch (ownership without handoff → no-op / ONB-38).
     resolveFetch(jsonResponse({ claimed: 1 }));
 
     await waitFor(() =>
-      expect(screen.getByTestId('claim-status')).toHaveTextContent('claimed')
+      expect(screen.getByTestId('claim-status')).toHaveTextContent('no-op')
     );
 
     // Only one fetch must have been dispatched for trigger=0.
@@ -410,7 +411,7 @@ describe('useOnboardingClaim', () => {
     rerender(renderClaimHarness(1));
 
     await waitFor(() =>
-      expect(screen.getByTestId('claim-status')).toHaveTextContent('claimed')
+      expect(screen.getByTestId('claim-status')).toHaveTextContent('no-op')
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
@@ -434,7 +435,7 @@ describe('useOnboardingClaim', () => {
 
     rerender(<ClaimHarness trigger={0} enabled={true} />);
     await waitFor(() =>
-      expect(screen.getByTestId('claim-status')).toHaveTextContent('claimed')
+      expect(screen.getByTestId('claim-status')).toHaveTextContent('no-op')
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });

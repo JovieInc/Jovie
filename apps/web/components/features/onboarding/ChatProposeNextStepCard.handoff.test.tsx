@@ -32,7 +32,7 @@ const payload = (
   decision: { kind, rationale: 'fixture', score: 0.8 },
 });
 
-describe('ChatProposeNextStepCard claim handoff (ONB-36)', () => {
+describe('ChatProposeNextStepCard claim handoff (ONB-36/38)', () => {
   beforeEach(() => {
     authState.isSignedIn = true;
     authState.canRenderClerkUi = true;
@@ -56,6 +56,7 @@ describe('ChatProposeNextStepCard claim handoff (ONB-36)', () => {
 
   it.each([
     ['pending' as ClaimStatus, /saving your request/i, false],
+    ['no-op' as ClaimStatus, /reply below so we can finish/i, false],
     ['error' as ClaimStatus, /couldn't save your request/i, true],
     ['identity-conflict' as ClaimStatus, /belongs to another account/i, true],
   ])(
@@ -98,6 +99,21 @@ describe('ChatProposeNextStepCard claim handoff (ONB-36)', () => {
     expect(screen.queryByText(/linking this conversation/i)).toBeNull();
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent(/couldn't save your request/i);
+    await expectNoA11yViolations(container);
+  });
+
+  it('names next action when instant-access claim stalls (ONB-38)', async () => {
+    const { container } = render(
+      <OnboardingClaimHandoffProvider status='no-op'>
+        <ChatProposeNextStepCard payload={payload('instant_access')} />
+      </OnboardingClaimHandoffProvider>
+    );
+
+    expect(screen.queryByText(/linking this conversation/i)).toBeNull();
+    const handoff = screen.getByTestId('onboarding-claim-handoff-copy');
+    expect(handoff).toHaveTextContent(/reply below so we can finish/i);
+    expect(handoff).toHaveAttribute('data-claim-status', 'no-op');
+    expect(handoff.getAttribute('role')).toBeNull();
     await expectNoA11yViolations(container);
   });
 });

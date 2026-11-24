@@ -256,12 +256,14 @@ export function useOnboardingClaim(
         // the interview finished. Only a durable waitlist receipt or a
         // server-verified readyForCheckout may navigate off /start; anything
         // less stays in the conversation and retries after the next turn.
+        // ONB-38: label that stall `no-op` so the Keep card stops promising a
+        // receipt/link while nothing is in flight.
         if (body.waitlist?.entryId || body.readyForCheckout) {
           completeClaim();
           return;
         }
         markTriggerCompleted();
-        setStatus('claimed');
+        setStatus('no-op');
         return;
       }
 
