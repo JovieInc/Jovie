@@ -35,20 +35,25 @@ describe('AppTableCellContent', () => {
     vi.stubGlobal('navigator', { clipboard });
     const parentClick = vi.fn();
 
-    const { container } = render(
-      <AppTableTextCell copyValue='Take Me Over' copyLabel='Title'>
-        Take Me Over
-      </AppTableTextCell>
+    render(
+      <table>
+        <tbody>
+          <tr onClick={parentClick}>
+            <td>
+              <AppTableTextCell copyValue='Take Me Over' copyLabel='Title'>
+                Take Me Over
+              </AppTableTextCell>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     );
 
     const button = screen.getByRole('button', { name: /Copy Title/i });
     expect(button).toHaveAttribute('aria-label', 'Copy Title: Take Me Over');
-    // Capture on the render host — proves stopPropagation without nested controls.
-    container.addEventListener('click', parentClick);
     fireEvent.click(button);
     expect(writeText).toHaveBeenCalledWith('Take Me Over');
     expect(parentClick).not.toHaveBeenCalled();
-    container.removeEventListener('click', parentClick);
     vi.unstubAllGlobals();
   });
 
