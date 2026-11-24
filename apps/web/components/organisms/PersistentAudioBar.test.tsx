@@ -94,7 +94,10 @@ describe('PersistentAudioBar', () => {
     player.state.artistName = 'Fixture Artist';
     const { container } = renderBar();
 
+    // A play press lands in the sidebar O: the full player starts closed.
     const toggle = screen.getByTestId('player-visibility-toggle');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await user.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     await user.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'false');

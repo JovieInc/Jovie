@@ -208,4 +208,38 @@ describe('ChatProposeNextStepCard states', () => {
     expect(screen.getByTestId('signup-surface')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
+
+  it('anchors waitlist and instant-access AuthShell cards for top-fade clearance (ONB-27)', () => {
+    const handle = 'claimpathartist';
+    const waitlist = render(
+      <ChatProposeNextStepCard
+        payload={payload('waitlist')}
+        claimHandle='reservepath'
+      />
+    );
+    const waitlistAnchor = waitlist.container.querySelector(
+      '[data-onboarding-auth-anchor]'
+    );
+    expect(waitlistAnchor?.hasAttribute('data-onboarding-auth-anchor')).toBe(
+      true
+    );
+    expect(waitlistAnchor).toContainElement(
+      waitlist.getByRole('heading', { name: 'Reserve @reservepath' })
+    );
+    waitlist.unmount();
+
+    const claim = render(
+      <ChatProposeNextStepCard
+        payload={payload('instant_access')}
+        claimHandle={handle}
+      />
+    );
+    const claimAnchor = claim.container.querySelector(
+      '[data-onboarding-auth-anchor]'
+    );
+    expect(claimAnchor?.hasAttribute('data-onboarding-auth-anchor')).toBe(true);
+    expect(claimAnchor).toContainElement(
+      claim.getByRole('heading', { name: `Claim @${handle}` })
+    );
+  });
 });

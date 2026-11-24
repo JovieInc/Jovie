@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { signInUser } from '../helpers/auth';
+import { ensureUserIsFree } from './helpers/ensure-user-is-free';
 import {
   completeCardPayment,
   createCheckoutSession,
-  ensureUserIsFree,
   fetchSubscriptionBySession,
   getBillingStatus,
   getStripeContextOrSkip,

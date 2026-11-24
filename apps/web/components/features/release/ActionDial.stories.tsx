@@ -52,7 +52,7 @@ const meta = {
     onActivate: fn(),
     actionLabel: 'Stream Now',
     groupLabel: 'Choose a streaming service',
-    hint: 'Swipe to switch. Your choice is remembered.',
+    hint: 'Swipe to switch.',
   },
   render: args => <InteractiveDial {...args} />,
 } satisfies Meta<typeof ActionDial>;

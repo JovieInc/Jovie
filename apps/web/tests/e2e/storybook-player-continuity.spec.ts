@@ -30,6 +30,11 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByTestId('continuity-state')).toContainText(
     '"duration":1'
   );
+  // A user-started play lands in the mini; these tests drive the full player.
+  await page.getByRole('button', { name: /Show Player/ }).click();
+  await expect(
+    page.getByRole('button', { name: 'Hide Player', exact: true })
+  ).toBeVisible();
 });
 
 test('hidden waveform cannot take keyboard focus or pointer input', async ({
@@ -253,7 +258,7 @@ test('mobile seek and play targets stay separate at 320px', async ({
 }, testInfo) => {
   await page.setViewportSize({ width: 320, height: 844 });
   const slider = await page
-    .getByRole('slider', { name: 'Seek track', exact: true })
+    .getByRole('slider', { name: 'Seek Track', exact: true })
     .boundingBox();
   const play = await page
     .getByRole('button', { name: /^(Pause playback|Resume playback)$/ })
@@ -289,13 +294,13 @@ test.describe('touch player', () => {
       exact: true,
     });
     await expect(
-      page.getByRole('slider', { name: 'Seek track', exact: true })
+      page.getByRole('slider', { name: 'Seek Track', exact: true })
     ).toBeEnabled();
     await play.tap();
     await expect
       .poll(() => page.evaluate(() => window.playerAudioInstances[0].paused))
       .toBe(true);
-    await page.getByRole('slider', { name: 'Seek track', exact: true }).tap();
+    await page.getByRole('slider', { name: 'Seek Track', exact: true }).tap();
     expect(await page.evaluate(() => window.playerAudioInstances.length)).toBe(
       1
     );

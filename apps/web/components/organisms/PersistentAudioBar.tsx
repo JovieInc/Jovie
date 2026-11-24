@@ -104,10 +104,11 @@ export function PersistentAudioBar() {
   // renders the canvas transport — play/pause, scrub, time, next/previous
   // item — instead of the audio track, which the canvas pauses on play.
   const canvasTransport = useMediaCanvasTransport();
-  // Compact is the default surface for an active track (founder spec
-  // 2026-09-25). The dock's PlayerVisibilityToggle closes it to the sidebar
-  // mini (JOV-3511); idle/dismissed playback leaves no dock at all (JOV-6680).
-  const [playerOpen, setPlayerOpen] = useState(true);
+  // The sidebar O is the player until the user asks for more: a play press
+  // lands in the mini, and auto-advance keeps whichever state this holds.
+  // Show Player, the title, and the ` / Cmd+\ shortcuts open the full dock;
+  // idle/dismissed playback leaves no dock at all (JOV-6680).
+  const [playerOpen, setPlayerOpen] = useState(false);
   const [waveformOn, setWaveformOn] = useState(false);
   // Reopen requests from compact chrome (e.g. the sidebar mini card) land on
   // this counter; the player owns `playerOpen` so the published snapshot
@@ -131,10 +132,6 @@ export function PersistentAudioBar() {
   useEffect(() => {
     setImgError(false);
   }, [playbackState.artworkUrl]);
-
-  useEffect(() => {
-    setPlayerOpen(true);
-  }, [playbackState.activeTrackId]);
 
   // The shell dock (ShellAudioDock) owns the cinematic reveal/hide motion —
   // it transitions height/opacity/transform off the published
