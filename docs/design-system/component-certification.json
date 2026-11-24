@@ -2755,15 +2755,19 @@
       "permission-denied": "An app update has no account, role or gated action: every signed-in or signed-out viewer gets the same pill and status line. The detector matched the sr-only role='status' line.",
       "rtl-overflow": "Its visible UI is RuntimeUpdatePill, pinned with the logical end-4 offset and a truncating label, so a right-to-left document moves it to the opposite corner without overflow; the status line is sr-only."
     },
+    "apps/web/components/shell/SidebarDock.tsx": {
+      "partial": "Every card renders from complete props its owner builds (the updater control, the changelog entry, the install prompt). The one partial input was a track with only a title, and audio no longer renders here: it lives in the sidebar O, whose own test covers a title with no artist."
+    },
     "apps/web/components/shell/SidebarInboxLink.tsx": {
       "offline": "The link never fetches: pending work arrives from the server as availability, and an unreadable status falls back to the plain Inbox bell (StatusUnavailable). Opening it is a normal navigation. The detector matched the pending flag."
     },
     "apps/web/components/shell/SidebarOPresence.tsx": {
+      "loading": "The one lazy part is the OStroke chunk, and its loading fallback is the same rest glyph the O draws everywhere else, so nothing shows or shifts while it loads; SidebarOPresence.test.tsx waits for the chunk before asserting the pose.",
+      "offline": "The O and its title button never fetch: playback and the updater are owned upstream and arrive as props, so a lost connection changes nothing here.",
       "empty": "The O is one link and a fixed status slot with no collection; the idle story is its empty face and the slot is always laid out. The detector matched the items-center layout classes.",
-      "partial": "It takes two booleans and a link and has no partially loaded data. Updating shows the one partial state it has.",
-      "long-content": "Every visible string is fixed copy ('Open Chat', 'Updating') and the slot truncates, so no caller text can grow; the box is asserted identical hidden and shown in SidebarOPresence.test.tsx.",
+      "partial": "It takes a few flags, a link and an optional player and has no partially loaded data; a title with no artist is the one partial player and is covered by its test. Updating shows the one partial state it has.",
       "permission-denied": "The link and the status carry no gated action or permission input; the detector matched role='status', which only announces updater work.",
-      "rtl-overflow": "Its only copy is the fixed English 'Updating' in a truncating flex slot that mirrors with the sidebar's direction; the row uses logical spacing and no left or right offsets."
+      "rtl-overflow": "Its copy is the fixed English 'Updating' and a track title, both in a truncating flex slot that mirrors with the sidebar's direction; the row uses logical spacing and no left or right offsets."
     },
     "apps/web/components/shell/Sparkline.tsx": {
       "error": "The chart takes points from its caller and never loads anything; the detector matched the var(--color-error-text) stroke token for the down trend.",
@@ -2931,6 +2935,12 @@
     "packages/ui/atoms/tooltip.tsx": {
       "empty": "TooltipContent only renders caller-supplied children and owns no data or collection; callers omit the Tooltip rather than open an empty one, and the detector matched the items-center utility class.",
       "partial": "Tooltip is a presentational overlay for caller content; its optional props (contentVariant, showArrow, testId, tone) are styling flags with defaults, so there is no partially-present data."
+    },
+    "packages/ui/brand/OStroke.tsx": {
+      "partial": "The mark takes a pose name and optional numbers, never partially loaded data; a missing label simply makes it decorative, which is its default.",
+      "long-content": "It draws one path in a fixed square and carries no text, so no caller content can grow it; the label, when given, is a screen-reader title only.",
+      "permission-denied": "A graphic has no account, role or gated action.",
+      "rtl-overflow": "It is a symmetric glyph with no text and no left or right offsets, so a right-to-left sidebar mirrors its box and nothing else."
     },
     "packages/ui/confirm-dialog.tsx": {
       "offline": "ConfirmDialog never fetches; it awaits the caller's onConfirm, so a request that fails offline surfaces as the ErrorState story's retry alert and connectivity is owned by the caller.",

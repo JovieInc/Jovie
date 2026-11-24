@@ -51,14 +51,45 @@ export function parseBillingStatusPayload(input: {
 }
 
 /**
- * Fetch current billing status via the app's API on the page's current origin.
+ * True when the page has actually navigated to an http(s) URL. A Playwright
+ * page that never navigated reports `about:blank`, where a relative in-page
+ * fetch has no origin to resolve against and throws
+ * `TypeError: Failed to parse URL` (JOV-8805).
+ */
+export function isNavigatedHttpPage(pageUrl: string): boolean {
+  return pageUrl.startsWith('http://') || pageUrl.startsWith('https://');
+}
+
+/**
+ * Fetch current billing status for the page's authenticated session.
  *
- * Uses in-page `fetch` (same pattern as `createCheckoutSession`) so the request
- * stays on whatever host the browser actually authenticated against — usually
- * the public `jov.ie` alias after OTP — instead of Playwright `baseURL` which
- * stays pinned to the protected exact deployment URL during postdeploy.
+ * On a navigated page this uses in-page `fetch` (same pattern as
+ * `createCheckoutSession`) so the request stays on whatever host the browser
+ * actually authenticated against — usually the public `jov.ie` alias after
+ * OTP — instead of Playwright `baseURL` which stays pinned to the protected
+ * exact deployment URL during postdeploy.
+ *
+ * On a page that has NOT navigated yet (about:blank — synthetic callers
+ * provision cookies via `page.request` and reset billing state before their
+ * first `goto`) a relative in-page fetch cannot resolve. Route through the
+ * page's own APIRequestContext instead: it shares the browser cookie jar and
+ * resolves the relative path against the configured test `baseURL`.
  */
 export async function getBillingStatus(page: Page): Promise<BillingStatus> {
+  if (!isNavigatedHttpPage(page.url())) {
+    const res = await page.request.get('/api/billing/status', {
+      headers: {
+        Accept: 'application/json',
+        ...vercelProtectionBypassHeaders(),
+      },
+    });
+    return parseBillingStatusPayload({
+      ok: res.ok(),
+      status: res.status(),
+      contentType: res.headers()['content-type'] ?? '',
+      text: await res.text(),
+    });
+  }
   const response = await page.evaluate(async () => {
     const res = await fetch('/api/billing/status', {
       headers: { Accept: 'application/json' },
@@ -72,4 +103,16 @@ export async function getBillingStatus(page: Page): Promise<BillingStatus> {
     };
   });
   return parseBillingStatusPayload(response);
+}
+
+/**
+ * Stripe webhook target for the page's state: a navigated page posts to its
+ * own origin (the public alias after OTP); an un-navigated synthetic page has
+ * none (`about:blank` parses to origin "null"), so use the relative path,
+ * which `page.request` resolves against the test `baseURL` (JOV-8805).
+ */
+export function stripeWebhookTarget(pageUrl: string): string {
+  return isNavigatedHttpPage(pageUrl)
+    ? `${new URL(pageUrl).origin}/api/stripe/webhooks`
+    : '/api/stripe/webhooks';
 }

@@ -575,6 +575,29 @@ async function logFirstDashboardReady(page: Page, source: string) {
   );
 }
 
+/**
+ * The sign-in redirect is usually the first request a new deploy serves, so
+ * its sample mostly times a cold instance. Two more hard loads of Home, on the
+ * same session, time the warm path most visits get, so one deploy's receipts
+ * show both and a cut can be told apart from cold-start noise (JOV-14411).
+ * Two plain GET /app requests per run; evidence only, never fails the smoke.
+ */
+const WARM_FIRST_DASHBOARD_SAMPLES = 2;
+
+async function logWarmFirstDashboardReady(page: Page, expectedOrigin: string) {
+  for (let index = 0; index < WARM_FIRST_DASHBOARD_SAMPLES; index += 1) {
+    const loaded = await page
+      .goto(`${expectedOrigin}${APP_ROUTES.DASHBOARD}`, {
+        waitUntil: 'domcontentloaded',
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      })
+      .then(() => true)
+      .catch(() => false);
+    if (!loaded) return;
+    await logFirstDashboardReady(page, 'prod-auth-smoke-warm');
+  }
+}
+
 test.describe('Production Auth Smoke @production-smoke', () => {
   // Keep sign-in and authenticated navigation in one browser session. Requesting
   // another Better Auth OTP can invalidate the prior code, so future checks must
@@ -696,6 +719,7 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     await telemetry.capture(page, 'onboarding');
 
     await logFirstDashboardReady(page, 'prod-auth-smoke');
+    await logWarmFirstDashboardReady(page, expectedOrigin);
 
     // Click the sidebar, not page.goto: only a click proves the shell's
     // client-side navigation still moves between dashboard pages.

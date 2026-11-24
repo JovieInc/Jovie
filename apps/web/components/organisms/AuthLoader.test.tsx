@@ -1,13 +1,10 @@
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { BRAND_MARK_MUTED_CLASS } from '@/lib/brand/tokens';
 import {
   inspectLoadingOwners,
   loadingOwnerIssueCodes,
 } from '@/tests/utils/loading-owner';
-
-vi.mock('@/components/atoms/JovieMarkElectric', () => ({
-  JovieMarkElectric: () => <div data-testid='jovie-mark-electric' />,
-}));
 
 import { AuthLoader } from './AuthLoader';
 
@@ -42,7 +39,6 @@ describe('AuthLoader', () => {
     expect(owner).toHaveAttribute('aria-busy', 'true');
     expect(owner).toHaveAttribute('aria-live', 'polite');
     expect(owner).toHaveAttribute('data-testid', 'auth-loader');
-    expect(screen.getByTestId('jovie-mark-electric')).toBeInTheDocument();
     expect(loadingOwnerIssueCodes(inspectLoadingOwners(container))).toEqual([]);
     expect(owner.querySelector('[aria-hidden="true"]')).not.toBeNull();
   });
@@ -73,5 +69,47 @@ describe('AuthLoader', () => {
       before.split('\n').length
     );
     expect(loadingOwnerIssueCodes(inspectLoadingOwners(container))).toEqual([]);
+  });
+
+  describe('muted mark (ovie-o-presence slice 2)', () => {
+    it('draws exactly one decorative static O in the muted value', () => {
+      const { container } = render(<AuthLoader />);
+      const marks = container.querySelectorAll('[data-brand-variant]');
+
+      expect(marks).toHaveLength(1);
+      const mark = marks[0];
+      expect(mark).toHaveAttribute('aria-hidden', 'true');
+      expect(mark).toHaveAttribute('data-brand-mark-size', '24');
+      expect(mark.querySelector('svg')).toHaveAttribute('height', '24');
+      expect(mark).toHaveClass('text-logo-muted', 'dark:text-quaternary-token');
+      expect(BRAND_MARK_MUTED_CLASS).toBe(
+        'text-logo-muted dark:text-quaternary-token'
+      );
+      // No color: no accent, spark or glow classes.
+      expect(container.innerHTML).not.toMatch(
+        /electric|spark|text-accent|bg-accent|blur/i
+      );
+    });
+
+    it('caps the turn at three iterations in CSS, with no timer', () => {
+      const { container } = render(<AuthLoader />);
+      const mark = container.querySelector<HTMLElement>('[data-brand-variant]');
+
+      expect(mark?.style.animationIterationCount).toBe('3');
+      expect(mark?.style.animationDuration).toBe('var(--duration-o-turn)');
+      const before = mark?.outerHTML;
+      act(() => {
+        vi.advanceTimersByTime(30_000);
+      });
+      expect(mark?.outerHTML).toBe(before);
+    });
+
+    it('only animates under motion-safe, so reduced motion has no turn', () => {
+      const { container } = render(<AuthLoader />);
+      const mark = container.querySelector('[data-brand-variant]');
+
+      expect(mark).toHaveClass('motion-safe:animate-spin');
+      expect(mark?.className).not.toMatch(/(^|\s)animate-spin/);
+    });
   });
 });

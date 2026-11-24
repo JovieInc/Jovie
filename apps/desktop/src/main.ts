@@ -1569,8 +1569,8 @@ async function preloadDesktopBootSplashWordmark(): Promise<void> {
 
 function buildDesktopBootSplashHtml(): string {
   const markCream = SYSTEM_B_DESKTOP_TOKENS.markCream;
-  const cornerMarkPx = SYSTEM_B_DESKTOP_TOKENS.macCornerMarkSizePx;
-  const cornerMarkOpacity = SYSTEM_B_DESKTOP_TOKENS.macCornerMarkOpacity;
+  const mutedMark = SYSTEM_B_DESKTOP_TOKENS.textSecondary;
+  const mutedMarkOpacity = SYSTEM_B_DESKTOP_TOKENS.macCornerMarkOpacity;
   const settledMarkPx = SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx;
   const wordmarkDataUrl = desktopBootSplashWordmarkDataUrl;
   return `<!doctype html>
@@ -1580,41 +1580,37 @@ function buildDesktopBootSplashHtml(): string {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Jovie</title>
     <style>
-      :root { color-scheme: dark; --mac-canvas: ${SYSTEM_B_DESKTOP_TOKENS.macCinematicCanvas}; --mac-ion: #11AFFF; --mac-cream: ${markCream}; }
+      :root { color-scheme: dark; --mac-canvas: ${SYSTEM_B_DESKTOP_TOKENS.macCinematicCanvas}; --mac-cream: ${markCream}; --mac-muted: ${mutedMark}; }
       html, body { margin: 0; width: 100%; min-height: 100%; background: var(--mac-canvas); }
       body { min-height: 100vh; overflow: hidden; color: var(--mac-cream); font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
-      main { position: relative; display: grid; min-height: 100vh; place-items: center; isolation: isolate; background: radial-gradient(ellipse 78% 34% at 52% -8%, rgba(17,175,255,.30), transparent 76%), radial-gradient(ellipse 44% 24% at 88% 4%, rgba(17,175,255,.18), transparent 80%), var(--mac-canvas); }
+      main { position: relative; display: grid; min-height: 100vh; place-items: center; isolation: isolate; background: var(--mac-canvas); }
       main::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 85% 90% at 50% 46%, transparent 55%, rgba(3,4,7,.72)); }
-      .corner-mark { position: absolute; top: min(32px, 1.43vw); right: min(32px, 1.43vw); width: min(${cornerMarkPx}px, 1.786vw); height: min(${cornerMarkPx}px, 1.786vw); opacity: ${cornerMarkOpacity}; color: var(--mac-cream); }
       .lockup-area { position: relative; display: grid; justify-items: center; gap: min(24px, 1.07vw); width: 100%; }
       .lockup { display: flex; width: min(249px, 11.12vw); align-items: center; justify-content: flex-start; gap: min(12px, .536vw); white-space: nowrap; }
       .wordmark { display: block; width: min(104px, 4.64vw); height: auto; flex: none; }
       .fallback-mark { width: min(32px, 1.43vw); height: min(32px, 1.43vw); color: var(--mac-cream); }
       .suffix { font-size: min(38px, 1.7vw); line-height: 1.15; font-weight: 400; letter-spacing: -.8px; }
-      .progress { width: min(120px, 5.36vw); height: 2px; overflow: hidden; background: rgba(255,255,255,.2); }
-      .progress::before { content: ""; display: block; width: min(44px, 1.96vw); height: 2px; background: var(--mac-ion); }
+      /* One grey 1px line, no color. */
+      .progress { width: min(120px, 5.36vw); height: 1px; background: var(--mac-muted); opacity: ${mutedMarkOpacity}; }
       /* splash-b-everywhere-v1: the wordmark appears, then settles down to just the O. Opacity/scale only, so nothing shifts layout. */
       .stage { display: grid; place-items: center; }
       .stage > * { grid-area: 1 / 1; }
-      .settled-mark { width: ${settledMarkPx}px; height: ${settledMarkPx}px; color: var(--mac-cream); opacity: 0; animation: splash-o-settle 360ms ease-out 1100ms forwards; }
+      .settled-mark { width: ${settledMarkPx}px; height: ${settledMarkPx}px; color: var(--mac-muted); opacity: 0; animation: splash-o-settle 360ms ease-out 1100ms forwards; }
       .lockup, .fallback-mark { opacity: 0; animation: splash-wordmark-appear 320ms ease-out forwards, splash-wordmark-settle 360ms ease-in 1100ms forwards; }
       .progress { animation: splash-progress-out 240ms ease-out 1100ms forwards; }
       @keyframes splash-wordmark-appear { from { opacity: 0; } to { opacity: 1; } }
       @keyframes splash-wordmark-settle { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(.4); } }
-      @keyframes splash-o-settle { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
-      @keyframes splash-progress-out { to { opacity: 0; } }
+      @keyframes splash-o-settle { from { opacity: 0; transform: scale(.85); } to { opacity: ${mutedMarkOpacity}; transform: scale(1); } }
+      @keyframes splash-progress-out { from { opacity: ${mutedMarkOpacity}; } to { opacity: 0; } }
       @media (prefers-reduced-motion: reduce) {
         .lockup, .fallback-mark, .settled-mark, .progress { animation: none; }
         .lockup, .fallback-mark, .progress { opacity: 0; }
-        .settled-mark { opacity: 1; }
+        .settled-mark { opacity: ${mutedMarkOpacity}; }
       }
     </style>
   </head>
   <body>
     <main role="main" aria-label="Jovie for Mac is loading" data-desktop-splash="cinematic">
-      <svg class="corner-mark" viewBox="0 0 353.68 347.97" aria-hidden="true">
-        <path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/>
-      </svg>
       <div class="lockup-area" aria-hidden="true">
         <div class="stage">${wordmarkDataUrl ? `<div class="lockup"><img class="wordmark" src="${wordmarkDataUrl}" alt="" /><span class="suffix">for Mac</span></div>` : `<svg class="fallback-mark" viewBox="0 0 353.68 347.97" aria-hidden="true"><path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/></svg>`}<svg class="settled-mark" viewBox="0 0 353.68 347.97" aria-hidden="true" data-splash-settled="o"><path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/></svg></div>
         <div class="progress"></div>
