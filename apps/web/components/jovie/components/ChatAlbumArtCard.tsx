@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, PlainButton } from '@jovie/ui';
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -242,18 +242,19 @@ function ChatAlbumArtCardSuccess({
             {result.candidates.map(candidate => {
               const isSelected = candidate.id === selectedCandidateId;
               return (
-                <button
+                <PlainButton
                   key={candidate.id}
                   type='button'
                   onClick={() => setSelectedCandidateId(candidate.id)}
                   className={cn(
                     'group min-w-24 overflow-hidden rounded-lg border bg-surface-2 text-left transition-colors',
                     isSelected
-                      ? 'border-cyan-400/60 shadow-[inset_0_0_0_1px_rgb(103_232_249_/_0.18)]'
+                      ? 'border-subtle ring-2 ring-focus/18'
                       : 'border-subtle hover:border-secondary-token'
                   )}
                   aria-pressed={isSelected}
                   aria-label={`Select ${candidate.styleLabel} artwork for ${result.releaseTitle}`}
+                  data-testid='album-art-candidate-tile'
                 >
                   <span className='relative block aspect-square w-full bg-surface-1'>
                     <Image
@@ -268,7 +269,7 @@ function ChatAlbumArtCardSuccess({
                   <span className='block border-t border-subtle px-2 py-1.5 text-3xs font-medium text-secondary-token'>
                     {candidate.styleLabel}
                   </span>
-                </button>
+                </PlainButton>
               );
             })}
           </div>
