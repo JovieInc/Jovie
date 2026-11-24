@@ -58,6 +58,9 @@ const SHOT_DIR = path.resolve('test-results/viewport-sweep-shots');
 
 const PROFILE_VARIANTS = {
   claimed: '/renders/profile-admission?layout=public&state=claimed',
+  // Fan capture on: mounts the desktop Get updates / Pay side rail, as on
+  // jov.ie/tim. Without it the rail never renders in this sweep.
+  rail: '/renders/profile-admission?layout=public&state=claimed&rail=on',
   unclaimed: '/renders/profile-admission?layout=public&state=unclaimed',
   preview: '/renders/profile-admission?layout=preview',
 } as const;
@@ -235,6 +238,16 @@ test.describe('viewport sweep: public profile', () => {
       const collector = createCollector();
       await openProfile(page, PROFILE_VARIANTS.claimed, width);
       await sweepScrollToEnd(page, collector, width, 'claimed');
+      collector.assertClean();
+    });
+
+    test(`claimed profile with updates rail at ${width}px`, async ({
+      page,
+    }) => {
+      const collector = createCollector();
+      await openProfile(page, PROFILE_VARIANTS.rail, width);
+      await auditProfileNow(page, collector, `rail ${width}px initial`);
+      await shot(page, width, 'rail-home');
       collector.assertClean();
     });
 

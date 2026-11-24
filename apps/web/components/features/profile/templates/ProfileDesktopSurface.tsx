@@ -775,7 +775,9 @@ export function ProfileDesktopSurface({
 
       <div
         className={cn(
-          'min-h-0 min-w-0 grid-cols-1 gap-3.5',
+          // content-start: the rail sits beside the tall hero card; without it
+          // the grid stretches its rows and splits Get updates from Pay.
+          'min-h-0 min-w-0 grid-cols-1 content-start gap-3.5',
           canGetUpdates
             ? 'grid [@media(min-width:1180px)]:col-start-3 [@media(min-width:1180px)]:row-start-1'
             : 'hidden'
