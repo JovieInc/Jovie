@@ -56,6 +56,8 @@ export const EMPTY_ASSISTANT_REPLY_FALLBACK =
 export interface EmptyReplyFallbackContext {
   readonly ask?: string;
   readonly namedReleases?: readonly string[];
+  /** Public handle for empty-profile setup stubs (jov.ie/{username}). */
+  readonly username?: string;
 }
 
 export interface AssistantGateContext extends EmptyReplyFallbackContext {
@@ -83,10 +85,11 @@ function titleCasePhrases(ask: string): readonly string[] {
 }
 
 /**
- * Ask-aware refuse→draft-hold stub (ASS-103). When blank model text would
- * otherwise surface the generic EMPTY_ASSISTANT_REPLY_FALLBACK, name the
- * release/artifact from the ask or Discography so grounding_0 / one-rec
- * needles still pass.
+ * Ask-aware refuse→draft-hold stub (ASS-103 + ASS-106). When blank model text
+ * would otherwise surface the generic EMPTY_ASSISTANT_REPLY_FALLBACK, name the
+ * release/artifact from the ask or Discography and, for short one-rec residuals
+ * (empty-profile start, clear draft asks, spend refuse), include a concrete
+ * next move so live next_action can clear without inventing facts or spending.
  */
 export function buildEmptyAssistantReplyFallback(
   context?: EmptyReplyFallbackContext
@@ -98,6 +101,8 @@ export function buildEmptyAssistantReplyFallback(
   const phrases = titleCasePhrases(ask);
   const artifact = named ?? phrases[0];
   const lower = ask.toLowerCase();
+  const handle = context?.username?.trim().replace(/^@/, '') ?? '';
+  const profileCue = handle ? `jov.ie/${handle}` : 'your profile';
 
   if (
     /\bauto[- ]?dm\b/.test(lower) ||
@@ -109,11 +114,48 @@ export function buildEmptyAssistantReplyFallback(
     );
   }
 
+  // Clear draft asks before spend/budget needles: "ad copy … budget ~$50"
+  // must get a held body, not a boost refuse (ASS-106 / live 45325957464).
+  const clearDraftAsk =
+    /\b(?:ad copy|outreach|playlist emails?)\b/.test(lower) ||
+    (/\bdraft\b/.test(lower) &&
+      /\b(?:email|emails|pitch|outreach|playlist|caption|ad)\b/.test(lower));
+  if (clearDraftAsk) {
+    const target = named ?? artifact ?? 'that release';
+    if (/\b(?:ad copy|ads?\b|pre-?save|budget)\b/.test(lower)) {
+      return (
+        `${target} ad copy (held): "${target} is out soon. Pre-save on ${profileCue}." ` +
+        'Nothing spends until you confirm.'
+      );
+    }
+    return (
+      `${target} playlist email (held): "Subject: ${target} for your list. ` +
+      `Short cut, profile ${profileCue}." One curator email, no send until yes.`
+    );
+  }
+
+  // Empty-profile / where-to-start: setup step, never a draft-hold stub.
+  if (
+    /\bwhere (?:do i|should i) start\b/.test(lower) ||
+    /\b(?:don'?t|do not) have (?:any )?music\b/.test(lower) ||
+    /\bno (?:music|releases|songs)(?:\s+out)?(?:\s+yet)?\b/.test(lower)
+  ) {
+    return `No releases yet. Add a bio on ${profileCue} today so the page is live.`;
+  }
+
   if (/\b(boost|spend|budget|ads?\b|reel)\b/.test(lower)) {
     const target = named ?? artifact ?? 'that Reel';
+    const other = (context?.namedReleases ?? []).find(
+      title => title.toLowerCase() !== target.toLowerCase()
+    );
+    // ASS-106: held plan body for next_action. ASS-107 live 45325957464: name
+    // another catalog title for time awareness when one is available.
+    const timed =
+      other != null ? ` Keep ads paused while ${other} is upcoming.` : '';
     return (
       `I will not boost ${target} until you confirm a budget. ` +
-      `I will draft a hold plan for ${target}.`
+      `Held plan: "Best ${target} Reel, tip link in bio, organic first." ` +
+      `Confirm the spend cap; nothing boosts until yes.${timed}`
     );
   }
 

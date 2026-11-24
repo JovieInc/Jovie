@@ -323,20 +323,46 @@
       ]
     },
     {
+      "id": "chat-pitch",
+      "label": "Chat: release pitch",
+      "core": true,
+      "entryPoints": [],
+      "chatTools": ["generateReleasePitch"],
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/chat-pitch-outcome.test.ts",
+          "test": "a pitch made in chat is saved on the release the page reads",
+          "runs": "merge"
+        }
+      ]
+    },
+    {
+      "id": "chat-album-art",
+      "label": "Chat: album art",
+      "core": true,
+      "entryPoints": [],
+      "chatTools": ["generateAlbumArt"],
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/chat-album-art-outcome.test.ts",
+          "test": "cover art made in chat gives three options and the pick lands on the release",
+          "runs": "merge"
+        }
+      ]
+    },
+    {
       "id": "chat-creative",
-      "label": "Chat: album art, retouch, pitch, promo and video",
+      "label": "Chat: retouch, promo, lyrics and video",
       "core": true,
       "entryPoints": [],
       "chatTools": [
-        "generateReleasePitch",
-        "generateAlbumArt",
         "retouchImage",
         "voicePromo",
         "formatLyrics",
         "proposeVideoRecording"
       ],
       "checks": [],
-      "gap": "Schema tests only; the pitch spec asserts a reply appears."
+      "gap": "Schema tests only."
     },
     {
       "id": "chat-account",

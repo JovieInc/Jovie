@@ -44,6 +44,7 @@ describe('deterministic /app/chat prompt contract (ASS-9 + ASS-16)', () => {
     ['forbidsInventedAccountStats', 'Never invent account stats'],
     ['forbidsInventedAccountFacts', 'Never invent Spotify algorithm'],
     ['forbidsInventedCapabilities', 'smart link is live or will live'],
+    ['forbidsInventedCapabilities', "I'll add it"],
     ['requiresDraftHoldOutbound', 'Draft every outbound artifact'],
     ['requiresDraftClearAskNow', 'Never reply with only a promise to draft'],
     ['requiresDraftClearAskNow', 'even when the promise names the release'],
@@ -65,6 +66,10 @@ describe('deterministic /app/chat prompt contract (ASS-9 + ASS-16)', () => {
     [
       'requiresVisibleCatalogFacts',
       'Never invent popularity, streams, peer benchmarks',
+    ],
+    [
+      'requiresEmptyProfileSetupNow',
+      'Never leave blank artist-facing text on where-to-start',
     ],
     [
       'requiresArtistFacingTextAfterTools',

@@ -109,3 +109,16 @@ describe('SidebarLinkRow accessibility', () => {
     await expectNoA11yViolations(container);
   });
 });
+
+describe('SidebarLinkRow press', () => {
+  it('presses its actions trigger through the shared press utility', () => {
+    render(
+      <main>
+        <SidebarLinkRow {...baseProps} />
+      </main>
+    );
+    expect(
+      screen.getByRole('button', { name: 'Actions for Website' })
+    ).toHaveClass('press');
+  });
+});

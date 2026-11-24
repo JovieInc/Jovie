@@ -24,6 +24,9 @@ export const shippingStateQueryOptions = queryOptions({
   },
   staleTime: SHIPPING_STATE_REFETCH_MS,
   retry: false,
+  // Paint the last successful observation immediately while a background
+  // reconcile (statistics interval / explicit Refresh) replaces it.
+  placeholderData: previousData => previousData,
   // Resize/focus and responsive remounts must not restart a slow observation.
   // The statistics observer owns timed refresh; explicit Refresh still works.
   refetchOnMount: false,

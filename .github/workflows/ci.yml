@@ -1010,7 +1010,7 @@ jobs:
           fi
 
           # Isolated DB certification: database, authz, migration, harness, dependency inputs.
-          NEON_PATTERN='^(apps/web/drizzle/|apps/web/lib/(db|queries|auth)/|apps/web/scripts/(drizzle-migrate|verify-db-migrations)\.ts|apps/web/tests/(integration/|setup-db\.ts)|apps/web/lib/domain/releases\.ts|apps/web/lib/ai/tools/create-release\.ts|apps/web/lib/chat/tools/(tasks|merch-tools|canvas-status)\.ts|apps/web/app/api/(chat/confirm-[a-z-]+|account/delete)/|apps/web/lib/domain/profile\.ts|apps/web/lib/merch/(design-generation|concept-review(-store)?|generation-concepts|generation-quarantine|source-candidates|service)\.ts|apps/web/app/app/\(shell\)/dashboard/tasks/task-actions\.ts|apps/web/vitest\.config\.integration\.mts|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|.*\.sql$|apps/web/app/api/cron/|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'
+          NEON_PATTERN='^(apps/web/drizzle/|apps/web/lib/(db|queries|auth)/|apps/web/scripts/(drizzle-migrate|verify-db-migrations)\.ts|apps/web/tests/(integration/|setup-db\.ts)|apps/web/lib/domain/(releases|profile)\.ts|apps/web/lib/ai/tools/create-release\.ts|apps/web/lib/chat/tools/(tasks|merch-tools|canvas-status|release-pitch|album-art)\.ts|apps/web/app/api/(chat/confirm-[a-z-]+|account/delete)/|apps/web/lib/merch/(design-generation|concept-review(-store)?|generation-concepts|generation-quarantine|source-candidates|service)\.ts|apps/web/app/app/\(shell\)/dashboard/tasks/task-actions\.ts|apps/web/vitest\.config\.integration\.mts|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|.*\.sql$|apps/web/app/api/cron/|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'
           if echo "$CHANGED_FILES" | grep -q -E "$NEON_PATTERN"; then
             echo "run_neon=true" >> "$GITHUB_OUTPUT"
           else
@@ -3512,16 +3512,28 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: '.nvmrc'
-      - name: Download lanes coverage ab
+      # Wave 2: one download per matrix group (a/b/c/d). Keys stay in
+      # LANES_COVERAGE_GROUP_SHARDS so the require/combine steps stay in sync.
+      - name: Download lanes coverage a
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: lanes-coverage-ab-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/lanes-coverage/ab
-      - name: Download lanes coverage cd
+          name: lanes-coverage-a-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/lanes-coverage/a
+      - name: Download lanes coverage b
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: lanes-coverage-cd-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/lanes-coverage/cd
+          name: lanes-coverage-b-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/lanes-coverage/b
+      - name: Download lanes coverage c
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: lanes-coverage-c-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/lanes-coverage/c
+      - name: Download lanes coverage d
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: lanes-coverage-d-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/lanes-coverage/d
       - name: Require complete lanes coverage evidence
         id: coverage
         run: |
@@ -3569,8 +3581,8 @@ jobs:
 
   ci-fast-structural-lanes-shards:
     name: ci-fast (structural lanes shard ${{ matrix.group }})
-    # Each group runs its existing pytest pair; the required fan-in combines
-    # both maps before enforcing every whole-suite coverage floor.
+    # Wave 2: each group runs one pytest shard (a|b|c|d); the required fan-in
+    # combines all four maps before enforcing every whole-suite coverage floor.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     runs-on: ubuntu-24.04
     permissions:
@@ -3581,7 +3593,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [ab, cd]
+        group: [a, b, c, d]
     env:
       CI_FAST_STRUCTURAL_LANES: only:${{ matrix.group }}
     steps:

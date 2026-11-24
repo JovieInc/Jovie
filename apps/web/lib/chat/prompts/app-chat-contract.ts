@@ -47,7 +47,8 @@ export function checkAppChatPromptContract(prompt: string) {
       'Never claim you will set up',
       'smart link is live or will live',
       'lands on Spotify',
-      'link will be up on my page'
+      'link will be up on my page',
+      "I'll add it"
     ),
     requiresDraftHoldOutbound: includesAll(
       'Draft every outbound artifact',
@@ -94,6 +95,12 @@ export function checkAppChatPromptContract(prompt: string) {
       'Never say you lack per-release data',
       'today Jovie setup step'
     ),
+    // ASS-106 live 45325957464: blank where-to-start → generic draft-hold.
+    requiresEmptyProfileSetupNow: includesAll(
+      'Empty profile (no bio/links/releases)',
+      'add a bio',
+      'Never leave blank artist-facing text on where-to-start'
+    ),
     // ASS-87 / ASS-95: empty-after-tool, length, refuse→draft-hold,
     // stream-count phrasing without catalog deny (44964568648 / 44968636057).
     requiresArtistFacingTextAfterTools: includesAll(
@@ -107,7 +114,9 @@ export function checkAppChatPromptContract(prompt: string) {
     requiresRefuseThenDraftHold: includesAll(
       'refusing an unasked send, post, auto-DM, scrape, or spend',
       'name the release or artifact from the ask',
+      // ASS-102 one-rec + ASS-103 safety: keep both needles.
       'one concrete next move this turn',
+      'draft and hold for their yes or confirm',
       'Never a generic draft-hold line',
       // ASS-103 live 45268223488: blank refuse + paste-ready post without hold.
       'Never leave blank artist-facing text on these refuses',

@@ -22,6 +22,9 @@ import type { LaneAgent } from '@/lib/ovie/shipping-state/contract';
 import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
+import { emptyMatrixMessage, matrixSummary } from './shipping-matrix-freshness';
+
+export { emptyMatrixMessage, matrixSummary } from './shipping-matrix-freshness';
 
 const SHIPPING_COLUMNS = [
   'Work',
@@ -388,35 +391,6 @@ export function ShippingRowRail({
   );
 }
 
-function matrixSummary(
-  query: Readonly<{ isPending: boolean; isError: boolean }>,
-  rowCount: number,
-  attentionCount: number,
-  syncState: TaskFeed['syncState'] | undefined
-): string {
-  if (query.isPending) return 'Loading in-flight work…';
-  if (query.isError) return 'UNKNOWN — observation failed. Refresh to retry.';
-  return `${rowCount} open · ${attentionCount} need attention · ${syncState ?? 'unknown'} cache`;
-}
-
-/**
- * An empty matrix means "no open lane PRs" only on a fresh observation.
- * Failed, stale, or syncing caches leave in-flight work unknown, never zero.
- */
-export function emptyMatrixMessage(
-  isError: boolean,
-  feed: Pick<TaskFeed, 'syncState' | 'lastSyncedAt'> | undefined
-): string {
-  if (isError || !feed || feed.syncState === 'failed') {
-    return 'Work matrix unavailable. In-flight work is unknown.';
-  }
-  if (feed.syncState === 'stale') {
-    return `Shipping cache is stale (${feed.lastSyncedAt ? `last synced ${formatTimeAgo(feed.lastSyncedAt)}` : 'never synced'}). In-flight work is unknown until the next sync.`;
-  }
-  if (feed.syncState === 'syncing') return 'Syncing in-flight work…';
-  return 'No open lane pull requests.';
-}
-
 /**
  * Live PR / merge-queue status matrix: one row per Linear-owned work item in
  * flight, with checks, queue state, owner, age, and last transition. Rows open
@@ -470,12 +444,7 @@ export function ShippingMatrix() {
               In-flight Work
             </h2>
             <p className='truncate text-2xs text-tertiary-token'>
-              {matrixSummary(
-                query,
-                rows.length,
-                attentionCount,
-                feed?.syncState
-              )}
+              {matrixSummary(query, rows.length, attentionCount, feed)}
             </p>
           </div>
           <Button

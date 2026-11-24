@@ -259,7 +259,7 @@ describe('RadioGroup', () => {
       expect(radio.className).toContain(
         'data-[state=checked]:border-btn-primary'
       );
-      expect(radio.className).toContain('motion-reduce:transition-none');
+      expect(radio).toHaveClass('press');
     });
 
     it('keeps hover feedback free of transform motion', () => {
@@ -282,8 +282,8 @@ describe('RadioGroup', () => {
       );
       const radio = screen.getByTestId('radio');
 
-      expect(radio.className).toContain('active:scale-95');
-      expect(radio.className).toContain('active:transition-transform');
+      expect(radio).toHaveClass('press');
+      expect(radio.className).not.toContain('active:scale-95');
     });
 
     it('merges custom className on group', () => {

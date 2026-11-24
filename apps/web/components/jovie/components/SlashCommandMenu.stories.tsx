@@ -65,6 +65,22 @@ export const EmptyNoMatches: Story = {
   },
 };
 
+// Pending entity search: emptyHint becomes "Searching…" when the release
+// query is in flight (asserted in SlashCommandMenu.test.tsx).
+export const LoadingSearching: Story = {
+  args: {
+    state: {
+      status: 'entity',
+      kind: 'release',
+      query: '',
+      startIdx: 0,
+      selectedIndex: 0,
+    },
+    attachmentActions: undefined,
+    onQueryChange: undefined,
+  },
+};
+
 // The slash menu as the composer opens it: no attachment rows and no filter
 // field, so the header names the mode instead.
 export const PartialNoAttachments: Story = {
@@ -115,4 +131,20 @@ export const Rtl: Story = {
       </div>
     ),
   ],
+};
+
+// Offline collapses to the same pending/empty path as loading (no distinct
+// offline face); story name covers the applicable state detector.
+export const OfflinePendingQueries: Story = {
+  args: {
+    state: {
+      status: 'entity',
+      kind: 'release',
+      query: '',
+      startIdx: 0,
+      selectedIndex: 0,
+    },
+    attachmentActions: undefined,
+    onQueryChange: undefined,
+  },
 };

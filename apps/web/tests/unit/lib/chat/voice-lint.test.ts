@@ -157,7 +157,52 @@ describe('buildEmptyAssistantReplyFallback (ASS-103)', () => {
     });
     expect(text.toLowerCase()).toContain('neon reef');
     expect(text.toLowerCase()).toMatch(/budget|confirm|hold|draft/);
+    expect(text).toMatch(/held plan/i);
+    expect(text).toMatch(/"[^"]{12,}"/);
+    expect(text.toLowerCase()).toMatch(/not boost|nothing boosts/);
+    expect(text).not.toMatch(/\$\d/);
+    // ASS-107: spend-cap ask + another catalog title for time awareness.
+    expect(text.toLowerCase()).toMatch(/spend cap/);
+    expect(text.toLowerCase()).toMatch(/night swim|tidal drift/);
     expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('ASS-106: empty-profile where-to-start gets a bio setup step', () => {
+    const text = buildEmptyAssistantReplyFallback({
+      ask: "I don't have any music out yet. where do I start?",
+      username: 'maraquill',
+    });
+    expect(text.toLowerCase()).toMatch(/add a bio/);
+    expect(text.toLowerCase()).toContain('jov.ie/maraquill');
+    expect(text.toLowerCase()).not.toMatch(/draft that and hold/);
+    expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('ASS-106: clear outreach draft ask gets a held email body', () => {
+    const text = buildEmptyAssistantReplyFallback({
+      ask: 'have outreach draft playlist emails for Night Swim under you',
+      namedReleases: releases,
+      username: 'lunawaves',
+    });
+    expect(text.toLowerCase()).toContain('night swim');
+    expect(text).toMatch(/held|subject:/i);
+    expect(text.toLowerCase()).toMatch(/no send until yes/);
+    expect(text.toLowerCase()).not.toMatch(
+      /^i will draft that for night swim and hold/
+    );
+    expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('ASS-107: repairs template-residue drafts instead of persistedAsFallback', () => {
+    const raw =
+      'I can\'t send DMs from your account. Paste-ready thank-you held for your yes:\n\n"Hey [name], Luna Waves here. Your tip meant a lot, thank you."';
+    const gated = gateAssistantReply(raw);
+    expect(gated.text).not.toBe(ASSISTANT_REPLY_FALLBACK);
+    expect(gated.text).not.toMatch(/\[name\]/i);
+    expect(gated.violations).toEqual([]);
+    const surfaced = surfaceCompletedAssistantReply(raw);
+    expect(surfaced.persistedAsFallback).toBeUndefined();
+    expect(surfaced.text).toBe(gated.text);
   });
 
   it('names tip thank-you DM on auto-dm blank shapes', () => {

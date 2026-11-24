@@ -256,4 +256,25 @@ describe('ChatProposeNextStepCard states', () => {
       claim.getByRole('heading', { name: `Claim @${handle}` })
     );
   });
+
+  it('places enrichment chips above AuthShell in the Keep pin viewport (ONB-30)', () => {
+    const { container } = render(
+      <ChatProposeNextStepCard
+        payload={payload('waitlist')}
+        claimHandle='reservepath'
+      />
+    );
+    const enrichment = screen.getByTestId('onboarding-post-keep-enrichment');
+    const signup = screen.getByTestId('signup-surface');
+    const anchor = container.querySelector('[data-onboarding-auth-anchor]');
+    expect(anchor).toContainElement(enrichment);
+    expect(anchor).toContainElement(signup);
+    // DOM order: chips before signup so the default pin viewport shows them.
+    expect(
+      Boolean(
+        enrichment.compareDocumentPosition(signup) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      )
+    ).toBe(true);
+  });
 });

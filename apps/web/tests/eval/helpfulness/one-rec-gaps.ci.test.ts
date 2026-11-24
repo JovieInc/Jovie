@@ -235,32 +235,13 @@ describe('one-rec gaps: promise-draft-not-a-move (ASS-100)', () => {
     ).toBeUndefined();
   });
 
-  it('ASS-102: named promise stubs still fail promise_draft on draft asks', async () => {
-    const { buildEmptyAssistantReplyFallback } = await import(
-      '@/lib/chat/voice-lint'
-    );
-    const outreach = HELPFULNESS_CASES.find(
-      x => x.id === 'specialist-outreach'
-    );
+  it('ASS-102: hand-crafted named promise stubs still fail promise_draft', async () => {
     const adCopy = HELPFULNESS_CASES.find(
       x => x.id === 'ad-copy-presave-budget'
     );
-    if (!outreach || !adCopy) throw new Error('missing draft-ask cases');
+    if (!adCopy) throw new Error('missing draft-ask cases');
 
-    // ASS-103 blank path for outreach names Night Swim but still no body.
-    const outreachStub = buildEmptyAssistantReplyFallback({
-      ask: outreach.ask,
-      namedReleases: ['Night Swim', 'Neon Reef', 'Ambient Evening'],
-    });
-    expect(isPromiseOnlyDraft(outreachStub)).toBe(true);
-    expect(
-      runHardChecks(outreach, { text: outreachStub, toolCalls: [] }).find(
-        x => x.id === 'promise_draft_not_a_move'
-      )?.ok
-    ).toBe(false);
-
-    // Hand-crafted named promise (ad-copy asks with "budget" take the spend
-    // branch in ASS-103; one-rec still fail-closes this shape on draft asks).
+    // Promise-only shapes (no draft body) still fail-close on draft asks.
     const namedPromise =
       'I will draft that for Night Swim and hold it for your yes. I do not send, post, or spend until you confirm.';
     expect(isPromiseOnlyDraft(namedPromise)).toBe(true);
@@ -269,6 +250,77 @@ describe('one-rec gaps: promise-draft-not-a-move (ASS-100)', () => {
         x => x.id === 'promise_draft_not_a_move'
       )?.ok
     ).toBe(false);
+  });
+
+  it('ASS-106: ask-aware blank stubs deliver draft body / setup / spend plan', async () => {
+    const { buildEmptyAssistantReplyFallback } = await import(
+      '@/lib/chat/voice-lint'
+    );
+    const outreach = HELPFULNESS_CASES.find(
+      x => x.id === 'specialist-outreach'
+    );
+    const whereStart = HELPFULNESS_CASES.find(x => x.id === 'new-where-start');
+    const spend = HELPFULNESS_CASES.find(x => x.id === 'safety-spend-boost');
+    const adCopy = HELPFULNESS_CASES.find(
+      x => x.id === 'ad-copy-presave-budget'
+    );
+    if (!outreach || !whereStart || !spend || !adCopy) {
+      throw new Error('missing ASS-106 short cases');
+    }
+
+    const outreachStub = buildEmptyAssistantReplyFallback({
+      ask: outreach.ask,
+      namedReleases: ['Night Swim', 'Neon Reef', 'Ambient Evening'],
+      username: 'lunawaves',
+    });
+    expect(isPromiseOnlyDraft(outreachStub)).toBe(false);
+    expect(
+      runHardChecks(outreach, { text: outreachStub, toolCalls: [] }).find(
+        x => x.id === 'promise_draft_not_a_move'
+      )?.ok
+    ).toBe(true);
+    expect(
+      runHardChecks(outreach, { text: outreachStub, toolCalls: [] }).find(
+        x => x.id === 'grounding_0'
+      )?.ok
+    ).toBe(true);
+
+    const whereStub = buildEmptyAssistantReplyFallback({
+      ask: whereStart.ask,
+      username: 'maraquill',
+    });
+    expect(
+      runHardChecks(whereStart, { text: whereStub, toolCalls: [] }).find(
+        x => x.id === 'grounding_0'
+      )?.ok
+    ).toBe(true);
+    expect(hasConcreteNextMove(whereStub) || /add a bio/i.test(whereStub)).toBe(
+      true
+    );
+
+    const spendStub = buildEmptyAssistantReplyFallback({
+      ask: spend.ask,
+      namedReleases: ['Night Swim', 'Neon Reef'],
+    });
+    expect(hasConcreteNextMove(spendStub)).toBe(true);
+    expect(spendStub.toLowerCase()).toMatch(/not boost|nothing boosts/);
+    expect(
+      runHardChecks(spend, { text: spendStub, toolCalls: [] }).every(c => c.ok)
+    ).toBe(true);
+
+    // Ad-copy + budget must not take the boost refuse branch.
+    const adStub = buildEmptyAssistantReplyFallback({
+      ask: adCopy.ask,
+      namedReleases: ['Night Swim'],
+      username: 'lunawaves',
+    });
+    expect(isPromiseOnlyDraft(adStub)).toBe(false);
+    expect(adStub.toLowerCase()).not.toMatch(/not boost/);
+    expect(
+      runHardChecks(adCopy, { text: adStub, toolCalls: [] }).find(
+        x => x.id === 'promise_draft_not_a_move'
+      )?.ok
+    ).toBe(true);
   });
 });
 

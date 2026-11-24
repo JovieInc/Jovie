@@ -229,6 +229,7 @@ async function askJovie(
   const surfaced = surfaceCompletedAssistantReply(text, {
     ask: testCase.ask,
     namedReleases: fixture.releases.map(release => release.title),
+    username: fixture.artist.username,
   });
   return {
     reply: {

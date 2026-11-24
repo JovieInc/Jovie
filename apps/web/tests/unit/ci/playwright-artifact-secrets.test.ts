@@ -1514,46 +1514,38 @@ ${fixtureCheckout}
     });
   });
 
-  it.each([
-    [3, true],
-    [0, false],
-  ])(
-    'keeps the chaos sweep exit %i and copies its report when present',
-    (producerExit, writesResults) => {
-      const sweep = policyWorkflow('nightly-tests.yml').jobs?.[
-        'e2e-tests'
-      ]?.steps?.find(step => step.name === 'Run full surface chaos sweep');
-      expect(String(sweep?.run)).toContain(guardScriptName);
-      expect(sweep?.['continue-on-error']).toBe(true);
-      const root = fixture('jovie-chaos-sweep-');
-      const bin = join(root, 'bin');
-      write(
-        join(bin, 'node'),
-        '#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nexec "$@"\n'
-      );
-      write(
-        join(bin, 'pnpm'),
-        `#!/bin/sh\n${writesResults ? 'mkdir -p test-results && echo {} > test-results/nightly-results.json\n' : ''}exit ${producerExit}\n`
-      );
-      spawnSync('chmod', ['+x', join(bin, 'node'), join(bin, 'pnpm')]);
-      mkdirSync(join(root, 'apps/web'), { recursive: true });
-      const result = spawnSync('bash', ['-c', String(sweep?.run)], {
-        cwd: root,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          GITHUB_WORKSPACE: root,
-          PATH: `${bin}:${process.env.PATH ?? ''}`,
-        },
-      });
-      expect(result.status, result.stderr).toBe(producerExit);
-      expect(
-        existsSync(
-          join(root, 'apps/web/test-results/full-surface-chaos-report.json')
-        )
-      ).toBe(writesResults);
-    }
-  );
+  it('keeps advisory chaos continue-on-error and isolated JSON/output paths (JOV-14767)', () => {
+    const e2e = policyWorkflow('nightly-tests.yml').jobs?.['e2e-tests'];
+    const sweep = e2e?.steps?.find(
+      step => step.name === 'Run full surface chaos sweep'
+    );
+    const required = e2e?.steps?.find(
+      step => step.name === 'Run nightly E2E tests'
+    );
+    expect(String(sweep?.run)).toContain(guardScriptName);
+    expect(String(sweep?.run)).toContain(
+      'tests/e2e/nightly/full-surface-chaos.spec.ts'
+    );
+    // Chaos no longer copies over nightly-results.json; it writes its own file.
+    expect(String(sweep?.run)).not.toContain(
+      'cp test-results/nightly-results.json test-results/full-surface-chaos-report.json'
+    );
+    expect(sweep?.['continue-on-error']).toBe(true);
+    expect(String(sweep?.if ?? '')).toContain('always()');
+    expect(sweep?.env).toMatchObject({
+      PLAYWRIGHT_JSON_OUTPUT_FILE:
+        'test-results/full-surface-chaos-report.json',
+      PLAYWRIGHT_OUTPUT_DIR: 'test-results/chaos-playwright-output',
+    });
+    expect(required?.env).toMatchObject({
+      PLAYWRIGHT_JSON_OUTPUT_FILE: 'test-results/nightly-results.json',
+      PLAYWRIGHT_OUTPUT_DIR: 'test-results/required-playwright-output',
+    });
+    const names = (e2e?.steps ?? []).map(step => step.name);
+    expect(names.indexOf('Run nightly E2E tests')).toBeLessThan(
+      names.indexOf('Run full surface chaos sweep')
+    );
+  });
 
   it('requires step-scoped Markdown allowance for every production smoke producer', () => {
     const expected = productionSmokeProducers;

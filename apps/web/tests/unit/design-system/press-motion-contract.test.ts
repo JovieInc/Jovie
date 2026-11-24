@@ -32,10 +32,9 @@ describe('shared press-motion contract', () => {
     );
 
     expect(designSystem).toMatch(/--scale-press:\s*0\.98;/);
-    expect(button).toContain('active:scale-press');
-    expect(button).toContain('motion-reduce:active:scale-100');
+    expect(button).toMatch(/tracking-normal press /);
+    expect(button).not.toContain('active:scale-');
     expect(button).not.toContain('active:scale-[0.96]');
-    expect(button).toContain('pressFeedback = false');
     expect(nativeManifest.motionBindings).toEqual([
       ['pressScale', '--scale-press'],
     ]);
@@ -53,9 +52,38 @@ describe('shared press-motion contract', () => {
     expect(globals).not.toContain(
       '[role="button"]:not([aria-disabled="true"]):not([data-static="true"])'
     );
-    expect(globals).toContain(
-      'active:scale-press motion-reduce:active:scale-100'
+    expect(globals).not.toContain('active:scale-press');
+    expect(globals).toContain('@apply press;');
+  });
+
+  it('defines one press utility: instant down, spring release, reduced-motion darken only', () => {
+    const foundation = readWeb('styles/tailwind-foundation.css');
+    const designSystem = readWeb('styles/design-system.css');
+    const utility = foundation.slice(foundation.indexOf('@utility press {'));
+
+    expect(foundation).toMatch(/--press-brightness:\s*0\.94;/);
+    expect(foundation).toMatch(
+      /--press-release-duration:\s*var\(--duration-normal\);/
     );
+    expect(foundation).toMatch(
+      /--ease-press-release:\s*cubic-bezier\(0\.34, 1\.3, 0\.64, 1\);/
+    );
+    // design-system.css only owns the scale; the press tokens live here.
+    expect(designSystem).not.toContain('--press-brightness');
+    expect(utility).toContain('scale: var(--scale-press);');
+    expect(utility).toContain('filter: brightness(var(--press-brightness));');
+    expect(utility).toContain('transition-duration: 0s;');
+    for (const gate of [
+      ':disabled',
+      '[aria-disabled=',
+      '[data-static=',
+      '[aria-busy=',
+    ]) {
+      expect(utility).toContain(gate);
+    }
+    const reduced = utility.slice(utility.indexOf('prefers-reduced-motion'));
+    expect(reduced).toContain('scale: none;');
+    expect(reduced).not.toContain('brightness');
   });
 
   it('keeps immediate-state and carousel controls static while remaining press feedback stays at 0.98', () => {
