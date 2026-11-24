@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { fastRender } from '@/tests/utils/fast-render';
 import { ImageAttachmentChip } from './ImageAttachmentChip';
 
@@ -16,17 +17,45 @@ vi.mock('next/image', () => ({
   ),
 }));
 
-function renderChip() {
+function renderChip(
+  props: Partial<ComponentProps<typeof ImageAttachmentChip>> = {}
+) {
   return fastRender(
     <ImageAttachmentChip
       url='https://example.com/cover.png'
       name='cover.png'
       tone='onLight'
+      {...props}
     />
   );
 }
 
 describe('ImageAttachmentChip', () => {
+  it.each([
+    { state: 'named', name: 'cover.png' as string | undefined },
+    { state: 'empty filename', name: undefined },
+    {
+      state: 'long content',
+      name: 'final-album-cover-art-for-international-tour-deluxe-edition-master.png',
+    },
+  ])('has no axe violations in the $state state', async ({ name }) => {
+    const { container } = renderChip({ name });
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no axe violations in an RTL overflow frame', async () => {
+    const { container } = fastRender(
+      <div dir='rtl' className='w-40'>
+        <ImageAttachmentChip
+          url='https://example.com/cover.png'
+          name='غلاف-الألبوم-النهائي.png'
+          tone='onLight'
+        />
+      </div>
+    );
+    await expectNoA11yViolations(container);
+  });
+
   it('exposes a dialog trigger with compact chip content', () => {
     renderChip();
 
@@ -66,7 +95,9 @@ describe('ImageAttachmentChip', () => {
       'image-attachment-popover-content'
     );
 
-    expect(content.className).toContain('system-b-image-attachment-popover');
+    expect(
+      content.querySelector('.system-b-image-attachment-popover')
+    ).toBeTruthy();
   });
 
   it('opens on keyboard Enter and closes on Escape', async () => {

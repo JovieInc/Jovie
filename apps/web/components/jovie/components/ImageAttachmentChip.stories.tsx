@@ -32,8 +32,40 @@ export const OnDark: Story = {
   },
 };
 
-export const NoName: Story = {
+/** Empty: no filename, so the chip falls back to the generic Image label. */
+export const EmptyNoFilename: Story = {
   args: {
+    tone: 'onLight',
+  },
+};
+
+/** Partial: short stem with no extension cue in the label. */
+export const PartialShortName: Story = {
+  args: {
+    name: 'a.png',
+    tone: 'onLight',
+  },
+};
+
+/** Long content: a long filename that truncates in the chip row. */
+export const LongContentFilename: Story = {
+  args: {
+    name: 'final-album-cover-art-for-international-tour-deluxe-edition-master.png',
+    tone: 'onLight',
+  },
+};
+
+/** RTL overflow: long Arabic filename in a narrow RTL frame. */
+export const RtlOverflowFilename: Story = {
+  decorators: [
+    Story => (
+      <div dir='rtl' className='w-40'>
+        <Story />
+      </div>
+    ),
+  ],
+  args: {
+    name: 'غلاف-الألبوم-النهائي-للجولة-الدولية-الطبعة-الخاصة.png',
     tone: 'onLight',
   },
 };
