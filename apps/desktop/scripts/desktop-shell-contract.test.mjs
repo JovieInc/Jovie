@@ -585,6 +585,20 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /function buildDesktopBootSplashUrl\(\)/);
   assert.match(mainSource, /function buildDesktopBootSplashHtml\(\)/);
   assert.match(mainSource, /function loadHostedUrlAfterSplash\(/);
+  assert.match(mainSource, /primeHostedLaunchCache\(/);
+  assert.match(mainSource, /primeHostedLaunch\(/);
+  // Splash→hosted overlap: warm cache during splash, navigate on dom-ready
+  // (earlier than did-finish-load) so cold launch is not serialized (JOV-14776).
+  const splashNavigate = mainSource.match(
+    /function loadHostedUrlAfterSplash\([\s\S]*?\n\}/
+  )?.[0];
+  assert.ok(splashNavigate, 'loadHostedUrlAfterSplash body must exist');
+  assert.match(splashNavigate, /primeHostedLaunchCache\(/);
+  assert.match(splashNavigate, /once\('dom-ready',\s*navigateToHosted\)/);
+  assert.doesNotMatch(
+    splashNavigate,
+    /once\('did-finish-load',\s*navigateToHosted\)/
+  );
   assert.match(mainSource, /Jovie for Mac is loading/);
   assert.match(
     mainSource,

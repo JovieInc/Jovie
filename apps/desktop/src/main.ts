@@ -130,6 +130,10 @@ import { buildNativeHelpMenu } from './native-help-menu';
 import { DesktopNavigationCoordinator } from './navigation-coordinator';
 import { createStartupMaintenanceGate } from './startup-maintenance';
 import {
+  primeHostedLaunch,
+  primeHostedLaunchCache,
+} from './hosted-launch-prime';
+import {
   getUrlDisposition as getDesktopUrlDisposition,
   isAllowedExternalUrl as isAllowedDesktopExternalUrl,
   isAllowedPublicProfileUrl,
@@ -1722,7 +1726,16 @@ function loadHostedUrlAfterSplash(win: BrowserWindow, hostedUrl: string): void {
     return;
   }
 
-  win.webContents.once('did-finish-load', navigateToHosted);
+  // Warm the hosted origin while the local splash paints so TLS/HTTP cache
+  // overlap splash instead of starting only after splash did-finish-load.
+  primeHostedLaunchCache({
+    origin: APP_ORIGIN,
+    entryUrl: hostedUrl.startsWith('http') ? hostedUrl : APP_ENTRY_URL,
+    fetch: (url, init) => net.fetch(url, { ...init, credentials: 'omit' }),
+  });
+  // dom-ready is earlier than did-finish-load for the data: splash; start the
+  // hosted navigation as soon as the splash document is interactive.
+  win.webContents.once('dom-ready', navigateToHosted);
   void win.loadURL(buildDesktopBootSplashUrl());
 }
 
@@ -3699,7 +3712,14 @@ app.whenReady().then(async () => {
     gotSingleInstanceLock &&
     !printBuildIdentityOnStart
   ) {
-    session.defaultSession.preconnect({ url: APP_ORIGIN, numSockets: 2 });
+    // Preconnect + cache-warm before window construction so splash paint and
+    // hosted document fetch overlap (SWI-36 / JOV-14776 cold-launch).
+    primeHostedLaunch({
+      origin: APP_ORIGIN,
+      entryUrl: APP_ENTRY_URL,
+      preconnect: options => session.defaultSession.preconnect(options),
+      fetch: (url, init) => net.fetch(url, { ...init, credentials: 'omit' }),
+    });
   }
   if (!gotSingleInstanceLock && !printBuildIdentityOnStart) return;
 
