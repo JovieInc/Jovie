@@ -77,4 +77,31 @@ describe('nightly workflow residuals (JOV-8095)', () => {
       'SESSION_SECRET: nightly-qa-onboarding-session-secret-0123456789abcdef'
     );
   });
+
+  it('publishes required browser verdict before advisory chaos (JOV-14767 / Astra 6.2)', () => {
+    const workflow = readFileSync(
+      resolve(repoRoot, '.github/workflows/nightly-tests.yml'),
+      'utf8'
+    );
+    const e2e = getJobBlock(workflow, 'e2e-tests');
+    const required = e2e.indexOf('- name: Run nightly E2E tests');
+    const chaos = e2e.indexOf('- name: Run full surface chaos sweep');
+    const chaosIf = e2e.slice(chaos, chaos + 400);
+
+    expect(required).toBeGreaterThanOrEqual(0);
+    expect(chaos).toBeGreaterThan(required);
+    expect(chaosIf).toMatch(/if:\s*\$\{\{\s*always\(\)/);
+    expect(e2e).toContain(
+      'PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/nightly-results.json'
+    );
+    expect(e2e).toContain(
+      'PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/full-surface-chaos-report.json'
+    );
+    expect(e2e).toContain(
+      'PLAYWRIGHT_OUTPUT_DIR: test-results/required-playwright-output'
+    );
+    expect(e2e).toContain(
+      'PLAYWRIGHT_OUTPUT_DIR: test-results/chaos-playwright-output'
+    );
+  });
 });
