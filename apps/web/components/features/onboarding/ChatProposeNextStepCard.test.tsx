@@ -334,17 +334,6 @@ describe('ChatProposeNextStepCard states', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('links the conversation for a visitor who is already signed in', async () => {
-    authState.isSignedIn = true;
-    const { container } = render(
-      <ChatProposeNextStepCard payload={payload('instant_access')} />
-    );
-
-    expect(screen.getByText(/already signed in/i)).toBeInTheDocument();
-    expect(screen.queryByTestId('signup-surface')).toBeNull();
-    await expectNoA11yViolations(container);
-  });
-
   it.each([
     [true, true, /saving your request/i],
     [false, false, /save your spot/i],

@@ -25,6 +25,7 @@ import {
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import { SidebarProvider } from '@/components/organisms/sidebar';
 import { APP_ROUTES } from '@/constants/routes';
+import { OnboardingClaimHandoffProvider } from '@/hooks/useOnboardingClaimHandoff';
 import { track } from '@/lib/analytics';
 import { publicEnv } from '@/lib/env-public';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
@@ -258,80 +259,82 @@ export function OnboardingShell({
 
   return (
     <SidebarProvider defaultOpen={false}>
-      <AppShellFrame
-        sidebar={null}
-        flushContent
-        containerClassName={ONBOARDING_FRAME_CLASS}
-        contentClassName='overflow-clip!'
-        main={
-          <div className='flex min-h-0 min-w-0 flex-1'>
-            <div
-              className='system-b-onboarding-session relative flex min-h-0 min-w-0 flex-1 flex-col'
-              data-onboarding-session={sessionLabel}
-            >
-              {(onRestart && hasConversation) || onLogout || !isSignedIn ? (
-                <OnboardingIdentityConflict
-                  visible={claimStatus === 'identity-conflict'}
-                  isSignedIn={isSignedIn}
-                  onLogout={onLogout}
-                  disabled={actionPending || controlsDisabled}
-                >
-                  <OnboardingOverflowMenu
+      <OnboardingClaimHandoffProvider status={claimStatus}>
+        <AppShellFrame
+          sidebar={null}
+          flushContent
+          containerClassName={ONBOARDING_FRAME_CLASS}
+          contentClassName='overflow-clip!'
+          main={
+            <div className='flex min-h-0 min-w-0 flex-1'>
+              <div
+                className='system-b-onboarding-session relative flex min-h-0 min-w-0 flex-1 flex-col'
+                data-onboarding-session={sessionLabel}
+              >
+                {(onRestart && hasConversation) || onLogout || !isSignedIn ? (
+                  <OnboardingIdentityConflict
+                    visible={claimStatus === 'identity-conflict'}
                     isSignedIn={isSignedIn}
-                    onRestart={hasConversation ? onRestart : undefined}
                     onLogout={onLogout}
                     disabled={actionPending || controlsDisabled}
-                  />
-                </OnboardingIdentityConflict>
+                  >
+                    <OnboardingOverflowMenu
+                      isSignedIn={isSignedIn}
+                      onRestart={hasConversation ? onRestart : undefined}
+                      onLogout={onLogout}
+                      disabled={actionPending || controlsDisabled}
+                    />
+                  </OnboardingIdentityConflict>
+                ) : null}
+                <OnboardingStartStepRail
+                  state={journeyState}
+                  className='shrink-0 px-4 pt-1 sm:px-6 lg:px-8'
+                />
+                <OnboardingChat
+                  initialMessages={initialMessages}
+                  conversationId={conversationId}
+                  interactionDisabled={actionPending}
+                  onBusyChange={onBusyChange}
+                  headerOverlay={!isSignedIn}
+                  intentId={intentId}
+                  onConversationActivity={handleConversationActivity}
+                  onProfileBuilderChange={setProfileBuilderState}
+                  profilePeekState={railState}
+                  starterHandoff={starterHandoff}
+                  entryProfile={entryProfile}
+                  turnstileToken={failOpen.token}
+                  turnstileStatus={failOpen.status}
+                  turnstilePanel={turnstilePanel}
+                  turnstilePanelVisible={turnstilePanelVisible}
+                  turnstileHasSiteKey={Boolean(turnstileSiteKey)}
+                  onTurnstileRequired={handleTurnstileRequired}
+                  onTurnstileRejected={handleTurnstileRejected}
+                />
+
+                <OnboardingShellStatus
+                  kind='error'
+                  message={actionError}
+                  visible={Boolean(actionError)}
+                />
+
+                <OnboardingShellStatus
+                  kind='status'
+                  message='Saving this conversation to your account…'
+                  visible={isLinking}
+                />
+                <OnboardingShellStatus
+                  kind='error'
+                  message="We couldn't save your request. Refresh this page to try again."
+                  visible={claimStatus === 'error'}
+                />
+              </div>
+              {sideProfileRail ? (
+                <div className='hidden shrink-0 lg:flex'>{sideProfileRail}</div>
               ) : null}
-              <OnboardingStartStepRail
-                state={journeyState}
-                className='shrink-0 px-4 pt-1 sm:px-6 lg:px-8'
-              />
-              <OnboardingChat
-                initialMessages={initialMessages}
-                conversationId={conversationId}
-                interactionDisabled={actionPending}
-                onBusyChange={onBusyChange}
-                headerOverlay={!isSignedIn}
-                intentId={intentId}
-                onConversationActivity={handleConversationActivity}
-                onProfileBuilderChange={setProfileBuilderState}
-                profilePeekState={railState}
-                starterHandoff={starterHandoff}
-                entryProfile={entryProfile}
-                turnstileToken={failOpen.token}
-                turnstileStatus={failOpen.status}
-                turnstilePanel={turnstilePanel}
-                turnstilePanelVisible={turnstilePanelVisible}
-                turnstileHasSiteKey={Boolean(turnstileSiteKey)}
-                onTurnstileRequired={handleTurnstileRequired}
-                onTurnstileRejected={handleTurnstileRejected}
-              />
-
-              <OnboardingShellStatus
-                kind='error'
-                message={actionError}
-                visible={Boolean(actionError)}
-              />
-
-              <OnboardingShellStatus
-                kind='status'
-                message='Saving this conversation to your account…'
-                visible={isLinking}
-              />
-              <OnboardingShellStatus
-                kind='error'
-                message="We couldn't save your request. Refresh this page to try again."
-                visible={claimStatus === 'error'}
-              />
             </div>
-            {sideProfileRail ? (
-              <div className='hidden shrink-0 lg:flex'>{sideProfileRail}</div>
-            ) : null}
-          </div>
-        }
-      />
+          }
+        />
+      </OnboardingClaimHandoffProvider>
     </SidebarProvider>
   );
 }
