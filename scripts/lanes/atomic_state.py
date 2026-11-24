@@ -2,11 +2,14 @@
 not hold the writer's lock sees an empty file (JSONDecodeError in ClaimScanCacheTest, 8 of 150 loaded
 runs; it refused a Gem release). Stage the content beside the target and swap it in atomically."""
 import os
+import subprocess
+import time
 import uuid
 import fcntl
 import json
 import math
 import stat
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -84,3 +87,90 @@ def append_json_object(path: Path, record: dict, *, before_append=None) -> None:
                 except OSError as error:
                     raise OSError("ledger-append-rollback-uncertain") from error
                 raise
+
+
+# Gem install receipt (JOV-14764): what the updater installed and why it refused, readable
+# off-host as the lanes-status.json 'release' block. The shape is contractual — Part B's
+# doctor closer consumes it — so these four keys are the whole block.
+RELEASE_RECEIPT_NAME = "release-receipt.json"
+RELEASE_RECEIPT_KEYS = ("sourceCommit", "bundleDigest", "installedAt", "refused")
+
+
+def now_iso_utc() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _read_json_object(path) -> dict:
+    try:
+        data = json.loads(Path(path).read_text())
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def read_release_receipt(state) -> dict:
+    """The install receipt read back for off-host consumers; {} before the first install."""
+    data = _read_json_object(Path(state) / RELEASE_RECEIPT_NAME)
+    return {key: data.get(key) for key in RELEASE_RECEIPT_KEYS} if data else {}
+
+
+def release_status(state, marker=None):
+    """The lanes-status.json 'release' block: the receipt, falling back to the legacy
+    installed-digest string until the first receipt exists."""
+    return read_release_receipt(state) or marker
+
+
+def write_release_receipt(state, *, bundle=None, refused=None) -> bool:
+    """Record install state only (JOV-14764): a successful install pins the installed bundle's
+    source commit and digest with refused null; a refusal keeps the installed release's fields
+    and names the exact failing release test or check. Atomic (tmp+rename), so a crash mid-write
+    or two installs racing leave one complete receipt. Returns False — and never raises — so a
+    receipt failure cannot gate or alter the install."""
+    try:
+        data = _read_json_object(Path(state) / RELEASE_RECEIPT_NAME)
+        if bundle is not None:
+            data = {"sourceCommit": bundle["sourceCommit"], "bundleDigest": bundle["bundleDigest"],
+                    "installedAt": now_iso_utc(), "refused": None}
+        else:
+            if not data.get("sourceCommit") or not data.get("bundleDigest"):
+                active = _read_json_object(Path(state) / "current" / "scripts" / "lanes" / ".release.json")
+                data.update(sourceCommit=data.get("sourceCommit") or active.get("sourceCommit"),
+                            bundleDigest=data.get("bundleDigest") or active.get("bundleDigest"))
+            data.setdefault("installedAt", None)
+            data["refused"] = {"reason": refused[0], "at": refused[1]}
+        atomic_write_text(Path(state) / RELEASE_RECEIPT_NAME, json.dumps(data, sort_keys=True))
+        return True
+    except Exception:
+        return False
+
+
+def selftest_refusal_reason(staging):
+    """The exact failing release test from the staged self-test's own diagnostic (JOV-14764):
+    'release tests failed' alone is why a Gem refusal was invisible off-host."""
+    try:
+        failed = json.loads((Path(staging) / ".selftest-diagnostic.json").read_text()).get("failedSelectors")
+    except (OSError, ValueError):
+        return None
+    return failed[0] if isinstance(failed, list) and failed and isinstance(failed[0], str) else None
+
+
+def record_release_refusal(state, staging, tree, why) -> None:
+    """Write the refused-tree record AND the receipt (JOV-14764), naming the exact failing
+    release test when the staged self-test's diagnostic has one, else the refusing check."""
+    atomic_write_text(Path(state) / "update-refused.json", json.dumps({"tree": tree, "at": time.time(), "why": why}))
+    write_release_receipt(state, refused=(selftest_refusal_reason(staging) or why, now_iso_utc()))
+
+
+def release_activated(state, bundle, refused_path) -> None:
+    """Resolve the refusal the activation answers and pin the installed bundle (JOV-14764)."""
+    Path(refused_path).unlink(missing_ok=True)
+    write_release_receipt(state, bundle=bundle)
+
+
+def note_update_exception(state, failure, error) -> str:
+    """An exception refusal (fetch, bundle identity, custody) names its check. A refuse()-then-
+    raise (self-test timeout) already wrote the exact reason — keep it, not the exception
+    string (JOV-14764)."""
+    if not isinstance(failure, subprocess.TimeoutExpired):
+        write_release_receipt(state, refused=(error, now_iso_utc()))
+    return error

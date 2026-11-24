@@ -1659,10 +1659,7 @@ def allocate(names: list[str], rows: int) -> dict[str, int]:
 
 def header(f: dict, width: int) -> str:
     local, linear, github, now = f["local"], f["linear"], f["github"], f["now"]
-    # 'release' is the install receipt block since JOV-14764; the digest is the display value.
-    raw_release = local.get("release")
-    release = (raw_release if isinstance(raw_release, str)
-               else (raw_release or {}).get("bundleDigest")) or "unknown-release"
+    release = (local.get("release") if not isinstance(local.get("release"), dict) else (local.get("release") or {}).get("bundleDigest")) or "unknown-release"  # JOV-14764: receipt block; digest is the display
     hud_state = paint("ok", "✓ hud=release") if local.get("releaseMatchesHud") else paint("warn", "! hud≠release")
     tick = local.get("tick") or {}
     tick_age = timestamp_age(tick.get("at"), now)

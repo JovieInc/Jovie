@@ -53,7 +53,7 @@ import autoscale  # noqa: E402
 import capacity_limit  # noqa: E402
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
-from atomic_state import append_json_object, atomic_write_text  # noqa: E402
+from atomic_state import append_json_object, atomic_write_text, note_update_exception, record_release_refusal, release_activated, release_status  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 import fleet_gate_emitter  # noqa: E402
@@ -166,7 +166,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_fix_red_size_split.py",
               "scripts/tests/test_continuity_clock.py",
               "scripts/tests/test_worktree_sweep.py", "scripts/tests/test_service_census.py",
-              "scripts/tests/test_worktree_pool.py", "scripts/tests/test_worktree_pool_bootstrap.py",
+              "scripts/tests/test_worktree_pool.py", "scripts/tests/test_worktree_pool_bootstrap.py", "scripts/tests/test_release_receipt.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
               "scripts/tests/test_remediation.py", "scripts/tests/test_revert_first.py", "scripts/tests/test_repair_order.py", "scripts/tests/test_autoscale.py", "scripts/tests/test_pr_wip.py",
@@ -10092,7 +10092,7 @@ def record_tick_duration(host: Host, seconds: float) -> None:
 
 
 def _dispatch(host: Host, unclean_previous: dict | None) -> int:
-    tick = {"at": now_iso(), "release": release_status(host), "unhealthy": [], "quotaBlocked": {},
+    tick = {"at": now_iso(), "release": release_status(host.state, read_marker(host)), "unhealthy": [], "quotaBlocked": {},
             "spawned": [], "error": None, "admissionDenied": None,
             "uncleanPreviousRun": unclean_previous}
     if unclean_previous:
@@ -10642,17 +10642,11 @@ def update(host: Host) -> int:
 def _update_locked(host: Host) -> int:
     mirror = host_maintenance(host, refresh_object_mirror)  # before install_release's origin fetch
     before = read_marker(host)
-    started = now_iso()
     try:
         code = install_release(host)
         error = None if code == 0 else "release tests failed"
     except Exception as failure:
-        code, error = 1, f"{type(failure).__name__}: {failure}"[:300]
-        # An exception refusal (fetch, bundle identity, custody) names its check here. A
-        # same-run refuse() already wrote the exact reason (the timeout path refuses, then
-        # raises): keep it instead of overwriting with the exception string (JOV-14764).
-        if ((release_receipt(host).get("refused") or {}).get("at") or "") < started:
-            write_release_receipt(host, refused=(error, now_iso()))
+        code, error = 1, note_update_exception(host.state, failure, f"{type(failure).__name__}: {failure}"[:300])
     skills = host_maintenance(host, refresh_codex_skills)
     lag = host_maintenance(host, lambda h: install_lag(h, before, error))
     update_json(host.state / "update.json", lambda data: (data.clear(), data.update(
@@ -11422,58 +11416,6 @@ def verify_generated_runtime(proven: Path, existing: Path) -> None:
                 raise lifecycle.AdmissionHeld("generated runtime output differs from fresh proof")
 
 
-RELEASE_RECEIPT_NAME = "release-receipt.json"
-RELEASE_RECEIPT_KEYS = ("sourceCommit", "bundleDigest", "installedAt", "refused")
-
-
-def release_receipt(host: Host) -> dict:
-    """The install receipt read back for off-host consumers; {} before the first install."""
-    receipt = read_json(host.state / RELEASE_RECEIPT_NAME)
-    return ({key: receipt.get(key) for key in RELEASE_RECEIPT_KEYS} if receipt else {})
-
-
-def release_status(host: Host):
-    """lanes-status.json's 'release' block (JOV-14764): the readable install receipt — what is
-    installed and why an install was refused, readable off this host. Falls back to the legacy
-    installed-digest string until the first receipt exists."""
-    return release_receipt(host) or read_marker(host)
-
-
-def write_release_receipt(host: Host, *, bundle: dict | None = None,
-                          refused: tuple[str, str] | None = None) -> None:
-    """Record install state only (JOV-14764): a successful install pins the installed bundle's
-    source commit and digest with refused null; a refusal keeps the installed release's fields
-    and names the exact failing release test or check. Atomic (tmp+rename under update_json's
-    lock, so racing updaters and a crash mid-write can never leave invalid JSON). A receipt
-    failure never gates or alters the install."""
-    try:
-        def change(data: dict) -> None:
-            if bundle is not None:
-                data.clear()
-                data.update(sourceCommit=bundle["sourceCommit"], bundleDigest=bundle["bundleDigest"],
-                            installedAt=now_iso(), refused=None)
-                return
-            if not data.get("sourceCommit") or not data.get("bundleDigest"):
-                active = read_json(host.state / "current" / "scripts" / "lanes" / ".release.json")
-                data.update(sourceCommit=data.get("sourceCommit") or active.get("sourceCommit"),
-                            bundleDigest=data.get("bundleDigest") or active.get("bundleDigest"))
-            data.setdefault("installedAt", None)
-            data["refused"] = {"reason": refused[0], "at": refused[1]}
-        update_json(host.state / RELEASE_RECEIPT_NAME, change)
-    except Exception as error:  # a receipt failure never takes the update down
-        print(f"lane update: release receipt unavailable: {type(error).__name__}: {error}", file=sys.stderr)
-
-
-def selftest_refusal_reason(staging: Path) -> str | None:
-    """The exact failing release test from the staged self-test's own diagnostic (JOV-14764):
-    'release tests failed' alone is why a Gem refusal was invisible off-host."""
-    try:
-        failed = json.loads((staging / ".selftest-diagnostic.json").read_text()).get("failedSelectors")
-    except (OSError, ValueError):
-        return None
-    return failed[0] if isinstance(failed, list) and failed and isinstance(failed[0], str) else None
-
-
 def install_release(host: Host, *, operator=None) -> int:
     if operator is None and lifecycle.draining(host.state):
         raise lifecycle.AdmissionHeld("operator requested natural controller drain")
@@ -11515,10 +11457,7 @@ def install_release(host: Host, *, operator=None) -> int:
                                      cwd=host.repo, capture_output=True, check=True)
             lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
             def refuse(why: str) -> int:
-                atomic_write_text(refused_path, json.dumps({"tree": tree, "at": time.time(), "why": why}))
-                # The receipt names the exact failing release test when the staged self-test's
-                # own diagnostic has one, not just the check that refused (JOV-14764).
-                write_release_receipt(host, refused=(selftest_refusal_reason(staging) or why, now_iso()))
+                record_release_refusal(host.state, staging, tree, why)
                 return 1
             # The staged tree proves itself with its own installer code. On 2026-10-10 the Mac
             # refused every release for a day because the *installed* installer chose a bare
@@ -11573,8 +11512,7 @@ def install_release(host: Host, *, operator=None) -> int:
         link.unlink()
     link.symlink_to(release / "scripts/lanes")
     os.replace(link, current)
-    refused_path.unlink(missing_ok=True)  # the refusal that marker recorded is resolved by this activation
-    write_release_receipt(host, bundle=bundle)
+    release_activated(host.state, bundle, refused_path)  # resolves the refusal this activation answers
     return 0
 
 
