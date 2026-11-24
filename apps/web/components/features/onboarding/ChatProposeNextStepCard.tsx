@@ -1,7 +1,7 @@
 'use client';
 
 // @coverage-via apps/web/tests/components/features/onboarding/ChatProposeNextStepCard.test.tsx
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { useEffect, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthShell } from '@/features/auth';
@@ -10,6 +10,7 @@ import { track } from '@/lib/analytics';
 import type { AudienceBand } from '@/lib/chat/tools/onboarding-signals';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import {
+  isAllowedEnrichmentSocialUrl,
   type PostKeepSocialPlatform,
   writePostKeepEnrichmentNotes,
 } from '@/lib/onboarding/post-keep-enrichment-notes';
@@ -86,11 +87,38 @@ function PostKeepEnrichmentChips() {
     null
   );
   const [savedBand, setSavedBand] = useState<AudienceBand | null>(null);
+  const [savedSocialUrl, setSavedSocialUrl] = useState<string | null>(null);
+  const [urlDraft, setUrlDraft] = useState('');
+  // Allowlist hint only — Input invalid face via validationState.
+  const [urlInvalidHint, setUrlInvalidHint] = useState<string | null>(null);
 
   const notePlatform = (platform: PostKeepSocialPlatform) => {
+    const platformChanged =
+      savedPlatform !== null && savedPlatform !== platform;
     setSavedPlatform(platform);
-    writePostKeepEnrichmentNotes({ platform });
-    setOpenPanel(null);
+    // Drop a saved URL that no longer matches the selected platform so
+    // chip label + claim primarySocialUrl stay honest.
+    const keepUrl =
+      savedSocialUrl && isAllowedEnrichmentSocialUrl(savedSocialUrl, platform)
+        ? savedSocialUrl
+        : null;
+    if (!keepUrl && savedSocialUrl) {
+      setSavedSocialUrl(null);
+    }
+    if (!keepUrl && (savedSocialUrl || platformChanged)) {
+      setUrlDraft('');
+    }
+    writePostKeepEnrichmentNotes(
+      keepUrl
+        ? { platform, socialUrl: keepUrl }
+        : savedSocialUrl
+          ? { platform, socialUrl: null }
+          : { platform }
+    );
+    // ONB-32: keep panel open so optional URL can be collected without
+    // restoring required social→audience. Platform-only remains valid.
+    setUrlInvalidHint(null);
+    setOpenPanel('social');
   };
 
   const noteAudience = (band: AudienceBand) => {
@@ -98,6 +126,33 @@ function PostKeepEnrichmentChips() {
     writePostKeepEnrichmentNotes({ audienceBand: band });
     setOpenPanel(null);
   };
+
+  const saveSocialUrl = () => {
+    if (!savedPlatform) return;
+    const trimmed = urlDraft.trim();
+    if (!trimmed) {
+      setUrlInvalidHint(null);
+      setOpenPanel(null);
+      return;
+    }
+    if (!isAllowedEnrichmentSocialUrl(trimmed, savedPlatform)) {
+      setUrlInvalidHint('Use an Instagram or TikTok profile link.');
+      return;
+    }
+    setSavedSocialUrl(trimmed);
+    writePostKeepEnrichmentNotes({
+      platform: savedPlatform,
+      socialUrl: trimmed,
+    });
+    setUrlInvalidHint(null);
+    setOpenPanel(null);
+  };
+
+  const socialChipLabel = savedSocialUrl
+    ? 'Instagram / TikTok Link Noted'
+    : savedPlatform
+      ? 'Instagram / TikTok Noted'
+      : 'Add Instagram / TikTok';
 
   return (
     <div
@@ -119,9 +174,7 @@ function PostKeepEnrichmentChips() {
             setOpenPanel(current => (current === 'social' ? null : 'social'))
           }
         >
-          {savedPlatform
-            ? 'Instagram / TikTok Noted'
-            : 'Add Instagram / TikTok'}
+          {socialChipLabel}
         </Button>
         <Button
           type='button'
@@ -146,7 +199,7 @@ function PostKeepEnrichmentChips() {
           data-testid='onboarding-enrichment-social-panel'
         >
           <legend className='text-xs leading-5 text-secondary-token'>
-            We will ask for the link after you sign up.
+            Optional link — we will use this after you sign up.
           </legend>
           <div className='flex flex-wrap gap-2'>
             <Button
@@ -170,6 +223,55 @@ function PostKeepEnrichmentChips() {
               TikTok
             </Button>
           </div>
+          {savedPlatform ? (
+            <div className='space-y-2 pt-1'>
+              <Input
+                inputSize='sm'
+                type='url'
+                inputMode='url'
+                autoComplete='url'
+                name='onboarding-enrichment-social-url'
+                label='Profile Link (Optional)'
+                placeholder={
+                  savedPlatform === 'tiktok'
+                    ? 'https://www.tiktok.com/@you'
+                    : 'https://www.instagram.com/you'
+                }
+                value={urlDraft}
+                // Allowlist reject uses the certified Input invalid face
+                // (atom-owned), not a card-level failure branch.
+                {...(urlInvalidHint
+                  ? {
+                      validationState: 'invalid' as const,
+                      helpText: urlInvalidHint,
+                    }
+                  : {})}
+                data-testid='onboarding-enrichment-social-url'
+                data-1p-ignore
+                onChange={event => {
+                  setUrlDraft(event.target.value);
+                  if (urlInvalidHint) setUrlInvalidHint(null);
+                }}
+                onKeyDown={event => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    saveSocialUrl();
+                  }
+                }}
+              />
+              <div className='flex flex-wrap gap-2'>
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='sm'
+                  data-testid='onboarding-enrichment-social-url-save'
+                  onClick={saveSocialUrl}
+                >
+                  {urlDraft.trim() ? 'Save link' : 'Continue without link'}
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </fieldset>
       ) : null}
 
