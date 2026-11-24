@@ -138,7 +138,6 @@
     "apps/web/components/features/pmf-survey/PmfSurveyCard.tsx": 1,
     "apps/web/components/features/profile/ProfileRedirectSurface.tsx": 1,
     "apps/web/components/features/waitlist/WaitlistSpotifySearch.tsx": 1,
-    "apps/web/components/jovie/components/ChatAvatarUploadCard.tsx": 3,
     "apps/web/components/jovie/components/ChatToolSurface.tsx": 1,
     "apps/web/components/jovie/components/ChatVideoRecordingProposalCard.tsx": 2,
     "apps/web/components/jovie/components/FeatureIntroCard.tsx": 1,

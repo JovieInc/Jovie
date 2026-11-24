@@ -76,7 +76,6 @@
     "apps/web/components/features/profile/templates/ProfileDesktopSurface.tsx": "a11y,ds-owner,states,tokens",
     "apps/web/components/features/profile/views/ReleasesView.tsx": "a11y,frontend-rules,states,tests,tokens",
     "apps/web/components/jovie/JovieChat.tsx": "a11y,ds-owner,frontend-rules,states,tests",
-    "apps/web/components/jovie/components/ChatAvatarUploadCard.tsx": "a11y,ds-owner,frontend-rules,states,tests",
     "apps/web/components/jovie/components/ChatInput.tsx": "a11y,ds-owner,frontend-rules,states,tests",
     "apps/web/components/molecules/drawer/SidebarLinkRow.tsx": "states,tokens",
     "apps/web/components/organisms/CmdKPalette.tsx": "a11y,ds-owner,frontend-rules,states",

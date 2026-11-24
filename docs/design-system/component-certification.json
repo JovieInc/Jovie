@@ -2283,6 +2283,10 @@
     "apps/web/components/jovie/components/ChatArtifactErrorCard.tsx": {
       "offline": "The card never fetches: Try again only dispatches the jovie-chat-submit-prompt window event, and the chat that receives it owns the request and its network error (ErrorDisplay's NetworkOffline story). A tool that failed for lack of connectivity reaches the card as an ordinary error title and message, which ErrorRecoverableRetry shows."
     },
+    "apps/web/components/jovie/components/ChatAvatarUploadCard.tsx": {
+      "empty": "ChatAvatarUploadCard is a single dropzone for one profile photo and owns no collection that could be empty. The detector matched the items-center layout classes on the dropzone and error rows.",
+      "offline": "Upload network failure is the Error face (ErrorUploadFailed story and the mutation onError path): useAvatarMutation paints the same retry chrome whether the browser is offline or the API rejects. There is no separate offline shell."
+    },
     "apps/web/components/jovie/components/ChatDropZoneOverlay.tsx": {
       "permission-denied": "The drop overlay only mirrors an active file drag and has no gated action or permission input; upload limits are enforced by the attachment hook before files reach it, and the detector matched role='status' on the live region."
     },
