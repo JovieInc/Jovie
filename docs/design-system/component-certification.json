@@ -2335,6 +2335,10 @@
       "error": "The menu has no error branch and submits nothing: a commit calls the composer's onSelectSkill, onSelectEntity or onSelectPrompt. The detector matched the word submit in the IME-composition comment of its key handler.",
       "permission-denied": "The menu draws no denied face: a skill the account cannot use (album art without the capability) is left out of the list, so there is nothing locked to show. The detector matched role='combobox' on the filter field."
     },
+    "apps/web/components/jovie/components/TeleprompterShowcaseInterstitial.tsx": {
+      "empty": "The interstitial owns no collection; it draws one title, one script and fixed actions. The detector matched the items-center layout classes. Closed shows the null face.",
+      "permission-denied": "The showcase has no gated action or permission input; anyone who sees it can start recording or dismiss. The detector matched role='dialog' on the modal."
+    },
     "apps/web/components/jovie/merch-tool-artifacts.tsx": {
       "error": "It never draws its own failure. The only submit signal is the jovie-chat-submit-prompt event it dispatches, and the chat that receives it owns the request and its errors. A failed tool event returns null so the shared failure card draws it. The detector matched submit in that event name.",
       "offline": "It never fetches. The only submit signal is the jovie-chat-submit-prompt event it dispatches, and the chat composer owns the request and its network error. The detector matched submit in that event name."

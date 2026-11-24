@@ -1,8 +1,7 @@
 'use client';
 
-import { Button, IconButton } from '@jovie/ui';
+import { Button, IconButton, PlainButton } from '@jovie/ui';
 import { X } from 'lucide-react';
-import type { CSSProperties } from 'react';
 import { useEffect, useRef } from 'react';
 import { TeleprompterNotchVisual } from '@/components/jovie/components/TeleprompterNotchVisual';
 import { trackTeleprompterFunnel } from '@/lib/teleprompter/analytics';
@@ -11,6 +10,7 @@ import type {
   TeleprompterShowcaseVariant,
 } from '@/lib/teleprompter/types';
 import { cn } from '@/lib/utils';
+import './TeleprompterShowcaseInterstitial.surface.css';
 
 export interface TeleprompterShowcaseInterstitialProps {
   readonly open: boolean;
@@ -22,27 +22,6 @@ export interface TeleprompterShowcaseInterstitialProps {
   readonly showcaseVariant: TeleprompterShowcaseVariant;
   readonly onStartRecording: () => void;
 }
-
-// This showcase surface is intentionally always dark in both themes, so the
-// canonical semantic token vars are scoped locally instead of using raw
-// white/black palette utilities.
-const SHOWCASE_SURFACE_STYLE: CSSProperties = {
-  background:
-    'radial-gradient(120% 100% at 50% -8%, color-mix(in oklab, var(--color-accent-blue) 36%, #101020) 0%, #0a0a12 58%)',
-  boxShadow: '0 28px 80px rgba(0, 0, 0, 0.5)',
-  '--color-text-primary-token': '#ffffff',
-  '--color-text-secondary-token': 'rgba(255, 255, 255, 0.75)',
-  '--color-text-tertiary-token': 'rgba(255, 255, 255, 0.65)',
-  '--color-bg-surface-1': 'rgba(255, 255, 255, 0.08)',
-  '--color-bg-surface-2': 'rgba(255, 255, 255, 0.14)',
-  '--color-interactive-hover': 'rgba(255, 255, 255, 0.1)',
-  '--color-border-subtle': 'rgba(255, 255, 255, 0.12)',
-  '--color-border-focus': 'rgba(255, 255, 255, 0.55)',
-  '--color-bg-page': '#0a0a12',
-  '--color-btn-primary-bg': '#ffffff',
-  '--color-btn-primary-fg': '#000000',
-  '--color-btn-primary-hover': 'rgba(255, 255, 255, 0.92)',
-} as CSSProperties;
 
 export function TeleprompterShowcaseInterstitial({
   open,
@@ -89,10 +68,10 @@ export function TeleprompterShowcaseInterstitial({
       className='fixed inset-0 z-50 flex items-center justify-center p-4'
       data-testid='teleprompter-showcase-interstitial'
     >
-      <button
+      <PlainButton
         type='button'
         aria-label='Dismiss Teleprompter Preview'
-        className='absolute inset-0 bg-black/55 backdrop-blur-sm'
+        className='absolute inset-0 bg-ink-on-media/55 backdrop-blur-sm'
         onClick={handleDismiss}
       />
       <div
@@ -100,11 +79,10 @@ export function TeleprompterShowcaseInterstitial({
         aria-modal='true'
         aria-labelledby='teleprompter-showcase-title'
         className={cn(
-          'relative z-10',
+          'teleprompter-showcase-surface relative z-10',
           'w-full max-w-lg overflow-hidden rounded-3xl border border-subtle',
           'p-6 text-primary-token sm:p-8'
         )}
-        style={SHOWCASE_SURFACE_STYLE}
       >
         <IconButton
           variant='ghost'
