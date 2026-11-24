@@ -1,9 +1,11 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { CLAIM_TIMEOUT_MS } from '@/components/features/onboarding/useOnboardingClaim';
 import {
-  CLAIM_TIMEOUT_MS,
-  useOnboardingClaim,
-} from '@/components/features/onboarding/useOnboardingClaim';
+  ClaimHarness,
+  jsonResponse,
+  renderClaimHarness,
+} from './useOnboardingClaim.test-harness';
 
 const { replaceMock } = vi.hoisted(() => ({
   replaceMock: vi.fn(),
@@ -22,29 +24,6 @@ vi.mock('@/hooks/useClerkSafe', () => ({
     userId: 'user_dev_creator',
   }),
 }));
-
-function ClaimHarness({
-  trigger,
-  enabled = true,
-}: {
-  readonly trigger: number;
-  readonly enabled?: boolean;
-}) {
-  const status = useOnboardingClaim(trigger, enabled);
-  return <span data-testid='claim-status'>{status}</span>;
-}
-
-function renderClaimHarness(trigger: number) {
-  return <ClaimHarness trigger={trigger} />;
-}
-
-function jsonResponse(body: unknown, init?: ResponseInit) {
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-    ...init,
-  });
-}
 
 describe('useOnboardingClaim', () => {
   it('does not reclaim or redirect a restored account-owned conversation on mount or later turns', async () => {
@@ -453,14 +432,16 @@ describe('useOnboardingClaim', () => {
     await new Promise(resolve => setTimeout(resolve, 50));
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    // Advance to trigger=1 — must fire exactly once.
+    // Advance to trigger=1 — must fire exactly once (after handoff paint deferral).
+    // Status may still read `no-op` from trigger=0 until the deferred pending
+    // flip, so assert the second POST rather than the stale terminal label.
     fetchMock.mockResolvedValue(jsonResponse({ claimed: 1 }));
     rerender(renderClaimHarness(1));
 
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     await waitFor(() =>
       expect(screen.getByTestId('claim-status')).toHaveTextContent('no-op')
     );
-    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('releases inflightTriggersRef when cancelled mid-flight so re-enabling can complete claim', async () => {
@@ -475,7 +456,8 @@ describe('useOnboardingClaim', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const { rerender } = render(<ClaimHarness trigger={0} enabled={true} />);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // ONB-50: fetch starts only after Keep handoff paint deferral.
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
     rerender(<ClaimHarness trigger={0} enabled={false} />);
     resolveFirst(jsonResponse({ claimed: 1 }));
