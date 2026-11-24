@@ -63,6 +63,7 @@
       "canon/outcome-coverage-baseline.json",
       "packages/copy/dead-ends.baseline.json",
       "scripts/invariants/art-direction/accent-pack.baseline.json",
+      "scripts/invariants/card-intent-ratchet.baseline.json",
       "scripts/invariants/duplicate-literals.baseline.json",
       "scripts/invariants/native-spacing-scale.baseline.json",
       "scripts/invariants/shell-ia.baseline.json",
@@ -81,6 +82,7 @@
       "reason": "Not migrated: id-set ratchet (art-direction/ratchet.mjs); resolved ids must be deleted in the same tree. Can fail a combined head.",
       "baselines": [
         "scripts/invariants/art-direction/accent.baseline.json",
+        "scripts/invariants/art-direction/empty-affordance.baseline.json",
         "scripts/invariants/art-direction/hero-scroll.baseline.json",
         "scripts/invariants/art-direction/hue.baseline.json",
         "scripts/invariants/art-direction/imagery-provenance.baseline.json",

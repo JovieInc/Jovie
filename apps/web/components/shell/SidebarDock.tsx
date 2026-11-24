@@ -1,7 +1,7 @@
 'use client';
 
 import { shortTooltipTitle } from '@jovie/copy/tooltip-copy';
-import { ArrowUp, AudioLines, Download } from 'lucide-react';
+import { ArrowUp, Download } from 'lucide-react';
 import {
   type ReactNode,
   useEffect,
@@ -14,7 +14,6 @@ import { banner } from '@/components/feedback/banner-store';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import type { WhatsNewEntry } from '@/lib/whats-new';
 import { InstallBanner } from './InstallBanner';
-import { SidebarBottomNowPlaying } from './SidebarBottomNowPlaying';
 import { DockUpdateCard, DockWhatsNewCard } from './SidebarDockCards';
 
 export interface SidebarDockStatus {
@@ -28,9 +27,6 @@ export interface SidebarDockProps {
   /** The desktop app's one update control; absent in web builds. */
   readonly updateControl?: SidebarDockUpdateControl;
   readonly release?: WhatsNewEntry | null;
-  readonly audio?: React.ComponentProps<typeof SidebarBottomNowPlaying> & {
-    readonly reserved?: boolean;
-  };
   readonly install?: {
     readonly isIOS?: boolean;
     readonly onInstall: () => void;
@@ -61,7 +57,6 @@ export function SidebarDock({
   collapsed = false,
   updateControl,
   release,
-  audio,
   install,
   children,
   onStatusChange,
@@ -131,16 +126,11 @@ export function SidebarDock({
   }, [noticePrefix, hasInstall, collapsed]);
   const selected = (kind: string) =>
     activeNotice?.id === `${noticePrefix}${kind}`;
-  const showAudio = Boolean(audio?.track.trackTitle || audio?.track.artworkUrl);
-  const audioLabel = audio
-    ? `${audio.isPlaying ? 'Playing' : 'Paused'}: ${audio.track.trackTitle ?? 'Audio'}`
-    : '';
   const statusLabels = [
     showUpdate && updateLabel,
     // Tooltip copy rule: a short title only. The story lives on /changelog,
     // which the expanded What's new card links to.
     showRelease && `What's new: ${shortTooltipTitle(release?.title ?? '')}`,
-    showAudio && audioLabel,
     install && 'Install Jovie',
   ].filter(Boolean);
 
@@ -232,9 +222,6 @@ export function SidebarDock({
                   className='size-1.5 rounded-full bg-primary'
                 />
               ) : null}
-              {showAudio ? (
-                <AudioLines data-dock-badge='audio' className='size-2.5' />
-              ) : null}
               {install ? (
                 <Download data-dock-badge='install' className='size-2.5' />
               ) : null}
@@ -272,23 +259,6 @@ export function SidebarDock({
               markSeen();
             }}
           />
-        ) : null}
-        {!collapsed && showAudio && audio ? (
-          <div
-            data-dock-card='now-playing'
-            data-state={audio.reserved ? 'reserved' : 'visible'}
-            aria-hidden={audio.reserved || undefined}
-            inert={audio.reserved || undefined}
-            className={`rounded-md border border-subtle bg-sidebar ${audio.reserved ? 'invisible' : ''}`}
-          >
-            <SidebarBottomNowPlaying
-              {...audio}
-              onDismiss={() => {
-                returnFocus();
-                audio.onDismiss?.();
-              }}
-            />
-          </div>
         ) : null}
         {!collapsed && install && selected('install') ? (
           <div data-dock-card='install'>

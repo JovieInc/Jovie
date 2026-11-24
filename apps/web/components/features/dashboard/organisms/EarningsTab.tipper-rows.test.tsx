@@ -76,11 +76,11 @@ function renderTab() {
 }
 
 describe('EarningsTab tipper rows', () => {
-  it('renders tippers as shared dense people rows', () => {
+  it('renders tippers as shared compact people rows', () => {
     renderTab();
 
     const table = screen.getByRole('table');
-    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+    expect(table).toHaveAttribute('data-table-row-mode', 'compact');
     expect(
       within(table)
         .getAllByRole('columnheader')

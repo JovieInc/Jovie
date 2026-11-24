@@ -57,11 +57,11 @@ export const ListPlacement: Story = {
 export const PartialLabelOnly: Story = {
   args: {
     children: (
-      <Button type='button' variant='secondary' size='icon' aria-label='Inbox'>
+      <Button type='button' variant='secondary' size='icon' aria-label='Home'>
         <Inbox className='size-4' aria-hidden='true' />
       </Button>
     ),
-    label: 'Inbox',
+    label: 'Home',
     side: 'right',
   },
 };

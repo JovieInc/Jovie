@@ -17,7 +17,6 @@ import types
 import time
 import unittest
 from pathlib import Path
-from datetime import datetime
 from types import SimpleNamespace
 from unittest import mock
 
@@ -648,6 +647,15 @@ class JudgeTest(unittest.TestCase):
         stale = {"status": "current", "lastRun": {"status": "ok", "at": doctor.epoch_iso(1_000_000 - 4 * 86400)}}
         self.assertIn("last run 96h ago", judged(stale)["yc-corpus-refresh"])
         self.assertIn("Boom", judged(ycCorpusError="RuntimeError: Boom")["yc-corpus-refresh"])
+
+    def test_a_held_tick_that_never_reaches_the_yc_refresher_still_alerts_from_its_state(self):
+        last = lambda age: {"lastRun": {"status": "ok", "at": doctor.epoch_iso(1_000_000 - age), "failures": []}}
+        held = doctor.judge(obs(ycCorpusState=last(3 * 86400), tick={"at": "x", "error": None, "admissionDenied": "disk-critical"}))
+        self.assertIn("72h ago, skipped while the tick is held (disk-critical)", held["yc-corpus-refresh"])
+        self.assertNotIn("yc-corpus-refresh", doctor.judge(obs(ycCorpusState=last(3600))))
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "yc-corpus.json").write_text(json.dumps({"lastRun": {"at": "t", "failures": list("abcdefg")}}))
+            self.assertEqual(doctor.yc_corpus_observation(Path(tmp))["lastRun"]["failures"], list("abcde"))
 
     def test_repairs_spent_without_work_name_their_infrastructure_causes(self):
         quiet = doctor.judge(obs(noWorkRepairs24h={"target-state-unavailable": doctor.NO_WORK_REPAIR_ALERT - 1}))
@@ -2716,11 +2724,21 @@ class PublishTest(unittest.TestCase):
         self.assertEqual(events({**row, "gateWaitS": 99999}), [events({**row, "gateWaitS": None})[0]])
         self.assertEqual(events({**row, "pr": None}), [])
 
-    def test_a_held_sweep_snapshot_raises_an_alert_per_checkout(self):
-        alerts = doctor.judge(obs(sweepSecretHeld=[{"name": "94af-Jovie", "path": "/w/Jovie",
-                                                     "reason": "secret-finding:trufflehog"}]))
-        self.assertIn("secret-finding:trufflehog", alerts["sweep-snapshot-secret:94af-Jovie"])
-        self.assertFalse([key for key in doctor.judge(obs()) if key.startswith("sweep-snapshot-secret:")])
+    def test_sweep_holds_coalesce_and_leave_non_sweep_linear_lifecycle_unchanged(self):
+        key, old_key = "sweep-snapshot-secret", "sweep-snapshot-secret:old"
+        rows = [{"name": f"checkout-{i}", "path": "/private/root", "reason": "private-detail"} for i in range(150)]
+        alerts = doctor.judge(obs(sweepSecretHeld=rows))
+        self.assertEqual([k for k in alerts if k.startswith(key)], [key])
+        self.assertNotIn("private", alerts[key])
+        baseline, tracker = FakeTracker(), FakeTracker()
+        clean, mixed = {}, {"issues": {old_key: {"id": "legacy", "closedAt": None}}}
+        for i, ordinary in enumerate(({"z": "first", "a": "second"}, {}, {"z": "again"}), 1):
+            events = {k: {"state": "active", "idempotencyKey": k} for k in ordinary}
+            clean = doctor.reconcile(ordinary, clean, baseline, 1000 + i, events)
+            mixed = doctor.reconcile({**ordinary, key: alerts[key], old_key: "legacy"}, mixed, tracker, 1000 + i, events)
+            self.assertNotIn(old_key, mixed["issues"])
+            self.assertEqual(clean["conditions"], mixed["conditions"])
+        self.assertEqual(vars(baseline), vars(tracker))
 
     def test_outcome_verification_is_the_outcome_receipt_stage(self):
         events = doctor.stage_events.events

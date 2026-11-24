@@ -1,16 +1,11 @@
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   downloadingUpdate,
   installDesktopUpdateBridge,
   uninstallDesktopUpdateBridge,
 } from '@/lib/desktop/desktop-updates.test-utils';
+import { renderWithQueryClient as render } from '@/tests/utils/test-utils';
 import { SidebarDockBridge } from './SidebarDockBridge';
 
 vi.mock('./release-sidebar/useTrackAudioSnapshot', () => ({
@@ -20,6 +15,7 @@ vi.mock('./release-sidebar/useTrackAudioSnapshot', () => ({
 }));
 vi.mock('./audio-chrome-state', () => ({
   useAudioChromeSnapshot: () => ({ fullPlayerVisible: false }),
+  useMediaCanvasTransport: () => null,
   requestFullAudioPlayer: vi.fn(),
 }));
 vi.mock('@/lib/desktop/electron-bridge', () => ({

@@ -69,7 +69,7 @@ function snapshot(
 }
 
 describe('companyBlocker', () => {
-  it('names a failing certification step with its consequence', () => {
+  it('attributes a public-profile certification failure without claiming product impact', () => {
     const blocker = companyBlocker(
       snapshot({
         activeConstraint: 'certification:public_profile',
@@ -81,9 +81,23 @@ describe('companyBlocker', () => {
       id: 'certification:public_profile',
       kind: 'certification',
       tone: 'bad',
-      text: 'The public profile fails certification, so no artist can be sent their profile yet',
+      text: 'The latest available public profile certification report shows a failed check. See Certifications for details.',
       detailsHref: APP_ROUTES.ADMIN_CERTIFICATIONS,
       observedAt: '2026-11-08T22:58:00.000Z',
+    });
+  });
+
+  it('keeps unknown profile certification evidence neutral', () => {
+    const blocker = companyBlocker(
+      snapshot({
+        activeConstraint: 'certification:public_profile',
+        cone: { public_profile: 'unknown' },
+      }),
+      NOW
+    );
+    expect(blocker).toMatchObject({
+      tone: 'warn',
+      text: 'Public profile certification is not confirmed. See Certifications for the latest evidence.',
     });
   });
 

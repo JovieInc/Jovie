@@ -68,3 +68,18 @@ export const RtlSelection: Story = {
     },
   ],
 };
+
+/** Partial: user-facing tables omit the row number; only the checkbox shows. */
+export const PartialNoRowNumber: Story = {
+  args: {
+    rowNumber: undefined,
+  },
+  play: async ({ args, canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.queryByText('1')).toBeNull();
+    await userEvent.click(
+      canvas.getByRole('checkbox', { name: 'Select Ada Lovelace' })
+    );
+    await expect(args.onToggle).toHaveBeenCalledTimes(1);
+  },
+};

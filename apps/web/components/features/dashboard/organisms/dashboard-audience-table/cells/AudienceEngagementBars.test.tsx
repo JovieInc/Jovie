@@ -11,7 +11,7 @@ describe('AudienceEngagementBars', () => {
     let litCount = 0;
     for (const bar of lit) {
       expect(bar.className).not.toMatch(/emerald|amber|orange|cyan/);
-      if (bar.className.includes('bg-success/70')) litCount += 1;
+      if (bar.className.includes('bg-success-text')) litCount += 1;
     }
     expect(litCount).toBe(4);
   });
@@ -25,7 +25,7 @@ describe('AudienceEngagementBars', () => {
     for (const bar of screen
       .getByRole('img', { name: 'Engagement 0 of 5' })
       .querySelectorAll('span[aria-hidden="true"]')) {
-      expect(bar.className).not.toContain('bg-success');
+      expect(bar.className).not.toContain('bg-success-text');
     }
   });
 });

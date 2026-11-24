@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
+import { oUpdateSpecs } from '@/lib/ovie/o-updates';
 import { emptyDeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import { OvieHomeCanvas } from './OvieHomeCanvas';
 import { COMPANY_RESPONSES, snapshot } from './OvieHomeCanvas.test-fixtures';
@@ -44,11 +45,12 @@ function renderCanvas() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
+  const view = render(
     <QueryClientProvider client={client}>
       <OvieHomeCanvas />
     </QueryClientProvider>
   );
+  return { ...view, client };
 }
 
 describe('OvieHomeCanvas Story First flat', () => {
@@ -85,9 +87,13 @@ describe('OvieHomeCanvas Story First flat', () => {
     );
     expect(bottleneck).toHaveTextContent('Shipping off target');
 
-    expect(screen.getByTestId('story-first-glance-shipping')).toBeVisible();
-    expect(screen.getByTestId('story-first-glance-revenue')).toBeVisible();
-    expect(screen.getByTestId('story-first-glance-users')).toBeVisible();
+    expect(
+      await screen.findByTestId('story-first-glance-shipping')
+    ).toBeVisible();
+    expect(
+      await screen.findByTestId('story-first-glance-revenue')
+    ).toBeVisible();
+    expect(await screen.findByTestId('story-first-glance-users')).toBeVisible();
 
     expect(screen.getByTestId('story-first-stages')).toBeVisible();
     expect(screen.getByTestId('story-first-stage-investigating')).toBeVisible();
@@ -154,6 +160,8 @@ describe('OvieHomeCanvas Story First flat', () => {
         operationalTasks: {
           ...base.operationalTasks,
           syncState: 'syncing',
+          observedAt: null,
+          lastSyncedAt: null,
           tasks: [],
         },
       };
@@ -176,6 +184,17 @@ describe('OvieHomeCanvas Story First flat', () => {
     await screen.findByTestId('story-first-glance-revenue');
     await vi.waitFor(() => expect(readyTiming).toHaveBeenCalledWith(true));
     expect(panelAlert).not.toHaveBeenCalled();
+  });
+
+  it('opts the glance query in to the O update reveal through meta only', async () => {
+    const { client } = renderCanvas();
+    await screen.findByTestId('story-first-glance-revenue');
+    const query = client
+      .getQueryCache()
+      .find({ queryKey: ['ovie', 'home', 'company'] });
+    expect(oUpdateSpecs(query?.meta).map(spec => spec.key)).toEqual([
+      'ovie.home-glance',
+    ]);
   });
 
   it('keeps reconciled tasks visible when a later shipping read fails', async () => {
@@ -240,11 +259,10 @@ describe('OvieHomeCanvas Story First flat', () => {
       operationalTasks: { ...snapshot().operationalTasks, tasks: [] },
     };
     renderCanvas();
-    await screen.findByTestId('story-first-glance-shipping');
+    await waitFor(() => {
+      expect(screen.queryByTestId('story-first-glance-shipping')).toBeNull();
+    });
+    expect(screen.getByText('Some signals are still syncing.')).toBeVisible();
     expect(screen.queryByTestId('home-loop-tile-runway')).toBeNull();
-    expect(screen.getByTestId('story-first-glance-shipping')).toHaveAttribute(
-      'data-tone',
-      'neutral'
-    );
   });
 });

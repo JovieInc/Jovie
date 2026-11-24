@@ -193,7 +193,6 @@ const baseConfig = {
         ],
       },
     ],
-
     // NOTE: Using import/no-duplicates only (has auto-fix), removed redundant no-duplicate-imports
     'import/no-duplicates': 'error',
     'import/no-cycle': 'error',
@@ -356,6 +355,8 @@ module.exports = [
       'components/atoms/AvatarUploadOverlay.tsx',
       'components/atoms/ReleaseArtworkThumb.tsx',
       'components/atoms/AnimatedIconSwap.tsx', // hooks predate the rule (JOV-14411)
+      'components/atoms/SwipeToReveal.tsx',
+      'components/atoms/SeekBar.tsx', // hooks predate (JOV-14715/14729)
     ],
     rules: {
       'no-restricted-syntax': [

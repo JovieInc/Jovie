@@ -10,6 +10,7 @@ import {
   incrementMerchCardView,
 } from '@/lib/merch/service';
 import { scheduleAfter } from '@/lib/next/schedule-after';
+import { getPublicProfileRobots } from '@/lib/profile/public-profile-indexing-policy';
 import { generateMerchStructuredData } from '@/lib/seo/structured-data';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import { uuidSchema } from '@/lib/validation/schemas/base';
@@ -87,6 +88,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         description,
         images: card.primaryImageUrl ? [{ url: card.primaryImageUrl }] : [],
       },
+      // Same indexing policy as the artist's profile, so a reserved or
+      // fixture handle's merch page stays out of search too.
+      robots: getPublicProfileRobots(profile.username, profile.displayName),
     };
   } catch {
     return {

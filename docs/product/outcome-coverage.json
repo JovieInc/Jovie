@@ -146,8 +146,14 @@
         "apps/web/app/app/(shell)/dashboard/releases/actions.ts#createRelease"
       ],
       "chatTools": [],
-      "checks": [],
-      "gap": "Slice 2: create a release as a test account, follow its smart link, delete it."
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/release-create-outcome.test.ts",
+          "runs": "merge",
+          "test": "the Releases form path writes the same way, and a repeated title gets its own smart link"
+        }
+      ],
+      "note": "Real database write read back through the smart link lookup; the public release page render is not asserted."
     },
     {
       "id": "account-email",
@@ -251,12 +257,17 @@
     },
     {
       "id": "chat-release",
-      "label": "Chat: set up a release or pitch it",
+      "label": "Chat: set up a release",
       "core": true,
       "entryPoints": [],
-      "chatTools": ["createRelease", "generateReleasePitch"],
-      "checks": [],
-      "gap": "Schema tests only; the pitch spec asserts a reply appears."
+      "chatTools": ["createRelease"],
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/release-create-outcome.test.ts",
+          "runs": "merge",
+          "test": "chat createRelease stores a release that its smart link resolves"
+        }
+      ]
     },
     {
       "id": "chat-task",
@@ -264,15 +275,21 @@
       "core": true,
       "entryPoints": [],
       "chatTools": ["manageTasks"],
-      "checks": [],
-      "gap": "Unit test with createTask mocked."
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/chat-task-outcome.test.ts",
+          "test": "chat manageTasks create writes a task row for the artist",
+          "runs": "merge"
+        }
+      ]
     },
     {
       "id": "chat-creative",
-      "label": "Chat: album art, retouch, promo and canvas",
+      "label": "Chat: album art, retouch, pitch, promo and canvas",
       "core": true,
       "entryPoints": [],
       "chatTools": [
+        "generateReleasePitch",
         "generateAlbumArt",
         "retouchImage",
         "voicePromo",
@@ -282,7 +299,7 @@
         "proposeVideoRecording"
       ],
       "checks": [],
-      "gap": "Schema tests only."
+      "gap": "Schema tests only; the pitch spec asserts a reply appears."
     },
     {
       "id": "chat-account",

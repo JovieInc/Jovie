@@ -20,4 +20,38 @@ describe('AudienceRowSelectionCell', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Select Ada' }));
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
+
+  it('shows the row number only when one is given', () => {
+    const { container, rerender } = render(
+      <AudienceRowSelectionCell
+        rowNumber={7}
+        isChecked={false}
+        displayName='Ada'
+        onToggle={vi.fn()}
+      />
+    );
+    expect(screen.getByText('7')).toBeInTheDocument();
+
+    rerender(
+      <AudienceRowSelectionCell
+        isChecked={false}
+        displayName='Ada'
+        onToggle={vi.fn()}
+      />
+    );
+    expect(screen.queryByText('7')).not.toBeInTheDocument();
+    expect(container.querySelector('.tabular-nums')).toBeNull();
+    expect(screen.getByRole('checkbox', { name: 'Select Ada' })).toBeVisible();
+  });
+
+  it('reveals the checkbox on keyboard focus without a row number', () => {
+    const { container } = render(
+      <AudienceRowSelectionCell
+        isChecked={false}
+        displayName='Ada'
+        onToggle={vi.fn()}
+      />
+    );
+    expect(container.innerHTML).toContain('focus-within:opacity-100');
+  });
 });

@@ -54,7 +54,8 @@ describe('Logo', () => {
     expect(icon).toHaveAttribute('width', '32');
     expect(icon).toHaveAttribute('height', '32');
     expect(icon.parentElement).toHaveAttribute('data-brand-mark-size', '32');
-    expect(icon.parentElement).toHaveClass('text-muted-foreground/50');
+    expect(icon.parentElement).toHaveClass('text-logo-muted');
+    expect(icon.parentElement).toHaveClass('dark:text-quaternary-token');
   });
 
   it('paints the white tone with the on-media token in both themes', async () => {

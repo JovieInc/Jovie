@@ -27,7 +27,6 @@ describe('presence loading skeleton System B source contract', () => {
     for (const className of [
       'bg-base',
       'border-subtle',
-      'bg-surface-0',
       'animate-pulse',
       'h-full',
       'min-h-0',
@@ -35,6 +34,11 @@ describe('presence loading skeleton System B source contract', () => {
     ]) {
       expect(source).toContain(className);
     }
+
+    // Card intent contract (.claude/rules/ui.md): loading states sit flat, so the
+    // placeholder tiles carry no card fill, border or radius of their own.
+    expect(source).not.toMatch(/\bbg-surface-[0-9]\b/);
+    expect(source).not.toMatch(/rounded-(?:lg|xl|2xl)\s+border\b/);
 
     expect(source).toContain("data-testid='presence-loading-skeleton'");
     expect(source).toContain("const CARD_KEYS = ['a', 'b', 'c'] as const");

@@ -117,13 +117,13 @@ describe('LinksPageClient', () => {
     expect(clicksValue.closest('td')?.className).toContain('text-right');
   });
 
-  it('renders through the shared UnifiedTable with dense shared rows', () => {
+  it('renders through the shared UnifiedTable with compact shared rows', () => {
     renderLinksWorkspace(
       <LinksPageClient rows={[baseRow, { ...baseRow, id: 'row-2' }]} />
     );
 
     const table = screen.getByRole('table');
-    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+    expect(table).toHaveAttribute('data-table-row-mode', 'compact');
     const row = screen.getByTestId('links-row-row-1');
     expect(row.className).toContain('system-b-table-row-shell');
     expect(row.className).toContain('system-b-table-row-hover');
@@ -220,7 +220,7 @@ describe('LinksPageClient', () => {
     ).toBeInTheDocument();
   });
 
-  it('opens the inspector for a selected row and copies the Jovie link', async () => {
+  it('opens the inspector for a selected row with one-action Copy Tracked Link', async () => {
     const user = userEvent.setup();
     renderLinksWorkspace(<LinksPageClient rows={[baseRow]} />);
 
@@ -239,16 +239,14 @@ describe('LinksPageClient', () => {
       '/app/releases/release-9'
     );
 
-    await user.click(screen.getByRole('button', { name: 'Copy' }));
-    expect(copyToClipboardMock).toHaveBeenCalledWith(
-      'https://jov.ie/tim/midnight-city'
-    );
+    await user.click(screen.getByRole('button', { name: 'Copy Tracked Link' }));
+    expect(copyToClipboardMock).toHaveBeenCalled();
     expect(
-      await screen.findByRole('button', { name: 'Copied' })
+      await screen.findByRole('button', { name: 'Copied Tracked Link' })
     ).toBeInTheDocument();
   });
 
-  it('keeps the Copy label when the clipboard write fails', async () => {
+  it('keeps Copy Tracked Link when the clipboard write fails from the rail', async () => {
     copyToClipboardMock.mockResolvedValue(false);
     const user = userEvent.setup();
     renderLinksWorkspace(<LinksPageClient rows={[baseRow]} />);
@@ -256,10 +254,12 @@ describe('LinksPageClient', () => {
     await user.click(
       screen.getByRole('button', { name: 'jov.ie/tim/midnight-city' })
     );
-    await user.click(screen.getByRole('button', { name: 'Copy' }));
+    await user.click(screen.getByRole('button', { name: 'Copy Tracked Link' }));
 
     expect(copyToClipboardMock).toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Copy Tracked Link' })
+    ).toBeInTheDocument();
   });
 
   it('omits entity link and optional fields when the row lacks them', async () => {

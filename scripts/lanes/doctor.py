@@ -56,6 +56,7 @@ import stage_events  # noqa: E402  (jovie-stage-event/v1 rows for the stage coll
 import ledger_archive  # noqa: E402  (bounded runs/ledger.jsonl)
 import throughput_sentinel  # noqa: E402
 import health_checks  # noqa: E402  (source certification and release health providers)
+import doctor_sweep_hold  # noqa: E402
 import credentials_spend  # noqa: E402  (shared redacted Linear app metadata)
 import integration_probes  # noqa: E402  (synthetic probes of the Gem integrations fleet work depends on)
 import repo_headroom  # noqa: E402  (tracked-bytes headroom of origin/main)
@@ -636,6 +637,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "rejectedIssues": dict(sorted(rejected_issues.items())[:20]),
         "designGate": design_census,
         "fileOverlap": file_overlap.doctor_view(state),
+        "ycCorpusState": yc_corpus_observation(state),
         **automation_observation(host, lane, now),
         "outcomeQueue": read_json(state / "outcome-queue.json", {}),
         "integrationProbes": integration_probes.observe(state, lane.HOST, now),
@@ -663,8 +665,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "diskFreePct": disk_pct,
         "diskMounts": disk_mounts,
         "repoHeadroom": repo_headroom.measure(host.repo) if getattr(host, "repo", None) else None,
-        "sweepSecretHeld": [row for row in (read_json(state / "worktree-sweep.json", {}).get("secretHeld") or [])
-                            if isinstance(row, dict) and row.get("path") and Path(row["path"]).exists()],
+        **doctor_sweep_hold.observe(state),
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
         "heldByReason": pr_events.by_reason(held, open_numbers),
         "reconcile": read_json(state / "reconcile.json", {}),
@@ -1157,7 +1158,17 @@ INSTALL_LAG_ALERT_S = 90 * 60
 # Gem sat three days on one release while `install-lag` stayed a degraded alert nobody acted on).
 INSTALL_LAG_P0_S = 2 * 3600
 # The YC corpus refresh is daily; three days without a finished run is a broken loop (JOV-14457).
-YC_CORPUS_STALE_S = 3 * 24 * 3600
+YC_CORPUS_STALE_S = 50 * 3600  # a daily refresh that missed two runs
+
+
+def yc_corpus_observation(state: Path) -> dict | None:
+    """The YC refresher's own state file, so a tick that never reached it still shows its age."""
+    data = read_json(state / "yc-corpus.json", None)
+    if not isinstance(data, dict):
+        return None
+    last = data.get("lastRun") if isinstance(data.get("lastRun"), dict) else {}
+    return {"lastRun": {"status": last.get("status"), "at": last.get("at"),
+                        "failures": list(last.get("failures") or [])[:5]}}
 
 
 def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
@@ -1166,14 +1177,20 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     tick = obs.get("tick") or {}
     if tick.get("error"):
         alerts["tick-error"] = f"last dispatch tick failed: {tick['error'][:140]}"
-    yc, yc_last = tick.get("ycCorpus") or {}, (tick.get("ycCorpus") or {}).get("lastRun") or {}
+    # The tick reaches the YC refresher last, so a held tick (disk admission, code-prep error)
+    # skips it; the refresher's own state file still shows how long it has been (JOV-14457).
+    yc, yc_file = tick.get("ycCorpus") or {}, obs.get("ycCorpusState") or {}
+    yc_last = yc.get("lastRun") or yc_file.get("lastRun") or {}
     yc_broken = [failure for failure in yc_last.get("failures") or []  # page fetch misses retry next run
                  if failure.startswith(("discovery:", "spawn:")) or "gbrain" in failure]
-    yc_age = age_s(yc_last.get("at"), obs["now"]) if yc.get("status") in {"current", "scheduled"} else None
+    yc_watched = yc.get("status") in {"current", "scheduled"} or (not yc and bool(yc_file))
+    yc_age = age_s(yc_last.get("at"), obs["now"]) if yc_watched else None
     if tick.get("ycCorpusError") or yc_broken or (yc_age or 0) > YC_CORPUS_STALE_S:
+        held = tick.get("admissionDenied") or tick.get("error")
         alerts["yc-corpus-refresh"] = ("YC knowledge refresh into GBrain is failing: " +
                                        (tick.get("ycCorpusError") or "; ".join(yc_broken) or
-                                        f"last run {int(yc_age // 3600)}h ago"))[:200]
+                                        f"last run {int(yc_age // 3600)}h ago" +
+                                        (f", skipped while the tick is held ({str(held)[:80]})" if not yc and held else "")))[:200]
     if tick.get("uncleanPreviousRun"):
         # A run-intent marker survived its own tick: that tick was killed (crash, SIGKILL,
         # power loss). Its bounded recovery already refunded stranded fix-attempt charges.
@@ -1438,11 +1455,8 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                                           "infrastructure, not the PRs, is exhausting them")
     # No design-brief-stale alert: since 2026-10-11 no issue is held for a brief (the
     # claiming run writes it), so a held brief is no longer a condition to watch.
-    for row in obs.get("sweepSecretHeld") or []:
-        # The public repo's refs/jovie-preserved/* must never carry a secret; the checkout is kept.
-        alerts[f"sweep-snapshot-secret:{row.get('name')}"] = (
-            f"worktree sweep did not publish a snapshot of {row.get('path')}: {row.get('reason')}; "
-            "the checkout is kept untouched until its owner reviews it")
+    if hold := doctor_sweep_hold.alert(obs, previous):
+        alerts[doctor_sweep_hold.KEY] = hold
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
         alerts["disk-critical"] = (f"lanes disk {obs['diskFreePct']}% free ({_lowest_mount(obs)}) even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
@@ -1542,7 +1556,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
 
     Evidence timestamps use the observation COMPLETION stamp (obs['observationCompletedAt'])
     so a report's freshness is its delivery lag, not the pass's own runtime."""
-    prior = previous.get("conditions") or {}
+    prior = doctor_sweep_hold.without_legacy(previous.get("conditions") or {})
     receipts: dict[str, dict] = {}
     now = float(obs["now"])
     # Report freshness measures delivery lag from completed observation.
@@ -2011,10 +2025,14 @@ def alert_issue_gaps(alerts: dict, issues: dict, now: float, grace_s: int = ALER
 
 
 def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, now: float,
-              conditions: dict[str, dict] | None = None) -> dict:
+              conditions: dict[str, dict] | None = None, *, sweep_delivery=None) -> dict:
     """Carry issue ids across ticks; acknowledge remote transitions before advancing receipts."""
-    issues = {key: dict(entry) for key, entry in previous.get("issues", {}).items()}
+    alerts = doctor_sweep_hold.without_legacy(alerts)
+    issues = {key: dict(entry) for key, entry in doctor_sweep_hold.without_legacy(previous.get("issues", {})).items()}
+    sweep_key = doctor_sweep_hold.KEY
     for key, text in alerts.items():
+        if key == sweep_key:
+            continue
         entry = issues.get(key)
         if entry and entry.get("closedAt") is None and entry.get("id") and not entry.get("pendingAction"):
             continue  # still open
@@ -2050,14 +2068,18 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
             if contradict:
                 contradict(conditions[key])
     for key, entry in issues.items():
-        if key not in alerts and (entry.get("closedAt") is None or entry.get("pendingAction")):
+        if key != sweep_key and key not in alerts and (entry.get("closedAt") is None or entry.get("pendingAction")):
             if not entry.get("id") or (tracker and tracker.close(entry["id"], key) is True):
                 entry["closedAt"] = now
                 entry.pop("pendingAction", None)
             else:
                 entry["pendingAction"] = "close"
+    # Sweep status is informational; never delay ordinary create/reopen/close side effects.
+    sweep_entry = doctor_sweep_hold.reconcile(alerts.get(sweep_key), issues.get(sweep_key), now, sweep_delivery)
+    if sweep_entry:
+        issues[sweep_key] = sweep_entry
     receipts = {}
-    for key, event in (conditions or {}).items():
+    for key, event in doctor_sweep_hold.without_legacy(conditions or {}).items():
         prior_event = (previous.get("conditions") or {}).get(key) or {}
         if (not event.get("writingReview") and prior_event.get("writingReview")
                 and prior_event.get("idempotencyKey") == event.get("idempotencyKey")):
@@ -2523,7 +2545,7 @@ def locked_doctor_write(state: Path, write) -> None:
 
 def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     path = host.state / "doctor.json"
-    previous = read_json(path, {})
+    previous = doctor_sweep_hold.migrate(read_json(path, {}))
     rotation = None
     if not os.environ.get("LANES_SELFTEST") and ledger_archive.due(host.state, time.time()):
         try:
@@ -2564,7 +2586,11 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
             tracker = Tracker(lane.Linear(host.linear_env), lane.HOST)
         except Exception:
             tracker = None
-    result = reconcile(alerts, previous, tracker, obs["now"], conditions)
+    linear = getattr(tracker, "linear", None)
+    def sweep_delivery(text):
+        return doctor_sweep_hold.note(linear, lane.HOST, host.state, time.time(), text,
+                                      doctor_sweep_hold.names(obs.get("sweepSecretHeld")))
+    result = reconcile(alerts, previous, tracker, obs["now"], conditions, sweep_delivery=sweep_delivery)
     try:  # incident stage events (detected, filed, cleared); a lost row only drops a sample
         stage_events.journal_incidents(host.state, previous, result, lane.HOST, obs["now"])
     except Exception:  # noqa: BLE001

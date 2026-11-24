@@ -4,7 +4,7 @@
     "profile-hero-desktop": {
       "width": 1640,
       "height": 1172,
-      "sourceHash": "80c664e30199ec9c2acfaef90b614370747ebdecc2c1799a997dcf6d09d44cdb",
+      "sourceHash": "6560b91cb9ffa643fc7d93a32b069917db940b51c6c5e818f7487c308b2567eb",
       "specHash": "431d2bbda1f7a334f405179ebdc85d1f63359bf2683879cf776aa248037d998c",
       "renderedAt": "2026-11-05T21:47:18.256Z",
       "sources": [
@@ -72,7 +72,7 @@
     "setup-share-profile": {
       "width": 764,
       "height": 568,
-      "sourceHash": "4f003ca3e22fac7127329a0b2742a483a9b7a4001f4d0842dcebca98e9f3fcf1",
+      "sourceHash": "2f331c43fa9416f4a8be898b9637e4216e37c077314edb4b3352b469284d3168",
       "specHash": "b5e7b8c2e7283ac396ec5dfc619fad20ad240bb90a4f1c4cd23a2ef7f9d8b881",
       "renderedAt": "2026-11-17T03:01:03.193Z",
       "sources": [

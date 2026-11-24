@@ -208,15 +208,12 @@ function getInitialModeFromLocation(
   return modeParam === null ? fallbackMode : getProfileMode(modeParam);
 }
 
+// First client render matches the server; both sync in an effect post-hydration.
 function getInitialDrawerPresentation(): ProfileSurfacePresentation {
-  // Keep the first client render identical to the server render. The responsive
-  // presentation is synced in an effect immediately after hydration.
   return 'standalone';
 }
 
 function getInitialIsDesktopLayout(): boolean {
-  // Keep the first client render identical to the server render. The responsive
-  // layout is synced in an effect immediately after hydration.
   return false;
 }
 
@@ -353,6 +350,7 @@ export function ProfileCompactTemplate({
   useCanonicalProfileMode(requestedMode, setRequestedMode, tourDates.length);
   // Strip detector wake for the history effect below (see the effect).
   const [historyWakeTick, setHistoryWakeTick] = useState(0);
+  const desktopMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const revealNotificationsRef = useRef<(() => void) | null>(null);
   const closeResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const drawerOpenRef = useRef(initialDrawerView !== null);
@@ -1258,6 +1256,7 @@ export function ProfileCompactTemplate({
               <ProfileDesktopSurface
                 presentation='embedded'
                 overlaysEnabled={isDesktopLayout}
+                menuButtonRef={desktopMenuButtonRef}
                 onReady={handleDesktopSurfaceReady}
                 artist={artist}
                 socialLinks={socialLinks}
@@ -1308,6 +1307,7 @@ export function ProfileCompactTemplate({
                 onOpenChange={setCreditsOpen}
                 credits={visibleReleaseCredits}
                 presentation='embedded'
+                anchorRef={desktopMenuButtonRef}
               />
             </div>
           ) : null

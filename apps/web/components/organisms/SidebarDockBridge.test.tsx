@@ -1,10 +1,4 @@
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   installDesktopUpdateBridge,
@@ -12,6 +6,7 @@ import {
 } from '@/lib/desktop/desktop-updates.test-utils';
 import { WHATS_NEW_PATH } from '@/lib/whats-new';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { renderWithQueryClient as render } from '@/tests/utils/test-utils';
 import { SidebarDockBridge } from './SidebarDockBridge';
 
 const mocks = vi.hoisted(() => ({
@@ -33,9 +28,14 @@ vi.mock('./release-sidebar/useTrackAudioSnapshot', () => ({
     toggleTrack: mocks.toggleTrack,
   }),
 }));
+const expandPlayer = vi.hoisted(() => vi.fn());
 vi.mock('./audio-chrome-state', () => ({
-  useAudioChromeSnapshot: () => ({ fullPlayerVisible: false }),
-  requestFullAudioPlayer: vi.fn(),
+  useAudioChromeSnapshot: () => ({
+    activeTrackId: null,
+    fullPlayerVisible: false,
+  }),
+  useMediaCanvasTransport: () => null,
+  requestFullAudioPlayer: expandPlayer,
 }));
 vi.mock('@/lib/desktop/electron-bridge', () => ({
   isElectronRuntime: () => false,
@@ -94,13 +94,17 @@ it('queues the newest release behind the updater while preserving audio actions'
     await screen.findByRole('button', { name: 'Download update' })
   ).toBeVisible();
   expect(bridge.download).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
+  // The O is the transport: one press toggles, and no dock card shows audio.
+  expect(document.querySelector('[data-dock-card="now-playing"]')).toBeNull();
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Pause Never Say A Word' })
+  );
   expect(mocks.toggleTrack).toHaveBeenCalledWith({
     id: 'track',
     title: 'Never Say A Word',
   });
-  fireEvent.click(screen.getByRole('button', { name: 'Dismiss Player' }));
-  expect(mocks.stop).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole('button', { name: /Show Player/ }));
+  expect(expandPlayer).toHaveBeenCalledOnce();
   act(() => emit({ state: 'not-available' }));
   expect(await screen.findByRole('link', releaseLink)).toHaveAttribute(
     'href',
