@@ -140,12 +140,11 @@ describe('lanes coverage matrix legs', () => {
       expect(command).toContain('coverage combine');
       expect(command).not.toContain('--fail-under');
     }
-    expect(LANES_COVERAGE_GROUP_COMMANDS.ab).toContain(
-      'jovie-lanes-ab.coverage'
-    );
-    expect(LANES_COVERAGE_GROUP_COMMANDS.cd).toContain(
-      'jovie-lanes-cd.coverage'
-    );
+    for (const group of Object.keys(LANES_COVERAGE_GROUP_SHARDS)) {
+      expect(LANES_COVERAGE_GROUP_COMMANDS[group]).toContain(
+        `jovie-lanes-${group}.coverage`
+      );
+    }
   });
 
   it('keeps the shared export as the single source for the combined report', () => {
@@ -162,7 +161,7 @@ describe('lanes coverage matrix legs', () => {
     vi.stubEnv('GITHUB_EVENT_NAME', 'pull_request');
     vi.stubEnv('CI_PRODUCT_LANES', 'web');
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
-    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:ab');
+    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:a');
     const started = [];
     const result = await runStructural({
       changedFileList: ['apps/web/components/features/profile/Foo.tsx'],
@@ -180,7 +179,7 @@ describe('lanes coverage matrix legs', () => {
       vi.stubEnv('GITHUB_EVENT_NAME', 'pull_request');
       vi.stubEnv('CI_PRODUCT_LANES', productLanes);
       vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
-      vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:cd');
+      vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:c');
       const started = [];
       const result = await runStructural({
         changedFileList: ['apps/web/components/features/profile/Foo.tsx'],
@@ -189,7 +188,7 @@ describe('lanes coverage matrix legs', () => {
           return { code: 0, output: '' };
         },
       });
-      expect(started).toEqual([LANES_COVERAGE_GROUP_COMMANDS.cd]);
+      expect(started).toEqual([LANES_COVERAGE_GROUP_COMMANDS.c]);
       expect(result.skipped).not.toBe(true);
       vi.unstubAllEnvs();
     }
@@ -199,7 +198,7 @@ describe('lanes coverage matrix legs', () => {
     vi.stubEnv('GITHUB_EVENT_NAME', 'merge_group');
     vi.stubEnv('CI_PRODUCT_LANES', 'none');
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
-    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:ab');
+    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:a');
     const started = [];
     const skipped = await runStructural({
       changedFileList: [],
@@ -221,7 +220,7 @@ describe('lanes coverage matrix legs', () => {
     // green). Same pin every sibling test in this file uses.
     vi.stubEnv('CI_PRODUCT_LANES', 'operations');
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
-    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:ab');
+    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:a');
     const dispatched = [];
     await runStructural({
       execute: command => {
@@ -229,7 +228,7 @@ describe('lanes coverage matrix legs', () => {
         return { code: 0, output: '' };
       },
     });
-    expect(dispatched).toEqual([LANES_COVERAGE_GROUP_COMMANDS.ab]);
+    expect(dispatched).toEqual([LANES_COVERAGE_GROUP_COMMANDS.a]);
   });
 
   it('gates evidence on the runner receipt, never a recomputed selection', () => {

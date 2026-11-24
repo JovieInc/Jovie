@@ -1,12 +1,14 @@
 /**
- * ci-fast (structural lanes) runs as two matrix legs on separate runners: leg
- * ab runs shards a+b, leg cd runs c+d, and each combines its pair into
- * jovie-lanes-<group>.coverage for the lanes-coverage report job, which merges
- * both and enforces the unchanged per-module floors on the full suite.
+ * ci-fast (structural lanes) runs as four matrix legs on separate runners
+ * (Wave 2): each leg runs one pytest shard a|b|c|d into
+ * jovie-lanes-<group>.coverage; the lanes-coverage report job merges all four
+ * and enforces the unchanged per-module floors on the full suite.
  */
 export const LANES_COVERAGE_GROUP_SHARDS = Object.freeze({
-  ab: Object.freeze(['a', 'b']),
-  cd: Object.freeze(['c', 'd']),
+  a: Object.freeze(['a']),
+  b: Object.freeze(['b']),
+  c: Object.freeze(['c']),
+  d: Object.freeze(['d']),
 });
 export const lanesCoverageGroupCommands = (allShards, run, wrap) =>
   Object.freeze(

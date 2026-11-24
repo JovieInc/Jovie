@@ -11,7 +11,10 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { load as loadYaml } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
-import { LANES_COVERAGE_FLOORS } from '../../ci-fast-lanes.mjs';
+import {
+  LANES_COVERAGE_FLOORS,
+  LANES_COVERAGE_GROUP_SHARDS,
+} from '../../ci-fast-lanes.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const WORKFLOW = readFileSync(
@@ -50,7 +53,7 @@ const PAIRS = [
     worker: 'ci-fast-structural-lanes-shards',
     faninName: 'ci-fast (structural lanes)',
     workerName: 'ci-fast (structural lanes shard ${{ matrix.group }})',
-    matrix: { group: ['ab', 'cd'] },
+    matrix: { group: ['a', 'b', 'c', 'd'] },
   },
 ];
 const ALLOWED_RUNNERS = new Set([
@@ -199,13 +202,12 @@ describe('ci-fast shard fan-in contracts', () => {
         'Require complete lanes coverage evidence'
       );
       const output = join(root, 'output');
-      const set = (ab, cd, missing) => {
+      const groups = Object.keys(LANES_COVERAGE_GROUP_SHARDS);
+      const set = (statuses, missing) => {
         rmSync(join(root, 'lanes-coverage'), { recursive: true, force: true });
         writeFileSync(output, '');
-        for (const [group, status] of [
-          ['ab', ab],
-          ['cd', cd],
-        ]) {
+        for (const group of groups) {
+          const status = statuses[group];
           const dir = join(root, 'lanes-coverage', group);
           mkdirSync(dir, { recursive: true });
           if (status)
@@ -218,19 +220,22 @@ describe('ci-fast shard fan-in contracts', () => {
         }
         return run(code, { RUNNER_TEMP: root, GITHUB_OUTPUT: output });
       };
-      expect(set('success', 'success').status).toBe(0);
+      const all = status => Object.fromEntries(groups.map(g => [g, status]));
+      expect(set(all('success')).status).toBe(0);
       expect(readFileSync(output, 'utf8')).toBe('ran=true\n');
-      expect(set('skipped', 'skipped').status).toBe(0);
+      expect(set(all('skipped')).status).toBe(0);
       expect(readFileSync(output, 'utf8')).toBe('ran=false\n');
-      for (const values of [
-        ['success', 'skipped'],
-        ['success', 'failure'],
-        ['success', 'cancelled'],
-        ['success', ''],
-        ['success', 'success', 'ab'],
-        ['', ''],
-      ]) {
-        expect(set(...values).status, values.join(',')).not.toBe(0);
+      /** @type {Array<[string, Record<string, string>, string?]>} */
+      const rejectCases = [
+        ['mixed-skip', { ...all('success'), a: 'skipped' }],
+        ['mixed-failure', { ...all('success'), b: 'failure' }],
+        ['mixed-cancelled', { ...all('success'), c: 'cancelled' }],
+        ['mixed-empty', { ...all('success'), d: '' }],
+        ['missing-data', all('success'), 'a'],
+        ['all-empty', all('')],
+      ];
+      for (const [label, statuses, missing] of rejectCases) {
+        expect(set(statuses, missing).status, label).not.toBe(0);
       }
       const collect = script(
         'ci-fast-structural-lanes-shards',
@@ -238,11 +243,11 @@ describe('ci-fast shard fan-in contracts', () => {
       );
       // A decision skip needs no runner receipt; a selected suite must supply it.
       expect(
-        run(collect, { RUNNER_TEMP: root, GROUP: 'ab', DECISION_SKIP: 'true' })
+        run(collect, { RUNNER_TEMP: root, GROUP: 'a', DECISION_SKIP: 'true' })
           .status
       ).toBe(0);
       expect(
-        run(collect, { RUNNER_TEMP: root, GROUP: 'ab', DECISION_SKIP: 'false' })
+        run(collect, { RUNNER_TEMP: root, GROUP: 'a', DECISION_SKIP: 'false' })
           .status
       ).not.toBe(0);
     } finally {
@@ -250,7 +255,7 @@ describe('ci-fast shard fan-in contracts', () => {
     }
   });
 
-  it('combines both branch maps before all 26 authoritative floors and propagates report failure', () => {
+  it('combines all lane group maps before all 26 authoritative floors and propagates report failure', () => {
     const root = mkdtempSync(join(tmpdir(), 'lanes-fanin-floors-'));
     try {
       const python = join(root, 'python3');
@@ -280,8 +285,10 @@ describe('ci-fast shard fan-in contracts', () => {
         '-m',
         'coverage',
         'combine',
-        `${root}/lanes-coverage/ab/jovie-lanes-ab.coverage`,
-        `${root}/lanes-coverage/cd/jovie-lanes-cd.coverage`,
+        ...Object.keys(LANES_COVERAGE_GROUP_SHARDS).map(
+          group =>
+            `${root}/lanes-coverage/${group}/jovie-lanes-${group}.coverage`
+        ),
       ]);
       expect(invoked.slice(1).map(call => call.args)).toEqual(
         LANES_COVERAGE_FLOORS.map(({ include, floor }) => [
