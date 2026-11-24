@@ -27,6 +27,23 @@ describe('ProfileDrawerShell', () => {
     }
   );
 
+  it('places the embedded card in a declared sheet lane it spans', () => {
+    render(
+      <ProfileDrawerShell
+        open
+        onOpenChange={vi.fn()}
+        title='Menu'
+        presentation='embedded'
+        dataTestId='profile-drawer'
+      >
+        <p>Share Profile</p>
+      </ProfileDrawerShell>
+    );
+    const card = screen.getByTestId('profile-drawer');
+    expect(card.parentElement).toHaveAttribute('data-sheet-container');
+    expect(card).toHaveClass('w-full');
+  });
+
   it('has no axe violations with a long truncated title', async () => {
     const title =
       'A very long drawer title that should truncate cleanly across the header';
