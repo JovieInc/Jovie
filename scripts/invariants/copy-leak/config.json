@@ -48,7 +48,6 @@
     { "path": "apps/web/app/[username]/[slug]/sounds/page.tsx", "rules": { "writer-imperative": ["a4932ff20a600dec"] }, "reason": "Exact product action, setting label, song title, or customer message; directs the product user, not a copy writer." },
     { "path": "apps/web/app/a/[handle]/[slug]/page.tsx", "rules": { "coming-soon": ["e4482fa8818d49d3"] }, "reason": "Truthful unreleased music or unavailable capability state; never claims that a shipped offer is available." },
     { "path": "apps/web/app/api/chat/route.ts", "rules": { "instruction": ["1d055df30dadba63", "bba881da1aa29042"] }, "reason": "Exact model-only prompt or tool description; not a rendered response." },
-    { "path": "apps/web/app/api/chat/route.ts", "rules": { "unresolved-prompt": ["cecc4dbe75940d97"] }, "reason": "Exact schema/selector/serialization or diagnostic syntax reviewed in source; not a copy prompt." },
     { "path": "apps/web/app/api/connectors/spotify/callback/route.ts", "rules": { "unresolved-prompt": ["e54b74eb9192b480"] }, "reason": "Exact diagnostic tag, redaction marker, schema path or security literal; not an authoring prompt." },
     { "path": "apps/web/app/api/connectors/youtube/callback/route.ts", "rules": { "unresolved-prompt": ["e54b74eb9192b480"] }, "reason": "Exact diagnostic tag, redaction marker, schema path or security literal; not an authoring prompt." },
     { "path": "apps/web/app/api/cron/pixel-forwarding/route.ts", "rules": { "punctuation": ["7b8b97ca9158a4eb"] }, "reason": "Exact SQL cast, IPv6/delimiter, route regex, diagnostic syntax, or urgent-priority glyph; not punctuation in prose." },
@@ -208,6 +207,7 @@
     { "path": "apps/web/lib/chat/prompt-disclosure-guard.ts", "rules": { "markdown": ["cb8854fee6ea46cf", "e10cd96c11979e3f"] }, "reason": "Intentional Markdown serialization, parser delimiter, plain-text signature/list, or security mask; not stray formatting in visible copy." },
     { "path": "apps/web/lib/chat/prompts/onboarding.ts", "rules": { "markdown": ["2ed3c5a0a3008113"] }, "reason": "Intentional Markdown serialization, parser delimiter, plain-text signature/list, or security mask; not stray formatting in visible copy." },
     { "path": "apps/web/lib/chat/tokens.ts", "rules": { "unresolved-prompt": ["62991ea8a77d1c39"] }, "reason": "Exact schema/selector/serialization or diagnostic syntax reviewed in source; not a copy prompt." },
+    { "path": "apps/web/lib/chat/tools/format-lyrics.ts", "rules": { "unresolved-prompt": ["cecc4dbe75940d97"] }, "reason": "Model-only tool description naming the [Verse]/[Chorus] labels the tool removes; not a copy prompt." },
     { "path": "apps/web/lib/chat/tools/tasks.ts", "rules": { "placeholder": ["602fae580f5863ab"] }, "reason": "Task workflow state enum or its existing display label, not unfinished copy." },
     {
       "path": "apps/web/lib/claim/finalize.ts",
