@@ -172,7 +172,7 @@ describe('UnifiedSidebar header', () => {
     expect(toggleSlot).not.toBeNull();
     expect(brandRow?.contains(toggleSlot ?? null)).toBe(true);
 
-    const bell = screen.getByRole('link', { name: /^Inbox/ });
+    const bell = screen.getByRole('link', { name: /^Home/ });
     expect(bell.closest('[data-sidebar-header-actions]')?.contains(bell)).toBe(
       true
     );

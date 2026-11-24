@@ -66,7 +66,8 @@ export function reportsOutcome(text) {
  * @param {string} root repo root
  * @returns {{file: string, triggers: string[], covered: boolean}[]}
  */
-export function scanOutcomeCoverage(root) {
+export function scanOutcomeCoverage(root, swept = readSweptList(root)) {
+  const sweptSet = new Set(swept);
   const dir = path.join(root, '.github/workflows');
   return fs
     .readdirSync(dir)
@@ -78,7 +79,7 @@ export function scanOutcomeCoverage(root) {
       return {
         file,
         triggers: unattendedTriggers(parsed.on),
-        covered: reportsOutcome(text),
+        covered: sweptSet.has(file) || reportsOutcome(text),
       };
     })
     .filter(row => row.triggers.length > 0);
@@ -106,6 +107,18 @@ export function readOutcomeBaseline(root) {
     fs.readFileSync(path.join(root, BASELINE_PATH), 'utf8')
   );
   return /** @type {string[]} */ (raw.uncovered ?? []);
+}
+
+/**
+ * Busy workflows the automation-liveness outcome sweep reports for
+ * (scripts/lib/outcome-sweep.mjs), so they need no job of their own.
+ * @param {string} root
+ */
+export function readSweptList(root) {
+  const raw = JSON.parse(
+    fs.readFileSync(path.join(root, BASELINE_PATH), 'utf8')
+  );
+  return /** @type {string[]} */ (raw.swept ?? []);
 }
 
 /**
