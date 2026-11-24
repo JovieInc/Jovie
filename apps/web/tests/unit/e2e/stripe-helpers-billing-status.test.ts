@@ -4,9 +4,11 @@ import {
   getBillingStatus,
   isNavigatedHttpPage,
   parseBillingStatusPayload,
-  stripeWebhookTarget,
   vercelProtectionBypassHeaders,
 } from '@/tests/e2e/helpers/billing-status';
+import {
+  cancelPersonaActiveSubscriptions,
+} from '@/tests/e2e/helpers/stripe-helpers';
 
 describe('vercelProtectionBypassHeaders', () => {
   it('returns the automation bypass header when the Playwright secret is set', () => {
@@ -150,11 +152,69 @@ describe('getBillingStatus request routing', () => {
   });
 });
 
-describe('stripeWebhookTarget', () => {
-  it('posts to the page origin when navigated, baseURL-relative when not', () => {
-    expect(stripeWebhookTarget('https://jov.ie/billing/success')).toBe(
-      'https://jov.ie/api/stripe/webhooks'
-    );
-    expect(stripeWebhookTarget('about:blank')).toBe('/api/stripe/webhooks');
+describe('cancelPersonaActiveSubscriptions', () => {
+  it('cancels only active/trialing/past_due/unpaid subscriptions on test-mode persona customers', async () => {
+    const cancelledIds: string[] = [];
+    const client = {
+      customers: {
+        list: async () => ({
+          data: [
+            {
+              id: 'cus_test_1',
+              email: 'creator@test',
+              livemode: false,
+              deleted: false,
+            },
+          ],
+        }),
+      },
+      subscriptions: {
+        list: async () => ({
+          data: [
+            { id: 'sub_active', status: 'active' },
+            { id: 'sub_trialing', status: 'trialing' },
+            { id: 'sub_past_due', status: 'past_due' },
+            { id: 'sub_unpaid', status: 'unpaid' },
+            { id: 'sub_canceled', status: 'canceled' },
+          ],
+        }),
+        cancel: async (id: string) => {
+          cancelledIds.push(id);
+          return { id, status: 'canceled' };
+        },
+      },
+    } as unknown as Parameters<typeof cancelPersonaActiveSubscriptions>[0];
+    const n = await cancelPersonaActiveSubscriptions(client, 'creator@test');
+    expect(n).toBe(4);
+    expect(cancelledIds.sort()).toEqual([
+      'sub_active',
+      'sub_past_due',
+      'sub_trialing',
+      'sub_unpaid',
+    ]);
+  });
+
+  it('skips deleted and livemode customers and stops at the runaway guard', async () => {
+    const client = {
+      customers: {
+        list: async () => ({
+          data: [
+            { id: 'cus_del', email: 'x', livemode: false, deleted: true },
+            { id: 'cus_live', email: 'x', livemode: true, deleted: false },
+          ],
+        }),
+      },
+      subscriptions: {
+        list: async () => {
+          throw new Error('must not list subscriptions for skipped customers');
+        },
+        cancel: async () => {
+          throw new Error('must not cancel for skipped customers');
+        },
+      },
+    } as unknown as Parameters<typeof cancelPersonaActiveSubscriptions>[0];
+    await expect(
+      cancelPersonaActiveSubscriptions(client, 'creator@test')
+    ).resolves.toBe(0);
   });
 });

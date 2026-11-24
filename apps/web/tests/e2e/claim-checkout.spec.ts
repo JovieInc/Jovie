@@ -75,7 +75,11 @@ test.describe('Self-serve artist profile checkout', () => {
     const { stripeClient, priceId } = await getStripeContextOrSkip();
     await interceptTrackingRoutes(page);
     await setTestAuthBypassSession(page, 'creator');
-    await ensureUserIsFree(page, stripeClient);
+    await ensureUserIsFree(
+      page,
+      stripeClient,
+      DEFAULT_DEV_TEST_AUTH_EMAILS.creator
+    );
     // JOV-8805: the persona's Stripe customer persists across runs; clear
     // attached test PaymentMethods so checkout.sessions.create stays under
     // Stripe's per-customer cap.
@@ -167,7 +171,11 @@ test.describe('Self-serve artist profile checkout', () => {
     } finally {
       // The persona keeps its Stripe customer; only the test subscription
       // is canceled so the next run starts free.
-      await ensureUserIsFree(page, stripeClient);
+      await ensureUserIsFree(
+        page,
+        stripeClient,
+        DEFAULT_DEV_TEST_AUTH_EMAILS.creator
+      );
       await detachCustomerPaymentMethods(
         stripeClient,
         DEFAULT_DEV_TEST_AUTH_EMAILS.creator
@@ -303,7 +311,7 @@ test.describe('Claim checkout dogfood', () => {
     // (JOV-8805, red 2026-11-17..19). This normalizes pre-existing persona
     // state only; the checkout under test is still exercised end to end.
     await resetDogfoodBilling(buyerEmail);
-    await ensureUserIsFree(page, stripeClient);
+    await ensureUserIsFree(page, stripeClient, buyerEmail);
     await detachCustomerPaymentMethods(stripeClient, buyerEmail);
     const { profileId } = await readActiveClaimVerification(buyerEmail);
     await clearDogfoodClaim(profileId, artist);
@@ -465,7 +473,7 @@ test.describe('Claim checkout dogfood', () => {
       );
     } finally {
       await clearDogfoodClaim(profileId, artist);
-      await ensureUserIsFree(page, stripeClient).catch(async () => {
+      await ensureUserIsFree(page, stripeClient, buyerEmail).catch(async () => {
         await resetDogfoodBilling(buyerEmail);
       });
       await detachCustomerPaymentMethods(stripeClient, buyerEmail).catch(
