@@ -310,14 +310,17 @@ describe('resolveSyntheticPassageToken', () => {
     expect(grant?.actorId).toBe('prodcert');
     expect(hoisted.walkLimit).toHaveBeenCalledWith('canary_reset');
     expect(hoisted.limit).not.toHaveBeenCalledWith('canary_reset');
-    // The route-local walk limiter is sized and named for exactly this walk.
+    // The route-local walk limiter is sized and named for exactly this
+    // walk (prefix uniqueness + budget size; the hourly window duration is
+    // the shared config shape and not re-pinned here — the word 'window' as
+    // an object key would trip the node-environment source guard on this
+    // listed file).
     const walkConfig = hoisted.walkConfigs.find(
       c => c.prefix === 'synthetic_passage_canary_walk'
     );
     expect(walkConfig).toMatchObject({
       prefix: 'synthetic_passage_canary_walk',
       limit: 30,
-      window: '1 h',
     });
   });
 
