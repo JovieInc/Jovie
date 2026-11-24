@@ -167,12 +167,12 @@ describe('ContactsTable certificate', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('renders rows in the compact (40px) row mode', () => {
+  it('renders rows in the dense (32px) row mode', () => {
     const { container } = renderTable([kelly]);
     const modeNodes = container.querySelectorAll('[data-table-row-mode]');
     expect(modeNodes.length).toBeGreaterThan(0);
     for (const node of modeNodes) {
-      expect(node).toHaveAttribute('data-table-row-mode', 'compact');
+      expect(node).toHaveAttribute('data-table-row-mode', 'dense');
     }
   });
 });

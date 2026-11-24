@@ -35,11 +35,11 @@ describe('UnifiedTableSkeleton', () => {
     // Skeleton rows have fixed height and live inside <tbody>.
     // UnifiedTable reserves max(skeletonRows, ceil(220px / rowHeight)) rows
     // so loading → empty → populated transitions do not shift layout
-    // (JOV-4869). Default rowHeight is 40px → ceil(220/40) = 6.
+    // (JOV-4869). Default dense rowHeight is 32px → ceil(220/32) = 7.
     const tbody = container.querySelector('tbody');
     expect(tbody).not.toBeNull();
     const rows = tbody?.querySelectorAll('tr') ?? [];
-    expect(rows.length).toBe(6);
+    expect(rows.length).toBe(7);
   });
 
   it('renders one <td> per column on every skeleton row', () => {
@@ -73,19 +73,19 @@ describe('UnifiedTableSkeleton', () => {
     expect(screen.getByText('Loading table data')).toBeInTheDocument();
   });
 
-  it('applies the loaded table row mode so two-line rows reserve their height', () => {
+  it('applies the loaded table row mode so dense rows reserve their height', () => {
     const { container } = render(
       <UnifiedTableSkeleton
         columns={COLUMNS}
         skeletonRows={1}
-        rowMode='two-line'
+        rowMode='dense'
       />
     );
 
     const table = container.querySelector('table');
-    expect(table?.style.getPropertyValue('--table-row-height')).toBe('56px');
+    expect(table?.style.getPropertyValue('--table-row-height')).toBe('32px');
     expect(table?.style.getPropertyValue('--table-cell-content-height')).toBe(
-      '48px'
+      '24px'
     );
   });
 

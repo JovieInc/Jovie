@@ -21,7 +21,7 @@ export function InvestorTable({
   return (
     <div className='w-full min-w-0 overflow-x-auto'>
       <TableRoot
-        rowMode='two-line'
+        rowMode='dense'
         className={cn('w-full border-collapse text-app', minWidth)}
       >
         {children}

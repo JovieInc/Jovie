@@ -249,7 +249,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(attempts).toBe(2);
     expect(screen.getByRole('table')).toHaveAttribute(
       'data-table-row-mode',
-      'list'
+      'dense'
     );
     const rowPhoto = within(screen.getByRole('table')).getByTestId(
       'presence-identity-photo'
@@ -1326,10 +1326,10 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     renderWorkspace(data);
 
     const table = screen.getByRole('table');
-    expect(table).toHaveAttribute('data-table-row-mode', 'list');
-    expect(table.style.getPropertyValue('--table-row-height')).toBe('44px');
+    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+    expect(table.style.getPropertyValue('--table-row-height')).toBe('32px');
     expect(table.style.getPropertyValue('--table-cell-content-height')).toBe(
-      '36px'
+      '24px'
     );
     expect(table.parentElement).toHaveClass(
       'overflow-auto',

@@ -902,7 +902,7 @@
 }
 
 :where(.system-b-table-row-height) {
-  height: var(--table-row-height, 40px);
+  height: var(--table-row-height, 32px);
 }
 
 /* Table primary cell text: Linear's 13px. --text-app stays 12px for meta. */

@@ -184,7 +184,7 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
     <AdminTableShell testId='admin-costs-table' toolbar={toolbar}>
       {() => (
         <AdminDataTable
-          rowMode='description'
+          rowMode='dense'
           data={items}
           columns={columns}
           emptyState={

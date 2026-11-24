@@ -30,10 +30,10 @@ pnpm design:tokens-export:check   # CI: stale files, off-palette colors, Figma d
   text-quaternary, aqua, gold, flare), status colors (success, warning and error
   are mint, orange and red), selected, focus-ring, and anything else.
 - Dimensions (space, text size, radius, row heights, grid) are exported in both
-  files. Grid tokens for the DataGrid: `grid/row-compact` 36, `grid/row-default`
-  (alias of `size/row/compact`, 40), `grid/row-comfortable` (alias of
-  `size/row/list`, 44), `grid/cell-padding-x` 12, `grid/avatar` 24 and
-  `grid/status-dot` 8.
+  files. Grid tokens for the DataGrid: `grid/row-compact` 36,
+  `grid/row-default` 40, `grid/row-comfortable` 44, `grid/cell-padding-x` 12,
+  `grid/avatar` 24 and `grid/status-dot` 8 (literals — UnifiedTable rows are
+  dense-only at `size/row/dense` 32).
 - Names are slash paths with no `color/` prefix: `surface/canvas`,
   `text/primary`, `border/subtle`, `accent/ion`, `radius/sm`. The nested DTCG
   groups produce exactly these.

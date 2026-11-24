@@ -40,7 +40,7 @@ describe('admin workspace composition', () => {
     expect(screen.getByRole('table')).toHaveClass('table-fixed');
     expect(screen.getByRole('table')).toHaveAttribute(
       'data-table-row-mode',
-      'compact'
+      'dense'
     );
     rerender(<AdminDataTable {...props} data={[]} />);
     expect(screen.getByText('No records')).toBeVisible();

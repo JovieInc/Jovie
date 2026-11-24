@@ -2136,14 +2136,14 @@ describe('LibrarySurface', () => {
     expect(next).toHaveFocus();
   });
 
-  it('gives two-line list rows the two-line row budget so the artist line is not clipped', () => {
+  it('keeps list rows on the canonical dense 32px budget', () => {
     renderLibrary([buildAsset()]);
     fireEvent.click(screen.getByRole('radio', { name: 'List View' }));
 
     const table = screen
       .getByTestId('library-release-row-release-1')
       .closest('table');
-    expect(table?.style.getPropertyValue('--table-row-height')).toBe('56px');
+    expect(table?.style.getPropertyValue('--table-row-height')).toBe('32px');
   });
 
   it('gives each tile one meta line: type then year, or type then price', () => {

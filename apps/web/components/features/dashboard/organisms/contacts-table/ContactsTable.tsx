@@ -251,7 +251,7 @@ export const ContactsTable = memo(function ContactsTable({
               data={contacts}
               columns={columns}
               isLoading={isLoading}
-              rowMode='compact'
+              rowMode='dense'
               skeletonColumnConfig={CONTACTS_SKELETON_COLUMN_CONFIG}
               getRowId={contact => contact.id}
               minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
