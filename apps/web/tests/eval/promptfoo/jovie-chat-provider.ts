@@ -6771,10 +6771,10 @@ function evaluateAlbumArtProviderContract(vars: EvalVars) {
     resolve(process.cwd(), modelSourcePath),
     'utf8'
   );
-  const chatRouteSource = readFileSync(
-    resolve(process.cwd(), chatRouteSourcePath),
-    'utf8'
-  );
+  const [chatRouteSource, toolSource] = [
+    chatRouteSourcePath,
+    'lib/chat/tools/album-art.ts',
+  ].map(path => readFileSync(resolve(process.cwd(), path), 'utf8'));
   const storageSource = readFileSync(
     resolve(process.cwd(), storageSourcePath),
     'utf8'
@@ -6850,16 +6850,16 @@ function evaluateAlbumArtProviderContract(vars: EvalVars) {
     exposesGenerateAlbumArtTool: chatRouteSource.includes(
       'generateAlbumArt: createGenerateAlbumArtTool'
     ),
-    checksProfileBeforeGeneration: sourceHasOrderedFragments(chatRouteSource, [
+    checksProfileBeforeGeneration: sourceHasOrderedFragments(toolSource, [
       'if (!params.profileId)',
       'const generated = await generateAlbumArtBackgrounds',
     ]),
-    checksPlanBeforeGeneration: sourceHasOrderedFragments(chatRouteSource, [
+    checksPlanBeforeGeneration: sourceHasOrderedFragments(toolSource, [
       'if (!params.canGenerateAlbumArt)',
       'const generated = await generateAlbumArtBackgrounds',
     ]),
     checksProviderBeforeReleaseFetchAndRateLimits: sourceHasOrderedFragments(
-      chatRouteSource.replaceAll(/\s+/g, ' '),
+      toolSource.replaceAll(/\s+/g, ' '),
       [
         'if (!isAlbumArtGatewayConfigured())',
         'const target = await resolveAlbumArtReleaseTarget( params.profileId, params.releases, {',
@@ -6867,36 +6867,34 @@ function evaluateAlbumArtProviderContract(vars: EvalVars) {
         'const generated = await generateAlbumArtBackgrounds',
       ]
     ),
-    appliesBurstBeforeDailyLimit: sourceHasOrderedFragments(chatRouteSource, [
+    appliesBurstBeforeDailyLimit: sourceHasOrderedFragments(toolSource, [
       'const burstLimit = await albumArtGenerationBurstLimiter.limit',
       'const dailyLimit = await albumArtGenerationLimiter.limit',
     ]),
     asksForReleaseTargetBeforeGeneration: sourceHasOrderedFragments(
-      chatRouteSource,
+      toolSource,
       [
         "target.status === 'needs_target'",
         'const generated = await generateAlbumArtBackgrounds',
       ]
     ),
     buildsProviderPromptBeforeGeneration: sourceHasOrderedFragments(
-      chatRouteSource,
+      toolSource,
       [
         'const providerPrompt = buildAlbumArtBackgroundPrompt',
         'const generated = await generateAlbumArtBackgrounds',
       ]
     ),
-    capsToolCandidatesAtThree: chatRouteSource.includes(
-      'if (index >= 2) break;'
-    ),
+    capsToolCandidatesAtThree: toolSource.includes('if (index >= 2) break;'),
     uploadsManifestAfterCandidateUploads: sourceHasOrderedFragments(
-      chatRouteSource,
+      toolSource,
       [
         'const urls = await uploadAlbumArtCandidate',
         'await uploadAlbumArtManifest',
       ]
     ),
     treatsMissingKeyAsUnavailableWithoutSentry: sourceHasOrderedFragments(
-      chatRouteSource,
+      toolSource,
       [
         'if (error instanceof AlbumArtGatewayUnconfiguredError)',
         "error: 'Album art generation is temporarily unavailable.'",

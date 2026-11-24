@@ -337,12 +337,25 @@
       ]
     },
     {
+      "id": "chat-album-art",
+      "label": "Chat: album art",
+      "core": true,
+      "entryPoints": [],
+      "chatTools": ["generateAlbumArt"],
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/chat-album-art-outcome.test.ts",
+          "test": "cover art made in chat gives three options and the pick lands on the release",
+          "runs": "merge"
+        }
+      ]
+    },
+    {
       "id": "chat-creative",
-      "label": "Chat: album art, retouch, promo, lyrics and video",
+      "label": "Chat: retouch, promo, lyrics and video",
       "core": true,
       "entryPoints": [],
       "chatTools": [
-        "generateAlbumArt",
         "retouchImage",
         "voicePromo",
         "formatLyrics",
