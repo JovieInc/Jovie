@@ -1,6 +1,11 @@
 import { act, render, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  resetAudioChromeSnapshot,
+  setAudioChromeSnapshot,
+  useFullAudioPlayerExpandRequests,
+} from '@/components/organisms/audio-chrome-state';
+import {
   captureTrackPlayback,
   syncPlayingReleaseMetadata,
   useTrackAudioPlayer,
@@ -12,6 +17,7 @@ vi.mock('next/navigation', () => ({ useSearchParams: () => params }));
 
 afterEach(() => {
   params = new URLSearchParams();
+  resetAudioChromeSnapshot();
 });
 
 describe('demo player capture', () => {
@@ -105,5 +111,45 @@ describe('demo player capture', () => {
     expect(mediaSession.metadata).toBeNull();
     expect(mediaSession.playbackState).toBe('none');
     vi.unstubAllGlobals();
+  });
+
+  it('asks the shell for the full player once the dock shows the capture track', () => {
+    // A play lands in the sidebar O and leaves the full player closed (#26754),
+    // so the capture asks for the open dock it exists to show, exactly once.
+    const requests = renderHook(useFullAudioPlayerExpandRequests);
+    const before = requests.result.current;
+    const view = render(<DemoPlayerCapture />);
+    act(() =>
+      setAudioChromeSnapshot({
+        activeTrackId: 'another-track',
+        compactPlayerVisible: true,
+        fullPlayerVisible: false,
+      })
+    );
+    expect(requests.result.current).toBe(before);
+    act(() =>
+      setAudioChromeSnapshot({
+        activeTrackId: DEMO_PLAYER_RELEASE.id,
+        compactPlayerVisible: true,
+        fullPlayerVisible: false,
+      })
+    );
+    expect(requests.result.current).toBe(before + 1);
+    act(() =>
+      setAudioChromeSnapshot({
+        activeTrackId: DEMO_PLAYER_RELEASE.id,
+        compactPlayerVisible: false,
+        fullPlayerVisible: true,
+      })
+    );
+    act(() =>
+      setAudioChromeSnapshot({
+        activeTrackId: DEMO_PLAYER_RELEASE.id,
+        compactPlayerVisible: true,
+        fullPlayerVisible: false,
+      })
+    );
+    expect(requests.result.current).toBe(before + 1);
+    view.unmount();
   });
 });
