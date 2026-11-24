@@ -145,10 +145,17 @@ export function buildEmptyAssistantReplyFallback(
 
   if (/\b(boost|spend|budget|ads?\b|reel)\b/.test(lower)) {
     const target = named ?? artifact ?? 'that Reel';
+    const other = (context?.namedReleases ?? []).find(
+      title => title.toLowerCase() !== target.toLowerCase()
+    );
+    // ASS-106: held plan body for next_action. ASS-107 live 45325957464: name
+    // another catalog title for time awareness when one is available.
+    const timed =
+      other != null ? ` Keep ads paused while ${other} is upcoming.` : '';
     return (
       `I will not boost ${target} until you confirm a budget. ` +
       `Held plan: "Best ${target} Reel, tip link in bio, organic first." ` +
-      'Confirm the spend cap; nothing boosts until yes.'
+      `Confirm the spend cap; nothing boosts until yes.${timed}`
     );
   }
 

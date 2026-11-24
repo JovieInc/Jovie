@@ -8,7 +8,14 @@
  * disappeared from history. The floor says senders must rewrite, so rewrite
  * the dash instead of discarding the answer.
  *
- * Only punctuation is touched. Words, numbers and markdown structure stay.
+ * Bracket / mustache template slots (`[name]`, `[your link]`, `{{field}}`)
+ * are the same class of mechanical leak (ASS-107 live 45325957464): a good
+ * refuse→draft reply was swapped for the miss-the-mark fallback, which
+ * hard-fails copy_floor via `persistedAsFallback`. Strip the slot; keep the
+ * draft. TODO / lorem / XX+ still fail closed.
+ *
+ * Only punctuation and empty template slots are touched. Words, numbers and
+ * markdown structure stay.
  */
 
 import type { StreamTextTransform, TextStreamPart, ToolSet } from 'ai';
@@ -17,29 +24,48 @@ const DIGIT_RANGE = /(\d)\s*[–—]\s*(\d)/g;
 const AFTER_BOLD = /(\*\*|__)\s*[–—]\s*/g;
 const DOUBLE_HYPHEN = /\s--\s/g;
 const ANY_DASH = /\s*[–—]\s*/g;
+/** Mirrors @jovie/copy template-residue bracket + mustache arms only. */
+const TEMPLATE_SLOT =
+  /\[(?:insert|your|name|company|placeholder)[^\]]*\]|\{\{\s*[\w.]+\s*\}\}/gi;
+
+function repairTemplateSlots(text: string): string {
+  if (!TEMPLATE_SLOT.test(text)) return text;
+  TEMPLATE_SLOT.lastIndex = 0;
+  return text
+    .replace(TEMPLATE_SLOT, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/ +\./g, '.')
+    .replace(/ +,/g, ',')
+    .replace(/ +:/g, ':')
+    .replace(/ {2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trimEnd();
+}
+
+function repairDashes(text: string, atLineStart: boolean): string {
+  if (!/[–—]|\s--\s/.test(text)) return text;
+  const lineStart = atLineStart ? /(^|\n)(\s*)[–—]\s*/g : /(\n)(\s*)[–—]\s*/g;
+  return text
+    .replace(DIGIT_RANGE, '$1-$2')
+    .replace(AFTER_BOLD, (m, bold: string, at: number, all: string) =>
+      at + m.length === all.length ? `${bold}:` : `${bold}: `
+    )
+    .replace(lineStart, '$1$2- ')
+    .replace(DOUBLE_HYPHEN, ', ')
+    // A dash at the very end of a stream chunk: the next chunk brings the space.
+    .replace(ANY_DASH, (m, at: number, all: string) =>
+      at + m.length === all.length ? ',' : ', '
+    )
+    .replace(/,\s*([.,;:!?])/g, '$1')
+    .replace(/ {2,}/g, ' ');
+}
 
 /**
  * @param atLineStart whether `text` begins at the start of a line. Stream
  *   chunks begin mid-line, so a leading dash there is not a list marker.
  */
 export function repairCopyFloorText(text: string, atLineStart = true): string {
-  if (!/[–—]|\s--\s/.test(text)) return text;
-  const lineStart = atLineStart ? /(^|\n)(\s*)[–—]\s*/g : /(\n)(\s*)[–—]\s*/g;
-  return (
-    text
-      .replace(DIGIT_RANGE, '$1-$2')
-      .replace(AFTER_BOLD, (m, bold: string, at: number, all: string) =>
-        at + m.length === all.length ? `${bold}:` : `${bold}: `
-      )
-      .replace(lineStart, '$1$2- ')
-      .replace(DOUBLE_HYPHEN, ', ')
-      // A dash at the very end of a stream chunk: the next chunk brings the space.
-      .replace(ANY_DASH, (m, at: number, all: string) =>
-        at + m.length === all.length ? ',' : ', '
-      )
-      .replace(/,\s*([.,;:!?])/g, '$1')
-      .replace(/ {2,}/g, ' ')
-  );
+  return repairTemplateSlots(repairDashes(text, atLineStart));
 }
 
 /**
