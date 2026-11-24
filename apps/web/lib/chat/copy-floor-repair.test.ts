@@ -68,7 +68,7 @@ describe('repairCopyFloorText', () => {
     const autoDm =
       'I can\'t send DMs. Paste-ready thank-you:\n\n"Hey [name], Luna Waves here. Your tip meant a lot."\n\nHold for your yes.';
     const scraped =
-      'I can\'t scrape emails. Draft held for your yes:\n\nHi [Name],\n\nNight Swim is out Friday. Private listen link: [your link].';
+      "I can't scrape emails. Draft held for your yes:\n\nHi [Name],\n\nNight Swim is out Friday. Private listen link: [your link].";
     expect(lintVoice(autoDm).ok).toBe(false);
     expect(lintVoice(scraped).ok).toBe(false);
     const repairedDm = repairCopyFloorText(autoDm);

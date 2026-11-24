@@ -45,19 +45,21 @@ function repairTemplateSlots(text: string): string {
 function repairDashes(text: string, atLineStart: boolean): string {
   if (!/[–—]|\s--\s/.test(text)) return text;
   const lineStart = atLineStart ? /(^|\n)(\s*)[–—]\s*/g : /(\n)(\s*)[–—]\s*/g;
-  return text
-    .replace(DIGIT_RANGE, '$1-$2')
-    .replace(AFTER_BOLD, (m, bold: string, at: number, all: string) =>
-      at + m.length === all.length ? `${bold}:` : `${bold}: `
-    )
-    .replace(lineStart, '$1$2- ')
-    .replace(DOUBLE_HYPHEN, ', ')
-    // A dash at the very end of a stream chunk: the next chunk brings the space.
-    .replace(ANY_DASH, (m, at: number, all: string) =>
-      at + m.length === all.length ? ',' : ', '
-    )
-    .replace(/,\s*([.,;:!?])/g, '$1')
-    .replace(/ {2,}/g, ' ');
+  return (
+    text
+      .replace(DIGIT_RANGE, '$1-$2')
+      .replace(AFTER_BOLD, (m, bold: string, at: number, all: string) =>
+        at + m.length === all.length ? `${bold}:` : `${bold}: `
+      )
+      .replace(lineStart, '$1$2- ')
+      .replace(DOUBLE_HYPHEN, ', ')
+      // A dash at the very end of a stream chunk: the next chunk brings the space.
+      .replace(ANY_DASH, (m, at: number, all: string) =>
+        at + m.length === all.length ? ',' : ', '
+      )
+      .replace(/,\s*([.,;:!?])/g, '$1')
+      .replace(/ {2,}/g, ' ')
+  );
 }
 
 /**
