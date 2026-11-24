@@ -58,6 +58,17 @@ function startup(nightlyUpdateLaunch = false, extra = {}) {
           calls.push(['preconnect', options.url, options.numSockets]),
       },
     },
+    net: {
+      fetch: async () => ({ ok: true }),
+    },
+    primeHostedLaunch: input => {
+      input.preconnect({
+        url: input.origin,
+        numSockets: 4,
+      });
+      void input.fetch(input.entryUrl);
+      calls.push(['prime', input.entryUrl]);
+    },
     gotSingleInstanceLock: true,
     printBuildIdentityOnStart: false,
     nightlyUpdateLaunch,
@@ -115,10 +126,11 @@ function startup(nightlyUpdateLaunch = false, extra = {}) {
   return { calls, run: () => callback() };
 }
 
-test('S1 preconnect is first on interactive startup and absent on nightly/diagnostic/non-owner launches', async () => {
+test('S1 hosted launch prime is first on interactive startup and absent on nightly/diagnostic/non-owner launches', async () => {
   const normal = startup();
   await normal.run();
-  assert.deepEqual(normal.calls[0], ['preconnect', 'https://app.example', 2]);
+  assert.deepEqual(normal.calls[0], ['preconnect', 'https://app.example', 4]);
+  assert.deepEqual(normal.calls[1], ['prime', 'https://app.example/app/chat']);
   const nightly = startup(true);
   await nightly.run();
   assert.deepEqual(nightly.calls, ['webauthn']);

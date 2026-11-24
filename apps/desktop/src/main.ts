@@ -129,6 +129,7 @@ import { installNightlyUpdateLaunchAgent } from './nightly-update-launch-agent';
 import { buildNativeHelpMenu } from './native-help-menu';
 import { DesktopNavigationCoordinator } from './navigation-coordinator';
 import { createStartupMaintenanceGate } from './startup-maintenance';
+import { loadHostedUrlAfterSplash as navigateHostedAfterSplash, primeHostedLaunch } from './hosted-launch-prime';
 import {
   getUrlDisposition as getDesktopUrlDisposition,
   isAllowedExternalUrl as isAllowedDesktopExternalUrl,
@@ -1629,6 +1630,14 @@ function buildDesktopBootSplashUrl(): string {
   return `data:text/html;charset=utf-8,${encodeURIComponent(buildDesktopBootSplashHtml())}`;
 }
 
+function loadHostedUrlAfterSplash(win: BrowserWindow, hostedUrl: string): void {
+  navigateHostedAfterSplash({
+    win, hostedUrl, origin: APP_ORIGIN, entryUrl: APP_ENTRY_URL,
+    splashUrl: buildDesktopBootSplashUrl(),
+    fetch: (url, init) => net.fetch(url, { ...init, credentials: 'omit' }),
+  });
+}
+
 function buildDesktopAboutUrl(): string {
   const body =
     desktopBuildIdentity.provenance === 'verified'
@@ -1702,21 +1711,6 @@ function showDesktopAboutWindow(): void {
     event.preventDefault();
   });
   void aboutWindow.loadURL(buildDesktopAboutUrl());
-}
-
-function loadHostedUrlAfterSplash(win: BrowserWindow, hostedUrl: string): void {
-  const navigateToHosted = (): void => {
-    if (win.isDestroyed()) return;
-    void win.loadURL(hostedUrl);
-  };
-
-  if (win.webContents.getURL().startsWith('data:text/html')) {
-    navigateToHosted();
-    return;
-  }
-
-  win.webContents.once('did-finish-load', navigateToHosted);
-  void win.loadURL(buildDesktopBootSplashUrl());
 }
 
 function showDesktopLoadFailure(
@@ -3692,7 +3686,11 @@ app.whenReady().then(async () => {
     gotSingleInstanceLock &&
     !printBuildIdentityOnStart
   ) {
-    session.defaultSession.preconnect({ url: APP_ORIGIN, numSockets: 2 });
+    primeHostedLaunch({
+      origin: APP_ORIGIN, entryUrl: APP_ENTRY_URL,
+      preconnect: options => session.defaultSession.preconnect(options),
+      fetch: (url, init) => net.fetch(url, { ...init, credentials: 'omit' }),
+    });
   }
   if (!gotSingleInstanceLock && !printBuildIdentityOnStart) return;
 

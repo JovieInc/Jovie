@@ -585,6 +585,20 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /function buildDesktopBootSplashUrl\(\)/);
   assert.match(mainSource, /function buildDesktopBootSplashHtml\(\)/);
   assert.match(mainSource, /function loadHostedUrlAfterSplash\(/);
+  assert.match(mainSource, /navigateHostedAfterSplash\(/);
+  assert.match(mainSource, /primeHostedLaunch\(/);
+  // Splash→hosted overlap lives in hosted-launch-prime (JOV-14776).
+  const primeSource = await readFile(
+    join(desktopRoot, 'src/hosted-launch-prime.ts'),
+    'utf8'
+  );
+  assert.match(primeSource, /export function loadHostedUrlAfterSplash\(/);
+  assert.match(primeSource, /primeHostedLaunchCache\(/);
+  assert.match(primeSource, /once\('dom-ready',\s*navigateToHosted\)/);
+  assert.doesNotMatch(
+    primeSource,
+    /once\('did-finish-load',\s*navigateToHosted\)/
+  );
   assert.match(mainSource, /Jovie for Mac is loading/);
   assert.match(
     mainSource,

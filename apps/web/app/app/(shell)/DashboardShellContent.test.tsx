@@ -133,14 +133,12 @@ vi.mock('./shell-route-matches', () => ({
     Boolean(pathname?.startsWith('/app/settings/profile/')),
 }));
 
-import { DashboardShellContent } from './DashboardShellContent';
-
-const shell = (
-  mode: 'ov' | 'customer',
-  child: React.ReactNode,
-  pathname = '/app'
-) =>
-  DashboardShellContent({ userId: 'user-1', pathname, mode, children: child });
+import {
+  boundaryMount,
+  dashboardData,
+  essentialReady,
+  shell,
+} from './DashboardShellContent.test-helpers';
 
 const ovieState = (enabled: boolean, locked: boolean) => {
   mocks.getFreshAuth.mockResolvedValue({
@@ -152,30 +150,6 @@ const ovieState = (enabled: boolean, locked: boolean) => {
     locked,
     unlockedUntil: null,
   });
-};
-
-const boundaryMount = () =>
-  document
-    .querySelector('[data-boundary-mount]')
-    ?.getAttribute('data-boundary-mount');
-
-const dashboardData = {
-  user: { id: 'user-1' },
-  creatorProfiles: [],
-  selectedProfile: null,
-  needsOnboarding: false,
-  sidebarCollapsed: false,
-  hasSocialLinks: false,
-  hasMusicLinks: false,
-  isAdmin: true,
-  tippingStats: { totalTips: 0, totalAmount: 0, recentTips: [] },
-  profileCompletion: {
-    percentage: 0,
-    completedCount: 0,
-    totalCount: 0,
-    steps: [],
-    profileIsLive: false,
-  },
 };
 
 /** ViewTransition shell wrap (JOV-14244). */
@@ -194,50 +168,95 @@ describe('DashboardShellContent privacy decision', () => {
     mocks.essential.mockReturnValue(true);
   });
 
-  it.each(['shell data', 'full data', 'flags'])(
-    'shows an error instead of holding the page behind the shell skeleton when %s stalls',
-    async stalledRead => {
-      vi.useFakeTimers();
-      try {
-        mocks.essential.mockReturnValue(stalledRead !== 'full data');
-        const stalledMock =
-          stalledRead === 'flags'
-            ? mocks.flags
-            : stalledRead === 'full data'
-              ? mocks.dashboard
-              : mocks.shellDashboard;
-        stalledMock.mockReturnValue(new Promise(() => {}));
-        let result: React.ReactNode;
-        const pending = shell(
-          'customer',
-          <div>Contacts page</div>,
-          '/app/contacts'
-        ).then(tree => {
-          result = tree;
-        });
-        await vi.advanceTimersByTimeAsync(10_001);
-        expect(result).toBeDefined();
-        await pending;
-        render(result);
+  it('paints essential-shell children from the placeholder before workspace data settles (JOV-14776)', async () => {
+    mocks.essential.mockReturnValue(true);
+    mocks.shellDashboard.mockReturnValue(new Promise(() => {}));
+    const tree = await shell(
+      'customer',
+      <div>Contacts page</div>,
+      '/app/contacts'
+    );
+    // Outer shell returns after ban with a Suspense fallback that already
+    // includes the route main — do not RTL-render the async Ready child.
+    expect(tree).toMatchObject({
+      props: {
+        fallback: expect.anything(),
+      },
+    });
+    expect(
+      typeof tree === 'object' &&
+        tree !== null &&
+        '$$typeof' in tree &&
+        (tree as { type?: unknown }).type === Symbol.for('react.suspense')
+    ).toBe(true);
+    expect(JSON.stringify(tree)).toContain('Contacts page');
+    expect(mocks.shellDashboard).toHaveBeenCalledOnce();
+  });
 
-        expect(screen.getByRole('alert')).toHaveTextContent(
-          'Failed to load your workspace. Please refresh the page.'
-        );
-        expect(screen.queryByText('Contacts page')).not.toBeInTheDocument();
-        expect(stalledMock).toHaveBeenCalledOnce();
-      } finally {
-        vi.useRealTimers();
-      }
+  it('EssentialShellReady shows an error when workspace data stalls past the timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      const { withTimeout } = await import('@/lib/resilience/primitives');
+      mocks.shellDashboard.mockReturnValue(new Promise(() => {}));
+      const workspacePromise = withTimeout(
+        Promise.all([mocks.shellDashboard('user-1'), Promise.resolve({})]),
+        { timeoutMs: 10_000, context: 'App shell workspace data' }
+      );
+      let result: React.ReactNode;
+      const pending = essentialReady(
+        workspacePromise as never,
+        <div>Contacts page</div>
+      ).then(tree => {
+        result = tree;
+      });
+      await vi.advanceTimersByTimeAsync(10_001);
+      expect(result).toBeDefined();
+      await pending;
+      render(result);
+
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Failed to load your workspace. Please refresh the page.'
+      );
+      expect(screen.queryByText('Contacts page')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
     }
-  );
+  });
 
-  it('preserves a dashboard authentication redirect', async () => {
+  it('shows an error instead of holding a full-data route behind the shell skeleton when dashboard stalls', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.essential.mockReturnValue(false);
+      mocks.dashboard.mockReturnValue(new Promise(() => {}));
+      let result: React.ReactNode;
+      const pending = shell(
+        'customer',
+        <div>Contacts page</div>,
+        '/app/contacts'
+      ).then(tree => {
+        result = tree;
+      });
+      await vi.advanceTimersByTimeAsync(10_001);
+      expect(result).toBeDefined();
+      await pending;
+      render(result);
+
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Failed to load your workspace. Please refresh the page.'
+      );
+      expect(screen.queryByText('Contacts page')).not.toBeInTheDocument();
+      expect(mocks.dashboard).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('preserves a dashboard authentication redirect from EssentialShellReady', async () => {
     const redirect = Object.assign(new Error('redirect'), {
       digest: 'NEXT_REDIRECT;replace;/signin;307;',
     });
-    mocks.shellDashboard.mockRejectedValue(redirect);
     await expect(
-      shell('customer', <div>Contacts page</div>, '/app/contacts')
+      essentialReady(Promise.reject(redirect), <div>Contacts page</div>)
     ).rejects.toBe(redirect);
   });
 
@@ -322,9 +341,11 @@ describe('DashboardShellContent privacy decision', () => {
   });
 
   it('renders the workspace error state accessibly when the shell read fails', async () => {
-    mocks.shellDashboard.mockRejectedValue(new Error('DAL unavailable'));
     const { container } = render(
-      await shell('customer', <div>Contacts page</div>, '/app/contacts')
+      await essentialReady(
+        Promise.reject(new Error('DAL unavailable')),
+        <div>Contacts page</div>
+      )
     );
 
     expect(screen.getByRole('alert')).toHaveTextContent(
