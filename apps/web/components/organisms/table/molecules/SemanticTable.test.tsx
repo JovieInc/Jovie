@@ -5,7 +5,7 @@ import { TableCell } from '../atoms/TableCell';
 import { TableBody, TableHead, TableRoot, TableRow } from './SemanticTable';
 
 describe('SemanticTable row geometry', () => {
-  it('forwards the canonical dense row mode to the semantic table', () => {
+  it('forwards an explicit dense row mode to the semantic table', () => {
     render(
       <TableRoot rowMode='dense'>
         <TableBody>

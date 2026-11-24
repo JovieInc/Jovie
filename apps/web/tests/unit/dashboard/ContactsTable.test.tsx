@@ -233,10 +233,10 @@ describe('ContactsTable', () => {
       screen.getByTestId('contacts-toolbar-count-skeleton')
     ).toBeInTheDocument();
     expect(screen.queryByText('No Contacts Yet')).not.toBeInTheDocument();
-    // Loading and loaded rows share the dense 32px people-row geometry.
+    // Loading and loaded rows share the compact 40px people-row geometry.
     expect(screen.getByTestId('contacts-unified-table')).toHaveAttribute(
       'data-row-mode',
-      'dense'
+      'compact'
     );
   });
 

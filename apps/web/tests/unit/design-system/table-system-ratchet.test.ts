@@ -105,7 +105,7 @@ describe('one table system ratchet', () => {
   it('adds no pixel rowHeight; tables pick a named rowMode', () => {
     expect(
       overBaseline(current.rawRowHeight, baseline.rawRowHeight),
-      "Use TABLE_ROW_MODES via rowMode (compact 40px for user-facing; dense 32px admin-only)."
+      'Use TABLE_ROW_MODES via rowMode (compact 40px for user-facing; dense 32px admin-only).'
     ).toEqual([]);
   });
 
