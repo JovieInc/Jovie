@@ -1,8 +1,5 @@
 /**
- * Shared Stripe E2E test helpers.
- *
- * Extracted from payment-complete-flow.spec.ts for reuse across billing specs.
- * All functions operate against Stripe test mode with locally-signed webhooks.
+ * Shared Stripe test-mode E2E helpers, with locally signed webhooks.
  */
 
 import type { APIResponse, Page } from '@playwright/test';
@@ -32,6 +29,7 @@ export interface SignedStripeWebhook {
 }
 
 export interface CheckoutSessionResult {
+  alreadySubscribed?: boolean;
   sessionId: string;
   url: string;
 }
@@ -251,6 +249,7 @@ export async function createCheckoutSession(
   expect(response.body.url).toBeTruthy();
 
   return {
+    alreadySubscribed: response.body.alreadySubscribed === true,
     sessionId: response.body.sessionId as string,
     url: response.body.url as string,
   };
