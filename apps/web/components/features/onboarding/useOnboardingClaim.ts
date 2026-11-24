@@ -10,6 +10,10 @@ import {
   trackFunnelStep,
 } from '@/lib/analytics/signup-funnel-client';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
+import {
+  clearPostKeepEnrichmentNotes,
+  readPostKeepEnrichmentNotes,
+} from '@/lib/onboarding/post-keep-enrichment-notes';
 
 /**
  * Auto-claim the anonymous onboarding conversation when the visitor
@@ -116,10 +120,11 @@ export function useOnboardingClaim(
       const startedAt = Date.now();
       let response: Response;
       try {
+        const enrichment = readPostKeepEnrichmentNotes();
         response = await fetch('/api/onboarding/claim', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: '{}',
+          body: JSON.stringify(enrichment ? { enrichment } : {}),
         });
       } catch {
         if (!cancelled) {
@@ -216,6 +221,7 @@ export function useOnboardingClaim(
             outcome: body.waitlist.outcome,
             duration_ms: Date.now() - startedAt,
           });
+          clearPostKeepEnrichmentNotes();
           router.replace(APP_ROUTES.WAITLIST);
           return;
         }
