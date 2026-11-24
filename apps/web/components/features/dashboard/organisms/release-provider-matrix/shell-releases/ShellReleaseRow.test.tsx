@@ -136,24 +136,23 @@ describe('ShellReleaseRow', () => {
 
 describe('ShellReleaseRow optical fixes (JOV-12568)', () => {
   it('keeps 28px circle actions, 14px glyphs and an ellipsised title', () => {
-    const source = readFileSync(
-      resolve(__dirname, './ShellReleaseRow.tsx'),
+    const row = readFileSync(resolve(__dirname, './ShellReleaseRow.tsx'), 'utf8');
+    const cells = readFileSync(
+      resolve(__dirname, './shell-release-row-cells.tsx'),
       'utf8'
     );
 
-    expect(source).toContain(
+    expect(cells).toContain(
       "'shrink-0 h-7 w-7 rounded-full grid place-items-center"
     );
-    expect(source).toMatch(/<Clock\s+className='h-3\.5 w-3\.5'/);
-    expect(source).toContain("<Lock className='h-3.5 w-3.5'");
-    expect(source).toContain("<ExternalLink className='h-3.5 w-3.5'");
-    expect(source).toContain('<PlayIcon');
-    expect(source).toContain(
-      "<span className='min-w-0 truncate'>{release.title}</span>"
-    );
-    expect(source).toContain("'min-w-0 shrink-9999'");
-    expect(source).not.toContain('h-7 w-7 rounded-md');
-    expect(source).not.toContain("className='h-3 w-3'");
-    expect(source).not.toContain('translate-x-px');
+    expect(cells).toMatch(/<Clock\s+className='h-3\.5 w-3\.5'/);
+    expect(cells).toContain("<Lock className='h-3.5 w-3.5'");
+    expect(cells).toContain("<ExternalLink className='h-3.5 w-3.5'");
+    expect(row).toContain('<PlayIcon');
+    expect(row).toContain('AppTableTextCell');
+    expect(row).toContain("'min-w-0 shrink-9999'");
+    expect(cells).not.toContain('h-7 w-7 rounded-md');
+    expect(cells).not.toContain("className='h-3 w-3'");
+    expect(row).not.toContain('translate-x-px');
   });
 });

@@ -430,7 +430,7 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
           copyValue={typeLabel}
           copyLabel='Type'
           title={typeLabel}
-          className='system-b-library-meta-text'
+          className='system-b-library-meta-text whitespace-nowrap'
         >
           {typeLabel}
         </AppTableTextCell>

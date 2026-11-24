@@ -74,7 +74,7 @@ describe('VirtualizedTableRow (colocated)', () => {
     const user = userEvent.setup();
     const onRowClick = vi.fn();
     const onRowShiftClick = vi.fn();
-    render(
+    const { container } = render(
       <ReleaseRow
         release={RELEASE}
         onRowClick={onRowClick}
@@ -88,6 +88,9 @@ describe('VirtualizedTableRow (colocated)', () => {
     fireEvent.click(row, { shiftKey: true });
     expect(onRowShiftClick).toHaveBeenCalledWith(3, RELEASE);
     expect(onRowClick).toHaveBeenCalledTimes(1);
+    expect(
+      container.querySelector('[data-table-cell-content="stable"]')
+    ).toHaveClass('flex', 'items-center');
   });
 
   it('focuses and opens the row before its context actions', () => {

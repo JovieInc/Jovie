@@ -3,7 +3,10 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Copy, Pencil, Trash2 } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
-import { TableRowActionBar } from './TableRowActionBar';
+import {
+  TableRowActionBar,
+  TableRowOverflowTrigger,
+} from './TableRowActionBar';
 
 describe('TableRowActionBar', () => {
   it('keeps the shared max-primary capacity inline and overflows the rest', async () => {
@@ -73,5 +76,13 @@ describe('TableRowActionBar', () => {
     expect(
       screen.getByRole('button', { name: 'More actions' })
     ).toBeInTheDocument();
+  });
+
+  it('lets dense catalog rows shrink the overflow trigger to xs', () => {
+    render(
+      <TableRowOverflowTrigger size='xs' ariaLabel='Actions for title' />
+    );
+    const trigger = screen.getByRole('button', { name: 'Actions for title' });
+    expect(trigger.className).toMatch(/h-6|size-6|h-\[24px\]/);
   });
 });

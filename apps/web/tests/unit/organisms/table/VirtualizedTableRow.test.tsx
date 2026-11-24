@@ -285,7 +285,14 @@ describe('VirtualizedTableRow', () => {
       screen
         .getByRole('cell')
         .querySelector('[data-table-cell-content="stable"]')
-    ).toHaveClass('h-8', 'max-h-8', 'overflow-hidden', 'whitespace-nowrap');
+    ).toHaveClass(
+      'flex',
+      'h-8',
+      'max-h-8',
+      'items-center',
+      'overflow-hidden',
+      'leading-none'
+    );
   });
 
   it('lets a column opt into wrapping without changing the shared default', () => {

@@ -96,10 +96,11 @@ describe('library right-rail System B structural compliance', () => {
       columns.indexOf("id: 'bpm'")
     );
     expect(typeCell).toContain('formatLibraryItemType');
+    expect(typeCell).toContain('AppTableTextCell');
     expect(typeCell).toContain('whitespace-nowrap');
     // Comment may name the forbidden class; the className string must not.
     expect(typeCell).toMatch(
-      /className='system-b-library-meta-text block truncate whitespace-nowrap text-tertiary-token'/
+      /className='system-b-library-meta-text whitespace-nowrap'/
     );
     expect(typeCell).not.toMatch(
       /className='[^']*system-b-library-fluid-cell[^']*'/

@@ -274,10 +274,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/shell-releases/shell-release-row-cells.tsx",
-      "linearIssue": "JOV-14762"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/releases/cells/PopularityCell.tsx",
       "linearIssue": "JOV-8847"
     },

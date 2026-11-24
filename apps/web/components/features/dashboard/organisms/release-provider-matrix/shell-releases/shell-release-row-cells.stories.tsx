@@ -8,7 +8,6 @@ const release = {
   title: 'Lost in the Light',
   artistNames: ['Bahamas'],
   status: 'released',
-  artworkUrl: null,
   slug: 'lost-in-the-light',
   smartLinkPath: '/lost-in-the-light',
   providers: [],
@@ -18,9 +17,6 @@ const release = {
   totalDurationMs: 214_000,
   releaseDate: '2026-06-15',
   weeklyStreams: 12_400,
-  previewUrl: null,
-  primaryIsrc: null,
-  upc: null,
 } satisfies ReleaseViewModel;
 
 const meta = {

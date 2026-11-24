@@ -92,7 +92,9 @@ export const WeeklyStreamsCell = memo(function WeeklyStreamsCell({
           <span className='text-quaternary-token'> / wk</span>
         </span>
       ) : (
-        <span className='text-2xs leading-none text-quaternary-token'>—</span>
+        <span className='text-2xs leading-none text-quaternary-token'>
+          {'\u2014'}
+        </span>
       )}
     </div>
   );

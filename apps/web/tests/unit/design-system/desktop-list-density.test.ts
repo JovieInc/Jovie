@@ -30,7 +30,7 @@ describe('desktop list density', () => {
 
     expect(row).toContain("density='dense'");
     expect(row).toContain('h-8');
-    expect(row).toContain('size={20}');
+    expect(row).toContain('APP_TABLE_MEDIA_SIZE.dense');
     expect(row).not.toContain("density='spacious'");
     expect(row).not.toContain('size={40}');
   });

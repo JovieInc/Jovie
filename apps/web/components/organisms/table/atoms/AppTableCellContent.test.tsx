@@ -35,22 +35,20 @@ describe('AppTableCellContent', () => {
     vi.stubGlobal('navigator', { clipboard });
     const parentClick = vi.fn();
 
-    render(
-      // Test host only — stopPropagation must not reach the row click handler.
-      // biome-ignore lint/a11y/noStaticElementInteractions: test harness
-      // biome-ignore lint/a11y/useKeyWithClickEvents: test harness
-      <div onClick={parentClick}>
-        <AppTableTextCell copyValue='Take Me Over' copyLabel='Title'>
-          Take Me Over
-        </AppTableTextCell>
-      </div>
+    const { container } = render(
+      <AppTableTextCell copyValue='Take Me Over' copyLabel='Title'>
+        Take Me Over
+      </AppTableTextCell>
     );
 
     const button = screen.getByRole('button', { name: /Copy Title/i });
     expect(button).toHaveAttribute('aria-label', 'Copy Title: Take Me Over');
+    // Capture on the render host — proves stopPropagation without nested controls.
+    container.addEventListener('click', parentClick);
     fireEvent.click(button);
     expect(writeText).toHaveBeenCalledWith('Take Me Over');
     expect(parentClick).not.toHaveBeenCalled();
+    container.removeEventListener('click', parentClick);
     vi.unstubAllGlobals();
   });
 
