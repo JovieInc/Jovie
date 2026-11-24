@@ -6,7 +6,7 @@ import {
   merchGenerationBatches,
 } from '@/lib/db/schema/merch';
 import { getMerchConceptPublicationBlockers } from './concept-contract';
-import type { MerchConceptPlan } from './concept-review';
+import { canRenderMerchConcept, type MerchConceptPlan } from './concept-review';
 import { reviewStoredMerchConceptPlan } from './concept-review-store';
 
 /** Persist exact pre-art evidence before the generator can cross an image boundary. */
@@ -24,6 +24,7 @@ export async function persistMerchConceptPlan(input: {
   };
 }) {
   const review = await reviewStoredMerchConceptPlan(input.plan, new Date());
+  const renderable = canRenderMerchConcept(review.decision);
   const evaluatedAt = new Date().toISOString();
   const receipt = {
     ...review,
@@ -38,7 +39,7 @@ export async function persistMerchConceptPlan(input: {
       enteredAt: input.enteredAt.toISOString(),
       exitedAt: evaluatedAt,
       actor: 'canonical-merch-generator',
-      outcome: review.decision === 'eligible' ? 'advanced' : 'failed',
+      outcome: renderable ? 'advanced' : 'failed',
       sourceReceipt: `merch-batch:${input.generationId}:artistBrief.conceptReview`,
     },
     completionStageEvent: {
@@ -49,7 +50,7 @@ export async function persistMerchConceptPlan(input: {
       enteredAt: evaluatedAt,
       exitedAt: null,
       actor: 'canonical-merch-generator',
-      outcome: review.decision === 'eligible' ? 'completed' : 'failed',
+      outcome: renderable ? 'completed' : 'failed',
       sourceReceipt: `merch-batch:${input.generationId}:artistBrief.conceptReview`,
     },
   };
@@ -66,8 +67,8 @@ export async function persistMerchConceptPlan(input: {
       conceptPlan: input.plan,
       conceptReview: receipt,
     },
-    status: review.decision === 'eligible' ? 'generating' : 'failed',
-    ...(review.decision === 'eligible'
+    status: renderable ? 'generating' : 'failed',
+    ...(renderable
       ? {}
       : { error: 'concept_review_required', completedAt: new Date() }),
   });

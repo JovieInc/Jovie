@@ -18,10 +18,13 @@ import {
   buildCrawlFixtureMerchSnapshots,
   CRAWL_CONTENT_FIXTURE,
   CRAWL_FIXTURE_MERCH_IMAGE_PATH,
+  CRAWL_FIXTURE_PLAN,
   CRAWL_FIXTURE_RELEASE_ARTWORK_PATH,
+  CRAWL_FIXTURE_TRIAL_ENDS_AT,
   type CrawlContentFixture,
   type CrawlContentObservedState,
   type CrawlContentStep,
+  crawlFixtureUserHasDownloadPlan,
   planCrawlContentFixture,
 } from './crawl-content-fixture';
 
@@ -40,8 +43,14 @@ const RIGHTS_ATTESTED_AT = RELEASE_DATE;
 export async function readCrawlContentFixtureState(
   fixture: CrawlContentFixture = CRAWL_CONTENT_FIXTURE
 ): Promise<CrawlContentObservedState> {
-  const [user] = await db
-    .select({ id: users.id })
+  const [userRow] = await db
+    .select({
+      id: users.id,
+      plan: users.plan,
+      isPro: users.isPro,
+      trialEndsAt: users.trialEndsAt,
+      stripeSubscriptionId: users.stripeSubscriptionId,
+    })
     .from(users)
     .where(drizzleSql`lower(trim(${users.email})) = ${fixture.email}`)
     .limit(1);
@@ -128,8 +137,15 @@ export async function readCrawlContentFixtureState(
         .limit(1)
     : [];
 
+  const user = userRow
+    ? {
+        id: userRow.id,
+        hasDownloadPlan: crawlFixtureUserHasDownloadPlan(userRow),
+      }
+    : null;
+
   return {
-    user: user ?? null,
+    user,
     profile: profile ?? null,
     claimUserId: claim?.userId ?? null,
     release: release ?? null,
@@ -144,16 +160,18 @@ export async function readCrawlContentFixtureState(
 async function writeFixture(fixture: CrawlContentFixture): Promise<void> {
   const now = new Date();
 
-  // User: plan 'pro' is what the download gate reads; there is no Stripe
-  // customer or subscription, so nothing bills.
+  // User: a trial that never lapses is what the download gate reads (see
+  // CRAWL_FIXTURE_PLAN). No Stripe customer or subscription, so nothing bills.
   const userValues = {
     clerkId: fixture.clerkId,
     email: fixture.email,
     name: fixture.displayName,
     userStatus: 'active' as const,
     isAdmin: false,
-    isPro: true,
-    plan: 'pro',
+    isPro: false,
+    plan: CRAWL_FIXTURE_PLAN,
+    trialEndsAt: CRAWL_FIXTURE_TRIAL_ENDS_AT,
+    stripeSubscriptionId: null,
     updatedAt: now,
   };
   const [user] = await db

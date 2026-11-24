@@ -12,6 +12,8 @@ export const FAILURE_MODES = [
   'format-violation',
   'policy-violation',
   'prompt-leak',
+  /** Action ask (merch, task, release, bio) that ended without the action. */
+  'action-stall',
 ] as const;
 
 export type FailureMode = (typeof FAILURE_MODES)[number];
@@ -25,6 +27,7 @@ export const DETERMINISTIC_FAILURE_MODES: ReadonlySet<FailureMode> = new Set([
   'format-violation',
   'policy-violation',
   'prompt-leak',
+  'action-stall',
 ]);
 
 const FAILURE_MODE_SET: ReadonlySet<string> = new Set(FAILURE_MODES);
@@ -56,5 +59,7 @@ export function failureModeLabel(mode: FailureMode): string {
       return 'Policy violation';
     case 'prompt-leak':
       return 'Prompt leak';
+    case 'action-stall':
+      return 'Action stall';
   }
 }

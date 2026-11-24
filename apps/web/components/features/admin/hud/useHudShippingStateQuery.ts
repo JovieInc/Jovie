@@ -23,6 +23,7 @@ import {
   shippingStateReadFromHttp,
 } from '@/lib/ovie/shipping-state-client';
 import { REALTIME_CACHE } from '@/lib/queries/cache-strategies';
+import { linearUpdate, shippedUpdate } from './useOUpdateOptIns';
 
 type OperationalTaskFeed = ShippingCockpitProjection['operationalTasks'];
 type OperationalRequestState = 'idle' | 'error';
@@ -234,6 +235,7 @@ export function useHudShippingStateQuery(kioskToken: string | null) {
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: false,
+    meta: { oUpdate: [shippedUpdate, linearUpdate] },
   });
 
   useEffect(() => {

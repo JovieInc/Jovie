@@ -1,9 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  homeNavItem,
-  inboxNavItem,
-} from '../components/features/dashboard/dashboard-nav/config';
+import { homeNavItem } from '../components/features/dashboard/dashboard-nav/config';
 import {
   clearWarmNavProbe,
   installWarmNavigationProbe,
@@ -89,7 +86,8 @@ describe('browser navigation acknowledgment receipt', () => {
     );
   });
 
-  it.each([inboxNavItem.id, null])(
+  // Stale id `inbox` (pre-T0.2) must not match Home (`home`), even on /app.
+  it.each(['inbox', null] as const)(
     'rejects a shared home URL with identity %s without recording input or acknowledgment',
     async identity => {
       const link = document.createElement('a');

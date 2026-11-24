@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderToString } from 'react-dom/server';
@@ -180,5 +182,17 @@ describe('TourDatesTable', () => {
     const source = screen.getByText('Admin Import');
     expect(source).toHaveClass('text-warning-text');
     expect(source.className).not.toMatch(/amber-\d/);
+  });
+});
+
+describe('TourDatesTable control heights (JOV-12567)', () => {
+  it('sits on the 28px control and 44px bar contract', () => {
+    const source = readFileSync(
+      resolve(__dirname, './TourDatesTable.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain("'h-7 gap-1 rounded-full px-2.5 text-app");
+    expect(source).not.toContain("'h-8 gap-1 rounded-md");
   });
 });

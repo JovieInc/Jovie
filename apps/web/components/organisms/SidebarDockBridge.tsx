@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
+import { useOUpdates } from '@/components/organisms/o-presence/useOUpdates';
 import {
   SidebarDock,
   type SidebarDockUpdateControl,
@@ -77,6 +78,7 @@ export function SidebarDockBridge({
 }) {
   const publishStatus = usePublishSidebarDockStatus();
   const updateControl = useDesktopUpdateState();
+  const { update: oUpdate, clear: clearOUpdate } = useOUpdates();
   const updateControlKind = updateControl.state.kind;
   const dockUpdateControl: SidebarDockUpdateControl =
     updateControlKind === 'hidden'
@@ -169,7 +171,13 @@ export function SidebarDockBridge({
         }
         onStatusChange={publishStatus}
       />
-      <SidebarOPresence updating={updating} variant={variant} href={oHref} />
+      <SidebarOPresence
+        updating={updating}
+        variant={variant}
+        href={oHref}
+        update={oUpdate}
+        onUpdateDone={clearOUpdate}
+      />
     </>
   );
 }

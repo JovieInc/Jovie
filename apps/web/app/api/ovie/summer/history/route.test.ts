@@ -146,7 +146,7 @@ describe('founder Summer history readback', () => {
         '1 earlier Summer turn ended without a reply'
       );
       expect(body.messages[0].content).toContain(state);
-      expect(body.messages[0].content).toContain('resend the message to retry');
+      expect(body.messages[0].content).toContain('Resend the message to retry');
       expect(body.messages[0].clientMessageId).toBeNull();
     }
   );
@@ -175,8 +175,16 @@ describe('founder Summer history readback', () => {
       '3 earlier Summer turns ended without a reply (failure ×2, unavailable)'
     );
     expect(summary.content).not.toContain('private-');
-    // The failed turns' user messages collapse too; no dead-end bubbles remain.
-    expect(JSON.stringify(body)).not.toContain('Question 2');
+    // The failed turns collapse into one row (no dead-end bubbles), but the
+    // founder's own words stay listed in it, newest first, so none are lost.
+    expect(summary.content).toMatch(
+      /Question 4[\s\S]*Question 3[\s\S]*Question 2/
+    );
+    expect(
+      body.messages.filter(
+        (m: { content: string }) => m.content === 'Question 2'
+      )
+    ).toHaveLength(0);
     expect(JSON.stringify(body)).toContain('Question 5');
   });
 

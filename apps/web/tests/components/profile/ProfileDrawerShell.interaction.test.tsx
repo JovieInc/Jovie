@@ -187,6 +187,7 @@ describe('ProfileDrawerShell keyboard modal contract', () => {
     expect(screen.getByTestId('profile-menu-drawer').parentElement).toHaveClass(
       'z-sheet'
     );
+    expect(screen.queryByTestId('popover-content')).not.toBeInTheDocument();
   });
 
   it('rejects the deliberate-red non-modal menu fixture', () => {

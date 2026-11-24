@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { VIEW_HTML_BLOCK_CSP } from '@/lib/views/html-sandbox';
 import type { ViewSpec } from '@/lib/views/spec';
 import { SAMPLE_VIEW_SPEC } from './ViewRenderer.stories';
 
@@ -35,6 +36,9 @@ describe('ViewRenderer', () => {
     expect(frame).not.toBeNull();
     expect(frame?.getAttribute('sandbox')).toBe('');
     expect(frame?.getAttribute('srcdoc')).toContain('Sandboxed HTML');
+    expect(frame?.getAttribute('srcdoc')).toContain(
+      `content="${VIEW_HTML_BLOCK_CSP}"`
+    );
     expect(container.querySelector('script')).toBeNull();
   });
 

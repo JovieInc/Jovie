@@ -1172,7 +1172,7 @@ describe('ProfileDesktopSurface', () => {
     ).toBeInTheDocument();
     expect(within(secondary).getAllByRole('link')).toHaveLength(3);
     expect(screen.getByTestId('profile-desktop-payments-card')).toBeVisible();
-    expect(screen.getByText('Pay Tim White directly.')).toBeVisible();
+    expect(screen.getByText('Send support directly.')).toBeVisible();
     screen.getByTestId('profile-desktop-open-payments').click();
     expect(onDrawerViewChange).toHaveBeenCalledWith('pay');
   });

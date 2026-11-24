@@ -118,7 +118,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
 
   return (
     <PageToolbar
-      className={cn(LINEAR_SURFACE.toolbar, 'min-h-8')}
+      className={LINEAR_SURFACE.toolbar}
       start={
         onReleaseViewChange ? (
           <ReleaseViewButtons

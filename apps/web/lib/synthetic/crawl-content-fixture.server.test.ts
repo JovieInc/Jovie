@@ -21,7 +21,10 @@ vi.mock('@/lib/db', async () => {
   const { drizzle } = await import('drizzle-orm/pglite');
   const client = new PGlite();
   harness.client = client;
-  return { db: drizzle(client) };
+  return {
+    db: drizzle(client),
+    withRetry: <T>(fn: () => Promise<T>) => fn(),
+  };
 });
 
 const { reconcileCrawlContentFixture, readCrawlContentFixtureState } =
@@ -92,7 +95,7 @@ describe('crawl content fixture reconciler (real Postgres)', () => {
     expect(rows[0]).toMatchObject({
       is_public: true,
       settings: { searchable: false },
-      plan: 'pro',
+      plan: 'trial',
     });
   });
 
@@ -117,6 +120,37 @@ describe('crawl content fixture reconciler (real Postgres)', () => {
     const state = await readCrawlContentFixtureState();
     expect(state.merchCard?.status).toBe('live');
     expect(state.promoDownload?.isActive).toBe(true);
+  });
+
+  it('survives billing reconciliation and keeps the download gate open', async () => {
+    await reconcileCrawlContentFixture({ apply: true });
+    // The reconciliation cron downgrades exactly this selection.
+    const selected = await client().query(
+      'SELECT 1 FROM users WHERE is_pro = true AND stripe_subscription_id IS NULL AND is_admin = false'
+    );
+    expect(selected.rows).toHaveLength(0);
+
+    const { getCreatorEntitlements } = await import(
+      '@/lib/entitlements/creator-plan'
+    );
+    const { rows } = await client().query<{ id: string }>(
+      'SELECT id FROM creator_profiles WHERE username_normalized = $1',
+      [f.handle]
+    );
+    const { plan } = await getCreatorEntitlements(rows[0].id);
+    expect(plan).not.toBe('free');
+  });
+
+  it('heals a plan that something downgraded', async () => {
+    await reconcileCrawlContentFixture({ apply: true });
+    await client().query(
+      "UPDATE users SET plan = 'free', is_pro = false WHERE email = $1",
+      [f.email]
+    );
+    const drifted = await reconcileCrawlContentFixture({ apply: false });
+    expect(actions(drifted.steps)).toContain('user:converge');
+    const healed = await reconcileCrawlContentFixture({ apply: true });
+    expect(healed.converged).toBe(true);
   });
 
   it('refuses the handle when another user owns it, before any write', async () => {

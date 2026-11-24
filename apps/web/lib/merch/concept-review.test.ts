@@ -40,14 +40,18 @@ const plan: MerchConceptPlan = {
 };
 
 describe('pre-art concept admission', () => {
-  it('requires persisted review; source ownership or a phrase preference is not approval', () => {
+  it('allows only a private draft without a persisted review; ownership or a phrase preference is not approval', () => {
     for (const feedback of founderFeedbackFixtures) {
       const result = evaluateMerchConceptPlan(
         { ...plan, feedback: [feedback] },
         null,
         now
       );
-      expect(result.decision).toBe('review_required');
+      expect(result.decision).toBe('draft');
+      expect(result.reasons).toEqual(['concept.review_required']);
+      expect(
+        getMerchConceptPublicationBlockers({ conceptReview: result })
+      ).toHaveLength(1);
       expect(result.imageCallsExecuted).toBe(0);
       expect(result.artworkHash).toBeNull();
     }

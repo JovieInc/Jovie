@@ -1,7 +1,7 @@
 {
   "schema": "jovie.waste/v1",
   "description": "One registry for company-wide waste. Every class is normalised to an outcome (per active user, per merged PR, per day) so anomalies show while absolute numbers are small. Read by scripts/capacity/waste.py, which runs inside the existing capacity collector pass (no new daemon). Detections become jovie-factory-signal/v1 files, which scripts/lanes/factory_intake.py files as compounding Linear issues. Tech debt is waste. No quarterly paydowns: JovieInc/ci canon/COMPANY.md.",
-  "updatedAt": "2026-10-30T00:00:00Z",
+  "updatedAt": "2026-11-23T00:00:00Z",
   "fixStream": {
     "signalLabel": "waste",
     "workstream": "ws:symphony-throughput (compounding: ranked first by lane_runner.admission_order)",
@@ -373,7 +373,7 @@
     {
       "id": "tech-debt",
       "label": "Tech debt (a form of waste)",
-      "owner": "ci",
+      "owner": "summer",
       "unit": "oversized files; slop ratchet size",
       "metrics": [
         {
@@ -389,6 +389,8 @@
         }
       ],
       "feeds": [
+        "gem:waste-loop → waste-latest.json (Summer owns tech-debt class observe/prioritize; no separate debt workflow)",
+        "follow-up observer (not this PR): cert-screens.debt cardinality via docs/design-system/cert-screens.json — repair stays ds-cert-loop",
         "scripts/waste-sweep.mjs dead code (#23690)",
         "slop ratchets",
         "findings ledger (#23709)"
