@@ -1,5 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import {
+  cloneElement,
+  isValidElement,
+  type MouseEvent,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 // ── Mock @jovie/ui Popover primitives ──
@@ -17,7 +24,7 @@ vi.mock('@jovie/ui', async importOriginal => {
       open,
       onOpenChange,
     }: {
-      children: React.ReactNode;
+      children: ReactNode;
       open?: boolean;
       onOpenChange?: (open: boolean) => void;
     }) => {
@@ -27,23 +34,34 @@ vi.mock('@jovie/ui', async importOriginal => {
     },
     PopoverTrigger: ({
       children,
+      asChild,
     }: {
-      children: React.ReactNode;
+      children: ReactNode;
       asChild?: boolean;
-    }) => (
-      // biome-ignore lint/a11y/useKeyWithClickEvents: test mock only
-      // biome-ignore lint/a11y/noStaticElementInteractions: test mock only
-      <div
-        data-testid='popover-trigger'
-        onClick={() => popoverOnOpenChange?.(!popoverOpen)}
-      >
-        {children}
-      </div>
-    ),
+    }) => {
+      const open = () => popoverOnOpenChange?.(!popoverOpen);
+      if (asChild && isValidElement(children)) {
+        const child = children as ReactElement<{
+          onClick?: (event: MouseEvent) => void;
+        }>;
+        return cloneElement(child, {
+          'data-testid': 'popover-trigger',
+          onClick: (event: MouseEvent) => {
+            child.props.onClick?.(event);
+            open();
+          },
+        } as never);
+      }
+      return (
+        <button data-testid='popover-trigger' type='button' onClick={open}>
+          {children}
+        </button>
+      );
+    },
     PopoverContent: ({
       children,
     }: {
-      children: React.ReactNode;
+      children: ReactNode;
       [key: string]: unknown;
     }) =>
       popoverOpen ? <div data-testid='popover-content'>{children}</div> : null,
