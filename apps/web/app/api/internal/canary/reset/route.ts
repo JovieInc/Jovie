@@ -52,6 +52,14 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
  * construction. The budget still bounds only resets of the ONE fixed
  * claim-walk canary account; every other gate (bearer, single-use scoped
  * passage token, kill switch) is unchanged.
+ *
+ * Supersedes #26888 (merged 207e258d), which sized this 6→12 aligned to the
+ * then-shared 12/h passage-grant allowance on the theory that allowance
+ * was the walk's ceiling. It was the ceiling only because the walk shared
+ * the visitor bucket; #26885 gives canary-walk scopes (`canary_reset`,
+ * `canary_checkout`) a dedicated 30/h passage-grant limiter
+ * (`synthetic_passage_canary_walk`, see `passage-token.server.ts`), so the
+ * shared 12/h no longer ceilings this route and the 12 sizing is obsolete.
  */
 const canaryResetLimiter = createRateLimiter(
   {
