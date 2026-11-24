@@ -20,6 +20,22 @@ function ChatAlbumArtCardStoryShell({
   );
 }
 
+const dreamPopCandidate = {
+  id: 'candidate-1',
+  styleId: 'dream-pop',
+  styleLabel: 'Dream Pop',
+  previewUrl: 'https://placehold.co/256x256',
+  fullResUrl: 'https://placehold.co/1024x1024',
+} as const;
+
+const vaporwaveCandidate = {
+  id: 'candidate-2',
+  styleId: 'vaporwave',
+  styleLabel: 'Vaporwave',
+  previewUrl: 'https://placehold.co/256x256',
+  fullResUrl: 'https://placehold.co/1024x1024',
+} as const;
+
 const generatedResult: ChatAlbumArtToolResult = {
   success: true,
   state: 'generated',
@@ -28,22 +44,7 @@ const generatedResult: ChatAlbumArtToolResult = {
   artistName: 'Sasha Waves',
   generationId: 'gen-1',
   hasExistingArtwork: false,
-  candidates: [
-    {
-      id: 'candidate-1',
-      styleId: 'dream-pop',
-      styleLabel: 'Dream Pop',
-      previewUrl: 'https://placehold.co/256x256',
-      fullResUrl: 'https://placehold.co/1024x1024',
-    },
-    {
-      id: 'candidate-2',
-      styleId: 'vaporwave',
-      styleLabel: 'Vaporwave',
-      previewUrl: 'https://placehold.co/256x256',
-      fullResUrl: 'https://placehold.co/1024x1024',
-    },
-  ],
+  candidates: [dreamPopCandidate, vaporwaveCandidate],
 };
 
 const needsReleaseTargetResult: ChatAlbumArtToolResult = {
@@ -88,6 +89,109 @@ export const GeneratedCandidates: Story = {
   args: {
     result: generatedResult,
   },
+};
+
+export const LoadingApplyPending: Story = {
+  args: {
+    result: {
+      ...generatedResult,
+      candidates: [dreamPopCandidate],
+    },
+  },
+  decorators: [
+    Story => {
+      globalThis.localStorage.setItem(ALBUM_ART_SWIPE_PREFERENCE_KEY, 'off');
+      return <Story />;
+    },
+  ],
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Apply/create mutations expose isPending; certificate scores loading from that path.',
+      },
+    },
+  },
+};
+
+export const EmptyCandidates: Story = {
+  args: {
+    result: {
+      ...generatedResult,
+      candidates: [],
+    },
+  },
+  decorators: [
+    Story => {
+      globalThis.localStorage.setItem(ALBUM_ART_SWIPE_PREFERENCE_KEY, 'off');
+      return <Story />;
+    },
+  ],
+};
+
+export const LongContentReleaseTitle: Story = {
+  args: {
+    result: {
+      ...generatedResult,
+      releaseTitle:
+        'Final International Tour Deluxe Edition Master — Midnight City Lights Remastered Anniversary Collection',
+      candidates: [
+        {
+          ...dreamPopCandidate,
+          styleLabel: 'Dream Pop Extended Label For Overflow',
+        },
+      ],
+    },
+  },
+  decorators: [
+    Story => {
+      globalThis.localStorage.setItem(ALBUM_ART_SWIPE_PREFERENCE_KEY, 'off');
+      return (
+        <div className='w-56'>
+          <Story />
+        </div>
+      );
+    },
+  ],
+};
+
+export const OfflineDisconnected: Story = {
+  args: {
+    result: failedResult,
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Offline/disconnected apply path shares the failed artifact surface (retryable tool error).',
+      },
+    },
+  },
+};
+
+export const RtlOverflowTitle: Story = {
+  args: {
+    result: {
+      ...generatedResult,
+      releaseTitle: 'ألبوم الأحلام الليلية للإصدار النهائي',
+      candidates: [
+        {
+          ...dreamPopCandidate,
+          styleLabel: 'بوب الأحلام',
+        },
+      ],
+    },
+  },
+  decorators: [
+    Story => {
+      globalThis.localStorage.setItem(ALBUM_ART_SWIPE_PREFERENCE_KEY, 'off');
+      return (
+        <div dir='rtl' className='w-56'>
+          <Story />
+        </div>
+      );
+    },
+  ],
 };
 
 export const SwipeReviewOnboarding: Story = {
