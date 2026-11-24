@@ -2425,6 +2425,13 @@
       "offline": "LoadingSkeleton never fetches; its owner decides what replaces it when a request cannot be made, and the detector matched the word skeleton.",
       "permission-denied": "LoadingSkeleton has no gated action or permission input; the detector matched role='status' on its loading regions."
     },
+    "apps/web/components/molecules/LocationPicker.tsx": {
+      "loading": "The picker never fetches; POPULAR_CITIES is a static constant and open only filters it. There is no loading chrome.",
+      "error": "City search is a local string filter over a fixed list; there is no network or parse failure face.",
+      "partial": "A selected city is a complete string (catalog or free-text). There is no half-loaded data face.",
+      "offline": "No fetch or mutation; opening the list works offline. The detector matched Search/filter UI only.",
+      "permission-denied": "A public city picker with no gated action or permission input; the detector matched role/button options."
+    },
     "apps/web/components/molecules/MeasuredValue.tsx": {
       "empty": "MeasuredValue renders one reading and owns no collection; a missing reading is its unknown state (the Unknown and NeverSeen stories). The detector matched the items-center class on the unknown branch."
     },
