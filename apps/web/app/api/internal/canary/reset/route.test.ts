@@ -5,7 +5,13 @@ const mocks = vi.hoisted(() => ({
   env: { SYNTHETIC_PASSAGE_TOKENS_DISABLED: undefined as string | undefined },
   cronAuth: vi.fn(),
   passageResolve: vi.fn(),
-  createLimiter: vi.fn(),
+  // Plain-array config log: the route constructs its limiter ONCE at module
+  // import, and the assertion below must see that call. Mock call records
+  // do not survive the per-test clearing (this file's clearAllMocks, plus
+  // the shared setup's restoreAllMocks in the shared-worker pilot shard) —
+  // a plain array does (same pattern as walkConfigs in
+  // passage-token.server.test.ts).
+  limiterConfigs: [] as unknown[][],
   limiter: vi.fn(),
   count: vi.fn(),
   execute: vi.fn(),
@@ -24,10 +30,10 @@ vi.mock('@/lib/rate-limit', () => ({
   // scope, BEFORE any beforeEach runs, so the bare-mock export
   // (`createRateLimiter: mocks.createLimiter`) returned undefined there and
   // every POST test reaching the budget step crashed on
-  // `canaryResetLimiter.limit`. Record the call on the mock (the route-local
-  // config assertion below needs it) and always return the shared limiter.
+  // `canaryResetLimiter.limit`. Record the call in the plain config log
+  // (immune to mock clearing) and always return the shared limiter.
   createRateLimiter: (...args: unknown[]) => {
-    mocks.createLimiter(...args);
+    mocks.limiterConfigs.push(args);
     return { limit: mocks.limiter };
   },
 }));
@@ -56,18 +62,7 @@ function grantFor(run: string) {
 
 describe('POST /api/internal/canary/reset', () => {
   beforeEach(() => {
-    // Per-mock clears instead of vi.clearAllMocks(): the route constructs
-    // its limiter ONCE at module import, and the route-local config
-    // assertion below requires that single import-time call to survive.
-    for (const mock of [
-      mocks.cronAuth,
-      mocks.passageResolve,
-      mocks.limiter,
-      mocks.count,
-      mocks.execute,
-    ]) {
-      mock.mockClear();
-    }
+    vi.clearAllMocks();
     mocks.env.SYNTHETIC_PASSAGE_TOKENS_DISABLED = undefined;
     mocks.cronAuth.mockReturnValue(null);
     mocks.passageResolve.mockResolvedValue(grantFor('run-1'));
@@ -183,15 +178,22 @@ describe('POST /api/internal/canary/reset', () => {
   });
 
   it('configures the per-run limiter as route-local and fail-closed', async () => {
-    expect(mocks.createLimiter).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({
-        name: 'Canary Reset (per run)',
-        limit: 12,
-        prefix: 'canary_reset_run',
-        requireRedis: true,
-      }),
-      expect.objectContaining({ requireRedis: true })
+    // Read the plain config log, not a mock call record: the construction
+    // happens once at module import and mock history is cleared between
+    // tests, while the array survives.
+    const perRun = mocks.limiterConfigs.filter(
+      args =>
+        (args[0] as { name?: string } | undefined)?.name ===
+        'Canary Reset (per run)'
     );
+    expect(perRun).toHaveLength(1);
+    expect(perRun[0]?.[0]).toMatchObject({
+      name: 'Canary Reset (per run)',
+      limit: 12,
+      prefix: 'canary_reset_run',
+      requireRedis: true,
+    });
+    expect(perRun[0]?.[1]).toMatchObject({ requireRedis: true });
   });
 
   it.each([
