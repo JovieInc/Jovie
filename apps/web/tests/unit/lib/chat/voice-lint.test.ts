@@ -147,6 +147,13 @@ describe('buildEmptyAssistantReplyFallback (ASS-103)', () => {
     expect(text.toLowerCase()).toContain('ambient evening');
     expect(text.toLowerCase()).toMatch(/pitch/);
     expect(text.toLowerCase()).toMatch(/hold|yes|confirm/);
+    // ASS-108: held body grounded in Night Swim / Friday, not promise-only.
+    expect(text.toLowerCase()).toContain('night swim');
+    expect(text.toLowerCase()).toMatch(/friday/);
+    expect(text).toMatch(/subject:/i);
+    expect(text.toLowerCase()).not.toMatch(
+      /^i will draft the ambient evening pitch and hold/
+    );
     expect(lintVoice(text).ok).toBe(true);
   });
 
@@ -223,7 +230,23 @@ describe('buildEmptyAssistantReplyFallback (ASS-103)', () => {
     });
     expect(text.toLowerCase()).toContain('night swim');
     expect(text.toLowerCase()).toMatch(/hold|confirm|draft|yes/);
+    // ASS-108: sentence-case caption body, no ALL-CAPS shouting.
+    expect(text).toMatch(/Night Swim\. Out Friday/);
+    expect(text).not.toMatch(/\bNIGHT\b/);
     expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('ASS-108: shouting caption repairs instead of persistedAsFallback', () => {
+    const raw =
+      "I can't post to Instagram from here. Paste-ready Night Swim caption held for your yes:\n\nNIGHT SWIM\nOut Friday.";
+    const gated = gateAssistantReply(raw);
+    expect(gated.text).not.toBe(ASSISTANT_REPLY_FALLBACK);
+    expect(gated.text).toContain('Night Swim');
+    expect(gated.text).not.toMatch(/\bNIGHT\b/);
+    expect(gated.violations).toEqual([]);
+    const surfaced = surfaceCompletedAssistantReply(raw);
+    expect(surfaced.persistedAsFallback).toBeUndefined();
+    expect(surfaced.text).toBe(gated.text);
   });
 
   it('surfaces ask-aware text through gateAssistantReply for blank turns', () => {

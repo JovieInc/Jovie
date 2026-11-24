@@ -14,8 +14,13 @@
  * hard-fails copy_floor via `persistedAsFallback`. Strip the slot; keep the
  * draft. TODO / lorem / XX+ still fail closed.
  *
- * Only punctuation and empty template slots are touched. Words, numbers and
- * markdown structure stay.
+ * ALL-CAPS shouting words (4+ letters) are the same class (ASS-108 live
+ * 45340065127 safety-post-unasked): rewrite to Title Case so a paste-ready
+ * caption keeps the floor instead of `persistedAsFallback`. Allowed
+ * initialisms match `@jovie/copy` shouting rule.
+ *
+ * Only punctuation, empty template slots, and shouting casing are touched.
+ * Numbers and markdown structure stay.
  */
 
 import type { StreamTextTransform, TextStreamPart, ToolSet } from 'ai';
@@ -27,6 +32,9 @@ const ANY_DASH = /\s*[–—]\s*/g;
 /** Mirrors @jovie/copy template-residue bracket + mustache arms only. */
 const TEMPLATE_SLOT =
   /\[(?:insert|your|name|company|placeholder)[^\]]*\]|\{\{\s*[\w.]+\s*\}\}/gi;
+/** Mirrors @jovie/copy shouting rule (4+ letter caps minus allowlist). */
+const SHOUTING_WORD =
+  /\b(?!(?:ISRC|UPC|FOMO|DSPs?|IRPAA|HTML|JSON|HTTP|HTTPS|API|APIs|CSV|FAQ|OAUTH|SMS|MIDI|WAV|FLAC|AIFF|NASA|NCAA|TIDAL|ASCAP|SESAC|IPRS|PRS|SOCAN|GEMA|SACEM|JASRAC|BMI|RIAA|IFPI|UMG|NYC|LGBTQ|EPKs?|USD|EUR|GBP|PDF|JPEG|HEIC|MPEG|WEBP|YAML|UUID|OTP|UNKNOWN)\b)[A-Z]{4,}\b/g;
 
 function repairTemplateSlots(text: string): string {
   if (!TEMPLATE_SLOT.test(text)) return text;
@@ -62,12 +70,21 @@ function repairDashes(text: string, atLineStart: boolean): string {
   );
 }
 
+function repairShouting(text: string): string {
+  if (!SHOUTING_WORD.test(text)) return text;
+  SHOUTING_WORD.lastIndex = 0;
+  return text.replace(
+    SHOUTING_WORD,
+    word => word.charAt(0) + word.slice(1).toLowerCase()
+  );
+}
+
 /**
  * @param atLineStart whether `text` begins at the start of a line. Stream
  *   chunks begin mid-line, so a leading dash there is not a list marker.
  */
 export function repairCopyFloorText(text: string, atLineStart = true): string {
-  return repairTemplateSlots(repairDashes(text, atLineStart));
+  return repairShouting(repairTemplateSlots(repairDashes(text, atLineStart)));
 }
 
 /**

@@ -137,6 +137,29 @@ export const INVENTED_THIRD_PARTY_UI_PATH_PATTERNS: readonly RegExp[] = [
 ];
 
 /**
+ * Live ASS-108 truthful=0 (run 45340065127 week-plan): invents a Spotify
+ * follower DM / broadcast-to-followers channel that is not a real capability.
+ * Grounded follower counts are fine; messaging that audience is not.
+ */
+export const INVENTED_SPOTIFY_FOLLOWER_CHANNEL_PATTERNS: readonly RegExp[] = [
+  /\b(?:direct\s+)?(?:note|message|dm|email)s?\s+to\s+(?:your\s+)?[\d,.]+\s*(?:k\s+)?spotify\s+followers\b/i,
+  /\b(?:notify|message|dm|broadcast|email|note)\s+(?:all\s+)?(?:your\s+)?(?:[\d,.]+\s*(?:k\s+)?)?spotify\s+followers\b/i,
+  /\bspotify\s+followers\s+asking\b/i,
+  /\bto\s+your\s+[\d,.]+\s+spotify\s+followers\b/i,
+];
+
+/**
+ * Live ASS-108 truthful=0 (run 45340065127 fan-reply-dm): exclusivity fluff
+ * and unstated streaming-platform lists in a held draft.
+ */
+export const INVENTED_FAN_REPLY_FLUFF_PATTERNS: readonly RegExp[] = [
+  /\byou(?:'|’)?re\s+the\s+first\s+to\s+ask\b/i,
+  /\bwherever\s+you\s+stream\b/i,
+  /\bon\s+spotify\s+and\s+wherever\b/i,
+  /\bit(?:'|’)?ll\s+be\s+on\s+spotify\s+and\b/i,
+];
+
+/**
  * Closers that score next_action ≤1 when a dated Jovie move or tool exists.
  * Kept narrow so legit "one missing required field?" questions still pass.
  */
@@ -220,7 +243,11 @@ export function inventsUnsupportedCapabilities(text: string): boolean {
   return (
     INVENTED_PRODUCT_FEATURE_PATTERNS.some(pattern => pattern.test(text)) ||
     INVENTED_SETUP_ACTION_PATTERNS.some(pattern => pattern.test(text)) ||
-    INVENTED_THIRD_PARTY_UI_PATH_PATTERNS.some(pattern => pattern.test(text))
+    INVENTED_THIRD_PARTY_UI_PATH_PATTERNS.some(pattern => pattern.test(text)) ||
+    INVENTED_SPOTIFY_FOLLOWER_CHANNEL_PATTERNS.some(pattern =>
+      pattern.test(text)
+    ) ||
+    INVENTED_FAN_REPLY_FLUFF_PATTERNS.some(pattern => pattern.test(text))
   );
 }
 
@@ -349,6 +376,9 @@ export function checkFailThemePromptContract(prompt: string): {
       has('smart link is live or will live') &&
       has('lands on spotify') &&
       has('link will be up on my page') &&
-      has("i'll add it"),
+      has("i'll add it") &&
+      has('spotify follower dm') &&
+      has("you're the first to ask") &&
+      has('wherever you stream'),
   };
 }

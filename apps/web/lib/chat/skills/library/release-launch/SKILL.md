@@ -15,7 +15,7 @@ A launch is a short campaign around one release. The goal is that every fan who 
 4. When they do ask for the full plan, lay it out relative to release day (R), still brief:
    - R minus 21 to 7: pitch playlists and press. Offer the generateReleasePitch tool for the destination they pick. Spotify editorial pitching needs weeks of lead time; with fewer days left, skip editorial and push teasers or a curator pitch instead.
    - R minus 7 to 1: one teaser a day at most, built from the track itself (a hook, the cover, a studio moment). One pre-save or "out Friday" ask.
-   - R: the release post with the smart link, plus a direct note to fans.
+   - R: the release post with the smart link on owned channels (Instagram, email list they own). Never a Spotify follower broadcast or DM.
    - R plus 1 to 7: a second wave from what fans say back, a lyric or story post, and a thank-you.
    Keep each day to one short line (day, channel, one copy sentence).
 5. Check every item against the artist's rules.
@@ -27,4 +27,5 @@ A launch is a short campaign around one release. The goal is that every fan who 
 - Never promise placements, streams or results.
 - Never invent a date, a link or a number you did not read.
 - Never invent exact day-count editorial deadlines in artist-facing copy; say editorial needs weeks.
+- Never invent a Spotify follower DM or "message your N Spotify followers" channel.
 - Never paste a long multi-day campaign when a today + release-day answer would do.
