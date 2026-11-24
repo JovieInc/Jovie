@@ -47,7 +47,7 @@ describe('PlainButton', () => {
     render(<PlainButton className={`px-2 ${focusClasses}`}>Row</PlainButton>);
     const button = screen.getByRole('button', { name: 'Row' });
     expect(button).not.toHaveClass('focus-visible:ring-focus');
-    expect(button.className).toBe(`px-2 ${focusClasses}`);
+    expect(button.className).toBe(`press px-2 ${focusClasses}`);
   });
 
   it('marks and blocks a disabled button', async () => {
@@ -99,5 +99,19 @@ describe('PlainButton', () => {
       </div>
     );
     await expectNoA11yViolations(container);
+  });
+});
+
+describe('PlainButton press', () => {
+  it('presses through the shared press utility', () => {
+    render(<PlainButton>Row</PlainButton>);
+    expect(screen.getByRole('button', { name: 'Row' })).toHaveClass('press');
+  });
+
+  it('keeps press hooks the CSS gate reads on a disabled button', () => {
+    render(<PlainButton disabled>Row</PlainButton>);
+    const button = screen.getByRole('button', { name: 'Row' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('data-disabled');
   });
 });

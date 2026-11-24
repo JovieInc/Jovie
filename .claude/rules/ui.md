@@ -566,7 +566,7 @@ This is the subtraction principle applied specifically to container boundaries. 
 
 - Hover states must not move layout or shift components without a product reason.
 - Do **NOT** use `translate`, `scale`, lift-on-hover, or floating-card motion on buttons, cards, screenshots, auth surfaces, or marketing panels as a default polish move.
-- Press/click compression is opt-in and uses the shared `--scale-press` token (`0.98`) only when an action has no immediate visible response. Dropdowns, accordions, tabs, toggles, and rail controls already communicate their state change and must not scale. Shared controls must disable the transform under reduced motion.
+- Every clickable presses through the shared `press` utility (scale `--scale-press` and a slight darken on pointer down, spring release, darken only under reduced motion; disabled, static and busy never press). No ripple, no hardcoded press scale; see `motion.md` Press feedback.
 - Menus, panels, drawers, and sidebars may use intentional `translate`/`scale` motion for open/close because the movement communicates spatial state.
 - Prefer background-color, border-color, text-color, opacity, or shadow changes for hover feedback.
 - If motion is necessary because the UI is directly manipulating something spatial, it must be intentional and clearly tied to that interaction.

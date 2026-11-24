@@ -102,9 +102,10 @@ describe('PublicShareActionList', () => {
   it('aligns rows to the drawer header they sit under', () => {
     const { rerender } = render(<PublicShareActionList context={context} />);
     const row = () => screen.getAllByRole('button')[0];
-    // Rows are PlainButtons, so they carry its keyboard focus ring first.
+    // Rows are PlainButtons, so they carry the shared press state and its
+    // keyboard focus ring first.
     const withFocus = (rowClass: string) =>
-      `${plainButtonFocusClassName} ${rowClass}`;
+      `press ${plainButtonFocusClassName} ${rowClass}`;
     expect(row().className).toBe(withFocus(PUBLIC_SHARE_MENU_ITEM_CLASS));
 
     // Under a back button: icons centre under it, labels on the title edge.

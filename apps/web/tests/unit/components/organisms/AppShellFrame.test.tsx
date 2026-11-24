@@ -12,6 +12,9 @@ afterEach(() => {
 describe('AppShellFrame', () => {
   it('mounts exactly one deferred titlebar in the desktop shell', async () => {
     document.documentElement.dataset.desktopRuntime = 'electron';
+    // Warm the deferred chunk first so a cold import under a loaded runner
+    // cannot outlast findBy's wait. The slot still mounts it lazily.
+    await import('@/components/organisms/DesktopTitlebar');
     render(<AppShellFrame sidebar={null} main={<div>Desktop content</div>} />);
 
     const titlebar = await screen.findByTestId('electron-titlebar-row');

@@ -46,7 +46,11 @@ export const PlainButton = React.forwardRef<
       disabled={disabled}
       data-slot='plain-button'
       data-disabled={disabled ? '' : undefined}
-      className={cn(!ownsFocus && plainButtonFocusClassName, className)}
+      className={cn(
+        'press',
+        !ownsFocus && plainButtonFocusClassName,
+        className
+      )}
       {...props}
     />
   );

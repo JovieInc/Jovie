@@ -44,6 +44,23 @@ describe('ChatStyleLinkItem', () => {
     expect(deleteAction.className).toContain('bg-error');
     expect(deleteAction.className).not.toMatch(/\bred-\d/);
   });
+  it('presses its row actions through the shared press utility', () => {
+    render(
+      <ChatStyleLinkItem
+        id='link-1'
+        link={link}
+        index={0}
+        onToggle={vi.fn()}
+        onRemove={vi.fn()}
+        onEdit={vi.fn()}
+        visible
+        openMenuId={null}
+        onAnyMenuOpen={vi.fn()}
+        isLastAdded={false}
+      />
+    );
+    expect(screen.getByLabelText('Delete Spotify')).toHaveClass('press');
+  });
   function renderItem(
     overrides: Partial<React.ComponentProps<typeof ChatStyleLinkItem>> = {}
   ) {

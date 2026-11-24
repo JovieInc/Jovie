@@ -381,33 +381,35 @@ describe('Button', () => {
     expect(btn.className).not.toContain('text-accent-foreground');
   });
 
-  it('keeps tactile press feedback opt-in with a static override', () => {
+  it('presses by default through the shared press utility', () => {
     render(
       <>
         <Button>Default</Button>
-        <Button pressFeedback>Press</Button>
-        <Button pressFeedback static>
-          Static
-        </Button>
+        <Button pressFeedback>Deprecated</Button>
+        <Button static>Static</Button>
+        <Button disabled>Disabled</Button>
+        <Button loading>Loading</Button>
       </>
     );
 
+    for (const name of ['Default', 'Deprecated']) {
+      const button = screen.getByRole('button', { name });
+      expect(button).toHaveClass('press');
+      expect(button).toHaveAttribute('data-press-feedback', 'true');
+    }
+    // The utility owns the scale and gates disabled/static/busy in CSS.
+    const static_ = screen.getByRole('button', { name: 'Static' });
+    expect(static_).toHaveAttribute('data-static', 'true');
+    expect(static_).not.toHaveAttribute('data-press-feedback');
+    expect(screen.getByRole('button', { name: 'Disabled' })).toBeDisabled();
     expect(
-      screen.getByRole('button', { name: 'Default' }).className
-    ).not.toContain('active:scale-press');
-    expect(screen.getByRole('button', { name: 'Press' }).className).toContain(
-      'active:scale-press'
-    );
-    expect(screen.getByRole('button', { name: 'Press' }).className).toContain(
-      'motion-reduce:active:scale-100'
-    );
+      screen.getByRole('button', { name: 'Disabled' })
+    ).not.toHaveAttribute('data-press-feedback');
     expect(
-      screen.getByRole('button', { name: 'Static' }).className
-    ).not.toContain('active:scale-press');
-    expect(screen.getByRole('button', { name: 'Press' })).toHaveAttribute(
-      'data-press-feedback',
-      'true'
-    );
+      screen
+        .getAllByRole('button')
+        .some(node => node.getAttribute('aria-busy') === 'true')
+    ).toBe(true);
   });
 
   it('uses the Jovie focus token', () => {
@@ -417,16 +419,13 @@ describe('Button', () => {
     expect(btn.className).toContain('focus-visible:ring-offset-surface-page');
   });
 
-  it('keeps normal focus transitions while disabling them for reduced motion', () => {
+  it('takes its transitions from the shared press utility alone', () => {
     render(<Button>Press</Button>);
     const btn = screen.getByRole('button');
 
-    expect(btn.className).toContain(
-      'transition-[background-color,border-color,color,box-shadow,opacity,transform]'
-    );
-    expect(btn.className).toContain('duration-subtle');
-    expect(btn.className).toContain('ease-subtle');
-    expect(btn.className).toContain('motion-reduce:transition-none');
+    expect(btn).toHaveClass('press');
+    expect(btn.className).not.toMatch(/(?:^|\s)transition-\[/);
+    expect(btn.className).not.toContain('duration-subtle');
   });
 
   it('keeps secondary buttons borderless at rest with tokenized hover', () => {

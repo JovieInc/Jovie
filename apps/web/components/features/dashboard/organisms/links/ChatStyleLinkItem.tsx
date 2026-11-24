@@ -205,7 +205,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
               type='button'
               className={cn(
                 'flex h-11 w-11 cursor-grab items-center justify-center rounded-md sm:h-8 sm:w-8',
-                'text-tertiary-token transition-colors',
+                'text-tertiary-token',
                 'hover:text-secondary-token active:cursor-grabbing active:text-primary-token',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
               )}
@@ -258,7 +258,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
             ref={floatingRefs.setReference}
             className={cn(
               'inline-flex h-11 w-11 items-center justify-center rounded-md sm:h-9 sm:w-9 sm:rounded-lg',
-              'text-secondary-token transition-colors',
+              'text-secondary-token',
               'hover:bg-surface-1 hover:text-primary-token active:bg-surface-2 active:text-primary-token',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
             )}
