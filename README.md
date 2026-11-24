@@ -29,7 +29,7 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 - **Turborepo 2.8** - Monorepo build system with intelligent caching, shared worktree cache, and `turbo docs` CLI
 
 ### Authentication & Security
-- **Clerk 7** - Complete user management with social login, MFA, and webhooks
+- **Better Auth** - Self-hosted authentication with email OTP and social login. See [the web auth architecture](apps/web/lib/auth/README.md).
 - **Doppler** - Centralized secrets management with audit logging (see [docs/DOPPLER_SETUP.md](docs/DOPPLER_SETUP.md))
 
 ### Database & ORM
@@ -77,7 +77,7 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 - 🔗 **Link-in-Bio** - Centralized link hub with click tracking
 - 💸 **Tipping & Payments** - Integrated Stripe payments with subscription support
 - 📊 **Analytics Dashboard** - Real-time creator analytics
-- 🔐 **Row Level Security** - Database-level security with Clerk JWT integration
+- 🔐 **Row Level Security** - Database-level access control with PostgreSQL policies
 - 📱 **Mobile Optimized** - Responsive design with touch-friendly UI
 - ⚡ **Edge Performance** - Server-side rendering with edge optimization
 - 🌙 **Dark Mode** - System-aware theme switching
@@ -93,7 +93,6 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 - **Doppler CLI** (secrets management) - [Install Guide](docs/DOPPLER_SETUP.md)
 - **Accounts Required:**
   - [Neon](https://neon.tech/) - PostgreSQL database
-  - [Clerk](https://clerk.com/) - Authentication
   - [Stripe](https://stripe.com/) - Payments
   - [Doppler](https://doppler.com/) - Secrets management
   - [Statsig](https://statsig.com/) - Feature flags and experiments (optional)
@@ -140,7 +139,6 @@ Useful local speed toggles:
 
 ```bash
 JOVIE_DEV_RESET_NEXT_CACHE=1 ./scripts/setup.sh
-JOVIE_DEV_SYNC_CLERK_IDS=1 ./scripts/setup.sh
 JOVIE_ENABLE_LOCAL_SENTRY=1 pnpm run dev:web:fast
 JOVIE_DEV_RESET_NEXT_CACHE=1 pnpm run benchmark:dev
 ```
@@ -336,9 +334,10 @@ Create `.env.local` with the following:
 # App
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
-# Clerk Authentication
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
+# Better Auth (use a generated local secret; never commit it)
+BETTER_AUTH_SECRET=replace-with-32-plus-random-bytes
+BETTER_AUTH_URL=http://localhost:3000
+NEXT_PUBLIC_BETTER_AUTH_URL=http://localhost:3000
 
 # Neon Database
 DATABASE_URL=postgresql://...
@@ -397,7 +396,6 @@ doppler run --project jovie-web --config prd -- pnpm --filter @jovie/web run dri
 
 ### Errors
 - **Sentry** - Error tracking, stack traces, user context
-- **Clerk Dashboard** - Authentication errors, login analytics
 - **Neon Dashboard** - Database errors, connection issues
 
 ### Feature Flags
@@ -407,7 +405,7 @@ doppler run --project jovie-web --config prd -- pnpm --filter @jovie/web run dri
 
 ### Core Tables
 
-- `users` - User accounts (synced with Clerk)
+- `users` - Application accounts mapped to Better Auth identities
 - `creator_profiles` - Artist/creator profile data
 - `social_links` - Social media and platform links
 - `click_events` - Link click tracking and analytics
@@ -416,7 +414,7 @@ doppler run --project jovie-web --config prd -- pnpm --filter @jovie/web run dri
 
 ### Row Level Security (RLS)
 
-All tables use PostgreSQL RLS with Clerk JWT integration:
+Application authorization uses PostgreSQL RLS where configured:
 
 - Users can only access their own data
 - Public profiles respect visibility settings
@@ -427,8 +425,8 @@ All tables use PostgreSQL RLS with Clerk JWT integration:
 
 This project has evolved through several migrations:
 
-1. **Supabase → Neon + Clerk** (2025)
-   - Auth: Supabase Auth → Clerk
+1. **Data and authentication migrations**
+   - Web authentication now uses self-hosted Better Auth
    - Database: Supabase PostgreSQL → Neon PostgreSQL
    - ORM: Supabase client → Drizzle ORM
 

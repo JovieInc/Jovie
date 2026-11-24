@@ -8,7 +8,6 @@
 
 | Route | Provider | Verification | Events Handled | Key Side Effects |
 |-------|----------|-------------|----------------|------------------|
-| `/api/clerk/webhook` | Clerk | Svix (`svix-id/timestamp/signature` + `CLERK_WEBHOOK_SECRET`) | `user.created`, `user.updated`, `user.deleted` | **created:** syncs metadata, stops outbound sales, sends founder welcome, Slack notify. **updated:** syncs verified email changes, invalidates proxy cache. **deleted:** soft-deletes DB user. |
 | `/api/stripe/webhooks` | Stripe (subscriptions) | Stripe signature (`stripe-signature` + `STRIPE_WEBHOOK_SECRET`) | `checkout.session.completed`, `customer.subscription.created/updated/deleted`, `invoice.payment_succeeded/failed`, `charge.refunded`, `charge.dispute.created` | Idempotent via `stripeWebhookEvents` table. **checkout:** activates Pro, activates referrals. **subscription:** updates billing status, Slack notify. **payment failed:** revokes Pro, sends dunning email. **refund/dispute:** revokes Pro on a subscription charge and cancels the live Stripe subscription so reconciliation cannot restore it. |
 | `/api/webhooks/instantly` | Instantly | Custom `Authorization: Bearer` header (`INSTANTLY_WEBHOOK_SECRET`, timing-safe; campaign-scoped) | `reply_received` | Records one `email_replied` funnel milestone per enrolled lead, deduped by the existing database unique key. Ignores auto-replies and unknown campaigns/contacts; fails closed on config, auth and persistence errors. See [commissioning runbook](runbooks/instantly-outbound-commissioning.md). |
 | `/api/webhooks/linear` | Linear | HMAC-SHA256 (`linear-signature` + `LINEAR_WEBHOOK_SECRET`, timing-safe) | CodeRabbit plan-ready comment; JOV Triage issue change; JOV validation-receipt comment; JOV issue gaining, or closing with, a post-mortem/defect label | Durable Redis lock keyed by provider webhook identity (six-hour TTL, deterministic fallback). Definite dispatch rejection releases the lock; an ambiguous timeout stays locked so Linear cannot replay. Fires GitHub `repository_dispatch` (`linear_plan_ready`, `linear_triage_assess`, `linear_validation_receipt` for Linear Sync on Merge, `quality-gap-scan` for Quality Gap Finder); issue pickup is owned by upstream OpenAI Symphony polling Linear. |
@@ -19,6 +18,8 @@
 | `/api/webhooks/stripe-connect` | Stripe Connect | Stripe signature (`STRIPE_CONNECT_WEBHOOK_SECRET`) | `account.updated` | Updates `creatorProfiles.stripeOnboardingComplete` and `stripePayoutsEnabled`. |
 | `/api/webhooks/stripe-merch` | Stripe (merch) | Stripe signature (`stripe-signature` + `STRIPE_WEBHOOK_SECRET_MERCH`) | `checkout.session.completed`, `charge.refunded` | **checkout:** marks merch orders paid, stores shipping details, enqueues Printful fulfillment, accrues manual payout ledger, attempts one-time first-sale artist SMS (dry-run unless `FIRST_SALE_TEXT_LIVE`). **full refund:** reverses ledger liability. **partial refund:** holds fulfillment/payout for manual review. |
 | `/api/webhooks/stripe-tips` | Stripe (tips) | Stripe signature (`STRIPE_WEBHOOK_SECRET_TIPS`) | `checkout.session.completed`, `charge.refunded` | **checkout:** inserts into `tips` (idempotent on `paymentIntentId`). **refunded:** updates tip status. |
+
+Auth lifecycle hooks run in [the Better Auth server](../apps/web/lib/auth/better-auth.ts), not an external webhook.
 
 ## Shared Patterns
 
@@ -33,7 +34,6 @@
 **Verification methods:**
 
 - **Instantly custom header:** Compares the dedicated bearer secret in constant time before parsing JSON. Instantly does not supply webhook HMAC signatures.
-- **Svix:** Used by Clerk. Verifies `svix-id`, `svix-timestamp`, `svix-signature` headers via `new Webhook(secret).verify()`
 - **Stripe signature:** Used by all Stripe handlers. Verifies `stripe-signature` header via `stripe.webhooks.constructEvent()`
 - **Manual HMAC-SHA256:** Used by Resend, Linear, Sentry. Computes HMAC over payload with timing-safe comparison
 - **Printful HMAC-SHA256:** Used by Printful. Computes the SHA-256 HMAC over the raw body with the configured Printful webhook secret and compares it to `x-pf-webhook-signature`.
