@@ -77,7 +77,7 @@ export function ActionDial({
   groupLabel,
   onActivate,
   preferredId = null,
-  hint = 'Swipe to switch. Your choice is remembered.',
+  hint = 'Swipe to switch.',
   className,
   disabled = false,
 }: Readonly<ActionDialProps>) {
@@ -547,7 +547,8 @@ export function ActionDial({
         hintGlyphRef={hintGlyphRef}
         multi={count > 1}
         hintId={hintId}
-        hint={hint}
+        // One destination: Stream Now + optional Remembered only — no swipe coach.
+        hint={count > 1 ? hint : null}
       />
       <p className='sr-only' role='status' aria-live='polite'>
         {settled.label} selected

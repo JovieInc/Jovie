@@ -408,16 +408,17 @@ describe('ActionDial edge cases', () => {
     );
     expect(container).toBeEmptyDOMElement();
   });
-  it('shows a lone service without a reel or listbox', async () => {
+  it('shows a lone service without a reel, listbox, or swipe hint', async () => {
     const { container } = render(<Fixture options={OPTIONS.slice(0, 1)} />);
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('action-dial-icon-track')
     ).not.toBeInTheDocument();
     expect(link()).toHaveAttribute('href', 'https://open.spotify.com/song');
-    expect(
-      screen.getByText('Swipe to switch. Your choice is remembered.')
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/Swipe to switch/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('action-dial-selection')).toHaveTextContent(
+      'Spotify'
+    );
     await expectNoA11yViolations(container);
   });
   it('shows no hint for a lone service when the host passes none', () => {
