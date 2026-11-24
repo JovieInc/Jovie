@@ -139,6 +139,20 @@ export class ClaimCanaryNotProvisionedError extends Error {
   }
 }
 
+/**
+ * The reset endpoint's dedicated 6/hour budget (shared across all runs in
+ * the Redis window) is exhausted. Retrying the walk cannot help until the
+ * window clears — every retry that reaches reset would burn the budget
+ * again (post-fix red 45336880733 retry #2). Named so the cert red is a
+ * budget condition, not an opaque 429.
+ */
+export class CanaryResetRateLimitedError extends Error {
+  constructor(detail: string) {
+    super(`canary reset HTTP 429: ${detail}`);
+    this.name = 'CanaryResetRateLimitedError';
+  }
+}
+
 /** POST /api/internal/canary/reset and assert it completed. */
 export async function resetClaimCanary({
   request,
@@ -173,6 +187,9 @@ export async function resetClaimCanary({
   const bodyText = await response.text();
   if (response.status() === 409 && /not provisioned/iu.test(bodyText)) {
     throw new ClaimCanaryNotProvisionedError(bodyText.slice(0, 300));
+  }
+  if (response.status() === 429) {
+    throw new CanaryResetRateLimitedError(bodyText.slice(0, 300));
   }
   if (response.status() !== 200) {
     throw new Error(

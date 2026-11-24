@@ -88,6 +88,18 @@ describe('planCanaryReset', () => {
     expect(plan.deleteSuggestedActions).toBe(true);
   });
 
+  it('always plans a billing reset so the next walk starts pre-purchase', () => {
+    // JOV-9826 red 45336880733: a stale price lock or subscription row
+    // survives the profile-only reset and the next checkout fails closed as
+    // 400 "Invalid pricing configuration" (the JOV-8805 dogfood class).
+    const plan = planCanaryReset({
+      user: { id: CANARY_ID, email: PRODCERT_CLAIM_CANARY_EMAIL },
+      claimRows: [],
+      profileRows: [],
+    });
+    expect(plan.resetBilling).toBe(true);
+  });
+
   it('flips a claimed structured-credit marker back to unclaimed', () => {
     const claimedSettings = {
       unclaimedArtistProfile: {
@@ -162,6 +174,7 @@ describe('summarizeCanaryResetPlan', () => {
     expect(summary).toContain('claims=1');
     expect(summary).toContain('profiles=1');
     expect(summary).toContain('handles=jovie-prodcert-claim');
+    expect(summary).toContain('billing=reset');
     expect(summary).not.toContain(PRODCERT_CLAIM_CANARY_EMAIL);
     expect(summary).not.toContain('token');
   });

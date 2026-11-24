@@ -8,6 +8,8 @@ const hoisted = vi.hoisted(() => ({
   inserted: [] as { table: string; row: Record<string, unknown> }[],
   deleted: [] as { table: string }[],
   profileUpdates: [] as { table: string; set: unknown }[],
+  /** Every tx update().set() call, keyed by table (profile + user rows). */
+  updates: [] as { table: string; set: unknown }[],
 }));
 
 vi.mock('server-only', () => ({}));
@@ -43,15 +45,16 @@ vi.mock('@/lib/db/legacy-transaction', async () => {
         }),
         update: (table: unknown) => ({
           set: (set: unknown) => ({
-            where: () => ({
-              returning: async () => {
-                hoisted.profileUpdates.push({
-                  table: getTableName(table as never),
-                  set,
-                });
-                return [{ id: 'profile-1' }];
-              },
-            }),
+            where: () => {
+              const record = { table: getTableName(table as never), set };
+              hoisted.updates.push(record);
+              return {
+                returning: async () => {
+                  hoisted.profileUpdates.push(record);
+                  return [{ id: 'profile-1' }];
+                },
+              };
+            },
           }),
         }),
         insert: (table: unknown) => ({
@@ -90,6 +93,7 @@ describe('executeCanaryReset', () => {
     hoisted.inserted = [];
     hoisted.deleted = [];
     hoisted.profileUpdates = [];
+    hoisted.updates = [];
   });
 
   it('refuses with unknown_canary_account when the canary user row is absent', async () => {
@@ -172,12 +176,28 @@ describe('executeCanaryReset', () => {
     expect(String(hoisted.inserted[0]?.row?.reason)).toContain('JOV-9826');
 
     // Walk-owned rows purged: claim rows + chat conversations + suggested
-    // actions.
+    // actions + the persona's price locks.
     const deletedTables = hoisted.deleted.map(d => d.table).sort();
     expect(deletedTables).toEqual([
       'chat_conversations',
+      'price_locks',
       'suggested_actions',
       'user_profile_claims',
     ]);
+
+    // Billing state returns to pre-purchase in the same pass (JOV-9826
+    // red 45336880733): the canary user row is reset, not the profile.
+    const userUpdate = hoisted.updates.find(u => u.table === 'users');
+    expect(userUpdate).toBeDefined();
+    const billingSet = userUpdate?.set as Record<string, unknown>;
+    expect(billingSet.isPro).toBe(false);
+    expect(billingSet.plan).toBe('free');
+    expect(billingSet.stripeSubscriptionId).toBeNull();
+    expect(billingSet.stripePriceId).toBeNull();
+    // billing_version is an SQL increment, never a literal: a drizzle SQL
+    // object (queryChunks), not a plain number.
+    expect(billingSet.billingVersion).toBeDefined();
+    expect(billingSet.billingVersion).toHaveProperty('queryChunks');
+    expect(typeof billingSet.billingVersion).toBe('object');
   });
 });
