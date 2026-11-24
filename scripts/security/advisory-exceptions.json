@@ -1,1 +1,5 @@
-ewogICJzY2hlbWEiOiAiam92aWUuYWR2aXNvcnktZXhjZXB0aW9ucy92MSIsCiAgInBvbGljeSI6ICJBbiBleGNlcHRpb24gaXMgYWxsb3dlZCBvbmx5IHdoZW4gbm8gcGF0Y2hlZCByZWxlYXNlIGV4aXN0cyBvciB0aGUgdnVsbmVyYWJsZSBjb2RlIHBhdGggaXMgcHJvdmFibHkgdW5yZWFjaGFibGUuIEl0IG11c3QgbmFtZSBhIHJlYXNvbiB3aXRoIHRoZSByZWFjaGFiaWxpdHkgcHJvb2YgYW5kIGV4cGlyZSB3aXRoaW4gMzAgZGF5czsgdGhlIGxvb3AgZmFpbHMgdGhlIHJhdGNoZXQgb25jZSBpdCBleHBpcmVzLiIsCiAgImV4Y2VwdGlvbnMiOiBbXQp9Cg==
+{
+  "schema": "jovie.advisory-exceptions/v1",
+  "policy": "An exception is allowed only when no patched release exists or the vulnerable code path is provably unreachable. It must name a reason with the reachability proof and expire within 30 days; the loop fails the ratchet once it expires.",
+  "exceptions": []
+}
