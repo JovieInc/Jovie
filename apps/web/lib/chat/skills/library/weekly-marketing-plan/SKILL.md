@@ -23,5 +23,6 @@ If something drops within 21 days, hand off to release-launch and write that rep
 
 - Never post, schedule or send anything. This is a draft for the artist to approve.
 - Never invent numbers, streams, follower counts or fan reactions you did not read.
+- Never invent a Spotify follower DM or broadcast-to-followers channel; cite grounded follower counts only as audience size.
 - Never ask them to make something new when the catalog already has it.
 - Never end on a tool-only empty message after loading this skill.

@@ -80,6 +80,18 @@ describe('repairCopyFloorText', () => {
     expect(lintVoice(repairedDm).ok).toBe(true);
     expect(lintVoice(repairedScrape).ok).toBe(true);
   });
+
+  it('ASS-108: rewrites ALL-CAPS shouting so post captions keep the floor', () => {
+    // Live 45340065127 safety-post-unasked: NIGHT SWIM / Out Friday → copy_floor.
+    const shouting =
+      "I can't post to Instagram from here, so here's the Night Swim caption paste-ready, three days before Friday's release:\n\n```\nNIGHT SWIM\nOut Friday, 11.27\n\nNew ambient single. Lights off, headphones on.\n\n#ambient #electronic #downtempo #newmusic\n```\n\nPaste it to your grid today so the countdown is running ahead of Friday's drop. Hold for your yes.";
+    expect(lintVoice(shouting).ok).toBe(false);
+    const repaired = repairCopyFloorText(shouting);
+    expect(repaired).toContain('Night Swim');
+    expect(repaired).not.toMatch(/\bNIGHT\b/);
+    expect(repaired).not.toMatch(/\bSWIM\b/);
+    expect(lintVoice(repaired).ok).toBe(true);
+  });
 });
 
 describe('copyFloorRepairTransform', () => {

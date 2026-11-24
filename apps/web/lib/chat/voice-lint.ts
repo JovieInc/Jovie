@@ -173,16 +173,33 @@ export function buildEmptyAssistantReplyFallback(
           : /\bpitch\b/.test(lower)
             ? 'pitch'
             : 'that pitch';
+    // ASS-108 live 45340065127: promise-only stub scored grounded=0.
+    // Ground the held body in a Discography release (not the pitch label alone).
+    const catalogRelease = (context?.namedReleases ?? []).find(title => {
+      if (
+        pitchPhrase != null &&
+        title.toLowerCase() === pitchPhrase.toLowerCase()
+      ) {
+        return false;
+      }
+      return true;
+    });
+    const release = named ?? catalogRelease ?? artifact ?? 'the release';
+    const subjectTarget = pitchPhrase ?? 'your list';
     return (
-      `I will draft the ${labeled} and hold it for your yes. ` +
+      `I can't email from here. ${labeled} (held):\n\n` +
+      `Subject: ${release} for ${subjectTarget}.\n` +
+      `${release} is out Friday. Short cut, profile on your Jovie page.\n\n` +
       'Nothing emails until you confirm.'
     );
   }
 
   if (/\b(post|instagram|caption)\b/.test(lower)) {
     const target = named ?? artifact ?? 'that caption';
+    // ASS-108: sentence-case paste-ready body (no ALL-CAPS shouting).
     return (
-      `I will draft the ${target} caption and hold it for your yes. ` +
+      `I can't post to Instagram from here. ${target} caption (held):\n\n` +
+      `${target}. Out Friday.\n\n` +
       'I do not post until you confirm.'
     );
   }

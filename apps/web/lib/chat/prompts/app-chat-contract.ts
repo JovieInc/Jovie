@@ -48,7 +48,11 @@ export function checkAppChatPromptContract(prompt: string) {
       'smart link is live or will live',
       'lands on Spotify',
       'link will be up on my page',
-      "I'll add it"
+      "I'll add it",
+      // ASS-108 live 45340065127: week-plan Spotify-follower DM + fan-reply fluff.
+      'Spotify follower DM',
+      "you're the first to ask",
+      'wherever you stream'
     ),
     requiresDraftHoldOutbound: includesAll(
       'Draft every outbound artifact',
