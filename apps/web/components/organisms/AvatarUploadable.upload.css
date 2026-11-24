@@ -1,0 +1,22 @@
+/* Cursor and upload-surface visuals for AvatarUploadable PlainButton —
+   call site stays layout-only; Avatar itself is not restyled via className. */
+
+.avatar-uploadable[data-slot="plain-button"] {
+  cursor: default;
+}
+
+.avatar-uploadable[data-slot="plain-button"][data-interactive] {
+  cursor: pointer;
+}
+
+.avatar-uploadable[data-slot="plain-button"][data-interactive]:hover img {
+  filter: brightness(0.95);
+}
+
+.avatar-uploadable[data-slot="plain-button"][data-drag-over] img {
+  transform: scale(1.05);
+}
+
+.avatar-uploadable[data-slot="plain-button"][data-uploading] img {
+  opacity: 0.8;
+}
