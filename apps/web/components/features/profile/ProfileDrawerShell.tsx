@@ -358,30 +358,36 @@ export function ProfileDrawerShell({
             bottom edge, capped at 384px, not an edge-to-edge sheet
             (Tim, jov.ie/tim at 768-1179px: the menu filled ~90% of the
             frame). Match the modal path: role=dialog on a positioned div
-            (not a native <dialog>) so ds-owner stays on @jovie/ui. */}
+            (not a native <dialog>) so ds-owner stays on @jovie/ui. The lane
+            is the sheet's declared container; the dialog spans it exactly. */}
         <div
-          ref={attachModalRef}
-          className={`absolute inset-x-3 bottom-3 ${PROFILE_Z.STICKY_CHROME} m-0 mx-auto w-auto max-w-96 border-0 bg-transparent p-0`}
-          data-testid={dataTestId}
-          role='dialog'
-          aria-modal='true'
-          aria-describedby={accessibleDescriptionId}
-          aria-labelledby={titleId}
-          style={drawerHeightStyle}
-          tabIndex={-1}
+          data-sheet-container
+          className={`absolute inset-x-3 bottom-3 ${PROFILE_Z.STICKY_CHROME} mx-auto max-w-96`}
         >
           <div
-            className={cn(
-              'profile-drawer-shell-surface-card relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-(--profile-drawer-radius-desktop) border bg-[color:var(--profile-drawer-bg)] text-primary-token',
-              floating && 'profile-drawer-floating',
-              contentClassName
-            )}
+            ref={attachModalRef}
+            className='relative m-0 w-full border-0 bg-transparent p-0'
+            data-testid={dataTestId}
+            role='dialog'
+            aria-modal='true'
+            aria-describedby={accessibleDescriptionId}
+            aria-labelledby={titleId}
+            style={drawerHeightStyle}
+            tabIndex={-1}
           >
-            <span id={accessibleDescriptionId} className='sr-only'>
-              {accessibleDescription}
-            </span>
-            {header}
-            {body}
+            <div
+              className={cn(
+                'profile-drawer-shell-surface-card relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-(--profile-drawer-radius-desktop) border bg-[color:var(--profile-drawer-bg)] text-primary-token',
+                floating && 'profile-drawer-floating',
+                contentClassName
+              )}
+            >
+              <span id={accessibleDescriptionId} className='sr-only'>
+                {accessibleDescription}
+              </span>
+              {header}
+              {body}
+            </div>
           </div>
         </div>
       </>
