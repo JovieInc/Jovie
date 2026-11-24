@@ -169,6 +169,36 @@ describe('HeaderNav states', () => {
     expect(trigger).toHaveFocus();
   });
 
+  it('never draws a caret for a flyout with nothing nested behind it', () => {
+    const menus: readonly HeaderFlyoutMenu[] = [
+      { id: 'empty', label: 'Empty', heading: 'Empty', links: [] },
+      {
+        id: 'single',
+        label: 'Single',
+        heading: 'Single',
+        links: [{ href: '/solo', label: 'Solo' }],
+      },
+      ...FLYOUTS,
+    ];
+    const { container } = render(
+      <HeaderNav
+        authMode='public-static'
+        presentation='marketing-glass'
+        flyoutMenus={menus}
+      />
+    );
+
+    expect(screen.queryByText('Empty')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Single' })).toBeNull();
+    const single = screen.getByRole('link', { name: 'Single' });
+    expect(single).toHaveAttribute('href', '/solo');
+    expect(single.querySelector('svg')).toBeNull();
+    // Only the multi-link menu is a disclosure with a caret.
+    const triggers = container.querySelectorAll('[aria-expanded]');
+    expect(triggers).toHaveLength(1);
+    expect(triggers[0]?.querySelector('svg')).not.toBeNull();
+  });
+
   it('hydrates the flyout before opening it with the native popover API', async () => {
     const props = {
       authMode: 'public-static' as const,

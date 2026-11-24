@@ -74,6 +74,20 @@ describe('WorkspaceSelector', () => {
     }
   );
 
+  it('drops the caret and menu when there is only one workspace', () => {
+    render(
+      <WorkspaceSelector
+        currentWorkspaceId='customer'
+        workspaces={[workspaces[0]]}
+      />
+    );
+    expect(screen.getByTestId('workspace-selector-single')).toHaveTextContent(
+      'Jovie'
+    );
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
   it('cancels its padding so the label sits on the nav icon column', () => {
     render(
       <WorkspaceSelector currentWorkspaceId='ov' workspaces={workspaces} />

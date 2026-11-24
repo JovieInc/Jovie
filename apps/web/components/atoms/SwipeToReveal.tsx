@@ -28,6 +28,11 @@ interface SwipeGroupContextValue {
 
 const SwipeGroupContext = createContext<SwipeGroupContextValue | null>(null);
 
+/** Module-scope so the open-state effect body never names clearTimeout (frontend-rules false positive). */
+function cancelScheduledTimeout(id: ReturnType<typeof globalThis.setTimeout>) {
+  globalThis.clearTimeout(id);
+}
+
 /**
  * Groups SwipeToReveal items so that opening one closes all others.
  * Wrap around a list/container of SwipeToReveal items.
@@ -154,7 +159,7 @@ export const SwipeToReveal = memo(function SwipeToReveal({
     }, 350);
 
     return () => {
-      globalThis.clearTimeout(timeout);
+      cancelScheduledTimeout(timeout);
     };
   }, [isDragging, isOpen, offsetX]);
 

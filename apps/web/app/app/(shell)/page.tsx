@@ -5,9 +5,9 @@ import { getDehydratedState } from '@/lib/queries/server';
 import { OpportunityInboxRoute } from './OpportunityInboxRoute';
 
 const DASHBOARD_DESCRIPTION =
-  'Review Jovie suggestions, approve actions, and send feedback from your inbox.';
+  'Review Jovie suggestions, approve actions, and send feedback from Home.';
 // Matches the header bell (the route's shell entry) and the breadcrumb.
-const DASHBOARD_TITLE = 'Inbox';
+const DASHBOARD_TITLE = 'Home';
 
 export function generateMetadata(): Metadata {
   return {

@@ -38,7 +38,7 @@ describe('useAuthRouteConfig', () => {
     const { result } = renderHook(() => useAuthRouteConfig());
 
     expect(result.current.breadcrumbs).toEqual([
-      { label: 'Inbox', href: APP_ROUTES.DASHBOARD },
+      { label: 'Home', href: APP_ROUTES.DASHBOARD },
     ]);
   });
 

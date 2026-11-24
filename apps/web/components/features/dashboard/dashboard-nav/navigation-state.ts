@@ -80,15 +80,15 @@ export function isNavigationItemActive(
 }
 
 /**
- * Navigation identity for `/app`. The header bell carries it once the rail
- * drops the Inbox row, and the warm probe measures that same id.
+ * Navigation identity for `/app` (Home). The header bell carries it once the
+ * rail drops the Home row, and the warm probe measures that same id.
  */
 export const INBOX_NAVIGATION_ITEM_ID = 'home';
 
 /**
- * Rail destinations for the current chrome. When the header bell owns the
- * Inbox, the rail drops its Inbox row: the bell (with the unread dot) and
- * New Chat already reach `/app` (Tim 2026-11-14).
+ * Rail destinations for the current chrome. When the header bell owns Home,
+ * the rail drops its Home row: the bell (with the unread dot) and New Chat
+ * already reach `/app` (Tim 2026-11-14).
  */
 export function getRailNavigation<Item extends Pick<NavItem, 'id'>>(
   items: readonly Item[],
@@ -102,7 +102,7 @@ export function getRailNavigation<Item extends Pick<NavItem, 'id'>>(
 /**
  * One selected row at a time. While a destination resolves it takes the
  * selected paint and the still-current page yields it, so `/app` never shows
- * Inbox and Audience highlighted together. `aria-current` stays on the page.
+ * Home and Audience highlighted together. `aria-current` stays on the page.
  */
 export function isNavigationItemHighlighted(
   itemId: string,

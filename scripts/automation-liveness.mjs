@@ -1014,6 +1014,17 @@ export async function main({
         state[decision.fingerprint] =
           decisionPrevious[decision.fingerprint] ?? 'unknown';
     }
+    // Busy unattended workflows report through one sweep (JOV-14467).
+    const { SWEEP_STATE_KEY, sweepOutcomes } = await import(
+      './lib/outcome-sweep.mjs'
+    );
+    state[SWEEP_STATE_KEY] = await sweepOutcomes({
+      root: REPO_ROOT,
+      previous: decisionPrevious[SWEEP_STATE_KEY] ?? null,
+      env,
+      fetchImpl,
+      log: line => process.stdout.write(`${line}\n`),
+    });
     if (args.previous)
       writeFileSync(args.previous, `${JSON.stringify(state, null, 2)}\n`);
   }
