@@ -1,9 +1,11 @@
 import type { APIRequestContext } from '@playwright/test';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   assertCanaryResetSurfaceReady,
+  CanaryResetRateLimitedError,
   type CanaryResetSurfacePreflight,
   classifyCanaryResetSurfaceProbe,
+  resetClaimCanary,
 } from '@/tests/e2e/helpers/canary-reset-client';
 
 describe('classifyCanaryResetSurfaceProbe', () => {
@@ -149,5 +151,38 @@ describe('assertCanaryResetSurfaceReady', () => {
       })
     ).rejects.toThrow('CRON_SECRET is not provided to this run');
     expect(probe.calls).toHaveLength(0);
+  });
+});
+
+describe('resetClaimCanary 429 classification', () => {
+  const previousEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env.CRON_SECRET = previousEnv.CRON_SECRET;
+    process.env.SYNTHETIC_PASSAGE_KEY = previousEnv.SYNTHETIC_PASSAGE_KEY;
+    vi.restoreAllMocks();
+  });
+
+  it('names the hourly budget condition on a 429 instead of a generic error', async () => {
+    process.env.CRON_SECRET = 'cron-secret-value';
+    process.env.SYNTHETIC_PASSAGE_KEY = 'passage-key-value';
+    const request = {
+      post: async () => ({
+        status: () => 429,
+        headers: () => ({ 'content-type': 'application/json' }),
+        text: async () => '{"error":"Canary reset rate limit exceeded"}',
+      }),
+    } as unknown as APIRequestContext;
+    const error = await resetClaimCanary({
+      request,
+      origin: 'https://staging.jov.ie',
+      runTag: 'run-429',
+    }).then(
+      () => null,
+      (e: unknown) => e
+    );
+    expect(error).toBeInstanceOf(CanaryResetRateLimitedError);
+    expect(String(error)).toContain('canary reset HTTP 429');
+    expect(String(error)).toContain('Canary reset rate limit exceeded');
   });
 });

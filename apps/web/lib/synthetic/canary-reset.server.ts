@@ -1,9 +1,10 @@
 import 'server-only';
 
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { runAtomicDbOperation } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
+import { priceLocks } from '@/lib/db/schema/billing';
 import { chatConversations } from '@/lib/db/schema/chat';
 import { suggestedActions } from '@/lib/db/schema/connectors';
 import {
@@ -132,6 +133,28 @@ export async function executeCanaryReset(): Promise<CanaryResetOutcome> {
         await tx
           .delete(suggestedActions)
           .where(eq(suggestedActions.userId, account.id));
+      }
+
+      // Billing state must return to pre-purchase inside the same
+      // transaction (JOV-9826, red 45336880733): a stale subscription row or
+      // price lock survives the profile reset otherwise, and the next walk's
+      // checkout fails closed — the route's price-error mapping masks it as
+      // 400 "Invalid pricing configuration" (the JOV-8805 dogfood class).
+      // Scoped to the canary's own row and lock rows only; `billing_version`
+      // is bumped so any cached entitlement reads invalidate.
+      if (plan.resetBilling) {
+        await tx
+          .update(users)
+          .set({
+            isPro: false,
+            plan: 'free',
+            stripeSubscriptionId: null,
+            stripePriceId: null,
+            billingVersion: sql`${users.billingVersion} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(eq(users.id, account.id));
+        await tx.delete(priceLocks).where(eq(priceLocks.userId, account.id));
       }
 
       return plan;

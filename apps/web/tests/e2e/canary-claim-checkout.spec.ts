@@ -3,6 +3,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { PRODCERT_CLAIM_CANARY_EMAIL } from '@/lib/synthetic/prodcert-identities';
 import {
   assertCanaryResetSurfaceReady,
+  CanaryResetRateLimitedError,
   ClaimCanaryNotProvisionedError,
   canaryResetConfigured,
   resetClaimCanary,
@@ -188,6 +189,17 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
     try {
       await resetClaimCanary({ request: page.request, origin, runTag: tag });
     } catch (error) {
+      if (error instanceof CanaryResetRateLimitedError) {
+        // Budget, not config: the 6/hour reset budget is shared across runs
+        // and every Playwright retry that reaches reset burns it again
+        // (post-fix red 45336880733 retry #2). Name the condition and fail —
+        // the walk never skips, but the red must say "hourly budget", not
+        // an opaque 429.
+        blockConeWalk(
+          'Canary reset budget exhausted (429): the 6/hour reset budget is shared across runs; retrying cannot help until the hourly window clears'
+        );
+        throw error;
+      }
       if (!(error instanceof ClaimCanaryNotProvisionedError)) throw error;
       // First run in this environment: the canary has no account yet.
       // Create it through the REAL email-code signup (the canary address is

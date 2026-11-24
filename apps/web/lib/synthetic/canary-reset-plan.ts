@@ -18,8 +18,17 @@
  *   - onboarding completion is cleared;
  *   - the structured-credit marker flips back to `unclaimed` when present,
  *     mirroring `markStructuredCreditProfileClaimed` in the claim finalize;
+ *   - the walk's billing state is cleared (JOV-9826, post-fix red
+ *     45336880733): the reset must also return the persona to its
+ *     PRE-PURCHASE state — `is_pro=false`, `plan='free'`, subscription and
+ *     price ids nulled, `billing_version` bumped, and the persona's
+ *     `price_locks` rows deleted. A stale lock or subscription-price row
+ *     makes every later checkout for the persona fail closed and the
+ *     route's price-error mapping masks it as a 400 "Invalid pricing
+ *     configuration" — the documented JOV-8805 dogfood class; and
  *   - only rows owned by the canary user id are touched, and only in the
- *     enumerated walk-owned tables (chat conversations, suggested actions).
+ *     enumerated walk-owned tables (chat conversations, suggested actions,
+ *     price locks, the canary's own user row billing columns).
  *
  * The executor (`canary-reset.server.ts`) reads the rows, applies this plan
  * in one transaction, and writes the ownership-audit log entry.
@@ -86,6 +95,8 @@ export interface CanaryResetPlan {
   readonly deleteChatConversations: boolean;
   /** Walk-owned agent-suggestion cleanup. */
   readonly deleteSuggestedActions: boolean;
+  /** Clear the persona's billing state so the next walk starts pre-purchase. */
+  readonly resetBilling: boolean;
 }
 
 /** The pre-claim marker state, mirroring the claim finalize's claimed flip. */
@@ -166,6 +177,7 @@ export function planCanaryReset(input: {
     profileUpdates,
     deleteChatConversations: true,
     deleteSuggestedActions: true,
+    resetBilling: true,
   };
 }
 
@@ -183,6 +195,7 @@ export function summarizeCanaryResetPlan(plan: CanaryResetPlan): string {
     handles.length > 0 ? `handles=${handles.join(',')}` : null,
     plan.deleteChatConversations ? 'chat=purged' : null,
     plan.deleteSuggestedActions ? 'suggestions=purged' : null,
+    plan.resetBilling ? 'billing=reset' : null,
   ]
     .filter(Boolean)
     .join(' ');
