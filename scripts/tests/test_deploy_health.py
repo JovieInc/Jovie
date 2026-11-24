@@ -236,9 +236,12 @@ class SamplerTest(unittest.TestCase):
                     return SimpleNamespace(returncode=0, stdout=json.dumps(body), stderr="")
                 return result
             data2, _ = dh.sample(Path(raw), later, fixed_run_later, repos)
-            self.assertEqual(dh.judge(data2, later), {})
-            doctor.reconcile(dh.judge(data2, later), second, Tracker(), later)
-            self.assertEqual(closed, ["issue-1"], "the next successful deploy closes the incident")
+            cleared = dh.judge(data2, later)
+            self.assertEqual(cleared, {})
+            state = second
+            for at in (later, later + 1200, later + 1260):  # close hysteresis (JOV-14452): sustained success
+                state = doctor.reconcile(cleared, state, Tracker(), at)
+            self.assertEqual(closed, ["issue-1"], "a sustained success closes the incident")
 
     def test_an_unreadable_repo_keeps_its_last_failing_state_and_the_sample_goes_stale(self):
         now = epoch("2026-10-25T06:40:00Z")

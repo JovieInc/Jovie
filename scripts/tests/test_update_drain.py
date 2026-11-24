@@ -202,7 +202,8 @@ class HoldLedgerRegressionTest(unittest.TestCase):
             return doctor.reconcile({**ordinary, key: "held"}, prior, tracker, now, sweep_delivery=deliver)
 
         state = {"issues": {key: {"id": "wrong-cached", "closedAt": None},
-                             "old-ordinary": {"id": "ordinary", "closedAt": None}}}
+                             "old-ordinary": {"id": "ordinary", "closedAt": None}},
+                 "filer": {"hysteresis": {"old-ordinary": {"absentTicks": 2, "lastSeenAt": 1000 - 1800}}}}
         state = run(1000, state, {"new-ordinary": "genuine"})
         self.assertEqual(actions, ["open", "close"])
         self.assertIsNone(state["issues"][key]["id"])

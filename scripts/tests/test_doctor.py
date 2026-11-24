@@ -8,6 +8,7 @@ from __future__ import annotations
 import importlib.util
 import hashlib
 import json
+import string
 from datetime import datetime, timezone
 import os
 import subprocess
@@ -1105,6 +1106,7 @@ class ConditionReceiptTest(unittest.TestCase):
         cleared_alerts = doctor.judge(observed, state)
         self.assertNotIn("provider-idle:devin", cleared_alerts)
         cleared = doctor.condition_receipts(cleared_alerts, state, observed, "gem")
+        state["filer"]["hysteresis"]["provider-idle:devin"] = {"absentTicks": 2, "lastSeenAt": observed["now"] - 1800}
         state = doctor.reconcile(cleared_alerts, state, tracker, observed["now"], cleared)
         self.assertEqual(state["conditions"]["provider-idle:devin"]["terminalOutcome"], "health-proven")
 
@@ -1240,8 +1242,9 @@ class ReconcileTest(unittest.TestCase):
                 observed = obs(designGate=None, **reason)
                 alerts = doctor.judge(observed, state)
                 self.assertNotIn("design-brief-stale", alerts)
-                state = doctor.reconcile(alerts, state, tracker, observed["now"],
-                                         doctor.condition_receipts(alerts, state, observed, "gem"))
+                for at in (0, 60, 1870):  # hysteresis (JOV-14452): 3 absent ticks spanning 30 min
+                    state = doctor.reconcile(alerts, state, tracker, observed["now"] + at,
+                                             doctor.condition_receipts(alerts, state, observed, "gem"))
                 self.assertEqual(tracker.closed.count("id-design-brief-stale"), 1)
                 self.assertEqual(state["conditions"]["design-brief-stale"]["state"], "resolved")
 
@@ -1253,15 +1256,12 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(state["issues"]["disk-low"], {"id": "id-disk-low", "closedAt": None})
         state = doctor.reconcile({"disk-low": "4% free"}, state, tracker, now + 60)
         self.assertEqual(len(tracker.opened), 1, "an open alert is not raised twice")
-        state = doctor.reconcile({}, state, tracker, now + 120)
-        self.assertEqual(tracker.closed, ["id-disk-low"])
-        self.assertEqual(state["issues"]["disk-low"]["closedAt"], now + 120)
-        state = doctor.reconcile({"disk-low": "again"}, state, tracker, now + 600)
-        self.assertEqual(tracker.reopened, [("id-disk-low", "again")])
-        self.assertEqual(len(tracker.opened), 1, "within the cool-off the same issue is reused")
-        state = doctor.reconcile({}, state, tracker, now + 700)
-        state = doctor.reconcile({"disk-low": "much later"}, state, tracker, now + 700 + doctor.COOL_OFF_S + 1)
-        self.assertEqual(len(tracker.opened), 2, "after the cool-off a fresh issue is opened")
+        for at in (now + 1700, now + 1720, now + 1870):  # 3 absent ticks spanning 30 min close it
+            state = doctor.reconcile({}, state, tracker, at)
+        self.assertEqual((tracker.closed, state["issues"]["disk-low"]["closedAt"]), (["id-disk-low"], now + 1870))
+        state = doctor.reconcile({"disk-low": "again"}, state, tracker, now + 2000)
+        self.assertEqual((tracker.reopened, len(tracker.opened)), ([("id-disk-low", "again")], 1), "a refire reuses the same issue")
+        # past-the-cool-off refire reopens the same owner instead of refiling: covered with a real Tracker in test_doctor_keys.py (JOV-14452)
 
     def test_tracker_failure_still_records_the_alert_and_retries_the_open(self):
         state = doctor.reconcile({"hud-stale": "x"}, {}, None, 5.0)
@@ -1279,7 +1279,7 @@ class ReconcileTest(unittest.TestCase):
 
             def gql(self, query, variables):
                 self.calls.append((query, variables))
-                if "title:{eq:$t}" in query:
+                if "description:{contains:$d}" in query:  # JOV-14452 marker lookup, any state
                     return {"issues": {"nodes": [{"id": "existing-1"}]}}
                 if "teams(filter" in query:
                     return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{
@@ -1351,7 +1351,7 @@ class ReconcileTest(unittest.TestCase):
                                      {"disk-low": condition})
             state = doctor.reconcile({"disk-low": "4% free"}, state, tracker, 1_000_060.0,
                                      {"disk-low": condition})
-        self.assertEqual(created[0]["description"], reviewed["message"])
+        self.assertEqual(created[0]["description"], reviewed["message"] + f"\n\n{doctor.doctor_keys.marker('disk-low', 'gem')}")
         self.assertEqual(len(created), 1)
         prepare.assert_called_once()
         verify.assert_called_once_with(reviewed, "disk-low", "4% free", condition, "gem", tracker.title("disk-low"))
@@ -1469,6 +1469,8 @@ class ReconcileTest(unittest.TestCase):
                     return {"issueAddLabel": {"success": True}}
                 if "issue(id:$id){state{type}}" in query:
                     return {"issue": {"state": {"type": "triage" if self.state_of("iss-1") == "Triage" else "completed"}}}
+                if "issue(id:$id){description}" in query:  # JOV-14764 gate reads the body
+                    return {"issue": {"description": ""}}
                 if "issueCreate" in query:
                     return {"issueCreate": {"issue": {"id": "iss-1", "identifier": "JOV-1"}}}
                 raise AssertionError(query)
@@ -1484,8 +1486,7 @@ class ReconcileTest(unittest.TestCase):
 
         tracker = doctor.Tracker(FakeLinear(), "gem")
         self.assertEqual(tracker.open("provider-down:codex", "down"), "iss-1")
-        self.assertEqual(created, [{
-            "teamId": "team", "name": "remediation:provider-down-codex", "color": "#E5484D"}])
+        self.assertEqual(created, [{"teamId": "team", "name": "remediation:provider-down-codex", "color": "#E5484D"}])
         tracker.reopen("iss-1", "again", "provider-down:codex")
         tracker.close("iss-1", "provider-down:codex")
         self.assertEqual([row["l"] for row in added], ["new-label", "new-label"])
@@ -1655,7 +1656,7 @@ class OpsReportDeliveryTest(unittest.TestCase):
 
         class FakeLinear:
             def gql(self, query, variables):
-                if "title:{eq:$t}" in query:
+                if "description:{contains:$d}" in query:  # JOV-14452 marker lookup, any state
                     return {"issues": {"nodes": [{"id": "iss-1"}] if created else []}}
                 if "teams(filter" in query:
                     return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [
@@ -1687,7 +1688,7 @@ class TransitionAcknowledgmentTest(unittest.TestCase):
     def test_failed_close_remains_pending_and_retries_the_same_issue(self):
         for acknowledged in [False, None]:
             with self.subTest(acknowledged=acknowledged):
-                previous = {"issues": {"disk-low": {"id": "same", "closedAt": None}}}
+                previous = {"issues": {"disk-low": {"id": "same", "closedAt": None}}, "filer": {"hysteresis": {"disk-low": {"absentTicks": 2, "lastSeenAt": 10 - 1800}}}}
                 tracker = FakeTracker()
                 tracker.close = mock.Mock(side_effect=[acknowledged, True])
                 conditions = {"disk-low": {"state": "resolved"}}
@@ -1728,7 +1729,7 @@ class TransitionAcknowledgmentTest(unittest.TestCase):
     def test_refire_after_uncertain_close_reopens_the_same_issue(self):
         tracker = FakeTracker()
         tracker.close = mock.Mock(return_value=False)
-        previous = {"issues": {"disk-low": {"id": "same", "closedAt": None}}}
+        previous = {"issues": {"disk-low": {"id": "same", "closedAt": None}}, "filer": {"hysteresis": {"disk-low": {"absentTicks": 2, "lastSeenAt": 10 - 1800}}}}
         failed = doctor.reconcile({}, previous, tracker, 10)
         state = doctor.reconcile({"disk-low": "again"}, failed, tracker, 20)
         self.assertEqual(tracker.reopened, [("same", "again")])
@@ -3973,3 +3974,126 @@ class QuotaDeferredHeadsTests(unittest.TestCase):
             stale, error = doctor.sample_quota_deferred_heads(Path(tmp), 5000.0, broken)
             self.assertEqual(stale["value"], 1)
             self.assertIn("boom", error)
+
+
+class FilerGuardrailP0Test(unittest.TestCase):
+    """JOV-14452 P0 (2026-11-24): 62 flapped reopenings 12:59-13:06 PT — the
+    installed doctor read a mid-sweep secretHeld (startedAt only) as empty and
+    closed every held key. The filer must hold unknown coverage and cap state
+    changes per key family."""
+
+    class RecordingLinear:
+        def __init__(self):
+            self.issues, self.moves, self.comments, self.counter = {}, [], [], 0
+
+        def gql(self, query, variables):
+            if "description:{contains:$d}" in query:
+                rows = [{"id": id_, "state": {"type": row["state"]}} for id_, row in self.issues.items()
+                        if variables["d"] in row["description"]]
+                return {"issues": {"nodes": rows[:5]}}
+            if "issue(id:$id){description}" in query:
+                row = self.issues.get(variables["id"]) or {}
+                return {"issue": {"description": row.get("description", "")}}
+            if "issue(id:$id){state{type}}" in query:
+                row = self.issues.get(variables["id"]) or {}
+                return {"issue": {"state": {"type": row.get("state", "started")}}}
+            if "teams(filter" in query:
+                return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [
+                    {"id": "triage", "name": "Triage"}, {"id": "backlog", "name": "Backlog"},
+                    {"id": "done", "name": "Done"}]}, "labels": {"nodes": [
+                        {"id": "symphony", "name": "symphony"}]}}]}}
+            if "issueLabels(" in query:
+                return {"issueLabels": {"nodes": []}}
+            if "issueAddLabel" in query:
+                return {"issueAddLabel": {"success": True}}
+            if "issueUpdate" in query:
+                if variables["id"] in self.issues and variables.get("d") is not None:
+                    self.issues[variables["id"]]["description"] = variables["d"]
+                return {"issueUpdate": {"success": True}}
+            if "issueCreate" in query:
+                self.counter += 1
+                created = variables["i"]
+                state = {"backlog": "backlog", "done": "completed"}.get(created.get("stateId"), "triage")
+                self.issues[f"ISSUE-{self.counter}"] = {
+                    "title": created["title"], "description": created.get("description", ""),
+                    "state": state, "labels": list(created.get("labelIds") or [])}
+                return {"issueCreate": {"issue": {"id": f"ISSUE-{self.counter}", "identifier": f"JOV-{self.counter}"}}}
+            raise AssertionError(f"unhandled query: {query[:90]}")
+
+        def move(self, issue_id, target):
+            self.moves.append((issue_id, target))
+            if issue_id in self.issues:
+                self.issues[issue_id]["state"] = "completed" if target == "Done" else "triage"
+            return True
+
+        def state_of(self, issue_id):
+            return "Done" if (self.issues.get(issue_id) or {}).get("state") == "completed" else "Triage"
+
+        def comment(self, issue_id, body):
+            self.comments.append((issue_id, body))
+            return True
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.clock = MutableClock(1_000_000.0)
+        for module in (doctor.doctor_keys, doctor.doctor_filer):
+            patcher = mock.patch.object(module.time, "time", self.clock)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def tracker(self):
+        return doctor.Tracker(self.RecordingLinear(), "gem",
+                              doctor.doctor_filer.FilerLedger(Path(self.tmp.name) / "doctor-filer.json"))
+
+    def test_150_flickering_keys_capped_per_family_never_two_open(self):
+        tracker = self.tracker()
+        names = [a + b for a in string.ascii_lowercase for b in string.ascii_lowercase][:150]
+        alerts = {f"flicker:{name}": f"condition {name} volatile" for name in names}
+        state = {}
+        for tick in range(20):  # 20 ticks over one hour, all 150 keys flickering
+            firing = alerts if tick % 2 == 0 else {}
+            state = doctor.reconcile(firing, state, tracker, self.clock.value)
+            self.clock.advance(180)
+        linear = tracker.linear
+        owners = [row for row in linear.issues.values()
+                  if "doctor-key:" in row["description"] and not row["title"].startswith("Symphony doctor: rollup")]
+        rollups = [row for row in linear.issues.values() if row["title"].startswith("Symphony doctor: rollup")]
+        self.assertLessEqual(len(owners), 3, "at most 3 creates in the flicker family's first hour")
+        self.assertEqual(len(rollups), 1, "the overflow folds into exactly one rollup issue")
+        self.assertEqual(rollups[0]["state"], "backlog", "the rollup never lands in Triage (P0)")
+        triage_moves = [move for move in linear.moves if move[1] == "Triage"]
+        done_moves = [move for move in linear.moves if move[1] == "Done"]
+        self.assertEqual((triage_moves, done_moves), ([], []),
+                         "one-tick absences neither close nor reopen: 0 further state changes")
+        markers = [row["description"].split("doctor-key:")[1].split(" -->")[0] for row in owners]
+        self.assertEqual(len(markers), len(set(markers)), "never two open issues for one key")
+
+    def test_mid_sweep_startedat_only_is_unknown_and_closes_nothing(self):
+        state_dir = Path(self.tmp.name)
+        sweep = state_dir / "worktree-sweep.json"
+        sweep.write_text(json.dumps({"startedAt": 1, "endedAt": 60, "secretHeldCoverage": "known",
+                                     "secretHeld": [{"name": "wt-a", "path": "/x", "reason": "secret-finding:183"}]}))
+        held = doctor.doctor_sweep_hold.observe(state_dir)
+        self.assertEqual(held["sweepSecretHeldCoverage"], "known", "a completed sweep reports its holds")
+        sweep.write_text(json.dumps({"startedAt": 100}))  # mid-sweep: the P0 shape
+        mid = doctor.doctor_sweep_hold.observe(state_dir)
+        self.assertIsNone(mid["sweepSecretHeld"], "a startedAt-only report has no readable held set")
+        self.assertEqual(mid["sweepSecretHeldCoverage"], "unknown", "unknown, never empty (P0 2026-11-24)")
+        previous = {"alerts": {doctor.doctor_sweep_hold.KEY: "snapshot preservation is held for 1 worktree(s)"}}
+        carried = doctor.judge(obs(**mid), previous)
+        self.assertIn(doctor.doctor_sweep_hold.KEY, carried, "unknown coverage retains the hold alert")
+        tracker = self.tracker()
+        delivered = []
+        state = doctor.reconcile(carried, previous, tracker, self.clock.value,
+                                 sweep_delivery=lambda text: delivered.append(text) or ("owner-x", True))
+        self.assertEqual(tracker.linear.moves, [], "a mid-sweep snapshot closes nothing")
+        self.assertEqual(tracker.linear.issues, {}, "a mid-sweep snapshot files nothing either")
+        self.assertEqual(delivered, ["snapshot preservation is held for 1 worktree(s); sweep coverage unknown "
+                                     "(in progress or unreadable) — hold state unchanged, nothing counted or cleared"],
+                         "the human-owned Gem tracker gets a status note carrying the unknown-coverage hold")
+        self.assertEqual(state["issues"][doctor.doctor_sweep_hold.KEY]["ownerVerified"], True)
+        sweep.write_text(json.dumps({"startedAt": 1, "endedAt": 260, "secretHeldCoverage": "known",
+                                     "secretHeld": []}))  # the sweep really finished with no holds
+        cleared = doctor.judge(obs(**doctor.doctor_sweep_hold.observe(state_dir)), {"alerts": carried})
+        self.assertNotIn(doctor.doctor_sweep_hold.KEY, cleared, "only real evidence clears the hold")

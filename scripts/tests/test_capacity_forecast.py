@@ -114,8 +114,9 @@ class Forecast(unittest.TestCase):
                 self.assertEqual(second["value"], 1)
                 self.assertNotIn("9999", second["gaps"][0]["sig"])
                 rows = f.access_gap_rows(dict(RES, collector=dict(spec, type="access-gaps")), second, 0)
+                self.assertEqual(len(rows), 1)
                 self.assertEqual(rows[0]["status"], "AT-LIMIT")
-                self.assertTrue(rows[0]["id"].startswith("x:"))
+                self.assertEqual(rows[0]["id"], "x")  # the class key, no error-text hash (JOV-14452)
                 third = f.c_access_gaps(spec, f.time.time())  # nothing new: offsets advanced, count stays
                 self.assertEqual(third["gaps"][0]["count"], 2)
             finally:
@@ -159,7 +160,8 @@ class CapacityLifecycle(unittest.TestCase):
 
     def snapshot(self, spec, now):
         reading = f.c_access_gaps(spec, now)
-        return [f.evaluate(self.ACCESS, reading, [], now)] + f.access_gap_rows(self.ACCESS, reading, now)
+        classed = f.access_gap_rows(self.ACCESS, reading, now)
+        return classed or [f.evaluate(self.ACCESS, reading, [], now)]  # the class row owns the id (JOV-14452)
 
     def test_expired_dynamic_gap_clears_once_after_collector_recovers(self):
         with tempfile.TemporaryDirectory() as d:
@@ -196,9 +198,8 @@ class CapacityLifecycle(unittest.TestCase):
                 with log.open("a") as fh:
                     fh.write('HTTP 403 Forbidden beta\n' * 3)
                 next_cards = f.publish(self.snapshot(spec, now + 1), reg, now + 1, state, feed)
-                self.assertEqual(len(next_cards), 1)
-                self.assertFalse(next_cards[0].get("clear"))
-                # The hidden alarm must remain tracked until a complete scan clears it.
+                self.assertEqual(next_cards, [])  # one class signal: a second signature files no twin (JOV-14452)
+                # The class alarm must remain tracked until a complete scan clears it.
                 self.assertEqual(json.loads((state / "alarm-status.json").read_text())[first[0]["id"]], "AT-LIMIT")
                 self.assertEqual(f.publish(self.snapshot(spec, now + 2), reg, now + 2, state, feed), [])
 
