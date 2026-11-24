@@ -82,7 +82,6 @@
     "apps/web/components/jovie/components/ChatAlbumArtCard.tsx": "a11y,ds-owner,states,tokens",
     "apps/web/components/jovie/components/ChatAvatarUploadCard.tsx": "a11y,ds-owner,frontend-rules,states,tests",
     "apps/web/components/jovie/components/ChatInput.tsx": "a11y,ds-owner,frontend-rules,states,tests",
-    "apps/web/components/jovie/components/ImageAttachmentChip.tsx": "a11y,ds-owner,states",
     "apps/web/components/jovie/components/TeleprompterShowcaseInterstitial.tsx": "a11y,ds-owner,states,tokens",
     "apps/web/components/molecules/GenrePicker.tsx": "a11y,ds-owner,frontend-rules,states,tests",
     "apps/web/components/molecules/LocationPicker.tsx": "a11y,ds-owner,forced-caps,frontend-rules,states,tests",
