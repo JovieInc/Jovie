@@ -1,9 +1,10 @@
 /**
- * Shared Audience members request builders / warm defaults.
+ * Shared Audience members request builders / defaults.
  *
- * Kept free of `'use client'` so nav prefetch and the infinite query hook
- * share one key + URL shape without pulling React Query into server-only
- * callers. Consumers: `audience-infinite.ts`, `prefetch-dashboard.ts`.
+ * Kept free of `'use client'` so the infinite query hook and API contract
+ * tests share one key + URL shape without pulling React Query into
+ * server-only callers. Consumers: `audience-infinite.ts` (nav hover does
+ * not warm Audience — SSR-only wins ties; see prefetch-dashboard.ts).
  */
 
 import type {

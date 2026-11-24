@@ -700,13 +700,13 @@
     },
     {
       "fingerprint": "Prefetch keys must match the consumer key and shape",
-      "lessonSha256": "07a3baad2a8ee2a29bace01d90260123b8942bc14f20159a58dfa53b8897c385",
+      "lessonSha256": "cddbd2efc05dbb652e63cc35b7436863ae4d605312f5e52847fc62e7ff529f32",
       "guards": [
         {
           "kind": "test",
           "path": "apps/web/tests/unit/queries/prefetch-dashboard.test.ts",
-          "anchor": "warms Audience under the infinite-query key and URL shape the table reads",
-          "reason": "Audience warm must hit the consumer infinite key, not the bare members key."
+          "anchor": "does not warm Audience on nav hover (SSR-only wins ties)",
+          "reason": "Audience has no nav hover warm; SSR-only wins ties."
         },
         {
           "kind": "test",
@@ -718,7 +718,7 @@
           "kind": "test",
           "path": "scripts/anti-slop/rsi-prevention/contract.test.mjs",
           "anchor": "ASR-043 bad fixture triggers dead-warm matchers; good control does not",
-          "reason": "Deliberate-red dead warm vs matching infinite warm."
+          "reason": "Deliberate-red dead warm vs SSR-only good control."
         }
       ]
     },

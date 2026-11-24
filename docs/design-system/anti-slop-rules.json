@@ -1030,12 +1030,12 @@
   {
     "id": "ASR-043",
     "title": "Prefetch and warm keys must match canonical consumers",
-    "statement": "Nav hover and panel warm queries must use the same TanStack query key shape and request params the destination consumer reads. Dead warms that write unused keys are forbidden. Never speculatively render a route that can write.",
-    "rationale": "Mismatched warm keys burn the request budget and leave the clicked route cold \u2014 classic AI 'helpful prefetch' that helps nothing.",
+    "statement": "Nav hover and panel warm queries must use the same TanStack query key shape and request params the destination consumer reads, or must not warm at all. Dead warms that write unused keys are forbidden. Stock/SSR-only wins ties: do not keep a hover warm that can block newer SSR initialData without a matched authenticated hover\u2192navigate A/B proving faster first usable rows, no request-budget regression, and correct freshness. Never speculatively render a route that can write.",
+    "rationale": "Mismatched warm keys burn the request budget and leave the clicked route cold \u2014 classic AI 'helpful prefetch' that helps nothing. A matched-key warm can still lose to SSR when hover cache blocks fresher initialData.",
     "source": {
       "by": "Tim White",
       "date": "2026-11-24",
-      "ref": "RSI AI-slop follow-up; Audience bare members(profileId) vs infinite+filters; Identity presence warm of dspEnrichment.presence while /app/presence is ProfilesWorkspace"
+      "ref": "RSI AI-slop follow-up + native-first audit on #26806; Audience/Identity warms removed (SSR-only); JOV-12668"
     },
     "scope": [
       "app"
@@ -1047,7 +1047,6 @@
       "check": "apps/web/tests/unit/queries/prefetch-dashboard.test.ts + scripts/anti-slop/rsi-prevention/contract.test.mjs",
       "evidence": [
         "apps/web/lib/queries/prefetch-dashboard.ts",
-        "apps/web/lib/queries/audience-members-params.ts",
         "apps/web/tests/unit/queries/prefetch-dashboard.test.ts",
         "scripts/anti-slop/rsi-prevention/contract.test.mjs"
       ],
@@ -1061,7 +1060,7 @@
               "queryKeys.audience.members(profileId)"
             ],
             "pass": [
-              "queryKeys.audience.members(profileId, filters)"
+              "case 'audience': break; // SSR-only"
             ]
           }
         },
@@ -1074,12 +1073,12 @@
               "queryKeys.dspEnrichment.presence(profileId)"
             ],
             "pass": [
-              "queryKeys.suggestions.list(profileId)"
+              "case 'presence': break; // SSR-only"
             ]
           }
         }
       ],
-      "coverageNote": "Shadow matchers catch regressions in prefetch modules. Product fix lands with the encoding PR: Audience uses prefetchInfiniteQuery + shared warm defaults; Identity presence warm removed."
+      "coverageNote": "Shadow matchers catch regressions in prefetch modules. Product fix: Audience and Identity nav warms removed (SSR-only wins ties); Identity dspEnrichment.presence warm deleted; no Audience replacement warm without A/B proof."
     }
   },
   {

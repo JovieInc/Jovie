@@ -77,13 +77,14 @@ test('ASR-043 bad fixture triggers dead-warm matchers; good control does not', (
   const rule = loadRegistry(REPO_ROOT).rules.find(r => r.id === 'ASR-043');
   const badHits = matcherHits(rule, fixture('ASR-043.bad.ts'));
   const goodText = fixture('ASR-043.good.ts');
-  // Good uses members(profileId, filters) — bare members(id) pattern must miss.
+  // Good is SSR-only (no warm) — bare members(id) / presence warm patterns miss.
   const bare = /queryKeys\.audience\.members\(\s*[A-Za-z_][\w.]*\s*\)/u;
   assert.ok(
     badHits.some(h => /audience\.members|dspEnrichment\.presence/u.test(h.text))
   );
   assert.equal(bare.test(goodText), false);
-  assert.ok(/prefetchInfiniteQuery/u.test(goodText));
+  assert.equal(/queryKeys\.dspEnrichment\.presence\(/u.test(goodText), false);
+  assert.ok(/SSR-only/u.test(goodText));
 });
 
 test('ASR-044 bad coerces missing to zero; good keeps null and prior rows', () => {

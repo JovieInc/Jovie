@@ -4,23 +4,10 @@ import { loadTourDates } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { loadReleaseMatrix } from '@/lib/releases/release-matrix-loader';
 import { DEFAULT_TASK_WORKSPACE_FILTERS } from '@/lib/tasks/query-defaults';
 import type { DashboardContact } from '@/types/contacts';
-import type { AudienceMember } from '@/types';
-import {
-  audienceWarmFilterParams,
-  buildAudienceMembersParams,
-  DEFAULT_AUDIENCE_WARM,
-} from './audience-members-params';
 import { FREQUENT_CACHE } from './cache-strategies';
 import { createQueryFn, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 import { tourDateToEventRecord } from './useEventsQuery';
-
-interface AudienceWarmPage {
-  rows: AudienceMember[];
-  total: number | null;
-  hasMore?: boolean;
-  nextCursor?: string | null;
-}
 
 const fetchEarnings = createQueryFn('/api/dashboard/earnings');
 
@@ -75,36 +62,14 @@ export function prefetchForRoute(
         staleTime,
       });
       break;
-    case 'audience': {
-      // Must match useAudienceInfiniteQuery key + URL shape exactly, or the
-      // warm write is dead cache (ASR-043). Defaults mirror DashboardAudienceClient.
-      const filters = audienceWarmFilterParams();
-      queryClient.prefetchInfiniteQuery({
-        queryKey: [...queryKeys.audience.members(profileId, filters)],
-        queryFn: async ({ pageParam, signal }) => {
-          const params = buildAudienceMembersParams({
-            profileId,
-            view: filters.view,
-            sort: filters.sort,
-            direction: filters.direction,
-            pageSize: DEFAULT_AUDIENCE_WARM.pageSize,
-            cursor: pageParam === 'first' ? undefined : String(pageParam),
-            segments: filters.segments,
-          });
-          return fetchWithTimeout<AudienceWarmPage>(
-            `/api/dashboard/audience/members?${params.toString()}`,
-            { signal }
-          );
-        },
-        initialPageParam: 'first',
-        getNextPageParam: (lastPage: AudienceWarmPage) =>
-          lastPage.hasMore && lastPage.nextCursor
-            ? lastPage.nextCursor
-            : undefined,
-        staleTime,
-      });
+    case 'audience':
+      // Audience is SSR-first (first page awaited on the route). A hover warm
+      // can occupy the infinite-query cache and block newer SSR initialData
+      // (Tim native-first audit / JOV-12668). Stock/SSR-only wins ties — do
+      // not reintroduce a nav warm without a matched authenticated
+      // hover→navigate A/B proving faster first usable rows, no request-budget
+      // regression, and correct freshness when SSR is newer. ASR-043.
       break;
-    }
     case 'presence':
       // Identity (/app/presence) is ProfilesWorkspace (connection suggestions),
       // not the legacy DSP presence loader. Warming dspEnrichment.presence is a
