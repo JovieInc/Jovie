@@ -350,5 +350,5 @@ export function checkFailThemePromptContract(prompt: string): {
       has('lands on spotify') &&
       has('link will be up on my page') &&
       has("i'll add it"),
-};
+  };
 }
