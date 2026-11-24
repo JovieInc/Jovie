@@ -1,5 +1,6 @@
 'use client';
 
+import { HostDrawnInput, PlainButton } from '@jovie/ui';
 import { Check, ImagePlus, Loader2, RotateCw, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -7,11 +8,11 @@ import {
   type PreviewPanelData,
   usePreviewPanelContext,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { validateAvatarFile } from '@/lib/avatar/validation';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 import { useAvatarMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import './ChatAvatarUploadCard.upload.css';
 
 type UploadState = 'idle' | 'uploading' | 'success' | 'error';
 
@@ -178,64 +179,70 @@ export function ChatAvatarUploadCard() {
 
   if (state === 'success') {
     return (
-      <ContentSurfaceCard className='system-b-chat-avatar-upload-state-card system-b-chat-avatar-upload-state-card-success'>
+      <div className='system-b-chat-avatar-upload-state-card system-b-chat-avatar-upload-state-card-success'>
         <div className='flex items-center gap-2 text-success'>
-          <Check className='h-4 w-4' />
+          <Check className='h-4 w-4' aria-hidden='true' />
           <span className='text-sm font-medium'>Profile photo updated</span>
         </div>
-      </ContentSurfaceCard>
+      </div>
     );
   }
 
   if (state === 'error') {
     return (
-      <ContentSurfaceCard className='system-b-chat-avatar-upload-state-card system-b-chat-avatar-upload-state-card-error'>
-        <div className='flex items-center justify-between'>
-          <div className='flex items-center gap-2 text-error'>
-            <X className='h-4 w-4' />
-            <span className='text-sm'>{error}</span>
+      <div className='system-b-chat-avatar-upload-state-card system-b-chat-avatar-upload-state-card-error'>
+        <div className='flex items-center justify-between gap-2'>
+          <div className='flex min-w-0 items-center gap-2 text-error'>
+            <X className='h-4 w-4 shrink-0' aria-hidden='true' />
+            <span className='text-sm break-words'>{error}</span>
           </div>
-          <button
+          <PlainButton
             type='button'
             onClick={handleRetry}
-            className='flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-error transition-colors hover:bg-error/10'
+            className='chat-avatar-upload-retry flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-error'
           >
-            <RotateCw className='h-3 w-3' />
+            <RotateCw className='h-3 w-3' aria-hidden='true' />
             Retry
-          </button>
+          </PlainButton>
         </div>
-      </ContentSurfaceCard>
+      </div>
     );
   }
 
+  const uploading = state === 'uploading';
+
   return (
     <>
-      <input
+      <HostDrawnInput
         ref={fileInputRef}
         type='file'
         accept={SUPPORTED_IMAGE_MIME_TYPES.join(',')}
         onChange={handleFileChange}
-        className='hidden'
+        visuallyHidden
         tabIndex={-1}
+        aria-label='Choose Profile Photo File'
       />
-      <ContentSurfaceCard className='system-b-chat-avatar-upload-card'>
-        <button
+      <div className='system-b-chat-avatar-upload-card'>
+        <PlainButton
           type='button'
           onClick={handleClick}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          disabled={state === 'uploading' || !selectedProfileId}
+          disabled={uploading || !selectedProfileId}
+          data-uploading={uploading ? '' : undefined}
           className={cn(
-            'system-b-chat-avatar-upload-dropzone',
-            isDragOver && 'system-b-chat-avatar-upload-dropzone-active',
-            state === 'uploading' && 'pointer-events-none opacity-60'
+            'chat-avatar-upload-dropzone system-b-chat-avatar-upload-dropzone',
+            isDragOver && 'system-b-chat-avatar-upload-dropzone-active'
           )}
         >
           <div className='flex flex-col items-center gap-3'>
-            {state === 'uploading' ? (
+            {uploading ? (
               <>
-                <Loader2 className='h-8 w-8 animate-spin text-accent' />
+                <Loader2
+                  className='h-8 w-8 animate-spin text-accent'
+                  aria-hidden='true'
+                />
                 <span className='text-sm text-secondary-token'>
                   Uploading...
                 </span>
@@ -248,6 +255,7 @@ export function ChatAvatarUploadCard() {
                       'h-5 w-5',
                       isDragOver ? 'text-accent' : 'text-tertiary-token'
                     )}
+                    aria-hidden='true'
                   />
                 </span>
                 <div>
@@ -261,8 +269,8 @@ export function ChatAvatarUploadCard() {
               </>
             )}
           </div>
-        </button>
-      </ContentSurfaceCard>
+        </PlainButton>
+      </div>
     </>
   );
 }
