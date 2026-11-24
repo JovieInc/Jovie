@@ -252,12 +252,13 @@ describe('ProfileDrawerShell keyboard modal contract', () => {
 
   it('stretches the embedded card up to popover width (jov.ie/tim dogfood)', () => {
     render(<MenuShell presentation='embedded' />);
-    // <dialog> is fit-content (185px Menu); w-auto stretches, max-w-96 caps.
-    const sheet = document.querySelector('dialog[open]');
-    expect(sheet).not.toBeNull();
-    expect(sheet?.className).toContain('w-auto');
-    expect(sheet?.className).toContain('inset-x-3');
-    expect(sheet?.className).toContain('max-w-96');
+    // Native <dialog> was fit-content (185px Menu); the role=dialog shell
+    // uses w-auto to stretch and max-w-96 to cap (match modal path).
+    const sheet = screen.getByTestId('profile-menu-drawer');
+    expect(sheet).toHaveAttribute('role', 'dialog');
+    expect(sheet.className).toContain('w-auto');
+    expect(sheet.className).toContain('inset-x-3');
+    expect(sheet.className).toContain('max-w-96');
   });
 
   it('centres the secondary title block against the 44px header buttons', () => {
