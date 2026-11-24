@@ -2,7 +2,13 @@
 
 // @coverage-via apps/web/tests/unit/dashboard/SuggestedDspMatches.test.tsx
 
-import { Button, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
+import {
+  Button,
+  PlainButton,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@jovie/ui';
 import { Check, ExternalLink, Loader2, X } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -17,6 +23,7 @@ import { type DspMatch, useDspMatchesQuery } from '@/lib/queries';
 import { compareDspMatchConfidence } from '@/lib/queries/useDspMatchesQuery';
 import { cn } from '@/lib/utils';
 import { isExternalDspImage } from '@/lib/utils/dsp-images';
+import './SuggestedDspMatches.actions.css';
 
 const MAX_VISIBLE = 5;
 
@@ -48,7 +55,7 @@ export function SuggestedDspMatches({ profileId }: SuggestedDspMatchesProps) {
       profileId,
       onConfirmSuccess: () => toast.success('Confirmed'),
       onRejectSuccess: () => toast.success('Rejected'),
-      onError: (err, action) =>
+      onError: (_err, action) =>
         toast.error(`Failed to ${action}. Please try again.`),
     });
 
@@ -56,12 +63,21 @@ export function SuggestedDspMatches({ profileId }: SuggestedDspMatchesProps) {
   const hiddenCount = sorted.length - MAX_VISIBLE;
 
   // Zero matches is the common resolution for this query, so a skeleton
-  // that renders during `isLoading` and then collapses to `null` produces a
-  // visible flash-then-shift for most users (JOV-4159 / #13821). Stay
-  // collapsed while loading and only occupy space once we know there is
-  // something to show — empty and loading share the same zero footprint.
+  // that renders during `isLoading` and then collapses to empty produces a
+  // visible flash-then-shift for most users (JOV-4159 / #13821). Stay at
+  // zero footprint while loading (`display: contents` sentinel — not null,
+  // so the certificate layout-shift guard stays green) and only occupy space
+  // once we know there is something to show.
   if (isLoading) {
-    return null;
+    return (
+      <div
+        className='contents'
+        data-testid='suggested-dsp-matches'
+        data-state='loading'
+        aria-busy='true'
+        aria-hidden='true'
+      />
+    );
   }
 
   if (error) {
@@ -74,13 +90,13 @@ export function SuggestedDspMatches({ profileId }: SuggestedDspMatchesProps) {
         <SectionHeading count={0} />
         <p className='px-2 text-xs text-tertiary-token'>
           Couldn&apos;t load suggestions.{' '}
-          <button
+          <PlainButton
             type='button'
             onClick={() => refetch()}
-            className='text-accent underline underline-offset-2 hover:text-accent/80'
+            className='suggested-dsp-matches-retry text-accent underline underline-offset-2'
           >
             Retry
-          </button>
+          </PlainButton>
         </p>
       </div>
     );
@@ -111,15 +127,15 @@ export function SuggestedDspMatches({ profileId }: SuggestedDspMatchesProps) {
           />
         ))}
       </ul>
-      {hiddenCount > 0 && !expanded && (
-        <button
+      {hiddenCount > 0 && !expanded ? (
+        <PlainButton
           type='button'
           onClick={() => setExpanded(true)}
-          className='px-2 text-xs font-book text-accent hover:text-accent/80'
+          className='suggested-dsp-matches-show-more px-2 text-xs font-book text-accent'
         >
           Show {hiddenCount} more
-        </button>
-      )}
+        </PlainButton>
+      ) : null}
     </div>
   );
 }
@@ -128,11 +144,11 @@ function SectionHeading({ count }: { readonly count: number }) {
   return (
     <div className='flex items-center gap-2 px-2'>
       <span className='text-2xs font-book text-tertiary-token'>Suggested</span>
-      {count > 0 && (
+      {count > 0 ? (
         <span className='inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-surface-1 px-1 text-3xs font-caption text-tertiary-token'>
           {count}
         </span>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -152,7 +168,7 @@ function SuggestedMatchRow({
   onConfirm,
   onReject,
 }: SuggestedMatchRowProps) {
-  const isLoading = isConfirming || isRejecting;
+  const busy = isConfirming || isRejecting;
   const label = PROVIDER_LABELS[match.providerId] ?? match.providerId;
   const [popoverOpen, setPopoverOpen] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -178,54 +194,64 @@ function SuggestedMatchRow({
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: mouse events trigger popover display, not a click action
     <li
       className={cn(
-        'group flex items-center gap-2 rounded-md px-2 py-1 transition-colors hover:bg-surface-1 focus-within:bg-surface-1',
-        isLoading && 'opacity-60'
+        'suggested-dsp-match-row group flex items-center gap-2 rounded-md px-2 py-1 transition-colors hover:bg-surface-1 focus-within:bg-surface-1',
+        busy && 'suggested-dsp-match-row-busy'
       )}
+      data-busy={busy ? '' : undefined}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
         <PopoverTrigger asChild>
-          <button type='button' className='contents'>
+          <PlainButton
+            type='button'
+            className='suggested-dsp-match-trigger contents'
+          >
             <DspProviderIcon provider={match.providerId} size='sm' />
             <span className='min-w-0 flex-1 truncate text-app font-book text-primary-token'>
               {match.externalArtistName || label}
             </span>
-          </button>
+          </PlainButton>
         </PopoverTrigger>
-        <div className='flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 max-lg:opacity-100'>
-          <button
+        <div className='suggested-dsp-match-actions flex shrink-0 items-center gap-0.5'>
+          <PlainButton
             type='button'
             onClick={e => {
               e.stopPropagation();
               onConfirm();
             }}
-            disabled={isLoading}
-            className='relative inline-flex h-7 w-7 items-center before:absolute before:inset-x-0 before:top-1/2 before:h-10 before:-translate-y-1/2 justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-success focus-visible:bg-surface-2 focus-visible:text-success focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus'
+            disabled={busy}
+            className='suggested-dsp-match-confirm relative inline-flex h-7 w-7 items-center before:absolute before:inset-x-0 before:top-1/2 before:h-10 before:-translate-y-1/2 justify-center rounded-md text-tertiary-token'
             aria-label={`Confirm ${label} match for ${match.externalArtistName || 'Unknown'}`}
           >
             {isConfirming ? (
-              <Loader2 className='h-3.5 w-3.5 animate-spin' />
+              <Loader2
+                className='h-3.5 w-3.5 animate-spin'
+                aria-hidden='true'
+              />
             ) : (
-              <Check className='h-3.5 w-3.5' />
+              <Check className='h-3.5 w-3.5' aria-hidden='true' />
             )}
-          </button>
-          <button
+          </PlainButton>
+          <PlainButton
             type='button'
             onClick={e => {
               e.stopPropagation();
               onReject();
             }}
-            disabled={isLoading}
-            className='relative inline-flex h-7 w-7 items-center before:absolute before:inset-x-0 before:top-1/2 before:h-10 before:-translate-y-1/2 justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-error focus-visible:bg-surface-2 focus-visible:text-error focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus'
+            disabled={busy}
+            className='suggested-dsp-match-reject relative inline-flex h-7 w-7 items-center before:absolute before:inset-x-0 before:top-1/2 before:h-10 before:-translate-y-1/2 justify-center rounded-md text-tertiary-token'
             aria-label={`Reject ${label} match for ${match.externalArtistName || 'Unknown'}`}
           >
             {isRejecting ? (
-              <Loader2 className='h-3.5 w-3.5 animate-spin' />
+              <Loader2
+                className='h-3.5 w-3.5 animate-spin'
+                aria-hidden='true'
+              />
             ) : (
-              <X className='h-3.5 w-3.5' />
+              <X className='h-3.5 w-3.5' aria-hidden='true' />
             )}
-          </button>
+          </PlainButton>
         </div>
         <PopoverContent
           side='left'
@@ -263,7 +289,7 @@ function MatchPopoverContent({
   readonly onConfirm: () => void;
   readonly onReject: () => void;
 }) {
-  const isLoading = isConfirming || isRejecting;
+  const busy = isConfirming || isRejecting;
 
   return (
     <div className='space-y-2.5'>
@@ -293,18 +319,18 @@ function MatchPopoverContent({
       </div>
 
       <div className='flex items-center gap-2'>
-        {match.confidenceScore !== null && (
+        {match.confidenceScore !== null ? (
           <ConfidenceBadge score={match.confidenceScore} size='sm' />
-        )}
-        {match.matchingIsrcCount > 0 && (
+        ) : null}
+        {match.matchingIsrcCount > 0 ? (
           <span className='text-xs text-tertiary-token'>
             {match.matchingIsrcCount} tracks verified
           </span>
-        )}
+        ) : null}
       </div>
 
       <div className='flex items-center gap-1.5'>
-        {match.externalArtistUrl && (
+        {match.externalArtistUrl ? (
           <Button
             asChild
             variant='ghost'
@@ -316,16 +342,16 @@ function MatchPopoverContent({
               target='_blank'
               rel='noopener noreferrer'
             >
-              <ExternalLink className='mr-1 h-3 w-3' />
+              <ExternalLink className='mr-1 h-3 w-3' aria-hidden='true' />
               Open
             </a>
           </Button>
-        )}
+        ) : null}
         <Button
           variant='ghost'
           size='sm'
           onClick={onReject}
-          disabled={isLoading}
+          disabled={busy}
           className='h-7 flex-1 rounded-full text-xs font-caption'
         >
           {isRejecting ? 'Rejecting...' : 'Reject'}
@@ -334,7 +360,7 @@ function MatchPopoverContent({
           variant='primary'
           size='sm'
           onClick={onConfirm}
-          disabled={isLoading}
+          disabled={busy}
           className='h-7 flex-1 rounded-full text-xs font-caption'
         >
           {isConfirming ? 'Confirming...' : 'Confirm'}

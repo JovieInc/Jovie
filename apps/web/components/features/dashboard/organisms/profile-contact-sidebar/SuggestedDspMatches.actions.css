@@ -1,0 +1,58 @@
+/* Opacity / cursor / hover paint for SuggestedDspMatches PlainButtons —
+   call sites stay layout-only. */
+
+.suggested-dsp-matches-retry[data-slot="plain-button"],
+.suggested-dsp-matches-show-more[data-slot="plain-button"],
+.suggested-dsp-match-trigger[data-slot="plain-button"],
+.suggested-dsp-match-confirm[data-slot="plain-button"],
+.suggested-dsp-match-reject[data-slot="plain-button"] {
+  cursor: pointer;
+}
+
+.suggested-dsp-matches-retry[data-slot="plain-button"]:hover,
+.suggested-dsp-matches-show-more[data-slot="plain-button"]:hover {
+  opacity: 0.8;
+}
+
+.suggested-dsp-match-row-busy {
+  opacity: 0.6;
+}
+
+.suggested-dsp-match-actions {
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.suggested-dsp-match-row:hover .suggested-dsp-match-actions,
+.suggested-dsp-match-row:focus-within .suggested-dsp-match-actions {
+  opacity: 1;
+}
+
+@media (max-width: 1023px) {
+  .suggested-dsp-match-actions {
+    opacity: 1;
+  }
+}
+
+.suggested-dsp-match-confirm[data-slot="plain-button"]:hover,
+.suggested-dsp-match-confirm[data-slot="plain-button"]:focus-visible {
+  background-color: var(--color-surface-2);
+  color: var(--color-success);
+}
+
+.suggested-dsp-match-reject[data-slot="plain-button"]:hover,
+.suggested-dsp-match-reject[data-slot="plain-button"]:focus-visible {
+  background-color: var(--color-surface-2);
+  color: var(--color-error);
+}
+
+.suggested-dsp-match-confirm[data-slot="plain-button"]:focus-visible,
+.suggested-dsp-match-reject[data-slot="plain-button"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px var(--color-focus);
+}
+
+.suggested-dsp-match-confirm[data-slot="plain-button"]:disabled,
+.suggested-dsp-match-reject[data-slot="plain-button"]:disabled {
+  cursor: default;
+}

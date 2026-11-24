@@ -2009,6 +2009,9 @@
       "long-content": "It renders no caller text: the column headers are fixed product copy and every cell is a skeleton bar. The detector matched its aria-label.",
       "offline": "The shell does no network work; it is what the route shows while its data loads, so going offline cannot change what it draws (the route's own error boundary owns failed loads)."
     },
+    "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/SuggestedDspMatches.tsx": {
+      "offline": "SuggestedDspMatches fetch failure is the Error face (ErrorLoadFailed story and the query error branch): Retry calls refetch() whether the browser is offline or the API rejects. There is no separate offline shell."
+    },
     "apps/web/components/features/dashboard/release-tasks/ReleaseTaskEmptyState.tsx": {
       "offline": "The empty state makes no request: generating the plan is the parent checklist's onSetUp, which owns the network call and its failure. The detector matched the isLoading prop, shown in LoadingGeneratingPlan.",
       "permission-denied": "It has no gated action or role check; the parent only renders it for someone who can set up the release. The detector matched the word plan in its fixed action label."
