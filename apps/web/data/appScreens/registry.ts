@@ -218,6 +218,7 @@ export const APP_SCREEN_RECIPE_REGISTRY = [
 /** Explicit closed-world inventory. The coverage test fails when this drifts. */
 export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/admin/activity/page.tsx',
+  'apps/web/app/app/(shell)/admin/agents/page.tsx',
   'apps/web/app/app/(shell)/admin/agent-runs/[id]/page.tsx',
   'apps/web/app/app/(shell)/admin/algorithm-health/page.tsx',
   'apps/web/app/app/(shell)/admin/campaigns/page.tsx',

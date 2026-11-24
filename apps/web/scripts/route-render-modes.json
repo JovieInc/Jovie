@@ -66,6 +66,7 @@
     "/app": "dynamic",
     "/app/admin": "dynamic",
     "/app/admin/activity": "dynamic",
+    "/app/admin/agents": "dynamic",
     "/app/admin/agent-runs/[id]": "dynamic",
     "/app/admin/algorithm-health": "dynamic",
     "/app/admin/campaigns": "dynamic",

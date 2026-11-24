@@ -38,9 +38,9 @@ export default async function OperationsPage() {
           </a>
           <a
             className='text-secondary-token hover:text-primary-token'
-            href={APP_ROUTES.ADMIN_SYSTEM}
+            href={APP_ROUTES.ADMIN_AGENTS}
           >
-            Systems and agents →
+            Agents →
           </a>
           <a
             className='text-secondary-token hover:text-primary-token'
