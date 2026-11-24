@@ -20,6 +20,22 @@ function ChatAlbumArtCardStoryShell({
   );
 }
 
+const dreamPopCandidate = {
+  id: 'candidate-1',
+  styleId: 'dream-pop',
+  styleLabel: 'Dream Pop',
+  previewUrl: 'https://placehold.co/256x256',
+  fullResUrl: 'https://placehold.co/1024x1024',
+} as const;
+
+const vaporwaveCandidate = {
+  id: 'candidate-2',
+  styleId: 'vaporwave',
+  styleLabel: 'Vaporwave',
+  previewUrl: 'https://placehold.co/256x256',
+  fullResUrl: 'https://placehold.co/1024x1024',
+} as const;
+
 const generatedResult: ChatAlbumArtToolResult = {
   success: true,
   state: 'generated',
@@ -28,22 +44,7 @@ const generatedResult: ChatAlbumArtToolResult = {
   artistName: 'Sasha Waves',
   generationId: 'gen-1',
   hasExistingArtwork: false,
-  candidates: [
-    {
-      id: 'candidate-1',
-      styleId: 'dream-pop',
-      styleLabel: 'Dream Pop',
-      previewUrl: 'https://placehold.co/256x256',
-      fullResUrl: 'https://placehold.co/1024x1024',
-    },
-    {
-      id: 'candidate-2',
-      styleId: 'vaporwave',
-      styleLabel: 'Vaporwave',
-      previewUrl: 'https://placehold.co/256x256',
-      fullResUrl: 'https://placehold.co/1024x1024',
-    },
-  ],
+  candidates: [dreamPopCandidate, vaporwaveCandidate],
 };
 
 const needsReleaseTargetResult: ChatAlbumArtToolResult = {
@@ -94,7 +95,7 @@ export const LoadingApplyPending: Story = {
   args: {
     result: {
       ...generatedResult,
-      candidates: [generatedResult.candidates[0]!],
+      candidates: [dreamPopCandidate],
     },
   },
   decorators: [
@@ -136,7 +137,7 @@ export const LongContentReleaseTitle: Story = {
         'Final International Tour Deluxe Edition Master — Midnight City Lights Remastered Anniversary Collection',
       candidates: [
         {
-          ...generatedResult.candidates[0]!,
+          ...dreamPopCandidate,
           styleLabel: 'Dream Pop Extended Label For Overflow',
         },
       ],
@@ -175,7 +176,7 @@ export const RtlOverflowTitle: Story = {
       releaseTitle: 'ألبوم الأحلام الليلية للإصدار النهائي',
       candidates: [
         {
-          ...generatedResult.candidates[0]!,
+          ...dreamPopCandidate,
           styleLabel: 'بوب الأحلام',
         },
       ],

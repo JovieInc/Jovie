@@ -35,6 +35,14 @@ vi.mock('@/lib/queries', () => ({
     mockUseCreateReleaseWithGeneratedAlbumArtMutation,
 }));
 
+const DREAM_POP_CANDIDATE = {
+  id: 'candidate-1',
+  styleId: 'dream-pop',
+  styleLabel: 'Dream Pop',
+  previewUrl: 'https://placehold.co/256x256',
+  fullResUrl: 'https://placehold.co/1024x1024',
+} as const;
+
 const GENERATED_RESULT: ChatAlbumArtToolResult = {
   success: true,
   state: 'generated',
@@ -43,15 +51,7 @@ const GENERATED_RESULT: ChatAlbumArtToolResult = {
   artistName: 'Sasha Waves',
   generationId: 'gen-1',
   hasExistingArtwork: false,
-  candidates: [
-    {
-      id: 'candidate-1',
-      styleId: 'dream-pop',
-      styleLabel: 'Dream Pop',
-      previewUrl: 'https://placehold.co/256x256',
-      fullResUrl: 'https://placehold.co/1024x1024',
-    },
-  ],
+  candidates: [DREAM_POP_CANDIDATE],
 };
 
 function mockMutations() {
@@ -118,7 +118,7 @@ describe('ChatAlbumArtCard', () => {
             releaseTitle: 'ألبوم الأحلام الليلية',
             candidates: [
               {
-                ...GENERATED_RESULT.candidates[0]!,
+                ...DREAM_POP_CANDIDATE,
                 styleLabel: 'بوب الأحلام',
               },
             ],
