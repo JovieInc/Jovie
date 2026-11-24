@@ -85,10 +85,11 @@ const RELEASE_TYPE_BADGE_LABEL: Record<ReleaseType, string> = {
   other: 'Other',
 };
 export const shellReleaseRowTypography = {
-  // Shared app-table text contract: one line-height, truncate. The row is a
-  // flex items-center host so media/text share one vertical center (JOV-14762).
+  // Shared app-table text contract: one line-height, truncate, and the dense
+  // 24px WCAG 2.5.8 target floor. The row is a flex items-center host so
+  // media/text share one vertical center (JOV-14762).
   titleClassName:
-    'truncate text-app font-caption text-primary-token leading-none',
+    'inline-flex min-h-6 min-w-0 items-center truncate text-app font-caption text-primary-token leading-none',
   subtitleClassName: 'truncate text-2xs text-tertiary-token leading-none',
 } as const;
 
@@ -334,9 +335,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
           entity={releaseEntity}
           className={cn(
             shellReleaseRowTypography.titleClassName,
-            // min-h-6 keeps the title target at the 24px WCAG 2.5.8 floor
-            // inside the dense h-8 row; items-center keeps glyphs centered.
-            'inline-flex min-h-6 min-w-0 items-center hover:no-underline'
+            'hover:no-underline'
           )}
         >
           <AppTableTextCell as='span' className='min-w-0'>
