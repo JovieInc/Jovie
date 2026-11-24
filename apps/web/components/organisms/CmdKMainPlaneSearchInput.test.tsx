@@ -137,6 +137,8 @@ describe('CmdKMainPlaneSearchInput', () => {
     expect(input).toHaveAttribute('aria-controls', 'palette-results');
     expect(input).toHaveAttribute('aria-activedescendant', 'palette-row-1');
     expect(input).toHaveAttribute('aria-describedby', 'palette-description');
+    // HostDrawnInput marks the field so app chrome can style host-drawn padding.
+    expect(input).toHaveAttribute('data-host-drawn', '');
   });
 
   it('renders the controlled value and delegates query changes', () => {
