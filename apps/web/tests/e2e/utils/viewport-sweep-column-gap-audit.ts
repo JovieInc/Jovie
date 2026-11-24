@@ -100,7 +100,14 @@ export async function auditColumnGaps(
         const key = scrollerOf(block.element);
         groups.set(key, [...(groups.get(key) ?? []), block]);
       }
-      for (const inside of groups.values()) {
+      // A column that holds its own scroller (the compact shell) frames it
+      // with chrome (header actions, tab bar); only the scroller's content
+      // is measured there.
+      const ownsScroller = Array.from(groups.keys()).some(
+        key => key !== null && column.contains(key)
+      );
+      for (const [scroller, inside] of groups) {
+        if (ownsScroller && !(scroller && column.contains(scroller))) continue;
         if (inside.length < 2) continue;
         let covered = inside[0].rect.bottom;
         let coveredBy = inside[0].element;
