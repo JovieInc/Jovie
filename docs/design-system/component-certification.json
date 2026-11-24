@@ -2766,6 +2766,10 @@
       "permission-denied": "An app update has no account, role or gated action: every signed-in or signed-out viewer gets the same pill and status line. The detector matched the sr-only role='status' line.",
       "rtl-overflow": "Its visible UI is RuntimeUpdatePill, pinned with the logical end-4 offset and a truncating label, so a right-to-left document moves it to the opposite corner without overflow; the status line is sr-only."
     },
+    "apps/web/components/shell/ScrubGradient.tsx": {
+      "empty": "The scrub bar owns no collection; cues are optional markers drawn as fixed SVG dots. The detector matched the items-center layout class. AwaitingMetadata shows the zero-duration face.",
+      "partial": "Optional cues, loopMode and loopSection only change overlays; ReadOnly omits the seek control and Default shows the full bar. There is no half-loaded data face."
+    },
     "apps/web/components/shell/SidebarDock.tsx": {
       "partial": "Every card renders from complete props its owner builds (the updater control, the changelog entry, the install prompt). The one partial input was a track with only a title, and audio no longer renders here: it lives in the sidebar O, whose own test covers a title with no artist."
     },

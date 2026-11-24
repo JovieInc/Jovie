@@ -1,12 +1,60 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
-import { ScrubGradient } from '../ScrubGradient';
+import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { ScrubGradient } from './ScrubGradient';
 
 describe('ScrubGradient', () => {
+  it.each([
+    {
+      state: 'default',
+      props: {
+        currentTime: 78,
+        duration: 213,
+        onSeek: vi.fn(),
+        cues: [{ at: 12, label: 'Intro' }],
+      },
+    },
+    {
+      state: 'read-only',
+      props: { currentTime: 78, duration: 213 },
+    },
+  ])('has no axe violations when $state', async ({ props }) => {
+    const { container } = render(<ScrubGradient {...props} />);
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no axe violations in an RTL overflow frame', async () => {
+    const { container } = render(
+      <div dir='rtl' className='w-full max-w-md'>
+        <ScrubGradient
+          currentTime={40}
+          duration={200}
+          onSeek={vi.fn()}
+          cues={[{ at: 18, label: 'مقدمة' }]}
+        />
+      </div>
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('uses HostDrawnInput for the seek control', () => {
+    render(<ScrubGradient currentTime={10} duration={100} onSeek={vi.fn()} />);
+    const slider = screen.getByRole('slider', { name: 'Seek Track Waveform' });
+    expect(slider).toHaveAttribute('data-host-drawn');
+    expect(slider).toHaveAttribute('type', 'range');
+  });
+
+  it('seeks when the range control changes', () => {
+    const onSeek = vi.fn();
+    render(<ScrubGradient currentTime={10} duration={100} onSeek={onSeek} />);
+    fireEvent.change(screen.getByRole('slider'), { target: { value: '42' } });
+    expect(onSeek).toHaveBeenCalledWith(42);
+  });
+
   it('renders the time labels for currentTime + duration', () => {
     const { getByText } = render(
       <ScrubGradient currentTime={78} duration={213} />
@@ -57,14 +105,14 @@ describe('ScrubGradient', () => {
       'linearGradient[id^="scrub-grad-"]'
     );
     expect(grads.length).toBe(2);
-    expect(grads[0].getAttribute('id')).not.toBe(grads[1].getAttribute('id'));
+    expect(grads[0]?.getAttribute('id')).not.toBe(grads[1]?.getAttribute('id'));
   });
 });
 
 describe('Ion accent polish (glm/lyrics-player)', () => {
   it('tints the loop-section band with the Ion accent, not raw cyan', () => {
     const source = readFileSync(
-      resolve(__dirname, '../ScrubGradient.tsx'),
+      resolve(import.meta.dirname, './ScrubGradient.tsx'),
       'utf8'
     );
     expect(source).not.toMatch(/cyan-/);

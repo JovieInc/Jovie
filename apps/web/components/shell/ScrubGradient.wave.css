@@ -1,0 +1,10 @@
+/* Scenic waveform gradient stops. Hex lives here so the component TSX
+   stays on semantic tokens for chrome; the scrub wash is intentional
+   product paint, not interactive chrome. */
+
+.scrub-gradient-wave {
+  --scrub-wave-0: #a78bfa;
+  --scrub-wave-35: #c084fc;
+  --scrub-wave-60: #f472b6;
+  --scrub-wave-100: #60a5fa;
+}
