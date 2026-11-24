@@ -15,9 +15,8 @@ export async function generateMetadata(): Promise<Metadata> {
  * Chat page. DeferredChatPageClient keeps the shared /app and /app/chat
  * render path identical.
  *
- * Note: essential-shell routes stream this page behind a placeholder while
- * DashboardShellContent reconciles workspace data (JOV-14776). Cold Electron
- * usable time is still dominated by hosted document + JS load, not this page.
+ * Note: skeleton-to-content time (~800ms) is dominated by the shared shell
+ * layout (DashboardShellContent) resolving dashboard data, not this page.
  */
 export default function ChatPage() {
   return <DeferredChatPageClient />;
