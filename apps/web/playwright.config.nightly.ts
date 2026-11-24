@@ -18,7 +18,8 @@ const managedWebServerPort = managedWebServerUrl.port;
 // (Astra 6.2 / JOV-14767): the second Playwright run empties outputDir and
 // would otherwise erase the first run's evidence from the workspace.
 const nightlyJsonOutputFile =
-  process.env.PLAYWRIGHT_JSON_OUTPUT_FILE || 'test-results/nightly-results.json';
+  process.env.PLAYWRIGHT_JSON_OUTPUT_FILE ||
+  'test-results/nightly-results.json';
 const nightlyOutputDir =
   process.env.PLAYWRIGHT_OUTPUT_DIR || 'test-results/playwright-output';
 
@@ -53,9 +54,7 @@ export default defineConfig({
         ['line'],
         ...(vercelAutomation.active
           ? []
-          : ([
-              ['json', { outputFile: nightlyJsonOutputFile }],
-            ] as const)),
+          : ([['json', { outputFile: nightlyJsonOutputFile }]] as const)),
       ]
     : 'html',
 

@@ -381,9 +381,9 @@ jobs:
           retention-days: 7
 
       - name: Upload full surface chaos report
-        # Prefer step outcome over schedule alone: isolated chaos JSON stays in
-        # workspace after the required run (separate outputDir), so hashFiles
-        # can see it. Skip when chaos itself was skipped/cancelled.
+        # Prefer step outcome over event filters alone: isolated chaos JSON
+        # stays in workspace after the required run (separate outputDir), so
+        # hashFiles can see it. Skip when chaos itself was skipped/cancelled.
         if: ${{ always() && steps.full-surface-chaos.outcome != 'skipped' && steps.full-surface-chaos.outcome != 'cancelled' && hashFiles('apps/web/test-results/full-surface-chaos-report.json') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
