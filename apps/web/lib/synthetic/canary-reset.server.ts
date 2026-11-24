@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq, inArray, sql as drizzleSql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { runAtomicDbOperation } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
