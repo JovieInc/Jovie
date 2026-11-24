@@ -6,10 +6,10 @@
  * cheap node:test suite that anti-slop validate proves exists via evidence.
  */
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { decideOutcomeResidual } from '../../lib/outcome-residual-policy.mjs';
 import { loadRegistry, REPO_ROOT } from '../lib.mjs';
 
@@ -70,7 +70,11 @@ test('ASR-042 bad fixture triggers stream-pacing matchers; good control does not
     badHits.some(h => /smoothStream|setTimeout/u.test(h.text)),
     `expected ASR-042 bad hit, got ${JSON.stringify(badHits)}`
   );
-  assert.equal(goodHits.length, 0, 'backoff/debounce must not count as stream pacing');
+  assert.equal(
+    goodHits.length,
+    0,
+    'backoff/debounce must not count as stream pacing'
+  );
 });
 
 test('ASR-043 bad fixture triggers dead-warm matchers; good control does not', () => {
