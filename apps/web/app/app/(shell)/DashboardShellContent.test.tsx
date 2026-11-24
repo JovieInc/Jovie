@@ -134,16 +134,11 @@ vi.mock('./shell-route-matches', () => ({
 }));
 
 import {
-  DashboardShellContent,
-  EssentialShellReady,
-} from './DashboardShellContent';
-
-const shell = (
-  mode: 'ov' | 'customer',
-  child: React.ReactNode,
-  pathname = '/app'
-) =>
-  DashboardShellContent({ userId: 'user-1', pathname, mode, children: child });
+  boundaryMount,
+  dashboardData,
+  essentialReady,
+  shell,
+} from './DashboardShellContent.test-helpers';
 
 const ovieState = (enabled: boolean, locked: boolean) => {
   mocks.getFreshAuth.mockResolvedValue({
@@ -156,46 +151,6 @@ const ovieState = (enabled: boolean, locked: boolean) => {
     unlockedUntil: null,
   });
 };
-
-const boundaryMount = () =>
-  document
-    .querySelector('[data-boundary-mount]')
-    ?.getAttribute('data-boundary-mount');
-
-const dashboardData = {
-  user: { id: 'user-1' },
-  creatorProfiles: [],
-  selectedProfile: null,
-  needsOnboarding: false,
-  sidebarCollapsed: false,
-  hasSocialLinks: false,
-  hasMusicLinks: false,
-  isAdmin: true,
-  tippingStats: { totalTips: 0, totalAmount: 0, recentTips: [] },
-  profileCompletion: {
-    percentage: 0,
-    completedCount: 0,
-    totalCount: 0,
-    steps: [],
-    profileIsLive: false,
-  },
-};
-
-const essentialReady = (
-  workspacePromise: Promise<readonly [typeof dashboardData, object]>,
-  child: React.ReactNode,
-  pathname = '/app/contacts'
-) =>
-  EssentialShellReady({
-    workspacePromise: workspacePromise as never,
-    userId: 'user-1',
-    pathname,
-    mode: 'customer',
-    cookieStore: { get: () => undefined } as never,
-    privacyEnabled: false,
-    lockedUntil: null,
-    children: child,
-  });
 
 /** ViewTransition shell wrap (JOV-14244). */
 describe('DashboardShellContent privacy decision', () => {
@@ -224,11 +179,16 @@ describe('DashboardShellContent privacy decision', () => {
     // Outer shell returns after ban with a Suspense fallback that already
     // includes the route main — do not RTL-render the async Ready child.
     expect(tree).toMatchObject({
-      type: expect.any(Function),
       props: {
         fallback: expect.anything(),
       },
     });
+    expect(
+      typeof tree === 'object' &&
+        tree !== null &&
+        '$$typeof' in tree &&
+        (tree as { type?: unknown }).type === Symbol.for('react.suspense')
+    ).toBe(true);
     expect(JSON.stringify(tree)).toContain('Contacts page');
     expect(mocks.shellDashboard).toHaveBeenCalledOnce();
   });
@@ -239,10 +199,7 @@ describe('DashboardShellContent privacy decision', () => {
       const { withTimeout } = await import('@/lib/resilience/primitives');
       mocks.shellDashboard.mockReturnValue(new Promise(() => {}));
       const workspacePromise = withTimeout(
-        Promise.all([
-          mocks.shellDashboard('user-1'),
-          Promise.resolve({}),
-        ]),
+        Promise.all([mocks.shellDashboard('user-1'), Promise.resolve({})]),
         { timeoutMs: 10_000, context: 'App shell workspace data' }
       );
       let result: React.ReactNode;
@@ -299,10 +256,7 @@ describe('DashboardShellContent privacy decision', () => {
       digest: 'NEXT_REDIRECT;replace;/signin;307;',
     });
     await expect(
-      essentialReady(
-        Promise.reject(redirect),
-        <div>Contacts page</div>
-      )
+      essentialReady(Promise.reject(redirect), <div>Contacts page</div>)
     ).rejects.toBe(redirect);
   });
 
