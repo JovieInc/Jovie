@@ -33,7 +33,7 @@ const render1 = (data: Row[]) =>
       columns={columns}
       getRowId={r => r.id}
       isLoading={false}
-      rowMode='compact'
+      rowMode='dense'
       enableVirtualization={false}
     />
   );

@@ -136,7 +136,7 @@ export default function ContactsLoading() {
           columns={CONTACTS_LOADING_COLUMNS}
           skeletonRows={SKELETON_ROW_COUNT.TABLE}
           skeletonColumnConfig={CONTACTS_SKELETON_COLUMN_CONFIG}
-          rowMode='compact'
+          rowMode='dense'
           minWidth='0'
           containerClassName='h-full'
           hideHeader={false}
