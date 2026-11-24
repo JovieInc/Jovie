@@ -7,9 +7,6 @@ vi.mock('@/lib/releases/release-matrix-loader', () => ({
 vi.mock('@/app/app/(shell)/dashboard/tour-dates/actions', () => ({
   loadTourDates: vi.fn().mockResolvedValue([]),
 }));
-vi.mock('@/app/app/(shell)/dashboard/presence/actions', () => ({
-  loadDspPresenceForProfile: vi.fn(),
-}));
 vi.mock('@/app/app/(shell)/dashboard/tasks/task-actions', () => ({
   getTasks: vi.fn(),
 }));
