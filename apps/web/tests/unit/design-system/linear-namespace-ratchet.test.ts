@@ -53,9 +53,11 @@ const SCANNED_ROOTS = ['app', 'components', 'styles'] as const;
 
 function walk(dir: string, out: string[]): void {
   if (!existsSync(dir)) return;
-  for (const entry of readdirSync(dir)) {
+  for (const dirent of readdirSync(dir, { withFileTypes: true })) {
+    const entry = dirent.name;
     const full = join(dir, entry);
-    const s = statSync(full);
+    // Follow symlinks as before without statting every ordinary entry.
+    const s = dirent.isSymbolicLink() ? statSync(full) : dirent;
     if (s.isDirectory()) {
       if (SKIP_DIRS.has(entry)) continue;
       walk(full, out);
@@ -188,7 +190,12 @@ describe('--linear-* namespace ratchet (shrink-only)', () => {
     const verdict = evaluateShrinkOnlyCount({
       count,
       baseline: baseline.count,
-      baseCount: countLinearNamespaceAtMergeBase(count),
+      // Only a non-queue shrink uses base provenance to classify its verdict.
+      baseCount:
+        count < baseline.count &&
+        process.env.GITHUB_EVENT_NAME !== 'merge_group'
+          ? countLinearNamespaceAtMergeBase(count)
+          : undefined,
       metric: '--linear-* usage',
     });
 
