@@ -48,4 +48,12 @@ describe('AudienceLastCell certificate', () => {
     expect(await screen.findByText('2h')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
+
+  it('renders through the kit RelativeTimeCell (tabular tertiary text)', async () => {
+    renderCell(ago(5 * 60_000));
+    expect(await screen.findByText('5m')).toHaveClass(
+      'tabular-nums',
+      'text-tertiary-token'
+    );
+  });
 });

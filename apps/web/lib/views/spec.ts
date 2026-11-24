@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { META_REFRESH_PATTERN } from '@/lib/views/html-sandbox';
 
 /** Max serialized size of a view spec (enforced by the publish service). */
 export const VIEW_SPEC_MAX_BYTES = 512 * 1024;
@@ -53,8 +54,17 @@ const textBlockSchema = z
 const htmlBlockSchema = z
   .object({
     type: z.literal('html'),
-    /** Rendered only inside `<iframe sandbox="" srcDoc>`. */
-    html: z.string().min(1).max(200_000),
+    /**
+     * Rendered only inside `<iframe sandbox="" srcDoc>` behind a no-network
+     * CSP (`buildSandboxedHtmlDocument`). Inline styles and data: images only.
+     */
+    html: z
+      .string()
+      .min(1)
+      .max(200_000)
+      .refine(html => !META_REFRESH_PATTERN.test(html), {
+        message: 'html blocks cannot use <meta http-equiv="refresh">',
+      }),
     height: z.number().int().min(120).max(2000).optional(),
   })
   .strict();

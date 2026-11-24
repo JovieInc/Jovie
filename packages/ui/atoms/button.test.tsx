@@ -12,6 +12,11 @@ import {
   BUTTON_PEN_CONTRACT,
 } from './button-contract';
 
+function readButtonSources(): string {
+  const root = process.cwd();
+  return readFileSync(path.join(root, 'atoms/button.tsx'), 'utf8');
+}
+
 describe('Button', () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -19,12 +24,7 @@ describe('Button', () => {
 
   describe('System B typography contract', () => {
     it('keeps shared button tracking neutral and non-negative', () => {
-      const source = readFileSync(
-        path.join(process.cwd(), 'atoms/button.tsx'),
-        {
-          encoding: 'utf8',
-        }
-      );
+      const source = readButtonSources();
 
       expect(source).not.toMatch(/\btracking-\[-[^\]]+\]/);
 
@@ -43,12 +43,7 @@ describe('Button', () => {
     });
 
     it('locks CTA label weight at medium (510) without dropping to book', () => {
-      const source = readFileSync(
-        path.join(process.cwd(), 'atoms/button.tsx'),
-        {
-          encoding: 'utf8',
-        }
-      );
+      const source = readButtonSources();
 
       expect(source).toContain('[font-weight:var(--font-weight-medium)]');
       expect(source).not.toMatch(/\bfont-medium\b/);

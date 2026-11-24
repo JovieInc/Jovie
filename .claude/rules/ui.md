@@ -415,6 +415,20 @@ to `variant='primary'`, so an omitted variant counts as primary. Filters,
 display controls, navigation, cancel, and overflow actions must use secondary,
 tertiary, ghost, or `PageToolbarActionButton` treatment.
 
+### Tables and lists (Linear parity)
+
+Measured against Linear's list (40-44px rows, 13px medium titles, tertiary meta, dot-or-icon status, hairline label pills, no row numbers, no empty columns).
+
+- Row height: user-facing rows are at least 40px (`rowMode='compact'`, single line) and 44px (`list`) or taller for two-line content. `dense` (32px) is for admin/debug tools only. `table-density-contract.test.tsx` ratchets `dense`/`rowHeight={32}` call sites down to 0.
+- Type: primary cell text is `system-b-table-primary-text` (13px) `font-medium text-primary-token`; secondary and meta text is `text-app` (12px) `text-tertiary-token`. Row-mode custom properties own row height; cells set horizontal padding only.
+- Status is quiet: a dot or icon plus text (`StatusCell`), never a filled pill. Pills are for labels and tags only: hairline, no fill, at most 20px tall (`TableBadge`). Keep semantic color on the dot/icon/text.
+- No row-number column on user-facing tables. `rowNumber` is for admin/debug tables only.
+- No empty columns: set `meta.hideWhenEmpty` (optionally `meta.hasValue`) and UnifiedTable hides the column while no loaded row has a value.
+- Data marks (meters, bars) keep at least 3:1 against the row in both themes; inactive marks stay visibly distinct from the background.
+- Every row has an identifying primary label (name, then email or handle, then a descriptor from existing fields). A bare "Visitor" is not a label.
+- No banner cards above tables. An empty, waiting or loading status draws nothing; a populated one is a flat one-line row (no border, fill or radius).
+- Table cells compose the kit in `organisms/table/cells` (`StatusCell`, `MeterCell`, `IdentityCell`, `RelativeTimeCell`). A surface-specific cell may map data to a kit cell but must not set its own typography, color or spacing.
+
 ### One Workspace Left Seam
 
 Authenticated workspace primitives use the canonical `px-3` seam for the
@@ -657,3 +671,9 @@ When building or iterating on the Artist Profiles landing page:
 - Honor the marketing registry's above-the-fold hero contract: do not use a
   full-height hero shell that pushes the first proof element below the fold.
   Keep the opening proof in the composition without decorative inset cards.
+- An affordance never outruns its contents. A disclosure caret, flyout trigger,
+  or count badge renders only when something is behind it: zero items render
+  nothing (or a plain label), one item renders a plain link, a count of 0 hides
+  its badge. Derive the caret from non-empty children by type, not a flag
+  (`apps/web/components/organisms/headerNavEntries.ts`). Enforced by the
+  shrink-only `scripts/invariants/art-direction/empty-affordance.mjs`.

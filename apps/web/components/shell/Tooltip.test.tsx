@@ -210,15 +210,15 @@ describe('Tooltip (shell) accessibility', () => {
 
   it('renders a label-only hint for an icon trigger without a keycap', async () => {
     const { container } = render(
-      <Tooltip label='Inbox' side='right' defaultOpen>
-        <button type='button' aria-label='Inbox'>
+      <Tooltip label='Home' side='right' defaultOpen>
+        <button type='button' aria-label='Home'>
           <svg aria-hidden='true' />
         </button>
       </Tooltip>
     );
 
     const content = screen.getByTestId('tooltip-content');
-    expect(content).toHaveTextContent('Inbox');
+    expect(content).toHaveTextContent('Home');
     expect(content.querySelector('kbd')).toBeNull();
     await expectOpenLayersClean(container);
   });

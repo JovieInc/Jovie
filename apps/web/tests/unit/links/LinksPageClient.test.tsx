@@ -117,13 +117,13 @@ describe('LinksPageClient', () => {
     expect(clicksValue.closest('td')?.className).toContain('text-right');
   });
 
-  it('renders through the shared UnifiedTable with dense shared rows', () => {
+  it('renders through the shared UnifiedTable with compact shared rows', () => {
     renderLinksWorkspace(
       <LinksPageClient rows={[baseRow, { ...baseRow, id: 'row-2' }]} />
     );
 
     const table = screen.getByRole('table');
-    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+    expect(table).toHaveAttribute('data-table-row-mode', 'compact');
     const row = screen.getByTestId('links-row-row-1');
     expect(row.className).toContain('system-b-table-row-shell');
     expect(row.className).toContain('system-b-table-row-hover');

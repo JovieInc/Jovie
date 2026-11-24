@@ -13,8 +13,8 @@ import { getRailNavigation } from '@/components/features/dashboard/dashboard-nav
 // changes.
 //
 // A destination may also leave the rail without a flag: when the header bell owns
-// the Inbox (the default customer sidebar the spec's dashboard story renders),
-// `getRailNavigation` drops the rail's Inbox row (2026-11-14). That exemption is
+// Home (the default customer sidebar the spec's dashboard story renders),
+// `getRailNavigation` drops the rail's Home row (2026-11-14). That exemption is
 // read from the real rail helper, so re-adding the row fails here too.
 const SPEC = readFileSync(
   resolve(__dirname, '../../e2e/storybook-elevation.spec.ts'),
@@ -32,9 +32,9 @@ const navItems = (Object.values(navigationConfig) as unknown[]).filter(
 );
 
 const { canonicalSidebarNavigation } = navigationConfig;
-/** Rail rows of the default customer sidebar, where the header owns the Inbox. */
+/** Rail rows of the default customer sidebar, where the header owns Home. */
 const headerOwnedRail = getRailNavigation(canonicalSidebarNavigation, true);
-const isDroppedByHeaderOwnedInbox = (name: string) =>
+const isDroppedByHeaderOwnedHome = (name: string) =>
   canonicalSidebarNavigation.some(item => item.name === name) &&
   !headerOwnedRail.some(item => item.name === name);
 
@@ -58,7 +58,7 @@ describe('storybook-elevation sidebar expectations match the navigation config',
   });
 
   it.each(labelsExpectedHidden)(
-    'expects %s hidden only while flag-gated or dropped for the header-owned Inbox',
+    'expects %s hidden only while flag-gated or dropped for the header-owned Home',
     name => {
       const items = navItems.filter(item => item.name === name);
       expect(
@@ -67,7 +67,7 @@ describe('storybook-elevation sidebar expectations match the navigation config',
       ).toBeGreaterThan(0);
       // Structural removal, not a gate: the header bell is the only `/app`
       // entry, so the rail renders no row with this name.
-      if (isDroppedByHeaderOwnedInbox(name)) return;
+      if (isDroppedByHeaderOwnedHome(name)) return;
       for (const item of items)
         expect(
           item.requiredFlag,
@@ -92,4 +92,18 @@ describe('storybook-elevation sidebar expectations match the navigation config',
       }
     }
   );
+
+  // The search-slot bell always ships a qualified accessible name
+  // (`Home — …`). Exact `Home` there fails Storybook Surface Matrix in
+  // merge groups (PR #26136 lane-form-red, 2026-11-22).
+  it('qualifies search-slot Home bell assertions', () => {
+    expect(
+      SPEC.includes(
+        "locator('[data-sidebar-search-slot]').getByRole('link', {\n        name: 'Home',\n        exact: true,"
+      ) ||
+        SPEC.includes("slot.getByRole('link', { name: 'Home', exact: true })"),
+      'search-slot Home must use /Home —/ (qualified), not exact "Home"'
+    ).toBe(false);
+    expect(SPEC).toContain('name: /Home —/');
+  });
 });

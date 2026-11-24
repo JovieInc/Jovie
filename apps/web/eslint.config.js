@@ -356,6 +356,7 @@ module.exports = [
       'components/atoms/AvatarUploadOverlay.tsx',
       'components/atoms/ReleaseArtworkThumb.tsx',
       'components/atoms/AnimatedIconSwap.tsx', // hooks predate the rule (JOV-14411)
+      'components/atoms/SwipeToReveal.tsx', // hooks predate the rule (JOV-14715 cert-screens debt)
     ],
     rules: {
       'no-restricted-syntax': [

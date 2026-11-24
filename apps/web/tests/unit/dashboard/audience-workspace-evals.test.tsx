@@ -29,7 +29,7 @@ describe('Audience workspace evals on the Contacts page', () => {
     ).toBeVisible();
     // Dense 32px rows with the people-row face skeleton (JOV-7798).
     expect(
-      document.querySelector('table[data-table-row-mode="dense"]')
+      document.querySelector('table[data-table-row-mode="compact"]')
     ).not.toBeNull();
     expect(
       document.querySelector('.system-b-table-skeleton-person-face')

@@ -30,6 +30,30 @@ export function WorkspaceSelector<Id extends string>({
 
   if (!currentWorkspace) return null;
 
+  const label = (
+    <span
+      className={cn(
+        'truncate text-left text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
+        SHELL_RAIL_LABEL
+      )}
+    >
+      {currentWorkspace.label}
+    </span>
+  );
+
+  // A caret promises somewhere else to go. With one workspace there is
+  // nowhere, so the name stands alone with no menu behind it.
+  if (workspaces.length < 2) {
+    return (
+      <div
+        data-testid='workspace-selector-single'
+        className='-ml-1.5 flex h-7 w-fit max-w-full items-center px-1.5'
+      >
+        {label}
+      </div>
+    );
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -44,14 +68,7 @@ export function WorkspaceSelector<Id extends string>({
             '-ml-1.5 flex h-7 w-fit max-w-full items-center rounded-lg px-1.5 transition-colors duration-subtle ease-subtle hover:bg-sidebar-accent/55 focus-visible:outline-none focus-visible:bg-sidebar-accent/55'
           )}
         >
-          <span
-            className={cn(
-              'truncate text-left text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
-              SHELL_RAIL_LABEL
-            )}
-          >
-            {currentWorkspace.label}
-          </span>
+          {label}
           <ChevronDown
             aria-hidden='true'
             className='ms-1 size-3.5 shrink-0 text-sidebar-item-icon'

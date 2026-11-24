@@ -47,6 +47,7 @@
     {"id": "workflow:desktop-release", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/desktop-release.yml"},
     {"id": "workflow:desktop-dogfood", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/desktop-dogfood.yml", "note": "Founder Mac staging/dogfood channel from green main; production stamps stay on desktop-release.yml."},
     {"id": "workflow:doc-gardening-agent", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/doc-gardening-agent.yml"},
+    {"id": "workflow:dogfood-feed-bind", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/dogfood-feed-bind.yml", "note": "JOV-7200 manual-only production public-profile dogfood bind; accountable writer Summer; not postdeploy-probes."},
     {"id": "workflow:e2e-full-matrix", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/e2e-full-matrix.yml"},
     {"id": "workflow:eve-pilot", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/eve-pilot.yml"},
     {"id": "workflow:fixed-runner-canary", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/fixed-runner-canary.yml"},

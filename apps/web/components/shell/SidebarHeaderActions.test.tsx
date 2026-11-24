@@ -82,7 +82,7 @@ function renderActions(
 describe('SidebarHeaderActions', () => {
   it('renders bell, search and rail toggle on one icon-button contract', async () => {
     const { container } = renderActions();
-    const bell = screen.getByRole('link', { name: /^Inbox — / });
+    const bell = screen.getByRole('link', { name: /^Home — / });
     const search = screen.getByRole('button', { name: 'Search Jovie' });
     const toggle = screen.getByRole('button', { name: 'Collapse sidebar' });
     for (const control of [bell, search, toggle]) {
@@ -108,7 +108,7 @@ describe('SidebarHeaderActions', () => {
     const user = userEvent.setup();
     renderActions();
     await user.tab();
-    expect(screen.getByRole('link', { name: /^Inbox — / })).toHaveFocus();
+    expect(screen.getByRole('link', { name: /^Home — / })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole('button', { name: 'Search Jovie' })).toHaveFocus();
     await user.tab();

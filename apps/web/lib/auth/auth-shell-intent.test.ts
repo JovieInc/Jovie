@@ -9,18 +9,34 @@ import {
 } from './auth-shell-intent';
 
 describe('auth shell intent', () => {
-  it('names login, continue, and claim headings', () => {
+  it('names login, continue, claim, and waitlist headings', () => {
     expect(getAuthShellHeading('sign-in')).toBe(AUTH_SHELL_HEADINGS['sign-in']);
     expect(getAuthShellHeading('continue')).toBe(AUTH_SHELL_HEADINGS.continue);
     expect(getAuthShellHeading('claim', 'motion')).toBe('Claim @motion');
     expect(getAuthShellHeading('claim')).toBe(AUTH_SHELL_HEADINGS.continue);
+    expect(getAuthShellHeading('waitlist', 'motion')).toBe('Reserve @motion');
+    expect(getAuthShellHeading('waitlist')).toBe(AUTH_SHELL_HEADINGS.continue);
   });
 
-  it('derives claim intent only for sign-up with a handle', () => {
+  it('derives claim vs waitlist intent for sign-up with a handle', () => {
     expect(resolveAuthShellIntent({ mode: 'sign-in' })).toBe('sign-in');
     expect(resolveAuthShellIntent({ mode: 'sign-up' })).toBe('continue');
     expect(
       resolveAuthShellIntent({ mode: 'sign-up', claimHandle: 'motion' })
+    ).toBe('claim');
+    expect(
+      resolveAuthShellIntent({
+        mode: 'sign-up',
+        claimHandle: 'motion',
+        accessKind: 'waitlist',
+      })
+    ).toBe('waitlist');
+    expect(
+      resolveAuthShellIntent({
+        mode: 'sign-up',
+        claimHandle: 'motion',
+        accessKind: 'claim',
+      })
     ).toBe('claim');
     expect(
       resolveAuthShellIntent({ mode: 'sign-in', claimHandle: 'motion' })

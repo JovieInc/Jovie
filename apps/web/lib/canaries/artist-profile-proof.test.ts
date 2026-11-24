@@ -72,6 +72,54 @@ describe('public artist integrity evidence', () => {
     ]);
     expect(result.links).toContain('https://jov.ie/cosmicgate');
   });
+  it('accepts About carried in ProfilePage structured data without the visible block', () => {
+    const body = `<link rel="canonical" href="${profileUrl}"><script type="application/ld+json">${JSON.stringify(
+      {
+        '@graph': [
+          {
+            '@id': `${profileUrl}#musicgroup`,
+            sameAs: [spotifyUrl],
+            mentions: [],
+          },
+          {
+            '@id': `${profileUrl}#profilepage`,
+            '@type': 'ProfilePage',
+            description: 'Tim White is an electronic artist.',
+          },
+        ],
+      }
+    )}</script>`;
+    const checks = inspect(body).checks;
+    expect(checks.find(c => c.id === 'about-present')).toEqual({
+      id: 'about-present',
+      status: 'pass',
+      evidence: ['present'],
+    });
+    expect(checks.find(c => c.id === 'no-ambiguous-self-links')?.status).toBe(
+      'pass'
+    );
+  });
+  it('fails About when neither the block nor a ProfilePage description exists', () => {
+    const body = `<link rel="canonical" href="${profileUrl}"><script type="application/ld+json">${JSON.stringify(
+      {
+        '@graph': [
+          {
+            '@id': `${profileUrl}#musicgroup`,
+            sameAs: [spotifyUrl],
+            mentions: [],
+          },
+          {
+            '@id': `${profileUrl}#profilepage`,
+            '@type': 'ProfilePage',
+            description: '  ',
+          },
+        ],
+      }
+    )}</script>`;
+    expect(
+      inspect(body).checks.find(c => c.id === 'about-present')?.status
+    ).toBe('fail');
+  });
   it('never treats missing content or malformed structured data as clean evidence', () => {
     const result = inspect(
       '<script type="application/ld+json">broken</script>'

@@ -23,9 +23,14 @@ vi.mock('@/components/features/admin/layout/AdminPage', () => ({
   ),
 }));
 
-describe('guarded Ovie inbox destination', () => {
+describe('guarded Ovie Operator Inbox destination', () => {
   beforeEach(() => {
     requireCurrentAdminPageAccess.mockReset().mockResolvedValue('founder');
+  });
+
+  it('qualifies the page title as Operator Inbox', async () => {
+    const { metadata } = await import('./page');
+    expect(metadata.title).toBe('Operator Inbox | Ovie');
   });
 
   it('renders the pilot workbench when pilot=1', async () => {

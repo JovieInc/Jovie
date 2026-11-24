@@ -289,6 +289,11 @@ test.describe('Authenticated dashboard axe', () => {
   test('/app/dashboard — zero critical axe violations', async ({ page }) => {
     await smokeNavigateWithRetry(page, '/app/dashboard', { timeout: 60_000 });
     await waitForHydration(page);
+    // The audio dock and lock screen load as their own chunks (JOV-14411);
+    // let them land so the scan covers the shell chrome, bounded for polling.
+    await page
+      .waitForLoadState('networkidle', { timeout: 10_000 })
+      .catch(() => undefined);
 
     const results = await new AxeBuilder({ page })
       .options(wcag22AaAxeOptions(disabledRuleIds('a11y-dashboard')))
