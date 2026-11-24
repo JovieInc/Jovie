@@ -238,6 +238,36 @@ describe('buildPulse', () => {
     }
   });
 
+  it.each([
+    [null, null, 'Not measured', null, 'neutral'],
+    [0, null, '0', null, 'bad'],
+    [1, 3, '0.1', '0.4 prior 7d', 'bad'],
+    [69, null, '9.9', null, 'bad'],
+    [70, null, '10', null, 'warn'],
+    [139, null, '19.9', null, 'warn'],
+    [140, null, '20', null, 'good'],
+  ] as const)(
+    'formats the org merges/day card for %s merges (prior %s) as %s',
+    (last7Days, prior7Days, value, was, tone) => {
+      const base = delivery();
+      const pulse = buildPulse({
+        ...base,
+        merges: {
+          ...base.merges,
+          last7Days: count(last7Days),
+          prior7Days: count(prior7Days),
+        },
+      });
+
+      expect(pulse.find(tile => tile.key === 'merges-day')).toMatchObject({
+        value,
+        was,
+        tone,
+        measured: last7Days !== null,
+      });
+    }
+  );
+
   it('gives every tile a target and a drill-down, never a raw counter', () => {
     for (const tile of buildPulse(onTargetDelivery())) {
       expect(tile.target, tile.key).toMatch(/^Target /);
@@ -391,7 +421,7 @@ describe('buildConstraint', () => {
       )
     ).toEqual({
       tone: 'bad',
-      text: 'Shipping off target: fleet degraded (1 alert) · 6 merges/day (target 20) · +2 more',
+      text: 'Shipping off target: fleet degraded (1 alert) · 5.7 merges/day (target 20) · +2 more',
       detailsHref: APP_ROUTES.ADMIN_OPERATIONS,
     });
   });
