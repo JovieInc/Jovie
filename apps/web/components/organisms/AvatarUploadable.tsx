@@ -1,6 +1,11 @@
 'use client';
 
-import { getAvatarShapeClassName, getAvatarSizePx } from '@jovie/ui';
+import {
+  getAvatarShapeClassName,
+  getAvatarSizePx,
+  HostDrawnInput,
+  PlainButton,
+} from '@jovie/ui';
 import React, {
   forwardRef,
   useCallback,
@@ -20,6 +25,7 @@ import {
   DEFAULT_MAX_FILE_SIZE,
 } from '@/lib/avatar/validation';
 import { cn } from '@/lib/utils';
+import './AvatarUploadable.upload.css';
 
 export interface AvatarUploadableProps extends Omit<AvatarProps, 'src'> {
   /** Current avatar image URL */
@@ -180,14 +186,16 @@ export const AvatarUploadable = React.memo(
 
       return (
         <>
-          <button
+          <PlainButton
             ref={mergedRef}
             type='button'
             className={cn(
-              'relative group/avatar outline-none',
-              isInteractive ? 'cursor-pointer focus-ring' : 'cursor-default',
+              'avatar-uploadable relative group/avatar outline-none focus-ring',
               className
             )}
+            data-interactive={isInteractive ? '' : undefined}
+            data-drag-over={isDragOver ? '' : undefined}
+            data-uploading={isUploading ? '' : undefined}
             tabIndex={isInteractive ? 0 : -1}
             onDragEnter={canUpload ? handleDragEnter : undefined}
             onDragLeave={canUpload ? handleDragLeave : undefined}
@@ -203,17 +211,7 @@ export const AvatarUploadable = React.memo(
             {isInteractive ? (
               <span className='sr-only'>{uploadButtonLabel}</span>
             ) : null}
-            <Avatar
-              src={previewUrl ?? src}
-              className={cn(
-                'transition-colors duration-subtle ease-out',
-                isInteractive &&
-                  'group-hover/avatar:brightness-95 group-focus-visible/avatar:ring-2 group-focus-visible/avatar:ring-accent group-focus-visible/avatar:ring-offset-2 group-focus-visible/avatar:ring-offset-(--color-bg-base)',
-                isDragOver && 'scale-105',
-                isUploading && 'opacity-80'
-              )}
-              {...avatarProps}
-            />
+            <Avatar src={previewUrl ?? src} {...avatarProps} />
 
             {isInteractive && showHoverOverlay && !isDragOver && (
               <AvatarUploadOverlay
@@ -241,14 +239,14 @@ export const AvatarUploadable = React.memo(
               progress={computedProgress}
               status={uploadStatus}
             />
-          </button>
+          </PlainButton>
           {canUpload && (
-            <input
+            <HostDrawnInput
               ref={fileInputRef}
               type='file'
               accept={acceptedTypeList}
               onChange={handleFileSelect}
-              className='sr-only'
+              visuallyHidden
               aria-label={fileInputLabel}
             />
           )}
