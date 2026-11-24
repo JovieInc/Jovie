@@ -354,29 +354,34 @@ export function ProfileDrawerShell({
         {/* Tablet and embedded widths: a detached card floating above the
             bottom edge, capped at 384px, not an edge-to-edge sheet
             (Tim, jov.ie/tim at 768-1179px: the menu filled ~90% of the
-            frame). A native dialog defaults to width: fit-content, so it
-            needs w-auto with both insets to stretch up to the cap. */}
-        <dialog
-          ref={attachModalRef}
-          className={`absolute inset-x-3 bottom-3 ${PROFILE_Z.STICKY_CHROME} m-0 mx-auto w-auto max-w-96 border-0 bg-transparent p-0`}
-          data-testid={dataTestId}
-          aria-modal='true'
-          aria-describedby={accessibleDescriptionId}
-          aria-labelledby={titleId}
-          style={drawerHeightStyle}
-          open
-          tabIndex={-1}
+            frame). The lane is the sheet's declared container; the dialog
+            (fit-content by default) is w-full so it spans the lane exactly. */}
+        <div
+          data-sheet-container
+          className={`absolute inset-x-3 bottom-3 ${PROFILE_Z.STICKY_CHROME} mx-auto max-w-96`}
         >
-          <div
-            className={`relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-(--profile-drawer-radius-desktop) border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_34px_96px_rgba(0,0,0,0.48)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${floating ? 'profile-drawer-floating' : ''} ${contentClassName ?? ''}`}
+          <dialog
+            ref={attachModalRef}
+            className='relative m-0 w-full max-w-none border-0 bg-transparent p-0'
+            data-testid={dataTestId}
+            aria-modal='true'
+            aria-describedby={accessibleDescriptionId}
+            aria-labelledby={titleId}
+            style={drawerHeightStyle}
+            open
+            tabIndex={-1}
           >
-            <span id={accessibleDescriptionId} className='sr-only'>
-              {accessibleDescription}
-            </span>
-            {header}
-            {body}
-          </div>
-        </dialog>
+            <div
+              className={`relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-(--profile-drawer-radius-desktop) border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_34px_96px_rgba(0,0,0,0.48)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${floating ? 'profile-drawer-floating' : ''} ${contentClassName ?? ''}`}
+            >
+              <span id={accessibleDescriptionId} className='sr-only'>
+                {accessibleDescription}
+              </span>
+              {header}
+              {body}
+            </div>
+          </dialog>
+        </div>
       </>
     );
   }
