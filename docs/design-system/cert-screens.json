@@ -69,7 +69,6 @@
     "apps/web/components/atoms/JovieMarkElectric.tsx": "a11y,states,tokens",
     "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens",
     "apps/web/components/features/dashboard/organisms/profile-contact-sidebar/SuggestedDspMatches.tsx": "a11y,ds-owner,frontend-rules,states,tests",
-    "apps/web/components/features/profile/ProfileDrawerShell.tsx": "a11y,ds-owner,states,tests,tokens",
     "apps/web/components/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA.tsx": "a11y,ds-owner,states,tests,tokens",
     "apps/web/components/features/profile/artist-notifications-cta/ProfileMobileNotificationsFlow.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens",
     "apps/web/components/features/profile/artist-notifications-cta/shared.tsx": "a11y,ds-owner,frontend-rules,states,tests,tokens",
