@@ -2,6 +2,10 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, fn } from 'storybook/test';
 import { ScrubGradient } from './ScrubGradient';
 
+const longCueLabel =
+  'Bridge Into Final Chorus With Extended Spoken Word Intro And Crowd Call Response';
+const rtlCueLabel = 'مقدمة طويلة جداً للاختبار';
+
 const meta = {
   title: 'Shell/ScrubGradient',
   component: ScrubGradient,
@@ -55,4 +59,29 @@ export const ReadOnly: Story = {
   play: ({ canvas }) => {
     expect(canvas.queryByRole('slider')).not.toBeInTheDocument();
   },
+};
+
+export const LongContentCueLabels: Story = {
+  args: {
+    cues: [
+      { at: 12, label: longCueLabel },
+      { at: 64, label: `${longCueLabel} · Outro` },
+    ],
+  },
+};
+
+export const RtlOverflowCueLabels: Story = {
+  args: {
+    cues: [
+      { at: 18, label: rtlCueLabel },
+      { at: 55, label: `${rtlCueLabel} — مقطع` },
+    ],
+  },
+  decorators: [
+    Story => (
+      <div dir='rtl' className='w-full max-w-md'>
+        <Story />
+      </div>
+    ),
+  ],
 };

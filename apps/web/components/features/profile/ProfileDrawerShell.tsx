@@ -2,7 +2,7 @@
 
 // @coverage-via apps/web/tests/components/profile/ProfileDrawerShell.interaction.test.tsx
 
-import { Popover, PopoverAnchor, PopoverContent } from '@jovie/ui';
+import { PlainButton, Popover, PopoverAnchor, PopoverContent } from '@jovie/ui';
 import { ChevronLeft, X } from 'lucide-react';
 import {
   useCallback,
@@ -18,6 +18,7 @@ import type { ProfileSurfacePresentation } from '@/features/profile/contracts';
 import { useModalFocusBoundary } from '@/lib/a11y/modal-focus-boundary';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 import { cn } from '@/lib/utils';
+import './ProfileDrawerShell.surface.css';
 
 /**
  * root: the menu (handle + title). secondary: a view reached from another
@@ -127,7 +128,11 @@ export function ProfileDrawerShell({
     ['--profile-drawer-height-max' as string]: 'min(472px, 62dvh)',
     ['--profile-drawer-header' as string]: '72px',
   } as React.CSSProperties;
-  const contentClasses = `relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-t-(--profile-drawer-radius-mobile) border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] md:max-w-(--profile-shell-max-width) md:rounded-t-(--profile-drawer-radius-desktop) before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${floating ? 'profile-drawer-floating' : ''} ${contentClassName ?? ''}`;
+  const contentClasses = cn(
+    'profile-drawer-shell-surface relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-t-(--profile-drawer-radius-mobile) border-t bg-[color:var(--profile-drawer-bg)] text-primary-token md:max-w-(--profile-shell-max-width) md:rounded-t-(--profile-drawer-radius-desktop)',
+    floating && 'profile-drawer-floating',
+    contentClassName
+  );
   // Fixed height (not min-h) so overflow-y-auto activates on overflow; min-h
   // lets the body grow past the parent's max-h and get clipped by overflow-hidden.
   // Docked sheets keep one fixed body height so switching views never jumps.
@@ -140,24 +145,23 @@ export function ProfileDrawerShell({
 
   const header = (
     <>
-      <div className='pointer-events-none absolute inset-x-0 top-0 h-px bg-white/[0.1]' />
+      <div className='profile-drawer-shell-hairline pointer-events-none absolute inset-x-0 top-0 h-px' />
 
       <div className='relative z-10 shrink-0 px-5 pb-2.5 pt-3'>
         <div className='absolute inset-x-0 top-3 flex justify-center'>
-          <div className='h-1 w-10 rounded-full bg-white/[0.22]' />
+          <div className='profile-drawer-shell-handle h-1 w-10 rounded-full' />
         </div>
 
         {isSecondaryHeader ? (
           <div className='grid grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2.5 pt-5'>
-            <button
-              type='button'
+            <PlainButton
               onClick={onBack}
               className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-bg-hover)] text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-interactive-active hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
               aria-label='Back'
               data-testid='profile-drawer-back-button'
             >
-              <ChevronLeft className='h-4 w-4' />
-            </button>
+              <ChevronLeft className='h-4 w-4' aria-hidden='true' />
+            </PlainButton>
 
             <div
               className='flex min-h-[2.625rem] min-w-0 flex-col justify-center py-px'
@@ -193,15 +197,14 @@ export function ProfileDrawerShell({
               </div>
             </div>
 
-            <button
-              type='button'
+            <PlainButton
               onClick={handleDismiss}
               className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-bg-hover)] text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-interactive-active hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
               aria-label='Close'
               data-testid='profile-drawer-close-button'
             >
-              <X className='h-4 w-4' />
-            </button>
+              <X className='h-4 w-4' aria-hidden='true' />
+            </PlainButton>
           </div>
         ) : isDirectHeader ? (
           <div
@@ -227,15 +230,14 @@ export function ProfileDrawerShell({
                 </p>
               ) : null}
             </div>
-            <button
-              type='button'
+            <PlainButton
               onClick={handleDismiss}
               className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[color:var(--color-bg-hover)] text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-interactive-active hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
               aria-label='Close'
               data-testid='profile-drawer-close-button'
             >
-              <X className='h-4 w-4' />
-            </button>
+              <X className='h-4 w-4' aria-hidden='true' />
+            </PlainButton>
           </div>
         ) : (
           <div className='pt-5' data-testid='profile-drawer-root-header'>
@@ -304,15 +306,14 @@ export function ProfileDrawerShell({
               data-testid='profile-popover-header'
             >
               {isSecondaryHeader ? (
-                <button
-                  type='button'
+                <PlainButton
                   onClick={onBack}
                   className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-colors duration-subtle hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
                   aria-label='Back'
                   data-testid='profile-drawer-back-button'
                 >
-                  <ChevronLeft className='h-4 w-4' />
-                </button>
+                  <ChevronLeft className='h-4 w-4' aria-hidden='true' />
+                </PlainButton>
               ) : null}
               <p
                 aria-hidden='true'
@@ -343,36 +344,43 @@ export function ProfileDrawerShell({
 
     return (
       <>
-        <button
-          type='button'
+        <PlainButton
           aria-label='Close Drawer Overlay'
           data-modal-backdrop
           tabIndex={-1}
-          className={`fixed inset-0 ${PROFILE_Z.LOCAL_CONTENT} bg-black/24`}
+          className={cn(
+            'profile-drawer-shell-scrim-light fixed inset-0',
+            PROFILE_Z.LOCAL_CONTENT
+          )}
           onClick={handleDismiss}
         />
         {/* Tablet and embedded widths: a detached card floating above the
             bottom edge, capped at 384px, not an edge-to-edge sheet
             (Tim, jov.ie/tim at 768-1179px: the menu filled ~90% of the
-            frame). The lane is the sheet's declared container; the dialog
-            (fit-content by default) is w-full so it spans the lane exactly. */}
+            frame). Match the modal path: role=dialog on a positioned div
+            (not a native <dialog>) so ds-owner stays on @jovie/ui. The lane
+            is the sheet's declared container; the dialog spans it exactly. */}
         <div
           data-sheet-container
           className={`absolute inset-x-3 bottom-3 ${PROFILE_Z.STICKY_CHROME} mx-auto max-w-96`}
         >
-          <dialog
+          <div
             ref={attachModalRef}
-            className='relative m-0 w-full max-w-none border-0 bg-transparent p-0'
+            className='relative m-0 w-full border-0 bg-transparent p-0'
             data-testid={dataTestId}
+            role='dialog'
             aria-modal='true'
             aria-describedby={accessibleDescriptionId}
             aria-labelledby={titleId}
             style={drawerHeightStyle}
-            open
             tabIndex={-1}
           >
             <div
-              className={`relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-(--profile-drawer-radius-desktop) border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_34px_96px_rgba(0,0,0,0.48)] before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${floating ? 'profile-drawer-floating' : ''} ${contentClassName ?? ''}`}
+              className={cn(
+                'profile-drawer-shell-surface-card relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-(--profile-drawer-radius-desktop) border bg-[color:var(--profile-drawer-bg)] text-primary-token',
+                floating && 'profile-drawer-floating',
+                contentClassName
+              )}
             >
               <span id={accessibleDescriptionId} className='sr-only'>
                 {accessibleDescription}
@@ -380,7 +388,7 @@ export function ProfileDrawerShell({
               {header}
               {body}
             </div>
-          </dialog>
+          </div>
         </div>
       </>
     );
@@ -393,10 +401,12 @@ export function ProfileDrawerShell({
 
     return (
       <div
-        className={`absolute inset-0 ${PROFILE_Z.EMBEDDED_MODAL} flex items-center justify-center bg-black/24 p-6`}
+        className={cn(
+          'profile-drawer-shell-scrim-light absolute inset-0 flex items-center justify-center p-6',
+          PROFILE_Z.EMBEDDED_MODAL
+        )}
       >
-        <button
-          type='button'
+        <PlainButton
           aria-label='Close Modal Overlay'
           data-modal-backdrop
           tabIndex={-1}
@@ -405,7 +415,7 @@ export function ProfileDrawerShell({
         />
         <div
           ref={attachModalRef}
-          className='relative z-10 flex max-h-[min(760px,calc(100%-24px))] w-full max-w-108 flex-col overflow-hidden rounded-(--profile-card-radius) border border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_34px_96px_rgba(0,0,0,0.48)]'
+          className='profile-drawer-shell-surface-card relative z-10 flex max-h-[min(760px,calc(100%-24px))] w-full max-w-108 flex-col overflow-hidden rounded-(--profile-card-radius) border bg-[color:var(--profile-drawer-bg)] text-primary-token'
           data-testid={dataTestId}
           role='dialog'
           aria-modal='true'
@@ -432,7 +442,10 @@ export function ProfileDrawerShell({
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
       <Drawer.Portal>
         <Drawer.Overlay
-          className={`fixed inset-0 ${PROFILE_Z.MODAL_DRAWER_BACKDROP} bg-black/60 backdrop-blur-sm`}
+          className={cn(
+            'profile-drawer-shell-scrim-heavy fixed inset-0 backdrop-blur-sm',
+            PROFILE_Z.MODAL_DRAWER_BACKDROP
+          )}
           onClick={handleDismiss}
           data-modal-backdrop
           tabIndex={-1}
