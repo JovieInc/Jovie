@@ -6,15 +6,23 @@ import { useEffect, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthShell } from '@/features/auth';
 import { useAuthSafe, useCanRenderClerkUi } from '@/hooks/useClerkSafe';
+import { useOnboardingClaimHandoffStatus } from '@/hooks/useOnboardingClaimHandoff';
 import { track } from '@/lib/analytics';
 import type { AudienceBand } from '@/lib/chat/tools/onboarding-signals';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import {
   isAllowedEnrichmentSocialUrl,
   type PostKeepSocialPlatform,
-  readPostKeepEnrichmentNotes,
   writePostKeepEnrichmentNotes,
 } from '@/lib/onboarding/post-keep-enrichment-notes';
+import {
+  AUDIENCE_BAND_OPTIONS,
+  type EnrichmentPanel,
+  initialEnrichmentChipState,
+  isTerminalClaimHandoff,
+  type SocialPlatformNote,
+  signedInHandoffCopy,
+} from './chatProposeNextStepCardModel';
 
 /**
  * Renders the `proposeNextStep` tool result inside the onboarding chat
@@ -61,52 +69,6 @@ interface ChatProposeNextStepCardProps {
    * access keeps Claim @handle (JOV-8052 / ONB-23).
    */
   readonly claimHandle?: string | null;
-}
-
-type EnrichmentPanel = 'social' | 'audience' | null;
-type SocialPlatformNote = 'instagram' | 'tiktok';
-
-const AUDIENCE_BAND_OPTIONS: ReadonlyArray<{
-  readonly band: AudienceBand;
-  readonly caption: string;
-}> = [
-  { band: 'under_500', caption: 'Under 500' },
-  { band: '500_to_5k', caption: '500 To 5k' },
-  { band: '5k_to_50k', caption: '5k To 50k' },
-  { band: '50k_to_500k', caption: '50k To 500k' },
-  { band: 'over_500k', caption: '500k+' },
-];
-
-/**
- * Hydrate chip UI from sessionStorage notes (ONB-34). Claim already reads
- * the same key; without this, remount / interruption return shows empty
- * “Add …” chips while notes still carry — dishonest vs what claim sends.
- */
-function initialEnrichmentChipState(): {
-  readonly platform: SocialPlatformNote | null;
-  readonly audienceBand: AudienceBand | null;
-  readonly socialUrl: string | null;
-  readonly urlDraft: string;
-} {
-  const notes = readPostKeepEnrichmentNotes();
-  if (!notes) {
-    return {
-      platform: null,
-      audienceBand: null,
-      socialUrl: null,
-      urlDraft: '',
-    };
-  }
-  const platform = notes.platform ?? null;
-  const rawUrl = notes.socialUrl?.trim() || null;
-  const socialUrl =
-    rawUrl && isAllowedEnrichmentSocialUrl(rawUrl, platform) ? rawUrl : null;
-  return {
-    platform,
-    audienceBand: (notes.audienceBand ?? null) as AudienceBand | null,
-    socialUrl,
-    urlDraft: socialUrl ?? '',
-  };
 }
 
 /**
@@ -349,6 +311,8 @@ export function ChatProposeNextStepCard({
 }: ChatProposeNextStepCardProps) {
   const { isSignedIn } = useAuthSafe();
   const canRenderClerkUi = useCanRenderClerkUi();
+  const claimHandoffStatus = useOnboardingClaimHandoffStatus();
+  const handoffIsTerminal = isTerminalClaimHandoff(claimHandoffStatus);
   const kind = payload.decision.kind;
   const decisionTrackedRef = useRef(false);
   const saveStartedTrackedRef = useRef(false);
@@ -393,9 +357,13 @@ export function ChatProposeNextStepCard({
     if (isSignedIn) {
       return (
         <div className='min-h-72 px-1 py-1'>
-          <p className='text-mid leading-7 text-primary-token'>
-            Saving your request and reserving your name and profile now. Keep
-            this page open until the receipt appears.
+          <p
+            className='text-mid leading-7 text-primary-token'
+            data-testid='onboarding-claim-handoff-copy'
+            data-claim-status={claimHandoffStatus}
+            {...(handoffIsTerminal ? { role: 'alert' as const } : {})}
+          >
+            {signedInHandoffCopy('waitlist', claimHandoffStatus)}
           </p>
         </div>
       );
@@ -442,11 +410,17 @@ export function ChatProposeNextStepCard({
   if (isSignedIn) {
     // Already authenticated mid-conversation (rare but possible if the user
     // had a Clerk session already). Skip the form; the claim hook on the
-    // shell will fire and bounce them to checkout.
+    // shell will fire and bounce them to checkout. ONB-36: copy tracks
+    // claim status so a failed handoff does not keep saying "Linking…".
     return (
       <div className='px-1 py-1'>
-        <p className='text-mid leading-7 text-primary-token'>
-          {`You're already signed in. Linking this conversation to your account.`}
+        <p
+          className='text-mid leading-7 text-primary-token'
+          data-testid='onboarding-claim-handoff-copy'
+          data-claim-status={claimHandoffStatus}
+          {...(handoffIsTerminal ? { role: 'alert' as const } : {})}
+        >
+          {signedInHandoffCopy('instant_access', claimHandoffStatus)}
         </p>
       </div>
     );

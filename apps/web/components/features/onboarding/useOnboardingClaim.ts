@@ -42,7 +42,7 @@ import {
  * `claimTrigger` value while one is already in-flight.
  */
 
-type ClaimStatus =
+export type ClaimStatus =
   | 'idle'
   | 'pending'
   | 'claimed'
