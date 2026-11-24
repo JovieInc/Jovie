@@ -614,7 +614,7 @@ describe('LibrarySurface', () => {
     ).toBeEnabled();
   });
 
-  it('defaults to a dense title-first table on first load', () => {
+  it('defaults to a compact title-first table on first load', () => {
     window.localStorage.removeItem(LIBRARY_VIEW_MODE_STORAGE_KEY);
     renderLibrary([buildAsset()]);
 
@@ -622,7 +622,7 @@ describe('LibrarySurface', () => {
     const row = screen.getByTestId('library-catalog-row-release-1');
     expect(
       row.closest('table')?.style.getPropertyValue('--table-row-height')
-    ).toBe('32px');
+    ).toBe('40px');
     expect(screen.queryByTestId('library-grid-density-toggle')).toBeNull();
     expect(
       screen.getByTestId('library-status-glyph-release-1')

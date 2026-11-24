@@ -67,6 +67,10 @@ describe('ShellReleaseRow', () => {
       </ul>
     );
 
+    const shellRow = container.querySelector('[data-shell-list-row="true"]');
+    expect(shellRow?.className).toContain('h-10');
+    expect(shellRow?.className).not.toContain('h-8');
+
     const play = screen.getByRole('button', { name: 'Play Lost in the Light' });
     expect(play.className).toContain('bg-ink-on-media/50');
     expect(play.className).toContain('text-on-media');

@@ -43,6 +43,10 @@ describe('ReleaseTaskCompactRow', () => {
       />
     );
 
+    const row = container.querySelector('[data-shell-list-row="true"]');
+    expect(row?.className).toContain('min-h-7');
+    expect(row?.className).toContain('py-0.5');
+
     const title = screen.getByRole('button', {
       name: /Pitch playlist editors/,
     });

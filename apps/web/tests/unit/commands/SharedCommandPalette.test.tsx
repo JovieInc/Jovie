@@ -297,8 +297,8 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       ),
     });
     expect(selected).toHaveClass('system-b-table-row-shell');
-    expect(selected).toHaveClass('min-h-8');
     expect(selected).toHaveClass('h-8');
+    expect(selected).not.toHaveClass('min-h-8');
     expect(selected).toHaveClass('py-0');
     expect(selected).toHaveClass('system-b-table-row-selected');
     expect(selected).not.toHaveClass('system-b-picker-row');

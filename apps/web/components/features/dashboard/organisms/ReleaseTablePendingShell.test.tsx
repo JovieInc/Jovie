@@ -14,14 +14,14 @@ describe('ReleaseTablePendingShell', () => {
     expect(screen.getByTestId('custom-loading')).toBeInTheDocument();
   });
 
-  it('reserves the dense release row and content height while loading', () => {
+  it('reserves the compact Linear-parity release row while loading', () => {
     render(<ReleaseTablePendingShell />);
 
     const table = screen.getByRole('table');
-    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
-    expect(table.style.getPropertyValue('--table-row-height')).toBe('32px');
+    expect(table).toHaveAttribute('data-table-row-mode', 'compact');
+    expect(table.style.getPropertyValue('--table-row-height')).toBe('40px');
     expect(table.style.getPropertyValue('--table-cell-content-height')).toBe(
-      '24px'
+      '32px'
     );
     expect(screen.getByText('Loading table data')).toBeInTheDocument();
   });

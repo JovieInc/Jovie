@@ -33,6 +33,8 @@ describe('HomeLoopLatency', () => {
     );
 
     const table = screen.getByRole('table');
+    expect(table).toHaveAttribute('data-table-row-mode', 'compact');
+    expect(table.style.getPropertyValue('--table-row-height')).toBe('40px');
     expect(within(table).getByText('Slowest stages by 7-day p95')).toBeTruthy();
     const tableRows = screen.getAllByTestId('home-loop-latency-row');
     expect(tableRows).toHaveLength(2);
