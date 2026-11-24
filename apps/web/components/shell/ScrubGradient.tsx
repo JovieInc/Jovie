@@ -1,9 +1,10 @@
-// @coverage-via apps/web/components/shell/__tests__/ScrubGradient.test.tsx
 'use client';
 
+import { HostDrawnInput } from '@jovie/ui';
 import { useId } from 'react';
 import { formatTime } from '@/lib/format-time';
 import { cn } from '@/lib/utils';
+import './ScrubGradient.wave.css';
 
 const SCRUB_W = 1000;
 const SCRUB_H = 32; // includes 4px reserved at the top for cue dots
@@ -128,7 +129,12 @@ export function ScrubGradient({
   const sectionToX = loopSection ? (loopSection.to / 100) * SCRUB_W : 0;
 
   return (
-    <div className={cn('flex w-full items-center gap-2', className)}>
+    <div
+      className={cn(
+        'scrub-gradient-wave flex w-full items-center gap-2',
+        className
+      )}
+    >
       <span className={cn(TIME_LABEL, 'text-right')}>
         {formatTime(safeCurrent)}
       </span>
@@ -141,10 +147,10 @@ export function ScrubGradient({
         >
           <defs>
             <linearGradient id={gradId} x1='0' y1='0' x2='1' y2='0'>
-              <stop offset='0%' stopColor='#a78bfa' />
-              <stop offset='35%' stopColor='#c084fc' />
-              <stop offset='60%' stopColor='#f472b6' />
-              <stop offset='100%' stopColor='#60a5fa' />
+              <stop offset='0%' stopColor='var(--scrub-wave-0)' />
+              <stop offset='35%' stopColor='var(--scrub-wave-35)' />
+              <stop offset='60%' stopColor='var(--scrub-wave-60)' />
+              <stop offset='100%' stopColor='var(--scrub-wave-100)' />
             </linearGradient>
             <linearGradient id={edgeFadeId} x1='0' y1='0' x2='1' y2='0'>
               <stop offset='0%' stopColor='white' stopOpacity='0' />
@@ -215,7 +221,7 @@ export function ScrubGradient({
           />
         </svg>
         {onSeek ? (
-          <input
+          <HostDrawnInput
             type='range'
             min={0}
             max={safeDuration > 0 ? safeDuration : 1}
@@ -225,7 +231,7 @@ export function ScrubGradient({
             aria-label='Seek Track Waveform'
             aria-valuetext={`${formatTime(safeCurrent)} of ${formatTime(safeDuration)}`}
             disabled={safeDuration <= 0}
-            className='absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0 disabled:cursor-default'
+            className='absolute inset-0 w-full'
           />
         ) : null}
       </div>

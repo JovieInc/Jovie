@@ -39,7 +39,6 @@
       "apps/web/components/shell/ContextMenuOverlay.test.tsx": 1,
       "apps/web/components/shell/SidebarInboxLink.test.tsx": 1,
       "apps/web/components/shell/Sparkline.test.tsx": 1,
-      "apps/web/components/shell/__tests__/ScrubGradient.test.tsx": 1,
       "apps/web/data/marketing/factory/pageRecordContract.test.ts": 1,
       "apps/web/eslint-rules/__tests__/no-raw-focus-ring-suppression.test.ts": 1,
       "apps/web/lib/agents/lifecycle.test.ts": 1,
