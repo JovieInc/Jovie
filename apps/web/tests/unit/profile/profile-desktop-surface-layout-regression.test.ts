@@ -21,7 +21,23 @@ describe('ProfileDesktopSurface layout contract', () => {
     const source = readFileSync(SURFACE_SOURCE, 'utf8');
     expect(source).toContain("'grid min-h-0 min-w-0 flex-none gap-4'");
     expect(source).not.toContain("'grid min-h-0 min-w-0 flex-1 gap-4'");
-    expect(source).toContain("'mt-auto flex justify-center pb-1 pt-2'");
+    // The branding follows the content: mt-auto pinned it to the bottom of
+    // the fold and left a 270px empty band under short tabs like About
+    // (viewport sweep, 1200-1440px).
+    expect(source).toContain("'flex justify-center pb-1 pt-2'");
+    expect(source).not.toContain("'mt-auto flex justify-center pb-1 pt-2'");
+  });
+
+  // Same JOV-11623 failure on the Music tab: a flex-1 + min-h-0 listen grid
+  // shrank to the pane height and the DSP column's "Listen on" links painted
+  // below "Made with Jovie" (viewport sweep, claimed profile 1200-1440px).
+  it('sizes the listen grid to its content', () => {
+    const source = readFileSync(SURFACE_SOURCE, 'utf8');
+    const listenGrid = source.match(
+      /PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME =\n {2}'([^']+)'/
+    )?.[1];
+    expect(listenGrid).toContain('flex-none');
+    expect(listenGrid?.split(' ')).not.toContain('flex-1');
   });
 
   // jov.ie/tim at 1440px: the Get-updates/Payments rail painted over the

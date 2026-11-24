@@ -92,6 +92,10 @@ const LEDGER = {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
+  'ci-profile-viewport-sweep/Fetch base-branch history': {
+    kind: 'git-auth',
+    greenGroupCalls: 0,
+  },
   'ci-fast-structural-python/Start base-branch history fetch': {
     kind: 'git-auth',
     greenGroupCalls: 0,

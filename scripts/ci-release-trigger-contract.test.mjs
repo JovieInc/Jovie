@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import test from 'node:test';
 
 const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
@@ -65,7 +65,7 @@ test('CI prevention verifier runs for every source PR and exact merge-group head
   assert.match(ciFastRemainingBlock, /echo "skip=false"/);
   assert.match(
     ciFastAggregateBlock,
-    /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*ci-fast-structural-lanes,\s*\]/s
+    /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-profile-viewport-sweep,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*ci-fast-structural-lanes,\s*\]/s
   );
   assert.match(
     ciFastAggregateBlock,
@@ -81,11 +81,28 @@ test('CI prevention verifier runs for every source PR and exact merge-group head
   );
   assert.match(
     ciFastAggregateBlock,
-    /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \|\| "\$STRUCTURAL_LANES_RESULT" != "success" \]\]/
+    /PROFILE_VIEWPORT_SWEEP_RESULT: \$\{\{ needs\.ci-profile-viewport-sweep\.result \}\}/
+  );
+  assert.match(
+    ciFastAggregateBlock,
+    /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$PROFILE_VIEWPORT_SWEEP_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \|\| "\$STRUCTURAL_LANES_RESULT" != "success" \]\]/
   );
   assert.match(ciFastAggregateBlock, /exit 1/);
   assert.doesNotMatch(
     ciFastAggregateBlock,
     /name: Validate CI\/release incident prevention contract|ci-release-incident-contract/
   );
+});
+
+// GitHub refuses a workflow file over 512,000 bytes: the merge group then gets
+// no CI run at all (only a parse failure), so the queue head stalls silently.
+test('every workflow file stays under the 512,000-byte limit', () => {
+  for (const name of readdirSync('.github/workflows')) {
+    if (!/\.ya?ml$/.test(name)) continue;
+    const size = statSync(`.github/workflows/${name}`).size;
+    assert.ok(
+      size < 512_000,
+      `${name} is ${size} bytes; move inline scripts to .github/scripts`
+    );
+  }
 });

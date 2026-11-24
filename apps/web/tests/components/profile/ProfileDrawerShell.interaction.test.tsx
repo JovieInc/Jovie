@@ -250,14 +250,14 @@ describe('ProfileDrawerShell keyboard modal contract', () => {
     expect(document.documentElement.style.overflow).toBe('');
   });
 
-  it('stretches the embedded sheet to its container width (jov.ie/tim dogfood)', () => {
+  it('stretches the embedded card up to popover width (jov.ie/tim dogfood)', () => {
     render(<MenuShell presentation='embedded' />);
-    // A native <dialog> defaults to width: fit-content; without w-full the
-    // Menu shrank to a 185px side panel in the tablet/desktop phone column.
+    // <dialog> is fit-content (185px Menu); w-auto stretches, max-w-96 caps.
     const sheet = document.querySelector('dialog[open]');
     expect(sheet).not.toBeNull();
-    expect(sheet?.className).toContain('w-full');
-    expect(sheet?.className).toContain('inset-x-0');
+    expect(sheet?.className).toContain('w-auto');
+    expect(sheet?.className).toContain('inset-x-3');
+    expect(sheet?.className).toContain('max-w-96');
   });
 
   it('centres the secondary title block against the 44px header buttons', () => {
