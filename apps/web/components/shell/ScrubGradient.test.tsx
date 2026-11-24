@@ -129,7 +129,10 @@ describe('Ion accent polish (glm/lyrics-player)', () => {
       />
     );
     const band = container.querySelector('rect.text-accent');
-    expect(band).not.toBeNull();
+    // Scrub viewBox width is 1000; section from/to are percent → x=60, width=170.
+    expect(band?.getAttribute('x')).toBe('60');
+    expect(band?.getAttribute('width')).toBe('170');
+    expect(band?.getAttribute('fill')).toBe('currentColor');
   });
 
   it('hydrates a fractional playhead and cue title without a mismatch', async () => {
