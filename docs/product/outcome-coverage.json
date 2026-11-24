@@ -351,18 +351,42 @@
       ]
     },
     {
-      "id": "chat-creative",
-      "label": "Chat: retouch, promo, lyrics and video",
+      "id": "chat-retouch",
+      "label": "Chat: photo retouch",
       "core": true,
       "entryPoints": [],
-      "chatTools": [
-        "retouchImage",
-        "voicePromo",
-        "formatLyrics",
-        "proposeVideoRecording"
-      ],
-      "checks": [],
-      "gap": "Schema tests only."
+      "chatTools": ["retouchImage"],
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/chat-retouch-outcome.test.ts",
+          "test": "a photo retouched in chat comes back as a stored result on a finished job",
+          "runs": "merge"
+        }
+      ]
+    },
+    {
+      "id": "chat-creative",
+      "label": "Chat: promo, lyrics and video",
+      "core": true,
+      "entryPoints": [],
+      "chatTools": ["voicePromo", "formatLyrics", "proposeVideoRecording"],
+      "checks": [
+        {
+          "file": "apps/web/lib/ai/tools/voice-promo.test.ts",
+          "test": "a radio drop made in chat comes back as playable audio in the artist's voice",
+          "runs": "merge"
+        },
+        {
+          "file": "apps/web/lib/chat/tools/format-lyrics.test.ts",
+          "test": "lyrics pasted in chat come back ready for Apple Music",
+          "runs": "merge"
+        },
+        {
+          "file": "apps/web/lib/chat/tools/propose-video-recording.test.ts",
+          "test": "trims the script and passes the interview questions on",
+          "runs": "merge"
+        }
+      ]
     },
     {
       "id": "chat-account",

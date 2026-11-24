@@ -113,6 +113,7 @@ import {
   createCheckCanvasStatusTool,
   createMarkCanvasUploadedTool,
 } from '@/lib/chat/tools/canvas-status';
+import { createFormatLyricsTool } from '@/lib/chat/tools/format-lyrics';
 import { proposeMerchAction } from '@/lib/chat/tools/merch-propose';
 import {
   createMerchAlternativeTool,
@@ -159,7 +160,6 @@ import {
   isDeterministicIntent,
   routeIntent,
 } from '@/lib/intent-detection';
-import { formatLyricsForAppleMusic } from '@/lib/lyrics/format-lyrics-for-apple-music';
 import { formatMerchMoney } from '@/lib/merch/pricing';
 import {
   optimizeMerchCards,
@@ -857,37 +857,6 @@ function createWorldClassBioTool(
 }
 
 /**
- * Creates the formatLyrics tool.
- * Applies deterministic Apple Music formatting rules to raw lyrics text.
- */
-function createLyricsFormatTool() {
-  return tool({
-    description:
-      'Format lyrics to Apple Music guidelines. Applies deterministic rules: removes section labels like [Verse]/[Chorus], straightens curly quotes, normalizes punctuation, collapses blank lines, and trims whitespace. Use when an artist asks to clean up or format lyrics.',
-    inputSchema: chatToolSchema({
-      lyrics: z
-        .string()
-        .min(1)
-        .max(10000)
-        .describe('Raw lyrics text to format for Apple Music'),
-    }),
-    execute: async ({ lyrics }) => {
-      const originalLineCount = lyrics.split('\n').length;
-      const { formatted, changesSummary } = formatLyricsForAppleMusic(lyrics);
-      const formattedLineCount = formatted.split('\n').length;
-
-      return {
-        success: true,
-        formatted,
-        changesSummary,
-        originalLineCount,
-        formattedLineCount,
-      };
-    },
-  });
-}
-
-/**
  * OPTIONS - CORS preflight handler
  */
 export async function OPTIONS(req: Request) {
@@ -1043,7 +1012,7 @@ function buildChatTools(
       resolvedProfileId,
       releases
     ),
-    formatLyrics: createLyricsFormatTool(),
+    formatLyrics: createFormatLyricsTool(),
     ...(resolvedProfileId
       ? { manageTasks: createManageTasksTool(resolvedProfileId) }
       : {}),
