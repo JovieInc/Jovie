@@ -67,7 +67,7 @@
       "checks": [
         {
           "file": "apps/web/tests/e2e/canary-claim-checkout.spec.ts",
-          "test": "reset → claim → test-mode payment → activation → reset",
+          "test": "reset \u2192 claim \u2192 test-mode payment \u2192 activation \u2192 reset",
           "runs": "prod-postdeploy"
         }
       ]
@@ -284,8 +284,22 @@
       ]
     },
     {
+      "id": "chat-canvas",
+      "label": "Chat: Spotify Canvas status",
+      "core": true,
+      "entryPoints": [],
+      "chatTools": ["checkCanvasStatus", "markCanvasUploaded"],
+      "checks": [
+        {
+          "file": "apps/web/tests/integration/chat-canvas-outcome.test.ts",
+          "test": "marking a canvas uploaded is what the next turn reports",
+          "runs": "merge"
+        }
+      ]
+    },
+    {
       "id": "chat-creative",
-      "label": "Chat: album art, retouch, pitch, promo and canvas",
+      "label": "Chat: album art, retouch, pitch, promo and video",
       "core": true,
       "entryPoints": [],
       "chatTools": [
@@ -294,8 +308,6 @@
         "retouchImage",
         "voicePromo",
         "formatLyrics",
-        "checkCanvasStatus",
-        "markCanvasUploaded",
         "proposeVideoRecording"
       ],
       "checks": [],
