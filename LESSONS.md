@@ -330,7 +330,7 @@ or linked guard changes; then review that linkage and regenerate the receipt.
 ### Prefetch keys must match the consumer key and shape
 **Mistake:** Nav hover warmed `queryKeys.audience.members(profileId)` while the Audience table reads an infinite query keyed with sort/direction/segments/view; Identity (`/app/presence`) warmed `dspEnrichment.presence` while the route mounts ProfilesWorkspace. Dead warms burned the request budget and left the click cold. A “fixed” Audience infinite warm still lost to SSR: the route awaits the first page, and hover cache can block newer SSR `initialData`.
 
-**Rule:** Warm queries must use the same TanStack key and request params the destination reads — or do not warm. Stock/SSR-only wins ties. Do not keep or invent a hover warm without a matched authenticated hover→navigate A/B proving faster first usable rows, no request-budget regression, and correct freshness when SSR is newer. Never speculatively render a route that can write. ASR-043 / RF-0004.
+**Rule:** Warm queries must use the same TanStack key and request params the destination reads — or do not warm. Stock/SSR-only wins ties. Do not keep or invent a hover warm without a matched authenticated hover→navigate A/B proving faster first usable rows, no request-budget regression, and correct freshness when SSR is newer. Keep request builders with the real consumer; do not extract a second module for a deleted hover path. Never speculatively render a route that can write. ASR-043 / RF-0004.
 
 ### Optional or stale data must not become zero or a period spike
 **Mistake:** Missing counts coerced with `?? 0`, lifetime totals shown as period spikes, and refresh clearing prior valid rows so the UI flickers empty or invents a surge.

@@ -10,18 +10,8 @@ import type {
   AudienceView,
 } from '@/features/dashboard/organisms/dashboard-audience-table/types';
 import type { AudienceMember } from '@/types';
-import {
-  buildAudienceMembersParams,
-  DEFAULT_AUDIENCE_WARM,
-} from './audience-members-params';
 import { PAGINATED_CACHE } from './cache-strategies';
 import { queryKeys } from './keys';
-
-export {
-  audienceWarmFilterParams,
-  buildAudienceMembersParams,
-  DEFAULT_AUDIENCE_WARM,
-} from './audience-members-params';
 
 interface AudiencePageResponse {
   rows: AudienceMember[];
@@ -43,13 +33,49 @@ interface UseAudienceInfiniteQueryParams {
   initialData?: { rows: AudienceMember[]; total: number | null };
 }
 
+/**
+ * The exact query string the Audience client sends to
+ * GET /api/dashboard/audience/members. profileId is REQUIRED by the route
+ * (membersQuerySchema); keep this the single builder so the contract test in
+ * tests/unit/api/audience/members-request-contract.test.ts covers real requests.
+ */
+export function buildAudienceMembersParams({
+  profileId,
+  view,
+  sort,
+  direction,
+  pageSize,
+  cursor,
+  segments,
+}: {
+  profileId: string;
+  view: AudienceView;
+  sort: string;
+  direction: 'asc' | 'desc';
+  pageSize: number;
+  cursor?: string;
+  segments: readonly string[];
+}): URLSearchParams {
+  const params = new URLSearchParams({
+    pageSize: String(pageSize),
+    sort,
+    direction,
+    profileId,
+  });
+  // Cursor-based pagination for members (JOV-1263).
+  if (cursor) params.set('cursor', cursor);
+  params.set('view', view);
+  for (const segment of segments) params.append('segments', segment);
+  return params;
+}
+
 export function useAudienceInfiniteQuery({
   profileId,
   view,
   sort,
   direction,
   filters,
-  pageSize = DEFAULT_AUDIENCE_WARM.pageSize,
+  pageSize = 50,
   initialData,
 }: UseAudienceInfiniteQueryParams) {
   const filterParams = {

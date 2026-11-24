@@ -96,7 +96,9 @@ test('ASR-044 bad coerces missing to zero; good keeps null and prior rows', () =
   assert.ok(/priorRows/u.test(fixture('ASR-044.good.ts')));
 });
 
-test('ASR-045 review-only signals: hover ring and focus→Attach are bad; keyboard ring is good', () => {
+test('ASR-045 fixture registration: hover ring and focus→Attach are bad; keyboard ring is good', () => {
+  // Review-only / human+vision rule — this case pins fixture text only; it does
+  // not exercise a shipped static review path.
   const bad = fixture('ASR-045.bad.ts');
   const good = fixture('ASR-045.good.ts');
   assert.ok(/hover:ring/u.test(bad));
@@ -119,9 +121,9 @@ test('ASR-046 unverifiable mandatory item cannot claim aggregate PASS', () => {
   assert.equal(good.claimedAggregate, 'pass');
 });
 
-test('existing loop can ingest a new verified miss without reinquiry', () => {
-  // Append-only review-findings ledger + ASR registry are the ingest surfaces.
-  // This check only proves the surfaces still exist and accept the RSI classes.
+test('RSI RF ledger + ASR registry registration are present (fixture/registration check)', () => {
+  // Registration only: reads preseeded RF-0003..0007 ledger lines and ASR
+  // registry ids. Does not exercise dry-run review ingestion.
   const ledger = readFileSync(
     join(REPO_ROOT, 'apps/web/review-findings/findings.jsonl'),
     'utf8'

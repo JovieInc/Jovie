@@ -995,7 +995,8 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   ...STRUCTURAL_PYTEST_PARTS,
 ]);
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
-  'scripts/anti-slop/rsi-prevention/contract.test.mjs', // RSI ASR-042..046 fixtures
+  // RSI ASR-042..046 fixtures run once via the anti-slop lane command above —
+  // do not also list the file here or the suite double-runs per PR.
   'scripts/lib/__tests__/source-docs-scope.test.mjs',
   'scripts/ios-certification-config.test.mjs',
   'scripts/schedule-trigger-guard.test.mjs', // JOV-12720 event-driven guard.

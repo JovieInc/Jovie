@@ -700,7 +700,7 @@
     },
     {
       "fingerprint": "Prefetch keys must match the consumer key and shape",
-      "lessonSha256": "cddbd2efc05dbb652e63cc35b7436863ae4d605312f5e52847fc62e7ff529f32",
+      "lessonSha256": "d3f3acbeead230fdff06be579fc8b08ab4398dfc9cd338d30236b9ce95c1c974",
       "guards": [
         {
           "kind": "test",
@@ -741,8 +741,8 @@
         {
           "kind": "test",
           "path": "scripts/anti-slop/rsi-prevention/contract.test.mjs",
-          "anchor": "ASR-045 review-only signals: hover ring and focus→Attach are bad; keyboard ring is good",
-          "reason": "Review-only fixture signals for shared UI contracts."
+          "anchor": "ASR-045 fixture registration: hover ring and focus→Attach are bad; keyboard ring is good",
+          "reason": "Fixture-text registration for review-only shared UI signals."
         },
         {
           "kind": "test",
