@@ -9,6 +9,10 @@ import { useAuthSafe, useCanRenderClerkUi } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
 import type { AudienceBand } from '@/lib/chat/tools/onboarding-signals';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
+import {
+  type PostKeepSocialPlatform,
+  writePostKeepEnrichmentNotes,
+} from '@/lib/onboarding/post-keep-enrichment-notes';
 
 /**
  * Renders the `proposeNextStep` tool result inside the onboarding chat
@@ -30,9 +34,9 @@ import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
  *    ask another sharp question; this card just acknowledges the tool was
  *    called.
  *
- * Optional post-Keep enrichment chips (ONB-21 / Keep This Draft Phase 5) sit
- * under AuthShell as subordinate, local-only controls. They never emit
- * SOCIAL_ATTACHED or restore required pre-auth social→audience.
+ * Optional post-Keep enrichment chips (ONB-21 / ONB-26) sit under AuthShell as
+ * subordinate controls. Notes persist via sessionStorage into waitlist claim;
+ * they never emit SOCIAL_ATTACHED or restore required social→audience.
  */
 
 export interface NextStepCardPayload {
@@ -80,6 +84,18 @@ function PostKeepEnrichmentChips() {
     null
   );
   const [savedBand, setSavedBand] = useState<AudienceBand | null>(null);
+
+  const notePlatform = (platform: PostKeepSocialPlatform) => {
+    setSavedPlatform(platform);
+    writePostKeepEnrichmentNotes({ platform });
+    setOpenPanel(null);
+  };
+
+  const noteAudience = (band: AudienceBand) => {
+    setSavedBand(band);
+    writePostKeepEnrichmentNotes({ audienceBand: band });
+    setOpenPanel(null);
+  };
 
   return (
     <div
@@ -137,10 +153,7 @@ function PostKeepEnrichmentChips() {
               size='sm'
               data-testid='onboarding-enrichment-social-instagram'
               aria-pressed={savedPlatform === 'instagram'}
-              onClick={() => {
-                setSavedPlatform('instagram');
-                setOpenPanel(null);
-              }}
+              onClick={() => notePlatform('instagram')}
             >
               Instagram
             </Button>
@@ -150,10 +163,7 @@ function PostKeepEnrichmentChips() {
               size='sm'
               data-testid='onboarding-enrichment-social-tiktok'
               aria-pressed={savedPlatform === 'tiktok'}
-              onClick={() => {
-                setSavedPlatform('tiktok');
-                setOpenPanel(null);
-              }}
+              onClick={() => notePlatform('tiktok')}
             >
               TikTok
             </Button>
@@ -178,10 +188,7 @@ function PostKeepEnrichmentChips() {
                 size='sm'
                 data-testid={`onboarding-enrichment-audience-${option.band}`}
                 aria-pressed={savedBand === option.band}
-                onClick={() => {
-                  setSavedBand(option.band);
-                  setOpenPanel(null);
-                }}
+                onClick={() => noteAudience(option.band)}
               >
                 {option.caption}
               </Button>
