@@ -41,6 +41,7 @@ import {
   settleViewport,
   type ViewportSweepViolation,
 } from '../utils/viewport-sweep-audit';
+import { auditColumnGaps } from '../utils/viewport-sweep-column-gap-audit';
 import { auditOverlay } from '../utils/viewport-sweep-overlay-audit';
 import {
   chunkSteps,
@@ -147,6 +148,7 @@ async function auditProfileNow(
   await settleViewport(page);
   collector.add(label, await auditViewport(page, { kind: 'profile' }));
   collector.add(label, await auditCoverAccentLine(page));
+  collector.add(label, await auditColumnGaps(page));
   const offenders = await getOverflowingElements(page);
   if (offenders.length > 0) {
     collector.addText(

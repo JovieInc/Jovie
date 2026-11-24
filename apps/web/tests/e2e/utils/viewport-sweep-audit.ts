@@ -468,44 +468,6 @@ export async function auditViewport(
           coveredBy = element;
         }
       }
-
-      // 5b. The same gap inside one column. A tall neighbouring column (the
-      // desktop hero card) covers the page-wide band, so a column whose rows
-      // were stretched apart (the side rail's Get updates and Pay rows) only
-      // shows when each block is measured against the content above it in the
-      // same narrow grid or flex container.
-      const columnMaxWidth = vw * 0.6;
-      for (const [index, { element, rect }] of blocks.entries()) {
-        let above: { element: HTMLElement; rect: DOMRect } | null = null;
-        for (const candidate of blocks.slice(0, index)) {
-          const overlap =
-            Math.min(candidate.rect.right, rect.right) -
-            Math.max(candidate.rect.left, rect.left);
-          if (overlap <= 8 || candidate.rect.top >= rect.top) continue;
-          if (!above || candidate.rect.bottom > above.rect.bottom) {
-            above = candidate;
-          }
-        }
-        if (!above) continue;
-        const gap = rect.top - above.rect.bottom;
-        if (gap <= opts.maxVerticalGapPx) continue;
-        let column: Element | null = above.element.parentElement;
-        while (column && !column.contains(element)) {
-          column = column.parentElement;
-        }
-        if (!column) continue;
-        const display = getComputedStyle(column).display;
-        if (
-          column.getBoundingClientRect().width > columnMaxWidth ||
-          !/grid|flex/.test(display)
-        ) {
-          continue;
-        }
-        add(
-          'large_vertical_gap',
-          `${Math.round(gap)}px of empty space inside ${describe(column)} between ${describe(above.element)} (bottom y=${Math.round(above.rect.bottom)}) and ${describe(element)} (top y=${Math.round(rect.top)}) (max ${opts.maxVerticalGapPx}px)`
-        );
-      }
     }
 
     // 6. Focus ring after pointer input: only :focus-visible may draw one.
