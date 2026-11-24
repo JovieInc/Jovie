@@ -18,13 +18,13 @@ describe('InboxAttentionLink', () => {
   it('links to the Inbox without prefetching and caps the pending badge', () => {
     render(
       <InboxAttentionLink
-        label='Inbox'
+        label='Home'
         itemId='home'
         attention='available'
         pendingCount={140}
       />
     );
-    const link = screen.getByRole('link', { name: 'Inbox' });
+    const link = screen.getByRole('link', { name: 'Home' });
     expect(link).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
     expect(link).toHaveAttribute('data-prefetch', 'false');
     expect(link).toHaveAttribute('data-inbox-attention', 'available');
@@ -35,9 +35,7 @@ describe('InboxAttentionLink', () => {
   });
 
   it('carries no app-update dot: the shell update pill announces updates', () => {
-    render(
-      <InboxAttentionLink label='Inbox' itemId='home' attention='empty' />
-    );
+    render(<InboxAttentionLink label='Home' itemId='home' attention='empty' />);
     expect(document.querySelector('[data-inbox-runtime-update]')).toBeNull();
     expect(screen.queryByRole('status')).toBeNull();
   });
@@ -46,14 +44,14 @@ describe('InboxAttentionLink', () => {
     const onClick = vi.fn(event => event.preventDefault());
     render(
       <InboxAttentionLink
-        label='Inbox'
+        label='Home'
         itemId='home'
         attention='empty'
         navigationPending
         onClick={onClick}
       />
     );
-    const link = screen.getByRole('link', { name: 'Inbox' });
+    const link = screen.getByRole('link', { name: 'Home' });
     expect(link).toHaveAttribute('aria-busy', 'true');
     expect(link).toHaveAttribute('data-navigation-pending', 'true');
     expect(link).toHaveClass('bg-sidebar-accent-active');
@@ -68,7 +66,7 @@ describe('InboxAttentionLink', () => {
     ['navigation pending', { attention: 'empty', navigationPending: true }],
   ] as const)('has no accessibility violations when %s', async (_, props) => {
     const { container } = render(
-      <InboxAttentionLink label='Inbox' itemId='home' {...props} />
+      <InboxAttentionLink label='Home' itemId='home' {...props} />
     );
     await expectNoA11yViolations(container);
   });

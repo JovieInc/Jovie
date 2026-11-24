@@ -374,7 +374,7 @@
       "id": "tech-debt",
       "label": "Tech debt (a form of waste)",
       "owner": "summer",
-      "unit": "oversized files; slop ratchet size",
+      "unit": "oversized files; cert-screens debt entries",
       "metrics": [
         {
           "id": "debt.oversized_files",
@@ -386,11 +386,22 @@
             "pct": 0.1,
             "floor": 5
           }
+        },
+        {
+          "id": "debt.cert_screen_entries",
+          "label": "cert-screens.json debt map entries (component paths still owing criteria)",
+          "unit": "count",
+          "source": "debt.certScreenEntries",
+          "detector": {
+            "kind": "wow",
+            "pct": 0.1,
+            "floor": 3
+          }
         }
       ],
       "feeds": [
         "gem:waste-loop → waste-latest.json (Summer owns tech-debt class observe/prioritize; no separate debt workflow)",
-        "follow-up observer (not this PR): cert-screens.debt cardinality via docs/design-system/cert-screens.json — repair stays ds-cert-loop",
+        "observer: docs/design-system/cert-screens.json#debt cardinality (Object.keys length) — repair stays ds-cert-loop / component-certificate",
         "scripts/waste-sweep.mjs dead code (#23690)",
         "slop ratchets",
         "findings ledger (#23709)"

@@ -60,24 +60,24 @@ describe('Profiles public page route', () => {
     mocks.loadProfiles.mockResolvedValue({ profileId: 'identity-1' });
   });
 
-  it('names the customer page Profiles while preserving the identity description', () => {
-    expect(metadata.title).toBe('Profiles');
+  it('names the customer page Identity while preserving the identity description', () => {
+    expect(metadata.title).toBe('Identity');
     expect(metadata.description).toBe(
       'Manage who you are and how you are represented across public surfaces'
     );
   });
 
-  it('renders and records Profiles-specific shell load failure without loading the inventory', async () => {
+  it('renders and records Identity-specific shell load failure without loading the inventory', async () => {
     const failure = new Error('dashboard unavailable');
     mocks.shell.mockResolvedValue({ dashboardLoadError: failure });
 
     render(await PresencePage());
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      'Failed to load Profiles. Please refresh the page.'
+      'Failed to load Identity. Please refresh the page.'
     );
     expect(mocks.capture).toHaveBeenCalledWith(
-      'Dashboard data load failed on Profiles page',
+      'Dashboard data load failed on Identity page',
       failure,
       { route: APP_ROUTES.PRESENCE }
     );

@@ -39,7 +39,7 @@ test.describe('Opportunity Inbox', () => {
     ).toBeVisible();
     if ((await emptyState.getAttribute('data-home-setup')) === 'true') {
       await expect(
-        page.getByRole('toolbar', { name: 'Inbox View' })
+        page.getByRole('toolbar', { name: 'Home View' })
       ).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Add Notes' })).toHaveCount(
         0

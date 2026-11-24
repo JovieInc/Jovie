@@ -489,7 +489,7 @@ export function OpportunityInboxPageClient({
               <div
                 className='mb-4 flex min-h-7 items-center justify-center gap-1'
                 role='toolbar'
-                aria-label='Inbox View'
+                aria-label='Home View'
               >
                 <Button
                   size='sm'
