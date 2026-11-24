@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildMatrixRows } from '@/app/app/(shell)/admin/shipping/ShippingMatrix';
+import {
+  buildMatrixRows,
+  emptyMatrixMessage,
+  matrixSummary,
+} from '@/app/app/(shell)/admin/shipping/ShippingMatrix';
 import {
   initialCursors,
   interpretAuthorityRead,
@@ -54,6 +58,43 @@ function interpretLanePrs(pullRequests: readonly Record<string, unknown>[]) {
     new Date(NOW).toISOString()
   ).observation;
 }
+
+describe('matrixSummary freshness (JOV-8961)', () => {
+  const ready = { isPending: false, isError: false };
+
+  it('reserves zero counts for a fresh complete feed', () => {
+    expect(matrixSummary(ready, 0, 0, { syncState: 'fresh' })).toBe(
+      '0 open · 0 need attention · fresh cache'
+    );
+    expect(
+      emptyMatrixMessage(false, { syncState: 'fresh', lastSyncedAt: null })
+    ).toBe('No open lane pull requests.');
+  });
+
+  it('never reports zero while stale or syncing with an empty feed', () => {
+    expect(matrixSummary(ready, 0, 0, { syncState: 'stale' })).toBe(
+      'In-flight work is unknown until the next sync.'
+    );
+    expect(matrixSummary(ready, 0, 0, { syncState: 'syncing' })).toBe(
+      'Syncing in-flight work…'
+    );
+    expect(matrixSummary(ready, 0, 0, { syncState: 'failed' })).toBe(
+      'UNKNOWN — observation failed. Refresh to retry.'
+    );
+    expect(matrixSummary(ready, 0, 0, undefined)).toBe(
+      'UNKNOWN — observation failed. Refresh to retry.'
+    );
+  });
+
+  it('preserves known cached rows under an explicit stale label', () => {
+    expect(matrixSummary(ready, 3, 1, { syncState: 'stale' })).toBe(
+      '3 open · 1 need attention · stale cache'
+    );
+    expect(matrixSummary(ready, 2, 0, { syncState: 'syncing' })).toBe(
+      '2 open · 0 need attention · syncing cache'
+    );
+  });
+});
 
 describe('lane pull request detail (JOV-6893)', () => {
   it('surfaces PR number, url, agent, checks, and queue state on the task', () => {

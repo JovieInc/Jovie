@@ -73,6 +73,16 @@ describe('Shipping query contract', () => {
     client.clear();
   });
 
+  it('keeps the previous observation as placeholder while a remount reconciles', () => {
+    const previous = { observationTimestamp: 'cached' };
+    const placeholder = shippingStateQueryOptions.placeholderData;
+    expect(typeof placeholder).toBe('function');
+    const reuse = placeholder as unknown as (
+      data: typeof previous
+    ) => typeof previous;
+    expect(reuse(previous)).toBe(previous);
+  });
+
   it.each([
     [503, 'unavailable', 'Shipping observation unavailable (503)'],
     [200, '{}', 'Shipping receipt could not be validated'],
