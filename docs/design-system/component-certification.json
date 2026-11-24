@@ -2099,6 +2099,11 @@
     "apps/web/components/features/profile/DesktopQrOverlayClient.tsx": {
       "loading": "The wrapper renders null on the server and on first paint by design (JOV-2273, no CSR bailout), then shows the icon once matchMedia resolves in an effect, so there is no loading chrome to capture; DesktopQrOverlayClient.test.tsx asserts the empty server render."
     },
+    "apps/web/components/features/profile/ProfileDrawerShell.tsx": {
+      "empty": "The shell owns no collection; it frames title, optional subtitle and children. The detector matched the items-center header grid. Closed presentations return null.",
+      "partial": "Optional subtitle, onBack, floating and anchorRef only change chrome; SecondaryWithSubtitle and DirectClose show the header variants. There is no half-loaded data face.",
+      "permission-denied": "A public drawer chrome with no gated action or permission input; navigationLevel only switches header controls. The detector matched role=dialog on the modal/embedded surfaces."
+    },
     "apps/web/components/features/profile/ProfilePrimaryTabPanel.tsx": {
       "offline": "The panel fetches nothing itself: releases, tour dates and the catalog result arrive as props from the server-rendered profile, and a failed catalog read arrives as catalogLoadFailed (ErrorCatalogLoadFailed, whose Try Again reloads the page). The detector matched the word skeleton in the visitorAssignmentResolved doc comment, which LoadingAlertsAssignment shows."
     },
