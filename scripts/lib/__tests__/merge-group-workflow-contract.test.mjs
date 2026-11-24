@@ -1339,7 +1339,9 @@ describe('merge_group workflow contract', () => {
         job.indexOf('name: Fetch base-branch history'),
         jobId
       ).toBeLessThan(
-        job.search(/git diff|ci-fast-lanes\.mjs|check-changed-test-coverage/)
+        job.search(
+          /git diff|ci-fast-lanes\.mjs|check-changed-test-coverage|viewport-sweep-admission\.sh/
+        )
       );
     }
   });
