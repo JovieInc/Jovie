@@ -190,13 +190,13 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
       await resetClaimCanary({ request: page.request, origin, runTag: tag });
     } catch (error) {
       if (error instanceof CanaryResetRateLimitedError) {
-        // Budget, not config: the 6/hour reset budget is shared across runs
+        // Budget, not config: the reset budget is shared across runs
         // and every Playwright retry that reaches reset burns it again
         // (post-fix red 45336880733 retry #2). Name the condition and fail —
         // the walk never skips, but the red must say "hourly budget", not
         // an opaque 429.
         blockConeWalk(
-          'Canary reset budget exhausted (429): the 6/hour reset budget is shared across runs; retrying cannot help until the hourly window clears'
+          'Canary reset budget exhausted (429): the hourly reset budget is shared across runs; retrying cannot help until the hourly window clears'
         );
         throw error;
       }
