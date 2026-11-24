@@ -370,7 +370,7 @@ export function TourDatesTable({
       }
       enableVirtualization={tourDates.length >= 20}
       // Dense 32px only (DRI-21); stacked date/time truncates in-cell.
-      rowMode='dense'
+      rowMode='compact'
       className='text-app'
       caption='Tour dates'
       emptyState={

@@ -78,11 +78,11 @@ const RELEASE_TYPE_BADGE_LABEL: Record<ReleaseType, string> = {
 };
 export const shellReleaseRowTypography = {
   // min-h-6 keeps the title target at the 24px WCAG 2.5.8 floor inside the
-  // dense h-8 row (axe target-size is enabled at WCAG 2.2 AA and cannot be
-  // allowlisted); items-center on the hover link keeps the glyphs centered.
+  // compact h-10 Linear-parity row; items-center on the hover link keeps the
+  // glyphs centered.
   titleClassName:
-    'truncate text-app font-caption text-primary-token leading-[1.2] min-h-6',
-  subtitleClassName: 'truncate text-2xs text-tertiary-token leading-[1.3]',
+    'truncate system-b-table-primary-text font-medium text-primary-token leading-[1.2] min-h-6',
+  subtitleClassName: 'truncate text-tertiary-token leading-[1.3]',
 } as const;
 
 // ── Subcomponents ─────────────────────────────────────────────────────────────
@@ -408,10 +408,10 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       data-release-id={release.id}
       data-release-active={isActiveTrack ? 'true' : undefined}
       chrome='shell'
-      density='dense'
+      density='compact'
       isSelected={isSelected}
       interactive
-      className='group/row flex h-8 items-center gap-2 overflow-hidden px-3'
+      className='group/row flex items-center gap-2 overflow-hidden px-3'
     >
       <ArtworkCell release={release} isSyncing={syncLabel !== null} />
 

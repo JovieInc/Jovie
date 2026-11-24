@@ -40,7 +40,7 @@ export function ViewTable({
         data={data}
         columns={defs}
         caption={caption}
-        rowMode='dense'
+        rowMode='compact'
         minWidth='0'
         columnSnap={false}
         getRowId={row => rowIds.get(row) ?? ''}

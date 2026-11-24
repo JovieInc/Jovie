@@ -35,10 +35,7 @@ export const ReleaseTaskCompactRow = React.memo(function ReleaseTaskCompactRow({
   const isAi = isReleaseTaskAutomated(task);
 
   return (
-    <ShellListRowFrame
-      density='compact'
-      className='flex items-center gap-2 px-3'
-    >
+    <ShellListRowFrame density='tight' className='flex items-center gap-2 px-3'>
       <ReleaseTaskCheckbox task={task} isDone={isDone} onToggle={onToggle} />
       <PlainButton
         type='button'

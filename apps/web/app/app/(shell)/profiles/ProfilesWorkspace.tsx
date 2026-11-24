@@ -1903,7 +1903,7 @@ function ProfilesWorkspaceContent({
           }
         }}
         getContextMenuItems={getContextMenuItems}
-        rowMode='dense'
+        rowMode='compact'
         containerClassName={cn('min-h-0 flex-1', styles.identityContainer)}
         minWidth='0'
         className={styles.table}

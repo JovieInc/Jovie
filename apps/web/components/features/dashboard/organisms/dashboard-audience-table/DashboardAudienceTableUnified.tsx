@@ -928,7 +928,7 @@ export const DashboardAudienceTableUnified = memo(
                       getRowId={row => row.id}
                       enableVirtualization={true}
                       enableKeyboardNavigation={true}
-                      rowMode='dense'
+                      rowMode='compact'
                       rowSelection={rowSelectionState}
                       onToggleRowSelection={toggleMemberSelection}
                       onSelectRowRange={selectRows}

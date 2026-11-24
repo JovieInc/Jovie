@@ -55,11 +55,17 @@ export const Selected: Story = {
 export const DensityMatrix: Story = {
   render: () => (
     <div className='space-y-1'>
+      <ShellListRowFrame chrome='shell' density='tight'>
+        <div className='px-3 text-2xs'>Tight nested row</div>
+      </ShellListRowFrame>
       <ShellListRowFrame chrome='shell' density='compact'>
-        <div className='px-3 text-2xs'>Compact row</div>
+        <div className='px-3 text-app'>Compact Linear row (40px)</div>
       </ShellListRowFrame>
       <ShellListRowFrame chrome='shell' density='dense'>
-        <div className='px-3 text-xs'>Dense row</div>
+        <div className='px-3 text-xs'>Dense admin row (32px)</div>
+      </ShellListRowFrame>
+      <ShellListRowFrame chrome='shell' density='standard'>
+        <div className='px-3 text-app'>Standard list row (44px)</div>
       </ShellListRowFrame>
       <ShellListRowFrame chrome='shell' density='spacious'>
         <div className='flex items-center justify-between px-3 text-sm'>

@@ -19,8 +19,7 @@ describe('ShellListRowFrame', () => {
     });
 
     expect(className).toContain('system-b-table-row-shell');
-    expect(className).toContain('min-h-11');
-    expect(className).toContain('py-1.5');
+    expect(className).toContain('h-11');
     expect(className).toContain('cursor-pointer');
   });
 
@@ -69,11 +68,17 @@ describe('ShellListRowFrame', () => {
     expect(className).not.toContain('cursor-pointer');
   });
 
-  it('centralizes compact density and rejects legacy row hover styling', () => {
+  it('centralizes Linear-parity compact density and rejects legacy row hover styling', () => {
     const className = getShellListRowFrameClassName({ density: 'compact' });
 
-    expect(className).toContain('min-h-7');
+    expect(className).toContain('h-10');
     expect(className).not.toContain('hover:text-accent');
+  });
+
+  it('keeps tight density for nested drawer task rows', () => {
+    const className = getShellListRowFrameClassName({ density: 'tight' });
+
+    expect(className).toContain('min-h-7');
   });
 
   it('uses button semantics for clickable shell rows', () => {

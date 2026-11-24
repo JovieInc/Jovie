@@ -4,8 +4,13 @@ import type { ComponentPropsWithoutRef, ReactElement } from 'react';
 import { cn, rowState } from '../table.styles';
 
 export type ShellListRowChrome = 'plain' | 'shell';
+/**
+ * Density tokens mirror `TABLE_ROW_MODES` for Linear-parity lists
+ * (JOV-14412). `tight` is nested drawer chrome only (not the data grid).
+ */
 export type ShellListRowDensity =
   | 'none'
+  | 'tight'
   | 'compact'
   | 'dense'
   | 'standard'
@@ -67,9 +72,15 @@ export interface ShellListRowDisclosureIconProps
 
 const shellListRowDensityClassName = {
   none: '',
-  compact: 'min-h-7 py-0.5',
-  dense: 'min-h-8 py-1',
-  standard: 'min-h-11 py-1.5',
+  /** Nested task/drawer rows — not Linear grid density. */
+  tight: 'min-h-7 py-0.5',
+  /** 40px — matches `TABLE_ROW_MODES.compact` (Linear issue list). */
+  compact: 'h-10',
+  /** 32px — matches `TABLE_ROW_MODES.dense` (admin/debug only). */
+  dense: 'h-8',
+  /** 44px — matches `TABLE_ROW_MODES.list`. */
+  standard: 'h-11',
+  /** 56px — two-line content. */
   spacious: 'h-14',
 } as const satisfies Record<ShellListRowDensity, string>;
 
