@@ -12,9 +12,12 @@ import {
 import {
   buildCrawlFixtureMerchSnapshots,
   CRAWL_CONTENT_FIXTURE,
+  CRAWL_FIXTURE_PLAN,
+  CRAWL_FIXTURE_TRIAL_ENDS_AT,
   CrawlContentFixtureGuardError,
   type CrawlContentObservedState,
   crawlContentFixturePaths,
+  crawlFixtureUserHasDownloadPlan,
   parseCrawlContentFixture,
   planCrawlContentFixture,
 } from './crawl-content-fixture';
@@ -32,7 +35,7 @@ const empty: CrawlContentObservedState = {
 };
 
 const converged: CrawlContentObservedState = {
-  user: { id: 'u1' },
+  user: { id: 'u1', hasDownloadPlan: true },
   profile: { id: 'p1', userId: 'u1', isPublic: true, isClaimed: true },
   claimUserId: 'u1',
   release: { creatorProfileId: 'p1' },
@@ -113,6 +116,42 @@ describe('crawl content fixture', () => {
       .filter(s => s.action !== 'none')
       .map(s => s.name);
     expect(changed).toEqual(['merch-card', 'asset-share']);
+  });
+
+  it('re-asserts the plan after billing reconciliation downgrades it', () => {
+    const downgraded = {
+      ...converged,
+      user: { id: 'u1', hasDownloadPlan: false },
+    };
+    expect(
+      planCrawlContentFixture(downgraded)
+        .filter(s => s.action !== 'none')
+        .map(s => `${s.name}:${s.action}`)
+    ).toEqual(['user:converge']);
+  });
+
+  it('holds a lasting trial that billing reconciliation never selects', () => {
+    const now = new Date('2026-11-23T00:00:00Z');
+    const fixtureUser = {
+      plan: CRAWL_FIXTURE_PLAN,
+      isPro: false,
+      trialEndsAt: CRAWL_FIXTURE_TRIAL_ENDS_AT,
+      stripeSubscriptionId: null,
+    };
+    expect(crawlFixtureUserHasDownloadPlan(fixtureUser, now)).toBe(true);
+    // Reconciliation downgrades is_pro = true without a subscription.
+    expect(
+      crawlFixtureUserHasDownloadPlan({ ...fixtureUser, isPro: true }, now)
+    ).toBe(false);
+    expect(
+      crawlFixtureUserHasDownloadPlan({ ...fixtureUser, plan: 'free' }, now)
+    ).toBe(false);
+    expect(
+      crawlFixtureUserHasDownloadPlan(
+        { ...fixtureUser, trialEndsAt: new Date('2026-01-01T00:00:00Z') },
+        now
+      )
+    ).toBe(false);
   });
 
   it('refuses a handle owned or claimed by someone else', () => {

@@ -214,11 +214,14 @@ jobs:
           )
           if [ "$FILE_ISSUES" = "true" ]; then args+=(--file); fi
           node scripts/automation-liveness.mjs "${args[@]}"
+      # The --file run above also sweeps the busy unattended workflows listed under `swept` in
+      # canon/outcome-coverage-baseline.json (JOV-14467): up to 5 run-list reads per bucket, then one
+      # repair issue per red workflow, resolved by its next green.
 
       # Release-lag dead-man: a green Production Controller run proves nothing because Coalesce can
       # skip the release as superseded. Alerts, naming the blocking step, when production has not
       # advanced in 3h while main has.
-      # github-token-budget: 3 calls/run - names the blocking controller step, only when production lags
+      # github-token-budget: 8 calls/run - release lag names the blocking controller step (3, only when production lags); the outcome sweep reads up to 5 run-list pages
       - name: Production release lag
         if: ${{ always() }}
         env:
@@ -251,6 +254,16 @@ jobs:
             liveness/decisions.json
           if-no-files-found: ignore
           retention-days: 90
+
+      # This check's own outcome: a red liveness run opens or updates its repair issue (JOV-14467).
+      - name: Report outcome
+        if: ${{ always() && github.event_name != 'workflow_dispatch' }}
+        uses: ./.github/actions/report-outcome
+        with:
+          conclusion: ${{ job.status }}
+          setup-node: 'false'
+          linear-api-key: ${{ secrets.LINEAR_API_KEY }}
+          intake-disabled: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
 
       # Marks this 20-minute bucket as checked (the gate reads it). Runs even when the check failed:
       # a failing check must not be retried by every guard run in the bucket.

@@ -42,7 +42,7 @@ describe('SidebarSection', () => {
   it('fires onToggle when the header is clicked', () => {
     const onToggle = vi.fn();
     render(
-      <SidebarSection name='X' open onToggle={onToggle} itemCount={0}>
+      <SidebarSection name='X' open onToggle={onToggle} itemCount={1}>
         <span />
       </SidebarSection>
     );
@@ -111,7 +111,7 @@ describe('SidebarSection PlainButton header', () => {
     const user = userEvent.setup();
     const onToggle = vi.fn();
     render(
-      <SidebarSection name='Releases' open onToggle={onToggle} itemCount={0}>
+      <SidebarSection name='Releases' open onToggle={onToggle} itemCount={1}>
         <span />
       </SidebarSection>
     );

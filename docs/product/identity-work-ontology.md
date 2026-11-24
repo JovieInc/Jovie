@@ -11,6 +11,11 @@ means who you are and how you are represented. Work means what you make and put
 into the world. Links represent or distribute either concept and are never a
 third top-level area.
 
+EVENT: Drift T0.2 (2026-11-20) locks the creator root visible label as **Home**
+(stable id `home`). Chrome, breadcrumbs, and the header bell agree on Home.
+`previousLabels` (Presence, Profiles, Library) are compatibility history only —
+never UI. Ovie operator cases use the qualified label **Operator Inbox**.
+
 ## Recommendation
 
 Adopt **Identity / Work** in the authenticated customer navigation and product

@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
-import { WorkspaceLockScreen } from '@/features/workspace-lock/WorkspaceLockScreen';
+import { WorkspaceLockScreenLazy } from '@/lib/app-shell/WorkspaceLockScreenLazy';
 import {
   getWorkspacePrivacyLockState,
   WORKSPACE_PRIVACY_LOCK_CONFIRMED_EVENT,
@@ -317,7 +317,7 @@ export function DashboardShellPrivacyBoundary({
               </Button>
             </div>
           ) : (
-            <WorkspaceLockScreen />
+            <WorkspaceLockScreenLazy />
           )
         ) : (
           children

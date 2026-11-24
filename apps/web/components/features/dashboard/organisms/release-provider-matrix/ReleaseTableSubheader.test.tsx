@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
@@ -65,5 +67,17 @@ describe('ReleaseTableSubheader', () => {
     expect(
       screen.getByRole('button', { name: 'Toggle release preview' })
     ).toBeInTheDocument();
+  });
+});
+
+describe('ReleaseTableSubheader control heights (JOV-12567)', () => {
+  it('sits on the 28px control and 44px bar contract', () => {
+    const source = readFileSync(
+      resolve(__dirname, './ReleaseTableSubheader.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain('className={LINEAR_SURFACE.toolbar}');
+    expect(source).not.toContain("'min-h-8'");
   });
 });

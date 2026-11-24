@@ -1602,13 +1602,16 @@ ${fixtureCheckout}
       expect(yamlPropertyBlock(source, 'env', 0), item).not.toContain(
         'PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN'
       );
-      // JOV-9826: Preview env GH Stripe TEST custody (not Doppler price/account).
+      // JOV-9826: Stripe TEST custody; paid walk → staging.jov.ie (pk_test-only).
       if (producer.includes('canary-claim-checkout.spec.ts')) {
         for (const s of [
           'STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}',
           'STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}',
           'STRIPE_TEST_ACCOUNT_ID=acct_1T1DV0ASl9B9udHv',
           'STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY=price_1USkjzASl9B9udHvEYkZLYZp',
+          "CANARY_BASE_URL='https://staging.jov.ie'",
+          'EXPECTED_VERCEL_ENVIRONMENT=preview',
+          'pk_test-only',
         ])
           expect(producer).toContain(s);
         expect(producer).not.toContain(

@@ -117,7 +117,7 @@ describe('extension summary', () => {
   it('treats unsupported pages as unsupported', async () => {
     const summary = await buildExtensionSummary({
       pageUrl: 'https://mail.google.com/mail/u/0/#inbox',
-      pageTitle: 'Inbox',
+      pageTitle: 'Home',
     });
 
     expect(summary).toMatchObject({

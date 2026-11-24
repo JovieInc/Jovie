@@ -4,8 +4,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   formatSidebarThreadTime,
-  getSidebarThreadStatus,
-  isTimestampAfter,
   readThreadReadState,
   type SidebarThread,
   SidebarThreadRow,
@@ -332,8 +330,11 @@ describe('SidebarThreadsSection', () => {
         collapsed={false}
       />
     );
-    const threadButton = screen.getByRole('button', { name: 'Draft thread' });
+    const threadButton = screen.getByRole('button', {
+      name: 'Draft thread, Running',
+    });
 
+    expect(threadButton).toHaveAttribute('aria-label', 'Draft thread, Running');
     expect(threadButton).toHaveAttribute('aria-pressed', 'true');
     expect(threadButton.innerHTML).toContain('bg-accent/85');
     expect(threadButton).toHaveClass(
@@ -439,12 +440,7 @@ describe('SidebarThreadsSection', () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
-  it('maps conversation status, unread state, and fallback titles deterministically', () => {
-    expect(getSidebarThreadStatus(null)).toBe('complete');
-    expect(getSidebarThreadStatus('streaming')).toBe('running');
-    expect(getSidebarThreadStatus('failed_network')).toBe('errored');
-    expect(getSidebarThreadStatus('complete')).toBe('complete');
-
+  it('maps conversation unread state and fallback titles deterministically', () => {
     const conversation = {
       id: 'thread / one',
       title: '  ',
@@ -484,15 +480,6 @@ describe('SidebarThreadsSection', () => {
 
     localStorage.setItem(THREAD_READ_STORAGE_KEY, '{invalid json');
     expect(readThreadReadState()).toEqual({});
-  });
-
-  it('compares valid and fallback timestamps without marking missing candidates unread', () => {
-    expect(isTimestampAfter(undefined, undefined)).toBe(false);
-    expect(isTimestampAfter('2026-05-12T00:00:00.000Z', undefined)).toBe(true);
-    expect(
-      isTimestampAfter('2026-05-12T00:00:00.000Z', '2026-05-13T00:00:00.000Z')
-    ).toBe(false);
-    expect(isTimestampAfter('zeta', 'alpha')).toBe(true);
   });
 });
 
