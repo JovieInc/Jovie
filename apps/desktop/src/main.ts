@@ -204,8 +204,8 @@ import {
   WINDOW_STATE_SHUTDOWN_FLUSH_MS,
 } from './window-state-store';
 
-// Separate userData for non-production shells so local, staging, and production
-// sessions coexist without sharing cookies or corrupted renderer state.
+// Separate userData for non-production shells: no shared cookies or corrupted
+// renderer state across channels.
 if (APP_ENV === 'staging') {
   app.setPath('userData', path.join(app.getPath('appData'), 'Jovie-Staging'));
 } else if (APP_ENV === 'local') {
@@ -222,10 +222,9 @@ const APP_ENTRY_URL = buildAppUrl('/app/chat');
 const SETTINGS_URL = buildAppUrl('/app/settings');
 const APP_BACKGROUND_COLOR = SYSTEM_B_DESKTOP_TOKENS.backgroundColor;
 const NAVIGATION_ABORTED_ERROR_CODE = -3;
-// A crashed/killed renderer is reloaded up to this many times before the shell
-// gives up and shows the visible load-failure page (Retry) instead of leaving
-// the window black. Reset to 0 only after a confirmed app-booted ping so a
-// renderer that crashes deterministically after load still hits the cap.
+// A crashed/killed renderer reloads up to this many times before the shell
+// shows the visible load-failure page. Reset to 0 only after a confirmed
+// app-booted ping so deterministic post-load crashes still hit the cap.
 const MAX_RENDERER_CRASH_RELOADS = 2;
 const MAX_HOSTED_LOAD_RETRIES = APP_ENV === 'local' ? 3 : 1;
 const HOSTED_LOAD_RETRY_DELAY_MS = APP_ENV === 'local' ? 2_000 : 0;
@@ -411,10 +410,9 @@ let startupMaintenance: ReturnType<typeof createStartupMaintenanceGate> | null =
 let summerRuntimeBridge: SummerRuntimeBridge | null = null;
 let mainLivenessMonitor: MainLivenessMonitor | null = null;
 
-// Observe async rejections in the main process instead of letting Node's
-// default warning be the only trace. The summary is bounded and redacted;
-// observing a rejection never marks the app healthy — the liveness probe
-// below is the only responsiveness verdict.
+// Observe async rejections instead of relying on Node's default warning; the
+// summary is bounded and redacted, and observing never marks the app healthy —
+// the liveness probe below is the only responsiveness verdict.
 process.on('unhandledRejection', reason => {
   console.error('[Jovie Desktop] Unhandled rejection', {
     reason: summarizeUnhandledRejection(reason),
@@ -470,11 +468,11 @@ function getDesktopAppDisplayName(): string {
 
 app.setName(getDesktopAppDisplayName());
 
-// Refuse to run a packaged shell that was launched with a Chrome DevTools
-// Protocol switch. A packaged .app can be started by ANY local process, so an
-// exposed CDP port lets any process running as the same user read the renderer's
-// cookies (incl. the Clerk session) and inject JS — a full session hijack. Source
-// runs may still opt in via JOVIE_DEV=1 (see scripts/launch-electron.mjs).
+// Refuse to run a packaged shell launched with a Chrome DevTools Protocol
+// switch: a packaged .app can be started by ANY local process, and an exposed
+// CDP port lets it read renderer cookies (incl. the Clerk session) and inject
+// JS — a full session hijack. Source runs may opt in via JOVIE_DEV=1
+// (see scripts/launch-electron.mjs).
 const remoteDebuggingGuard = evaluateRemoteDebuggingGuard({
   isPackaged: app.isPackaged,
   hasRemoteDebuggingPort: app.commandLine.hasSwitch('remote-debugging-port'),
@@ -887,12 +885,10 @@ function findLegacyAuthReturnRouteInArgv(
   return null;
 }
 
-// Chromium's Web Speech recognition backend needs Google API keys that
-// Electron cannot ship, so `webkitSpeechRecognition` exists in the renderer
-// but every start() fails with a 'network' error (electron/electron#46143,
-// #7749). Advertising it as a fallback made the composer mic look live and
-// fail on every press. Report it unavailable so the renderer points at OS
-// dictation instead — macOS dictation types into any focused field here.
+// Chromium's Web Speech backend needs Google API keys Electron cannot ship,
+// so `webkitSpeechRecognition` fails every start() with a 'network' error
+// (electron/electron#46143, #7749). Report it unavailable so the renderer
+// points at OS dictation instead — macOS dictation types into any field.
 function getDesktopDictationStatus(): DesktopDictationStatus {
   return {
     ok: true,
@@ -1490,9 +1486,6 @@ function buildDesktopShellHtml(input: {
   readonly identityHtml?: string;
   readonly mainAttributes?: string;
 }): string {
-  const mainAttributes = input.mainAttributes
-    ? ` ${input.mainAttributes}`
-    : '';
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -1517,7 +1510,7 @@ function buildDesktopShellHtml(input: {
     </style>
   </head>
   <body>
-    <main class="shell" role="main"${mainAttributes}>
+    <main class="shell" role="main"${input.mainAttributes ? ` ${input.mainAttributes}` : ''}>
       <svg class="mark" viewBox="0 0 353.68 347.97" aria-hidden="true">
         <path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/>
       </svg>
