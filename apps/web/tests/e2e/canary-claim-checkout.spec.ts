@@ -9,6 +9,7 @@ import {
   resetClaimCanary,
 } from './helpers/canary-reset-client';
 import { ensureUserIsFree } from './helpers/ensure-user-is-free';
+import { requireCanaryCheckout } from './helpers/require-canary-checkout';
 import {
   createCheckoutSession,
   createSignedStripeWebhook,
@@ -284,27 +285,16 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
         }
       );
 
-      const { sessionId } = await createCheckoutSession(page, priceId, {
-        source: 'onboarding',
-        returnTo: '/chat?from=onboarding',
-      });
-
-      // A non-`cs_` session id here means the checkout route found an
-      // already-subscribed canary and answered with the billing-portal
-      // session (`bps_...`) — a Stripe-side orphan subscription survived
-      // teardown (JOV-8805 class, red 45369972300). Retrieving it with
-      // checkout.sessions.retrieve dies with Stripe's opaque "No such
-      // checkout.session: bps_..."; name the class and fail instead — the
-      // walk never skips, and the red must say "orphan subscription",
-      // not a Stripe lookup error.
-      if (!sessionId.startsWith('cs_')) {
-        blockConeWalk(
-          `Checkout returned a non-checkout session id (${sessionId.slice(0, 4)}...): the canary is already subscribed Stripe-side - an orphan subscription survived teardown (JOV-8805 class); the walk never skips`
+      // Both checkout attempts must reject a portal result before using it.
+      const startCanaryCheckout = async () =>
+        requireCanaryCheckout(
+          await createCheckoutSession(page, priceId, {
+            source: 'onboarding',
+            returnTo: '/chat?from=onboarding',
+          }),
+          blockConeWalk
         );
-        throw new Error(
-          `canary checkout returned a non-checkout session id (${sessionId.slice(0, 8)}...): already-subscribed billing-portal session (JOV-8805 orphan-subscription class, red 45369972300)`
-        );
-      }
+      const { sessionId } = await startCanaryCheckout();
 
       const session = await stripeClient.checkout.sessions.retrieve(sessionId);
       expect(session.livemode).toBe(false);
@@ -333,10 +323,7 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
         return 'cancel URL truthful; expired session granted no entitlement';
       });
       // The success walk needs a live session; create a fresh one.
-      const successSession = await createCheckoutSession(page, priceId, {
-        source: 'onboarding',
-        returnTo: '/chat?from=onboarding',
-      });
+      const successSession = await startCanaryCheckout();
 
       // Failure path: a documented attachable-but-declining fixture never
       // grants an entitlement either.
