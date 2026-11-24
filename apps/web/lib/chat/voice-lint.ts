@@ -114,8 +114,37 @@ export function buildEmptyAssistantReplyFallback(
     );
   }
 
+  // ASS-110 live 45347141855: invent-stats / scrape asks must not fall through
+  // to the generic "I will draft that for Night Swim…" stub.
+  if (
+    /\b(?:editorial\s+)?playlists?\s+added\b/.test(lower) ||
+    /\bwhich\s+(?:editorial\s+)?playlists?\b/.test(lower)
+  ) {
+    const target = named ?? artifact ?? 'that release';
+    return (
+      `I can't see which editorial playlists added ${target}. ` +
+      'Jovie has no editorial-add feed. One move: check your distributor ' +
+      'dashboard for adds, or submit a pitch from there today.'
+    );
+  }
+
+  if (
+    /\bscrape\b/.test(lower) ||
+    (/\bblast\b/.test(lower) && /\bemail/.test(lower))
+  ) {
+    const target = named ?? artifact ?? 'that release';
+    return (
+      `I won't scrape curator emails from Spotify or blast ${target}. ` +
+      `${target} curator pitch (held):\n\n` +
+      `Hi, ${target} is out Friday. Would you consider it for your ambient list? ` +
+      `Profile ${profileCue}.\n\n` +
+      'Nothing sends until you confirm.'
+    );
+  }
+
   // Clear draft asks before spend/budget needles: "ad copy … budget ~$50"
   // must get a held body, not a boost refuse (ASS-106 / live 45325957464).
+  // ASS-110: held body must name Friday + stated budget / pitch body.
   const clearDraftAsk =
     /\b(?:ad copy|outreach|playlist emails?)\b/.test(lower) ||
     (/\bdraft\b/.test(lower) &&
@@ -123,14 +152,19 @@ export function buildEmptyAssistantReplyFallback(
   if (clearDraftAsk) {
     const target = named ?? artifact ?? 'that release';
     if (/\b(?:ad copy|ads?\b|pre-?save|budget)\b/.test(lower)) {
+      const budgetMatch = ask.match(/\$\s*(\d+)/);
+      const budgetCue =
+        budgetMatch != null ? ` Budget ~$${budgetMatch[1]}.` : '';
       return (
-        `${target} ad copy (held): "${target} is out soon. Pre-save on ${profileCue}." ` +
+        `${target} ad copy (held): "${target} is out Friday. Pre-save on ${profileCue}.${budgetCue}" ` +
         'Nothing spends until you confirm.'
       );
     }
     return (
-      `${target} playlist email (held): "Subject: ${target} for your list. ` +
-      `Short cut, profile ${profileCue}." One curator email, no send until yes.`
+      `${target} playlist email (held):\n\n` +
+      `Subject: ${target} for your list.\n` +
+      `Hi, ${target} is out Friday. Short cut for headphones, profile ${profileCue}.\n\n` +
+      'One curator email, no send until yes.'
     );
   }
 

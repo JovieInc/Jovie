@@ -38,7 +38,10 @@ export function checkAppChatPromptContract(prompt: string) {
       'Do not claim Jovie creates or hosts a DSP pre-save',
       'Never invent CPC',
       'Never invent studio lore',
-      'Never invent exact Spotify editorial day-count'
+      'Never invent exact Spotify editorial day-count',
+      // ASS-110 live 45347141855: tipper/studio invent + empty-profile invent.
+      'tipper counts',
+      'nothing on it pointing'
     ),
     forbidsInventedCapabilities: includesAll(
       'Never invent product features',
@@ -52,7 +55,9 @@ export function checkAppChatPromptContract(prompt: string) {
       // ASS-108 live 45340065127: week-plan Spotify-follower DM + fan-reply fluff.
       'Spotify follower DM',
       "you're the first to ask",
-      'wherever you stream'
+      'wherever you stream',
+      // ASS-110 live 45347141855: related-artist list pull invent.
+      'related-artist list'
     ),
     requiresDraftHoldOutbound: includesAll(
       'Draft every outbound artifact',
