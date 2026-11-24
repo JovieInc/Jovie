@@ -277,7 +277,7 @@ export function OnboardingSessionBoundary({
               actionError={linkFailed ? LINK_RESTORE_FAIL_COPY : null}
             />
             {linkFailed ? (
-              <div className='pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4'>
+              <div className='pointer-events-none fixed inset-x-0 bottom-6 z-banner flex justify-center px-4'>
                 <Button
                   className='pointer-events-auto'
                   data-testid='onboarding-link-restore-retry'
