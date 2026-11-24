@@ -32,7 +32,7 @@ const payload = (
   decision: { kind, rationale: 'fixture', score: 0.8 },
 });
 
-describe('ChatProposeNextStepCard claim handoff (ONB-36/38/40)', () => {
+describe('ChatProposeNextStepCard claim handoff (ONB-36/38/40/44)', () => {
   beforeEach(() => {
     authState.isSignedIn = true;
     authState.canRenderClerkUi = true;
@@ -136,6 +136,45 @@ describe('ChatProposeNextStepCard claim handoff (ONB-36/38/40)', () => {
       /name your artist or paste a spotify link/i
     );
     expect(handoff).toHaveAttribute('data-claim-status', 'intake-required');
+    expect(handoff.getAttribute('role')).toBeNull();
+    await expectNoA11yViolations(container);
+  });
+
+  it('names opening waitlist receipt when claim settles to claimed (ONB-44)', async () => {
+    const { container } = render(
+      <OnboardingClaimHandoffProvider status='claimed'>
+        <ChatProposeNextStepCard
+          payload={payload('waitlist')}
+          claimHandle='wattwhite'
+        />
+      </OnboardingClaimHandoffProvider>
+    );
+
+    const handoff = screen.getByTestId('onboarding-claim-handoff-copy');
+    expect(handoff).toHaveTextContent(/opening your waitlist receipt/i);
+    expect(handoff).toHaveAttribute('data-claim-status', 'claimed');
+    expect(handoff.getAttribute('role')).toBeNull();
+    expect(
+      screen.queryByText(/until the receipt appears/i)
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('signup-surface')).toBeNull();
+    await expectNoA11yViolations(container);
+  });
+
+  it('names opening checkout when instant-access claim settles to claimed (ONB-44)', async () => {
+    const { container } = render(
+      <OnboardingClaimHandoffProvider status='claimed'>
+        <ChatProposeNextStepCard payload={payload('instant_access')} />
+      </OnboardingClaimHandoffProvider>
+    );
+
+    expect(screen.queryByText(/linking this conversation/i)).toBeNull();
+    expect(
+      screen.queryByText(/until the receipt appears/i)
+    ).not.toBeInTheDocument();
+    const handoff = screen.getByTestId('onboarding-claim-handoff-copy');
+    expect(handoff).toHaveTextContent(/opening checkout/i);
+    expect(handoff).toHaveAttribute('data-claim-status', 'claimed');
     expect(handoff.getAttribute('role')).toBeNull();
     await expectNoA11yViolations(container);
   });
