@@ -126,7 +126,11 @@ export function cursorQuotaEventFromTranscript(
  */
 export function cursorPlanSnapshotFromAbout(
   payload,
-  { accountId, observedAt, now = Date.now() } = /** @type {CursorSnapshotMeta} */ ({})
+  {
+    accountId,
+    observedAt,
+    now = Date.now(),
+  } = /** @type {CursorSnapshotMeta} */ ({})
 ) {
   const observed =
     observedAt ?? payload?.observedAt ?? new Date(now).toISOString();
@@ -135,7 +139,9 @@ export function cursorPlanSnapshotFromAbout(
     provider: CURSOR_PROVIDER,
     accountId,
     tier: payload?.membership ?? payload?.plan ?? 'unknown',
-    pools: /** @type {Array<Record<string, unknown>>} */ (payload?.pools ?? []).map(row => ({
+    pools: /** @type {Array<Record<string, unknown>>} */ (
+      payload?.pools ?? []
+    ).map(row => ({
       id: row.id ?? DEFAULT_CURSOR_POOL,
       label: row.label ?? row.id,
       status: row.status ?? 'unknown',
@@ -168,6 +174,9 @@ export function ingestCursorQuotaEvent(ledger, transcript, meta, options = {}) {
 }
 
 export function ingestCursorPlanSnapshot(ledger, payload, meta, options = {}) {
-  const snapshot = cursorPlanSnapshotFromAbout(payload, { ...meta, ...options });
+  const snapshot = cursorPlanSnapshotFromAbout(payload, {
+    ...meta,
+    ...options,
+  });
   return recordPlanSnapshot(ledger, snapshot);
 }

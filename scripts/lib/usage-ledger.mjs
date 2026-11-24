@@ -36,7 +36,11 @@ const parseMs = v => {
 
 /** Stable idempotency key: provider + account + pool + provider event id when present. */
 export function usageEventKey({ provider, accountId, pool, providerEventId }) {
-  if (!ID.test(provider ?? '') || !ID.test(accountId ?? '') || !ID.test(pool ?? '')) {
+  if (
+    !ID.test(provider ?? '') ||
+    !ID.test(accountId ?? '') ||
+    !ID.test(pool ?? '')
+  ) {
     throw new Error('provider, accountId, and pool must be kebab identifiers');
   }
   const tail =
@@ -63,7 +67,9 @@ export function sanitizeReceipt(value) {
   for (const [key, item] of Object.entries(value)) {
     if (key.toLowerCase().includes('email')) continue;
     out[key] =
-      typeof item === 'string' ? sanitizeReceiptText(item) : structuredClone(item);
+      typeof item === 'string'
+        ? sanitizeReceiptText(item)
+        : structuredClone(item);
   }
   return out;
 }
@@ -82,11 +88,15 @@ export function createEmptyLedger() {
 
 function validateEvent(event) {
   const problems = [];
-  if (event?.schema !== EVENT_SCHEMA) problems.push(`schema must be ${EVENT_SCHEMA}`);
+  if (event?.schema !== EVENT_SCHEMA)
+    problems.push(`schema must be ${EVENT_SCHEMA}`);
   if (!ID.test(event?.provider ?? '')) problems.push('provider required');
   if (!ID.test(event?.accountId ?? '')) problems.push('accountId required');
   if (!ID.test(event?.pool ?? '')) problems.push('pool required');
-  if (!POOL_STATES.includes(event?.condition) && event?.condition !== 'recovered') {
+  if (
+    !POOL_STATES.includes(event?.condition) &&
+    event?.condition !== 'recovered'
+  ) {
     problems.push('condition invalid');
   }
   if (parseMs(event?.observedAt) === null) problems.push('observedAt required');
@@ -146,11 +156,13 @@ export function appendUsageEvent(ledger, event, { now = Date.now() } = {}) {
 
 export function recordPlanSnapshot(ledger, snapshot) {
   const base = ledger?.schema === LEDGER_SCHEMA ? ledger : createEmptyLedger();
-  if (snapshot?.schema !== PLAN_SCHEMA) throw new Error(`schema must be ${PLAN_SCHEMA}`);
+  if (snapshot?.schema !== PLAN_SCHEMA)
+    throw new Error(`schema must be ${PLAN_SCHEMA}`);
   if (!ID.test(snapshot.provider ?? '') || !ID.test(snapshot.accountId ?? '')) {
     throw new Error('provider and accountId required');
   }
-  if (parseMs(snapshot.observedAt) === null) throw new Error('observedAt required');
+  if (parseMs(snapshot.observedAt) === null)
+    throw new Error('observedAt required');
   const key = `${snapshot.provider}/${snapshot.accountId}`;
   const next = structuredClone(base);
   const prior = next.planSnapshots[key];
@@ -167,11 +179,14 @@ export function recordPlanSnapshot(ledger, snapshot) {
 
 export function appendResetGrant(ledger, grant) {
   const base = ledger?.schema === LEDGER_SCHEMA ? ledger : createEmptyLedger();
-  if (grant?.schema !== GRANT_SCHEMA) throw new Error(`schema must be ${GRANT_SCHEMA}`);
+  if (grant?.schema !== GRANT_SCHEMA)
+    throw new Error(`schema must be ${GRANT_SCHEMA}`);
   if (!ID.test(grant.provider ?? '') || !ID.test(grant.accountId ?? '')) {
     throw new Error('provider and accountId required');
   }
-  const key = grant.idempotencyKey ?? `${grant.provider}:${grant.accountId}:${grant.grantId}`;
+  const key =
+    grant.idempotencyKey ??
+    `${grant.provider}:${grant.accountId}:${grant.grantId}`;
   if (base.grants.some(g => g.idempotencyKey === key)) {
     return { ledger: base, applied: false, duplicate: true };
   }
@@ -239,15 +254,21 @@ export function derivePoolCondition(event, { remaining = null } = {}) {
  */
 export function readPoolState(
   ledger,
-  { provider, accountId, pool, now = Date.now(), maxAgeMs = 3_600_000, staleRead = false }
+  {
+    provider,
+    accountId,
+    pool,
+    now = Date.now(),
+    maxAgeMs = 3_600_000,
+    staleRead = false,
+  }
 ) {
   const event = latestEventForPool(ledger, provider, accountId, pool);
   const plan = ledger.planSnapshots?.[`${provider}/${accountId}`] ?? null;
   const observedAt = event?.observedAt ?? null;
   const ageMs =
     observedAt == null ? null : Math.max(0, now - (parseMs(observedAt) ?? now));
-  const fresh =
-    ageMs == null ? false : staleRead ? true : ageMs <= maxAgeMs;
+  const fresh = ageMs == null ? false : staleRead ? true : ageMs <= maxAgeMs;
 
   const remainingValue =
     event?.remaining && Object.hasOwn(event.remaining, 'value')
@@ -341,7 +362,11 @@ function invalidateSupersededResets(ledger, event, now) {
   }
 }
 
-export function beginRefresh(ledger, key, { now = Date.now(), ttlMs = 30_000 } = {}) {
+export function beginRefresh(
+  ledger,
+  key,
+  { now = Date.now(), ttlMs = 30_000 } = {}
+) {
   const base = ledger?.schema === LEDGER_SCHEMA ? ledger : createEmptyLedger();
   const inflight = base.refreshInFlight?.[key];
   if (inflight && now - inflight.startedAtMs < ttlMs) {
@@ -355,7 +380,11 @@ export function beginRefresh(ledger, key, { now = Date.now(), ttlMs = 30_000 } =
   return { ledger: next, coalesced: false, started: true };
 }
 
-export function endRefresh(ledger, key, { error = null, now = Date.now() } = {}) {
+export function endRefresh(
+  ledger,
+  key,
+  { error = null, now = Date.now() } = {}
+) {
   const base = ledger?.schema === LEDGER_SCHEMA ? ledger : createEmptyLedger();
   const next = structuredClone(base);
   const inflight = { ...(next.refreshInFlight ?? {}) };
@@ -364,7 +393,10 @@ export function endRefresh(ledger, key, { error = null, now = Date.now() } = {})
   if (error) {
     next.refreshBackoff = {
       ...(next.refreshBackoff ?? {}),
-      [key]: { untilMs: now + Math.min(300_000, 15_000 * 2), lastError: String(error) },
+      [key]: {
+        untilMs: now + Math.min(300_000, 15_000 * 2),
+        lastError: String(error),
+      },
     };
   }
   return next;
