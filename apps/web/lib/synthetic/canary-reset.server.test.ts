@@ -194,7 +194,10 @@ describe('executeCanaryReset', () => {
     expect(billingSet.plan).toBe('free');
     expect(billingSet.stripeSubscriptionId).toBeNull();
     expect(billingSet.stripePriceId).toBeNull();
-    // billing_version is an SQL increment, never a literal.
-    expect(String(billingSet.billingVersion)).toContain('billing_version');
+    // billing_version is an SQL increment, never a literal: a drizzle SQL
+    // object (queryChunks), not a plain number.
+    expect(billingSet.billingVersion).toBeDefined();
+    expect(billingSet.billingVersion).toHaveProperty('queryChunks');
+    expect(typeof billingSet.billingVersion).toBe('object');
   });
 });
