@@ -23,7 +23,7 @@ import { resolveSyntheticPassageToken } from '@/lib/synthetic/passage-token.serv
  *   3. a single-use `jsp1` passage token with the `canary_reset` scope,
  *      minted in CI from a key derived from CRON_SECRET, consumed in Redis
  *      with replay protection → 401;
- *   4. a 6/hour Redis-backed fixed-window limit, fail closed without
+ *   4. a 12/hour Redis-backed fixed-window limit, fail closed without
  *      Redis → 429.
  *
  * The endpoint refuses every account whose email is not the exact canary
@@ -37,15 +37,27 @@ export const runtime = 'nodejs';
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 /**
- * Route-local limiter (the sms-intents route pattern): 6/hour across all
+ * Route-local limiter (the sms-intents route pattern): 12/hour across all
  * runs, Redis-backed. Fail closed without Redis: requireRedis at both the
  * config and the limiter level means an unavailable store denies, never
  * degrades to memory, because this endpoint mutates accounts.
+ *
+ * Sizing (JOV-9826, red 45350243078): Post-Deploy Probes fires on every
+ * deploy/promotion — several runs per hour — and each walk consumes two
+ * resets (pre-claim open + post-activation close). The prior 6/hour cap
+ * made the budget the BINDING failure for otherwise-healthy walks (every
+ * walk past the third run in an hour hit an opaque 429 before checkout).
+ * 12 matches the synthetic-passage-token allowance (rate-limit/config.ts:
+ * `syntheticPassageToken` 12/h) — and because every reset requires a
+ * single-use passage token, that allowance is the true security ceiling;
+ * the route cap now defers to it instead of contradicting it. Mutation
+ * scope is unchanged: bearer + single-use passage token + canary-email
+ * fence + fail-closed Redis requirement.
  */
 const canaryResetLimiter = createRateLimiter(
   {
     name: 'Canary Reset',
-    limit: 6,
+    limit: 12,
     window: '1 h',
     prefix: 'canary_reset',
     requireRedis: true,
@@ -88,8 +100,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     return json({ error: 'Valid canary passage token required' }, 401);
   }
 
-  // 4. Dedicated 6/hour budget for account resets, independent of the
-  // passage-token allowance.
+  // 4. Dedicated 12/hour budget for account resets, aligned with (and
+  // never exceeding) the passage-token allowance that each reset consumes.
   const rate = await canaryResetLimiter.limit('canary-reset');
   if (!rate.success) {
     // The public response remains deliberately indistinguishable. Record only
