@@ -32,7 +32,7 @@ const payload = (
   decision: { kind, rationale: 'fixture', score: 0.8 },
 });
 
-describe('ChatProposeNextStepCard claim handoff (ONB-36/38/40/44)', () => {
+describe('ChatProposeNextStepCard claim handoff (ONB-36/38/40/44/46)', () => {
   beforeEach(() => {
     authState.isSignedIn = true;
     authState.canRenderClerkUi = true;
@@ -55,6 +55,7 @@ describe('ChatProposeNextStepCard claim handoff (ONB-36/38/40/44)', () => {
   });
 
   it.each([
+    ['idle' as ClaimStatus, /preparing to save your request/i, false],
     ['pending' as ClaimStatus, /saving your request/i, false],
     ['no-op' as ClaimStatus, /reply below so we can finish/i, false],
     [
@@ -93,6 +94,27 @@ describe('ChatProposeNextStepCard claim handoff (ONB-36/38/40/44)', () => {
       await expectNoA11yViolations(container);
     }
   );
+
+  it('does not promise linking while instant-access claim is still idle (ONB-46)', async () => {
+    const { container } = render(
+      <OnboardingClaimHandoffProvider status='idle'>
+        <ChatProposeNextStepCard payload={payload('instant_access')} />
+      </OnboardingClaimHandoffProvider>
+    );
+
+    expect(
+      screen.queryByText(/linking this conversation to your account/i)
+    ).toBeNull();
+    expect(
+      screen.queryByText(/until the receipt appears/i)
+    ).not.toBeInTheDocument();
+    const handoff = screen.getByTestId('onboarding-claim-handoff-copy');
+    expect(handoff).toHaveTextContent(/preparing to link this conversation/i);
+    expect(handoff).toHaveAttribute('data-claim-status', 'idle');
+    expect(handoff.getAttribute('role')).toBeNull();
+    expect(screen.queryByTestId('signup-surface')).toBeNull();
+    await expectNoA11yViolations(container);
+  });
 
   it('stops promising linking when instant-access claim fails', async () => {
     const { container } = render(
