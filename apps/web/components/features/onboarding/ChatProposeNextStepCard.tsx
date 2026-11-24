@@ -34,9 +34,11 @@ import {
  *    ask another sharp question; this card just acknowledges the tool was
  *    called.
  *
- * Optional post-Keep enrichment chips (ONB-21 / ONB-26) sit under AuthShell as
- * subordinate controls. Notes persist via sessionStorage into waitlist claim;
- * they never emit SOCIAL_ATTACHED or restore required social→audience.
+ * Optional post-Keep enrichment chips (ONB-21 / ONB-26 / ONB-30) sit above
+ * AuthShell (still ghost + “Optional”) so the default Keep pin viewport shows
+ * them without scrolling past the tall auth form. Notes persist via
+ * sessionStorage into waitlist claim; they never emit SOCIAL_ATTACHED or
+ * restore required social→audience.
  */
 
 export interface NextStepCardPayload {
@@ -74,9 +76,9 @@ const AUDIENCE_BAND_OPTIONS: ReadonlyArray<{
 ];
 
 /**
- * Subordinate optional chips under Sign up to keep. Local session state only —
- * never advances the guarded onboarding rail. Kept in this module so Phase 5
- * does not introduce a new certificate-tracked component surface.
+ * Subordinate optional chips above AuthShell (ONB-30). Local session state
+ * only — never advances the guarded onboarding rail. Kept in this module so
+ * Phase 5 does not introduce a new certificate-tracked component surface.
  */
 function PostKeepEnrichmentChips() {
   const [openPanel, setOpenPanel] = useState<EnrichmentPanel>(null);
@@ -277,6 +279,13 @@ export function ChatProposeNextStepCard({
           your name and profile. You are not on the list until the confirmation
           appears.
         </p>
+        {/*
+         * ONB-30: chips above AuthShell so the default Keep pin viewport
+         * (ONB-27) shows optional enrichment without scrolling past the tall
+         * auth form. Ghost + “Optional” keep AuthShell primary; carry (ONB-26)
+         * and Reserve paint (ONB-28) unchanged.
+         */}
+        <PostKeepEnrichmentChips />
         <AuthShell
           mode='sign-up'
           compact
@@ -284,7 +293,6 @@ export function ChatProposeNextStepCard({
           accessKind='waitlist'
           fallbackRedirectUrl={APP_ROUTES.START}
         />
-        <PostKeepEnrichmentChips />
       </div>
     );
   }
@@ -318,13 +326,18 @@ export function ChatProposeNextStepCard({
       <p className='mb-3 text-mid leading-7 text-primary-token'>
         {`You're in. Add an email to save your profile and this conversation.`}
       </p>
+      {/*
+       * ONB-30: same chip-above-AuthShell order for Claim as for Reserve.
+       * Instant-access copy stays Claim `@handle`; pin/top-fade clearance
+       * stays on this auth-anchor (ONB-27).
+       */}
+      <PostKeepEnrichmentChips />
       <AuthShell
         mode='sign-up'
         compact
         claimHandle={claimHandle ?? undefined}
         fallbackRedirectUrl={APP_ROUTES.START}
       />
-      <PostKeepEnrichmentChips />
     </div>
   );
 }
