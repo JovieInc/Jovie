@@ -51,7 +51,7 @@ export function initialEnrichmentChipState(): {
   };
 }
 
-/** ONB-36/38/40: signed-in Keep copy must track claim handoff, not forever-promise. */
+/** ONB-36/38/40/44: signed-in Keep copy must track claim handoff, not forever-promise. */
 export function signedInHandoffCopy(
   kind: 'waitlist' | 'instant_access',
   status: ClaimStatus
@@ -69,6 +69,13 @@ export function signedInHandoffCopy(
   // ONB-38: claim settled with nothing in flight — name the next action.
   if (status === 'no-op') {
     return 'Reply below so we can finish saving your request. Nothing more is happening until you continue.';
+  }
+  // ONB-44: claimed only fires when navigating to waitlist receipt or checkout —
+  // name the opening step; never forever-receipt / bare Linking.
+  if (status === 'claimed') {
+    return kind === 'waitlist'
+      ? 'Your request is saved. Opening your waitlist receipt.'
+      : "You're already signed in. Opening checkout.";
   }
   if (kind === 'waitlist') {
     return 'Saving your request and reserving your name and profile now. Keep this page open until the receipt appears.';
