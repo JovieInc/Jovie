@@ -48,3 +48,73 @@ export const CustomPlaceholder: Story = {
     placeholder: 'Where do you perform?',
   },
 };
+
+/** Empty catalog face — no city matches; free-text escape hatch is the empty chrome. */
+export const Empty: Story = {
+  play: async ({ canvasElement }) => {
+    const trigger = within(canvasElement).getByRole('button', {
+      name: 'Choose a city',
+    });
+    await userEvent.click(trigger);
+    const search = within(document.body).getByPlaceholderText(
+      'Search cities...'
+    );
+    await userEvent.type(search, 'zzzz-no-such-city');
+    await expect(
+      within(document.body).getByText(/Use \u201czzzz-no-such-city\u201d/)
+    ).toBeInTheDocument();
+  },
+};
+
+/** Long selected value + long placeholder pressure. */
+export const LongContent: Story = {
+  args: {
+    value: 'san francisco bay area, california, united states',
+    placeholder:
+      'Search cities, metro areas, touring markets, and hometown labels...',
+    trigger: (
+      <Button variant='outline' size='sm'>
+        Choose a city — San Francisco Bay Area, California, United States
+      </Button>
+    ),
+  },
+  play: async ({ canvasElement }) => {
+    const trigger = within(canvasElement).getByRole('button', {
+      name: /Choose a city/,
+    });
+    await userEvent.click(trigger);
+    await expect(
+      within(document.body).getByPlaceholderText(
+        'Search cities, metro areas, touring markets, and hometown labels...'
+      )
+    ).toBeInTheDocument();
+  },
+};
+
+/** RTL overflow frame for the open list. */
+export const Rtl: Story = {
+  decorators: [
+    Story => (
+      <div dir='rtl' className='w-64'>
+        <Story />
+      </div>
+    ),
+  ],
+  args: {
+    value: 'nashville, tn',
+    trigger: (
+      <Button variant='outline' size='sm'>
+        اختر مدينة
+      </Button>
+    ),
+  },
+  play: async ({ canvasElement }) => {
+    const trigger = within(canvasElement).getByRole('button', {
+      name: 'اختر مدينة',
+    });
+    await userEvent.click(trigger);
+    await expect(
+      within(document.body).getByPlaceholderText('Search cities...')
+    ).toBeInTheDocument();
+  },
+};
