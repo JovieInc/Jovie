@@ -6,8 +6,6 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { expectNoA11yViolations } from '@/tests/utils/a11y';
-import { ActionDial, DIAL_HINT_SEEN_KEY } from './ActionDial';
 import {
   ActionDialFixture as Fixture,
   ACTION_DIAL_MANY as MANY,
@@ -15,6 +13,8 @@ import {
   ACTION_DIAL_OPTIONS as OPTIONS,
   actionDialTouch as touch,
 } from '@/tests/unit/release/ActionDial.test-helpers';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { ActionDial, DIAL_HINT_SEEN_KEY } from './ActionDial';
 
 beforeEach(() => {
   localStorage.clear();

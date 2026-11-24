@@ -62,7 +62,8 @@ export function ActionDialFixture({
   readonly onSelect?: (id: string) => void;
   readonly onActivate?: (id: string) => void;
 }) {
-  const [selectedId, setSelectedId] = useState(options[0]!.id);
+  const initialId = options[0]?.id ?? '';
+  const [selectedId, setSelectedId] = useState(initialId);
   return (
     <ActionDial
       options={options}
