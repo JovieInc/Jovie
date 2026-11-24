@@ -47,7 +47,8 @@ export function checkAppChatPromptContract(prompt: string) {
       'Never claim you will set up',
       'smart link is live or will live',
       'lands on Spotify',
-      'link will be up on my page'
+      'link will be up on my page',
+      "I'll add it"
     ),
     requiresDraftHoldOutbound: includesAll(
       'Draft every outbound artifact',

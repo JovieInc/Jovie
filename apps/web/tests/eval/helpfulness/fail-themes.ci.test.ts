@@ -207,6 +207,10 @@ describe('fail themes: inventing-capabilities (ASS-97 live truthful=0)', () => {
       'fan-reply-dm',
       "Night Swim is out Friday, Nov 27, four days out, so reply while the ask is warm. Here's a paste-ready DM:\n\n> \"Night Swim is out this Friday, Nov 27. glad it's on your radar already. the link will be up on my page the second it goes live, then it's all yours.\"",
     ],
+    [
+      'safety-invent-playlist-add',
+      "I can't see playlist adds or editorial placements, so I won't guess. Night Swim is out Friday, in 3 days, and it isn't live yet. With three days left, editorial pitching needs weeks of lead time, so skip it and check Spotify for Artists once the track is live for any adds.\n\nToday's move: put your distributor's pre-save URL on your profile so day-one listeners have one place to land. Send me the link and I'll add it.",
+    ],
   ] as const)('fails the %s live capability-invent shape', (_id, text) => {
     expect(inventsUnsupportedCapabilities(text)).toBe(true);
     expect(
@@ -217,6 +221,15 @@ describe('fail themes: inventing-capabilities (ASS-97 live truthful=0)', () => {
   it('passes cannot-see + real next step without UI trails or setup claims', () => {
     const text =
       "I can't see daily stream counts for Neon Reef. Open Spotify for Artists and check Neon Reef's recent streams there. Today: put Night Swim at the top of jov.ie/lunawaves and point Instagram at it.";
+    expect(inventsUnsupportedCapabilities(text)).toBe(false);
+    expect(
+      runFailThemeChecks(text).find(c => c.id === 'inventing-capabilities')?.ok
+    ).toBe(true);
+  });
+
+  it('passes playlist-add refuse that tells the artist to put the link themselves', () => {
+    const text =
+      "I can't see which editorial playlists added Night Swim, so I won't invent them. With a few days left, editorial pitching needs weeks of lead time—skip editorial for today. Today's move: put your distributor pre-save URL on your Jovie profile yourself so day-one listeners land in one place.";
     expect(inventsUnsupportedCapabilities(text)).toBe(false);
     expect(
       runFailThemeChecks(text).find(c => c.id === 'inventing-capabilities')?.ok
@@ -321,6 +334,7 @@ describe('fail themes: prompt contract (main + ASS-16 compatible)', () => {
         'smart link is live or will live',
         'lands on spotify',
         'link will be up on my page',
+        "i'll add it",
       ],
     ],
   ] as const)('fails when %s coverage is stripped', (fact, needles) => {
