@@ -1,6 +1,7 @@
 import { ARTIST_PROFILE_SECTION_SCREENSHOT_ORDER } from '@/data/artistProfilePageOrder';
 import { getCanonicalSurfaceForScreenshotId } from '@/lib/canonical-surfaces';
 import screenshotCatalogManifest from '../../screenshot-catalog/current/manifest.json';
+import { DESKTOP_PROFILE_READY_SELECTOR } from './profile-ready';
 import type {
   ScreenshotConsumer,
   ScreenshotGroup,
@@ -277,7 +278,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     id: 'tim-white-profile-live-desktop',
     title: 'Tim White Profile — Latest Release Desktop',
     route: '/demo/showcase/tim-white-profile?release=live',
-    waitFor: '[data-testid="profile-compact-shell"]',
+    waitFor: DESKTOP_PROFILE_READY_SELECTOR,
     publicExportPath: 'tim-white-profile-live-desktop.png',
   }),
   ...defineScenarios('marketing', ADMIN_AND_INVESTOR, [
@@ -285,7 +286,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       id: 'tim-white-profile-mainstream-desktop',
       title: 'Tim White Profile — Mainstream Desktop',
       route: '/demo/showcase/tim-white-profile?archetype=mainstream',
-      waitFor: '[data-testid="profile-compact-shell"]',
+      waitFor: DESKTOP_PROFILE_READY_SELECTOR,
       publicExportPath: 'tim-white-profile-mainstream-desktop.png',
     },
     {
@@ -592,13 +593,9 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       id: 'public-profile-desktop',
       title: 'Public Profile',
       route: '/demo/showcase/public-profile',
-      // Wait for the stable profile-compact-shell (always present on the inner
-      // content div rendered by ProfileCompactTemplate via StaticArtistPage for
-      // the demo surfaces). This is the reliable post-hydration marker used for
-      // desktop marketing captures (tim-white live/mainstream + public profile)
-      // across shell waves; avoids pre-hydration phone fallback and stale
-      // data-layout attr after UnifiedSidebar / compact template changes.
-      waitFor: '[data-testid="profile-compact-shell"]',
+      // Desktop marketing captures (tim-white live/mainstream + public
+      // profile) wait for whichever profile surface is visible at 1440px.
+      waitFor: DESKTOP_PROFILE_READY_SELECTOR,
       publicExportPath: 'profile-desktop.png',
     },
     {

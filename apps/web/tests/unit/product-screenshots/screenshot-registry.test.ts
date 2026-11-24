@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { ARTIST_PROFILE_SECTION_SCREENSHOT_ORDER } from '@/data/artistProfilePageOrder';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { CANONICAL_SURFACES } from '@/lib/canonical-surfaces';
+import { DESKTOP_PROFILE_READY_SELECTOR } from '../../../lib/screenshots/profile-ready';
 import {
   SCREENSHOT_MOBILE_SAFE_AREA,
   SCREENSHOT_SCENARIOS,
@@ -147,7 +148,7 @@ describe('screenshot registry', () => {
     }
   });
 
-  it('waits for compact profile shell on desktop captures (stable post-shell-migration selector)', () => {
+  it('waits for the visible profile surface on desktop captures', () => {
     const desktopProfileIds = [
       'tim-white-profile-live-desktop',
       'tim-white-profile-mainstream-desktop',
@@ -159,7 +160,7 @@ describe('screenshot registry', () => {
         currentScenario => currentScenario.id === id
       );
 
-      expect(scenario?.waitFor).toBe('[data-testid="profile-compact-shell"]');
+      expect(scenario?.waitFor).toBe(DESKTOP_PROFILE_READY_SELECTOR);
     }
   });
 
