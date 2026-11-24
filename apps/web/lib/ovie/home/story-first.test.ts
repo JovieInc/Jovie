@@ -194,18 +194,19 @@ describe('buildStoryFirstBottleneck', () => {
     });
   });
 
+  const row = (identifier: string, title: string, complete = false) => ({
+    id: identifier,
+    identifier,
+    title,
+    url: null,
+    stage: 'building' as const,
+    stageIndex: 1,
+    complete,
+    attention: null,
+    updatedAt: null,
+  });
+
   it('links only shipping work on the blocker as Moving', () => {
-    const row = (identifier: string, title: string, complete = false) => ({
-      id: identifier,
-      identifier,
-      title,
-      url: null,
-      stage: 'building' as const,
-      stageIndex: 1,
-      complete,
-      attention: null,
-      updatedAt: null,
-    });
     const lanes = row(
       'JOV-10172',
       'feat(lanes): gem-default worktree hosts, fallback cap'
@@ -241,6 +242,30 @@ describe('buildStoryFirstBottleneck', () => {
       label: 'Success page receipt',
       href: null,
     });
+  });
+
+  it.each([
+    ['homepage_entry', 'Polish homepage navigation'],
+    ['visits', 'Improve landing page navigation'],
+    ['eligible_entries', 'Improve eligible-entry navigation'],
+  ] as const)('links entry work in shipping order for %s', (step, title) => {
+    const sentry = row('JOV-3', 'Fix Sentry error grouping');
+    const completed = row('JOV-4', 'Update homepage copy', true);
+    const entry = row('JOV-5', title);
+    const later = row('JOV-6', 'Tidy landing page copy');
+    const moving = (rows: ReturnType<typeof row>[]) =>
+      buildStoryFirstBottleneck({
+        revenue: { ...checkout, step },
+        revenueRead: true,
+        constraint: null,
+        highlight: null,
+        rows,
+      }).moving;
+
+    expect([
+      moving([sentry]),
+      moving([sentry, completed, entry, later]),
+    ]).toEqual([null, { label: title, href: null }]);
   });
 
   it('keeps funnel title distinct from the measured body', () => {
