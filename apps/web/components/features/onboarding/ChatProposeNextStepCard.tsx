@@ -328,8 +328,8 @@ export function ChatProposeNextStepCard({
       </p>
       {/*
        * ONB-30: same chip-above-AuthShell order for Claim as for Reserve.
-       * Instant-access copy stays Claim @handle; pin/top-fade clearance stays
-       * on this auth-anchor (ONB-27).
+       * Instant-access copy stays Claim `@handle`; pin/top-fade clearance
+       * stays on this auth-anchor (ONB-27).
        */}
       <PostKeepEnrichmentChips />
       <AuthShell
