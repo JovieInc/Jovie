@@ -51,7 +51,7 @@ export function initialEnrichmentChipState(): {
   };
 }
 
-/** ONB-36: signed-in Keep copy must track claim handoff, not forever-promise. */
+/** ONB-36/38: signed-in Keep copy must track claim handoff, not forever-promise. */
 export function signedInHandoffCopy(
   kind: 'waitlist' | 'instant_access',
   status: ClaimStatus
@@ -61,6 +61,10 @@ export function signedInHandoffCopy(
   }
   if (status === 'identity-conflict') {
     return 'This profile belongs to another account. Switch accounts to continue, or start over.';
+  }
+  // ONB-38: claim settled with nothing in flight — name the next action.
+  if (status === 'no-op') {
+    return 'Reply below so we can finish saving your request. Nothing more is happening until you continue.';
   }
   if (kind === 'waitlist') {
     return 'Saving your request and reserving your name and profile now. Keep this page open until the receipt appears.';
