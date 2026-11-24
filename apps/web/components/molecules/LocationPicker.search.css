@@ -1,0 +1,14 @@
+/* Search field paint for LocationPicker HostDrawnInput — call site stays layout-only. */
+
+.location-picker-search :where(input[data-host-drawn]) {
+  background-color: transparent;
+  color: var(--color-text-primary-token);
+  font-size: var(--text-app);
+  outline: none;
+  appearance: none;
+  cursor: text;
+}
+
+.location-picker-search :where(input[data-host-drawn]::placeholder) {
+  color: var(--color-text-tertiary-token);
+}

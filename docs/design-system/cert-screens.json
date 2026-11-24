@@ -78,7 +78,6 @@
     "apps/web/components/jovie/JovieChat.tsx": "a11y,ds-owner,frontend-rules,states,tests",
     "apps/web/components/jovie/components/ChatAvatarUploadCard.tsx": "a11y,ds-owner,frontend-rules,states,tests",
     "apps/web/components/jovie/components/ChatInput.tsx": "a11y,ds-owner,frontend-rules,states,tests",
-    "apps/web/components/molecules/LocationPicker.tsx": "a11y,ds-owner,forced-caps,frontend-rules,states,tests",
     "apps/web/components/molecules/drawer/SidebarLinkRow.tsx": "states,tokens",
     "apps/web/components/organisms/AvatarUploadable.tsx": "a11y,ds-owner,frontend-rules,states,tests",
     "apps/web/components/organisms/CmdKPalette.tsx": "a11y,ds-owner,frontend-rules,states",

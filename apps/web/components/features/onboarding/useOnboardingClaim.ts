@@ -47,6 +47,8 @@ export type ClaimStatus =
   | 'pending'
   | 'claimed'
   | 'no-op'
+  /** Missing durable public artist identity — stay on /start; name identity next action. */
+  | 'intake-required'
   | 'retry-after-webhook'
   | 'identity-conflict'
   | 'error';
@@ -242,12 +244,14 @@ export function useOnboardingClaim(
       if (body.waitlistIntakeRequired) {
         // Missing durable artist/social identity. Stay in this /start
         // conversation and retry after the next natural-language turn.
+        // ONB-40: distinct from generic `no-op` so the Keep card can name
+        // artist/Spotify recovery instead of a vague "Reply below…".
         track(ONBOARDING_FUNNEL_EVENTS.WAITLIST_INTAKE_REQUIRED, {
           surface: 'start_chat',
           duration_ms: Date.now() - startedAt,
         });
         markTriggerCompleted();
-        setStatus('no-op');
+        setStatus('intake-required');
         return;
       }
 
