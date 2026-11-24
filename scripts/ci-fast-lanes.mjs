@@ -1395,7 +1395,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/postdeploy-probe-transport.test.mjs',
   'scripts/lib/__tests__/postdeploy-probe-workflow-admission.test.mjs',
   'scripts/lib/__tests__/postdeploy-crawl-receipt.test.mjs',
-  'scripts/lib/__tests__/golden-path-cert-reuse.test.mjs scripts/lib/__tests__/golden-path-step-scope.test.mjs',
+  'scripts/lib/__tests__/golden-path-cert-reuse.test.mjs scripts/lib/__tests__/golden-path-step-scope.test.mjs scripts/lib/__tests__/golden-path-release-hold.test.mjs',
   'scripts/lib/__tests__/postdeploy-cert-after-pen.test.mjs',
   'scripts/lib/__tests__/pr-preparation-safety.test.mjs',
   'scripts/lib/__tests__/production-environment-secrets.test.mjs',
