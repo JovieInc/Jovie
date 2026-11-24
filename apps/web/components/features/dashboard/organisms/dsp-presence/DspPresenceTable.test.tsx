@@ -30,7 +30,7 @@ describe('DspPresenceTable', () => {
     item({ matchId: 'm-apple', providerId: 'apple_music' }),
   ];
 
-  it('uses the canonical dense row mode', () => {
+  it('uses the canonical compact row mode', () => {
     render(
       <DspPresenceTable
         items={items}
@@ -41,7 +41,7 @@ describe('DspPresenceTable', () => {
 
     expect(screen.getByRole('table')).toHaveAttribute(
       'data-table-row-mode',
-      'dense'
+      'compact'
     );
   });
 

@@ -29,7 +29,7 @@ export function TaskDataTable<TData extends RowData>({
   getRowClassName,
   hideHeader = true,
   minWidth = '100%',
-  rowMode = 'dense',
+  rowMode = 'compact',
   skeletonRows = 8,
   ...props
 }: Readonly<TaskDataTableProps<TData>>) {

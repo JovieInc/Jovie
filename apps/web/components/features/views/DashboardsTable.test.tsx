@@ -32,7 +32,7 @@ describe('DashboardsTable', () => {
     expect(screen.getByText('2026-11-22')).toBeInTheDocument();
     // New tables use the shared compact rows; dense is a shrinking legacy set.
     expect(
-      container.querySelector('[data-table-row-mode="dense"]')
+      container.querySelector('[data-table-row-mode="compact"]')
     ).not.toBeNull();
   });
 
