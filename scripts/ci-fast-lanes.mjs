@@ -536,7 +536,7 @@ export const SOURCE_GUARDS = Object.freeze([
     // Registry integrity, prose drift and whole-repository spelling share this
     // existing guard; policy is docs/design-system/anti-slop-rules.json.
     id: 'anti-slop',
-    command: `node scripts/anti-slop/run.mjs validate && node scripts/anti-slop/brand-name.mjs && node --test --test-concurrency=1 --test-isolation=none scripts/anti-slop/anti-slop.test.mjs`,
+    command: `node scripts/anti-slop/run.mjs validate && node scripts/anti-slop/brand-name.mjs && node --test --test-concurrency=1 --test-isolation=none scripts/anti-slop/anti-slop.test.mjs scripts/anti-slop/rsi-prevention/contract.test.mjs`,
     inputs: /./u,
     prOnly: false,
   }),
@@ -995,6 +995,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   ...STRUCTURAL_PYTEST_PARTS,
 ]);
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/anti-slop/rsi-prevention/contract.test.mjs', // RSI ASR-042..046 fixtures
   'scripts/lib/__tests__/source-docs-scope.test.mjs',
   'scripts/ios-certification-config.test.mjs',
   'scripts/schedule-trigger-guard.test.mjs', // JOV-12720 event-driven guard.
