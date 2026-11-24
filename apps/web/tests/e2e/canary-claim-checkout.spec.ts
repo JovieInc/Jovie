@@ -190,17 +190,13 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
       await resetClaimCanary({ request: page.request, origin, runTag: tag });
     } catch (error) {
       if (error instanceof CanaryResetRateLimitedError) {
-        // Budget, not config: the shared canary-walk passage-grant window is
-        // the cross-run ceiling, and the reset window is PER RUN TAG — a
-        // single walk's retries can never be denied by another run's
-        // consumption (red 45366385483: the prior GLOBAL reset key was
-        // burned by every run and retry, so deploy storms exhausted any
-        // fixed size). Name the condition and fail — the walk never skips,
-        // but the red must say "hourly budget", not an opaque 429 (and
-        // never the opaque 401 the passage-budget denial masqueraded as,
-        // red 45350750159).
+        // Budget, not config: the reset budget is shared across runs
+        // and every Playwright retry that reaches reset burns it again
+        // (post-fix red 45336880733 retry #2). Name the condition and fail —
+        // the walk never skips, but the red must say "hourly budget", not
+        // an opaque 429.
         blockConeWalk(
-          'Canary reset budget exhausted (429): the hourly canary-walk passage-grant budget is shared across all runs and the reset budget is per run tag; retrying cannot help until the window clears'
+          'Canary reset budget exhausted (429): the hourly reset budget is shared across runs; retrying cannot help until the hourly window clears'
         );
         throw error;
       }
@@ -245,13 +241,7 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
       await waitForProductionDashboardContent(page);
 
       // Payment authority ordering: BEFORE any payment the canary is free.
-      // The personaEmail sweep is load-bearing for the canary (JOV-8805
-      // class, red 45369972300): a previous walk whose teardown died — or
-      // whose reset 401/429'd — leaves the subscription active Stripe-side
-      // while the canary reset clears the local rows, and the next checkout
-      // is then answered with the already-subscribed billing-portal session
-      // (`bps_...`) instead of a checkout session.
-      await ensureUserIsFree(page, stripeClient, PRODCERT_CLAIM_CANARY_EMAIL);
+      await ensureUserIsFree(page, stripeClient);
       await detachCustomerPaymentMethods(
         stripeClient,
         PRODCERT_CLAIM_CANARY_EMAIL
@@ -288,23 +278,6 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
         source: 'onboarding',
         returnTo: '/chat?from=onboarding',
       });
-
-      // A non-`cs_` session id here means the checkout route found an
-      // already-subscribed canary and answered with the billing-portal
-      // session (`bps_...`) — a Stripe-side orphan subscription survived
-      // teardown (JOV-8805 class, red 45369972300). Retrieving it with
-      // checkout.sessions.retrieve dies with Stripe's opaque "No such
-      // checkout.session: bps_..."; name the class and fail instead — the
-      // walk never skips, and the red must say "orphan subscription",
-      // not a Stripe lookup error.
-      if (!sessionId.startsWith('cs_')) {
-        blockConeWalk(
-          `Checkout returned a non-checkout session id (${sessionId.slice(0, 4)}...): the canary is already subscribed Stripe-side - an orphan subscription survived teardown (JOV-8805 class); the walk never skips`
-        );
-        throw new Error(
-          `canary checkout returned a non-checkout session id (${sessionId.slice(0, 8)}...): already-subscribed billing-portal session (JOV-8805 orphan-subscription class, red 45369972300)`
-        );
-      }
 
       const session = await stripeClient.checkout.sessions.retrieve(sessionId);
       expect(session.livemode).toBe(false);
@@ -471,12 +444,10 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
       );
     } finally {
       // The canary returns to its exact pre-claim state: subscription
-      // canceled Stripe-side (with the persona orphan sweep so no
-      // provider-only subscription survives the local reset), test payment
-      // methods detached, then the canary-reset endpoint unclaims the
-      // reserved handle.
+      // canceled Stripe-side (with webhook), test payment methods detached,
+      // then the canary-reset endpoint unclaims the reserved handle.
       try {
-        await ensureUserIsFree(page, stripeClient, PRODCERT_CLAIM_CANARY_EMAIL);
+        await ensureUserIsFree(page, stripeClient);
       } finally {
         try {
           await detachCustomerPaymentMethods(
