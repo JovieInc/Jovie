@@ -1,0 +1,11 @@
+{
+  "items": [
+    {
+      "criterion": "First readable paint under load",
+      "status": "pass",
+      "evidence": "browser fixture painted #audience-table rows",
+      "mandatory": true
+    }
+  ],
+  "claimedAggregate": "pass"
+}

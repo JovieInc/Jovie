@@ -1,5 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { audienceWarmFilterParams } from '@/lib/queries/audience-members-params';
 import { queryKeys } from '@/lib/queries/keys';
 import { prefetchForRoute } from '@/lib/queries/prefetch-dashboard';
 import { DEFAULT_TASK_WORKSPACE_FILTERS } from '@/lib/tasks/query-defaults';
@@ -15,10 +16,6 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/releases/release-matrix-loader', () => ({
   loadReleaseMatrix: mocks.loadReleaseMatrix,
-}));
-
-vi.mock('@/app/app/(shell)/dashboard/presence/actions', () => ({
-  loadDspPresenceForProfile: vi.fn(async () => []),
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/tour-dates/actions', () => ({
@@ -102,5 +99,52 @@ describe('prefetchForRoute', () => {
         )
       ).toEqual({ nextCursor: null, tasks: [] });
     });
+  });
+
+  it('warms Audience under the infinite-query key and URL shape the table reads', async () => {
+    const queryClient = new QueryClient();
+    const filters = audienceWarmFilterParams();
+
+    prefetchForRoute('audience', queryClient, 'profile-123');
+
+    await vi.waitFor(() => {
+      expect(mocks.fetchWithTimeout).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /^\/api\/dashboard\/audience\/members\?.*profileId=profile-123/
+        ),
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
+    });
+
+    const warmUrl = String(mocks.fetchWithTimeout.mock.calls[0]?.[0] ?? '');
+    expect(warmUrl).toContain('sort=lastSeen');
+    expect(warmUrl).toContain('direction=desc');
+    expect(warmUrl).toContain('view=all');
+    expect(warmUrl).toContain('pageSize=50');
+
+    // Bare members(profileId) must stay empty — that was the dead-warm bug.
+    expect(
+      queryClient.getQueryData(queryKeys.audience.members('profile-123'))
+    ).toBeUndefined();
+
+    await vi.waitFor(() => {
+      expect(
+        queryClient.getQueryData(
+          queryKeys.audience.members('profile-123', filters)
+        )
+      ).toBeDefined();
+    });
+  });
+
+  it('does not warm dspEnrichment.presence for Identity (presence route)', () => {
+    const queryClient = new QueryClient();
+    const prefetchSpy = vi.spyOn(queryClient, 'prefetchQuery');
+    const prefetchInfiniteSpy = vi.spyOn(queryClient, 'prefetchInfiniteQuery');
+
+    prefetchForRoute('presence', queryClient, 'profile-123');
+
+    expect(prefetchSpy).not.toHaveBeenCalled();
+    expect(prefetchInfiniteSpy).not.toHaveBeenCalled();
+    expect(mocks.fetchWithTimeout).not.toHaveBeenCalled();
   });
 });

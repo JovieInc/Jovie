@@ -320,6 +320,33 @@ or linked guard changes; then review that linkage and regenerate the receipt.
 
 **Rule:** All protected Vercel probes use `apps/web/scripts/vercel-protected-origin.cjs`. Read protection and CLI secrets only from process environment; never put `--token` or `--env KEY=value` on argv. Require the caller to choose `preview` or `production`, bind the exact URL and deployment ID through deadline-bounded pagination, retry only missing/known-transient evidence, fail immediately on present contradictions, verify the full commit through a host-only cookie, and require semantic HTTP-200 content. After exact staging alias ownership, click both real provider buttons and prove their Better Auth catch-all POST plus external navigation and callback URI; `/api/auth/ok` is not runtime auth proof. Select one complete named auth credential pair and derive auth status from the completed test result. Runtime cookies must be masked and included in artifact scans. Browser routes must be awaited before navigation. Lighthouse validation owns upload from one hash-sealed mode-0400 isolated copy, re-proves source and isolated file identity after the same-UID child, and rejects symlinks, FIFOs, directories, and mutation. Grant OIDC/attestation only to a dedicated no-checkout, no-secret attestation job; secret-bearing checkout/deploy jobs must never receive it. Disable persisted credentials on every checkout, and accept a production marker only with completed-success controller and verification evidence; consume the single SHA-bound interrupted-marker recovery lease before mutation.
 
+## RSI AI-slop prevention (pre-merge)
+
+### Intentional stream and paint waits are AI slop
+**Mistake:** Agents insert `smoothStream({ delayInMs })`, `await new Promise(r => setTimeout(...))`, or similar sleeps on the success / first-readable-paint path because demos look “paced.” Production tip carried `delayInMs: 15` (JOV-3525); a claimed `delayInMs: 5` was not present at tip (AI SDK default is 10ms) and must stay unverifiable.
+
+**Rule:** No artificial waits on the response or first-paint path. Documented bounded retry, backoff, and debounce off the success path are allowed. Verify first readable paint and full output, not headers. Encode hits as ASR-042 / RF-0003; do not treat skipped evidence as PASS (ASR-046).
+
+### Prefetch keys must match the consumer key and shape
+**Mistake:** Nav hover warmed `queryKeys.audience.members(profileId)` while the Audience table reads an infinite query keyed with sort/direction/segments/view; Identity (`/app/presence`) warmed `dspEnrichment.presence` while the route mounts ProfilesWorkspace. Dead warms burned the request budget and left the click cold.
+
+**Rule:** Warm queries must use the same TanStack key and request params the destination reads. Prefer shared builders (`audience-members-params.ts`). Never speculatively render a route that can write. ASR-043 / RF-0004.
+
+### Optional or stale data must not become zero or a period spike
+**Mistake:** Missing counts coerced with `?? 0`, lifetime totals shown as period spikes, and refresh clearing prior valid rows so the UI flickers empty or invents a surge.
+
+**Rule:** Keep prior valid values during refresh (`keepPreviousData` / equivalent). Skipped counts stay null. Period metrics stay period-scoped. Test stale, failure, and recovery. ASR-044 / RF-0005.
+
+### Shared UI contracts beat per-screen patches
+**Mistake:** One-off screen fixes for popover detachment, hover focus rings, nested radius clipping, drawer-resize reordering columns, or composer focus activating Attach — then the next surface regresses.
+
+**Rule:** Encode on shared primitives and browser fixtures. Keyboard focus rings only; nested radius = outer − padding; drawer resize ≠ reorder animation; composer focus ≠ Attach. ASR-045 / RF-0006.
+
+### Skipped or unverifiable evidence is never PASS
+**Mistake:** Treating skipped fixtures, missing browser runs, or unverifiable claims as green so slop merges.
+
+**Rule:** Aggregate pass requires every mandatory item verified with empty residual. Unverifiable holds closure (`outcome-residual-policy.mjs`). ASR-046 / RF-0007.
+
 ## Marketing copy guardrails
 
 ### Banned names stay out of marketing and homepage surfaces (JOV-8603)

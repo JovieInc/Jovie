@@ -1,6 +1,6 @@
 {
   "schema": "jovie.feedback-guards/v1",
-  "reviewedOn": "2026-11-21",
+  "reviewedOn": "2026-11-24",
   "lessons": [
     {
       "fingerprint": "`captureWarning(message, context)` files Linear as `Error: {json}`",
@@ -677,6 +677,96 @@
           "path": "apps/web/tests/unit/marketing/recipe-manifest.test.ts",
           "anchor": "binds the homepage beats to the recipe and one source owner",
           "reason": "Keeps the homepage manifest bound to its recipe and a single source owner."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Intentional stream and paint waits are AI slop",
+      "lessonSha256": "64991487efb374d43d3aa813e8a85785c272e9c80269cf8c8d28b3f155ed2739",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "scripts/anti-slop/rsi-prevention/contract.test.mjs",
+          "anchor": "ASR-042 bad fixture triggers stream-pacing matchers; good control does not",
+          "reason": "Bad/good fixtures pin intentional pacing vs backoff/debounce."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/chat/run.stream-smoothing.test.ts",
+          "anchor": "toHaveBeenCalledWith({\n      delayInMs: 15",
+          "reason": "Pins the known production pacing value so shadow detections stay grounded."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Prefetch keys must match the consumer key and shape",
+      "lessonSha256": "07a3baad2a8ee2a29bace01d90260123b8942bc14f20159a58dfa53b8897c385",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/queries/prefetch-dashboard.test.ts",
+          "anchor": "warms Audience under the infinite-query key and URL shape the table reads",
+          "reason": "Audience warm must hit the consumer infinite key, not the bare members key."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/tests/unit/queries/prefetch-dashboard.test.ts",
+          "anchor": "does not warm dspEnrichment.presence for Identity (presence route)",
+          "reason": "Identity presence warm of DSP presence is a dead cache write."
+        },
+        {
+          "kind": "test",
+          "path": "scripts/anti-slop/rsi-prevention/contract.test.mjs",
+          "anchor": "ASR-043 bad fixture triggers dead-warm matchers; good control does not",
+          "reason": "Deliberate-red dead warm vs matching infinite warm."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Optional or stale data must not become zero or a period spike",
+      "lessonSha256": "62680565684e00ece06a68ce462e854680d1f66cb9a05fbee7485aba9cb4cff9",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "scripts/anti-slop/rsi-prevention/contract.test.mjs",
+          "anchor": "ASR-044 bad coerces missing to zero; good keeps null and prior rows",
+          "reason": "Missing→zero and lifetime-as-period are deliberate red; null + prior rows pass."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Shared UI contracts beat per-screen patches",
+      "lessonSha256": "5678ec2a114e62cbb292df688720a131f341d6e37030d33ba46b7cdf89f71dea",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "scripts/anti-slop/rsi-prevention/contract.test.mjs",
+          "anchor": "ASR-045 review-only signals: hover ring and focus→Attach are bad; keyboard ring is good",
+          "reason": "Review-only fixture signals for shared UI contracts."
+        },
+        {
+          "kind": "test",
+          "path": "apps/web/components/jovie/components/ChatComposerToolbar.test.tsx",
+          "anchor": "opens the shared composer palette instead of a file-only dropdown",
+          "reason": "Attach opens on explicit activation via the shared primitive."
+        }
+      ]
+    },
+    {
+      "fingerprint": "Skipped or unverifiable evidence is never PASS",
+      "lessonSha256": "18dbd6529490a28d8d0470d6f6c1ff2cc7234dec09f2cf1f9c82087a40233e76",
+      "guards": [
+        {
+          "kind": "test",
+          "path": "scripts/anti-slop/rsi-prevention/contract.test.mjs",
+          "anchor": "ASR-046 unverifiable mandatory item cannot claim aggregate PASS",
+          "reason": "decideOutcomeResidual holds on mandatory unverifiable."
+        },
+        {
+          "kind": "test",
+          "path": "scripts/lib/__tests__/ordinary-issue-validation-closure-replay.test.mjs",
+          "anchor": "INV-TERMINAL-RECEIPT-1",
+          "reason": "Existing enforced residual policy refuses unverifiable-as-pass."
         }
       ]
     }

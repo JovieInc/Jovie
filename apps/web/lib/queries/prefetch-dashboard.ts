@@ -1,14 +1,26 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { loadDspPresenceForProfile } from '@/app/app/(shell)/dashboard/presence/actions';
 import { getTasks } from '@/app/app/(shell)/dashboard/tasks/task-actions';
 import { loadTourDates } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { loadReleaseMatrix } from '@/lib/releases/release-matrix-loader';
 import { DEFAULT_TASK_WORKSPACE_FILTERS } from '@/lib/tasks/query-defaults';
 import type { DashboardContact } from '@/types/contacts';
+import type { AudienceMember } from '@/types';
+import {
+  audienceWarmFilterParams,
+  buildAudienceMembersParams,
+  DEFAULT_AUDIENCE_WARM,
+} from './audience-members-params';
 import { FREQUENT_CACHE } from './cache-strategies';
 import { createQueryFn, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 import { tourDateToEventRecord } from './useEventsQuery';
+
+interface AudienceWarmPage {
+  rows: AudienceMember[];
+  total: number | null;
+  hasMore?: boolean;
+  nextCursor?: string | null;
+}
 
 const fetchEarnings = createQueryFn('/api/dashboard/earnings');
 
@@ -63,24 +75,41 @@ export function prefetchForRoute(
         staleTime,
       });
       break;
-    case 'audience':
-      // Audience uses cursor-based pagination — prefetch the first page
-      queryClient.prefetchQuery({
-        queryKey: queryKeys.audience.members(profileId),
-        queryFn: ({ signal }) =>
-          fetchWithTimeout<unknown>(
-            `/api/dashboard/audience/members?profileId=${encodeURIComponent(profileId)}`,
+    case 'audience': {
+      // Must match useAudienceInfiniteQuery key + URL shape exactly, or the
+      // warm write is dead cache (ASR-043). Defaults mirror DashboardAudienceClient.
+      const filters = audienceWarmFilterParams();
+      queryClient.prefetchInfiniteQuery({
+        queryKey: [...queryKeys.audience.members(profileId, filters)],
+        queryFn: async ({ pageParam, signal }) => {
+          const params = buildAudienceMembersParams({
+            profileId,
+            view: filters.view,
+            sort: filters.sort,
+            direction: filters.direction,
+            pageSize: DEFAULT_AUDIENCE_WARM.pageSize,
+            cursor: pageParam === 'first' ? undefined : String(pageParam),
+            segments: filters.segments,
+          });
+          return fetchWithTimeout<AudienceWarmPage>(
+            `/api/dashboard/audience/members?${params.toString()}`,
             { signal }
-          ),
+          );
+        },
+        initialPageParam: 'first',
+        getNextPageParam: (lastPage: AudienceWarmPage) =>
+          lastPage.hasMore && lastPage.nextCursor
+            ? lastPage.nextCursor
+            : undefined,
         staleTime,
       });
       break;
+    }
     case 'presence':
-      queryClient.prefetchQuery({
-        queryKey: queryKeys.dspEnrichment.presence(profileId),
-        queryFn: () => loadDspPresenceForProfile(profileId),
-        staleTime,
-      });
+      // Identity (/app/presence) is ProfilesWorkspace (connection suggestions),
+      // not the legacy DSP presence loader. Warming dspEnrichment.presence is a
+      // dead cache write that burns the request budget (ASR-043). Identity is
+      // SSR-first via loadProfilesWorkspaceData; do not invent a second warm.
       break;
     case 'earnings':
       queryClient.prefetchQuery({
