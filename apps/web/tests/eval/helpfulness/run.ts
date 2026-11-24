@@ -224,8 +224,12 @@ async function askJovie(
 
   // Mirror production: blank model text surfaces the draft-hold fallback so
   // live CI-subset never scores tool-only / silent-refuse as reply.text ''.
-  // Copy-floor swaps keep raw text + persistedAsFallback (JOV-6616).
-  const surfaced = surfaceCompletedAssistantReply(text);
+  // Ask-aware stub names the release/artifact (ASS-103). Copy-floor swaps
+  // keep raw text + persistedAsFallback (JOV-6616).
+  const surfaced = surfaceCompletedAssistantReply(text, {
+    ask: testCase.ask,
+    namedReleases: fixture.releases.map(release => release.title),
+  });
   return {
     reply: {
       text: surfaced.text,

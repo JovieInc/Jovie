@@ -2669,7 +2669,11 @@ export async function POST(req: Request) {
         // Copy floor (canon/VOICE.md) and artist rules: a streamed reply can't
         // be blocked mid-flight, so gate the completed text before it persists.
         // A violation swaps in a safe fallback and logs the rules that fired.
-        const gatedReply = gateAssistantReply(assistantText, artistContext);
+        const gatedReply = gateAssistantReply(assistantText, {
+          artistRules: artistContext.artistRules,
+          ask: userText,
+          namedReleases: releases.map(release => release.title),
+        });
         if (gatedReply.violations.length > 0) {
           const emptyReply = gatedReply.violations.some(
             violation => violation.rule === 'empty-reply'

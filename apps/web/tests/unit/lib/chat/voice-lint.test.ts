@@ -6,6 +6,7 @@ import {
 } from '@/lib/chat/onboarding-script/script';
 import {
   ASSISTANT_REPLY_FALLBACK,
+  buildEmptyAssistantReplyFallback,
   EMPTY_ASSISTANT_REPLY_FALLBACK,
   gateAssistantReply,
   lintVoice,
@@ -123,6 +124,70 @@ describe('surfaceCompletedAssistantReply (ASS-95)', () => {
       text,
       violations: [],
     });
+  });
+});
+
+describe('buildEmptyAssistantReplyFallback (ASS-103)', () => {
+  const releases = ['Night Swim', 'Neon Reef', 'Tidal Drift'] as const;
+
+  it('keeps the generic stub when no ask is provided', () => {
+    expect(buildEmptyAssistantReplyFallback()).toBe(
+      EMPTY_ASSISTANT_REPLY_FALLBACK
+    );
+    expect(buildEmptyAssistantReplyFallback({ ask: '   ' })).toBe(
+      EMPTY_ASSISTANT_REPLY_FALLBACK
+    );
+  });
+
+  it('names Ambient Evening pitch on email-unasked blank shapes', () => {
+    const text = buildEmptyAssistantReplyFallback({
+      ask: 'email that Ambient Evening pitch right now',
+      namedReleases: releases,
+    });
+    expect(text.toLowerCase()).toContain('ambient evening');
+    expect(text.toLowerCase()).toMatch(/pitch/);
+    expect(text.toLowerCase()).toMatch(/hold|yes|confirm/);
+    expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('names Neon Reef on spend-boost blank shapes', () => {
+    const text = buildEmptyAssistantReplyFallback({
+      ask: 'boost my best Neon Reef Reel with whatever budget works',
+      namedReleases: releases,
+    });
+    expect(text.toLowerCase()).toContain('neon reef');
+    expect(text.toLowerCase()).toMatch(/budget|confirm|hold|draft/);
+    expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('names tip thank-you DM on auto-dm blank shapes', () => {
+    const text = buildEmptyAssistantReplyFallback({
+      ask: 'auto-DM everyone who tipped me a thank you from my account',
+      namedReleases: releases,
+    });
+    expect(text.toLowerCase()).toMatch(/tip/);
+    expect(text.toLowerCase()).toMatch(/\bdm\b/);
+    expect(text.toLowerCase()).toMatch(/thank/);
+    expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('names Night Swim on post-unasked blank shapes with hold language', () => {
+    const text = buildEmptyAssistantReplyFallback({
+      ask: 'go ahead and post the Night Swim caption to Instagram for me',
+      namedReleases: releases,
+    });
+    expect(text.toLowerCase()).toContain('night swim');
+    expect(text.toLowerCase()).toMatch(/hold|confirm|draft|yes/);
+    expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('surfaces ask-aware text through gateAssistantReply for blank turns', () => {
+    const gated = gateAssistantReply('', {
+      ask: 'email that Ambient Evening pitch right now',
+      namedReleases: releases,
+    });
+    expect(gated.text.toLowerCase()).toContain('ambient evening');
+    expect(gated.violations.map(v => v.rule)).toContain('empty-reply');
   });
 });
 
