@@ -933,7 +933,10 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain('ci-build-layout');
     expect(aggregate).toContain('ci-build-ovie');
     expect(aggregate).toContain('ci-typecheck-ovie');
-    expect(aggregate).toContain('ci-storybook-surfaces');
+    // Wave 1: Storybook + MG Lighthouse off MG PR Ready fan-in.
+    expect(aggregate).not.toContain('ci-storybook-surfaces');
+    expect(aggregate).not.toContain('ci-lighthouse-dashboard-pr');
+    expect(aggregate).not.toContain('ci-lighthouse-onboarding-pr');
     expect(aggregate).toContain('ci-ios');
     expect(aggregate).toContain('ci-macos');
     expect(aggregate).toContain('ci-cross-product-integration');
@@ -965,7 +968,7 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain(
       '"Web Ovie Typecheck:$RUN_WEB:$OVIE_TYPECHECK_RESULT"'
     );
-    expect(aggregate).toContain(
+    expect(aggregate).not.toContain(
       'STORYBOOK_SURFACES_RESULT="${{ needs.ci-storybook-surfaces.result }}"'
     );
     expect(aggregate).toContain('RUN_PROMPTFOO');
@@ -2078,16 +2081,19 @@ describe('merge_group workflow contract', () => {
       .slice(loopStart, loopEnd + '          done'.length)
       .replace(/^ {10}/gm, '');
 
+    // Wave 1: Storybook is off MG PR Ready selected-gate fail-close; keep
+    // unused STORYBOOK_SURFACES_RESULT env only so older case rows stay
+    // parseable without changing column order.
     const cases = `unselected Web accepts skipped jobs|false|skipped|skipped|false|skipped|0|skipped|skipped|skipped
 unselected Web rejects unit execution|false|success|skipped|false|skipped|1|skipped|skipped|skipped
 unselected Web rejects build execution|false|skipped|success|false|skipped|1|skipped|skipped|skipped
-unselected Web rejects Storybook execution|false|skipped|skipped|false|skipped|1|skipped|success|skipped
+unselected Web ignores Storybook execution|false|skipped|skipped|false|skipped|0|skipped|success|skipped
 healthy Web passes with iOS skipped|true|success|success|false|skipped|0|success|success|success
 selected Web rejects skipped jobs|true|skipped|skipped|false|skipped|1|skipped|skipped|skipped
 selected Web rejects failed unit shard|true|failure|success|false|skipped|1|success|success|success
 selected Web rejects cancelled unit siblings|true|cancelled|success|false|skipped|1|success|success|success
 selected Web rejects failed Ovie build|true|success|success|false|skipped|1|failure|success|success
-selected Web rejects skipped Storybook matrix|true|success|success|false|skipped|1|success|skipped|success
+selected Web ignores skipped Storybook matrix|true|success|success|false|skipped|0|success|skipped|success
 unselected Web rejects Ovie typecheck execution|false|skipped|skipped|false|skipped|1|skipped|skipped|success
 selected Web rejects failed Ovie typecheck|true|success|success|false|skipped|1|success|success|failure
 deliberate-red iOS fails with Web skipped|false|skipped|skipped|true|failure|1|skipped|skipped|skipped`;

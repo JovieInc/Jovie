@@ -92,10 +92,13 @@ describe('merge-group sibling burn', () => {
     for (const lane of [
       '"Web Unit Tests:$RUN_WEB:$UNIT_RESULT"',
       '"Web Build + Layout:$RUN_WEB:$BUILD_LAYOUT_RESULT"',
-      '"Web Storybook Surface Matrix:$RUN_WEB:$STORYBOOK_SURFACES_RESULT"',
+      '"Web Ovie Typecheck:$RUN_WEB:$OVIE_TYPECHECK_RESULT"',
     ]) {
       expect(loop).toContain(lane);
     }
+    expect(loop).not.toContain(
+      '"Web Storybook Surface Matrix:$RUN_WEB:$STORYBOOK_SURFACES_RESULT"'
+    );
     const failIf =
       'if [[ "$selected" == "true" && "$result" != "success" ]]; then';
     const failAt = loop.indexOf(failIf);
