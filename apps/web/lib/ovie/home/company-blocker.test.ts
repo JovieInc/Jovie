@@ -69,6 +69,40 @@ function snapshot(
 }
 
 describe('companyBlocker', () => {
+  it.each([
+    ['checkout_payment_entitlement', 'checkout'],
+    ['homepage_entry', 'the homepage entry'],
+    ['onboarding_auth_claim', 'sign-up and claim'],
+    ['activation_dashboard', 'first use after paying'],
+  ] as const)(
+    'reports the failed check for %s and routes to its evidence',
+    (step, name) => {
+      const id = `certification:${step}`;
+      const blocker = companyBlocker(
+        snapshot({
+          activeConstraint: id,
+          cone: { [step]: 'red' },
+          investigations: [
+            {
+              id,
+              firstObservedAt: '2026-11-07T10:00:00.000Z',
+              cause: 'product_failure',
+            } as Input['investigations'][number],
+          ],
+        }),
+        NOW
+      );
+      expect(blocker).toMatchObject({
+        id,
+        kind: 'certification',
+        tone: 'bad',
+        text: `The latest available certification report for ${name} shows a failed check. See Certifications for details.`,
+        detailsHref: APP_ROUTES.ADMIN_CERTIFICATIONS,
+        nextAction: 'Review the failed check before assessing impact.',
+      });
+    }
+  );
+
   it('attributes a public-profile certification failure without claiming product impact', () => {
     const blocker = companyBlocker(
       snapshot({
@@ -130,10 +164,14 @@ describe('companyBlocker', () => {
   });
 
   it('names a funnel drop with the step before it', () => {
+    const id = 'funnel:claim_attempted';
     const blocker = companyBlocker(
       snapshot({
-        activeConstraint: 'funnel:claim_attempted',
+        activeConstraint: id,
         funnel: { claim_shown: 12, claim_attempted: 0, paid: 0 },
+        investigations: [
+          { id, cause: 'product_failure' } as Input['investigations'][number],
+        ],
       }),
       NOW
     );
@@ -142,6 +180,8 @@ describe('companyBlocker', () => {
       tone: 'bad',
       text: '12 claim prompts shown this week, but no claim attempts',
       detailsHref: APP_ROUTES.ADMIN_GROWTH,
+      nextAction:
+        'People are dropping off here. Ovie is tracing where they leave.',
     });
   });
 
