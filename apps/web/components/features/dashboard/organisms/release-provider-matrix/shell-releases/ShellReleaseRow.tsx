@@ -4,8 +4,7 @@
 
 import { PlainButton } from '@jovie/ui';
 import { QueryClientContext } from '@tanstack/react-query';
-import { Clock, ExternalLink, Lock, Pause } from 'lucide-react';
-import Link from 'next/link';
+import { Pause } from 'lucide-react';
 import {
   type ComponentPropsWithoutRef,
   type KeyboardEvent,
@@ -26,6 +25,11 @@ import {
   ShellListRowFrame,
   TableRowOverflowTrigger,
 } from '@/components/organisms/table';
+import {
+  AppTableMediaCell,
+  AppTableTextCell,
+} from '@/components/organisms/table/atoms/AppTableCellContent';
+import { APP_TABLE_MEDIA_SIZE } from '@/components/organisms/table/atoms/app-table-row';
 import { AgentPulse } from '@/components/shell/AgentPulse';
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
 import { DropDateChip } from '@/components/shell/DropDateChip';
@@ -39,12 +43,16 @@ import { TypeBadge } from '@/components/shell/TypeBadge';
 import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
 import { dropDateMeta } from '@/lib/format-drop-date';
-import { formatStreams } from '@/lib/format-streams';
 import { prefetchReleaseTracks } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { releaseStatusToShell, releaseToDspItems } from './release-adapters';
+import {
+  type ShellRowLockReason,
+  SmartLinkCell,
+  WeeklyStreamsCell,
+} from './shell-release-row-cells';
 
-export type ShellRowLockReason = 'scheduled' | 'cap' | null;
+export type { ShellRowLockReason };
 
 /**
  * In-flight agent state for a release row, mirroring the experiment's
@@ -77,12 +85,11 @@ const RELEASE_TYPE_BADGE_LABEL: Record<ReleaseType, string> = {
   other: 'Other',
 };
 export const shellReleaseRowTypography = {
-  // min-h-6 keeps the title target at the 24px WCAG 2.5.8 floor inside the
-  // dense h-8 row (axe target-size is enabled at WCAG 2.2 AA and cannot be
-  // allowlisted); items-center on the hover link keeps the glyphs centered.
+  // Shared app-table text contract: one line-height, truncate. The row is a
+  // flex items-center host so media/text share one vertical center (JOV-14762).
   titleClassName:
-    'truncate text-app font-caption text-primary-token leading-[1.2] min-h-6',
-  subtitleClassName: 'truncate text-2xs text-tertiary-token leading-[1.3]',
+    'truncate text-app font-caption text-primary-token leading-none',
+  subtitleClassName: 'truncate text-2xs text-tertiary-token leading-none',
 } as const;
 
 // ── Subcomponents ─────────────────────────────────────────────────────────────
@@ -149,11 +156,12 @@ const ArtworkCell = memo(function ArtworkCell({
   const hasPreview = Boolean(previewUrl);
 
   return (
-    <div className='relative shrink-0'>
+    <AppTableMediaCell size={APP_TABLE_MEDIA_SIZE.dense} className='relative'>
       <ArtworkThumb
         src={release.artworkUrl ?? ''}
         title={release.title}
-        size={20}
+        size={APP_TABLE_MEDIA_SIZE.dense}
+        className='h-full w-full'
       />
       {isSyncing ? <AgentPulse className='rounded-sm' /> : null}
       {hasPreview ? (
@@ -192,101 +200,7 @@ const ArtworkCell = memo(function ArtworkCell({
           )}
         </PlainButton>
       ) : null}
-    </div>
-  );
-});
-
-const SmartLinkCell = memo(function SmartLinkCell({
-  release,
-  smartLinkLockReason,
-  smartLinkPath,
-}: {
-  readonly release: ReleaseViewModel;
-  readonly smartLinkLockReason: ShellRowLockReason;
-  readonly smartLinkPath: string;
-}) {
-  const isLocked = smartLinkLockReason !== null;
-  const isScheduled = smartLinkLockReason === 'scheduled';
-
-  if (isLocked) {
-    return (
-      <span
-        role='img'
-        aria-label={
-          isScheduled
-            ? `Scheduled smart link (Pro) for ${release.title}`
-            : `Smart link locked (Pro) for ${release.title}`
-        }
-        title={
-          isScheduled
-            ? 'Pre-release smart link requires Pro'
-            : 'Smart link locked — upgrade for more'
-        }
-        data-shell-release-smart-link-locked='true'
-        data-shell-release-smart-link-lock-reason={smartLinkLockReason}
-        className='shrink-0 h-7 w-7 rounded-full grid place-items-center text-quaternary-token cursor-not-allowed'
-      >
-        {isScheduled ? (
-          <Clock
-            className='h-3.5 w-3.5'
-            strokeWidth={2.25}
-            aria-hidden='true'
-          />
-        ) : (
-          <Lock className='h-3.5 w-3.5' strokeWidth={2.25} aria-hidden='true' />
-        )}
-      </span>
-    );
-  }
-
-  return (
-    <Link
-      href={smartLinkPath}
-      prefetch={false}
-      target='_blank'
-      rel='noreferrer'
-      onClick={e => e.stopPropagation()}
-      title={`Open smart link · ${smartLinkPath}`}
-      aria-label={`Open smart link for ${release.title}`}
-      className='shrink-0 h-7 w-7 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-colors duration-subtle ease-subtle'
-    >
-      <ExternalLink className='h-3.5 w-3.5' strokeWidth={2.25} />
-    </Link>
-  );
-});
-
-/**
- * Weekly performance metric for the release row — smart-link click-throughs
- * from the trailing 7 days (canonical analytics metrics layer). Renders an
- * em dash when the release has no recorded weekly data, so rows without
- * analytics stay quiet instead of showing a noisy zero.
- */
-const WeeklyStreamsCell = memo(function WeeklyStreamsCell({
-  weeklyStreams,
-}: {
-  readonly weeklyStreams: number | null | undefined;
-}) {
-  const hasData = typeof weeklyStreams === 'number' && weeklyStreams > 0;
-
-  return (
-    <div
-      className='hidden w-20 shrink-0 justify-end xl:inline-flex'
-      title={
-        hasData
-          ? `${weeklyStreams.toLocaleString()} smart-link clicks this week`
-          : 'No weekly activity recorded yet'
-      }
-      data-testid='shell-release-weekly-streams'
-    >
-      {hasData ? (
-        <span className='whitespace-nowrap text-2xs tabular-nums text-tertiary-token'>
-          {formatStreams(weeklyStreams)}
-          <span className='text-quaternary-token'> / wk</span>
-        </span>
-      ) : (
-        <span className='text-2xs text-quaternary-token'>—</span>
-      )}
-    </div>
+    </AppTableMediaCell>
   );
 });
 
@@ -411,57 +325,62 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       density='dense'
       isSelected={isSelected}
       interactive
-      className='group/row flex h-8 items-center gap-2 overflow-hidden px-3'
+      className='group/row gap-2 overflow-hidden px-3'
     >
       <ArtworkCell release={release} isSyncing={syncLabel !== null} />
 
-      <div className='min-w-0 flex-1'>
-        <div className='flex min-w-0 items-center gap-1.5'>
-          <EntityHoverLink
-            entity={releaseEntity}
-            className={cn(
-              shellReleaseRowTypography.titleClassName,
-              'inline-flex min-w-0 hover:no-underline'
-            )}
-          >
-            <span className='min-w-0 truncate'>{release.title}</span>
-          </EntityHoverLink>
-          <TypeBadge label={typeLabel} />
-          {artistLabel ? (
-            <>
-              <span
-                aria-hidden='true'
-                className='shrink-0 text-2xs text-quaternary-token'
-              >
-                ·
-              </span>
-              <span
-                className={cn(
-                  shellReleaseRowTypography.subtitleClassName,
-                  'min-w-0 shrink-9999'
-                )}
-              >
-                {artistLabel}
-              </span>
-            </>
-          ) : null}
-          {syncLabel ? (
-            <span className='inline-flex shrink-0 items-center text-2xs text-accent-blue'>
-              <span aria-hidden='true' className='mr-1 text-quaternary-token'>
-                ·
-              </span>
-              <span className='whitespace-nowrap'>{syncLabel}</span>
+      <div className='flex min-w-0 flex-1 items-center gap-1.5'>
+        <EntityHoverLink
+          entity={releaseEntity}
+          className={cn(
+            shellReleaseRowTypography.titleClassName,
+            // min-h-6 keeps the title target at the 24px WCAG 2.5.8 floor
+            // inside the dense h-8 row; items-center keeps glyphs centered.
+            'inline-flex min-h-6 min-w-0 items-center hover:no-underline'
+          )}
+        >
+          <AppTableTextCell as='span' className='min-w-0'>
+            {release.title}
+          </AppTableTextCell>
+        </EntityHoverLink>
+        <TypeBadge label={typeLabel} />
+        {artistLabel ? (
+          <>
+            <span
+              aria-hidden='true'
+              className='shrink-0 text-2xs leading-none text-quaternary-token'
+            >
+              ·
             </span>
-          ) : null}
-        </div>
+            <AppTableTextCell
+              tone='meta'
+              copyValue={artistLabel}
+              copyLabel='Artist'
+              className={cn(
+                shellReleaseRowTypography.subtitleClassName,
+                'min-w-0 shrink-9999'
+              )}
+            >
+              {artistLabel}
+            </AppTableTextCell>
+          </>
+        ) : null}
+        {syncLabel ? (
+          <span className='inline-flex shrink-0 items-center text-2xs leading-none text-accent-blue'>
+            <span aria-hidden='true' className='mr-1 text-quaternary-token'>
+              ·
+            </span>
+            <span className='whitespace-nowrap'>{syncLabel}</span>
+          </span>
+        ) : null}
       </div>
 
-      <div className='hidden w-24 shrink-0 justify-start md:inline-flex'>
+      <div className='hidden w-24 shrink-0 items-center justify-start md:inline-flex'>
         <StatusBadge status={status} />
       </div>
 
       {dropMeta ? (
-        <div className='hidden w-28 shrink-0 justify-start lg:inline-flex'>
+        <div className='hidden w-28 shrink-0 items-center justify-start lg:inline-flex'>
           <DropDateChip tone={dropMeta.tone} label={dropMeta.label} />
         </div>
       ) : (
@@ -470,7 +389,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
 
       <WeeklyStreamsCell weeklyStreams={release.weeklyStreams} />
 
-      <div className='hidden w-24 shrink-0 justify-start md:inline-flex'>
+      <div className='hidden w-24 shrink-0 items-center justify-start md:inline-flex'>
         <DspAvatarStack dsps={dspItems} maxVisible={3} />
       </div>
 
@@ -480,12 +399,16 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
         smartLinkPath={smartLinkPath}
       />
 
-      {actionMenuItems && actionMenuItems.length > 0 ? (
-        <div
-          className={cn('h-7 w-7 shrink-0', contextualAction.slot)}
-          data-menu-open={actionsOpen || undefined}
-          data-testid='shell-release-row-actions'
-        >
+      {/* Always reserve the action slot so hover opacity cannot shift columns. */}
+      <div
+        className={cn(
+          'inline-flex h-6 w-6 shrink-0 items-center justify-center',
+          contextualAction.slot
+        )}
+        data-menu-open={actionsOpen || undefined}
+        data-testid='shell-release-row-actions'
+      >
+        {actionMenuItems && actionMenuItems.length > 0 ? (
           <TableActionMenu
             items={actionMenuItems}
             trigger='custom'
@@ -495,10 +418,11 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
           >
             <TableRowOverflowTrigger
               ariaLabel={`Release actions for ${release.title}`}
+              size='xs'
             />
           </TableActionMenu>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </ShellListRowFrame>
   );
 });

@@ -17,6 +17,12 @@ import {
   type LibraryStatusGlyphSpec,
   resolveLibraryStatusGlyph,
 } from '@/components/features/library/resolve-library-status-glyph';
+import {
+  AppTableMediaCell,
+  AppTableNumericCell,
+  AppTableTextCell,
+} from '@/components/organisms/table/atoms/AppTableCellContent';
+import { APP_TABLE_MEDIA_SIZE } from '@/components/organisms/table/atoms/app-table-row';
 import { alignment } from '@/components/organisms/table/table.styles';
 import {
   type DspAvatarItem,
@@ -106,9 +112,13 @@ export const LibraryCatalogStatusCell = memo(function LibraryCatalogStatusCell({
   readonly asset: LibraryReleaseAsset;
 }) {
   return (
-    <span className='flex h-6 items-center'>
+    <AppTableMediaCell
+      size={APP_TABLE_MEDIA_SIZE.dense}
+      className='text-secondary-token'
+      aria-hidden={false}
+    >
       <LibraryStatusGlyph asset={asset} />
-    </span>
+    </AppTableMediaCell>
   );
 });
 
@@ -119,11 +129,13 @@ export const LibraryCatalogArtworkCell = memo(
     readonly asset: LibraryReleaseAsset;
   }) {
     return (
-      <LibraryMediaThumbnail
-        asset={asset}
-        size='row'
-        className='system-b-library-artwork-shell block h-6 w-6'
-      />
+      <AppTableMediaCell size={APP_TABLE_MEDIA_SIZE.dense}>
+        <LibraryMediaThumbnail
+          asset={asset}
+          size='row'
+          className='system-b-library-artwork-shell block h-6 w-6'
+        />
+      </AppTableMediaCell>
     );
   }
 );
@@ -220,19 +232,23 @@ export const LibraryCatalogLengthCell = memo(function LibraryCatalogLengthCell({
 }: {
   readonly asset: LibraryReleaseAsset;
 }) {
+  const label = asset.totalDurationMs
+    ? formatLibraryDuration(asset.totalDurationMs)
+    : null;
+
   return (
-    <span
+    <AppTableNumericCell
       data-testid={`library-catalog-length-${asset.id}`}
-      className='system-b-library-meta-text block whitespace-nowrap text-right tabular-nums text-tertiary-token'
+      className='system-b-library-meta-text'
+      copyValue={label ?? undefined}
+      copyLabel='Length'
     >
-      {asset.totalDurationMs ? (
-        formatLibraryDuration(asset.totalDurationMs)
-      ) : (
+      {label ?? (
         <span role='img' aria-label='Length: Not Available'>
           &mdash;
         </span>
       )}
-    </span>
+    </AppTableNumericCell>
   );
 });
 
@@ -322,14 +338,17 @@ export const LibraryCatalogArtistCell = memo(function LibraryCatalogArtistCell({
 }) {
   return (
     // Full artist value on one line (JOV-8963): the column sizes to its
-    // content instead of truncating the name, so every row keeps the same
-    // single-line text-cell treatment as Length.
-    <span
+    // content instead of truncating the name. Copy-on-click stays pasteable.
+    <AppTableTextCell
+      tone='meta'
+      truncate={false}
+      copyValue={asset.artist}
+      copyLabel='Artist'
       title={asset.artist}
-      className='system-b-library-meta-text block whitespace-nowrap text-tertiary-token'
+      className='system-b-library-meta-text'
     >
       {asset.artist}
-    </span>
+    </AppTableTextCell>
   );
 });
 
@@ -372,12 +391,14 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
       // Fluid cell: no min-content width, so the auto-layout table shrinks
       // this column and long titles truncate instead of pushing trailing
       // columns out of the container.
-      <span
+      <AppTableTextCell
+        copyValue={row.original.title}
+        copyLabel='Title'
         title={row.original.title}
-        className='system-b-library-release-title system-b-library-fluid-cell block truncate'
+        className='system-b-library-release-title system-b-library-fluid-cell'
       >
         {row.original.title}
-      </span>
+      </AppTableTextCell>
     ),
     minSize: 180,
     size: 9999,
@@ -401,14 +422,20 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
     id: 'type',
     header: 'Type',
     // Not fluid-cell: Title absorbs spare width; Type stays readable (JOV-7752).
-    cell: ({ row }) => (
-      <span
-        title={formatLibraryItemType(row.original)}
-        className='system-b-library-meta-text block truncate whitespace-nowrap text-tertiary-token'
-      >
-        {formatLibraryItemType(row.original)}
-      </span>
-    ),
+    cell: ({ row }) => {
+      const typeLabel = formatLibraryItemType(row.original);
+      return (
+        <AppTableTextCell
+          tone='meta'
+          copyValue={typeLabel}
+          copyLabel='Type'
+          title={typeLabel}
+          className='system-b-library-meta-text'
+        >
+          {typeLabel}
+        </AppTableTextCell>
+      );
+    },
     size: 112,
     minSize: 96,
     meta: { className: 'pl-2 pr-3', priority: 6, minWidth: 112 },

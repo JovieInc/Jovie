@@ -118,6 +118,7 @@ import {
   PageToolbarActionButton,
   PageToolbarTabButton,
   TableEmptyState,
+  TableRowOverflowTrigger,
   type ToolbarFilterSuggestion,
   ToolbarFilterSuggestions,
   UnifiedTable,
@@ -619,14 +620,24 @@ const LibraryEntityActionCell = memo(function LibraryEntityActionCell({
   const items = convertContextMenuItems(getContextMenuItems(asset));
 
   return (
-    <div data-testid={`library-row-actions-${asset.id}`}>
+    <div
+      data-testid={`library-row-actions-${asset.id}`}
+      className='inline-flex h-6 w-6 items-center justify-center'
+      data-app-table-cell='action'
+    >
       <TableActionMenu
         items={items}
+        trigger='custom'
         align='end'
         searchable
         searchPlaceholder='Search actions'
         searchMode='recursive'
-      />
+      >
+        <TableRowOverflowTrigger
+          ariaLabel={`Actions for ${asset.title}`}
+          size='xs'
+        />
+      </TableActionMenu>
     </div>
   );
 });

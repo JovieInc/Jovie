@@ -2656,6 +2656,7 @@
       "offline": "SkeletonRow never fetches or mutates; the table that shows it owns any network failure. The detector matched the word Skeleton."
     },
     "apps/web/components/organisms/table/atoms/TableCell.tsx": {
+      "empty": "TableCell is a layout host for one required children slot; callers that have no value omit the cell or pass an em dash themselves. An empty row is the table's emptyState, not an empty TableCell.",
       "partial": "A cell wraps one required children slot; width, align, multiline, hideOnMobile, as and className are layout options, so there is nothing to be partially present. An empty or partial row is the caller's data, drawn by the cells it passes."
     },
     "apps/web/components/organisms/table/atoms/TableEmptyState.tsx": {

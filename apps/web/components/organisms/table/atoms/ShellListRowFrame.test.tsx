@@ -19,8 +19,10 @@ describe('ShellListRowFrame', () => {
     });
 
     expect(className).toContain('system-b-table-row-shell');
-    expect(className).toContain('min-h-11');
-    expect(className).toContain('py-1.5');
+    expect(className).toContain('h-11');
+    expect(className).toContain('flex');
+    expect(className).toContain('items-center');
+    expect(className).not.toContain('py-1.5');
     expect(className).toContain('cursor-pointer');
   });
 
@@ -72,8 +74,17 @@ describe('ShellListRowFrame', () => {
   it('centralizes compact density and rejects legacy row hover styling', () => {
     const className = getShellListRowFrameClassName({ density: 'compact' });
 
-    expect(className).toContain('min-h-7');
+    expect(className).toContain('h-7');
+    expect(className).not.toContain('min-h-7');
     expect(className).not.toContain('hover:text-accent');
+  });
+
+  it('stamps data-app-table-row for the shared alignment gate', () => {
+    render(<ShellListRowFrame data-testid='row' density='dense' />);
+    expect(screen.getByTestId('row')).toHaveAttribute(
+      'data-app-table-row',
+      'true'
+    );
   });
 
   it('uses button semantics for clickable shell rows', () => {

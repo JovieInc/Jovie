@@ -1,11 +1,17 @@
 import { cn } from '@jovie/ui/lib/utils';
 import { borders, presets, tableAlignment } from '../table.styles';
+import { APP_TABLE_CELL_CONTENT_CLASSNAME } from './app-table-row';
 
-export const TABLE_CELL_CONTENT_CLASSNAME =
-  'block h-8 max-h-8 min-w-0 content-center overflow-hidden text-ellipsis whitespace-nowrap leading-normal [&>*]:max-w-full';
+/**
+ * Alias of the shared app table cell host (flex + items-center). Kept as the
+ * historical export so existing VirtualizedTableRow / TableCell call sites
+ * pick up the vertical-center contract without a second class name.
+ */
+export const TABLE_CELL_CONTENT_CLASSNAME = APP_TABLE_CELL_CONTENT_CLASSNAME;
 
 /** Allow wrapping within the height budget selected by the table row mode. */
-export const TABLE_CELL_MULTILINE_CONTENT_CLASSNAME = 'whitespace-normal';
+export const TABLE_CELL_MULTILINE_CONTENT_CLASSNAME =
+  'whitespace-normal leading-normal';
 
 export interface TableCellProps {
   readonly children: React.ReactNode;
@@ -47,6 +53,7 @@ export function TableCell({
           multiline && TABLE_CELL_MULTILINE_CONTENT_CLASSNAME
         )}
         data-table-cell-content='stable'
+        data-app-table-cell='content'
       >
         {children}
       </div>

@@ -39,6 +39,12 @@
 // =============================================================================
 
 export { ActionsCell } from './atoms/ActionsCell';
+export {
+  AppTableCellContent,
+  AppTableMediaCell,
+  AppTableNumericCell,
+  AppTableTextCell,
+} from './atoms/AppTableCellContent';
 // Audience-specific atoms (consolidated from dashboard/audience/table/atoms)
 export type { AudienceActionsCellProps } from './atoms/AudienceActionsCell';
 export { AudienceActionsCell } from './atoms/AudienceActionsCell';
@@ -81,6 +87,19 @@ export { AudienceUserCell } from './atoms/AudienceUserCell';
 export type { AudienceVisitsCellProps } from './atoms/AudienceVisitsCell';
 export { AudienceVisitsCell } from './atoms/AudienceVisitsCell';
 export { AvatarCell } from './atoms/AvatarCell';
+export type { AppTableMediaSize } from './atoms/app-table-row';
+export {
+  APP_TABLE_CELL_ATTR,
+  APP_TABLE_CELL_CONTENT_CLASSNAME,
+  APP_TABLE_MEDIA_CLASSNAME,
+  APP_TABLE_MEDIA_SIZE,
+  APP_TABLE_META_TEXT_CLASSNAME,
+  APP_TABLE_NUMERIC_CLASSNAME,
+  APP_TABLE_ROW_ATTR,
+  APP_TABLE_TEXT_CLASSNAME,
+  appTableMediaSizeForRowMode,
+  appTableRowHeightForMode,
+} from './atoms/app-table-row';
 export { DateCell } from './atoms/DateCell';
 export { GroupHeader } from './atoms/GroupHeader';
 export { PersonCell, type PersonCellProps } from './atoms/PersonCell';
@@ -103,6 +122,7 @@ export { SkeletonRow } from './atoms/SkeletonRow';
 export { TableBadge } from './atoms/TableBadge';
 export type { TableCellProps } from './atoms/TableCell';
 export {
+  TABLE_CELL_CONTENT_CLASSNAME,
   TABLE_CELL_MULTILINE_CONTENT_CLASSNAME,
   TableCell,
 } from './atoms/TableCell';

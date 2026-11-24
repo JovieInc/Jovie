@@ -180,6 +180,7 @@ function VirtualizedTableRowComponent<TData extends RowData>({
       data-testid={getRowTestId?.(rowData, rowIndex)}
       tabIndex={shouldEnableKeyboardNav ? (isFocused ? 0 : -1) : undefined}
       aria-selected={isRowSelected || htmlProps['aria-selected']}
+      data-app-table-row='true'
       className={cn(
         presets.tableRow,
         onRowClick && 'cursor-pointer',
@@ -214,9 +215,10 @@ function VirtualizedTableRowComponent<TData extends RowData>({
             className={cn(
               TABLE_CELL_CONTENT_CLASSNAME,
               meta?.cellContentClassName,
-              showCompacts && 'flex items-center gap-2'
+              showCompacts && 'gap-2'
             )}
             data-table-cell-content='stable'
+            data-app-table-cell='content'
           >
             {showCompacts ? (
               <div className='min-w-0 flex-1 overflow-hidden'>

@@ -11,6 +11,11 @@ import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { CompactLinkRail } from '@/components/molecules/CompactLinkRail';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
+import {
+  AppTableCellContent,
+  AppTableNumericCell,
+  AppTableTextCell,
+} from '@/components/organisms/table/atoms/AppTableCellContent';
 import { TableDependencyGuide } from '@/components/organisms/table/atoms/TableDependencyGuide';
 import type {
   ProviderKey,
@@ -268,63 +273,54 @@ export const TrackRow = memo(function TrackRow({
       className={rowClassName}
       onClick={onClick}
       data-testid={`track-row-${track.id}`}
+      data-app-table-row='true'
       data-state={isSelected ? 'selected' : 'idle'}
     >
-      {/* 1. Spacer for checkbox column (always visible) */}
       {isVisible('select') && (
-        <td className='w-14 py-2 align-top'>
-          <div className='flex items-center justify-center'>
+        <td className='w-14 align-middle'>
+          <AppTableCellContent align='center'>
             {playbackButton}
-          </div>
+          </AppTableCellContent>
         </td>
       )}
 
-      {/* 2. Track info - spans the release column width (always visible) */}
       {isVisible('release') && (
-        <td className='py-2 pr-3 align-top'>
-          <div className='relative flex items-center gap-2.5'>
-            <TableDependencyGuide last={lastDependency} className='min-h-10' />
-            {/* Track number */}
-            <span className='w-7 shrink-0 text-right text-2xs tabular-nums text-tertiary-token'>
+        <td className='pr-3 align-middle'>
+          <AppTableCellContent className='relative gap-2.5'>
+            <TableDependencyGuide last={lastDependency} className='min-h-8' />
+            <AppTableNumericCell className='w-7 shrink-0 text-tertiary-token'>
               {trackLabel}.
-            </span>
-
-            {/* Track title with explicit badge */}
-            <div className='min-w-0 flex-1'>
-              <div className='flex items-center gap-2'>
-                <TruncatedText
-                  lines={1}
-                  className='text-xs font-caption text-primary-token'
-                  tooltipSide='top'
-                  tooltipAlign='start'
+            </AppTableNumericCell>
+            <div className='flex min-w-0 flex-1 items-center gap-2'>
+              <AppTableTextCell
+                copyValue={track.title}
+                copyLabel='Title'
+                className='text-xs'
+              >
+                {track.title}
+              </AppTableTextCell>
+              {track.isExplicit ? (
+                <Badge
+                  variant='secondary'
+                  size='sm'
+                  tone='neutral'
+                  className='shrink-0'
+                  title='Explicit content'
+                  aria-label='Explicit Content'
                 >
-                  {track.title}
-                </TruncatedText>
-                {track.isExplicit && (
-                  <Badge
-                    variant='secondary'
-                    size='sm'
-                    tone='neutral'
-                    className='shrink-0'
-                    title='Explicit content'
-                    aria-label='Explicit Content'
-                  >
-                    E
-                  </Badge>
-                )}
-              </div>
+                  E
+                </Badge>
+              ) : null}
             </div>
-          </div>
+          </AppTableCellContent>
         </td>
       )}
 
-      {/* 3. Type column spacer */}
       {isVisible('releaseType') && <td />}
 
-      {/* 4. Availability - compact provider dots */}
       {isVisible('availability') && (
-        <td className='py-2 align-top'>
-          <div className='flex items-center gap-2'>
+        <td className='align-middle'>
+          <AppTableCellContent className='gap-2'>
             {linkedProviders.length > 0 ? (
               <CompactLinkRail
                 items={linkedProviders.slice(0, 4).map(providerKey => ({
@@ -350,43 +346,40 @@ export const TrackRow = memo(function TrackRow({
             ) : (
               <span className='text-2xs text-tertiary-token'>—</span>
             )}
-          </div>
+          </AppTableCellContent>
         </td>
       )}
 
-      {/* 5. Smart link spacer */}
       {isVisible('smartLink') && <td />}
-
-      {/* 6. Release date spacer */}
       {isVisible('releaseDate') && <td />}
 
-      {/* 7. Metrics - only duration for tracks */}
       {isVisible('metrics') && (
-        <td className='py-2 align-top'>
-          {track.durationMs ? (
-            <span className='text-2xs tabular-nums text-secondary-token'>
-              {formatDuration(track.durationMs)}
-            </span>
-          ) : (
-            <span className='text-2xs text-tertiary-token'>—</span>
-          )}
+        <td className='align-middle'>
+          <AppTableCellContent align='end'>
+            <AppTableNumericCell
+              copyValue={
+                track.durationMs ? formatDuration(track.durationMs) : undefined
+              }
+              copyLabel='Duration'
+              className='text-secondary-token'
+            >
+              {track.durationMs ? formatDuration(track.durationMs) : '—'}
+            </AppTableNumericCell>
+          </AppTableCellContent>
         </td>
       )}
 
-      {/* 8. Popularity spacer */}
       {isVisible('popularity') && <td />}
 
-      {/* 9. ISRC */}
       {isVisible('primaryIsrc') && (
-        <td className='py-2 align-top'>
-          <CopyableMonospaceCell value={track.isrc} label='ISRC' size='sm' />
+        <td className='align-middle'>
+          <AppTableCellContent>
+            <CopyableMonospaceCell value={track.isrc} label='ISRC' size='sm' />
+          </AppTableCellContent>
         </td>
       )}
 
-      {/* 10. UPC spacer */}
       {isVisible('upc') && <td />}
-
-      {/* 11. Actions spacer (always visible) */}
       {isVisible('actions') && <td />}
     </tr>
   );

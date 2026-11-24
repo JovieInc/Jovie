@@ -25,12 +25,9 @@ describe('TableCell', () => {
     const content = screen.getByRole('button', {
       name: 'Copy token',
     }).parentElement;
-    expect(content).toHaveClass('h-8', 'max-h-8', 'whitespace-normal');
-    expect(content).not.toHaveClass(
-      'h-auto',
-      'max-h-none',
-      'whitespace-nowrap'
-    );
+    expect(content).toHaveClass('h-8', 'max-h-8', 'items-center', 'flex');
+    expect(content).toHaveClass('whitespace-normal');
+    expect(content).not.toHaveClass('h-auto', 'max-h-none');
   });
   it('uses the canonical table cell density and typography preset', () => {
     renderInTable(<TableCell>Title</TableCell>);
@@ -84,7 +81,7 @@ describe('TableCell', () => {
       .getByRole('cell')
       .querySelector('[data-table-cell-content="stable"]');
     expect(content).toHaveClass('h-8', 'max-h-8', 'overflow-hidden');
-    expect(content).toHaveClass('whitespace-nowrap', 'text-ellipsis');
+    expect(content).toHaveClass('items-center', 'flex');
   });
 
   it('stays axe-clean as a data cell beside a header cell', async () => {
