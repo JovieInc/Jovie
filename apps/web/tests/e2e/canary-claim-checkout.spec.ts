@@ -6,11 +6,11 @@ import {
   canaryResetConfigured,
   resetClaimCanary,
 } from './helpers/canary-reset-client';
+import { ensureUserIsFree } from './helpers/ensure-user-is-free';
 import {
   createCheckoutSession,
   createSignedStripeWebhook,
   detachCustomerPaymentMethods,
-  ensureUserIsFree,
   expireRunOwnedTestCheckoutSession,
   getBillingStatus,
   getRequiredStripeTestContext,

@@ -17,11 +17,11 @@ import {
   routeDogfoodArtistSearch,
   seedDogfoodArtists,
 } from './helpers/claim-dogfood-fixtures';
+import { ensureUserIsFree } from './helpers/ensure-user-is-free';
 import {
   createCheckoutSession,
   createSignedStripeWebhook,
   detachCustomerPaymentMethods,
-  ensureUserIsFree,
   expireRunOwnedTestCheckoutSession,
   getBillingStatus,
   getStripeContextOrSkip,

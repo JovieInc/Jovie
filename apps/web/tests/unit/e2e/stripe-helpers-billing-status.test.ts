@@ -6,9 +6,7 @@ import {
   parseBillingStatusPayload,
   vercelProtectionBypassHeaders,
 } from '@/tests/e2e/helpers/billing-status';
-import {
-  cancelPersonaActiveSubscriptions,
-} from '@/tests/e2e/helpers/stripe-helpers';
+import { cancelPersonaActiveSubscriptions } from '@/tests/e2e/helpers/ensure-user-is-free';
 
 describe('vercelProtectionBypassHeaders', () => {
   it('returns the automation bypass header when the Playwright secret is set', () => {

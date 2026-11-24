@@ -1,11 +1,11 @@
 import { expect, type Page, test } from '@playwright/test';
 import { DEFAULT_DEV_TEST_AUTH_EMAILS } from '@/lib/auth/dev-test-auth-identity';
 import { setTestAuthBypassSession } from '../helpers/auth';
+import { ensureUserIsFree } from './helpers/ensure-user-is-free';
 import {
   createCheckoutSession,
   createSignedStripeWebhook,
   detachCustomerPaymentMethods,
-  ensureUserIsFree,
   getBillingStatus,
   getStripeContextOrSkip,
   interceptTrackingRoutes,
