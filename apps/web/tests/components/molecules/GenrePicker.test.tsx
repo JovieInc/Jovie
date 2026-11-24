@@ -8,43 +8,47 @@ import { describe, expect, it, vi } from 'vitest';
 let popoverOpen = false;
 let popoverOnOpenChange: ((open: boolean) => void) | undefined;
 
-vi.mock('@jovie/ui', () => ({
-  Popover: ({
-    children,
-    open,
-    onOpenChange,
-  }: {
-    children: React.ReactNode;
-    open?: boolean;
-    onOpenChange?: (open: boolean) => void;
-  }) => {
-    popoverOpen = open ?? false;
-    popoverOnOpenChange = onOpenChange;
-    return <div data-testid='popover-root'>{children}</div>;
-  },
-  PopoverTrigger: ({
-    children,
-  }: {
-    children: React.ReactNode;
-    asChild?: boolean;
-  }) => (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: test mock only
-    // biome-ignore lint/a11y/noStaticElementInteractions: test mock only
-    <div
-      data-testid='popover-trigger'
-      onClick={() => popoverOnOpenChange?.(!popoverOpen)}
-    >
-      {children}
-    </div>
-  ),
-  PopoverContent: ({
-    children,
-  }: {
-    children: React.ReactNode;
-    [key: string]: unknown;
-  }) =>
-    popoverOpen ? <div data-testid='popover-content'>{children}</div> : null,
-}));
+vi.mock('@jovie/ui', async importOriginal => {
+  const actual = await importOriginal<typeof import('@jovie/ui')>();
+  return {
+    ...actual,
+    Popover: ({
+      children,
+      open,
+      onOpenChange,
+    }: {
+      children: React.ReactNode;
+      open?: boolean;
+      onOpenChange?: (open: boolean) => void;
+    }) => {
+      popoverOpen = open ?? false;
+      popoverOnOpenChange = onOpenChange;
+      return <div data-testid='popover-root'>{children}</div>;
+    },
+    PopoverTrigger: ({
+      children,
+    }: {
+      children: React.ReactNode;
+      asChild?: boolean;
+    }) => (
+      // biome-ignore lint/a11y/useKeyWithClickEvents: test mock only
+      // biome-ignore lint/a11y/noStaticElementInteractions: test mock only
+      <div
+        data-testid='popover-trigger'
+        onClick={() => popoverOnOpenChange?.(!popoverOpen)}
+      >
+        {children}
+      </div>
+    ),
+    PopoverContent: ({
+      children,
+    }: {
+      children: React.ReactNode;
+      [key: string]: unknown;
+    }) =>
+      popoverOpen ? <div data-testid='popover-content'>{children}</div> : null,
+  };
+});
 
 import { GenrePicker } from '@/components/molecules/GenrePicker';
 import { GENRE_TAXONOMY } from '@/constants/genres';

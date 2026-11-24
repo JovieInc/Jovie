@@ -2409,6 +2409,13 @@
     "apps/web/components/molecules/FormStatus.tsx": {
       "permission-denied": "FormStatus shows the loading, error and success lines its owning form passes and gates nothing; the detector matched role='alert' on the error line."
     },
+    "apps/web/components/molecules/GenrePicker.tsx": {
+      "loading": "The picker never fetches; GENRE_TAXONOMY is a static constant and open only filters it. There is no loading chrome.",
+      "error": "Genre search is local string filter over a fixed taxonomy; there is no network or parse failure face.",
+      "partial": "Selected genres are complete strings from the taxonomy; maxGenres only caps adds. AtMaxGenres shows the cap chrome. There is no half-loaded data face.",
+      "offline": "No fetch or mutation; opening the list works offline. The detector matched Search/filter UI only.",
+      "permission-denied": "A public genre multiselect with no gated action or permission input; the detector matched role/button options."
+    },
     "apps/web/components/molecules/InfoBox.tsx": {
       "permission-denied": "InfoBox shows caller copy in a variant tone and has no account, role or gated action of its own. The detector matched role='alert' on the error variant (Error story)."
     },
