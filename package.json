@@ -386,7 +386,8 @@
     "copy:landing": "tsx apps/web/scripts/copy-landing.ts",
     "copy:judge": "doppler run --project jovie-web --config dev -- tsx packages/copy/cli.ts judge",
     "test:certification-inventory": "node --test scripts/certification-inventory/inventory.test.mjs",
-    "desktop:performance": "pnpm --filter @jovie/desktop run performance"
+    "desktop:performance": "pnpm --filter @jovie/desktop run performance",
+    "desktop:performance:cert": "pnpm --filter @jovie/desktop run performance:cert"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.135.0",
