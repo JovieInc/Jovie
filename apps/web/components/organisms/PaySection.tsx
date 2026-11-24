@@ -1,7 +1,7 @@
 'use client';
 // @coverage-via apps/web/tests/unit/organisms/TipSection.test.tsx
 
-import { Button } from '@jovie/ui';
+import { Button, HostDrawnInput } from '@jovie/ui';
 import { useEffect, useRef, useState } from 'react';
 import { AmountSelector } from '@/components/atoms/AmountSelector';
 import { toast } from '@/components/feedback';
@@ -216,16 +216,18 @@ export function PaySection({
             Choose an amount and a payment method
           </p>
           {customMode ? (
-            <input
-              ref={customInputRef}
-              type='text'
-              inputMode='decimal'
-              aria-label='Custom Amount'
-              value={customAmount}
-              onChange={event => setCustomAmount(event.currentTarget.value)}
-              className='h-12 w-full rounded-full border border-subtle bg-surface-2 px-4 text-center text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
-              placeholder='Amount in dollars'
-            />
+            <div className='flex h-12 w-full items-center rounded-full border border-subtle bg-surface-2 px-4 text-primary-token focus-within:outline-none focus-within:ring-2 focus-within:ring-focus'>
+              <HostDrawnInput
+                ref={customInputRef}
+                type='text'
+                inputMode='decimal'
+                aria-label='Custom Amount'
+                value={customAmount}
+                onChange={event => setCustomAmount(event.currentTarget.value)}
+                className='min-w-0 w-full appearance-none text-center'
+                placeholder='Amount in dollars'
+              />
+            </div>
           ) : (
             <fieldset
               className='m-0 grid grid-cols-3 gap-2 border-0 p-0'
