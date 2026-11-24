@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql as drizzleSql } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { runAtomicDbOperation } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
@@ -150,7 +150,7 @@ export async function executeCanaryReset(): Promise<CanaryResetOutcome> {
             plan: 'free',
             stripeSubscriptionId: null,
             stripePriceId: null,
-            billingVersion: sql`${users.billingVersion} + 1`,
+            billingVersion: drizzleSql`${users.billingVersion} + 1`,
             updatedAt: new Date(),
           })
           .where(eq(users.id, account.id));
