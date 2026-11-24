@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   env: { SYNTHETIC_PASSAGE_TOKENS_DISABLED: undefined as string | undefined },
   cronAuth: vi.fn(),
   passageResolve: vi.fn(),
+  createLimiter: vi.fn(),
   limiter: vi.fn(),
   count: vi.fn(),
   execute: vi.fn(),
@@ -19,7 +20,7 @@ vi.mock('@/lib/synthetic/passage-token.server', () => ({
   resolveSyntheticPassageTokenDetailed: mocks.passageResolve,
 }));
 vi.mock('@/lib/rate-limit', () => ({
-  createRateLimiter: () => ({ limit: mocks.limiter }),
+  createRateLimiter: mocks.createLimiter,
 }));
 vi.mock('@/lib/synthetic/canary-reset.server', () => ({
   executeCanaryReset: mocks.execute,
@@ -34,11 +35,11 @@ function postRequest(): Request {
   });
 }
 
-function grantOnce() {
+function grantFor(run: string) {
   return {
     grant: {
       actorId: 'prodcert' as const,
-      claims: { run: 'run-1', sub: 'x' },
+      claims: { run, sub: 'x' },
     },
     denyCause: null,
   };
@@ -49,7 +50,8 @@ describe('POST /api/internal/canary/reset', () => {
     vi.clearAllMocks();
     mocks.env.SYNTHETIC_PASSAGE_TOKENS_DISABLED = undefined;
     mocks.cronAuth.mockReturnValue(null);
-    mocks.passageResolve.mockResolvedValue(grantOnce());
+    mocks.passageResolve.mockResolvedValue(grantFor('run-1'));
+    mocks.createLimiter.mockReturnValue({ limit: mocks.limiter });
     mocks.limiter.mockResolvedValue({ success: true });
     mocks.count.mockReset();
     mocks.execute.mockResolvedValue({
@@ -68,6 +70,7 @@ describe('POST /api/internal/canary/reset', () => {
     const response = await POST(postRequest());
     expect(response.status).toBe(503);
     expect(mocks.cronAuth).not.toHaveBeenCalled();
+    expect(mocks.passageResolve).not.toHaveBeenCalled();
     expect(mocks.limiter).not.toHaveBeenCalled();
     expect(mocks.execute).not.toHaveBeenCalled();
   });
@@ -101,25 +104,24 @@ describe('POST /api/internal/canary/reset', () => {
     );
   });
 
-  it('charges the reset budget BEFORE consuming the passage token (JOV-9826)', async () => {
-    // Red 45350750159: with the passage token consumed first, a budget-denied
-    // hour burned BOTH windows and the passage denial masqueraded as the
-    // opaque 401. The reset window is now charged first, so a denied hour
-    // costs this budget only and no passage grant is spent on it.
+  it('verifies the passage token BEFORE charging the per-run reset budget (JOV-9826)', async () => {
+    // The per-run budget is keyed by the VERIFIED token's run claim, so
+    // verification must come first. An invalid attempt therefore burns no
+    // reset budget at all — the inverse of the pre-45366385483 order, where
+    // even garbage requests charged the shared global reset window.
     mocks.passageResolve.mockResolvedValue({
       grant: null,
       denyCause: 'invalid_token',
     });
     await POST(postRequest());
-    const limiterOrder = mocks.limiter.mock.invocationCallOrder[0];
     const resolveOrder = mocks.passageResolve.mock.invocationCallOrder[0];
-    expect(limiterOrder).toBeDefined();
-    expect(resolveOrder).toBeGreaterThan(limiterOrder as number);
+    expect(resolveOrder).toBeDefined();
+    expect(mocks.limiter).not.toHaveBeenCalled();
   });
 
   it('names the passage-grant budget as a 429, never the opaque 401 (JOV-9826)', async () => {
     // The cert red must say "shared hourly budget", not auth drift: the
-    // 12/h shared window exhaustion (run 45350750159 class) previously
+    // 12/h shared walk-grant exhaustion (run 45350750159 class) previously
     // returned the identical body as a bad token.
     mocks.passageResolve.mockResolvedValue({
       grant: null,
@@ -132,6 +134,7 @@ describe('POST /api/internal/canary/reset', () => {
     expect(body.error).toContain('Canary passage budget exhausted');
     expect(body.error).not.toContain('Valid canary passage token required');
     expect(mocks.execute).not.toHaveBeenCalled();
+    expect(mocks.limiter).not.toHaveBeenCalled();
     expect(mocks.count).toHaveBeenCalledExactlyOnceWith(
       'synthetic.canary_reset.denied',
       1,
@@ -139,22 +142,57 @@ describe('POST /api/internal/canary/reset', () => {
     );
   });
 
+  it('keys the per-run reset budget by the verified run tag (JOV-9826, red 45366385483)', async () => {
+    // Red 45366385483: the GLOBAL reset key was shared across every probe
+    // run, every Playwright retry and every red loop, so deploy storms
+    // exhausted any fixed global size. The budget is now per run tag.
+    const response = await POST(postRequest());
+    expect(response.status).toBe(200);
+    expect(mocks.limiter).toHaveBeenCalledExactlyOnceWith('canary-reset:run-1');
+  });
+
+  it('gives each run tag its own reset bucket', async () => {
+    // A single walk's retries can never be denied by another run's
+    // consumption: different run tags charge different keys.
+    mocks.passageResolve
+      .mockResolvedValueOnce(grantFor('run-1'))
+      .mockResolvedValueOnce(grantFor('run-2'));
+    await POST(postRequest());
+    await POST(postRequest());
+    expect(mocks.limiter).toHaveBeenNthCalledWith(1, 'canary-reset:run-1');
+    expect(mocks.limiter).toHaveBeenNthCalledWith(2, 'canary-reset:run-2');
+  });
+
+  it('configures the per-run limiter as route-local and fail-closed', async () => {
+    expect(mocks.createLimiter).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        name: 'Canary Reset (per run)',
+        limit: 12,
+        prefix: 'canary_reset_run',
+        requireRedis: true,
+      }),
+      expect.objectContaining({ requireRedis: true })
+    );
+  });
+
   it.each([
-    [false, 'budget_exhausted'],
+    [false, 'per_run_budget_exhausted'],
     [true, 'limiter_unavailable'],
   ] as const)(
-    'fails closed on the reset budget without consuming a passage token (unavailable=%s)',
+    'fails closed on the per-run reset budget after the grant (unavailable=%s)',
     async (unavailable, reason) => {
       mocks.limiter.mockResolvedValue({ success: false, unavailable });
       const response = await POST(postRequest());
       expect(response.status).toBe(429);
       expect(response.headers.get('cache-control')).toBe('no-store');
-      expect(await response.json()).toEqual({
-        error: 'Canary reset rate limit exceeded',
-      });
+      const body = (await response.json()) as { error: string };
+      expect(body.error).toContain('Canary reset budget exhausted');
+      expect(body.error).toContain('per-run hourly resets for this run tag');
       expect(mocks.execute).not.toHaveBeenCalled();
-      // No single-use passage grant is spent on a budget-denied attempt.
-      expect(mocks.passageResolve).not.toHaveBeenCalled();
+      // The single-use passage grant is consumed before the per-run charge
+      // (verification keys the budget); the walk's client mints a fresh
+      // token per reset call, so a retry is never blocked by a spent jti.
+      expect(mocks.passageResolve).toHaveBeenCalledTimes(1);
       expect(mocks.count).toHaveBeenCalledExactlyOnceWith(
         'synthetic.canary_reset.denied',
         1,

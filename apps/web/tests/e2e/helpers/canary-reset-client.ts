@@ -140,15 +140,16 @@ export class ClaimCanaryNotProvisionedError extends Error {
 }
 
 /**
- * The reset endpoint's hourly budgets are exhausted (JOV-9826): either the
- * account-reset window (`Canary reset rate limit exceeded`) or the shared
- * canary-walk passage-grant window (`Canary passage budget exhausted`),
- * both Redis fixed windows shared across all runs. Retrying the walk
- * cannot help until the window clears — every retry that reaches reset
- * would burn the budget again (post-fix red 45336880733 retry #2). Named
- * so the cert red is a budget condition, not an opaque 429 (and never the
- * opaque 401 the passage-budget denial used to masquerade as, red
- * 45350750159).
+ * The reset endpoint's hourly budgets are exhausted (JOV-9826): either
+ * the shared canary-walk passage-grant window (`Canary passage budget
+ * exhausted`, shared across all runs — the cross-run ceiling) or the
+ * per-run reset window (`Canary reset budget exhausted`, keyed by this
+ * run's tag — the single-walk runaway guard, red 45366385483). Retrying
+ * the walk cannot help until the window clears — every retry that
+ * reaches reset burns its own run's budget again (post-fix red
+ * 45336880733 retry #2). Named so the cert red is a budget condition, not
+ * an opaque 429 (and never the opaque 401 the passage-budget denial used
+ * to masquerade as, red 45350750159).
  */
 export class CanaryResetRateLimitedError extends Error {
   constructor(detail: string) {
