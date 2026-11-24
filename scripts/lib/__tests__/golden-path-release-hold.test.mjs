@@ -109,15 +109,16 @@ describe('applyReleaseHold', () => {
     });
 
   it('upserts one release-hold:<step> issue per held step', async () => {
-    const upsert = vi.fn(async () => ({
-      ok: true,
-      action: 'created',
-      identifier: 'JOV-1',
-    }));
+    /** @type {Array<{ fingerprint: string, title: string }>} */
+    const calls = [];
+    const upsert = vi.fn(async (/** @type {any} */ input) => {
+      calls.push(input);
+      return { ok: true, action: 'created', identifier: 'JOV-1' };
+    });
     const r = await applyReleaseHold(holdFor(stepA), { upsert });
     expect(upsert).toHaveBeenCalledTimes(1);
-    expect(upsert.mock.calls[0][0].fingerprint).toBe(`release-hold:${stepA}`);
-    expect(upsert.mock.calls[0][0].title).toContain(`release-hold:${stepA}`);
+    expect(calls[0]?.fingerprint).toBe(`release-hold:${stepA}`);
+    expect(calls[0]?.title).toContain(`release-hold:${stepA}`);
     expect(holdFingerprint(stepA)).toBe(`release-hold:${stepA}`);
     expect(r.issues[0]).toMatchObject({ step: stepA, ok: true });
   });
