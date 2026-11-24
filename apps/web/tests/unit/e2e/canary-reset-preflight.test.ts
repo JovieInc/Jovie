@@ -1,3 +1,4 @@
+import type { APIRequestContext } from '@playwright/test';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   assertCanaryResetSurfaceReady,
@@ -73,17 +74,17 @@ describe('assertCanaryResetSurfaceReady', () => {
 
   function mockRequest(status: number, body: string) {
     const calls: Array<{ url: string; headers: Record<string, string> }> = [];
+    // Test seam: only .get is exercised; cast to the full
+    // APIRequestContext the helper's signature requires.
+    const request = {
+      get: async (url: string, init?: { headers?: Record<string, string> }) => {
+        calls.push({ url, headers: init?.headers ?? {} });
+        return { status: () => status, text: async () => body };
+      },
+    } as unknown as APIRequestContext;
     return {
       calls,
-      request: {
-        get: async (
-          url: string,
-          init?: { headers?: Record<string, string> }
-        ) => {
-          calls.push({ url, headers: init?.headers ?? {} });
-          return { status: () => status, text: async () => body };
-        },
-      },
+      request,
       origin: 'https://staging.jov.ie',
     };
   }
