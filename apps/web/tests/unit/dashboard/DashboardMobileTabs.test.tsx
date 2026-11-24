@@ -46,7 +46,7 @@ vi.mock('@/lib/tracking/navigation-telemetry', () => ({
     mockTrackNavigationImpressions(...args),
 }));
 
-const EXPANDED_LABELS = ['Inbox', 'Identity', 'Work', 'Audience'] as const;
+const EXPANDED_LABELS = ['Home', 'Identity', 'Work', 'Audience'] as const;
 
 describe('DashboardMobileTabs', () => {
   beforeEach(() => {
@@ -70,7 +70,7 @@ describe('DashboardMobileTabs', () => {
     const directLinks = within(tabs).getAllByRole('link');
 
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
-      'Inbox',
+      'Home',
       'Identity',
       'Work',
     ]);
@@ -217,7 +217,7 @@ describe('DashboardMobileTabs', () => {
     const menu = within(dialog).getByRole('navigation', {
       name: 'Expanded Navigation Menu',
     });
-    const first = within(menu).getByRole('link', { name: 'Inbox' });
+    const first = within(menu).getByRole('link', { name: 'Home' });
     const last = within(dialog).getByRole('button', { name: 'Sign out' });
     const background = screen.getByText('Background action');
 
@@ -246,7 +246,7 @@ describe('DashboardMobileTabs', () => {
     const chat = render(<DashboardMobileTabs />);
     const chatTabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
     expect(
-      within(chatTabs).getByRole('link', { name: 'Inbox' })
+      within(chatTabs).getByRole('link', { name: 'Home' })
     ).not.toHaveAttribute('aria-current');
     chat.unmount();
 
@@ -256,7 +256,7 @@ describe('DashboardMobileTabs', () => {
       name: 'Dashboard Tabs',
     });
     expect(
-      within(homeTabs).getByRole('link', { name: 'Inbox' })
+      within(homeTabs).getByRole('link', { name: 'Home' })
     ).toHaveAttribute('aria-current', 'page');
   });
 
@@ -271,7 +271,7 @@ describe('DashboardMobileTabs', () => {
     const tabs = screen.getByRole('navigation', { name: 'Dashboard Tabs' });
     const directLinks = within(tabs).getAllByRole('link');
     expect(directLinks.map(link => link.textContent?.trim())).toEqual([
-      'Inbox',
+      'Home',
       'Identity',
       'Audience',
     ]);

@@ -42,8 +42,8 @@ vi.mock('@/features/admin/OperatorBannerWrapper', () => ({
 vi.mock('@/features/admin/ImpersonationBannerWrapper', () => ({
   ImpersonationBannerWrapper: () => null,
 }));
-vi.mock('@/features/workspace-lock/WorkspaceLockScreen', () => ({
-  WorkspaceLockScreen: () => <div>Unlock Ovie</div>,
+vi.mock('@/lib/app-shell/WorkspaceLockScreenLazy', () => ({
+  WorkspaceLockScreenLazy: () => <div>Unlock Ovie</div>,
 }));
 vi.mock('@/lib/auth/ban-check', () => ({
   getUserBanStatus: mocks.banStatus,

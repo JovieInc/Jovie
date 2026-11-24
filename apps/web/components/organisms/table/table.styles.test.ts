@@ -111,7 +111,9 @@ describe('table System B style exports', () => {
       'utf8'
     );
 
-    expect(designSystemSource).toContain('height: 40px;');
+    expect(designSystemSource).toContain(
+      'height: var(--table-row-height, 40px);'
+    );
     expect(designSystemSource).toContain(
       '@media (prefers-reduced-motion: reduce)'
     );

@@ -44,7 +44,7 @@ import {
   applyCacheScope,
   resetCacheIsolationForTests,
 } from '@/lib/queries/cache-isolation';
-import { expectDesktop32Control } from './library-control-assertions';
+import { expectDesktop28Control } from './library-control-assertions';
 import { buildAsset } from './library-surface-fixtures';
 
 Element.prototype.scrollIntoView = vi.fn();
@@ -666,7 +666,7 @@ describe('LibrarySurface', () => {
     );
   });
 
-  it('keeps desktop Library toolbar controls at 32px without desktop 44px hit targets', () => {
+  it('keeps desktop Library toolbar controls at 28px without desktop 44px hit targets', () => {
     window.matchMedia = vi.fn().mockImplementation(query => ({
       matches: query === '(min-width: 1024px)',
       media: query,
@@ -681,32 +681,31 @@ describe('LibrarySurface', () => {
 
     renderLibrary([buildAsset()]);
 
-    expectDesktop32Control(screen.getByRole('tab', { name: 'All' }));
-    expectDesktop32Control(screen.getByRole('tab', { name: 'Ideas' }));
-    expectDesktop32Control(
+    expectDesktop28Control(screen.getByRole('tab', { name: 'All' }));
+    expectDesktop28Control(screen.getByRole('tab', { name: 'Ideas' }));
+    expectDesktop28Control(
       screen.getByRole('button', { name: /^Show filters/i }),
       { square: true }
     );
-    expectDesktop32Control(
+    expectDesktop28Control(
       screen.getByRole('button', { name: 'Sort by Release Date' }),
       { square: true }
     );
-    expectDesktop32Control(
+    expectDesktop28Control(
       screen.getByRole('button', { name: /Small cards/u }),
       { square: true }
     );
-    expectDesktop32Control(
+    expectDesktop28Control(
       screen.getByRole('button', { name: /Medium cards/u }),
       { square: true }
     );
-    expectDesktop32Control(
+    expectDesktop28Control(
       screen.getByRole('button', { name: /Large cards/u }),
       { square: true }
     );
     // The view slider (2026-09-25 header/toolbar IA) is a single fixed-size
-    // sliding control rather than three independently-densified buttons, so
-    // it intentionally stays at the founder-specified 28px visible size
-    // instead of picking up the desktop 32px density override.
+    // sliding control rather than three independently-densified buttons. It
+    // sits at the same 28px visible size as every other desktop control.
     for (const name of ['Grid View', 'List View', 'Table View']) {
       const visibleOption = screen
         .getByRole('radio', { name })
@@ -2655,7 +2654,7 @@ describe('LibrarySurface', () => {
     const filterTrigger = screen.getByRole('button', {
       name: /^Show filters/i,
     });
-    expectDesktop32Control(filterTrigger, { square: true });
+    expectDesktop28Control(filterTrigger, { square: true });
     expect(
       screen.queryByTestId('library-filter-active-indicator')
     ).not.toBeInTheDocument();
@@ -2843,7 +2842,7 @@ describe('LibrarySurface', () => {
     const contentFrame = screen.getByTestId('library-content-frame');
     const before = contentFrame.getBoundingClientRect();
     const trigger = screen.getByRole('button', { name: /^Show filters/i });
-    expectDesktop32Control(trigger, { square: true });
+    expectDesktop28Control(trigger, { square: true });
     expect(trigger).toHaveClass(
       'before:h-full',
       'before:min-h-11',

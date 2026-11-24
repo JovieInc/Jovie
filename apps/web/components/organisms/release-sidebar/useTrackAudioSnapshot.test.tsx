@@ -1,5 +1,6 @@
-import { act, render, renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderWithQueryClient as render } from '@/tests/utils/test-utils';
 import { SidebarDockBridge } from '../SidebarDockBridge';
 import {
   type AudioTrackSource,

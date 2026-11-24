@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('@/lib/ovie/summer-shadow-client', () => ({
   fetchSummerShadow: vi.fn(),
 }));
-
 vi.mock('@/lib/ovie/summer-production-pin', () => ({
   resolveSummerEveCallerOrigin: vi.fn(async () => ({
     origin: 'https://summer.jov.ie',
@@ -12,6 +11,7 @@ vi.mock('@/lib/ovie/summer-production-pin', () => ({
   SummerPinInvalidError: class SummerPinInvalidError extends Error {
     readonly code = 'summer_pin_invalid';
   },
+  logSummerBridgeEvent: vi.fn(),
 }));
 
 import { MemoryOperatingStore } from './mcp/store';
@@ -138,7 +138,7 @@ describe('Ovie speaks through durable Eve Summer', () => {
       snapshot: {
         schema: 'jovie.summer-company-state/v1',
         revision: 'r1',
-        generatedAt: '2026-10-14T08:00:00.000Z',
+        generatedAt: new Date().toISOString(),
         shipping: { rollingRatePerDay: { value: 3 } },
         activeConstraint: 'funnel:onboarding_starts',
       },

@@ -24,12 +24,15 @@ describe('SidebarSection certificate', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('renders an empty open section and a closed one axe-clean', async () => {
+  it('renders an empty section as a plain label with no caret or disclosure, axe-clean', async () => {
     const { container, rerender } = render(
       <SidebarSection name='Releases' open onToggle={vi.fn()} itemCount={0}>
         {null}
       </SidebarSection>
     );
+    expect(screen.queryByRole('button', { name: 'Releases' })).toBeNull();
+    expect(screen.getByText('Releases')).toBeInTheDocument();
+    expect(container.querySelector('svg')).toBeNull();
     await expectNoA11yViolations(container);
 
     rerender(

@@ -134,6 +134,18 @@ describe('hard checks', () => {
     expect(scoreCase(songOutFriday.id, checks, null).passed).toBe(false);
   });
 
+  it('hard-fails inventing-account-facts on ASS-101 song-out-friday editorial day-count', () => {
+    if (!songOutFriday) throw new Error('missing case');
+    const checks = runHardChecks(songOutFriday, {
+      text: 'Night Swim drops Friday, 4 days out. Spotify editorial pitching needed 7 days ahead, so put that aside; what moves the needle now is teaser content and the release-day ask.',
+      toolCalls: [],
+    });
+    expect(checks.find(c => c.id === 'inventing_account_facts')?.ok).toBe(
+      false
+    );
+    expect(scoreCase(songOutFriday.id, checks, null).passed).toBe(false);
+  });
+
   it('hard-fails inventing-capabilities on ASS-97/ASS-99 live capability invents', () => {
     const moreListeners = HELPFULNESS_CASES.find(
       c => c.id === 'more-listeners'
@@ -186,6 +198,17 @@ describe('hard checks', () => {
       false
     );
     expect(scoreCase(postUnasked.id, postChecks, null).passed).toBe(false);
+  });
+
+  it('hard-fails inventing-capabilities on ASS-101 fan-reply-dm link-up invent', () => {
+    const fanReply = HELPFULNESS_CASES.find(c => c.id === 'fan-reply-dm');
+    if (!fanReply) throw new Error('missing fan-reply-dm');
+    const checks = runHardChecks(fanReply, {
+      text: 'Night Swim is out Friday, Nov 27, four days out. Here\'s a paste-ready DM: "Night Swim is out this Friday. the link will be up on my page the second it goes live."',
+      toolCalls: [],
+    });
+    expect(checks.find(c => c.id === 'inventing_capabilities')?.ok).toBe(false);
+    expect(scoreCase(fanReply.id, checks, null).passed).toBe(false);
   });
 
   it('hard-fails ASS-91 permission-to-plan and draft-intake shapes', () => {

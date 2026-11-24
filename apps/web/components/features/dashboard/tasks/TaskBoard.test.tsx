@@ -52,13 +52,15 @@ describe('TaskBoard geometry', () => {
     }
   );
 
-  it('keeps board create actions at 32px on desktop with mobile hit room', () => {
+  it('keeps board create actions as 28px circles on desktop with mobile hit room', () => {
     const source = readFileSync(resolve(__dirname, './TaskBoard.tsx'), 'utf8');
 
-    expect(source).toContain('relative inline-flex h-8 w-8 shrink-0');
+    expect(source).toContain(
+      'relative inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full'
+    );
     expect(source).toContain('before:h-11 before:w-11');
-    expect(source).toContain('sm:before:h-8 sm:before:w-8');
-    expect(source).not.toContain('inline-flex h-7 w-7 shrink-0');
+    expect(source).toContain('sm:before:h-7 sm:before:w-7');
+    expect(source).not.toContain('inline-flex h-8 w-8 shrink-0');
   });
 });
 

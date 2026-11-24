@@ -4,7 +4,7 @@ import { DashboardsTable } from './DashboardsTable';
 
 describe('DashboardsTable', () => {
   it('lists dashboards with title links, source and date', () => {
-    render(
+    const { container } = render(
       <DashboardsTable
         rows={[
           {
@@ -30,6 +30,10 @@ describe('DashboardsTable', () => {
     expect(screen.getByText('Agent')).toBeInTheDocument();
     expect(screen.getByText('You')).toBeInTheDocument();
     expect(screen.getByText('2026-11-22')).toBeInTheDocument();
+    // New tables use the shared compact rows; dense is a shrinking legacy set.
+    expect(
+      container.querySelector('[data-table-row-mode="compact"]')
+    ).not.toBeNull();
   });
 
   it('shows the flat empty state', () => {

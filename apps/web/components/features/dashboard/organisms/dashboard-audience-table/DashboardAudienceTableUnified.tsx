@@ -702,13 +702,12 @@ export const DashboardAudienceTableUnified = memo(
       (row: AudienceMember) => {
         const isSelected = selectedMember?.id === row.id;
         return cn(
-          hasMetadataSubtitle ? 'h-12' : 'h-10',
           isSelected
             ? 'bg-(--linear-row-selected)'
             : 'bg-transparent hover:bg-(--linear-row-hover)'
         );
       },
-      [hasMetadataSubtitle, selectedMember]
+      [selectedMember]
     );
 
     // Issue 4: Arrow keys update sidebar when panel is open
@@ -931,7 +930,7 @@ export const DashboardAudienceTableUnified = memo(
                       getRowId={row => row.id}
                       enableVirtualization={true}
                       enableKeyboardNavigation={true}
-                      rowMode='dense'
+                      rowMode={hasMetadataSubtitle ? 'list' : 'compact'}
                       rowSelection={rowSelectionState}
                       onToggleRowSelection={toggleMemberSelection}
                       onSelectRowRange={selectRows}

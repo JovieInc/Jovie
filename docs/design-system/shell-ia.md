@@ -125,9 +125,8 @@ Motion tokens and rules live in `.claude/rules/motion.md`. Shell additions:
 ## IA across surfaces
 
 - **App and Ovie.** Home first (what matters, then what is blocked on you, in
-  flight, done today, releases). Four Jovie roots: Inbox (Home), Identity, Work,
-  Audience. Ovie: Home plus one collapsed Tools group.
-  *(T0.2 pending: Tim picks a single Home vs Inbox root label — do not silent-unify.)*
+  flight, done today, releases). Four Jovie roots: **Home**, Identity, Work,
+  Audience. Ovie: Home plus Operator Inbox and one collapsed Tools group.
 - **Public profile.** One right thing per visitor. Destinations come only from
   `PUBLIC_PROFILE_NAVIGATION` (Home, Music, Events, About).
 - **Smart link.** One release, one primary action, no site nav.
@@ -140,6 +139,22 @@ Motion tokens and rules live in `.claude/rules/motion.md`. Shell additions:
 These contracts lock meaning. They do **not** authorize public tab reshuffles,
 root renames, or settings UI migrations — those land in later tracks after the
 contract is stable.
+
+### C1 — Creator root job tuple (Home)
+
+EVENT: Creator root visible label is **Home** (Drift T0.2; JOV-7159). Stable
+semantic id remains `home`. `/app` still hosts the opportunity / attention
+stack; chrome, breadcrumbs, tab titles, and the header bell all say Home —
+never Inbox, Presence, Profiles, or Library.
+
+- Visible labels: **Home · Identity · Work · Audience**
+  (`primaryNavigation` / `CREATOR_ROOT_LABELS`).
+- Stable semantic ids may lag routes only with an explicit compatibility map;
+  UI copy never uses `previousLabels`.
+- Capacity: ≤4 roots; More overflow only for `experimental` tier.
+- **Ovie Operator Inbox** is a separate operator job (`/app/ov/inbox`). Cross-
+  workspace copy and Ovie chrome use the qualified label **Operator Inbox** so
+  it never collides with creator Home.
 
 ### C2 — Profile representation isomorphism
 
@@ -204,5 +219,6 @@ does not replace them.
 
 | Date | Change | Source |
 |---|---|---|
-| 2026-11-20 | Drift W1 contracts: Profile isomorphism (C2), Audience absorption (C3), settings admission monopoly (C4). Home/Inbox label deferred (T0.2). | Drift remediation plan |
+| 2026-11-20 | Drift T0.2: lock creator root label Home (C1); ban previousLabels in UI; qualify Ovie Operator Inbox. | Tim White taste decisions |
+| 2026-11-20 | Drift W1 contracts: Profile isomorphism (C2), Audience absorption (C3), settings admission monopoly (C4). | Drift remediation plan |
 | 2026-10-29 | Created: one shell and IA registry for app, Ovie, public and marketing; canvas north star; JOV-INV-047. | Design lead; Tim White (JOV-9748) |

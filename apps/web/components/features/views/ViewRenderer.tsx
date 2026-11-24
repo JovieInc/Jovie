@@ -1,5 +1,6 @@
 import { StatTile } from '@/components/molecules/drawer/StatTile';
 import { Sparkline } from '@/components/shell/Sparkline';
+import { buildSandboxedHtmlDocument } from '@/lib/views/html-sandbox';
 import type { ViewBlock, ViewSpec } from '@/lib/views/spec';
 import { ViewTable } from './ViewTable';
 
@@ -54,14 +55,15 @@ function renderBlock(block: ViewBlock, index: number) {
         </p>
       );
     case 'html':
-      // Untrusted agent HTML: empty sandbox = no scripts, no same-origin, no forms.
+      // Untrusted agent HTML: empty sandbox = no scripts, no same-origin, no
+      // forms; the wrapper's CSP blocks every network load (html-sandbox.ts).
       return (
         <iframe
           key={index}
           data-block='html'
           title={`Embedded content ${index + 1}`}
           sandbox=''
-          srcDoc={block.html}
+          srcDoc={buildSandboxedHtmlDocument(block.html)}
           referrerPolicy='no-referrer'
           loading='lazy'
           style={{ height: block.height ?? DEFAULT_HTML_HEIGHT }}

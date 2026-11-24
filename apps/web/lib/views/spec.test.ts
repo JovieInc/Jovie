@@ -84,6 +84,18 @@ describe('viewSpecSchema', () => {
       { ...base, blocks: [{ type: 'html', html: 'x', height: 5000 }] },
     ],
     [
+      'html meta refresh',
+      {
+        ...base,
+        blocks: [
+          {
+            type: 'html',
+            html: '<META HTTP-EQUIV=Refresh content="0;url=https://example.com">',
+          },
+        ],
+      },
+    ],
+    [
       'html too long',
       { ...base, blocks: [{ type: 'html', html: 'x'.repeat(200_001) }] },
     ],

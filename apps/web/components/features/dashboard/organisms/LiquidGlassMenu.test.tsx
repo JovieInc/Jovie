@@ -131,4 +131,17 @@ describe('LiquidGlassMenu', () => {
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
+
+  it('shows no badge, and no stray zero, when an item has nothing to count', async () => {
+    const user = userEvent.setup();
+    render(
+      <LiquidGlassMenu
+        primaryItems={primary}
+        expandedItems={[{ ...expanded[0], badge: 0 }]}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: 'More options' }));
+    const audience = screen.getByRole('link', { name: /Audience/ });
+    expect(audience).toHaveTextContent(/^Audience$/);
+  });
 });

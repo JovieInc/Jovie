@@ -130,13 +130,14 @@ describe('UnifiedSidebar library route', () => {
     expect(nowPlayingBridgePropsMock).toHaveBeenCalledWith(
       expect.objectContaining({ collapsed: false })
     );
+    // Creator root is Home; header bell uses a qualified Home name.
     const row = screen
-      .getByRole('link', { name: 'Inbox' })
+      .getByRole('link', { name: /^Home/ })
       .closest('[data-sidebar-brand-row]');
     expect(row).toContainElement(
       screen.getByRole('button', { name: 'Search Sidebar' })
     );
-    expect(screen.getByRole('link', { name: 'Inbox' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /^Home/ })).toHaveAttribute(
       'href',
       '/app'
     );

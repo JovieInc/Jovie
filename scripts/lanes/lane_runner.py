@@ -1146,11 +1146,19 @@ def context_manifest_matches(path: Path) -> bool:
         return False
 
 
+class ContextPreflightError(ValueError):
+    """H-02: a drifted assembly contract or unbound inputs stop the spawn, fail closed."""
+
+
 def write_agent_prompt(path: Path, prompt: str, kind: str, provider: str,
                        inputs: dict[str, str]) -> dict:
-    """Write the required prompt; qualify new context diagnostics without stopping delivery."""
+    """Write the prompt; contract drift blocks the spawn, receipt-write trouble does not (H-02)."""
     content = prompt.encode("utf-8")
     path.write_bytes(content)  # Original prompt persistence remains required before spawn.
+    if not context_manifest_matches(HERE / "context-manifest.json"):
+        raise ContextPreflightError("context-manifest-drift: regenerate the checked-in preflight contract")
+    if kind not in CONTEXT_INPUTS or set(inputs) != set(CONTEXT_INPUTS[kind]):
+        raise ContextPreflightError(f"context-inputs:{kind}")
     started = time.perf_counter()
     qualification = {"schema": "jovie-lane-context-qualification/v1",
                      "mode": "qualification-only", "ok": False, "findings": []}
@@ -1158,10 +1166,6 @@ def write_agent_prompt(path: Path, prompt: str, kind: str, provider: str,
               "promptSha256": hashlib.sha256(content).hexdigest(), "kind": kind}
     try:
         contract = context_manifest_json().encode("utf-8")
-        if not context_manifest_matches(HERE / "context-manifest.json"):
-            raise ValueError("context-manifest-drift: regenerate the checked-in preflight contract")
-        if kind not in CONTEXT_INPUTS or set(inputs) != set(CONTEXT_INPUTS[kind]):
-            raise ValueError(f"context-inputs:{kind}")
 
         def fingerprint(text: str) -> dict:
             value = text.encode("utf-8")
@@ -1557,8 +1561,11 @@ def sensitive_review(host: Host, pr: dict, worktree: Path, log, pass_fds=()) -> 
         "gates run separately. End with exactly `LLM-REVIEW: PASS` only if no blocking finding exists;",
         "otherwise end with `LLM-REVIEW: FAIL — <concise blocking findings>`.",
     ])
-    write_agent_prompt(review_prompt, review_text, "sensitive-review", "codex",
-                       {"pr": json.dumps(pr, sort_keys=True), "review_contract": review_text})
+    try:
+        write_agent_prompt(review_prompt, review_text, "sensitive-review", "codex",
+                           {"pr": json.dumps(pr, sort_keys=True), "review_contract": review_text})
+    except ContextPreflightError as error:  # H-02: never spawn a reviewer on a drifted contract
+        return False, [f"context-preflight:{error}"]
     last = worktree / ".codex-last-message.txt"
     last.unlink(missing_ok=True)
     command = [sys.executable, str(HERE / "codex_lane.py"), "run", "--prompt-file", str(review_prompt),

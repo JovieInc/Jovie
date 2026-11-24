@@ -20,6 +20,23 @@ vi.mock('@clerk/nextjs', () => ({
   SignedOut: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+// A flyout needs two or more links; one link renders as a plain link.
+const FEATURES_FLYOUT = [
+  {
+    id: 'features',
+    label: 'Features',
+    heading: 'Product',
+    links: [
+      {
+        href: '/artist-profiles',
+        label: 'Artist Profiles',
+        description: 'Artist profile pages',
+      },
+      { href: '/pricing', label: 'Pricing', description: 'Plans and pricing' },
+    ],
+  },
+];
+
 describe('HeaderNav flyout interactions', () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -97,20 +114,7 @@ describe('HeaderNav flyout interactions', () => {
       <HeaderNav
         authMode='public-static'
         presentation='marketing-glass'
-        flyoutMenus={[
-          {
-            id: 'features',
-            label: 'Features',
-            heading: 'Product',
-            links: [
-              {
-                href: '/artist-profiles',
-                label: 'Artist Profiles',
-                description: 'Artist profile pages',
-              },
-            ],
-          },
-        ]}
+        flyoutMenus={FEATURES_FLYOUT}
       />
     );
 
@@ -134,20 +138,7 @@ describe('HeaderNav flyout interactions', () => {
       <HeaderNav
         authMode='public-static'
         presentation='marketing-glass'
-        flyoutMenus={[
-          {
-            id: 'features',
-            label: 'Features',
-            heading: 'Product',
-            links: [
-              {
-                href: '/artist-profiles',
-                label: 'Artist Profiles',
-                description: 'Artist profile pages',
-              },
-            ],
-          },
-        ]}
+        flyoutMenus={FEATURES_FLYOUT}
       />
     );
 

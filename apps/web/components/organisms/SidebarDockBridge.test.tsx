@@ -1,10 +1,4 @@
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   installDesktopUpdateBridge,
@@ -12,6 +6,7 @@ import {
 } from '@/lib/desktop/desktop-updates.test-utils';
 import { WHATS_NEW_PATH } from '@/lib/whats-new';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { renderWithQueryClient as render } from '@/tests/utils/test-utils';
 import { SidebarDockBridge } from './SidebarDockBridge';
 
 const mocks = vi.hoisted(() => ({

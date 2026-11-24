@@ -74,6 +74,8 @@ runs:
         if [ "$EVENT_NAME" = workflow_run ] && [ "$UPSTREAM_BRANCH" != main ]; then
           conclusion=skip
         fi
+        # Only unattended runs report: PR, label and manual events report on the PR or to the person.
+        case "$EVENT_NAME" in schedule|push|workflow_run|repository_dispatch) ;; *) conclusion=skip ;; esac
         file="${WORKFLOW_REF%@*}"
         file="${file##*/}"
         fp="$FINGERPRINT"

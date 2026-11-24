@@ -76,7 +76,7 @@ class FixStream(unittest.TestCase):
             n = 0
             def gql(self, q, v):
                 if "teams" in q:
-                    return {"teams": {"nodes": [{"id": "t", "states": {"nodes": [{"name": "Todo", "id": "s"}]},
+                    return {"teams": {"nodes": [{"id": "t", "states": {"nodes": [{"name": "Backlog", "id": "s"}]},
                                                  "labels": {"nodes": []}}]}}
                 if "issueLabelCreate" in q:
                     return {"issueLabelCreate": {"issueLabel": {"id": "l"}}}
@@ -186,6 +186,43 @@ class SummerCritic(unittest.TestCase):
         self.assertTrue({"summer.turn_failure_rate", "summer.noise_to_tim_rate", "summer.missed_incidents"} <= {m["id"] for m in tim["metrics"]})
         self.assertEqual(w.detect(SPECS["summer.missed_incidents"], 1, None, None)["status"], "WASTE")
         self.assertEqual(w.detect(SPECS["summer.missed_incidents"], 0, None, None)["status"], "OK")
+
+
+class TechDebtOwnership(unittest.TestCase):
+    def test_tech_debt_class_is_owned_by_summer(self):
+        cls = next(c for c in REG["classes"] if c["id"] == "tech-debt")
+        self.assertEqual(cls["owner"], "summer")
+        self.assertEqual({m["id"] for m in cls["metrics"]},
+                         {"debt.oversized_files", "debt.cert_screen_entries"})
+        self.assertTrue(any("waste-latest.json" in f for f in cls["feeds"]))
+        cert = next(m for m in cls["metrics"] if m["id"] == "debt.cert_screen_entries")
+        self.assertEqual(cert["source"], "debt.certScreenEntries")
+        self.assertTrue(any("cert-screens.json" in f for f in cls["feeds"]))
+
+    def test_tech_debt_signal_carries_summer_owner_into_factory_intake(self):
+        row = {"id": "debt.oversized_files", "class": "tech-debt", "owner": "summer",
+               "label": "Tracked source files over 1500 lines", "unit": "count",
+               "value": 120, "status": "WASTE", "excess": 1.2, "why": "+20% vs 7 days ago"}
+        sig = w.signal(REG, row, SPECS["debt.oversized_files"])
+        self.assertIsNone(fi.validate(sig))
+        self.assertIn("Owner: summer", sig["problem"])
+        planned = fi.plan([sig])[0]
+        self.assertIn("waste", planned["labels"])
+
+    def test_cert_screen_entries_collector_reads_debt_map_cardinality(self):
+        # Live ledger on the checkout: observer only; never invents debt.
+        reading = w.col_debt()
+        self.assertIn("certScreenEntries", reading)
+        self.assertIsInstance(reading["certScreenEntries"], int)
+        self.assertGreaterEqual(reading["certScreenEntries"], 0)
+        live = json.loads(w.CERT_SCREENS.read_text()).get("debt") or {}
+        self.assertEqual(reading["certScreenEntries"], len(live))
+        # Metric evaluates through the registry source path (no GAP when ledger present).
+        data = {"debt": reading, "inputs": {"activeUsers": 0}}
+        rows = {r["id"]: r for r in w.evaluate(REG, data, {})}
+        self.assertEqual(rows["debt.cert_screen_entries"]["status"], "OK")
+        self.assertEqual(rows["debt.cert_screen_entries"]["value"], float(len(live)))
+        self.assertEqual(rows["debt.cert_screen_entries"]["owner"], "summer")
 
 
 if __name__ == "__main__":
