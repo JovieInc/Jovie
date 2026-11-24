@@ -13,6 +13,18 @@ import {
 import { relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// A Git LFS pointer is a small text file that names the real object. CI
+// checkouts leave LFS paths as pointers until .github/actions/lfs-pull runs, so
+// a deploy job that skipped the pull would ship text where an image belongs.
+// Refuse every static file that is still a pointer, before anything is written.
+const LFS_POINTER_PREFIX = 'version https://git-lfs.github.com/spec/v1\n';
+
+export function isLfsPointerFile(path) {
+  const stat = lstatSync(path);
+  if (!stat.isFile() || stat.size > 1024) return false;
+  return readFileSync(path, 'utf8').startsWith(LFS_POINTER_PREFIX);
+}
+
 function inside(root, path) {
   const name = relative(root, path);
   if (name === '..' || name.startsWith(`..${sep}`)) {
@@ -36,6 +48,7 @@ export function materializeStatic(root) {
     }
   }
   const pending = [];
+  const pointers = [];
   function walk(directory) {
     for (const name of readdirSync(directory).sort()) {
       if (name.startsWith('.jovie-materialize-')) {
@@ -89,13 +102,21 @@ export function materializeStatic(root) {
         }
         if (!lstatSync(target).isFile())
           throw new Error('Static symlink target must be a file');
+        if (isLfsPointerFile(target)) pointers.push(relative(root, target));
         pending.push({ path, target });
       } else if (!stat.isFile()) {
         throw new Error('Unsupported static artifact entry');
+      } else if (isLfsPointerFile(path)) {
+        pointers.push(relative(root, path));
       }
     }
   }
   walk(resolve(output, 'static'));
+  if (pointers.length > 0) {
+    throw new Error(
+      `Static assets are Git LFS pointers, not files; pull them with .github/actions/lfs-pull before the build: ${pointers.join(', ')}`
+    );
+  }
   // Validate the complete tree before replacing any link. Stage outside output
   // on the build filesystem, then rename. SIGKILL can leave a partial staging
   // file, but it cannot become a deployable asset on a subsequent invocation.

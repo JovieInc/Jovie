@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   readFileSync,
   readlinkSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -17,6 +18,7 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
   dereferenceFunctionFileLinks,
+  isLfsPointerFile,
   materializeStatic,
 } from './materialize-vercel-static.mjs';
 import { artifactSnapshot } from './production-input-provenance.mjs';
@@ -53,9 +55,15 @@ test('real canonical public exports survive Vercel relocation and bind exact ima
     .filter(line => line.startsWith('120000 '))
     .map(line => line.split('\t')[1]);
   assert.ok(names.length >= 6);
+  // Unpulled LFS catalog targets are pointers materializeStatic refuses.
+  const bytesOf = name => {
+    const target = realpathSync(resolve(repo, name));
+    if (!isLfsPointerFile(target)) return readFileSync(target);
+    return Buffer.from(`image bytes for ${name}`);
+  };
   for (const name of names) {
     const source = resolve(repo, name);
-    f.put(join(dirname(name), readlinkSync(source)), readFileSync(source));
+    f.put(join(dirname(name), readlinkSync(source)), bytesOf(name));
     f.link(name, readlinkSync(source));
     f.link(
       name.replace('apps/web/public', '.vercel/output/static'),
@@ -72,15 +80,10 @@ test('real canonical public exports survive Vercel relocation and bind exact ima
       false
     );
     assert.equal(lstatSync(resolve(f.root, name)).isSymbolicLink(), true);
-    assert.deepEqual(
-      readFileSync(resolve(f.root, outputName)),
-      readFileSync(resolve(repo, name))
-    );
+    assert.deepEqual(readFileSync(resolve(f.root, outputName)), bytesOf(name));
     assert.equal(
       receipt.files.find(file => file.path === outputName).sha256,
-      createHash('sha256')
-        .update(readFileSync(resolve(repo, name)))
-        .digest('hex')
+      createHash('sha256').update(bytesOf(name)).digest('hex')
     );
   }
   assert.equal(materializeStatic(f.root), 0);

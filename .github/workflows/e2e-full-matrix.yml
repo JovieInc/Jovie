@@ -43,6 +43,13 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
+      # The product screenshot catalog is in Git LFS; sync-standalone-assets
+      # refuses to copy its pointers into the standalone public/ tree.
+      - name: Pull product screenshots (Git LFS)
+        uses: ./.github/actions/lfs-pull
+        with:
+          include: 'apps/web/screenshot-catalog/current/*.png,apps/web/public/demo/jovie-demo.mp4'
+          cache: 'true'
       - name: Build production-mode standalone server
         run: pnpm turbo build --filter=@jovie/web
         env:

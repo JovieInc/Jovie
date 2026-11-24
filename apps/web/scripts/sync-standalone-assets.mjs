@@ -14,6 +14,7 @@ import {
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertPublicLfsFiles } from './assert-public-lfs-files.mjs';
 import { resolvePackageJson } from './resolve-package-json.mjs';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -75,6 +76,7 @@ if (!existsSync(standaloneRoot)) {
     `Standalone output not found at ${standaloneRoot}. Run "pnpm --filter @jovie/web build" first.`
   );
 }
+assertPublicLfsFiles({ publicDir: path.join(appRoot, 'public') });
 
 function countSymlinks(rootDir) {
   let total = 0;

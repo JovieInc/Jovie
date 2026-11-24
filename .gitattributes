@@ -29,3 +29,14 @@ apps/web/tests/e2e/__snapshots__/**/*.png filter=lfs diff=lfs merge=lfs -text
 # UI judge calibration captures (JOV-7713). Read by scripts/invariants/ui-escape-holdout.test.mjs,
 # which checks them by their LFS oid when only the pointer is checked out.
 docs/screenshots/ui-escape-holdout/*.png filter=lfs diff=lfs merge=lfs -text
+# Product screenshot catalog (served at /product-screenshots/* through the
+# apps/web/public symlinks). Deploy, Playwright and Storybook jobs pull them
+# through .github/actions/lfs-pull; materialize-vercel-static refuses to deploy
+# a pointer. The two onboarding captures stay plain blobs because
+# ArtistProfileHowItWorks.tsx imports them at build time.
+apps/web/screenshot-catalog/current/*.png filter=lfs diff=lfs merge=lfs -text
+apps/web/screenshot-catalog/current/onboarding-dsp-desktop.png -filter -diff -merge binary
+apps/web/screenshot-catalog/current/onboarding-handle-desktop.png -filter -diff -merge binary
+# Public demo video fallback (/demo/jovie-demo.mp4 when DEMO_VIDEO_URL is
+# unset). Pulled with the catalog by the same lfs-pull steps.
+apps/web/public/demo/jovie-demo.mp4 filter=lfs diff=lfs merge=lfs -text

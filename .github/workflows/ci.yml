@@ -1848,6 +1848,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-
             ${{ runner.os }}-next-build-web-v1-
+      # The product screenshot catalog is in Git LFS; sync-standalone-assets
+      # refuses to copy its pointers into the standalone public/ tree.
+      - name: Pull product screenshots (Git LFS)
+        if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
+        uses: ./.github/actions/lfs-pull
+        with:
+          include: 'apps/web/screenshot-catalog/current/*.png,apps/web/public/demo/jovie-demo.mp4'
+          cache: 'restore'
       - name: Build homepage for rendered snapshot compare
         if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
         run: pnpm turbo build --filter=@jovie/web
@@ -4866,6 +4874,14 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
 
+      # The product screenshot catalog is in Git LFS; sync-standalone-assets
+      # refuses to copy its pointers into the standalone public/ tree.
+      - name: Pull product screenshots (Git LFS)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: ./.github/actions/lfs-pull
+        with:
+          include: 'apps/web/screenshot-catalog/current/*.png,apps/web/public/demo/jovie-demo.mp4'
+          cache: 'restore'
       - name: Build app (public routes only — no secrets needed)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm turbo build --filter=@jovie/web
@@ -6437,6 +6453,13 @@ jobs:
           tests/unit/lib/blog/publication.test.ts
           scripts/marketing-factory/blog-adapter.test.ts
           --maxWorkers 2
+      # The product screenshot catalog is in Git LFS; sync-standalone-assets
+      # refuses to copy its pointers into the standalone public/ tree.
+      - name: Pull product screenshots (Git LFS)
+        uses: ./.github/actions/lfs-pull
+        with:
+          include: 'apps/web/screenshot-catalog/current/*.png,apps/web/public/demo/jovie-demo.mp4'
+          cache: 'restore'
       - name: Build the exact rendered candidate
         id: candidate-build
         env:
@@ -8666,6 +8689,14 @@ jobs:
                 ;;
             esac
           done
+      # Product screenshots are Git LFS files (.gitattributes) served at
+      # /product-screenshots/*; checkout leaves pointers, and
+      # materialize-vercel-static refuses to deploy one.
+      - name: Pull product screenshots (Git LFS)
+        uses: ./.github/actions/lfs-pull
+        with:
+          include: 'apps/web/screenshot-catalog/current/*.png,apps/web/public/demo/jovie-demo.mp4'
+          cache: 'restore'
       - name: Build (PR preview)
         timeout-minutes: 10
         run: |

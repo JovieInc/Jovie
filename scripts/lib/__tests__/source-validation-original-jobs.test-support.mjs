@@ -22,6 +22,7 @@ const TWIN_TSC_HOUR = 'Resolve parity tsc cache hour';
 const TWIN_TSC_RESTORE =
   'Restore web tsc incremental state for typecheck parity';
 const UNIT_FLAKY_UPLOAD = 'Preserve retried-then-passed unit tests';
+const PRODUCT_SCREENSHOTS = 'Pull product screenshots (Git LFS)';
 const REUSE_STEP = 'Reuse exact-head proof for a metadata-only edit';
 
 /** Serial → pooled disk-read step is an owned migration (same guards, first
@@ -228,6 +229,7 @@ export function assertOriginalJobsRetained(current, baseline) {
     TWIN_TSC_HOUR,
     TWIN_TSC_RESTORE,
     UNIT_FLAKY_UPLOAD,
+    PRODUCT_SCREENSHOTS,
   ]);
   const strip = job => ({
     ...job,
@@ -263,7 +265,8 @@ export function assertOriginalJobsRetained(current, baseline) {
               name === REMAINING_TWIN ||
               name === TWIN_TSC_HOUR ||
               name === TWIN_TSC_RESTORE ||
-              name === UNIT_FLAKY_UPLOAD))) &&
+              name === UNIT_FLAKY_UPLOAD)) ||
+          (id === 'coverage' && name === PRODUCT_SCREENSHOTS)) &&
         !kept.length &&
         added.length === 1;
       assert.ok(kept.length === added.length || firstLanding, `${id}: ${name}`);
@@ -336,6 +339,24 @@ export function assertOriginalJobsRetained(current, baseline) {
     assert.match(String(flaky.with?.name), /^unit-flaky-/);
     assert.equal(flaky['continue-on-error'], undefined);
     assert.match(String(flaky.if), /steps\.reuse\.outputs\.reuse != 'true'/);
+  }
+
+  // The LFS screenshot catalog is pulled before the exact-head build, under
+  // the build's own condition, restoring the object cache only.
+  const coverageSteps = current.jobs.coverage.steps;
+  const pull = coverageSteps.findIndex(
+    step => step.name === PRODUCT_SCREENSHOTS
+  );
+  if (pull !== -1) {
+    const build = coverageSteps[pull + 1];
+    assert.equal(build?.name, 'Build exact PR head');
+    assert.equal(coverageSteps[pull].uses, './.github/actions/lfs-pull');
+    assert.deepEqual(coverageSteps[pull].with, {
+      include:
+        'apps/web/screenshot-catalog/current/*.png,apps/web/public/demo/jovie-demo.mp4',
+      cache: 'restore',
+    });
+    assert.equal(coverageSteps[pull].if, build?.if);
   }
 
   const steps = current.jobs.deterministic.steps;

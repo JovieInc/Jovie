@@ -575,7 +575,10 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
   ],
   ['.github/scripts/production-continuity-workflow.test.mjs', null, []],
   [
-    '.github/scripts/materialize-vercel-static.test.mjs',
+    [
+      '.github/scripts/materialize-vercel-static.test.mjs',
+      '.github/scripts/materialize-vercel-static-lfs.test.mjs',
+    ],
     '.github/scripts/materialize-vercel-static.mjs',
     [
       '--test-coverage-lines=90',

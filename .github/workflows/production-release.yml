@@ -272,6 +272,14 @@ jobs:
           fail-on-cache-miss: false
       - name: Skip vercel build while Vercel blocked breaker is open
         run: node .github/scripts/vercel-blocked-breaker.mjs check
+      # Product screenshots are Git LFS files (.gitattributes) served at
+      # /product-screenshots/*; checkout leaves pointers, and
+      # materialize-vercel-static refuses to deploy one.
+      - name: Pull product screenshots (Git LFS)
+        uses: ./.github/actions/lfs-pull
+        with:
+          include: 'apps/web/screenshot-catalog/current/*.png,apps/web/public/demo/jovie-demo.mp4'
+          cache: 'true'
       - name: Build (preview target for staging verification)
         timeout-minutes: 10
         run: |
@@ -965,6 +973,15 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         run: node .github/scripts/vercel-on-demand-ledger.mjs
 
+      # Product screenshots are Git LFS files (.gitattributes) served at
+      # /product-screenshots/*; checkout leaves pointers, and
+      # materialize-vercel-static refuses to deploy one.
+      - name: Pull product screenshots (Git LFS)
+        if: ${{ steps.mutation-head.outputs.is_current == 'true' }}
+        uses: ./.github/actions/lfs-pull
+        with:
+          include: 'apps/web/screenshot-catalog/current/*.png,apps/web/public/demo/jovie-demo.mp4'
+          cache: 'true'
       - name: Build and stage production deployment
         id: stage-production
         if: ${{ steps.mutation-head.outputs.is_current == 'true' }}

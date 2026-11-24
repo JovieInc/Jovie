@@ -78,6 +78,7 @@ apps/docs/scripts/*.test.mjs
 # Build-critical web build and postbuild scripts
 !apps/web/scripts/
 !apps/web/scripts/sync-standalone-assets.mjs
+!apps/web/scripts/assert-public-lfs-files.mjs
 !apps/web/scripts/ensure-sharp-runtime-traces.mjs
 !apps/web/scripts/resolve-package-json.mjs
 !apps/web/scripts/stage-runtime-data.mjs

@@ -77,6 +77,30 @@ export function parseCatFileBatch(buffer) {
   return records;
 }
 
+/** Set of symlink paths (mode 120000) in the index or in `treeish`. */
+function symlinkPaths({ cwd, staged, treeish }) {
+  const args = staged
+    ? ['ls-files', '-s', '-z']
+    : ['ls-tree', '-r', '-z', '--full-tree', treeish];
+  let output;
+  try {
+    output = execFileSync('git', args, {
+      cwd,
+      maxBuffer: MAX_BUFFER,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch {
+    return new Set();
+  }
+  const links = new Set();
+  for (const entry of output.toString('utf8').split('\0')) {
+    if (!entry.startsWith('120000 ')) continue;
+    const tab = entry.indexOf('\t');
+    if (tab >= 0) links.add(entry.slice(tab + 1));
+  }
+  return links;
+}
+
 /**
  * Map of path -> { blobBytes, pointer, objectBytes } for every LFS-attributed
  * path, read from the index (`staged`) or from `treeish`.
@@ -88,10 +112,13 @@ export function collectLfsBlobs({
   staged = false,
   treeish = 'HEAD',
 } = {}) {
+  const symlinks = symlinkPaths({ cwd, staged, treeish });
+  // Git stores a symlink as a blob holding its target path, and LFS never
+  // filters symlinks, so an LFS-attributed symlink is not a plain blob.
   const lfsPaths = lfsAttributedPaths(paths ?? [], {
     cwd,
     cached: staged,
-  }).filter(path => !path.includes('\n'));
+  }).filter(path => !path.includes('\n') && !symlinks.has(path));
   const blobs = new Map();
   if (lfsPaths.length === 0) return blobs;
   const specs = lfsPaths.map(path =>
