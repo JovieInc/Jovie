@@ -3159,8 +3159,7 @@ jobs:
 
   ci-profile-viewport-sweep:
     name: ci-fast (profile viewport sweep)
-    # Viewport sweep (tests/e2e/profile/viewport-sweep.spec.ts) for the public
-    # profile and golden-path pages; ci-fast fails closed on its result.
+    # tests/e2e/profile/viewport-sweep.spec.ts; ci-fast fails closed on it.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
     runs-on: ubuntu-24.04
     permissions:
@@ -3198,15 +3197,7 @@ jobs:
           MG_BASE: ${{ github.event.merge_group.base_sha }}
           BASE_REF: ${{ github.base_ref }}
           BEFORE: ${{ github.event.before }}
-        run: |
-          set -euo pipefail
-          if [[ "$EVENT" == merge_group ]]; then BASE="$MG_BASE"
-          elif [[ "$EVENT" == pull_request ]]; then git fetch origin "$BASE_REF" --no-tags; BASE="origin/$BASE_REF"
-          elif [[ -n "$BEFORE" && "$BEFORE" != 0000000000000000000000000000000000000000 ]]; then BASE="$BEFORE"
-          else BASE="HEAD^1"; fi
-          mapfile -t PATHSPECS < <(grep -v '^#' .github/viewport-sweep-paths.txt)
-          CHANGED="$(git diff --diff-filter=ACDMRT --name-only --no-renames "$BASE" HEAD -- "${PATHSPECS[@]}")"
-          echo "run=$([[ -n "$CHANGED" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+        run: bash .github/scripts/viewport-sweep-admission.sh
       - uses: ./.github/actions/setup-node-pnpm
         if: steps.sweep.outputs.run == 'true'
         with:

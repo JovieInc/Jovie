@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import test from 'node:test';
 
 const workflow = readFileSync('.github/workflows/ci.yml', 'utf8');
@@ -92,4 +92,17 @@ test('CI prevention verifier runs for every source PR and exact merge-group head
     ciFastAggregateBlock,
     /name: Validate CI\/release incident prevention contract|ci-release-incident-contract/
   );
+});
+
+// GitHub refuses a workflow file over 512,000 bytes: the merge group then gets
+// no CI run at all (only a parse failure), so the queue head stalls silently.
+test('every workflow file stays under the 512,000-byte limit', () => {
+  for (const name of readdirSync('.github/workflows')) {
+    if (!/\.ya?ml$/.test(name)) continue;
+    const size = statSync(`.github/workflows/${name}`).size;
+    assert.ok(
+      size < 512_000,
+      `${name} is ${size} bytes; move inline scripts to .github/scripts`
+    );
+  }
 });
