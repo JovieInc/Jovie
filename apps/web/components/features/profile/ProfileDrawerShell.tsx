@@ -124,13 +124,17 @@ export function ProfileDrawerShell({
   // subscribe so desktop preview shells never jump when swapping views.
   // `--profile-drawer-height-max` is intentionally shorter than the full phone
   // height to match the reference mock's exposed hero area.
+  // Tablet/embedded cards always float: they size to their content and clear
+  // the bottom tab bar (Tim, jov.ie/tim at 1000px: the menu card ran the full
+  // envelope height and slid under the tabs).
+  const floatingCard = floating || presentation === 'embedded';
   const drawerHeightStyle = {
     ['--profile-drawer-height-max' as string]: 'min(472px, 62dvh)',
     ['--profile-drawer-header' as string]: '72px',
   } as React.CSSProperties;
   const contentClasses = cn(
     'profile-drawer-shell-surface relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-t-(--profile-drawer-radius-mobile) border-t bg-[color:var(--profile-drawer-bg)] text-primary-token md:max-w-(--profile-shell-max-width) md:rounded-t-(--profile-drawer-radius-desktop)',
-    floating && 'profile-drawer-floating',
+    floatingCard && 'profile-drawer-floating',
     contentClassName
   );
   // Fixed height (not min-h) so overflow-y-auto activates on overflow; min-h
@@ -138,10 +142,10 @@ export function ProfileDrawerShell({
   // Docked sheets keep one fixed body height so switching views never jumps.
   // A floating task sheet sizes to its content (capped at the same height),
   // so a short list ends on the sheet's edge instead of empty space.
-  const bodyHeightClass = floating
+  const bodyHeightClass = floatingCard
     ? 'profile-drawer-floating-body'
     : 'h-[calc(var(--profile-drawer-height-max)_-_var(--profile-drawer-header))]';
-  const bodyClasses = `relative z-10 ${bodyHeightClass} overflow-y-auto overscroll-contain [touch-action:pan-y] [will-change:scroll-position] px-5 ${floating ? '' : 'pb-[calc(1.25rem_+_env(safe-area-inset-bottom))]'} pt-3 ${bodyClassName ?? ''}`;
+  const bodyClasses = `relative z-10 ${bodyHeightClass} overflow-y-auto overscroll-contain [touch-action:pan-y] [will-change:scroll-position] px-5 ${floatingCard ? '' : 'pb-[calc(1.25rem_+_env(safe-area-inset-bottom))]'} pt-3 ${bodyClassName ?? ''}`;
 
   const header = (
     <>
@@ -378,7 +382,7 @@ export function ProfileDrawerShell({
             <div
               className={cn(
                 'profile-drawer-shell-surface-card relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-(--profile-drawer-radius-desktop) border bg-[color:var(--profile-drawer-bg)] text-primary-token',
-                floating && 'profile-drawer-floating',
+                floatingCard && 'profile-drawer-floating',
                 contentClassName
               )}
             >
