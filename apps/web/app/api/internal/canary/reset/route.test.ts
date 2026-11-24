@@ -20,7 +20,16 @@ vi.mock('@/lib/synthetic/passage-token.server', () => ({
   resolveSyntheticPassageTokenDetailed: mocks.passageResolve,
 }));
 vi.mock('@/lib/rate-limit', () => ({
-  createRateLimiter: mocks.createLimiter,
+  // Import-time safe: route.ts constructs its route-local limiter at module
+  // scope, BEFORE any beforeEach runs, so the bare-mock export
+  // (`createRateLimiter: mocks.createLimiter`) returned undefined there and
+  // every POST test reaching the budget step crashed on
+  // `canaryResetLimiter.limit`. Record the call on the mock (the route-local
+  // config assertion below needs it) and always return the shared limiter.
+  createRateLimiter: (...args: unknown[]) => {
+    mocks.createLimiter(...args);
+    return { limit: mocks.limiter };
+  },
 }));
 vi.mock('@/lib/synthetic/canary-reset.server', () => ({
   executeCanaryReset: mocks.execute,
@@ -47,11 +56,21 @@ function grantFor(run: string) {
 
 describe('POST /api/internal/canary/reset', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    // Per-mock clears instead of vi.clearAllMocks(): the route constructs
+    // its limiter ONCE at module import, and the route-local config
+    // assertion below requires that single import-time call to survive.
+    for (const mock of [
+      mocks.cronAuth,
+      mocks.passageResolve,
+      mocks.limiter,
+      mocks.count,
+      mocks.execute,
+    ]) {
+      mock.mockClear();
+    }
     mocks.env.SYNTHETIC_PASSAGE_TOKENS_DISABLED = undefined;
     mocks.cronAuth.mockReturnValue(null);
     mocks.passageResolve.mockResolvedValue(grantFor('run-1'));
-    mocks.createLimiter.mockReturnValue({ limit: mocks.limiter });
     mocks.limiter.mockResolvedValue({ success: true });
     mocks.count.mockReset();
     mocks.execute.mockResolvedValue({
