@@ -2492,6 +2492,7 @@ export async function POST(req: Request) {
           artistRules: artistContext.artistRules,
           ask: userText,
           namedReleases: releases.map(release => release.title),
+          username: artistContext.username,
         });
         if (gatedReply.violations.length > 0) {
           const emptyReply = gatedReply.violations.some(

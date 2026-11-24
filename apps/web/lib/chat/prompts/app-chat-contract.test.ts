@@ -67,6 +67,10 @@ describe('deterministic /app/chat prompt contract (ASS-9 + ASS-16)', () => {
       'Never invent popularity, streams, peer benchmarks',
     ],
     [
+      'requiresEmptyProfileSetupNow',
+      'Never leave blank artist-facing text on where-to-start',
+    ],
+    [
       'requiresArtistFacingTextAfterTools',
       'After any tool or useSkill result, always write the artist-facing reply',
     ],

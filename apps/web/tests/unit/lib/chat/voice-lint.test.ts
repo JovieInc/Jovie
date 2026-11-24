@@ -157,6 +157,36 @@ describe('buildEmptyAssistantReplyFallback (ASS-103)', () => {
     });
     expect(text.toLowerCase()).toContain('neon reef');
     expect(text.toLowerCase()).toMatch(/budget|confirm|hold|draft/);
+    expect(text).toMatch(/held plan/i);
+    expect(text).toMatch(/"[^"]{12,}"/);
+    expect(text.toLowerCase()).toMatch(/not boost|nothing boosts/);
+    expect(text).not.toMatch(/\$\d/);
+    expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('ASS-106: empty-profile where-to-start gets a bio setup step', () => {
+    const text = buildEmptyAssistantReplyFallback({
+      ask: "I don't have any music out yet. where do I start?",
+      username: 'maraquill',
+    });
+    expect(text.toLowerCase()).toMatch(/add a bio/);
+    expect(text.toLowerCase()).toContain('jov.ie/maraquill');
+    expect(text.toLowerCase()).not.toMatch(/draft that and hold/);
+    expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('ASS-106: clear outreach draft ask gets a held email body', () => {
+    const text = buildEmptyAssistantReplyFallback({
+      ask: 'have outreach draft playlist emails for Night Swim under you',
+      namedReleases: releases,
+      username: 'lunawaves',
+    });
+    expect(text.toLowerCase()).toContain('night swim');
+    expect(text).toMatch(/held|subject:/i);
+    expect(text.toLowerCase()).toMatch(/no send until yes/);
+    expect(text.toLowerCase()).not.toMatch(
+      /^i will draft that for night swim and hold/
+    );
     expect(lintVoice(text).ok).toBe(true);
   });
 
