@@ -252,8 +252,7 @@ describe('ProfileDrawerShell keyboard modal contract', () => {
 
   it('stretches the embedded card up to popover width (jov.ie/tim dogfood)', () => {
     render(<MenuShell presentation='embedded' />);
-    // Native <dialog> was fit-content (185px Menu); the role=dialog shell
-    // uses w-auto to stretch and max-w-96 to cap (match modal path).
+    // role=dialog shell: w-auto stretches fit-content; max-w-96 caps.
     const sheet = screen.getByTestId('profile-menu-drawer');
     expect(sheet).toHaveAttribute('role', 'dialog');
     expect(sheet.className).toContain('w-auto');
