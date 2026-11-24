@@ -120,8 +120,9 @@ describe('add and remove a link in chat (outcome)', () => {
     const { userId, profileId } = await createArtist();
     session.userId = userId;
 
-    // What the proposeSocialLink tool returns for "add my instagram".
-    const detected = detectPlatform('instagram.com/linksoutcome');
+    // What the proposeSocialLink tool returns for "add my instagram"; the tool
+    // is told to pass a full URL, and the confirm route rejects anything else.
+    const detected = detectPlatform('https://instagram.com/linksoutcome');
     expect(detected.isValid).toBe(true);
 
     const added = await confirmLink(
@@ -158,7 +159,7 @@ describe('add and remove a link in chat (outcome)', () => {
     const owner = await createArtist();
     const other = await createArtist();
     session.userId = other.userId;
-    const detected = detectPlatform('instagram.com/notyours');
+    const detected = detectPlatform('https://instagram.com/notyours');
 
     const response = await confirmLink(
       post({
