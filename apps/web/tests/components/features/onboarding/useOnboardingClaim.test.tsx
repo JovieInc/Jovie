@@ -314,7 +314,7 @@ describe('useOnboardingClaim', () => {
     expect(replaceMock).not.toHaveBeenCalledWith('/onboarding/checkout');
   });
 
-  it('keeps missing durable artist data in the same /start conversation', async () => {
+  it('keeps missing durable artist data in the same /start conversation as intake-required (ONB-40)', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({
         claimed: 0,
@@ -326,7 +326,9 @@ describe('useOnboardingClaim', () => {
     render(renderClaimHarness(0));
 
     await waitFor(() =>
-      expect(screen.getByTestId('claim-status')).toHaveTextContent('no-op')
+      expect(screen.getByTestId('claim-status')).toHaveTextContent(
+        'intake-required'
+      )
     );
     expect(replaceMock).not.toHaveBeenCalled();
   });
@@ -343,7 +345,9 @@ describe('useOnboardingClaim', () => {
     const { rerender } = render(renderClaimHarness(0));
 
     await waitFor(() =>
-      expect(screen.getByTestId('claim-status')).toHaveTextContent('no-op')
+      expect(screen.getByTestId('claim-status')).toHaveTextContent(
+        'intake-required'
+      )
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
 

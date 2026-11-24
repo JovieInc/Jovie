@@ -32,7 +32,7 @@ const payload = (
   decision: { kind, rationale: 'fixture', score: 0.8 },
 });
 
-describe('ChatProposeNextStepCard claim handoff (ONB-36/38)', () => {
+describe('ChatProposeNextStepCard claim handoff (ONB-36/38/40)', () => {
   beforeEach(() => {
     authState.isSignedIn = true;
     authState.canRenderClerkUi = true;
@@ -57,6 +57,11 @@ describe('ChatProposeNextStepCard claim handoff (ONB-36/38)', () => {
   it.each([
     ['pending' as ClaimStatus, /saving your request/i, false],
     ['no-op' as ClaimStatus, /reply below so we can finish/i, false],
+    [
+      'intake-required' as ClaimStatus,
+      /name your artist or paste a spotify link/i,
+      false,
+    ],
     ['error' as ClaimStatus, /couldn't save your request/i, true],
     ['identity-conflict' as ClaimStatus, /belongs to another account/i, true],
   ])(
@@ -113,6 +118,24 @@ describe('ChatProposeNextStepCard claim handoff (ONB-36/38)', () => {
     const handoff = screen.getByTestId('onboarding-claim-handoff-copy');
     expect(handoff).toHaveTextContent(/reply below so we can finish/i);
     expect(handoff).toHaveAttribute('data-claim-status', 'no-op');
+    expect(handoff.getAttribute('role')).toBeNull();
+    await expectNoA11yViolations(container);
+  });
+
+  it('names artist/Spotify next action when intake is required (ONB-40)', async () => {
+    const { container } = render(
+      <OnboardingClaimHandoffProvider status='intake-required'>
+        <ChatProposeNextStepCard payload={payload('instant_access')} />
+      </OnboardingClaimHandoffProvider>
+    );
+
+    expect(screen.queryByText(/linking this conversation/i)).toBeNull();
+    expect(screen.queryByText(/reply below so we can finish/i)).toBeNull();
+    const handoff = screen.getByTestId('onboarding-claim-handoff-copy');
+    expect(handoff).toHaveTextContent(
+      /name your artist or paste a spotify link/i
+    );
+    expect(handoff).toHaveAttribute('data-claim-status', 'intake-required');
     expect(handoff.getAttribute('role')).toBeNull();
     await expectNoA11yViolations(container);
   });
