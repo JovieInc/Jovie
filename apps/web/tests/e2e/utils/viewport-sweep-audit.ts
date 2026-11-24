@@ -69,14 +69,8 @@ export async function settleViewport(page: Page): Promise<void> {
         ].map(selector => {
           const element = document.querySelector<HTMLElement>(selector);
           if (!element) return null;
-          const rect = element.getBoundingClientRect();
-          return [
-            rect.x,
-            rect.y,
-            rect.width,
-            rect.height,
-            getComputedStyle(element).transform,
-          ];
+          const { x, y, width, height } = element.getBoundingClientRect();
+          return [x, y, width, height, getComputedStyle(element).transform];
         })
       );
     await frame();
@@ -89,6 +83,12 @@ export async function settleViewport(page: Page): Promise<void> {
       stableFrames = current === previous ? stableFrames + 1 : 0;
       previous = current;
     }
+    // Let finite animations (a popover fading out at 1180px) end, up to 1s.
+    const finite = document
+      .getAnimations()
+      .filter(a => a.effect?.getComputedTiming().endTime !== Infinity);
+    const done = Promise.allSettled(finite.map(a => a.finished));
+    await Promise.race([done, new Promise(r => setTimeout(r, 1000))]);
   });
 }
 
