@@ -271,9 +271,8 @@ export async function auditViewport(
       );
       footer = madeWith?.closest<HTMLElement>('a') ?? madeWith ?? null;
     }
-    // Shell chrome: when the footer lives in an inner scroller (the profile's
-    // app shell), elements laid out outside that scroller, such as the pinned
-    // bottom tab bar, are chrome, not page content after the footer.
+    // Shell chrome: with the footer in an inner scroller (the profile shell),
+    // elements outside it, like the pinned tab bar, are chrome, not content.
     let contentScroller: HTMLElement | null = null;
     for (
       let current = footer?.parentElement ?? null;
@@ -286,6 +285,13 @@ export async function auditViewport(
         break;
       }
     }
+    // No branding (embedded preview): fall back to the shell's scroller.
+    contentScroller ??=
+      Array.from(
+        document.querySelectorAll<HTMLElement>(
+          '[data-testid="profile-content-scroll"], [data-testid="profile-desktop-content-scroll"]'
+        )
+      ).find(element => isVisible(element)) ?? null;
     const isShellChrome = (element: Element): boolean =>
       contentScroller !== null &&
       !contentScroller.contains(element) &&
@@ -444,19 +450,23 @@ export async function auditViewport(
             )
           );
         })
-        .map(element => element.getBoundingClientRect())
-        .filter(rect => rect.bottom > 0 && rect.top < vh)
-        .sort((a, b) => a.top - b.top);
-      let covered = blocks.length > 0 ? blocks[0].bottom : 0;
-      for (const rect of blocks.slice(1)) {
+        .map(element => ({ element, rect: element.getBoundingClientRect() }))
+        .filter(({ rect }) => rect.bottom > 0 && rect.top < vh)
+        .sort((a, b) => a.rect.top - b.rect.top);
+      let covered = blocks.length > 0 ? blocks[0].rect.bottom : 0;
+      let coveredBy: Element | null = blocks[0]?.element ?? null;
+      for (const { element, rect } of blocks.slice(1)) {
         const gap = rect.top - covered;
         if (gap > opts.maxVerticalGapPx) {
           add(
             'large_vertical_gap',
-            `${Math.round(gap)}px of empty vertical space between y=${Math.round(covered)} and y=${Math.round(rect.top)} (max ${opts.maxVerticalGapPx}px)`
+            `${Math.round(gap)}px of empty vertical space between y=${Math.round(covered)} and y=${Math.round(rect.top)} (max ${opts.maxVerticalGapPx}px), from ${coveredBy ? describe(coveredBy) : 'the top'} to ${describe(element)}`
           );
         }
-        covered = Math.max(covered, rect.bottom);
+        if (rect.bottom > covered) {
+          covered = rect.bottom;
+          coveredBy = element;
+        }
       }
     }
 

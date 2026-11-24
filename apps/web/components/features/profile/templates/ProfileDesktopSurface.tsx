@@ -74,7 +74,7 @@ import { useOverlayAnchor } from './useOverlayAnchor';
 
 // JOV-6201: reuse the 360px track at 1180px with min-w-0 on every desktop listen branch.
 export const PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME =
-  'grid min-h-0 min-w-0 flex-1 items-start gap-3.5 [@media(min-width:1180px)]:grid-cols-[minmax(0,1.3fr)_360px]';
+  'grid min-h-0 min-w-0 flex-none items-start gap-3.5 [@media(min-width:1180px)]:grid-cols-[minmax(0,1.3fr)_360px]';
 
 export const PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME =
   'min-h-0 min-w-0 overflow-hidden isolate';
@@ -1103,7 +1103,7 @@ export function ProfileDesktopSurface({
             {nonHomeContent}
             {!hideJovieBranding ? (
               <div
-                className='mt-auto flex justify-center pb-1 pt-2'
+                className='flex justify-center pb-1 pt-2'
                 data-testid='profile-jovie-branding'
               >
                 <FooterBranding

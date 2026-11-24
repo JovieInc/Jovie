@@ -1093,7 +1093,9 @@ describe('ProfileDesktopSurface', () => {
       'href',
       `/?utm_source=profile&utm_artist=${artist.handle}`
     );
-    expect(branding).toHaveClass('mt-auto'); // JOV-11623
+    // Follows the content instead of pinning to the fold, so short tabs
+    // like About leave no empty band above it (viewport sweep).
+    expect(branding).not.toHaveClass('mt-auto');
   });
 
   it('omits Jovie footer branding when hideJovieBranding is set (JOV-8777)', () => {
