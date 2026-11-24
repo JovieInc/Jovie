@@ -207,6 +207,75 @@ describe('ChatProposeNextStepCard states', () => {
     vi.unstubAllGlobals();
   });
 
+  it('rehydrates enrichment chip labels from sessionStorage on remount (ONB-34)', async () => {
+    const user = userEvent.setup();
+    const store = new Map<string, string>();
+    store.set(
+      'jovie:onboarding:enrichment:v1',
+      JSON.stringify({
+        platform: 'instagram',
+        audienceBand: '5k_to_50k',
+        socialUrl: 'https://www.instagram.com/wattwhite',
+        notedAt: new Date().toISOString(),
+      })
+    );
+    vi.stubGlobal('sessionStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      },
+    });
+
+    const { unmount } = render(
+      <ChatProposeNextStepCard
+        payload={payload('waitlist')}
+        claimHandle='wattwhite'
+      />
+    );
+
+    expect(
+      screen.getByTestId('onboarding-enrichment-social-chip')
+    ).toHaveTextContent('Instagram / TikTok Link Noted');
+    expect(
+      screen.getByTestId('onboarding-enrichment-social-chip')
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      screen.getByTestId('onboarding-enrichment-audience-chip')
+    ).toHaveTextContent('Audience Noted');
+    expect(
+      screen.getByTestId('onboarding-enrichment-audience-chip')
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('signup-surface')).toBeInTheDocument();
+
+    unmount();
+    render(
+      <ChatProposeNextStepCard
+        payload={payload('waitlist')}
+        claimHandle='wattwhite'
+      />
+    );
+
+    expect(
+      screen.getByTestId('onboarding-enrichment-social-chip')
+    ).toHaveTextContent('Instagram / TikTok Link Noted');
+    expect(
+      screen.getByTestId('onboarding-enrichment-audience-chip')
+    ).toHaveTextContent('Audience Noted');
+
+    await user.click(screen.getByTestId('onboarding-enrichment-social-chip'));
+    expect(
+      screen.getByTestId('onboarding-enrichment-social-instagram')
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('onboarding-enrichment-social-url')).toHaveValue(
+      'https://www.instagram.com/wattwhite'
+    );
+    expect(screen.getByTestId('signup-surface')).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
   it('rejects a disallowed enrichment URL without writing socialUrl (ONB-32)', async () => {
     const user = userEvent.setup();
     const store = new Map<string, string>();

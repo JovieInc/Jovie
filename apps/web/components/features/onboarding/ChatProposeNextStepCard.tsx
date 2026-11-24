@@ -12,6 +12,7 @@ import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 import {
   isAllowedEnrichmentSocialUrl,
   type PostKeepSocialPlatform,
+  readPostKeepEnrichmentNotes,
   writePostKeepEnrichmentNotes,
 } from '@/lib/onboarding/post-keep-enrichment-notes';
 
@@ -77,18 +78,56 @@ const AUDIENCE_BAND_OPTIONS: ReadonlyArray<{
 ];
 
 /**
+ * Hydrate chip UI from sessionStorage notes (ONB-34). Claim already reads
+ * the same key; without this, remount / interruption return shows empty
+ * “Add …” chips while notes still carry — dishonest vs what claim sends.
+ */
+function initialEnrichmentChipState(): {
+  readonly platform: SocialPlatformNote | null;
+  readonly audienceBand: AudienceBand | null;
+  readonly socialUrl: string | null;
+  readonly urlDraft: string;
+} {
+  const notes = readPostKeepEnrichmentNotes();
+  if (!notes) {
+    return {
+      platform: null,
+      audienceBand: null,
+      socialUrl: null,
+      urlDraft: '',
+    };
+  }
+  const platform = notes.platform ?? null;
+  const rawUrl = notes.socialUrl?.trim() || null;
+  const socialUrl =
+    rawUrl && isAllowedEnrichmentSocialUrl(rawUrl, platform) ? rawUrl : null;
+  return {
+    platform,
+    audienceBand: (notes.audienceBand ?? null) as AudienceBand | null,
+    socialUrl,
+    urlDraft: socialUrl ?? '',
+  };
+}
+
+/**
  * Subordinate optional chips above AuthShell (ONB-30). Local session state
  * only — never advances the guarded onboarding rail. Kept in this module so
  * Phase 5 does not introduce a new certificate-tracked component surface.
  */
 function PostKeepEnrichmentChips() {
   const [openPanel, setOpenPanel] = useState<EnrichmentPanel>(null);
+  // One storage read on mount (ONB-34); claim path uses the same key.
+  const [initial] = useState(initialEnrichmentChipState);
   const [savedPlatform, setSavedPlatform] = useState<SocialPlatformNote | null>(
-    null
+    initial.platform
   );
-  const [savedBand, setSavedBand] = useState<AudienceBand | null>(null);
-  const [savedSocialUrl, setSavedSocialUrl] = useState<string | null>(null);
-  const [urlDraft, setUrlDraft] = useState('');
+  const [savedBand, setSavedBand] = useState<AudienceBand | null>(
+    initial.audienceBand
+  );
+  const [savedSocialUrl, setSavedSocialUrl] = useState<string | null>(
+    initial.socialUrl
+  );
+  const [urlDraft, setUrlDraft] = useState(initial.urlDraft);
   // Allowlist hint only — Input invalid face via validationState.
   const [urlInvalidHint, setUrlInvalidHint] = useState<string | null>(null);
 
