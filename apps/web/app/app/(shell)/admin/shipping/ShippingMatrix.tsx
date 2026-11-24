@@ -388,15 +388,34 @@ export function ShippingRowRail({
   );
 }
 
-function matrixSummary(
+/**
+ * One freshness decision for the header and empty table (JOV-8961).
+ * Zero counts are reserved for a fresh complete feed. Known cached rows may
+ * still be shown under an explicit stale/syncing label.
+ */
+export function matrixSummary(
   query: Readonly<{ isPending: boolean; isError: boolean }>,
   rowCount: number,
   attentionCount: number,
-  syncState: TaskFeed['syncState'] | undefined
+  feed: Pick<TaskFeed, 'syncState'> | undefined
 ): string {
   if (query.isPending) return 'Loading in-flight work…';
-  if (query.isError) return 'UNKNOWN — observation failed. Refresh to retry.';
-  return `${rowCount} open · ${attentionCount} need attention · ${syncState ?? 'unknown'} cache`;
+  if (query.isError || !feed || feed.syncState === 'failed') {
+    return 'UNKNOWN — observation failed. Refresh to retry.';
+  }
+  if (feed.syncState === 'syncing') {
+    if (rowCount > 0) {
+      return `${rowCount} open · ${attentionCount} need attention · syncing cache`;
+    }
+    return 'Syncing in-flight work…';
+  }
+  if (feed.syncState === 'stale') {
+    if (rowCount > 0) {
+      return `${rowCount} open · ${attentionCount} need attention · stale cache`;
+    }
+    return 'In-flight work is unknown until the next sync.';
+  }
+  return `${rowCount} open · ${attentionCount} need attention · fresh cache`;
 }
 
 /**
@@ -470,12 +489,7 @@ export function ShippingMatrix() {
               In-flight Work
             </h2>
             <p className='truncate text-2xs text-tertiary-token'>
-              {matrixSummary(
-                query,
-                rows.length,
-                attentionCount,
-                feed?.syncState
-              )}
+              {matrixSummary(query, rows.length, attentionCount, feed)}
             </p>
           </div>
           <Button

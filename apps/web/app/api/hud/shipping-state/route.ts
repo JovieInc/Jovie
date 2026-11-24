@@ -3,10 +3,7 @@ import { NextResponse } from 'next/server';
 import { authorizeHud } from '@/lib/auth/hud';
 import { captureError } from '@/lib/error-tracking';
 import { scheduleAfter } from '@/lib/next/schedule-after';
-import {
-  FORBIDDEN_QUERY_KEYS,
-  SHIPPING_STATE_FRESHNESS_MS,
-} from '@/lib/ovie/shipping-state';
+import { FORBIDDEN_QUERY_KEYS } from '@/lib/ovie/shipping-state';
 import {
   hasCachedConfiguredShippingState,
   publishConfiguredShippingState,
@@ -104,31 +101,13 @@ export async function GET(request: NextRequest) {
 
     const projection = readCachedConfiguredShippingState();
 
-    // Each serverless instance keeps its own last-known projection and only
-    // reconciles when it is hit, so a poll can land on an instance whose
-    // observation is minutes old (observed 2026-10-25: ages 50-161s, which
-    // painted Shipping "cache is stale" and Product n/a while Home was live).
-    // Past the freshness window, take one coalesced measurement before
-    // answering; the publisher reuses any publication under its max age, so
-    // this costs one read per instance per window, not one per request.
-    const observedAtMs = Date.parse(projection.observationTimestamp ?? '');
-    if (
-      Number.isFinite(observedAtMs) &&
-      Date.now() - observedAtMs > SHIPPING_STATE_FRESHNESS_MS
-    ) {
-      try {
-        const refreshed = await measureWithin(INLINE_REFRESH_WAIT_MS);
-        if (refreshed) {
-          return NextResponse.json(refreshed, { headers: NO_STORE_HEADERS });
-        }
-      } catch (error) {
-        logger.error(
-          '[hud/shipping-state] Inline refresh failed; serving aged projection',
-          error
-        );
-      }
-    }
-
+    // Local-first (JOV-8961 / Mac daily-driver): a warm instance always paints
+    // the last-known projection immediately. Reconciliation runs after the
+    // response. Waiting on Linear/GitHub here held the Mac Shipping UI for
+    // up to INLINE_REFRESH_WAIT_MS on every poll past the freshness window
+    // (observed 2026-10-25: ages 50-161s while Home stayed live).
+    // Cold instances still measure inline above; publisher coalescing keeps
+    // background work to one read per instance per window.
     keepMeasuring();
 
     return NextResponse.json(projection, { headers: NO_STORE_HEADERS });

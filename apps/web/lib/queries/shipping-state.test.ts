@@ -73,6 +73,26 @@ describe('Shipping query contract', () => {
     client.clear();
   });
 
+  it('keeps the previous observation as placeholder while a remount reconciles', () => {
+    expect(shippingStateQueryOptions.placeholderData).toEqual(
+      expect.any(Function)
+    );
+    const previous = unknownProjection({
+      sequence: 2,
+      observationTimestamp: new Date().toISOString(),
+      emissionTimestamp: new Date().toISOString(),
+      latencyMs: 1,
+      publishing: true,
+      lastError: null,
+    });
+    const placeholder = shippingStateQueryOptions.placeholderData;
+    expect(
+      typeof placeholder === 'function'
+        ? placeholder(previous, undefined)
+        : placeholder
+    ).toBe(previous);
+  });
+
   it.each([
     [503, 'unavailable', 'Shipping observation unavailable (503)'],
     [200, '{}', 'Shipping receipt could not be validated'],
