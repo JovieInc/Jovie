@@ -140,17 +140,43 @@ export class ClaimCanaryNotProvisionedError extends Error {
 }
 
 /**
- * The reset endpoint's dedicated 6/hour budget (shared across all runs in
- * the Redis window) is exhausted. Retrying the walk cannot help until the
- * window clears — every retry that reaches reset would burn the budget
- * again (post-fix red 45336880733 retry #2). Named so the cert red is a
- * budget condition, not an opaque 429.
+ * The reset endpoint's hourly budgets are exhausted (JOV-9826): either the
+ * account-reset window (`Canary reset rate limit exceeded`) or the shared
+ * canary-walk passage-grant window (`Canary passage budget exhausted`),
+ * both Redis fixed windows shared across all runs. Retrying the walk
+ * cannot help until the window clears — every retry that reaches reset
+ * would burn the budget again (post-fix red 45336880733 retry #2). Named
+ * so the cert red is a budget condition, not an opaque 429 (and never the
+ * opaque 401 the passage-budget denial used to masquerade as, red
+ * 45350750159).
  */
 export class CanaryResetRateLimitedError extends Error {
   constructor(detail: string) {
     super(`canary reset HTTP 429: ${detail}`);
     this.name = 'CanaryResetRateLimitedError';
   }
+}
+
+/**
+ * Mint the walk's single-use `canary_reset` passage token exactly as
+ * `resetClaimCanary` sends it: bound to the fixed claim-walk canary, 5
+ * minutes of life, run-tagged for the audit log. Exported so the JOV-9826
+ * seam contract test (`tests/unit/e2e/canary-reset-passage-contract.test.ts`)
+ * can prove this mint satisfies the reset route's verify against the SAME
+ * key CI derives from CRON_SECRET — the failure class that red 45350750159
+ * was misread as (auth contract drift) is now pinned green or red by a
+ * unit test, not by a production probe.
+ */
+export function mintCanaryResetPassageToken(
+  passageKeyBase64Url: string,
+  runTag: string
+): string {
+  return mintPassageToken(Buffer.from(passageKeyBase64Url, 'base64url'), {
+    sub: PRODCERT_CLAIM_CANARY_EMAIL,
+    scp: 'canary_reset',
+    run: runTag.slice(0, 64),
+    ttlSeconds: 300,
+  });
 }
 
 /** POST /api/internal/canary/reset and assert it completed. */
@@ -166,12 +192,7 @@ export async function resetClaimCanary({
       'CRON_SECRET/SYNTHETIC_PASSAGE_KEY are not provided to this run'
     );
   }
-  const token = mintPassageToken(Buffer.from(passageKey, 'base64url'), {
-    sub: PRODCERT_CLAIM_CANARY_EMAIL,
-    scp: 'canary_reset',
-    run: runTag.slice(0, 64),
-    ttlSeconds: 300,
-  });
+  const token = mintCanaryResetPassageToken(passageKey, runTag);
   const bypassSecret = process.env.PLAYWRIGHT_VERCEL_BYPASS_SECRET;
   const response = await request.post(`${origin}/api/internal/canary/reset`, {
     headers: {

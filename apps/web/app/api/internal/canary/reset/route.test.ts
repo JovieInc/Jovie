@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   env: { SYNTHETIC_PASSAGE_TOKENS_DISABLED: undefined as string | undefined },
   cronAuth: vi.fn(),
-  passageGrant: vi.fn(),
+  passageResolve: vi.fn(),
   limiter: vi.fn(),
   count: vi.fn(),
   execute: vi.fn(),
@@ -16,7 +16,7 @@ vi.mock('@/lib/cron/auth', () => ({
   verifyCronRequest: mocks.cronAuth,
 }));
 vi.mock('@/lib/synthetic/passage-token.server', () => ({
-  resolveSyntheticPassageToken: mocks.passageGrant,
+  resolveSyntheticPassageTokenDetailed: mocks.passageResolve,
 }));
 vi.mock('@/lib/rate-limit', () => ({
   createRateLimiter: () => ({ limit: mocks.limiter }),
@@ -34,15 +34,22 @@ function postRequest(): Request {
   });
 }
 
+function grantOnce() {
+  return {
+    grant: {
+      actorId: 'prodcert' as const,
+      claims: { run: 'run-1', sub: 'x' },
+    },
+    denyCause: null,
+  };
+}
+
 describe('POST /api/internal/canary/reset', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.env.SYNTHETIC_PASSAGE_TOKENS_DISABLED = undefined;
     mocks.cronAuth.mockReturnValue(null);
-    mocks.passageGrant.mockResolvedValue({
-      actorId: 'prodcert',
-      claims: { run: 'run-1', sub: 'x' },
-    });
+    mocks.passageResolve.mockResolvedValue(grantOnce());
     mocks.limiter.mockResolvedValue({ success: true });
     mocks.count.mockReset();
     mocks.execute.mockResolvedValue({
@@ -61,6 +68,7 @@ describe('POST /api/internal/canary/reset', () => {
     const response = await POST(postRequest());
     expect(response.status).toBe(503);
     expect(mocks.cronAuth).not.toHaveBeenCalled();
+    expect(mocks.limiter).not.toHaveBeenCalled();
     expect(mocks.execute).not.toHaveBeenCalled();
   });
 
@@ -70,19 +78,64 @@ describe('POST /api/internal/canary/reset', () => {
     );
     const response = await POST(postRequest());
     expect(response.status).toBe(401);
-    expect(mocks.passageGrant).not.toHaveBeenCalled();
+    expect(mocks.limiter).not.toHaveBeenCalled();
+    expect(mocks.passageResolve).not.toHaveBeenCalled();
   });
 
   it('requires a consumable canary_reset passage token', async () => {
-    mocks.passageGrant.mockResolvedValue(null);
+    mocks.passageResolve.mockResolvedValue({
+      grant: null,
+      denyCause: 'invalid_token',
+    });
     const response = await POST(postRequest());
     expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      error: 'Valid canary passage token required',
+    });
     expect(mocks.execute).not.toHaveBeenCalled();
     expect(mocks.count).not.toHaveBeenCalled();
-    expect(mocks.passageGrant).toHaveBeenCalledWith(
+    expect(mocks.passageResolve).toHaveBeenCalledWith(
       expect.objectContaining({ get: expect.any(Function) }),
       'canary_reset',
       expect.objectContaining({ consume: true })
+    );
+  });
+
+  it('charges the reset budget BEFORE consuming the passage token (JOV-9826)', async () => {
+    // Red 45350750159: with the passage token consumed first, a budget-denied
+    // hour burned BOTH windows and the passage denial masqueraded as the
+    // opaque 401. The reset window is now charged first, so a denied hour
+    // costs this budget only and no passage grant is spent on it.
+    mocks.passageResolve.mockResolvedValue({
+      grant: null,
+      denyCause: 'invalid_token',
+    });
+    await POST(postRequest());
+    const limiterOrder = mocks.limiter.mock.invocationCallOrder[0];
+    const resolveOrder = mocks.passageResolve.mock.invocationCallOrder[0];
+    expect(limiterOrder).toBeDefined();
+    expect(resolveOrder).toBeGreaterThan(limiterOrder as number);
+  });
+
+  it('names the passage-grant budget as a 429, never the opaque 401 (JOV-9826)', async () => {
+    // The cert red must say "shared hourly budget", not auth drift: the
+    // 12/h shared window exhaustion (run 45350750159 class) previously
+    // returned the identical body as a bad token.
+    mocks.passageResolve.mockResolvedValue({
+      grant: null,
+      denyCause: 'rate_limited',
+    });
+    const response = await POST(postRequest());
+    expect(response.status).toBe(429);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const body = (await response.json()) as { error: string };
+    expect(body.error).toContain('Canary passage budget exhausted');
+    expect(body.error).not.toContain('Valid canary passage token required');
+    expect(mocks.execute).not.toHaveBeenCalled();
+    expect(mocks.count).toHaveBeenCalledExactlyOnceWith(
+      'synthetic.canary_reset.denied',
+      1,
+      { attributes: { reason: 'passage_budget_exhausted' } }
     );
   });
 
@@ -90,7 +143,7 @@ describe('POST /api/internal/canary/reset', () => {
     [false, 'budget_exhausted'],
     [true, 'limiter_unavailable'],
   ] as const)(
-    'fails closed and records only the denial reason (unavailable=%s)',
+    'fails closed on the reset budget without consuming a passage token (unavailable=%s)',
     async (unavailable, reason) => {
       mocks.limiter.mockResolvedValue({ success: false, unavailable });
       const response = await POST(postRequest());
@@ -100,6 +153,8 @@ describe('POST /api/internal/canary/reset', () => {
         error: 'Canary reset rate limit exceeded',
       });
       expect(mocks.execute).not.toHaveBeenCalled();
+      // No single-use passage grant is spent on a budget-denied attempt.
+      expect(mocks.passageResolve).not.toHaveBeenCalled();
       expect(mocks.count).toHaveBeenCalledExactlyOnceWith(
         'synthetic.canary_reset.denied',
         1,

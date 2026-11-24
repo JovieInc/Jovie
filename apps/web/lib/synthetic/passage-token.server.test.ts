@@ -6,6 +6,8 @@ const hoisted = vi.hoisted(() => ({
     SYNTHETIC_PASSAGE_TOKENS_DISABLED: undefined as string | undefined,
   },
   limit: vi.fn(),
+  walkLimit: vi.fn(),
+  walkConfigs: [] as { name?: string; limit?: number; prefix?: string }[],
   set: vi.fn(),
   redis: true,
   info: vi.fn(),
@@ -17,6 +19,17 @@ vi.mock('@/lib/env-server', () => ({ env: hoisted.env }));
 vi.mock('@/lib/rate-limit/limiters', () => ({
   syntheticPassageTokenLimiter: { limit: hoisted.limit },
 }));
+// JOV-9826: the canary-walk passage limiter is constructed at module level
+// in passage-token.server (route-local pattern; the shared limiters file is
+// size/export-pinned), so its constructor and budget land here.
+vi.mock('@/lib/rate-limit/rate-limiter', () => ({
+  createRateLimiter: (config: unknown) => {
+    hoisted.walkConfigs.push(
+      config as { name?: string; limit?: number; prefix?: string }
+    );
+    return { limit: hoisted.walkLimit, config };
+  },
+}));
 vi.mock('@/lib/redis', () => ({
   getRedis: () => (hoisted.redis ? { set: hoisted.set } : null),
 }));
@@ -27,7 +40,10 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 import { derivePassageKey, mintPassageToken } from './passage-token';
-import { resolveSyntheticPassageToken } from './passage-token.server';
+import {
+  resolveSyntheticPassageToken,
+  resolveSyntheticPassageTokenDetailed,
+} from './passage-token.server';
 
 const CANARY = 'browse-ready+synthetic-prodcert-run12345@jov.ie';
 
@@ -54,6 +70,7 @@ describe('resolveSyntheticPassageToken', () => {
     hoisted.env.SYNTHETIC_PASSAGE_TOKENS_DISABLED = undefined;
     hoisted.redis = true;
     hoisted.limit.mockResolvedValue({ success: true });
+    hoisted.walkLimit.mockResolvedValue({ success: true });
     hoisted.set.mockResolvedValue('OK');
   });
 
@@ -273,5 +290,98 @@ describe('resolveSyntheticPassageToken', () => {
       '[synthetic-passage-token] denied: rate limit',
       expect.anything()
     );
+  });
+
+  it('canary_reset grants draw the walk budget, not the shared /start budget (JOV-9826)', async () => {
+    // Red 45350750159: the walk's resets exhausted the shared 12/h window
+    // and the denial read as auth drift. The canary walk scopes now have
+    // their own hourly grant budget, sized for the postdeploy cadence.
+    const grant = await resolveSyntheticPassageToken(
+      headersWith(
+        mintPassageToken(derivePassageKey(hoisted.env.CRON_SECRET ?? ''), {
+          sub: CANARY,
+          scp: 'canary_reset',
+          run: '42-1',
+        })
+      ),
+      'canary_reset',
+      { consume: true, requestId: 'req-reset' }
+    );
+    expect(grant?.actorId).toBe('prodcert');
+    expect(hoisted.walkLimit).toHaveBeenCalledWith('canary_reset');
+    expect(hoisted.limit).not.toHaveBeenCalledWith('canary_reset');
+    // The route-local walk limiter is sized and named for exactly this walk.
+    const walkConfig = hoisted.walkConfigs.find(
+      c => c.prefix === 'synthetic_passage_canary_walk'
+    );
+    expect(walkConfig).toMatchObject({
+      prefix: 'synthetic_passage_canary_walk',
+      limit: 30,
+      window: '1 h',
+    });
+  });
+
+  it('canary_checkout draws the walk budget too (the JOV-9826 scope pair)', async () => {
+    await resolveSyntheticPassageToken(
+      headersWith(
+        mintPassageToken(derivePassageKey(hoisted.env.CRON_SECRET ?? ''), {
+          sub: CANARY,
+          scp: 'canary_checkout',
+          run: '42-1',
+        })
+      ),
+      'canary_checkout',
+      { consume: true }
+    );
+    expect(hoisted.walkLimit).toHaveBeenCalledWith('canary_checkout');
+    expect(hoisted.limit).not.toHaveBeenCalled();
+  });
+
+  it('exposes rate_limited as the deny cause so callers name the budget, not auth drift (JOV-9826)', async () => {
+    hoisted.walkLimit.mockResolvedValue({ success: false });
+    const detailed = await resolveSyntheticPassageTokenDetailed(
+      headersWith(
+        mintPassageToken(derivePassageKey(hoisted.env.CRON_SECRET ?? ''), {
+          sub: CANARY,
+          scp: 'canary_reset',
+          run: '42-1',
+        })
+      ),
+      'canary_reset',
+      { consume: true }
+    );
+    expect(detailed.grant).toBeNull();
+    expect(detailed.denyCause).toBe('rate_limited');
+    // The legacy wrapper keeps its null contract for the other callers.
+    await expect(
+      resolveSyntheticPassageToken(
+        headersWith(
+          mintPassageToken(derivePassageKey(hoisted.env.CRON_SECRET ?? ''), {
+            sub: CANARY,
+            scp: 'canary_reset',
+            run: '42-1',
+          })
+        ),
+        'canary_reset',
+        { consume: true }
+      )
+    ).resolves.toBeNull();
+  });
+
+  it('exposes invalid_token for a bad signature so the route keeps the opaque 401', async () => {
+    const detailed = await resolveSyntheticPassageTokenDetailed(
+      headersWith(
+        `${mintPassageToken(derivePassageKey(hoisted.env.CRON_SECRET ?? ''), {
+          sub: CANARY,
+          scp: 'canary_reset',
+          run: '42-1',
+        })}x`
+      ),
+      'canary_reset',
+      { consume: true }
+    );
+    expect(detailed.grant).toBeNull();
+    expect(detailed.denyCause).toBe('invalid_token');
+    expect(hoisted.walkLimit).not.toHaveBeenCalled();
   });
 });
