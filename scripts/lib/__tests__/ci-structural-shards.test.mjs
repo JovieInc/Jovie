@@ -136,14 +136,17 @@ describe('lanes coverage matrix legs', () => {
     expect([...grouped].sort()).toEqual(
       LANES_PYTEST_SHARDS.map(shard => shard.id).sort()
     );
-    for (const command of Object.values(LANES_COVERAGE_GROUP_COMMANDS)) {
-      expect(command).toContain('coverage combine');
+    for (const [group, ids] of Object.entries(LANES_COVERAGE_GROUP_SHARDS)) {
+      const command = LANES_COVERAGE_GROUP_COMMANDS[group];
+      expect(command).toContain(`jovie-lanes-${group}.coverage`);
       expect(command).not.toContain('--fail-under');
-    }
-    for (const group of Object.keys(LANES_COVERAGE_GROUP_SHARDS)) {
-      expect(LANES_COVERAGE_GROUP_COMMANDS[group]).toContain(
-        `jovie-lanes-${group}.coverage`
-      );
+      // Single-shard groups whose key equals the shard id must not combine the
+      // shard data file onto itself (coverage.py: "No usable data files").
+      if (ids.length === 1 && ids[0] === group) {
+        expect(command).not.toContain('coverage combine');
+      } else {
+        expect(command).toContain('coverage combine');
+      }
     }
   });
 
