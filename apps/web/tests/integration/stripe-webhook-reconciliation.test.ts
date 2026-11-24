@@ -90,6 +90,7 @@ function resolveTarget(env: NodeJS.ProcessEnv): Target | null {
 }
 
 const target = resolveTarget(process.env);
+const PARKED_LEASE = new Date('9999-01-01T00:00:00.000Z');
 
 describe.skipIf(!target)(
   'Stripe webhooks never acknowledge and lose a paid event (real Postgres)',
@@ -99,6 +100,7 @@ describe.skipIf(!target)(
     const suffix = randomUUID().slice(0, 8);
     const eventIds: string[] = [];
     const userIds: string[] = [];
+    let parked: { id: string; processing_started_at: Date | null }[] = [];
 
     beforeAll(async () => {
       if (!target) throw new Error('Database target missing');
@@ -149,10 +151,33 @@ describe.skipIf(!target)(
           migrationsFolder: path.join(process.cwd(), 'drizzle', 'migrations'),
         });
       }
+      // The certification database is a copy of a shared branch, so it can
+      // arrive holding older unprocessed webhook rows. Replay takes the oldest
+      // ten, so those rows can crowd this test's events out of every batch.
+      // Park them under a far-future lease for the run and restore them after.
+      parked = await client<
+        { id: string; processing_started_at: Date | null }[]
+      >`
+        SELECT id, processing_started_at FROM stripe_webhook_events
+        WHERE processed_at IS NULL`;
+      if (parked.length > 0) {
+        console.info(
+          `[stripe-recon] parking ${parked.length} pre-existing unprocessed webhook row(s) for this run`
+        );
+        await client`
+          UPDATE stripe_webhook_events SET processing_started_at = ${PARKED_LEASE}
+          WHERE id IN ${client(parked.map(row => row.id))}`;
+      }
     }, 120_000);
 
     afterAll(async () => {
       if (client) {
+        for (const row of parked) {
+          await client`
+            UPDATE stripe_webhook_events
+            SET processing_started_at = ${row.processing_started_at}
+            WHERE id = ${row.id} AND processing_started_at = ${PARKED_LEASE}`;
+        }
         await client`DROP TRIGGER IF EXISTS recon_capture_failure ON stripe_webhook_events`;
         await client`DROP FUNCTION IF EXISTS recon_capture_failure()`;
         if (eventIds.length > 0) {
