@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
+  assertCanaryResetSurfaceReady,
   type CanaryResetSurfacePreflight,
   classifyCanaryResetSurfaceProbe,
 } from '@/tests/e2e/helpers/canary-reset-client';
@@ -53,5 +54,99 @@ describe('classifyCanaryResetSurfaceProbe', () => {
     if (!verdict.ready) {
       expect(verdict.detail).toContain('500');
     }
+  });
+});
+
+describe('assertCanaryResetSurfaceReady', () => {
+  const previousSecret = process.env.CRON_SECRET;
+  const previousBypass = process.env.PLAYWRIGHT_VERCEL_BYPASS_SECRET;
+
+  afterEach(() => {
+    if (previousSecret === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = previousSecret;
+    if (previousBypass === undefined) {
+      delete process.env.PLAYWRIGHT_VERCEL_BYPASS_SECRET;
+    } else {
+      process.env.PLAYWRIGHT_VERCEL_BYPASS_SECRET = previousBypass;
+    }
+  });
+
+  function mockRequest(status: number, body: string) {
+    const calls: Array<{ url: string; headers: Record<string, string> }> = [];
+    return {
+      calls,
+      request: {
+        get: async (
+          url: string,
+          init?: { headers?: Record<string, string> }
+        ) => {
+          calls.push({ url, headers: init?.headers ?? {} });
+          return { status: () => status, text: async () => body };
+        },
+      },
+      origin: 'https://staging.jov.ie',
+    };
+  }
+
+  it('sends the cron bearer (and bypass header when held) and returns the verdict when ready', async () => {
+    process.env.CRON_SECRET = 'cron-secret-value';
+    process.env.PLAYWRIGHT_VERCEL_BYPASS_SECRET = 'bypass-value';
+    const probe = mockRequest(200, '{"status":"ok"}');
+    const verdict = await assertCanaryResetSurfaceReady({
+      request: probe.request,
+      origin: probe.origin,
+    });
+    expect(verdict.ready).toBe(true);
+    expect(probe.calls).toHaveLength(1);
+    expect(probe.calls[0].url).toBe('https://staging.jov.ie/api/health/redis');
+    expect(probe.calls[0].headers.authorization).toBe(
+      'Bearer cron-secret-value'
+    );
+    expect(probe.calls[0].headers['x-vercel-protection-bypass']).toBe(
+      'bypass-value'
+    );
+  });
+
+  it('throws the named preflight error when the surface has no Redis', async () => {
+    process.env.CRON_SECRET = 'cron-secret-value';
+    delete process.env.PLAYWRIGHT_VERCEL_BYPASS_SECRET;
+    const probe = mockRequest(
+      503,
+      JSON.stringify({
+        error: 'Redis is unavailable',
+        failureKind: 'not_configured',
+      })
+    );
+    await expect(
+      assertCanaryResetSurfaceReady({
+        request: probe.request,
+        origin: probe.origin,
+      })
+    ).rejects.toThrow(/cannot run the JOV-9826 walk.*no Redis/su);
+    expect(
+      probe.calls[0].headers['x-vercel-protection-bypass']
+    ).toBeUndefined();
+  });
+
+  it('defers to the reset endpoint when the build predates the health route', async () => {
+    process.env.CRON_SECRET = 'cron-secret-value';
+    const probe = mockRequest(405, '');
+    const verdict = await assertCanaryResetSurfaceReady({
+      request: probe.request,
+      origin: probe.origin,
+    });
+    expect(verdict.ready).toBe(true);
+  });
+
+  it('fails fast when CRON_SECRET is absent from the run', async () => {
+    delete process.env.CRON_SECRET;
+    const probe = mockRequest(200, '{}');
+    await expect(
+      assertCanaryResetSurfaceReady({
+        request: probe.request,
+        origin: probe.origin,
+      })
+    ).rejects.toThrow('CRON_SECRET is not provided to this run');
+    expect(probe.calls).toHaveLength(0);
   });
 });
