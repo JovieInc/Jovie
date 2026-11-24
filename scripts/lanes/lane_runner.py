@@ -10648,10 +10648,12 @@ def _update_locked(host: Host) -> int:
     except Exception as failure:
         code, error = 1, f"{type(failure).__name__}: {failure}"[:300]
     skills = host_maintenance(host, refresh_codex_skills)
+    # Keep capacity SHARE waste modules aligned with origin/main (gem:waste-loop receipt).
+    waste = host_maintenance(host, lambda h: __import__("waste_loop_heal").heal(h, force_run=False))
     lag = host_maintenance(host, lambda h: install_lag(h, before, error))
     update_json(host.state / "update.json", lambda data: (data.clear(), data.update(
         at=now_iso(), ok=code == 0, error=error, current=read_marker(host), mirror=mirror, skills=skills,
-        behindS=lag.get("behindS"), behindCommit=lag.get("behindCommit"))))
+        wasteLoop=waste, behindS=lag.get("behindS"), behindCommit=lag.get("behindCommit"))))
     host_maintenance(host, lambda h: update_drain.finish(h.state, lag.get("behindS")) or {"status": "no-drain"})
     return code
 

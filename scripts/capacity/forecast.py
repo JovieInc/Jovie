@@ -377,7 +377,18 @@ def main(argv: list[str] | None = None) -> int:
         delivery = deliver(cards, state, local, now)
         if local == cloud_owner and os.environ.get("WASTE_LOOP") != "off":
             try:  # unit-metric waste detectors ride the same pass (ops/registry/waste.json)
-                import waste
+                try:
+                    import waste
+                except ImportError:
+                    # SHARE install historically omitted waste.py (#23933). Prefer a live
+                    # checkout beside CAPACITY_REPO / LANES_REPO before giving up.
+                    for root in (os.environ.get("CAPACITY_REPO"), os.environ.get("LANES_REPO")):
+                        if not root:
+                            continue
+                        extra = str(Path(root) / "scripts" / "capacity")
+                        if extra not in sys.path and (Path(extra) / "waste.py").is_file():
+                            sys.path.insert(0, extra)
+                    import waste  # noqa: F401
                 waste.run_pass()
             except Exception as error:  # a waste-loop fault never blocks capacity alarms
                 print(f"waste-loop: {type(error).__name__}: {error}", file=sys.stderr)
