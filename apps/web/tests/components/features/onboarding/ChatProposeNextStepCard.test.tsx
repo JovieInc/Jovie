@@ -117,4 +117,20 @@ describe('ChatProposeNextStepCard waitlist truthfulness', () => {
       'waitlist'
     );
   });
+
+  it('marks the AuthShell card as an onboarding auth scroll anchor (ONB-27)', () => {
+    const { container, getByTestId } = render(
+      <ChatProposeNextStepCard
+        payload={waitlistPayload}
+        claimHandle='unmarkedpave'
+      />
+    );
+    const anchor = container.querySelector('[data-onboarding-auth-anchor]');
+    expect(anchor?.hasAttribute('data-onboarding-auth-anchor')).toBe(true);
+    expect(anchor).toContainElement(getByTestId('waitlist-signup'));
+    expect(getByTestId('waitlist-signup')).toHaveAttribute(
+      'data-access-kind',
+      'waitlist'
+    );
+  });
 });

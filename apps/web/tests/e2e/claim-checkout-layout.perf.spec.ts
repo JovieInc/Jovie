@@ -1,11 +1,11 @@
 import { expect, type Page, test } from '@playwright/test';
 import { DEFAULT_DEV_TEST_AUTH_EMAILS } from '@/lib/auth/dev-test-auth-identity';
 import { setTestAuthBypassSession } from '../helpers/auth';
+import { ensureUserIsFree } from './helpers/ensure-user-is-free';
 import {
   createCheckoutSession,
   createSignedStripeWebhook,
   detachCustomerPaymentMethods,
-  ensureUserIsFree,
   getBillingStatus,
   getStripeContextOrSkip,
   interceptTrackingRoutes,
@@ -50,7 +50,11 @@ test.describe('Claim checkout layout budget', () => {
     const { stripeClient } = await getStripeContextOrSkip();
     await interceptTrackingRoutes(page);
     await setTestAuthBypassSession(page, 'creator');
-    await ensureUserIsFree(page, stripeClient);
+    await ensureUserIsFree(
+      page,
+      stripeClient,
+      DEFAULT_DEV_TEST_AUTH_EMAILS.creator
+    );
     // Same entry as a buyer: claim start sets the Pro intent and flow marker.
     const start = await page.request.get('/claim/start?new=1', {
       maxRedirects: 0,
@@ -67,7 +71,11 @@ test.describe('Claim checkout layout budget', () => {
     const { stripeClient, priceId } = await getStripeContextOrSkip();
     await interceptTrackingRoutes(page);
     await setTestAuthBypassSession(page, 'creator');
-    await ensureUserIsFree(page, stripeClient);
+    await ensureUserIsFree(
+      page,
+      stripeClient,
+      DEFAULT_DEV_TEST_AUTH_EMAILS.creator
+    );
     await detachCustomerPaymentMethods(
       stripeClient,
       DEFAULT_DEV_TEST_AUTH_EMAILS.creator

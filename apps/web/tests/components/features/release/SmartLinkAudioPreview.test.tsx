@@ -83,7 +83,7 @@ describe('SmartLinkAudioPreview', () => {
       />
     );
     expect(screen.getByTestId('smart-link-audio-preview')).toBeInTheDocument();
-    expect(screen.getByLabelText('Seek track')).toBeDisabled();
+    expect(screen.getByLabelText('Seek Track')).toBeDisabled();
   });
 
   it('shows a deliberate idle dash instead of malformed duration before playback', () => {
@@ -166,7 +166,7 @@ describe('SmartLinkAudioPreview', () => {
       />
     );
     expect(screen.getByText('0:30 · Preview')).toBeInTheDocument();
-    expect(screen.getByLabelText('Seek track')).toBeEnabled();
+    expect(screen.getByLabelText('Seek Track')).toBeEnabled();
     expect(
       screen.getByRole('button', { name: 'Pause preview' })
     ).toBeInTheDocument();

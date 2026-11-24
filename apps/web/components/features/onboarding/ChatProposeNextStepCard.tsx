@@ -264,7 +264,7 @@ export function ChatProposeNextStepCard({
     }
 
     return (
-      <div className='min-h-72 space-y-3 px-1 py-1'>
+      <div className='min-h-72 space-y-3 px-1 py-1' data-onboarding-auth-anchor>
         <p className='mb-3 text-mid leading-7 text-primary-token'>
           Save your spot. Add a verified email to save this request and reserve
           your name and profile. You are not on the list until the confirmation
@@ -307,7 +307,7 @@ export function ChatProposeNextStepCard({
   }
 
   return (
-    <div className='space-y-3 px-1 py-1'>
+    <div className='space-y-3 px-1 py-1' data-onboarding-auth-anchor>
       <p className='mb-3 text-mid leading-7 text-primary-token'>
         {`You're in. Add an email to save your profile and this conversation.`}
       </p>

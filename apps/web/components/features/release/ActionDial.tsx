@@ -77,7 +77,7 @@ export function ActionDial({
   groupLabel,
   onActivate,
   preferredId = null,
-  hint = 'Swipe to switch. Your choice is remembered.',
+  hint = 'Swipe to switch.',
   className,
   disabled = false,
 }: Readonly<ActionDialProps>) {

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
@@ -32,6 +32,98 @@ const layoutClasses = (el: HTMLElement) =>
     .join(' ');
 
 const advance = (ms: number) => act(() => void vi.advanceTimersByTime(ms));
+
+const player = {
+  title: 'Never Say A Word',
+  artist: 'Tim White',
+  isPlaying: true,
+  onToggle: vi.fn(),
+  onExpand: vi.fn(),
+};
+
+describe('SidebarOPresence as the mini player', () => {
+  it('is play/pause with the track title beside it, in the compact audio surface', () => {
+    const { rerender } = render(<SidebarOPresence player={player} />);
+    const pause = screen.getByRole('button', {
+      name: 'Pause Never Say A Word',
+    });
+    fireEvent.click(pause);
+    expect(player.onToggle).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('link', { name: 'Open Chat' })).toBeNull();
+    const surface = screen.getByTestId(SIDEBAR_O_PRESENCE_TEST_ID);
+    expect(surface).toHaveAttribute(
+      'data-shell-audio-surface',
+      'sidebar-compact'
+    );
+    expect(surface).toHaveAttribute('data-state', 'visible');
+    const expand = screen.getByRole('button', { name: /Show Player/ });
+    expect(expand).toHaveAttribute('data-audio-expand-player', 'true');
+    expect(expand).toHaveTextContent('Never Say A Word · Tim White');
+    fireEvent.click(expand);
+    expect(player.onExpand).toHaveBeenCalledOnce();
+    rerender(<SidebarOPresence player={{ ...player, isPlaying: false }} />);
+    expect(
+      screen.getByRole('button', { name: 'Play Never Say A Word' })
+    ).toBeVisible();
+  });
+
+  it('draws one glyph and keeps the row and slot boxes the same as idle', () => {
+    const idle = render(<SidebarOPresence />);
+    const idleRow = layoutClasses(
+      screen.getByTestId(SIDEBAR_O_PRESENCE_TEST_ID)
+    );
+    const idleButton = layoutClasses(screen.getByRole('link'));
+    idle.unmount();
+    const { container } = render(<SidebarOPresence player={player} />);
+    expect(layoutClasses(screen.getByTestId(SIDEBAR_O_PRESENCE_TEST_ID))).toBe(
+      idleRow
+    );
+    // Idle O is a 28px link (size-7); the player O is Button icon-sm, which
+    // is the same 28px box, so the slot does not move when play starts.
+    expect(idleButton.split(' ')).toContain('size-7');
+    const playerButton = screen
+      .getByRole('button', { name: /^Pause/ })
+      .className.split(' ');
+    expect(playerButton).toEqual(expect.arrayContaining(['h-7', 'w-7']));
+    expect(container.querySelectorAll('svg')).toHaveLength(1);
+  });
+
+  it('shows just the title when the track has no artist', () => {
+    render(<SidebarOPresence player={{ ...player, artist: null }} />);
+    expect(
+      screen.getByRole('button', { name: /Show Player/ })
+    ).toHaveTextContent(/^Never Say A WordShow Player$/);
+  });
+
+  it('is present but inert and hidden while the full player is the transport', () => {
+    render(<SidebarOPresence player={player} inert />);
+    const surface = screen.getByTestId(SIDEBAR_O_PRESENCE_TEST_ID);
+    expect(surface).toHaveAttribute('inert');
+    expect(surface).toHaveAttribute('aria-hidden', 'true');
+    expect(surface).toHaveAttribute('data-state', 'reserved');
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('fades a new title in on the subtle token and drops it under reduced motion', () => {
+    const css = readFileSync(join(__dirname, 'SidebarOPresence.css'), 'utf8');
+    expect(css).toMatch(
+      /animation:\s*sidebar-o-title-in var\(--duration-subtle\)/
+    );
+    expect(css).not.toMatch(/\d\s?ms\b/);
+    const keyframes =
+      css.match(/@keyframes sidebar-o-title-in\s*\{[^@]*?\}\s*\}/s)?.[0] ?? '';
+    expect(keyframes).toMatch(/opacity/);
+    expect(keyframes).not.toMatch(/width|height|margin|padding|top|left/);
+    expect(css).toMatch(
+      /prefers-reduced-motion: reduce\)\s*\{[^}]*\.sidebar-o-title\s*\{\s*animation: none/s
+    );
+  });
+
+  it('has no axe violations as the mini player', async () => {
+    const { container } = render(<SidebarOPresence player={player} />);
+    await expectNoA11yViolations(container);
+  });
+});
 
 describe('SidebarOPresence', () => {
   it('links the O to the main chat page without opening a panel', () => {

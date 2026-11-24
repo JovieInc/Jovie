@@ -33,3 +33,24 @@
 .group[data-collapsible="icon"] .sidebar-o-status {
   display: none;
 }
+
+/* The track title cross-fades in on a new track; auto-advance is the only
+   other change. Opacity only, on the subtle token. */
+.sidebar-o-title {
+  animation: sidebar-o-title-in var(--duration-subtle) var(--ease-subtle) both;
+}
+
+@keyframes sidebar-o-title-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-o-title {
+    animation: none;
+  }
+}
