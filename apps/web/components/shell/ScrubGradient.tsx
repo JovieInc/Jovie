@@ -231,7 +231,7 @@ export function ScrubGradient({
             aria-label='Seek Track Waveform'
             aria-valuetext={`${formatTime(safeCurrent)} of ${formatTime(safeDuration)}`}
             disabled={safeDuration <= 0}
-            className='absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0 disabled:cursor-default'
+            className='absolute inset-0 w-full'
           />
         ) : null}
       </div>
