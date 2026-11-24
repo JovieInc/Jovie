@@ -150,9 +150,11 @@ describe('ci-fast shard fan-in contracts', () => {
     for (const name of REMAINING_ONCE) {
       const step = worker.steps.find(step => step.name === name);
       expect(step, name).toBeDefined();
-      expect(step.if, name).toContain('matrix.shard == 1');
+      // Wave 1a: once-work on shard 2 so it does not stack on shard 1's
+      // heavy structural slice.
+      expect(step.if, name).toContain('matrix.shard == 2');
       expect(
-        worker.strategy.matrix.shard.filter(shard => shard === 1)
+        worker.strategy.matrix.shard.filter(shard => shard === 2)
       ).toHaveLength(1);
     }
     for (const name of REMAINING_SHARED) {
