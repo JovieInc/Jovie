@@ -74,9 +74,6 @@ describe('Shipping query contract', () => {
   });
 
   it('keeps the previous observation as placeholder while a remount reconciles', () => {
-    expect(shippingStateQueryOptions.placeholderData).toEqual(
-      expect.any(Function)
-    );
     const previous = unknownProjection({
       sequence: 2,
       observationTimestamp: new Date().toISOString(),
@@ -86,11 +83,11 @@ describe('Shipping query contract', () => {
       lastError: null,
     });
     const placeholder = shippingStateQueryOptions.placeholderData;
-    expect(
-      typeof placeholder === 'function'
-        ? placeholder(previous, undefined)
-        : placeholder
-    ).toBe(previous);
+    expect(placeholder).toEqual(expect.any(Function));
+    if (typeof placeholder !== 'function') {
+      throw new Error('expected placeholderData function');
+    }
+    expect(placeholder(previous, undefined as never)).toBe(previous);
   });
 
   it.each([
