@@ -72,7 +72,7 @@ describe('TaskDataTable', () => {
       'data-row-class-name',
       TASK_DATA_TABLE_ROW_CLASSNAME
     );
-    expect(table).toHaveAttribute('data-row-mode', 'dense');
+    expect(table).toHaveAttribute('data-row-mode', 'compact');
     expect(table).toHaveAttribute('data-skeleton-rows', '8');
     expect(table).toHaveAttribute('data-virtualized', 'false');
     expect(TASK_DATA_TABLE_ROW_CLASSNAME).toContain('group/row');
@@ -89,7 +89,7 @@ describe('TaskDataTable', () => {
     );
   });
 
-  it('allows callers to extend task table chrome without losing dense row mode', () => {
+  it('allows callers to extend task table chrome without losing compact row mode', () => {
     render(
       <TaskDataTable
         className='custom-density'
@@ -114,7 +114,7 @@ describe('TaskDataTable', () => {
       'data-row-class-name',
       `${TASK_DATA_TABLE_ROW_CLASSNAME} selected-row`
     );
-    expect(table).toHaveAttribute('data-row-mode', 'dense');
+    expect(table).toHaveAttribute('data-row-mode', 'compact');
   });
 
   it('preserves column-owned multiline content through the task table wrapper', () => {

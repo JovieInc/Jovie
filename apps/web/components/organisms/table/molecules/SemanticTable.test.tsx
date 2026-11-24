@@ -30,7 +30,7 @@ describe('SemanticTable row geometry', () => {
     );
   });
 
-  it('defaults to dense geometry when no mode is selected', () => {
+  it('defaults to compact geometry when no mode is selected', () => {
     render(
       <TableRoot>
         <TableBody>
@@ -41,8 +41,8 @@ describe('SemanticTable row geometry', () => {
       </TableRoot>
     );
     const table = screen.getByRole('table');
-    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
-    expect(table.style.getPropertyValue('--table-row-height')).toBe('32px');
+    expect(table).toHaveAttribute('data-table-row-mode', 'compact');
+    expect(table.style.getPropertyValue('--table-row-height')).toBe('40px');
   });
 
   it('composes an axe-clean table with a header row', async () => {

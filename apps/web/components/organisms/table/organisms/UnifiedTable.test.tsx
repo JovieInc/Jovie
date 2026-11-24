@@ -42,15 +42,15 @@ function table(data: CatalogRow[], emptyState?: ReactNode) {
 }
 
 describe('UnifiedTable states', () => {
-  it('defaults to the canonical dense row mode', () => {
+  it('defaults to the canonical compact row mode', () => {
     render(table(RELEASES));
     expect(screen.getByRole('table')).toHaveAttribute(
       'data-table-row-mode',
-      'dense'
+      'compact'
     );
     expect(
       screen.getByRole('table').style.getPropertyValue('--table-row-height')
-    ).toBe('32px');
+    ).toBe('40px');
   });
 
   it('opens a row with missing values on click', async () => {
