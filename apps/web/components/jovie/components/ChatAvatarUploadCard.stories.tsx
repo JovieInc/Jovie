@@ -20,7 +20,22 @@ function buildDashboardData(withProfile: boolean): DashboardData {
     hasSocialLinks: false,
     hasMusicLinks: false,
     isAdmin: false,
-  } as unknown as DashboardData;
+    tippingStats: {
+      tipClicks: 0,
+      qrTipClicks: 0,
+      linkTipClicks: 0,
+      tipsSubmitted: 0,
+      totalReceivedCents: 0,
+      monthReceivedCents: 0,
+    },
+    profileCompletion: {
+      percentage: 0,
+      completedCount: 0,
+      totalCount: 6,
+      steps: [],
+      profileIsLive: false,
+    },
+  };
 }
 
 function createStoryQueryClient() {
