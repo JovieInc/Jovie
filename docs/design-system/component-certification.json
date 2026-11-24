@@ -2092,6 +2092,10 @@
     "apps/web/components/features/profile/ClaimBanner.tsx": {
       "empty": "ClaimBanner renders no collection: it always shows one ownership message and at most one CTA; the detector matched the items-center class. The no-CTA variant is PartialNoClaimAction."
     },
+    "apps/web/components/features/profile/DesktopQrOverlay.tsx": {
+      "empty": "The overlay owns no collection; it draws one QR card or one reopen icon. The detector matched the items-center layout class. Hidden mode returns null.",
+      "error": "The only catch guards location.origin when reopening the card; failure logs and keeps the previous url, so there is no error face to draw."
+    },
     "apps/web/components/features/profile/DesktopQrOverlayClient.tsx": {
       "loading": "The wrapper renders null on the server and on first paint by design (JOV-2273, no CSR bailout), then shows the icon once matchMedia resolves in an effect, so there is no loading chrome to capture; DesktopQrOverlayClient.test.tsx asserts the empty server render."
     },
