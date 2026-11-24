@@ -198,7 +198,10 @@ async function verifyHomeWelcome(page: Page) {
       await page.emulateMedia({
         reducedMotion: viewport.width === 615 ? 'reduce' : 'no-preference',
       });
-      const { initialGreeting, before } = await openHomeWelcome(page);
+      const { initialGreeting, before } = await openHomeWelcome(
+        page,
+        TEST_SPOTIFY_ARTIST.name.split(' ')[0]
+      );
       await expect(heading).toHaveText(initialGreeting!);
       // Same chunk-swap race as the helper's `before` read: re-read the box
       // until the mounted composer yields a real one, never a single sample.
