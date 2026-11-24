@@ -43,10 +43,5 @@ const ui = {
   }) => <input ref={ref} data-host-drawn='' {...props} />,
 };
 
-export const {
-  Dialog,
-  DialogContent,
-  Button,
-  PlainButton,
-  HostDrawnInput,
-} = ui;
+export const { Dialog, DialogContent, Button, PlainButton, HostDrawnInput } =
+  ui;
