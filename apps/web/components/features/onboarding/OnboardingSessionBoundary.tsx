@@ -32,6 +32,17 @@ export interface OnboardingSessionBoundaryProps extends OnboardingShellProps {
   readonly initialSnapshot?: OnboardingSessionSnapshot;
 }
 
+/** Cold restore / account switch — keep the nightly stall window tight. */
+const RESTORE_TIMEOUT_MS = 10_000;
+/**
+ * Anonymous → account link after Keep → OTP. Matches claim hang budget so a
+ * slow restore does not falsely abort mid-handoff (ONB-52 / JOV-14959).
+ */
+const LINK_RESTORE_TIMEOUT_MS = 20_000;
+
+const LINK_RESTORE_FAIL_COPY =
+  'We could not link this conversation to your account. Try again.';
+
 /** Resolve history before mounting useChat, and discard it on identity changes. */
 export function OnboardingSessionBoundary({
   initialSnapshot,
@@ -86,8 +97,17 @@ export function OnboardingSessionBoundary({
     // The server already resolved this exact identity and revision.
     const seeded = loadedRef.current;
     if (seeded?.identity === identity && seeded.revision === revision) return;
+    // Sign-up in this tab: give the link restore the claim-hang budget so a
+    // slow OTP→account handoff does not tear down the frozen Keep at 10s.
+    const linkingFromAnonymous =
+      identity !== 'anonymous' &&
+      seeded?.identity === 'anonymous' &&
+      seeded.revision === revision;
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10_000);
+    const timeout = setTimeout(
+      () => controller.abort(),
+      linkingFromAnonymous ? LINK_RESTORE_TIMEOUT_MS : RESTORE_TIMEOUT_MS
+    );
     let cancelled = false;
     void (async () => {
       // Distinct failure codes feed data-restore-error so the nightly
@@ -112,7 +132,8 @@ export function OnboardingSessionBoundary({
             typeof snapshot.conversationId !== 'string')
         )
           throw new Error('restore-invalid-restore');
-        if (!cancelled)
+        if (!cancelled) {
+          setFailure(null);
           setLoaded({
             identity,
             revision,
@@ -122,6 +143,7 @@ export function OnboardingSessionBoundary({
               snapshot.messages.length === 0 &&
               initialIdentity.current === identity,
           });
+        }
       } catch (error) {
         if (cancelled) return;
         const code =
@@ -217,30 +239,57 @@ export function OnboardingSessionBoundary({
     // it flashed a blank "Restoring your conversation…" screen right after
     // the code was entered (2026-10-31 golden-path walk). Account-to-account
     // switches still hide history immediately.
+    //
+    // Link restore abort/network must not tear that freeze down into the cold
+    // "could not be restored" screen (ONB-52 / JOV-14959) — Keep stays, with
+    // honest link-fail copy + Try Again that retries restore.
     if (
-      !failed &&
       identity &&
       identity !== 'anonymous' &&
       loaded?.identity === 'anonymous' &&
       loaded.revision === revision
     ) {
-      return (
-        <OnboardingShell
-          {...props}
-          key={`anonymous:${revision}:${loaded.snapshot.conversationId ?? 'new'}`}
-          isSignedIn={false}
-          intentId={loaded.allowHandoff ? props.intentId : undefined}
-          starterHandoff={loaded.allowHandoff ? props.starterHandoff : null}
-          entryProfile={loaded.allowHandoff ? props.entryProfile : null}
-          initialMessages={loaded.snapshot.messages}
-          conversationId={loaded.snapshot.conversationId}
-          resumeOwnedConversation={loaded.snapshot.owned}
-          onBusyChange={setChatBusy}
-          controlsDisabled
-          actionPending
-          actionError={null}
-        />
-      );
+      const linkFailed =
+        failed &&
+        (failureCode === 'restore-abort' || failureCode === 'restore-network');
+      // Non-transient link failures (status/invalid) still fall through to the
+      // cold restore alert — only abort/network keep the frozen Keep.
+      if (!failed || linkFailed) {
+        const retryLinkRestore = () => {
+          setFailure(null);
+          setRevision(current => current + 1);
+        };
+        return (
+          <>
+            <OnboardingShell
+              {...props}
+              key={`anonymous:${revision}:${loaded.snapshot.conversationId ?? 'new'}`}
+              isSignedIn={false}
+              intentId={loaded.allowHandoff ? props.intentId : undefined}
+              starterHandoff={loaded.allowHandoff ? props.starterHandoff : null}
+              entryProfile={loaded.allowHandoff ? props.entryProfile : null}
+              initialMessages={loaded.snapshot.messages}
+              conversationId={loaded.snapshot.conversationId}
+              resumeOwnedConversation={loaded.snapshot.owned}
+              onBusyChange={setChatBusy}
+              controlsDisabled
+              actionPending={!linkFailed}
+              actionError={linkFailed ? LINK_RESTORE_FAIL_COPY : null}
+            />
+            {linkFailed ? (
+              <div className='pointer-events-none fixed inset-x-0 bottom-6 z-banner flex justify-center px-4'>
+                <Button
+                  className='pointer-events-auto'
+                  data-testid='onboarding-link-restore-retry'
+                  onClick={retryLinkRestore}
+                >
+                  Try Again
+                </Button>
+              </div>
+            ) : null}
+          </>
+        );
+      }
     }
     // The restore state sits in the same frame as the live chat. Rendered
     // bare, desktop painted a flat page and then snapped to the raised,
