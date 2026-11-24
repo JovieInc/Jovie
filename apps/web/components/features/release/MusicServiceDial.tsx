@@ -115,8 +115,9 @@ export function MusicServiceDial({
       onActivate={handleStream}
       actionLabel='Stream Now'
       groupLabel='Choose a streaming service'
-      // One service has nothing to switch to, so it gets no swipe hint.
-      hint={options.length > 1 ? 'Swipe to switch. Always remembered.' : null}
+      // Multi: quiet swipe coach. Memory cue lives on the Remembered caption.
+      // Single: no swipe hint — Stream Now + optional Remembered is enough.
+      hint={options.length > 1 ? 'Swipe to switch.' : null}
     />
   );
 }

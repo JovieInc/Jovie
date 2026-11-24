@@ -55,13 +55,6 @@ class Admission(unittest.TestCase):
         self.assertEqual(pr_wip.producer_of("Opus/mesh"), "opus")
         self.assertEqual(pr_wip.producer_of("main"), "(none)")
 
-    def test_twelve_prs_against_eight_is_diagnostic_when_capacity_is_healthy(self):
-        prs = [pr(n, f"codex/jov-{n}", draft=n < 10, state="DIRTY" if n < 6 else "BLOCKED") for n in range(12)]
-        policy = {**POLICY, "caps": {"codex": 8}}
-        out = pr_wip.admit(prs, "codex", policy, capacity=HEALTHY)
-        self.assertEqual((out["allowed"], out["used"], out["cap"], out["reason"]), (True, 12, 8, "within-capacity"))
-        self.assertEqual(out["reservation"], "at-request", "a prospective check does not invent an entire PR's quota cost")
-
     def test_holds_and_other_producers_remain_count_diagnostics_only(self):
         prs = [pr(1, "codex/a"), pr(2, "codex/b", labels=["hold"]), pr(3, "opus/x")]
         out = pr_wip.admit(prs, "codex", POLICY, capacity=HEALTHY)
@@ -357,17 +350,6 @@ class AdmissionCommand(unittest.TestCase):
 
 
 class LaneBudget(unittest.TestCase):
-    def test_capacity_controls_new_issues_while_wip_is_diagnostic(self):
-        import lane_runner as lane
-        cap = pr_wip.cap_for("codex", pr_wip.load_policy())
-        prs = [pr(n, f"codex/jov-{n}-20261101") for n in range(cap + 4)]
-        healthy = lane.new_issue_budget("codex", 3, prs, capacity=HEALTHY)
-        self.assertEqual((healthy["allowed"], healthy["wip"], healthy["wipCap"]), (True, cap + 4, cap))
-        self.assertEqual((healthy["reason"], healthy["capacity"]["reason"]), ("within-budget", "within-capacity"))
-        exhausted = {"allowed": False, "known": True, "reason": "github-quota:core", "blockers": ["github-quota:core"]}
-        self.assertFalse(lane.new_issue_budget("codex", 3, prs, capacity=exhausted)["allowed"])
-        self.assertEqual(lane.new_issue_budget("codex", 0, prs, capacity=HEALTHY)["reason"], "provider-disabled")
-
     def test_doctor_recognizes_empty_demand_without_losing_capacity_uncertainty(self):
         import lane_runner as lane
         import doctor

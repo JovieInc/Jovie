@@ -151,7 +151,7 @@ describe('public CTA guard', () => {
         ],
       })
     );
-    fireEvent.focus(screen.getByRole('button', { name: /Customers/ }));
+    fireEvent.pointerEnter(screen.getByRole('button', { name: /Customers/ }));
     const flyout = document.getElementById('marketing-header-flyout-customers');
     expect(flyout).toHaveClass('marketing-glass-header__flyout--compact');
     expect(flyout?.querySelectorAll('[data-variant]')).toHaveLength(0);
@@ -211,6 +211,9 @@ describe('public CTA guard', () => {
 
     expect(variantsSource).toContain('export function getNavLinkVariantClass');
     expect(variantsSource).toContain('export function getNavGroupVariantClass');
+    expect(variantsSource).toContain(
+      'export function getNavContainerVariantClass'
+    );
     expect(headerNavSource).toContain("from './header-nav-variants'");
   });
 
@@ -280,7 +283,11 @@ describe('public CTA guard', () => {
       "<MarketingSignInLink variant='ghost' label={minimalLabel} />"
     );
     expect(headerNav).toContain('focus-ring-themed shrink-0 whitespace-nowrap');
-    expect(headerNav).toContain('max-w-public-content lg:px-0');
+    const headerNavVariants = readFileSync(
+      join(ROOT, 'components/organisms/header-nav-variants.ts'),
+      'utf8'
+    );
+    expect(headerNavVariants).toContain('max-w-public-content lg:px-0');
     expect(headerNav).not.toContain('max-w-linear-content');
     expect(headerNav).not.toContain('linear-content-max');
     expect(headerNav).toContain('function HeaderPrimaryAuthLink');

@@ -3,7 +3,7 @@ import { linearRequest } from './linear-cooldown.mjs';
 
 export const JOVIE_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
 
-async function linearGraphql(
+export async function linearGraphql(
   { query, variables, apiKey, fetchImpl = fetch },
   caller
 ) {
@@ -146,6 +146,9 @@ export async function listLinearIssueComments({
 
 const REMEDIATION_KEY_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const labelCache = new Map();
+// binding_refill.ACCEPTANCE: admission promotes from Backlog only with acceptance criteria.
+const ACCEPTANCE =
+  /acceptance|accept\b|\bverif(?:y|ication)\b|required outcome|definition of done|\bdone bar\b|(?:^|\n)#+[ \t]*done\b/i;
 
 // Linear rejects issue-label names longer than 80 characters with a GraphQL
 // error. Every existing remediation label is at most 80; the time-bomb label
@@ -345,8 +348,8 @@ export async function upsertLinearIssueByTitleFingerprint({
   title,
   description,
   priority = 1,
-  // Optional state name (e.g. 'Todo') resolved from the team's workflow so a
-  // newly created issue can skip the default intake state (JOV-5966).
+  // Optional state name resolved from the team's workflow (JOV-5966). 'Todo'
+  // files into Backlog: admission is the only Backlog -> Todo writer.
   createStateName = null,
   // Optional label ids applied only when a new issue is created.
   createLabelIds = [],
@@ -376,10 +379,13 @@ export async function upsertLinearIssueByTitleFingerprint({
     ? reopenTerminal !== false
     : reopenTerminal === true;
   const footer = `Fingerprint: remediation:${bareRemediationKey(labelSource)}`;
-  const descriptionBody =
+  const body =
     stableLabel && !String(description ?? '').includes(footer)
       ? `${description}\n\n${footer}`
       : description;
+  const descriptionBody = ACCEPTANCE.test(String(body ?? ''))
+    ? body
+    : `${body}\n\n## Definition of done\n- \`${labelName}\` is green on main: the check that filed this issue passes again with no retry.\n- Verify: the next scheduled run of that check is green, which also closes this issue.`;
   const found = await linearGraphql(
     {
       query: `
@@ -470,12 +476,17 @@ export async function upsertLinearIssueByTitleFingerprint({
     labelId = ensured.id;
   }
 
+  const states = found.data?.team?.states?.nodes ?? [];
+  const backlogState =
+    states.find(state => state?.name === 'Backlog') ??
+    states.find(state => state?.type === 'backlog');
   if (!match) {
-    const states = found.data?.team?.states?.nodes ?? [];
-    const createStateId = createStateName
-      ? (states.find(state => state?.name === createStateName)?.id ?? null)
-      : null;
-    if (createStateName && !createStateId) {
+    // 'Todo' files into Backlog (or the team default when it has none).
+    const todo = createStateName === 'Todo';
+    const createStateId = todo
+      ? (backlogState?.id ?? null)
+      : (states.find(state => state?.name === createStateName)?.id ?? null);
+    if (createStateName && !todo && !createStateId) {
       return { ok: false, reason: 'linear_create_state_missing' };
     }
     const createIds = [
@@ -534,26 +545,12 @@ export async function upsertLinearIssueByTitleFingerprint({
   }
 
   const terminal = ['completed', 'canceled'].includes(match.state?.type);
-  const states = found.data?.team?.states?.nodes ?? [];
-  const backlogState =
-    states.find(state => state?.name === 'Backlog') ??
-    states.find(state => state?.type === 'backlog');
-  const todoState =
-    states.find(state => state?.name === 'Todo') ??
-    states.find(state => state?.type === 'unstarted');
   if (terminal && shouldReopen && !backlogState)
     return { ok: false, reason: 'linear_backlog_state_missing' };
   const existingLabelNodes = match.labels?.nodes;
   const input = {
     description: descriptionBody,
-    ...(terminal && shouldReopen
-      ? {
-          stateId:
-            createStateName === 'Todo' && todoState
-              ? todoState.id
-              : backlogState.id,
-        }
-      : {}),
+    ...(terminal && shouldReopen ? { stateId: backlogState.id } : {}),
     ...((labelId || keepLabelIds.length > 0) &&
     Array.isArray(existingLabelNodes)
       ? {

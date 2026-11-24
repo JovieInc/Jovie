@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
@@ -149,6 +150,14 @@ describe('HeaderNav states', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     const flyout = container.querySelector('#marketing-header-flyout-product');
     expect(flyout).not.toBeNull();
+    expect(flyout).toHaveClass('marketing-glass-header__flyout--open');
+    // Native popover path (JOV-14244) when the runtime exposes showPopover.
+    if (
+      typeof HTMLElement !== 'undefined' &&
+      'showPopover' in HTMLElement.prototype
+    ) {
+      expect(flyout).toHaveAttribute('popover', 'manual');
+    }
     expect(
       within(flyout as HTMLElement).getByRole('link', { name: /Pricing/ })
     ).toHaveAttribute('href', '/pricing');
@@ -156,7 +165,95 @@ describe('HeaderNav states', () => {
 
     await user.keyboard('{Escape}');
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(flyout).not.toHaveClass('marketing-glass-header__flyout--open');
     expect(trigger).toHaveFocus();
+  });
+
+  it('never draws a caret for a flyout with nothing nested behind it', () => {
+    const menus: readonly HeaderFlyoutMenu[] = [
+      { id: 'empty', label: 'Empty', heading: 'Empty', links: [] },
+      {
+        id: 'single',
+        label: 'Single',
+        heading: 'Single',
+        links: [{ href: '/solo', label: 'Solo' }],
+      },
+      ...FLYOUTS,
+    ];
+    const { container } = render(
+      <HeaderNav
+        authMode='public-static'
+        presentation='marketing-glass'
+        flyoutMenus={menus}
+      />
+    );
+
+    expect(screen.queryByText('Empty')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Single' })).toBeNull();
+    const single = screen.getByRole('link', { name: 'Single' });
+    expect(single).toHaveAttribute('href', '/solo');
+    expect(single.querySelector('svg')).toBeNull();
+    // Only the multi-link menu is a disclosure with a caret.
+    const triggers = container.querySelectorAll('[aria-expanded]');
+    expect(triggers).toHaveLength(1);
+    expect(triggers[0]?.querySelector('svg')).not.toBeNull();
+  });
+
+  it('hydrates the flyout before opening it with the native popover API', async () => {
+    const props = {
+      authMode: 'public-static' as const,
+      presentation: 'marketing-glass' as const,
+      flyoutMenus: FLYOUTS,
+    };
+    const original = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'showPopover'
+    );
+    const showPopover = vi.fn(function (this: HTMLElement) {
+      if (!this.hasAttribute('popover')) {
+        throw new DOMException('not a popover', 'NotSupportedError');
+      }
+    });
+    const container = document.createElement('div');
+    try {
+      // Model SSR without the native API, then enable it before hydration.
+      Object.defineProperty(HTMLElement.prototype, 'showPopover', {
+        configurable: true,
+        value: undefined,
+      });
+      container.innerHTML = renderToString(<HeaderNav {...props} />);
+      const panel = container.querySelector('#marketing-header-flyout-product');
+      expect(panel).not.toHaveAttribute('popover');
+
+      Object.defineProperty(HTMLElement.prototype, 'showPopover', {
+        configurable: true,
+        value: showPopover,
+      });
+      document.body.append(container);
+      const view = render(<HeaderNav {...props} />, {
+        container,
+        hydrate: true,
+      });
+      try {
+        await userEvent
+          .setup()
+          .hover(within(container).getByRole('button', { name: 'Product' }));
+        expect(
+          container.querySelector('#marketing-header-flyout-product')
+        ).toBe(panel);
+        expect(panel).toHaveAttribute('popover', 'manual');
+        expect(showPopover).toHaveBeenCalledTimes(1);
+      } finally {
+        view.unmount();
+      }
+    } finally {
+      if (original) {
+        Object.defineProperty(HTMLElement.prototype, 'showPopover', original);
+      } else {
+        Reflect.deleteProperty(HTMLElement.prototype, 'showPopover');
+      }
+      container.remove();
+    }
   });
 
   it('has no axe violations for long nav labels in a right-to-left page', async () => {

@@ -26,6 +26,8 @@ const CONTACTS_CLIENT_PATH = path.join(
 const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
   '/app': 'Shell root entry page',
   '/app/chats': 'Canonical chat index reached from the sidebar link',
+  '/app/dashboards':
+    'Saved shared views reached from the shared view page and by direct link; sidebar placement is owned by the nav work',
   '/app/chat': 'New Chat utility and contextual Identity link editor',
   '/app/chat/[id]': 'Thread detail is reached from chat history',
   '/app/ov/chat': 'Deep-link alias that renders Ovie Home (/app/ov)',
@@ -98,8 +100,7 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Release plan demo page (gated by RELEASE_PLAN_DEMO flag)',
   '/app/insights':
     'Contextual Audience workspace reached from the Audience route control and chat insight cards',
-  '/app/jovie-work':
-    'Contextual autonomous work history reached from Home/Inbox',
+  '/app/jovie-work': 'Contextual autonomous work history reached from Home',
   '/app/lyrics/[trackId]':
     'Cinematic lyrics surface reached from the AudioBar lyrics button',
   '/app/youtube':

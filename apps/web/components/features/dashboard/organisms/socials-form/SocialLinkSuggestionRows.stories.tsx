@@ -29,3 +29,44 @@ export const Default: Story = {
     onDismiss: () => {},
   },
 };
+
+const LONG_SUGGESTION = {
+  id: 's2',
+  platform: 'instagram',
+  platformLabel: 'Instagram for an extremely long label that must truncate',
+  url: 'https://instagram.com/an-extremely-long-handle-that-keeps-going-and-going',
+  username: 'an-extremely-long-handle-that-keeps-going-and-going',
+  confidence: 0.9,
+};
+
+export const Empty: Story = {
+  args: { ...Default.args, suggestions: [] },
+};
+
+export const Partial: Story = {
+  args: {
+    ...Default.args,
+    suggestions: [
+      ...(Default.args?.suggestions ?? []),
+      { ...LONG_SUGGESTION, id: 's3', username: null },
+    ],
+    actioningId: 's1',
+  },
+};
+
+export const LongContent: Story = {
+  args: { ...Default.args, suggestions: [LONG_SUGGESTION] },
+};
+
+export const Rtl: Story = {
+  args: { ...Default.args, suggestions: [LONG_SUGGESTION] },
+  decorators: [
+    function RtlDecorator(StoryFn) {
+      return (
+        <div dir='rtl'>
+          <StoryFn />
+        </div>
+      );
+    },
+  ],
+};

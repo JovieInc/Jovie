@@ -24,8 +24,8 @@ describe('HudShippingStrip', () => {
     expect(chip('ci')).toHaveClass('text-success');
     expect(chip('merged-7-days')).toHaveTextContent('12 (+20%)');
     expect(chip('behind-main')).toHaveTextContent('3');
-    expect(chip('prod-lag')).toHaveTextContent('—');
-    expect(chip('lyb-behind')).toHaveTextContent('—');
+    expect(screen.queryByTestId('hud-shipping-chip-prod-lag')).toBeNull();
+    expect(screen.queryByTestId('hud-shipping-chip-lyb-behind')).toBeNull();
     expect(screen.getByRole('link', { name: 'Open shipping' })).toHaveAttribute(
       'href',
       APP_ROUTES.ADMIN_SHIPPING
@@ -43,7 +43,7 @@ describe('HudShippingStrip', () => {
     expect(document.body).toHaveFocus();
   });
 
-  it('shows the em dash for every unmeasured chip, axe-clean', async () => {
+  it('omits unmeasured chips instead of showing em dashes, axe-clean', async () => {
     const { container } = render(
       <HudShippingStrip view={createEmptyShippingStateView()} />
     );
@@ -57,8 +57,7 @@ describe('HudShippingStrip', () => {
       'prod-lag',
       'lyb-behind',
     ]) {
-      expect(chip(name)).toHaveTextContent('—');
-      expect(chip(name)).toHaveClass('text-primary-token');
+      expect(screen.queryByTestId(`hud-shipping-chip-${name}`)).toBeNull();
     }
     await expectNoA11yViolations(container);
   });

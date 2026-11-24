@@ -59,6 +59,8 @@ export {
   escapeAnnotationProperty,
 } from './lib/ci-fast-annotations.mjs';
 
+export { orderSourceGuardsByFailureRate } from './lib/source-guard-order.mjs';
+
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
@@ -110,6 +112,7 @@ import {
 import { STRUCTURAL_PYTEST_FILES } from './lib/ci-structural-pytest-files.mjs';
 import { MERGED_WITH_BASE_POOL_CONCURRENCY } from './lib/merged-with-base-pool-config.mjs';
 import { scriptContractNodeArgs } from './lib/script-contract-node-args.mjs';
+import { orderSourceGuardsByFailureRate } from './lib/source-guard-order.mjs';
 import { testsAffectedBy } from './lib/test-file-dependencies.mjs';
 import { TEST_PLANNER_CONTRACT_TESTS } from './lib/test-planner-contract-tests.mjs';
 
@@ -376,6 +379,16 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // JOV-14474: every chat tool and core mutation names an outcome check.
+    // No fetch: a --depth=1 fetch re-shallowed CI's unshallowed checkout.
+    id: 'outcome-coverage',
+    command:
+      'node scripts/outcome-coverage.mjs --check && node --test scripts/outcome-coverage.test.mjs',
+    inputs:
+      /^(?:apps\/web\/lib\/chat\/chat-tool-inventory\.ts$|docs\/product\/(?:outcome-coverage\.json$|generated\/artist-launch-inventory\.json$)|scripts\/outcome-coverage|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     // Compliance: no third-party tracker component on routes where people type
     // (CIPA wiretap exposure). Canon: gbrain decisions/company/privacy-tracking-compliance-guidelines-2026-10-31.
     id: 'privacy-input-route-trackers',
@@ -428,7 +441,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command:
       'node --test --experimental-test-coverage --test-coverage-include=scripts/installation-budget-sentinel.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 scripts/installation-budget-sentinel.test.mjs && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/automation-registry.test.mjs scripts/lib/__tests__/automation-liveness*.test.mjs lib/__tests__/red-monitor-owner-gate.test.mjs lib/__tests__/workers-inventory.test.mjs',
     inputs:
-      /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:apps\/[^/]+\/)?vercel\.json|workers\/[^/]+\/wrangler[\w.-]*\.(?:toml|jsonc?)|scripts\/lanes\/continuity_clock\.py|canon\/(?:automation-registry\.jsonl|monitor-incidents\.jsonl|deployed-workers\.json|schedulers\.json)|scripts\/(?:automation-liveness\.mjs|installation-budget-sentinel(?:\.test)?\.mjs)|scripts\/lib\/(?:automation-registry\.mjs|github-json-read\.mjs|red-monitor-owner-gate\.mjs|workers-inventory\.mjs|__tests__\/(?:automation-(?:registry|liveness[\w-]*)|red-monitor-owner-gate|workers-inventory)\.test\.mjs))/u,
+      /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:apps\/[^/]+\/)?vercel\.json|workers\/[^/]+\/wrangler[\w.-]*\.(?:toml|jsonc?)|scripts\/lanes\/continuity_clock\.py|\.github\/actions\/report-outcome\/|canon\/(?:automation-registry\.jsonl|monitor-incidents\.jsonl|deployed-workers\.json|schedulers\.json|outcome-coverage-baseline\.json)|scripts\/(?:automation-liveness\.mjs|installation-budget-sentinel(?:\.test)?\.mjs|remediation-signal-intake\.mjs)|scripts\/lib\/(?:automation-registry\.mjs|github-json-read\.mjs|red-monitor-owner-gate\.mjs|workers-inventory\.mjs|outcome-coverage\.mjs|remediation-recurrence\.mjs|outcome-sweep\.mjs|remediation-signal\.mjs|ci-trigger-registry\.mjs|__tests__\/(?:automation-(?:registry|liveness[\w-]*)|red-monitor-owner-gate|workers-inventory)\.test\.mjs))/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -498,13 +511,13 @@ export const SOURCE_GUARDS = Object.freeze([
   Object.freeze({
     // Art-direction ratchets (one accent, hue, plates, surface media, hero
     // scroll, shadow vision judges). prOnly: merge groups run the same
-    // checks via web unit tests. Path-filtered so product-only diffs skip it.
+    // checks via web unit tests. Any component diff runs it (empty affordance).
     // The glob wires every art-direction unit test, including ones added later.
     id: 'art-direction',
     command:
       'node scripts/invariants/art-direction/run.mjs && node --test scripts/invariants/art-direction/*.test.mjs',
     inputs:
-      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage)\/|apps\/web\/public\/assets\/generated\/|docs\/design-system\/taste-labels\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|docs\/design-system\/motion-effects\.json$|scripts\/invariants\/art-direction\/)/u,
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/|apps\/web\/public\/assets\/generated\/|docs\/design-system\/taste-labels\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|docs\/design-system\/motion-effects\.json$|scripts\/invariants\/art-direction\/)/u,
     prOnly: true,
   }),
   Object.freeze({
@@ -747,40 +760,6 @@ export function loadSourceGuardHistory(
   }
 }
 
-/** Fail-probability per second. 0 without usable runs. */
-function guardFailureScore(entry) {
-  const runs = Number(entry?.runs);
-  const failures = Number(entry?.failures);
-  if (
-    !Number.isInteger(runs) ||
-    runs <= 0 ||
-    !Number.isInteger(failures) ||
-    failures < 0
-  )
-    return 0;
-  const failProbability = Math.min(failures / runs, 1);
-  const durationMs = Number(entry?.durationMs);
-  const durationSeconds =
-    Number.isFinite(durationMs) && durationMs > 0 ? durationMs / 1000 : 0;
-  // No measured duration keeps the fail-probability. Never invent a duration.
-  return durationSeconds > 0
-    ? failProbability / durationSeconds
-    : failProbability;
-}
-
-/** Stable reorder: higher score first, ties keep manifest order. */
-export function orderSourceGuardsByFailureRate(guards, entries) {
-  if (!entries) return [...guards];
-  return guards
-    .map((guard, index) => ({
-      guard,
-      index,
-      score: guardFailureScore(entries[guard?.id]),
-    }))
-    .sort((a, b) => b.score - a.score || a.index - b.index)
-    .map(item => item.guard);
-}
-
 /**
  * @param {string} event GITHUB_EVENT_NAME ('' locally)
  * @param {readonly string[] | null} changed changed paths; null = unreadable
@@ -916,7 +895,7 @@ export function webCiContractTestsCommand(
   return `pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci${excludes}`;
 }
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-source-guard-pool.test.mjs lib/__tests__/ci-source-guard-pool.path-gates.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs lib/__tests__/ci-fast-merge-queue-compatibility.test.mjs lib/__tests__/ci-fast-shard-fanin-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-fast-public-openapi-guard.test.mjs lib/__tests__/ci-source-guard-pool.test.mjs lib/__tests__/ci-source-guard-pool.path-gates.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs lib/__tests__/ci-fast-merge-queue-compatibility.test.mjs lib/__tests__/ci-fast-shard-fanin-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 
 /**
  * Script contracts that no other CI command ran (orphan sweep). The
@@ -1021,6 +1000,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/schedule-trigger-guard.test.mjs', // JOV-12720 event-driven guard.
   'scripts/resolve-main-sha.test.mjs', // JOV-12497 SIGPIPE regression.
   'scripts/dogfood-truth-intake.test.mjs', // JOV-7140 dogfood loop intake.
+  'scripts/chat-outcome-intake.test.mjs', // Daily chat outcome judge intake.
   'scripts/desktop-stamp-ownership.test.mjs',
   'scripts/summer/pr-no-stall.test.mjs',
   'scripts/hostops/pen-golden-path-sync.test.mjs',
@@ -1044,6 +1024,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/pr-open-priority.test.mjs',
   'scripts/pr-open-win.test.mjs',
   'scripts/pr-body-lint.test.mjs',
+  'scripts/done-check.test.mjs',
   'scripts/lib/__tests__/sources-of-truth.test.mjs',
   'scripts/invariants/duplicate-literals.test.mjs',
   'scripts/invariants/jump-policy-pin.test.mjs',
@@ -1254,7 +1235,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/wake-fanout-contract.test.mjs',
   'scripts/design-system-source-ratchet.test.mjs',
   'scripts/review-escapes.test.mjs',
-  'scripts/catalog-duplicate-report.test.mjs',
+  'scripts/catalog-duplicate-report.test.mjs scripts/backlog-orchestrator/__tests__/leverage-first-ordering.test.mjs',
 ]);
 export const DEPRECATION_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/deprecation-clearance.mjs --test-coverage-include=scripts/lib/deprecation-observation.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=90 scripts/deprecation-clearance.test.mjs';
@@ -1290,14 +1271,14 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
   'scripts/lib/__tests__/changed-test-coverage-diagnostics.test.mjs',
-  'scripts/lib/__tests__/automation-liveness-lost-state-recovery.test.mjs',
+  'scripts/lib/__tests__/automation-liveness-lost-state-recovery.test.mjs scripts/lib/__tests__/summer-pr-age-rule.test.mjs',
   'scripts/lib/__tests__/canonical-profile-json-handoff.test.mjs',
   'scripts/lib/__tests__/merge-group-shard-failure-hold.test.mjs',
   'scripts/lib/__tests__/ci-structural-shards.test.mjs',
   'scripts/lib/__tests__/merge-group-sibling-burn-contract.test.mjs',
   'scripts/lib/__tests__/gh-api-hold-retry.test.mjs',
   'scripts/lib/__tests__/prod-cert.test.mjs',
-  'scripts/lib/__tests__/prod-cert-skew.test.mjs',
+  'scripts/lib/__tests__/prod-cert-skew.test.mjs scripts/lib/__tests__/prod-cert-carry.test.mjs',
   'scripts/lib/__tests__/prod-cone-cases.test.mjs scripts/lib/__tests__/prod-cone-scoreboard-clobber.test.mjs',
   'scripts/lib/__tests__/cert-bottleneck.test.mjs',
   'scripts/lib/__tests__/self-hosted-workspace-reset-contract.test.mjs',
@@ -1411,7 +1392,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/postdeploy-probe-transport.test.mjs',
   'scripts/lib/__tests__/postdeploy-probe-workflow-admission.test.mjs',
   'scripts/lib/__tests__/postdeploy-crawl-receipt.test.mjs',
-  'scripts/lib/__tests__/golden-path-cert-reuse.test.mjs',
+  'scripts/lib/__tests__/golden-path-cert-reuse.test.mjs scripts/lib/__tests__/golden-path-step-scope.test.mjs',
   'scripts/lib/__tests__/postdeploy-cert-after-pen.test.mjs',
   'scripts/lib/__tests__/pr-preparation-safety.test.mjs',
   'scripts/lib/__tests__/production-environment-secrets.test.mjs',
@@ -1465,6 +1446,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/shipping-slo.test.mjs',
   'scripts/lib/__tests__/shipping-slo-snapshot.test.mjs',
   'scripts/lib/__tests__/shipping-slo-history.test.mjs',
+  'scripts/lib/__tests__/shipping-slo-dora.test.mjs',
+  'scripts/lib/__tests__/shipping-slo-queue-removal.test.mjs',
   'scripts/lib/__tests__/stage-collect-linear.test.mjs',
   'scripts/lib/__tests__/stage-derive.test.mjs',
   'scripts/lib/__tests__/stage-events.test.mjs',
@@ -1614,7 +1597,7 @@ const LANES = [
     id: 'design-governance-enforcement',
     name: 'Design governance enforcement',
     nextLocalCommand:
-      'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel && pnpm --filter @jovie/web run lint:composite-field && pnpm --filter @jovie/web run lint:design-noise',
+      'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:tokens-export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel && pnpm --filter @jovie/web run lint:composite-field && pnpm --filter @jovie/web run lint:design-noise',
     run: runDesignGovernanceEnforcement,
   },
   {

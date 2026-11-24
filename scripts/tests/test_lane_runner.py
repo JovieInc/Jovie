@@ -148,7 +148,7 @@ class ContextManifestTest(unittest.TestCase):
             changed = lane.write_agent_prompt(path, "different prompt", "issue", "devin", inputs)
             self.assertNotEqual(first["sha256"], changed["sha256"])
 
-    def test_missing_context_and_drift_are_explicit_nonblocking_findings(self):
+    def test_context_drift_or_unbound_inputs_block_the_spawn(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "issue.prompt.md"
             inputs = {"issue": "task", "gbrain": "", "branch": "codex/jov-1", "prior_attempts": ""}
@@ -158,18 +158,20 @@ class ContextManifestTest(unittest.TestCase):
                 for contract in [None, '{}', 'malformed']:
                     if contract is not None:
                         (Path(tmp) / "context-manifest.json").write_text(contract)
-                    drift = lane.write_agent_prompt(path, "still runs", "issue", "codex", inputs)
-                    self.assertEqual(path.read_text(), "still runs")
-                    self.assertFalse(drift["qualification"]["ok"])
-                    self.assertIn("context-manifest-drift", drift["qualification"]["findings"][0])
-                    self.assertIsNone(drift["path"])
-                with patch.object(lane.sys.stderr, "write", side_effect=OSError("closed log")):
-                    self.assertFalse(lane.write_agent_prompt(path, "still runs", "issue", "codex", inputs)["qualification"]["ok"])
-            for kind, data in [("issue", {"gbrain": ""}), ("unknown", inputs),
-                               ("issue", {**inputs, "issue": None})]:
-                failed = lane.write_agent_prompt(path, "still runs", kind, "codex", data)
-                self.assertFalse(failed["qualification"]["ok"])
-                self.assertIsNone(failed["sha256"])
+                    with self.assertRaisesRegex(lane.ContextPreflightError, "context-manifest-drift"):
+                        lane.write_agent_prompt(path, "held", "issue", "codex", inputs)
+            for kind, data in [("issue", {"gbrain": ""}), ("unknown", inputs)]:
+                with self.assertRaisesRegex(lane.ContextPreflightError, f"context-inputs:{kind}"):
+                    lane.write_agent_prompt(path, "held", kind, "codex", data)
+            unhashable = {**inputs, "issue": None}  # receipt trouble stays a nonblocking finding
+            with patch.object(lane.sys.stderr, "write", side_effect=OSError("closed log")):
+                failed = lane.write_agent_prompt(path, "still runs", "issue", "codex", unhashable)
+            self.assertEqual(path.read_text(), "still runs")
+            self.assertFalse(failed["qualification"]["ok"])
+            self.assertIsNone(failed["sha256"])
+
+    def test_checked_in_contract_matches_the_generator(self):
+        self.assertTrue(lane.context_manifest_matches(lane.HERE / "context-manifest.json"))
 
     def test_generator_does_not_load_credentials_or_query_services(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(lane, "HERE", Path(tmp)), \
@@ -1335,19 +1337,15 @@ class GateTest(unittest.TestCase):
         self.assertFalse(passed)
         self.assertTrue(reasons[0].startswith("llm-review-failed"))
 
-    def test_context_drift_does_not_replace_the_sensitive_review_verdict(self):
+    def test_context_drift_fails_the_sensitive_review_without_spawning_a_reviewer(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            host = lane.Host(state=root)
-            for verdict, expected in [("LLM-REVIEW: FAIL", False), ("LLM-REVIEW: PASS", True)]:
-                def review(*args, **kwargs):
-                    (root / ".codex-last-message.txt").write_text(verdict)
-                    return SimpleNamespace(returncode=0)
-                with patch.object(lane, "context_manifest_matches", return_value=False), \
-                        patch.object(lane, "sh", side_effect=review) as reviewer:
-                    passed, _ = lane.sensitive_review(host, {"number": 7, "headRefOid": "abc"}, root, None)
-                self.assertEqual(passed, expected)
-                reviewer.assert_called_once()
+            with patch.object(lane, "context_manifest_matches", return_value=False), \
+                    patch.object(lane, "sh") as reviewer:
+                passed, reasons = lane.sensitive_review(lane.Host(state=root), {"number": 7, "headRefOid": "abc"}, root, None)
+            self.assertFalse(passed)
+            self.assertIn("context-preflight:context-manifest-drift", reasons[0])
+            reviewer.assert_not_called()
 
     def test_numstat_parsing_handles_binary(self):
         changes = lane.parse_numstat("3\t1\ta.ts\n-\t-\timg.png\nnoise\n")
@@ -3121,15 +3119,15 @@ class RunIssueTest(unittest.TestCase):
                 self.assertEqual(receipt["execution"]["terminalState"], "succeeded")
                 self.assertEqual(receipt["verdict"], verdict)
 
-    def test_context_contract_drift_does_not_prevent_agent_execution(self):
+    def test_context_contract_drift_holds_the_issue_before_the_agent_spawns(self):
         lane.verify_and_land = lambda *a, **k: {"verdict": "landing", "pr": 9, "reasons": []}
         with patch.object(lane, "context_manifest_json", return_value="drift"), \
                 patch.object(lane, "run_agent", wraps=lane.run_agent) as agent:
             receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"]}, FakeLinear([]), issue())
-        self.assertEqual(receipt["verdict"], "landing")
-        self.assertIn("context-manifest-drift", receipt["contextManifests"][0]["qualification"]["findings"][0])
-        agent.assert_called_once()
-        self.assertEqual(self.ledger()[0]["contextManifests"], receipt["contextManifests"])
+        self.assertEqual(receipt["verdict"], "failed")
+        self.assertIn("ContextPreflightError:context-manifest-drift", receipt["reasons"][0])
+        agent.assert_not_called()
+        self.assertEqual(self.ledger()[0]["verdict"], "failed")
 
     def test_context_receipt_failure_is_isolated_but_prompt_write_failure_still_blocks(self):
         original = Path.write_bytes
@@ -4733,7 +4731,8 @@ class WorkerTest(unittest.TestCase):
         self.assertFalse((self.host.state / "worker-idle.json").exists())
         self.assertEqual(self.linear.moves, [])
 
-    def test_capacity_controls_claiming_above_the_diagnostic_wip_cap(self):
+    def test_capacity_and_the_wip_cap_both_control_claiming(self):
+        """Tim 2026-11-22: a lane at its WIP cap lands its own PRs before it claims new work."""
         cap = lane.pr_wip.cap_for("devin", lane.pr_wip.load_policy())
         rows = lambda n: [{"number": i, "headRefName": f"devin/jov-{i}-20260927t000000", "isDraft": True} for i in range(1, n + 1)]
         lane.lane_prs, ran = (lambda name, fields="", *, inventory=None: []), []
@@ -4741,11 +4740,14 @@ class WorkerTest(unittest.TestCase):
         real = lane.new_issue_budget
         healthy = {"allowed": True, "known": True, "reason": "within-capacity"}
         exhausted = {"allowed": False, "known": True, "reason": "github-quota:core"}
-        for capacity, claimed in ((exhausted, []), (healthy, [1])):
-            with patch.object(lane, "read_new_issue_budget", side_effect=lambda name, slots: real(name, slots, rows(cap + 4), capacity=capacity)):
+        for capacity, count, claimed, reason in ((exhausted, 1, [], "github-quota:core"), (healthy, cap + 4, [], "wip-cap"),
+                                                 (healthy, cap - 1, [1], None)):
+            ran.clear()
+            with patch.object(lane, "read_new_issue_budget", side_effect=lambda name, slots: real(name, slots, rows(count), capacity=capacity)):
                 lane.worker(self.host, "devin")
-            self.assertEqual(ran, claimed, "claims only when actual capacity permits")
-        self.assertEqual(json.loads((self.host.state / "worker-idle.json").read_text())["devin"]["reason"], "github-quota:core")
+            self.assertEqual(ran, claimed, "claims only with capacity and room under the cap")
+            if reason:
+                self.assertEqual(json.loads((self.host.state / "worker-idle.json").read_text())["devin"]["reason"], reason)
 
     def test_new_issue_budget_uses_base_slots_not_autoscaled(self):
         """JOV-7514: intake retains the configured seat bound as autoscale capacity rises."""
@@ -4946,7 +4948,7 @@ class NewIssueBudgetTest(unittest.TestCase):
         return {"number": number, "headRefName": branch or f"codex/jov-{number}-20261002",
                 "isDraft": draft, "mergeStateStatus": state, "labels": [{"name": name} for name in labels]}
 
-    def test_counts_do_not_refuse_new_issues_and_held_prs_remain_diagnostic(self):
+    def test_the_cap_refuses_new_issues_and_held_prs_do_not_count(self):
         cap = lane.pr_wip.cap_for("codex", lane.pr_wip.load_policy())
         parked = [self.row(n, labels=("hold",)) for n in range(1, 40)]
         active = [self.row(n, state="BLOCKED") for n in range(40, 40 + cap - 1)]
@@ -4955,8 +4957,8 @@ class NewIssueBudgetTest(unittest.TestCase):
                          (True, "within-budget", None, None))
         self.assertEqual((result["used"], result["terminal"], result["wip"]), (cap - 1, 39, cap - 1))
         full = lane.new_issue_budget("codex", 1, parked + active + [self.row(99, branch="codex/manual")])
-        self.assertEqual((full["allowed"], full["reason"], full["wipCap"]), (True, "within-budget", cap))
-        self.assertEqual((full["capacity"]["known"], full["capacity"]["reason"]), (False, "capacity-unknown"))
+        self.assertEqual((full["allowed"], full["reason"], full["wipCap"]), (False, "wip-cap", cap))
+        self.assertEqual((full["capacity"]["known"], full["capacity"]["capacityReason"]), (False, "capacity-unknown"))
         self.assertEqual(lane.new_issue_budget("codex", 0, None)["reason"], "provider-disabled")
         self.assertFalse(hasattr(lane, "OPEN_PRS_PER_SLOT") or hasattr(lane, "TERMINAL_PRS_PER_SLOT")
                          or hasattr(lane, "over_budget"))

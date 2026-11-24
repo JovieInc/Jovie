@@ -74,6 +74,25 @@ describe('MusicServiceDial', () => {
       screen.getByRole('link', { name: 'Stream Now with Spotify' })
     ).toBeInTheDocument();
     expect(screen.queryByText(/Swipe to switch/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('action-dial-selection')).toHaveTextContent(
+      'Spotify'
+    );
+  });
+
+  it('coaches swipe quietly without competing with Remembered', () => {
+    document.cookie = `${LISTEN_COOKIE}=spotify; path=/`;
+    render(
+      <MusicServiceDial
+        providers={PROVIDERS}
+        utmParams={{}}
+        onStream={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Swipe to switch.')).toBeInTheDocument();
+    expect(screen.queryByText(/Always remembered/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('action-dial-selection')).toHaveTextContent(
+      'Remembered'
+    );
   });
 
   it('persists a newly settled choice before the next visit', () => {

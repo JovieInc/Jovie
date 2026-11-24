@@ -3,8 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const captureErrorMock = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock('@/lib/error-tracking', () => ({ captureError: captureErrorMock }));
+const fileRepairMock = vi.hoisted(() => vi.fn(async () => 'filed' as const));
+vi.mock('@/lib/ovie/summer-turn-repair', () => ({
+  fileSummerTurnRepair: fileRepairMock,
+}));
 
 import { encodeToolEvents } from '@/lib/chat/tool-events';
+import { createOvieTurnTiming } from './chat-timing';
 import { MemoryOperatingStore } from './mcp/store';
 import { summerFailureText } from './summer-failure';
 import {
@@ -70,6 +75,9 @@ describe('Summer UI message stream', () => {
         feature: 'ovie-summer',
         hop: 'summer_deployment_unverified',
       })
+    );
+    expect(fileRepairMock).toHaveBeenCalledWith(
+      expect.objectContaining({ hop: 'summer_deployment_unverified' })
     );
   });
 
@@ -403,5 +411,39 @@ describe('Summer fast-path progress and acknowledgement mapping', () => {
     ]);
     expect(text).not.toContain('data-summer-progress');
     expect(text).not.toContain('summerAck');
+  });
+
+  it('flushes the first Summer delta before the source produces its next event', async () => {
+    let releaseSecond: () => void = () => undefined;
+    const gate = new Promise<void>(resolve => {
+      releaseSecond = resolve;
+    });
+    const timing = createOvieTurnTiming();
+    const response = await createSummerAssistantStreamResponse({
+      events: (async function* () {
+        yield { type: 'text-delta', text: 'first' } as const;
+        await gate;
+        yield { type: 'text-delta', text: 'second' } as const;
+      })(),
+      requestId: 'first-delta-flush',
+      corsHeaders: {},
+      timing,
+    });
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let seen = '';
+    while (!seen.includes('data-ovie-timing')) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      seen += decoder.decode(value);
+    }
+    // The gate is still closed: the delta was not held for later events.
+    expect(seen).toContain('"delta":"first"');
+    expect(seen).not.toContain('second');
+    expect(seen.match(/data-ovie-timing/g)).toHaveLength(1);
+    releaseSecond();
+    while (!(await reader.read()).done) {
+      // drain
+    }
   });
 });

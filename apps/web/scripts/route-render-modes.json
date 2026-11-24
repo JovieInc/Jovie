@@ -9,6 +9,22 @@
       "removalCondition": "Remove if Checkout stops returning to this route or the request-specific server verification moves to an existing payment surface; reassess this runtime contract under JOV-12407 before expiry.",
       "evidence": "https://github.com/JovieInc/Jovie/actions/runs/43786968068/job/133036679060 records the measured dynamic build. apps/web/app/[username]/tip/thank-you/page.test.tsx verifies distinct request headers and pending-to-confirmed rechecks with a mocked verifier; real-payment production certification remains unclaimed.",
       "expiresOn": "2026-12-16"
+    },
+    "/product": {
+      "owner": "@itstimwhite",
+      "reason": "Main already prerenders /product at 87581 bytes against a recorded 83454 (45 bytes under the limit); this change adds about 500 bytes through one extra CSS chunk reference, with no views content on the page.",
+      "issue": "JOV-14465",
+      "removalCondition": "Remove once the /product drift on main is trimmed or accepted and the entry is re-baselined (JOV-14465).",
+      "evidence": "https://github.com/JovieInc/Jovie/actions/runs/45005356258/job/137155650730 measured 88093 bytes; local mock-env builds measured base 86641c2e at 87581 bytes and this head at 88093 bytes.",
+      "expiresOn": "2026-12-22"
+    },
+    "/v/[token]": {
+      "owner": "@itstimwhite",
+      "reason": "Shared dashboard views read the optional session on the server to choose between the signup card and the Save as dashboard button, so each visit renders on request, like the /p/[token] share link.",
+      "issue": "JOV-14462",
+      "removalCondition": "Remove once /v/[token] renders the view as ISR, revalidated on publish and revoke, with viewer state resolved on the client (JOV-14462).",
+      "evidence": "https://github.com/JovieInc/Jovie/actions/runs/45005356258/job/137155650730 records the measured dynamic build for PR #26632.",
+      "expiresOn": "2026-12-22"
     }
   },
   "routes": {
@@ -106,6 +122,7 @@
     "/app/chat": "dynamic",
     "/app/chat/[id]": "dynamic",
     "/app/chats": "dynamic",
+    "/app/dashboards": "dynamic",
     "/app/contact": "dynamic",
     "/app/contacts": "dynamic",
     "/app/dashboard": "dynamic",
@@ -256,7 +273,7 @@
     "/playlists/genre/[genre]": "dynamic",
     "/playlists/mood/[mood]": "dynamic",
     "/pricing": "static html=86197",
-    "/product": "static html=83454",
+    "/product": "static html=88093",
     "/product/command-palette": "static html=72132",
     "/product/dsp-links": "static html=63661",
     "/product/isrc": "static html=61971",
@@ -294,6 +311,7 @@
     "/ui/switches": "static html=27410",
     "/ui/tooltips": "static html=22388",
     "/unavailable": "static html=25662",
+    "/v/[token]": "dynamic",
     "/voice": "static html=70546",
     "/waitlist": "dynamic",
     "/waitlist/invite": "dynamic",

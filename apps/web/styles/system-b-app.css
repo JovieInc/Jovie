@@ -247,6 +247,25 @@
   font-weight: var(--font-weight-medium);
 }
 
+/* JOV-7771: the whole composer and the intro heading stay on screen at any
+   text size. The step rail and the peek strip are extras, so they give their
+   room back when the /start column is short in rem: a 390x615 phone with
+   32px root text is only 19.2rem tall, and the rail alone pushed the send
+   button 45px past the fold. The column is a size container (its height
+   comes from the shell, never from its content); rem in a container query
+   follows the root font size, which a media query cannot see. 24rem keeps
+   both extras at 16px and 24px text and on tall phones with 32px text. */
+.system-b-onboarding-session {
+  container: onboarding-session / size;
+}
+
+@container onboarding-session (height < 24rem) {
+  .system-b-onboarding-step-rail,
+  .system-b-onboarding-profile-peek {
+    display: none;
+  }
+}
+
 /* JOV-12045: the side rail's phone preview must fit the rail at rest. The
    preview keeps the locked 402:874 screen aspect (JOV-7192, width-only
    sizing), which is ~618px tall at its w-71 width and ran past the rail's
@@ -883,7 +902,16 @@
 }
 
 :where(.system-b-table-row-height) {
-  height: 40px;
+  height: var(--table-row-height, 40px);
+}
+
+/* Table primary cell text: Linear's 13px. --text-app stays 12px for meta. */
+:root {
+  --table-primary-text-size: 0.8125rem;
+}
+
+.system-b-table-primary-text {
+  font-size: var(--table-primary-text-size);
 }
 
 :where(.system-b-table-column-small) {
@@ -3425,7 +3453,10 @@
 }
 
 :where(.system-b-chat-composer-thread-scroll-padding) {
-  padding-bottom: var(--system-b-chat-composer-thread-scroll-padding);
+  padding-bottom: calc(
+    var(--system-b-chat-composer-thread-scroll-padding) +
+    var(--chat-composer-dock-extra, 0px)
+  );
 }
 
 :where(.system-b-chat-composer-surface) {
@@ -3740,6 +3771,14 @@
     transparent var(--space-16),
     black var(--space-16)
   );
+}
+
+/* ONB-27: AuthShell in onboarding chat must clear the top-fade band above.
+   pinTranscriptToLatest scrolls [data-onboarding-auth-anchor] with block:start;
+   this margin matches the fade so Reserve/Claim h1 paints in the default Keep
+   viewport. Do not remove the fade globally — only pair anchor + margin. */
+:where([data-onboarding-auth-anchor]) {
+  scroll-margin-top: var(--space-16);
 }
 
 :where(.system-b-chat-prompt-rail-scroll) {

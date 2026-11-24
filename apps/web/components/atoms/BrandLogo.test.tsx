@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { jovieMarkAtSize } from '@/lib/brand/tokens';
+import { BRAND_MARK_MUTED_CLASS, jovieMarkAtSize } from '@/lib/brand/tokens';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { BrandLogo } from './BrandLogo';
 
@@ -89,5 +89,18 @@ describe('BrandLogo', () => {
       </>
     );
     await expectNoA11yViolations(container);
+  });
+
+  it('muted tone is the shared muted value: logo-muted in light, quaternary in dark', () => {
+    render(<BrandLogo tone='muted' aria-hidden />);
+    const wrapper = document.querySelector('[data-brand-variant]');
+
+    expect(wrapper).toHaveClass(
+      'text-logo-muted',
+      'dark:text-quaternary-token'
+    );
+    expect(BRAND_MARK_MUTED_CLASS).toBe(
+      'text-logo-muted dark:text-quaternary-token'
+    );
   });
 });

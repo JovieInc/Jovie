@@ -216,16 +216,42 @@ export function MyComponent({ title, children, onAction }: MyComponentProps) {
 - Follow existing design tokens in `tailwind.config.ts`
 - Mobile-first responsive design
 
+### Card intent: no extra carding
+
+A card is any box that sets content apart with its own fill, border or shadow. The default is no card: content sits flat on its surface and is grouped by spacing, type and hairline dividers. A card is allowed only when the box says something true about the object inside it. The five allowed intents:
+
+1. `transient`: it appears and goes away (toast, popover, menu, dialog, hover preview, inline notice the user dismisses).
+2. `movable`: the user drags, reorders, pins or dismisses the object (kanban card, sortable row, draggable chip).
+3. `collection`: one of a set of peer objects the user browses or compares (carousel, gallery, grid of releases or artists, pricing tiers, opportunity cards).
+4. `selectable`: the whole box is one target that opens or selects one entity (option card, link card).
+5. `floating`: a live object layered over the page (chat composer, sticky player).
+
+Banned, whatever the reason:
+
+- Empty, loading and error states: always flat, no card, no fill, no border.
+- A card around a page section, settings group, form, single chart, single stat or single table just to give it structure.
+- A card inside a card, or inside a drawer, sheet or dialog body.
+- A card used as a heading or hierarchy device.
+
+The test: if removing the box loses nothing the user can do with, or understand about, the object, the box goes.
+
+Enforcement:
+
+- Card primitives (`Card`, `ContentSurfaceCard`, `DrawerSurfaceCard`) take an `intent` prop typed as `CardIntent` (the five intents above). Set it on every card you add or touch; it renders as `data-card-intent`.
+- `node scripts/invariants/card-intent-ratchet.mjs` (wired into `pnpm invariants:check`) counts card-primitive usages without an `intent` against `scripts/invariants/card-intent-ratchet.baseline.json`. The count may only go down: add an intent or remove the card, and run the script with `--write` to lock the lower floor. Never raise the baseline.
+- The same script fails if any empty, loading or error-state component (a file named `*Empty*`, `*Loading*`, `*Skeleton*`, `*Error*`, or a route `loading.tsx` / `error.tsx`) renders a card primitive, with or without an intent. Those states have no baseline: they are always flat.
+- Tests for empty, loading and error states assert flatness with `expectFlatState` from `apps/web/tests/utils/flat-state.ts`.
+
 ### Surface Elevation Rules (Card/Background Consistency)
 
 The main content area (`<main>`) uses `bg-(--app-shell-content-surface)`, the shell-owned canvas tone. In dark mode it must stay distinct from both recessed wells (`bg-surface-0`) and shared cards (`bg-surface-1`).
 
 **Allowed patterns:**
-- Card on app-shell canvas parent → `bg-surface-1` for shared cards and panels
-- Recessed/"well" element inside the shell or a card → `bg-surface-0` (e.g., skeleton containers, empty states, input wells)
+- A card that passes the intent test above, on the app-shell canvas parent → `bg-surface-1`
+- Recessed/"well" element for an input or code block → `bg-surface-0`. Empty, loading and error states are never wells: they sit flat
 - Sticky shell chrome (toolbars, table headers, shell frame) → `bg-(--app-shell-content-surface)`
 - Card with elevation → `Card` component as-is (has `bg-surface-1 border border-subtle shadow-card`)
-- Nested card inside card → `bg-surface-0` for the inner element
+- A card inside a card is banned (see "Card intent"); the inner element is flat. A recessed well for an input is not a card
 - Table/workspace routes → consume the shell-owned canvas by default. A nested bordered `LINEAR_SURFACE.contentContainer` canvas is allowed only when the screen declares `canvasOwner: 'screen'` in the app-screen canvas manifest (`apps/web/data/appScreens/canvas.ts`); undeclared nested canvases are rejected by the canvas-ownership guardrail
 
 **Banned patterns (will cause invisible cards):**
@@ -236,20 +262,81 @@ The main content area (`<main>`) uses `bg-(--app-shell-content-surface)`, the sh
 - `Card className='border-0 shadow-none'` — strips all elevation from a surface-1 card, making it invisible on surface-1 parent
 - `bg-surface-0/XX` (semi-transparent) — use solid `bg-surface-0` instead
 - Card-within-card nesting (e.g., `DrawerSurfaceCard variant='card'` inside another card) — use `variant='flat'` for inner elements
+- A card of any kind in an empty, loading or error state, or around a section, form, chart, stat or table to give it structure (see "Card intent")
 
 **Quick test:** If removing the element would cause no visual change, it's an elevation bug.
 
 ### Color & Accent Discipline
 
-`DESIGN.md` is canonical for tokens. Color is neutral by default; accents
-appear only on card and section backgrounds, rotating in visual order
-blue → purple → pink (then orange, then red/green last) with no two
-consecutive sections sharing one. Image cards pick the accent that
-complements the art by color theory and anchor the rotation. Each gradient
-uses one accent centered on its exact token value. Lower OKLCH chroma for
-contrast, and more strongly behind art. The focus/link accent never rotates.
-CTAs stay neutral pills. Color never carries status alone. Full rule:
-`docs/design-system/DETAILS.md` (accent rotation rule).
+`DESIGN.md` is canonical for tokens. Long form with tables and rationale:
+[DETAILS.md, accent rotation rule](../../docs/design-system/DETAILS.md).
+
+**Framing (founder, Nov 22 2026).** Be very Apple in our color approach. The
+picture is the iPod nano lineup, set at night:
+
+- A near-black neutral canvas does the work.
+- Color shows up only as a row of equal-weight, saturated peers, like the nano
+  lineup, glowing against the dark.
+- Functional color is Apple-sparing: one tint per context. Green and red keep
+  success and failure. Nothing relies on color alone.
+
+**Mood.** A monochrome editorial world: high-contrast greys, black and white.
+Color appears only as light: thin hairline strokes, rings and small precise
+points, at most a soft .12 tint. Hues are vivid but used lean and sharp, like a
+downtown fashion editorial, never lush, glossy, rounded or toy-like. One equal
+color per item, with Apple-like restraint. Color is high-fashion and premium:
+saturated but refined, never primary-colored or cartoonish.
+
+#### Accent pack
+
+1. **Pack only.** Accents come from the six-color pack in
+   `apps/web/design/ziawi-color-sot.json` (ion `#11AFFF` blue, ultra `#8E56F5`
+   purple, pulse `#F52BB5` pink, mint `#3FFA8B`, orange `#FF7800`, red
+   `#F72A36`; aqua, gold and flare are aliases) plus neutrals. No Tailwind
+   palette colors, `--geist-*` variables or raw accent-like hex or rgb in
+   components.
+2. **Neutrals dominate.** Greys, black and white make up most of every screen.
+   Accents are small in area. No single accent carries more visual weight than
+   its peers: same tint strength and size per item. No accent is a full-bleed
+   page or hero fill.
+3. **Light, not paint.** An accent shows up as an edge, ring, dot, underline or
+   glow, or at most a faint soft (.12) tint behind a single peer item. Never a
+   solid fill on a card, section, panel or button. Text and CTAs stay neutral,
+   except the focus/link ion.
+4. **One accent per section; peers rotate.** A section gets one accent. If the
+   section is a set of peer items (a data series, a spec or feature grid, a
+   carousel, repeated cards), each item gets exactly one accent, rotating in
+   the fixed order below. One item never carries two colors.
+5. **Fixed order: ion, ultra, pulse, orange, mint, red.** Blue, purple and
+   pink come first. Green and red come last. A rotation list equals this order
+   or a prefix of it. Two adjacent items never share an accent.
+6. **Green and red mean success and failure.** As a decorative or series color,
+   mint and red need a set of 6 or more peers (`GREEN_RED_MIN_SET`). Sets of 5
+   or fewer rotate only ion, ultra, pulse and orange; a 5-item set wraps to ion
+   for item 5, which is not adjacent to item 1. In a set of 1 to 4 items, and
+   at 5, never use green or red as decoration; only real success and error
+   status may. Status components are exempt by role (status props, variants),
+   not by path. Use `getRotationAccent(index, setSize)` from
+   `apps/web/lib/ui/accent-palette.ts` for dynamic sets.
+7. **No two-tone gradients, anywhere.** A gradient, shader or background uses
+   one accent and shades of that hue, centered on the exact token value.
+8. **Image anchor.** A card carrying album art, release artwork or a photo
+   picks the accent that complements the image by color theory and anchors the
+   rotation; the next item cannot reuse it. Lower OKLCH chroma only (never
+   lightness or hue) for contrast, and more strongly behind art.
+9. The focus/link ion never rotates. CTAs stay neutral high-contrast pills.
+   Color never carries status alone.
+
+**Enforcement.** `scripts/invariants/art-direction/accent-pack.mjs`, run by
+`pnpm invariants:check` and the art-direction lane, with a shrink-only baseline
+in `accent-pack.baseline.json` and thresholds in `accent-pack-config.mjs`:
+(a) off-pack color, (b) two-tone gradient, (c) rotation order and adjacency,
+(d) one accent per item or section, (e) green and red minimum set,
+(f) equal weight across peers, (g) solid accent fills on containers. Rules
+(d) to (g) are heuristics: they read the token stream, allow indexed rotations
+and data-viz paths (the allowlist lives in the config), and keep every finding
+reviewable. Do not add ids to the baseline; fix the code or shrink it.
+`pnpm design:accent-pack:inventory` prints the ranked sweep.
 
 For Jovie-owned intentionally art-directed/generated brand imagery, use
 Scene Palette v1 from `apps/web/data/marketing/imageColorPolicy.ts`. The
@@ -293,10 +380,14 @@ Hard product and marketing rules from `DESIGN.md`. Not aesthetic taste.
   consume instances. Do not create route-local masters.
 - Founder review contains only canonical masters and intentional variants. Put
   receipts, duplicates, mappings, and process copy in operator artifacts.
-- Pen (+ZiaWI for color) is the publishable design SoT. Unmapped Pen nodes stay
-  proposal until source identity, save/readback, and persistence contracts
-  pass. Visual similarity is not source backing. Figma/Paper are never
-  publishable SoT; Figma MCP is an optional bridge only.
+- Figma is the canonical design canvas (remote MCP). Code tokens are the
+  source: `pnpm design:tokens-export` writes Figma variables to
+  `docs/design/figma/` (semantic palette only, see
+  `docs/design/FIGMA_VARIABLES.md`); never edit Figma variables by hand.
+  Figma frames come back into code 1:1, and CI compares the export with the
+  committed Figma variables snapshot. Unmapped Figma nodes stay proposal until
+  source identity, save/readback, and persistence contracts pass. Visual
+  similarity is not source backing. Paper is scratch/reference only.
 - Marketing pages share one spine and one type ramp: sections use
   `ArtistProfileSectionShell`, heroes use `.ap-section-container`, and type
   uses `.marketing-type-display` / `-section` / `-lede`.
@@ -323,6 +414,20 @@ action belongs in `end={}`. The canonical `Button` is pill-shaped and defaults
 to `variant='primary'`, so an omitted variant counts as primary. Filters,
 display controls, navigation, cancel, and overflow actions must use secondary,
 tertiary, ghost, or `PageToolbarActionButton` treatment.
+
+### Tables and lists (Linear parity)
+
+Measured against Linear's list (40-44px rows, 13px medium titles, tertiary meta, dot-or-icon status, hairline label pills, no row numbers, no empty columns).
+
+- Row height: user-facing rows are at least 40px (`rowMode='compact'`, single line) and 44px (`list`) or taller for two-line content. `dense` (32px) is for admin/debug tools only. `table-density-contract.test.tsx` ratchets `dense`/`rowHeight={32}` call sites down to 0.
+- Type: primary cell text is `system-b-table-primary-text` (13px) `font-medium text-primary-token`; secondary and meta text is `text-app` (12px) `text-tertiary-token`. Row-mode custom properties own row height; cells set horizontal padding only.
+- Status is quiet: a dot or icon plus text (`StatusCell`), never a filled pill. Pills are for labels and tags only: hairline, no fill, at most 20px tall (`TableBadge`). Keep semantic color on the dot/icon/text.
+- No row-number column on user-facing tables. `rowNumber` is for admin/debug tables only.
+- No empty columns: set `meta.hideWhenEmpty` (optionally `meta.hasValue`) and UnifiedTable hides the column while no loaded row has a value.
+- Data marks (meters, bars) keep at least 3:1 against the row in both themes; inactive marks stay visibly distinct from the background.
+- Every row has an identifying primary label (name, then email or handle, then a descriptor from existing fields). A bare "Visitor" is not a label.
+- No banner cards above tables. An empty, waiting or loading status draws nothing; a populated one is a flat one-line row (no border, fill or radius).
+- Table cells compose the kit in `organisms/table/cells` (`StatusCell`, `MeterCell`, `IdentityCell`, `RelativeTimeCell`). A surface-specific cell may map data to a kit cell but must not set its own typography, color or spacing.
 
 ### One Workspace Left Seam
 
@@ -566,3 +671,9 @@ When building or iterating on the Artist Profiles landing page:
 - Honor the marketing registry's above-the-fold hero contract: do not use a
   full-height hero shell that pushes the first proof element below the fold.
   Keep the opening proof in the composition without decorative inset cards.
+- An affordance never outruns its contents. A disclosure caret, flyout trigger,
+  or count badge renders only when something is behind it: zero items render
+  nothing (or a plain label), one item renders a plain link, a count of 0 hides
+  its badge. Derive the caret from non-empty children by type, not a flag
+  (`apps/web/components/organisms/headerNavEntries.ts`). Enforced by the
+  shrink-only `scripts/invariants/art-direction/empty-affordance.mjs`.

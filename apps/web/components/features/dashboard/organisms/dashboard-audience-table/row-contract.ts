@@ -1,3 +1,4 @@
+import type { StatusCellTone } from '@/components/organisms/table/cells/StatusCell';
 import {
   type AudienceRowState,
   deriveAudienceState,
@@ -6,11 +7,15 @@ import type { AudienceMember } from '@/types';
 
 export type AudienceDisplayState = AudienceRowState | 'subscriber';
 
-export const AUDIENCE_STATE_STYLES: Record<AudienceDisplayState, string> = {
-  high: 'bg-emerald-500/15 text-emerald-300 ring-emerald-500/25',
-  rising: 'bg-amber-500/15 text-amber-300 ring-amber-500/25',
-  dormant: 'bg-surface-0 text-tertiary-token ring-subtle',
-  subscriber: 'bg-violet-500/15 text-violet-200 ring-violet-500/25',
+/** Dot tone per state. Status is a dot plus text, never a filled pill. */
+export const AUDIENCE_STATE_TONES: Record<
+  AudienceDisplayState,
+  StatusCellTone
+> = {
+  high: 'info',
+  rising: 'ultra',
+  dormant: 'neutral',
+  subscriber: 'info',
 };
 
 export const AUDIENCE_STATE_LABELS: Record<AudienceDisplayState, string> = {
@@ -105,6 +110,47 @@ export function getAudienceIdentityChip(
   if (member.phone && member.emailVisibleToArtist === true) {
     return maskAudiencePhone(member.phone);
   }
+  return null;
+}
+
+function referrerHost(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.replace(/^www\./, '') || null;
+  } catch {
+    return null;
+  }
+}
+
+const DEVICE_LABELS: Record<string, string> = {
+  mobile: 'Mobile',
+  desktop: 'Desktop',
+  tablet: 'Tablet',
+};
+
+/**
+ * Short descriptor from fields that already exist on the row: place, then
+ * referrer source, then device. Gives unnamed visitors something to read
+ * ("Anonymous visitor  Los Angeles") instead of a bare label.
+ */
+export function getAudienceDescriptor(
+  member: Pick<
+    AudienceMember,
+    | 'locationLabel'
+    | 'geoCity'
+    | 'geoCountry'
+    | 'referrerHistory'
+    | 'deviceType'
+  >
+): string | null {
+  const place =
+    [member.geoCity, member.geoCountry].filter(Boolean).join(', ') ||
+    member.locationLabel?.trim();
+  if (place && place !== 'Unknown') return place;
+  const source = referrerHost(member.referrerHistory?.[0]?.url);
+  if (source) return `via ${source}`;
+  const device = member.deviceType?.trim().toLowerCase();
+  if (device) return DEVICE_LABELS[device] ?? member.deviceType ?? null;
   return null;
 }
 

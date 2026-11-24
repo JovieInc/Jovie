@@ -666,15 +666,6 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/features/home/ScrollRevealInit.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
     "apps/web/components/features/landing/LandingCTAButton.tsx": [
       "ds-owner",
       "tokens",
@@ -838,15 +829,6 @@
       "forced-caps"
     ],
     "apps/web/components/features/profile/EntityMentionText.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
-    "apps/web/components/features/profile/ProfileAeoContent.tsx": [
       "ds-owner",
       "tokens",
       "states",

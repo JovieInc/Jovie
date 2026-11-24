@@ -11,6 +11,7 @@ import {
   it,
   vi,
 } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { OnboardingInterviewModal } from './OnboardingInterviewModal';
 
 const router = vi.hoisted(() => ({ replace: vi.fn() }));
@@ -227,5 +228,55 @@ describe('OnboardingInterviewModal submission recovery', () => {
     });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(window.sessionStorage.getItem(SESSION_KEY)).toBeNull();
+  });
+
+  it('renders the shared Dialog organism and is axe-clean while open and after an error', async () => {
+    const user = userEvent.setup();
+    const fetchMock = mockFetch();
+    fetchMock.mockRejectedValue(new TypeError('offline'));
+    renderInterview();
+
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Quick Interview',
+    });
+    expect(dialog).toHaveAttribute('data-slot', 'dialog-content');
+    expect(dialog.tagName).not.toBe('DIALOG');
+    await expectNoA11yViolations(document.body);
+
+    await user.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(
+      screen.getByRole('status', { name: 'Question 2 of 5' })
+    ).toBeTruthy();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('ends the interview from the keyboard with Escape', async () => {
+    const user = userEvent.setup();
+    renderInterview();
+    await screen.findByRole('dialog', { name: 'Quick Interview' });
+
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Quick Interview' })
+      ).toBeNull()
+    );
+  });
+
+  it('keeps typed input and focus across a parent rerender and a blur', async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderInterview();
+    const input = await screen.findByRole('textbox');
+
+    await user.type(input, 'I send a Linktree.');
+    rerender(
+      <StrictMode>
+        <OnboardingInterviewModal initialRequested />
+      </StrictMode>
+    );
+    fireEvent.blur(screen.getByRole('textbox'));
+
+    expect(screen.getByRole('textbox')).toHaveValue('I send a Linktree.');
+    expect(screen.getByRole('textbox')).toHaveFocus();
   });
 });

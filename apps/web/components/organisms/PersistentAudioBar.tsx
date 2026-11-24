@@ -104,10 +104,11 @@ export function PersistentAudioBar() {
   // renders the canvas transport — play/pause, scrub, time, next/previous
   // item — instead of the audio track, which the canvas pauses on play.
   const canvasTransport = useMediaCanvasTransport();
-  // Compact is the default surface for an active track (founder spec
-  // 2026-09-25). The dock's PlayerVisibilityToggle closes it to the sidebar
-  // mini (JOV-3511); idle/dismissed playback leaves no dock at all (JOV-6680).
-  const [playerOpen, setPlayerOpen] = useState(true);
+  // The sidebar O is the player until the user asks for more: a play press
+  // lands in the mini, and auto-advance keeps whichever state this holds.
+  // Show Player, the title, and the ` / Cmd+\ shortcuts open the full dock;
+  // idle/dismissed playback leaves no dock at all (JOV-6680).
+  const [playerOpen, setPlayerOpen] = useState(false);
   const [waveformOn, setWaveformOn] = useState(false);
   // Reopen requests from compact chrome (e.g. the sidebar mini card) land on
   // this counter; the player owns `playerOpen` so the published snapshot
@@ -131,10 +132,6 @@ export function PersistentAudioBar() {
   useEffect(() => {
     setImgError(false);
   }, [playbackState.artworkUrl]);
-
-  useEffect(() => {
-    setPlayerOpen(true);
-  }, [playbackState.activeTrackId]);
 
   // The shell dock (ShellAudioDock) owns the cinematic reveal/hide motion —
   // it transitions height/opacity/transform off the published
@@ -612,10 +609,10 @@ export function PersistentAudioBar() {
               data-testid='audio-surface-expanded-shell'
               data-shell-audio-surface='persistent-expanded'
               aria-hidden={!playerOpen}
-              className='flex items-center gap-3 px-4 py-1.5 lg:px-6'
+              className='flex items-end gap-3 px-4 py-1.5 lg:px-6'
             >
               <div
-                className='flex w-56 min-w-0 shrink-0 items-center gap-3'
+                className='flex h-11 w-56 min-w-0 shrink-0 items-center gap-3'
                 data-testid='desktop-player-track'
               >
                 {playbackState.artworkUrl && !imgError ? (
@@ -673,9 +670,9 @@ export function PersistentAudioBar() {
                 }
                 onLyricsIntent={prefetchLyricsRoute}
                 track={shellTrack}
-                className='min-w-0 flex-1 px-0 py-0'
+                className='min-w-0 flex-1 px-0'
               />
-              <div className='flex shrink-0 items-center gap-1'>
+              <div className='flex h-11 shrink-0 items-center gap-1'>
                 <PlayerVisibilityToggle
                   open={playerOpen}
                   onClick={() => setPlayerOpen(value => !value)}

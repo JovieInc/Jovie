@@ -44,6 +44,7 @@ import {
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { resolveArtistChatPreflight } from '@/app/api/chat/artist-preflight';
 import { tryHandleAnonymousOnboardingChat } from '@/app/api/chat/onboarding-handler';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 import { isAiGatewayAvailable } from '@/lib/ai/gateway-availability';
@@ -66,7 +67,6 @@ import { createAccountChatTools } from '@/lib/chat/account-tools';
 import {
   buildAlbumArtUnavailableAssistantMessage,
   detectAlbumArtGenerationIntent,
-  resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
 import { resolveAlbumArtReleaseTarget } from '@/lib/chat/album-art-release-target';
 import { fetchArtistContext } from '@/lib/chat/artist-context.server';
@@ -96,7 +96,6 @@ import {
 import {
   buildRetouchUnavailableAssistantMessage,
   detectRetouchIntent,
-  resolveRetouchCapability,
 } from '@/lib/chat/retouch-capability';
 import { executeChatTurn, isClientDisconnect } from '@/lib/chat/run';
 import { isShowTopInsightsTurnRelevant } from '@/lib/chat/show-top-insights-relevance';
@@ -147,15 +146,17 @@ import {
 } from '@/lib/chat/types';
 import { gateAssistantReply } from '@/lib/chat/voice-lint';
 import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
-import { loadCustomerChatPinnedOpportunity } from '@/lib/connectors/customer-pinned-opportunity';
 import { isArtistRuleViolation } from '@/lib/copy/outbound-floor';
 import { db } from '@/lib/db';
 import { socialLinks } from '@/lib/db/schema/links';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
-import { scheduleOnlineScoring } from '@/lib/eval/scorers/online';
-import { checkGatesForUser, getAppFlagValue } from '@/lib/flags/server';
+import {
+  scheduleOnlineScoring,
+  scheduleTurnOutcomeCheck,
+} from '@/lib/eval/scorers/online';
+import { checkGatesForUser } from '@/lib/flags/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
   classifyIntent,
@@ -172,6 +173,11 @@ import {
   updateMerchCardDetails,
 } from '@/lib/merch/service';
 import { prepareOvieChatTurn } from '@/lib/ovie/chat-entry';
+import {
+  createFounderFastChatFetch,
+  prefetchSummerSession,
+} from '@/lib/ovie/chat-route-helpers';
+import { createOvieTurnTiming, ovieServerTiming } from '@/lib/ovie/chat-timing';
 import { getOvieOperatingStore } from '@/lib/ovie/mcp/runtime-store';
 import {
   assertModelMustNotSelfIdentifyAsOvie,
@@ -184,7 +190,7 @@ import {
   authorizeFounderSummerUser,
   founderPrincipalHash,
 } from '@/lib/ovie/summer-founder-auth';
-import { fetchSummerShadow } from '@/lib/ovie/summer-shadow-client';
+import { FOUNDER_SUMMER_DENIAL } from '@/lib/ovie/summer-founder-denial';
 import { createSummerAssistantStreamResponse } from '@/lib/ovie/summer-stream';
 import {
   getBoundSummerSpeaker,
@@ -227,7 +233,6 @@ import {
   PITCH_TARGETS,
   resolvePitchDestination,
 } from '@/lib/services/pitch';
-import { isRetouchConfigured } from '@/lib/services/retouching/provider-gemini';
 import { isWeeklyQuotaExemptCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
@@ -1849,6 +1854,7 @@ async function tryRouteViaIntent(
 }
 
 export async function POST(req: Request) {
+  const timing = createOvieTurnTiming();
   const requestId = extractRequestId(req);
   const corsHeaders = createAuthenticatedCorsHeaders(
     req.headers.get('origin'),
@@ -1885,28 +1891,19 @@ export async function POST(req: Request) {
     );
   }
 
-  // Resolve account context once and use it for plan tags, rate limits,
-  // prompt context, and tool gates. This avoids stale request/body plan paths
-  // disagreeing with the canonical entitlement resolver.
-  const accountContext = await resolveChatAccountContext({ userId });
-  const userPlan = accountContext.plan;
-  const planLimits = resolveChatTurnPlanLimits(accountContext);
-  const currentUserEntitlements = accountContext.userEntitlements;
-  const insightsEnabled = currentUserEntitlements.isPro;
-  safeSetSentryContext(() => {
-    Sentry.setTag('plan_tier', userPlan);
-    Sentry.setTag('billing_verification', accountContext.billingVerification);
-  });
-
   // Kill switch: Statsig-backed, no deploy required. When a provider incident
   // happens, flip `ai_chat_disabled` to 503 all chat traffic with a friendly
   // message, or `ai_chat_force_light` to force-route to the cheaper/faster
   // light model without a code change. Defaults (both false) = normal behavior.
   // Keys are const-declared so a typo fails at compile time rather than
   // silently falling back to the default.
-  const [chatDisabled, forceLightModel] = await checkGatesForUser(userId, [
-    { key: CHAT_KILL_SWITCH_GATES.DISABLED, defaultValue: false },
-    { key: CHAT_KILL_SWITCH_GATES.FORCE_LIGHT, defaultValue: false },
+  // The gate read and the body parse are independent: run them together.
+  const [[chatDisabled, forceLightModel], parsedRequest] = await Promise.all([
+    checkGatesForUser(userId, [
+      { key: CHAT_KILL_SWITCH_GATES.DISABLED, defaultValue: false },
+      { key: CHAT_KILL_SWITCH_GATES.FORCE_LIGHT, defaultValue: false },
+    ]),
+    parseChatRequestBody(req, { corsHeaders, requestId }),
   ]);
   if (chatDisabled) {
     return NextResponse.json(
@@ -1920,10 +1917,6 @@ export async function POST(req: Request) {
       { status: 503, headers: { ...corsHeaders, 'x-request-id': requestId } }
     );
   }
-  const parsedRequest = await parseChatRequestBody(req, {
-    corsHeaders,
-    requestId,
-  });
   if (!parsedRequest.ok) {
     return parsedRequest.response;
   }
@@ -1959,16 +1952,16 @@ export async function POST(req: Request) {
   if (summerTransportRequested) {
     const founderAuthorization = authorizeFounderSummerUser(userId);
     if (founderAuthorization !== 'authorized') {
+      const denial = FOUNDER_SUMMER_DENIAL[founderAuthorization];
       return NextResponse.json(
         {
-          error:
-            founderAuthorization === 'unconfigured'
-              ? 'Founder Summer identity is not configured'
-              : 'Founder Summer access required',
+          error: denial.error,
+          errorCode: denial.errorCode,
+          message: denial.message,
           requestId,
         },
         {
-          status: founderAuthorization === 'unconfigured' ? 503 : 403,
+          status: denial.status,
           headers: { ...corsHeaders, 'x-request-id': requestId },
         }
       );
@@ -1995,6 +1988,13 @@ export async function POST(req: Request) {
   if (summerTransportRequested) {
     bindEveSummerSpeaker();
   }
+  timing.endHop('auth');
+  // Session history is read-only and independent of ingest: start it now so
+  // it overlaps the ingest writes. Only for a turn that will really go live.
+  const summerSessionPromise = prefetchSummerSession({
+    live: summerTransportRequested && Boolean(clientTurnId),
+    store: ovieStore,
+  });
   const {
     eveTurn,
     receipts: ovieIngestReceipts,
@@ -2007,35 +2007,25 @@ export async function POST(req: Request) {
   const source = normalizeChatTurnSource(body.source);
   const toolIntent = normalizeToolIntent(body.toolIntent);
   const modelRotationStep = normalizeModelRotationStep(body.modelRotationStep);
-  const pinnedOpportunity = await loadCustomerChatPinnedOpportunity(
-    userId,
-    body.pinnedOpportunity
-  );
   const resolvedProfileId = toNullableString(profileId);
   const resolvedConversationId = toNullableString(conversationId);
-  const albumArtFeatureEnabled = await getAppFlagValue('ALBUM_ART_GENERATION', {
-    userId,
-  });
-  const teleprompterRecordingEnabled = await getAppFlagValue(
-    'TELEPROMPTER_RECORDING',
-    { userId }
-  );
-  const albumArtCapability = resolveAlbumArtCapability({
-    featureEnabled: albumArtFeatureEnabled,
-    providerConfigured: isAlbumArtGatewayConfigured(),
-    entitlements: currentUserEntitlements,
-  });
-  const retouchCapability = resolveRetouchCapability({
-    entitlements: currentUserEntitlements,
-    provisioned: isRetouchConfigured(),
-  });
+  // Artist-only context, flags and capability preflights: an OV turn never
+  // uses them, so it skips them and starts Summer sooner.
+  const artistPreflight =
+    chatMode === 'ov'
+      ? null
+      : await resolveArtistChatPreflight({
+          userId,
+          pinnedOpportunityCandidate: body.pinnedOpportunity,
+        });
 
   let reservedTurn: {
     conversationId: string;
     turnId: string;
   } | null = null;
 
-  if (clientTurnId && chatMode !== 'ov') {
+  if (clientTurnId && artistPreflight) {
+    const { albumArtCapability, retouchCapability } = artistPreflight;
     if (!resolvedProfileId) {
       return NextResponse.json(
         {
@@ -2263,6 +2253,7 @@ export async function POST(req: Request) {
   }
 
   if (generation.kind === 'summer-transport') {
+    timing.endHop('preflight');
     const ingestMeta = ovieIngestReceipts.map(receipt => ({
       lane: receipt.lane,
       destination: receipt.destination,
@@ -2274,15 +2265,7 @@ export async function POST(req: Request) {
     const speaker = eveSpeaker
       ? createFallbackSummerSpeaker({
           eve: eveSpeaker,
-          fetchChat: (chatBody, signal) =>
-            fetchSummerShadow('/ovie/v1/summer-chat/stream', {
-              method: 'POST',
-              body: JSON.stringify(chatBody),
-              signal,
-              headers: {
-                'x-jovie-summer-principal-hash': founderPrincipalHash(userId),
-              },
-            }),
+          fetchChat: createFounderFastChatFetch(userId, timing),
         })
       : null;
     const summerSession = generation.session;
@@ -2308,7 +2291,9 @@ export async function POST(req: Request) {
           signal: req.signal,
           clientTurnId,
           principalHash: founderPrincipalHash(userId),
+          sessionPromise: summerSessionPromise,
         }),
+        timing,
         requestId,
         corsHeaders,
         headers: {
@@ -2317,6 +2302,7 @@ export async function POST(req: Request) {
           'x-ovie-summer-speaker': 'summer',
           'x-ovie-summer-session': summerSession.sessionId,
           'x-ovie-m1': OVIE_PROGRAM.m1Status,
+          'server-timing': ovieServerTiming(timing.snapshot()),
           ...(firstReceipt?.workId
             ? { 'x-ovie-eve-work-id': firstReceipt.workId }
             : {}),
@@ -2350,6 +2336,22 @@ export async function POST(req: Request) {
       },
     });
   }
+
+  if (!artistPreflight) {
+    // OV turns always return from the summer-transport branch above.
+    throw new Error('OV turn reached the artist chat path');
+  }
+  const {
+    accountContext,
+    pinnedOpportunity,
+    albumArtFeatureEnabled,
+    teleprompterRecordingEnabled,
+    albumArtCapability,
+  } = artistPreflight;
+  const userPlan = accountContext.plan;
+  const planLimits = resolveChatTurnPlanLimits(accountContext);
+  const currentUserEntitlements = accountContext.userEntitlements;
+  const insightsEnabled = currentUserEntitlements.isPro;
 
   // Rate limiting - plan-aware weekly quota + burst protection. For clients
   // that send clientTurnId, reservation/replay happens before quota charging.
@@ -2732,8 +2734,13 @@ export async function POST(req: Request) {
         // A violation swaps in a safe fallback and logs the rules that fired.
         const gatedReply = gateAssistantReply(assistantText, artistContext);
         if (gatedReply.violations.length > 0) {
+          const emptyReply = gatedReply.violations.some(
+            violation => violation.rule === 'empty-reply'
+          );
           logger.warn(
-            'Assistant reply failed copy floor; persisting fallback',
+            emptyReply
+              ? 'Assistant reply was blank; persisting draft-hold fallback'
+              : 'Assistant reply failed copy floor; persisting fallback',
             {
               requestId,
               turnId: reservedTurn.turnId,
@@ -2745,16 +2752,8 @@ export async function POST(req: Request) {
           parts: responseMessage.parts,
           isAborted,
         });
-        if (
-          !isAborted &&
-          !assistantText.trim() &&
-          (!toolCalls || toolCalls.length === 0)
-        ) {
-          await persistStreamFailure(
-            new Error('Model turn produced no text or tool calls')
-          );
-          return;
-        }
+        // ASS-95: blank artist-facing text (with or without tools) persists the
+        // gated draft-hold fallback instead of an empty bubble or stream failure.
         await persistTerminalAssistantMessage({
           conversationId: reservedTurn.conversationId,
           turnId: reservedTurn.turnId,
@@ -2778,6 +2777,14 @@ export async function POST(req: Request) {
             userPrompt: userText,
             assistantResponse: assistantText,
             plan: userPlan,
+          });
+        }
+        if (!isAborted) {
+          scheduleTurnOutcomeCheck({
+            traceId: requestId,
+            userText,
+            assistantText,
+            toolEvents: toolCalls ?? [],
           });
         }
       },

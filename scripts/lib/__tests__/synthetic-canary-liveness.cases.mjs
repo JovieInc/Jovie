@@ -23,8 +23,11 @@ installSplitSuiteHooks();
 describe('watchdog wiring', () => {
   /** @typedef {{name?: string, id?: string, uses?: string, run?: string, if?: string,
    * env?: Record<string, string>, with?: Record<string, string>, 'continue-on-error'?: boolean}} Step */
+  /** @typedef {{name?: string, needs?: string, if?: string, permissions?: {contents?: string, actions?: string},
+   * outputs?: Record<string, string>, steps: Step[]}} ObserverJob */
   /** @typedef {{on: {schedule?: unknown, workflow_run: {workflows: string[]}},
-   * jobs: Record<string, {steps: Step[]}>, 'run-name'?: string}} Workflow */
+   * concurrency?: {group?: string, queue?: string, 'cancel-in-progress'?: boolean},
+   * jobs: Record<string, ObserverJob>, 'run-name'?: string}} Workflow */
   const load = name =>
     /** @type {Workflow} */ (
       loadYaml(readFileSync(join(root, '.github/workflows', name), 'utf8'))
@@ -126,6 +129,35 @@ describe('watchdog wiring', () => {
       '--coverage.include=synthetic-canary-liveness.mjs'
     );
     expect(guard.command).toContain('--coverage.thresholds.lines=90');
+  });
+
+  it('catches up one missed slot from this backstop without a new cron or dispatch flag', () => {
+    expect(observer.on.schedule).toBeUndefined();
+    expect(observer.jobs.liveness.outputs.missed_slot).toBe(
+      '${{ steps.synthetic-heartbeat.outputs.missed_slot }}'
+    );
+    const catchup = observer.jobs['synthetic-canary-catchup'];
+    expect(catchup.needs).toBe('liveness');
+    expect(catchup['runs-on']).toBe('ubuntu-24.04');
+    expect(catchup.if).toBe(
+      "${{ always() && needs.liveness.outputs.missed_slot == 'true' }}"
+    );
+    expect(catchup.permissions).toEqual({
+      contents: 'read',
+      actions: 'write',
+    });
+    const dispatch = catchup.steps.find(step =>
+      step.run?.includes('scripts/synthetic-canary-catchup.mjs')
+    );
+    expect(dispatch?.run).toBe('node scripts/synthetic-canary-catchup.mjs');
+    expect(dispatch?.env).toEqual({ GH_TOKEN: '${{ github.token }}' });
+    expect(dispatch?.env?.SYNTHETIC_CANARY_DISPATCH).toBeUndefined();
+    const probe = observer.jobs.liveness.steps.find(
+      step => step.id === 'synthetic-heartbeat'
+    );
+    expect(probe?.env?.SYNTHETIC_CANARY_DISPATCH).toBeUndefined();
+    expect(producer.concurrency?.queue).toBe('max');
+    expect(producer.concurrency?.['cancel-in-progress']).toBe(false);
   });
 });
 

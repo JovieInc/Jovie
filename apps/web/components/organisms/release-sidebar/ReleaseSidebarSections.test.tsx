@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -489,4 +491,9 @@ describe('ReleaseSidebarSections', () => {
     expect(screen.getByRole('button', { name: /preview/i })).toBeDisabled();
     await expectNoA11yViolations(container);
   });
+});
+
+it('draws the play triangle through PlayIcon (JOV-12568)', () => {
+  const src = readFileSync(resolve(__dirname, './ReleaseSidebarSections.tsx'));
+  expect(String(src)).toMatch(/^(?![\s\S]*translate-x-px)[\s\S]*<PlayIcon/);
 });

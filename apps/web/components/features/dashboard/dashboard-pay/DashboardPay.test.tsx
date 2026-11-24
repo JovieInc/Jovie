@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import userEvent from '@testing-library/user-event';
+import { type ReactNode, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { DashboardPay } from './DashboardPay';
 
 const mockUseDashboardData = vi.fn();
@@ -127,6 +129,106 @@ describe('DashboardPay', () => {
   });
 });
 
+describe('DashboardPay behaviour', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('keeps the typed Venmo username through a rerender and Escape, and saves it', async () => {
+    const user = userEvent.setup();
+    const handleSaveVenmo = vi.fn();
+    mockDashboardData();
+    mockUseDashboardPay.mockImplementation(() => {
+      const [venmoHandle, setVenmoHandle] = useState('');
+      return {
+        artist: { handle: 'artist-handle', venmo_handle: undefined },
+        venmoHandle,
+        setVenmoHandle,
+        isEditing: false,
+        setIsEditing: vi.fn(),
+        isSaving: false,
+        saveSuccess: null,
+        hasVenmoHandle: false,
+        handleSaveVenmo,
+        handleCancel: vi.fn(),
+        handleDisconnect: vi.fn(),
+      };
+    });
+
+    const { container, rerender } = render(<DashboardPay />);
+    const field = screen.getByLabelText('Venmo Username');
+    await user.type(field, 'tim-white');
+    rerender(<DashboardPay />);
+    await user.keyboard('{Escape}');
+
+    expect(field).toHaveValue('tim-white');
+    expect(field).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Connect' }));
+    expect(handleSaveVenmo).toHaveBeenCalledTimes(1);
+    await expectNoA11yViolations(container);
+  });
+
+  it('disables Connect until a username is typed and explains success', async () => {
+    mockDashboardData();
+    mockDashboardPay({ saveSuccess: 'Venmo connected' });
+
+    const { container } = render(<DashboardPay />);
+
+    expect(screen.getByRole('button', { name: 'Connect' })).toBeDisabled();
+    expect(screen.getByText('Venmo connected')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('opens the connected menu to edit or disconnect', async () => {
+    const user = userEvent.setup();
+    const setIsEditing = vi.fn();
+    const handleDisconnect = vi.fn();
+    mockDashboardData();
+    mockDashboardPay({
+      artist: { handle: 'artist-handle', venmo_handle: '@artist' },
+      hasVenmoHandle: true,
+      venmoHandle: 'artist',
+      setIsEditing,
+      handleDisconnect,
+    });
+
+    const { container } = render(<DashboardPay />);
+    const badge = screen.getByRole('button', { name: /@artist/ });
+    expect(badge).toHaveAttribute('type', 'button');
+    await user.click(badge);
+    await user.click(
+      await screen.findByRole('menuitem', { name: 'Disconnect' })
+    );
+
+    expect(handleDisconnect).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: /@artist/ }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Edit' }));
+    expect(setIsEditing).toHaveBeenCalledWith(true);
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders nothing without an artist', () => {
+    mockDashboardData();
+    mockDashboardPay({ artist: null });
+
+    const { container } = render(<DashboardPay />);
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('uses neutral tokens for the pay link icon and the metric dividers', () => {
+    mockDashboardData();
+    mockDashboardPay({
+      artist: { handle: 'artist-handle', venmo_handle: '@artist' },
+      hasVenmoHandle: true,
+    });
+
+    const { container } = render(<DashboardPay />);
+
+    expect(container.innerHTML).not.toMatch(/text-blue-|color-mix/);
+  });
+});
+
 describe('DashboardPay scale tokens', () => {
   it('uses the 16px text-base step instead of the text-lg alias', () => {
     const source = readFileSync(
@@ -145,5 +247,17 @@ describe('DashboardPay icon geometry', () => {
       'utf8'
     );
     expect(source).not.toMatch(/\b[hw]-4\.5\b|\bsize-4\.5\b/);
+  });
+});
+
+describe('DashboardPay seam', () => {
+  it('puts its content on the 12px workspace seam (JOV-12565)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './DashboardPay.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain("contentPadding='default'");
+    expect(source).not.toContain("contentPadding='compact'");
   });
 });

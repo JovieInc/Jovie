@@ -1,6 +1,13 @@
 'use client';
 
-import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
+import {
+  CompositeField,
+  HostDrawnInput,
+  PlainButton,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@jovie/ui';
 import { SendHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -115,18 +122,17 @@ function AskJoviePanel({ pathname }: AskJoviePanelProps) {
           data-testid='ask-jovie-suggestions'
         >
           {ASK_JOVIE_SUGGESTIONS.map(suggestion => (
-            <button
+            <PlainButton
               key={suggestion.id}
-              type='button'
               onClick={() => send(suggestion.label, suggestion.intent)}
               className={cn(
                 'rounded-full border border-subtle px-3 py-1 text-xs text-secondary-token',
-                'transition-colors duration-subtle hover:bg-white/[0.06] hover:text-primary-token',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30'
+                'transition-colors duration-subtle hover:bg-interactive-hover hover:text-primary-token',
+                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus'
               )}
             >
               {suggestion.label}
-            </button>
+            </PlainButton>
           ))}
         </div>
       ) : (
@@ -142,8 +148,8 @@ function AskJoviePanel({ pathname }: AskJoviePanelProps) {
               className={cn(
                 'rounded-lg px-3 py-1.5 text-xs',
                 message.role === 'user'
-                  ? 'self-end bg-white/[0.08] text-primary-token'
-                  : 'self-start bg-white/[0.04] text-secondary-token'
+                  ? 'self-end bg-surface-2 text-primary-token'
+                  : 'self-start bg-surface-1 text-secondary-token'
               )}
               data-role={message.role}
               data-intent={message.intent}
@@ -165,33 +171,35 @@ function AskJoviePanel({ pathname }: AskJoviePanelProps) {
         </ul>
       )}
 
-      <form onSubmit={onSubmit} className='flex items-center gap-1.5'>
-        <input
-          type='text'
-          value={draft}
-          onChange={event => setDraft(event.target.value)}
-          placeholder='Ask Jovie anything…'
-          aria-label='Message Jovie'
-          className={cn(
-            'h-8 min-w-0 flex-1 rounded-md border border-subtle bg-transparent px-2 text-xs text-primary-token',
-            'placeholder:text-tertiary-token',
-            'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30'
-          )}
-        />
-        <button
-          type='submit'
-          disabled={!draft.trim()}
-          aria-label='Send Message'
-          data-testid='ask-jovie-send'
-          className={cn(
-            'flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-secondary-token',
-            'transition-colors duration-subtle hover:bg-white/[0.06] hover:text-primary-token',
-            'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/30',
-            'disabled:pointer-events-none disabled:opacity-30'
-          )}
-        >
-          <SendHorizontal className='h-3.5 w-3.5' strokeWidth={2} />
-        </button>
+      <form onSubmit={onSubmit}>
+        <div className='text-xs text-primary-token'>
+          <CompositeField shape='md' size='sm' surface='field'>
+            <span className='flex min-w-0 flex-1 ps-2'>
+              <HostDrawnInput
+                type='text'
+                value={draft}
+                onChange={event => setDraft(event.target.value)}
+                placeholder='Ask Jovie anything…'
+                aria-label='Message Jovie'
+                className='w-full min-w-0'
+              />
+            </span>
+            <PlainButton
+              type='submit'
+              disabled={!draft.trim()}
+              aria-label='Send Message'
+              data-testid='ask-jovie-send'
+              className={cn(
+                'flex size-7 shrink-0 items-center justify-center rounded-md text-secondary-token',
+                'transition-colors duration-subtle hover:bg-interactive-hover hover:text-primary-token',
+                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus',
+                'disabled:pointer-events-none disabled:opacity-30'
+              )}
+            >
+              <SendHorizontal className='h-3.5 w-3.5' strokeWidth={2} />
+            </PlainButton>
+          </CompositeField>
+        </div>
       </form>
     </div>
   );
@@ -212,8 +220,7 @@ export function AskJovieMark({ variant = 'jovie' }: AskJovieMarkProps) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button
-          type='button'
+        <PlainButton
           aria-label='Ask Jovie'
           data-testid='ask-jovie-trigger'
           className={cn(
@@ -246,7 +253,7 @@ export function AskJovieMark({ variant = 'jovie' }: AskJovieMarkProps) {
               Jovie
             </span>
           </span>
-        </button>
+        </PlainButton>
       </PopoverTrigger>
       <PopoverContent side='right' align='start' aria-label='Ask Jovie'>
         <AskJoviePanel pathname={pathname} />

@@ -46,15 +46,15 @@ describe('central Inbox bell', () => {
         availability={{ state: 'available', pendingCount: null }}
       />
     );
-    const link = screen.getByRole('link', { name: 'Inbox' });
+    const link = screen.getByRole('link', { name: 'Home' });
     expect(link).toBeVisible();
     expect(link).toHaveAttribute('data-inbox-attention', 'unknown');
     expect(link.querySelector('span')).toBeNull();
   });
 
   it.each([
-    [1, 'Inbox — 1 Item Needs Attention'],
-    [2, 'Inbox — 2 Items Need Attention'],
+    [1, 'Home — 1 Item Needs Attention'],
+    [2, 'Home — 2 Items Need Attention'],
   ])(
     'agrees the attention label with %i pending items',
     (pendingCount, name) => {
@@ -72,7 +72,7 @@ describe('central Inbox bell', () => {
       />
     );
     const link = screen.getByRole('link', {
-      name: 'Inbox — 3 Items Need Attention',
+      name: 'Home — 3 Items Need Attention',
     });
     expect(link.querySelector('svg')).toHaveClass(
       'size-(--app-shell-sidebar-icon-size)'
@@ -97,7 +97,7 @@ describe('central Inbox bell', () => {
       render(
         <SidebarInboxLink availability={{ state: 'empty', pendingCount: 0 }} />
       );
-      const link = screen.getByRole('link', { name: 'Inbox — all caught up' });
+      const link = screen.getByRole('link', { name: 'Home — all caught up' });
       expect(link).toHaveAttribute('data-inbox-attention', 'empty');
       expect(link.querySelector('[data-runtime-update]')).toBeNull();
       expect(link.querySelector('[data-inbox-unread]')).toBeNull();
@@ -113,7 +113,7 @@ describe('central Inbox bell', () => {
       />
     );
     const link = screen.getByRole('link', {
-      name: 'Inbox — 3 Items Need Attention',
+      name: 'Home — 3 Items Need Attention',
     });
     expect(link.querySelectorAll('[data-inbox-unread]')).toHaveLength(1);
     expect(link.querySelector('[data-inbox-unread]')).toHaveClass(
@@ -125,8 +125,8 @@ describe('central Inbox bell', () => {
   });
 
   it.each([
-    [{ state: 'empty' as const, pendingCount: 0 }, 'Inbox — all caught up'],
-    [{ state: 'unknown' as const, pendingCount: null }, 'Inbox'],
+    [{ state: 'empty' as const, pendingCount: 0 }, 'Home — all caught up'],
+    [{ state: 'unknown' as const, pendingCount: null }, 'Home'],
   ])('keeps the destination available for %s', async (availability, name) => {
     const { container } = render(
       <SidebarInboxLink availability={availability} />
@@ -144,7 +144,7 @@ describe('central Inbox bell', () => {
       />
     );
     const link = screen.getByRole('link', {
-      name: 'Inbox — 12840 Items Need Attention',
+      name: 'Home — 12840 Items Need Attention',
     });
     expect(link).toHaveClass('size-7');
     expect(link.querySelectorAll('[aria-hidden="true"]')).toHaveLength(2);
@@ -160,7 +160,7 @@ describe('central Inbox bell', () => {
       </div>
     );
     const link = screen.getByRole('link', {
-      name: 'Inbox — 3 Items Need Attention',
+      name: 'Home — 3 Items Need Attention',
     });
     expect(link).toHaveAttribute('data-inbox-attention', 'available');
     await expectNoA11yViolations(container);
@@ -173,7 +173,7 @@ describe('central Inbox bell', () => {
       />
     );
     expect(
-      screen.getByRole('link', { name: 'Inbox — 1 Item Needs Attention' })
+      screen.getByRole('link', { name: 'Home — 1 Item Needs Attention' })
     ).toBeInTheDocument();
   });
 
@@ -186,7 +186,7 @@ describe('central Inbox bell', () => {
         />
       );
       const link = screen.getByRole('link', {
-        name: 'Inbox — 1 Item Needs Attention',
+        name: 'Home — 1 Item Needs Attention',
       });
       expect(link.getAttribute('aria-label')).not.toMatch(/update/i);
     } finally {
@@ -199,7 +199,7 @@ describe('central Inbox bell', () => {
     render(
       <SidebarInboxLink availability={{ state: 'empty', pendingCount: 0 }} />
     );
-    const link = screen.getByRole('link', { name: 'Inbox — all caught up' });
+    const link = screen.getByRole('link', { name: 'Home — all caught up' });
     expect(link).toHaveAttribute('data-navigation-item-id', 'home');
     expect(link).not.toHaveAttribute('data-navigation-pending');
     fireEvent.pointerDown(link, { button: 0 });
@@ -213,7 +213,7 @@ describe('central Inbox bell', () => {
     render(
       <SidebarInboxLink availability={{ state: 'empty', pendingCount: 0 }} />
     );
-    const link = screen.getByRole('link', { name: 'Inbox — all caught up' });
+    const link = screen.getByRole('link', { name: 'Home — all caught up' });
     fireEvent.pointerDown(link, { button: 0 });
     expect(link).not.toHaveAttribute('data-navigation-pending');
     expect(link).not.toHaveAttribute('aria-busy');
@@ -224,7 +224,7 @@ describe('central Inbox bell', () => {
     render(
       <SidebarInboxLink availability={{ state: 'empty', pendingCount: 0 }} />
     );
-    const link = screen.getByRole('link', { name: 'Inbox — all caught up' });
+    const link = screen.getByRole('link', { name: 'Home — all caught up' });
     fireEvent.pointerDown(link, { button: 0 });
     expect(link).toHaveAttribute('data-navigation-pending', 'true');
     fireEvent.click(link, { button: 0, metaKey: true });
@@ -235,7 +235,7 @@ describe('central Inbox bell', () => {
     render(
       <SidebarInboxLink availability={{ state: 'empty', pendingCount: 0 }} />
     );
-    const link = screen.getByRole('link', { name: 'Inbox — all caught up' });
+    const link = screen.getByRole('link', { name: 'Home — all caught up' });
     for (const token of SIDEBAR_HEADER_ICON_BUTTON_CLASS.split(' ')) {
       expect(link).toHaveClass(token);
     }
@@ -250,7 +250,7 @@ describe('central Inbox bell', () => {
     render(
       <SidebarInboxLink availability={{ state: 'empty', pendingCount: 0 }} />
     );
-    const link = screen.getByRole('link', { name: 'Inbox — all caught up' });
+    const link = screen.getByRole('link', { name: 'Home — all caught up' });
     fireEvent.click(link, { metaKey: true });
     expect(startNavigationTelemetry).not.toHaveBeenCalled();
     fireEvent.click(link, { detail: 1 });

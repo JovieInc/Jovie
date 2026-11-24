@@ -1,7 +1,8 @@
 'use client';
 
-import { Play } from 'lucide-react';
+import { PlainButton } from '@jovie/ui';
 import { memo } from 'react';
+import { PlayIcon } from '@/components/atoms/PlayIcon';
 import { cn } from '@/lib/utils';
 import type { Cue, CueKind } from './cues.types';
 import { SHELL_CAPTION_CLASSNAME } from './shell-caption';
@@ -47,8 +48,7 @@ const CueRow = memo(function CueRow({
   readonly disabled: boolean;
 }) {
   return (
-    <button
-      type='button'
+    <PlainButton
       onClick={() => onSeek?.(c.at)}
       disabled={disabled}
       className='group/cue w-full flex items-center gap-2 h-8 px-2 rounded-md text-xs text-secondary-token hover:bg-surface-1/40 hover:text-primary-token disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) transition-colors duration-subtle ease-subtle'
@@ -65,17 +65,13 @@ const CueRow = memo(function CueRow({
         </span>
         {onSeek && (
           <span className='absolute inset-0 grid place-items-center text-primary-token opacity-0 group-hover/cue:opacity-100 transition-opacity duration-subtle ease-subtle'>
-            <Play
-              className='h-3 w-3 translate-x-px'
-              strokeWidth={2.5}
-              fill='currentColor'
-            />
+            <PlayIcon size={12} strokeWidth={2.5} fill='currentColor' />
           </span>
         )}
       </span>
       <span className='flex-1 text-left truncate'>{c.label}</span>
       <span className={SHELL_CAPTION_CLASSNAME}>{CUE_KIND_LABEL[c.kind]}</span>
-    </button>
+    </PlainButton>
   );
 });
 
@@ -124,7 +120,7 @@ export function CuesPanel({
             <span
               key={`ribbon-${c.at}-${c.label}`}
               aria-hidden='true'
-              className='absolute top-1/2 -translate-y-1/2 h-2 w-0.5 rounded-full bg-cyan-300/60'
+              className='absolute top-1/2 -translate-y-1/2 h-2 w-0.5 rounded-full bg-accent/60'
               style={{ left: `${pct}%` }}
             />
           );

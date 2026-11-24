@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
@@ -145,9 +146,8 @@ export function PerformanceCard({
             {surfacedRanges.map(r => {
               const on = r.key === range;
               return (
-                <button
+                <PlainButton
                   key={r.key}
-                  type='button'
                   role='tab'
                   aria-selected={on}
                   onClick={() => {
@@ -157,12 +157,12 @@ export function PerformanceCard({
                   className={cn(
                     'h-5 px-2 rounded-full text-3xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle',
                     on
-                      ? 'bg-(--surface-2) text-primary-token ring-1 ring-inset ring-white/10'
+                      ? 'bg-(--surface-2) text-primary-token ring-1 ring-inset ring-(--app-shell-border)'
                       : 'text-tertiary-token hover:text-primary-token'
                   )}
                 >
                   {r.label}
-                </button>
+                </PlainButton>
               );
             })}
           </div>

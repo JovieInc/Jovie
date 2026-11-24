@@ -22,16 +22,48 @@ export function checkAppChatPromptContract(prompt: string) {
       'never "here are some tips"',
       'never a "let me know" closer'
     ),
+    forbidsPermissionToPlanCloser: includesAll(
+      'Commit the next move in this turn',
+      'Never close with permission-to-plan',
+      'say the word'
+    ),
     forbidsInventedAccountStats: includesAll(
       'Never invent account stats',
       'streams, followers, popularity, saves, playlist adds',
-      'say you cannot see it',
+      'say plainly what you cannot see',
       'Never invent the missing figure'
+    ),
+    forbidsInventedAccountFacts: includesAll(
+      'Never invent Spotify algorithm',
+      'Do not claim Jovie creates or hosts a DSP pre-save',
+      'Never invent CPC',
+      'Never invent studio lore',
+      'Never invent exact Spotify editorial day-count'
+    ),
+    forbidsInventedCapabilities: includesAll(
+      'Never invent product features',
+      'third-party UI paths',
+      'say plainly what you cannot see',
+      'Never claim you will set up',
+      'smart link is live or will live',
+      'lands on Spotify',
+      'link will be up on my page'
     ),
     requiresDraftHoldOutbound: includesAll(
       'Draft every outbound artifact',
       "Hold for the artist's one-tap yes",
       'Never send, post, schedule, pitch live, or spend money'
+    ),
+    requiresDraftClearAskNow: includesAll(
+      'When the artist clearly asks for a draft',
+      'ad copy',
+      'write the draft body in this turn',
+      'Never reply with only a promise to draft',
+      'Do not grill for a positioning line'
+    ),
+    requiresRefuseDraftHoldOnlyForUnasked: includesAll(
+      'refusing an unasked send, post, auto-DM, scrape, or spend',
+      'That refuse→draft-hold line is only for unasked'
     ),
     keepsGroundingToPromptOrTools: includesAll(
       'must come from this prompt or from a tool result in this turn',
@@ -41,7 +73,7 @@ export function checkAppChatPromptContract(prompt: string) {
       'first content sentence',
       'name that release and the days left',
       'Never invent lead-time rules',
-      'pre-save can go up today'
+      'a release or pre-save link can go on the Jovie profile today'
     ),
     requiresDatedMoveOrToolCall: includesAll(
       'clarifying question is allowed only when a required tool field is truly missing',
@@ -53,6 +85,32 @@ export function checkAppChatPromptContract(prompt: string) {
       'Never invent popularity, streams, peer benchmarks',
       'Never say you lack per-release data',
       'today Jovie setup step'
+    ),
+    // ASS-87 / ASS-95: empty-after-tool, length, refuse→draft-hold,
+    // stream-count phrasing without catalog deny (44964568648 / 44968636057).
+    requiresArtistFacingTextAfterTools: includesAll(
+      'After any tool or useSkill result, always write the artist-facing reply',
+      'tool-only turn with empty text is a failure'
+    ),
+    requiresShortDefaultPlans: includesAll(
+      'Default advice and launch plans stay short',
+      'today plus release-day only'
+    ),
+    requiresRefuseThenDraftHold: includesAll(
+      'refusing an unasked send, post, auto-DM, scrape, or spend',
+      'name the release or artifact from the ask',
+      'draft and hold for their yes or confirm',
+      'Never a generic draft-hold line'
+    ),
+    // ASS-92 residual safety (44983916780): private-data train refuse before pivot.
+    requiresRefusePrivateDataTrain: includesAll(
+      'train on private DMs, demos, or other private data',
+      'Jovie does not train on creator work',
+      'Do not call release-launch'
+    ),
+    requiresStreamCountNotCatalogDeny: includesAll(
+      'cannot see stream counts or saves',
+      'Never say you lack per-release data, track-by-track data'
     ),
   };
 }

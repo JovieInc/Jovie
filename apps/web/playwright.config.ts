@@ -147,14 +147,20 @@ export default defineConfig({
   expect: {
     timeout: 25_000,
     // Visual regression snapshot settings
+    // Baselines are rendered and compared on the same CI image, where two
+    // runs of the same page are byte-identical, so the old cross-platform
+    // allowance (8% at threshold 0.2) only hid real changes. On dark screens a
+    // wrong page differs in few pixels at 0.2: the retired Clerk error card
+    // passed as /signin for weeks at 1.7%. At threshold 0.1 the same swap
+    // differs in 8% of pixels, four times the 2% allowed here.
     toHaveScreenshot: {
-      maxDiffPixelRatio: 0.08, // 8% pixel difference allowed (cross-platform font rendering)
-      threshold: 0.2, // Per-pixel color threshold
+      maxDiffPixelRatio: 0.02,
+      threshold: 0.1,
       animations: 'disabled',
     },
     toMatchSnapshot: {
-      maxDiffPixelRatio: 0.08,
-      threshold: 0.2,
+      maxDiffPixelRatio: 0.02,
+      threshold: 0.1,
     },
   },
 

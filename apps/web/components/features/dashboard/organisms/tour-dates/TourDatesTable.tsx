@@ -167,11 +167,11 @@ const PROVIDER_CONFIG: Record<
 > = {
   bandsintown: {
     label: 'Bandsintown',
-    className: 'text-teal-600 dark:text-teal-400',
+    className: 'text-accent-teal',
   },
   songkick: {
     label: 'Songkick',
-    className: 'text-pink-600 dark:text-pink-400',
+    className: 'text-accent-pink',
   },
   manual: { label: 'Manual', className: 'text-tertiary-token' },
   admin_import: {
@@ -201,6 +201,7 @@ const ActionsHeader = memo(function ActionsHeader({
 }) {
   return (
     <div className='flex items-center justify-end gap-2'>
+      <span className='sr-only'>Actions</span>
       {onSync && (
         <Button
           onClick={event => {
@@ -210,7 +211,7 @@ const ActionsHeader = memo(function ActionsHeader({
           disabled={isSyncing}
           variant='ghost'
           size='sm'
-          className='h-8 gap-1 rounded-md px-2.5 text-app text-secondary-token hover:bg-surface-0 hover:text-primary-token'
+          className='h-7 gap-1 rounded-full px-2.5 text-app text-secondary-token hover:bg-surface-0 hover:text-primary-token'
         >
           <Icon
             name='RefreshCw'

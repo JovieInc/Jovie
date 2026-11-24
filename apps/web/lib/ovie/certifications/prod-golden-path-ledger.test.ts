@@ -4,7 +4,6 @@ import type { CertificationRecordBackend } from '@/lib/agent-os/certification-ca
 import {
   certifiedProdGoldenPathSurfaces,
   isProdGoldenPathReceipt,
-  PROD_GOLDEN_PATH_CERTIFICATION_MAX_AGE_MS,
   PROD_GOLDEN_PATH_RECEIPT_SCHEMA,
   type ProdGoldenPathReceipt,
   prodGoldenPathPacketFiles,
@@ -160,34 +159,35 @@ describe('prod golden-path ledger', () => {
     expect(chat?.summary).toContain('Not exercised on production');
   });
 
-  it('emits certified / expired / missing lifecycle states per surface (JOV-9625)', async () => {
+  it('emits certified / expired / missing lifecycle states per surface, bound to the release (JOV-14402)', async () => {
     const backend = memoryBackend();
-    const oldEndedAt = new Date(
-      Date.parse('2026-10-28T20:00:05.000Z') - 25 * 60 * 60 * 1000
-    ).toISOString();
     await recordProdGoldenPathRun({
       backend,
       receipts: [
         receipt(),
+        // An older release's pass, superseded by the newer landing receipt.
         receipt({
           surface: 'chat',
+          sha: SHA2,
           startedAt: '2026-10-27T19:00:00.000Z',
-          endedAt: oldEndedAt,
+          endedAt: '2026-10-27T19:00:05.000Z',
         }),
       ],
       recordedAt: '2026-10-28T20:00:05.000Z',
     });
     const ledger = await readProdGoldenPathLedger(backend);
+    // A week later nothing has aged out: the pass belongs to its release.
     const files = prodGoldenPathPacketFiles(ledger!, {
-      nowMs: Date.parse('2026-10-28T20:00:06.000Z'),
+      nowMs: Date.parse('2026-11-04T20:00:06.000Z'),
     });
     const dogfood = (i: number) =>
       files[i].packet.operational?.runtimeDogfood?.[0];
-    // Fresh pass -> certified.
     expect(dogfood(0)?.summary).toContain('state=certified');
     expect(dogfood(0)?.status).toBe('passed');
-    // Stale pass -> expired.
-    expect(dogfood(4)?.summary).toContain('state=expired');
+    // A pass for an older release than the served one -> expired.
+    expect(dogfood(4)?.summary).toContain(
+      'state=expired; Last production pass on dddddddd is for an older release than cccccccc'
+    );
     expect(dogfood(4)?.status).toBe('pending');
     // Never-recorded surface -> explicit missing row, never vanished.
     expect(dogfood(1)?.summary).toContain('state=missing');
@@ -196,29 +196,20 @@ describe('prod golden-path ledger', () => {
     expect(files[1].packet.source).toBeNull();
   });
 
-  it('rejects future-dated passes beyond clock skew in both surface certification and packet projection', async () => {
+  it('refuses receipts dated beyond clock skew after they were recorded', async () => {
     const backend = memoryBackend();
-    const nowMs = Date.parse('2026-10-28T20:00:05.000Z');
-    const futureEndedAt = new Date(nowMs + 15 * 60 * 1000).toISOString();
-    await recordProdGoldenPathRun({
-      backend,
-      receipts: [
-        receipt({
-          surface: 'landing',
-          startedAt: futureEndedAt,
-          endedAt: futureEndedAt,
-        }),
-      ],
-      recordedAt: '2026-10-28T20:00:05.000Z',
-    });
-    const ledger = await readProdGoldenPathLedger(backend);
-    expect(certifiedProdGoldenPathSurfaces(ledger, nowMs)).toEqual([]);
-    const files = prodGoldenPathPacketFiles(ledger!, { nowMs });
-    const landingDogfood = files[0].packet.operational?.runtimeDogfood?.[0];
-    expect(landingDogfood?.status).toBe('pending');
-    expect(landingDogfood?.summary).toContain(
-      'state=expired; Last production pass on cccccccc has a future or unparseable timestamp'
-    );
+    const recordedAt = '2026-10-28T20:00:05.000Z';
+    const future = new Date(
+      Date.parse(recordedAt) + 15 * 60 * 1000
+    ).toISOString();
+    await expect(
+      recordProdGoldenPathRun({
+        backend,
+        receipts: [receipt({ startedAt: future, endedAt: future })],
+        recordedAt,
+      })
+    ).rejects.toThrow('is invalid');
+    expect(await readProdGoldenPathLedger(backend)).toBeNull();
   });
 
   it('failed and blocked receipts carry no lifecycle state (JOV-9625)', async () => {
@@ -380,8 +371,6 @@ describe('prod golden-path ledger', () => {
 });
 
 describe('certified golden-path surfaces (alias gate scope)', () => {
-  const ENDED = Date.parse('2026-10-28T20:00:05.000Z');
-
   async function ledgerWith(receipts: ProdGoldenPathReceipt[]) {
     const backend = memoryBackend();
     await recordProdGoldenPathRun({ backend, receipts });
@@ -389,10 +378,10 @@ describe('certified golden-path surfaces (alias gate scope)', () => {
   }
 
   it('certifies nothing without a ledger', () => {
-    expect(certifiedProdGoldenPathSurfaces(null, ENDED)).toEqual([]);
+    expect(certifiedProdGoldenPathSurfaces(null)).toEqual([]);
   });
 
-  it('lists only surfaces whose latest receipt passed within the certification period, in launch order', async () => {
+  it('lists surfaces whose pass belongs to the served release, in launch order', async () => {
     const ledger = await ledgerWith([
       receipt({ surface: 'public-profile' }),
       receipt({ surface: 'landing' }),
@@ -410,32 +399,37 @@ describe('certified golden-path surfaces (alias gate scope)', () => {
         ],
       }),
     ]);
-    expect(certifiedProdGoldenPathSurfaces(ledger, ENDED + 60_000)).toEqual([
+    expect(certifiedProdGoldenPathSurfaces(ledger)).toEqual([
       'landing',
       'public-profile',
     ]);
   });
 
-  it('expires a certification once the latest pass is older than the certification period', async () => {
-    const ledger = await ledgerWith([receipt({ surface: 'public-profile' })]);
+  it('never expires a certification with time, only with a newer release (JOV-14402)', async () => {
+    const backend = memoryBackend();
+    await recordProdGoldenPathRun({
+      backend,
+      receipts: [receipt({ surface: 'public-profile' })],
+    });
+    // No clock is read: a pass is certified for as long as its release serves.
     expect(
-      certifiedProdGoldenPathSurfaces(
-        ledger,
-        ENDED + PROD_GOLDEN_PATH_CERTIFICATION_MAX_AGE_MS
-      )
+      certifiedProdGoldenPathSurfaces(await readProdGoldenPathLedger(backend))
     ).toEqual(['public-profile']);
+    // A newer release that has a receipt for landing only: the profile pass
+    // belongs to the older release, so it no longer certifies the served one.
+    await recordProdGoldenPathRun({
+      backend,
+      receipts: [
+        receipt({
+          surface: 'landing',
+          sha: SHA2,
+          startedAt: '2026-10-29T20:00:00.000Z',
+          endedAt: '2026-10-29T20:00:05.000Z',
+        }),
+      ],
+    });
     expect(
-      certifiedProdGoldenPathSurfaces(
-        ledger,
-        ENDED + PROD_GOLDEN_PATH_CERTIFICATION_MAX_AGE_MS + 1
-      )
-    ).toEqual([]);
-  });
-
-  it('does not trust a receipt stamped far in the future', async () => {
-    const ledger = await ledgerWith([receipt({ surface: 'public-profile' })]);
-    expect(
-      certifiedProdGoldenPathSurfaces(ledger, ENDED - 60 * 60 * 1000)
-    ).toEqual([]);
+      certifiedProdGoldenPathSurfaces(await readProdGoldenPathLedger(backend))
+    ).toEqual(['landing']);
   });
 });

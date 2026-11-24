@@ -8,10 +8,14 @@ vi.mock('server-only', () => ({}));
 
 import {
   chatCompletionsUrl,
+  cheapJudgeFallbackModel,
+  isWorkersAiModelAllowlistError,
   WORKERS_AI_CHEAP_JUDGE,
+  WORKERS_AI_CHEAP_JUDGE_FALLBACK,
   WORKERS_AI_RELAY_BASE_URL,
   WORKERS_AI_STRONG_JUDGE,
   WORKERS_AI_SUBJECT_MODEL,
+  withCheapJudgeFallback,
 } from './workers-ai';
 
 const routing = JSON.parse(
@@ -61,11 +65,94 @@ describe('answerer ≠ judge models', () => {
   it('keeps subject and cheap judge on distinct @cf models', () => {
     expect(WORKERS_AI_SUBJECT_MODEL).toBe('@cf/zai-org/glm-5.3');
     expect(WORKERS_AI_CHEAP_JUDGE).toBe('@cf/openai/gpt-oss-120b');
+    expect(WORKERS_AI_CHEAP_JUDGE_FALLBACK).toBe(
+      '@cf/deepseek-ai/deepseek-v4.1-flash-1017'
+    );
     expect(WORKERS_AI_STRONG_JUDGE).toBe(
       '@cf/deepseek-ai/deepseek-v4-pro-0813'
     );
     expect(WORKERS_AI_SUBJECT_MODEL).not.toBe(WORKERS_AI_CHEAP_JUDGE);
     expect(WORKERS_AI_SUBJECT_MODEL).not.toBe(WORKERS_AI_STRONG_JUDGE);
+    expect(WORKERS_AI_SUBJECT_MODEL).not.toBe(WORKERS_AI_CHEAP_JUDGE_FALLBACK);
+    // Summer share + answerer ≠ judge: fallback must not be glm-5.3*.
+    expect(WORKERS_AI_CHEAP_JUDGE_FALLBACK).not.toMatch(/glm-5\.3/);
+  });
+});
+
+describe('cheap judge allowlist fallback', () => {
+  const liveAllowlistMiss = new Error(
+    `Workers AI ${WORKERS_AI_CHEAP_JUDGE} HTTP 400: {"error":{"message":"model not allowed","type":"invalid_request_error"}}`
+  );
+
+  it('detects the live relay model-not-allowed HTTP 400', () => {
+    expect(isWorkersAiModelAllowlistError(liveAllowlistMiss)).toBe(true);
+    expect(
+      isWorkersAiModelAllowlistError(
+        new Error('Workers AI x HTTP 400: model not on the allowlist')
+      )
+    ).toBe(true);
+    expect(
+      isWorkersAiModelAllowlistError(
+        new Error(`Workers AI x HTTP 500: ${'model not allowed'}`)
+      )
+    ).toBe(false);
+    expect(
+      isWorkersAiModelAllowlistError(
+        new Error('Workers AI x HTTP 400: rate limited')
+      )
+    ).toBe(false);
+  });
+
+  it('offers fallback only for cheap judge + allowlist misses', () => {
+    expect(
+      cheapJudgeFallbackModel(WORKERS_AI_CHEAP_JUDGE, liveAllowlistMiss)
+    ).toBe(WORKERS_AI_CHEAP_JUDGE_FALLBACK);
+    expect(
+      cheapJudgeFallbackModel(WORKERS_AI_STRONG_JUDGE, liveAllowlistMiss)
+    ).toBeNull();
+    expect(
+      cheapJudgeFallbackModel(
+        WORKERS_AI_CHEAP_JUDGE,
+        new Error('Workers AI x HTTP 429: rate limited')
+      )
+    ).toBeNull();
+  });
+
+  it('retries once on allowlist miss then returns the fallback result', async () => {
+    const calls: string[] = [];
+    const result = await withCheapJudgeFallback(
+      WORKERS_AI_CHEAP_JUDGE,
+      async model => {
+        calls.push(model);
+        if (model === WORKERS_AI_CHEAP_JUDGE) throw liveAllowlistMiss;
+        return { model, ok: true };
+      }
+    );
+    expect(calls).toEqual([
+      WORKERS_AI_CHEAP_JUDGE,
+      WORKERS_AI_CHEAP_JUDGE_FALLBACK,
+    ]);
+    expect(result).toEqual({
+      model: WORKERS_AI_CHEAP_JUDGE_FALLBACK,
+      ok: true,
+    });
+  });
+
+  it('does not retry non-allowlist errors or non-cheap judges', async () => {
+    await expect(
+      withCheapJudgeFallback(WORKERS_AI_CHEAP_JUDGE, async () => {
+        throw new Error('Workers AI x HTTP 429: rate limited');
+      })
+    ).rejects.toThrow(/HTTP 429/);
+
+    const strongCalls: string[] = [];
+    await expect(
+      withCheapJudgeFallback(WORKERS_AI_STRONG_JUDGE, async model => {
+        strongCalls.push(model);
+        throw liveAllowlistMiss;
+      })
+    ).rejects.toThrow(/model not allowed/);
+    expect(strongCalls).toEqual([WORKERS_AI_STRONG_JUDGE]);
   });
 });
 

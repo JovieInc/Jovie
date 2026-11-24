@@ -49,6 +49,8 @@ describe('ProfileIdentityHeader', () => {
     const portrait = header.querySelector('img');
     expect(portrait?.getAttribute('alt') ?? '').toBe('');
     expect(portrait?.closest('.h-20.w-20')).not.toBeNull();
+    // Portrait + title stay mounted for route ViewTransition morph (JOV-14244).
+    expect(screen.getByTestId('profile-identity-portrait')).toBeInTheDocument();
   });
 
   it('asks for a 2x source for the 160px desktop portrait while phones keep 80px', () => {

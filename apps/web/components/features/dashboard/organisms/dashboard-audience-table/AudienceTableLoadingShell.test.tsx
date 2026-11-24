@@ -38,4 +38,13 @@ describe('AudienceTableLoadingShell', () => {
     );
     await expectNoA11yViolations(container);
   });
+
+  it('lays the skeleton table out in the compact row mode', () => {
+    const { container } = render(<AudienceTableLoadingShell />);
+    const modeNodes = container.querySelectorAll('[data-table-row-mode]');
+    expect(modeNodes.length).toBeGreaterThan(0);
+    for (const node of modeNodes) {
+      expect(node).toHaveAttribute('data-table-row-mode', 'compact');
+    }
+  });
 });

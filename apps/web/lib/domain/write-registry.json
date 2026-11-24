@@ -66,6 +66,26 @@
       "tables": ["creatorProfiles"]
     },
     {
+      "id": "profile.catalog-sync",
+      "entity": "profile",
+      "module": "apps/web/lib/discography/post-import-profile-sync.ts",
+      "exports": [
+        "syncProfileGenresFromReleases",
+        "syncProfileAfterCatalogImport"
+      ],
+      "tables": ["creatorProfiles"]
+    },
+    {
+      "id": "profile.cover-accent",
+      "entity": "profile",
+      "module": "apps/web/lib/profile/sync-cover-accent.server.ts",
+      "exports": [
+        "syncProfileCoverAccentTheme",
+        "syncProfileCoverAccentThemeBestEffort"
+      ],
+      "tables": ["creatorProfiles"]
+    },
+    {
       "id": "profile.edit",
       "entity": "profile",
       "module": "apps/web/lib/domain/profile.ts",
@@ -136,6 +156,18 @@
       "module": "apps/web/lib/synthetic/admitted-canary.server.ts",
       "exports": ["reconcileAdmittedCanary", "verifyAdmittedCanaryOwnership"],
       "tables": ["creatorProfiles", "userProfileClaims"]
+    },
+    {
+      "id": "synthetic.crawl-content-fixture",
+      "entity": "product crawl hidden demo artist fixture",
+      "module": "apps/web/lib/synthetic/crawl-content-fixture.server.ts",
+      "exports": ["reconcileCrawlContentFixture"],
+      "tables": [
+        "users",
+        "creatorProfiles",
+        "userProfileClaims",
+        "discogReleases"
+      ]
     },
     {
       "id": "synthetic.canary-reset",

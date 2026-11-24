@@ -14,6 +14,8 @@ import {
   type HomeLoopTone,
 } from '@/lib/home-loop/contract';
 import type { DeliverySummary } from '@/lib/ovie/shipping-state/contract';
+import { movingForBlocker } from './blocker-work';
+import { shortTitle, stepLabel } from './bottleneck-copy';
 import type { CompanyBlocker } from './company-blocker';
 import type { OvieCompanyTile } from './company-tiles';
 import {
@@ -21,7 +23,7 @@ import {
   type OviePulseTile,
   type OvieShipStage,
 } from './shipping-home';
-import { perDay } from './shipping-pulse-format';
+import { weekCount } from './shipping-pulse-format';
 
 /** Matches shell Sparkline trend without importing UI into lib. */
 export type StoryFirstSparkTrend = 'up' | 'down' | 'flat';
@@ -35,6 +37,8 @@ export interface StoryFirstGlancePulse {
   readonly delta: string | null;
   readonly tone: HomeLoopTone;
   readonly measured: boolean;
+  /** Why the value is not measured, in plain words; null when measured. */
+  readonly reason?: string | null;
   readonly points: readonly number[];
   readonly trend: StoryFirstSparkTrend;
   readonly href: string | null;
@@ -90,14 +94,6 @@ export const STORY_FIRST_BOARD_STAGES = [
   'merging',
 ] as const satisfies readonly OvieShipStage[];
 
-const STEP_EYEBROW: Readonly<Record<string, string>> = {
-  public_profile: 'Profile',
-  homepage_entry: 'Homepage',
-  onboarding_auth_claim: 'Claim',
-  checkout_payment_entitlement: 'Checkout',
-  activation_dashboard: 'Activation',
-};
-
 /** Drop a trailing " (ID)" or leading "ID: " when it repeats the identifier. */
 export function stripIssueId(identifier: string, title: string): string {
   const id = identifier.trim();
@@ -110,8 +106,25 @@ export function stripIssueId(identifier: string, title: string): string {
   return stripped || title;
 }
 
+const COMMIT_PREFIX = /^[a-z]+(?:\([^)]*\))?!?:\s*/i;
+const LEADING_ISSUE_KEY = /^[A-Z][A-Z0-9]+-\d+[:\s]\s*/;
+
+/**
+ * A founder-readable title: no issue key, no conventional-commit prefix
+ * ("feat(lanes): "), first letter capitalised. Falls back to the raw title
+ * when stripping would leave nothing.
+ */
+export function plainTitle(identifier: string, title: string): string {
+  const stripped = stripIssueId(identifier, title)
+    .replace(LEADING_ISSUE_KEY, '')
+    .replace(COMMIT_PREFIX, '')
+    .trim();
+  if (!stripped) return title.trim();
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
+}
+
 export function issueLabel(identifier: string, title: string): string {
-  return `${identifier} · ${stripIssueId(identifier, title)}`;
+  return plainTitle(identifier, title);
 }
 
 function trendFromPoints(points: readonly number[]): StoryFirstSparkTrend {
@@ -156,7 +169,8 @@ function formatDelta(
   if (kind === 'alive') {
     if (current > prior) return 'alive';
     if (current < prior) return 'down';
-    return 'flat';
+    // $0 that stayed $0 is not a trend worth a label.
+    return current === 0 ? null : 'flat';
   }
   if (kind === 'flat-label') {
     if (current === prior) return 'flat';
@@ -186,11 +200,12 @@ export function buildStoryFirstGlance(input: {
   readonly shippingPulse: readonly OviePulseTile[];
 }): readonly StoryFirstGlancePulse[] {
   const merges = input.shippingPulse.find(tile => tile.key === 'merges-day');
+  // The raw 7-day counts, not the per-day average: the label says 7D.
   const currentMerges = input.delivery
-    ? perDay(input.delivery.merges.last7Days)
+    ? weekCount(input.delivery.merges.last7Days)
     : null;
   const priorMerges = input.delivery
-    ? perDay(input.delivery.merges.prior7Days)
+    ? weekCount(input.delivery.merges.prior7Days)
     : null;
   const shippingPoints =
     currentMerges !== null && priorMerges !== null
@@ -226,11 +241,18 @@ export function buildStoryFirstGlance(input: {
       : null;
   const shipping: StoryFirstGlancePulse = {
     key: 'shipping',
-    label: 'Shipping · 7D',
-    value: merges?.measured ? merges.value : HOME_LOOP_NOT_MEASURED,
+    label: 'PRs merged · 7D',
+    value:
+      currentMerges !== null ? String(currentMerges) : HOME_LOOP_NOT_MEASURED,
     delta: shippingDelta,
     tone: shippingTone,
-    measured: merges?.measured ?? false,
+    measured: currentMerges !== null,
+    reason:
+      currentMerges !== null
+        ? null
+        : input.delivery
+          ? "GitHub's merge count didn't load"
+          : 'Waiting for the shipping feed',
     points: shippingPoints,
     trend: sparkTrendForPulse(shippingPoints, shippingTone, {
       hasPriorSeries: priorMerges !== null,
@@ -244,11 +266,12 @@ export function buildStoryFirstGlance(input: {
     mrrNow !== null ? formatDelta(mrrNow, mrrWas, 'alive') : null;
   const revenue: StoryFirstGlancePulse = {
     key: 'revenue',
-    label: 'Revenue',
+    label: 'MRR',
     value: mrr?.measured ? mrr.value : HOME_LOOP_NOT_MEASURED,
     delta: revenueDelta,
     tone: revenueTone,
     measured: mrr?.measured ?? false,
+    reason: mrr?.measured ? null : "Stripe revenue didn't load",
     points: revenuePoints,
     trend: sparkTrendForPulse(revenuePoints, revenueTone, {
       hasPriorSeries: mrrWas !== null,
@@ -264,11 +287,12 @@ export function buildStoryFirstGlance(input: {
       : null;
   const usersPulse: StoryFirstGlancePulse = {
     key: 'users',
-    label: 'Users',
+    label: 'New accounts · 7D',
     value: users?.measured ? users.value : HOME_LOOP_NOT_MEASURED,
     delta: usersDelta,
     tone: usersTone,
     measured: users?.measured ?? false,
+    reason: users?.measured ? null : "The signup funnel didn't load",
     points: usersPoints,
     trend: sparkTrendForPulse(usersPoints, usersTone, {
       hasPriorSeries: false,
@@ -278,35 +302,6 @@ export function buildStoryFirstGlance(input: {
   };
 
   return [shipping, revenue, usersPulse];
-}
-
-function stepLabel(step: string): string {
-  const labeled = STEP_EYEBROW[step];
-  if (labeled) return labeled;
-  return step
-    .split('_')
-    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
-
-function shortTitle(blocker: CompanyBlocker): string {
-  if (blocker.kind === 'certification') {
-    const name =
-      blocker.step === 'checkout_payment_entitlement'
-        ? 'Checkout'
-        : blocker.step === 'homepage_entry'
-          ? 'Homepage entry'
-          : blocker.step === 'public_profile'
-            ? 'The public profile'
-            : blocker.step === 'onboarding_auth_claim'
-              ? 'Sign-up and claim'
-              : blocker.step === 'activation_dashboard'
-                ? 'First use after paying'
-                : stepLabel(blocker.step);
-    return `${name} is blocking revenue`;
-  }
-  // Funnel body already carries the measured detail — headline must differ.
-  return `${stepLabel(blocker.step)} is blocking revenue`;
 }
 
 /**
@@ -322,6 +317,8 @@ export function buildStoryFirstBottleneck(input: {
   readonly revenueFailed?: boolean;
   readonly constraint: HomeLoopConstraint | null;
   readonly highlight: StoryFirstStageHighlight | null;
+  /** Shipping rows; when given, a revenue blocker's Moving line is the row working on it. */
+  readonly rows?: readonly HomeLoopRow<OvieShipStage>[];
   readonly clearTitle?: string;
   readonly clearBody?: string;
 }): StoryFirstBottleneck {
@@ -339,6 +336,9 @@ export function buildStoryFirstBottleneck(input: {
   }
 
   if (input.revenue) {
+    const moving = input.rows
+      ? movingForBlocker(input.rows, input.revenue.step)
+      : input.highlight;
     const since =
       input.revenue.since != null
         ? new Date(input.revenue.since).toLocaleDateString('en-US', {
@@ -348,17 +348,20 @@ export function buildStoryFirstBottleneck(input: {
           })
         : null;
     return {
-      tone: input.revenue.tone,
-      eyebrow: `Bottleneck · ${stepLabel(input.revenue.step)}`,
+      tone: input.revenue.tone === 'bad' ? 'bad' : 'unknown',
+      eyebrow:
+        input.revenue.tone === 'bad'
+          ? input.revenue.kind === 'certification' &&
+            input.revenue.step === 'public_profile'
+            ? 'Certification · Profile'
+            : `Bottleneck · ${stepLabel(input.revenue.step)}`
+          : `Not measured · ${stepLabel(input.revenue.step)}`,
       title: shortTitle(input.revenue),
       body: input.revenue.text,
-      moving: input.highlight
+      moving: moving
         ? {
-            label: issueLabel(
-              input.highlight.identifier,
-              input.highlight.title
-            ),
-            href: input.highlight.href,
+            label: issueLabel(moving.identifier, moving.title),
+            href: moving.href,
           }
         : null,
       needs: input.revenue.nextAction,

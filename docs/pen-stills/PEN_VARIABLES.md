@@ -1,4 +1,9 @@
-# Pen variables
+# Pen variables (legacy parity check)
+
+Figma is the canonical design canvas now. Token export and drift checks live in
+[`docs/design/FIGMA_VARIABLES.md`](../design/FIGMA_VARIABLES.md). This file
+only covers the older `pen-token-parity` check, which stays until nothing
+depends on it.
 
 Dark is the primary mode. Light values may be stored on a variable and are
 not compared. The homepage headline stays locked: **Be found. Be understood.**

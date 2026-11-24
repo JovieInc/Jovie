@@ -12,7 +12,7 @@ import { IconButton } from '@jovie/ui';
 import { ChevronLeft } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { type ReactNode, useCallback } from 'react';
+import { type ReactNode, useCallback, ViewTransition } from 'react';
 import {
   ARTWORK_FIT_CLASSNAME,
   ArtworkFrame,
@@ -69,6 +69,8 @@ type SmartLinkShellBaseProps = {
   readonly returnLabel?: string;
   /** Wraps the artwork image (e.g., for context menu). Must render a relative h-full w-full container. */
   readonly artworkWrapper?: (img: React.ReactNode) => React.ReactNode;
+  /** Shared-element name for cover morph across routes (JOV-14244). */
+  readonly artworkViewTransitionName?: string;
 };
 
 type SmartLinkShellProps =
@@ -141,6 +143,7 @@ export function SmartLinkShell({
   returnHref,
   returnLabel = 'Back',
   artworkWrapper,
+  artworkViewTransitionName,
 }: SmartLinkShellProps) {
   const artworkImage = artworkUrl ? (
     <Image
@@ -153,6 +156,16 @@ export function SmartLinkShell({
     />
   ) : (
     <ArtworkFallback />
+  );
+
+  const artworkFrame = (
+    <ArtworkFrame
+      size='hero'
+      className='aspect-square w-full'
+      data-testid='smart-link-artwork'
+    >
+      {artworkWrapper ? artworkWrapper(artworkImage) : artworkImage}
+    </ArtworkFrame>
   );
 
   return (
@@ -189,13 +202,17 @@ export function SmartLinkShell({
           />
 
           <div className='relative px-5 pt-4'>
-            <ArtworkFrame
-              size='hero'
-              className='aspect-square w-full'
-              data-testid='smart-link-artwork'
-            >
-              {artworkWrapper ? artworkWrapper(artworkImage) : artworkImage}
-            </ArtworkFrame>
+            {artworkViewTransitionName ? (
+              <ViewTransition
+                name={artworkViewTransitionName}
+                share='jovie-morph'
+                default='none'
+              >
+                {artworkFrame}
+              </ViewTransition>
+            ) : (
+              artworkFrame
+            )}
           </div>
 
           {heroMeta ? (

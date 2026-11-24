@@ -9,6 +9,10 @@ import {
   type CompanyMetricState,
   deriveOvieCompanyOverview,
 } from '@/lib/ovie/company-operations';
+import {
+  isUnmeasuredDisplayValue,
+  OVIE_METRICS_SYNCING_NOTICE,
+} from '@/lib/ovie/metrics-presentation';
 import type { HudMetrics } from '@/types/hud';
 
 const STATE_LABELS = {
@@ -71,6 +75,11 @@ export function OvieCeoOverview({
     ? Math.max(now, generatedAt)
     : now;
   const overview = deriveOvieCompanyOverview(metrics, evaluationNow);
+  const visibleMetrics = overview.metrics.filter(
+    metric =>
+      !isUnmeasuredDisplayValue(metric.value) && metric.state !== 'unknown'
+  );
+  const syncingNotice = visibleMetrics.length < overview.metrics.length;
 
   return (
     <ContentSurfaceCard
@@ -80,9 +89,17 @@ export function OvieCeoOverview({
     >
       <div className='border-b border-subtle px-4 py-3 sm:px-5'>
         <p className='text-xs font-semibold text-primary-token'>Company Now</p>
+        {syncingNotice ? (
+          <p
+            className='mt-2 text-2xs text-tertiary-token'
+            data-testid='ovie-ceo-syncing'
+          >
+            {OVIE_METRICS_SYNCING_NOTICE}
+          </p>
+        ) : null}
       </div>
       <div className='divide-y divide-subtle'>
-        {overview.metrics.map(metric => (
+        {visibleMetrics.map(metric => (
           <section
             key={metric.id}
             className='grid h-72 overflow-hidden gap-3 px-4 py-4 sm:px-5 lg:h-40 lg:grid-cols-[minmax(9rem,0.7fr)_minmax(12rem,1fr)_minmax(16rem,1.5fr)] lg:items-start'

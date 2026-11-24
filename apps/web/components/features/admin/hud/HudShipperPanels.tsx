@@ -98,84 +98,85 @@ function ShipperStatusPanel({
   return (
     <ContentSurfaceCard
       surface='details'
-      className='space-y-3 p-3'
       data-testid='hud-shipper-status-panel'
     >
-      <div className='flex items-center justify-between gap-3'>
-        <div className='flex items-center gap-2'>
-          <Ship className='h-4 w-4 text-secondary-token' aria-hidden='true' />
-          <SectionLabel>Shipper</SectionLabel>
-        </div>
-        <HudStatusPill
-          label={shipperLabel(payload.state)}
-          tone={shipperTone(payload.state)}
-        />
-      </div>
-
-      <div className='grid gap-2 sm:grid-cols-2'>
-        <ContentMetricRow
-          label='Dispatchable'
-          value={payload.dispatchableCount.toLocaleString('en-US')}
-        />
-        <ContentMetricRow
-          label='In Flight'
-          value={payload.inFlightCount.toLocaleString('en-US')}
-        />
-        <ContentMetricRow
-          label='Last Run'
-          value={formatTimestamp(payload.lastRunAt)}
-        />
-        <ContentMetricRow
-          label='Last Result'
-          value={payload.lastResult ?? '—'}
-        />
-      </div>
-
-      {payload.inFlightJobs.length > 0 ? (
-        <div className='space-y-2 border-t border-subtle pt-3'>
-          <SectionLabel>In-flight ledger</SectionLabel>
-          <div className='grid gap-2'>
-            {payload.inFlightJobs.map(job => (
-              <div
-                key={`${job.repo}-${job.issue}-${job.startedAt}`}
-                className='rounded-md border border-subtle bg-surface-0 px-3 py-2'
-              >
-                <p className='text-app font-semibold text-primary-token'>
-                  #{job.issue}
-                  <span className='ml-2 font-normal text-secondary-token'>
-                    {job.branch}
-                  </span>
-                </p>
-                <p className='mt-1 text-2xs text-tertiary-token'>
-                  PID {job.pid} · {formatTimestamp(job.startedAt)}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {payload.lastError || payload.recentErrors.length > 0 ? (
-        <div className='space-y-2 border-t border-subtle pt-3'>
+      <div className='space-y-3 p-3'>
+        <div className='flex items-center justify-between gap-3'>
           <div className='flex items-center gap-2'>
-            <AlertTriangle
-              className='h-3.5 w-3.5 text-destructive'
-              aria-hidden='true'
-            />
-            <SectionLabel>Last errors</SectionLabel>
+            <Ship className='h-4 w-4 text-secondary-token' aria-hidden='true' />
+            <SectionLabel>Shipper</SectionLabel>
           </div>
-          {payload.lastError ? (
-            <p className='text-app leading-5 text-secondary-token'>
-              {payload.lastError}
-            </p>
-          ) : null}
-          {payload.recentErrors.length > 0 ? (
-            <pre className='max-h-32 overflow-auto rounded-md border border-subtle bg-surface-0 p-3 text-2xs leading-5 text-tertiary-token'>
-              {payload.recentErrors.join('\n')}
-            </pre>
-          ) : null}
+          <HudStatusPill
+            label={shipperLabel(payload.state)}
+            tone={shipperTone(payload.state)}
+          />
         </div>
-      ) : null}
+
+        <div className='grid gap-2 sm:grid-cols-2'>
+          <ContentMetricRow
+            label='Dispatchable'
+            value={payload.dispatchableCount.toLocaleString('en-US')}
+          />
+          <ContentMetricRow
+            label='In Flight'
+            value={payload.inFlightCount.toLocaleString('en-US')}
+          />
+          <ContentMetricRow
+            label='Last Run'
+            value={formatTimestamp(payload.lastRunAt)}
+          />
+          <ContentMetricRow
+            label='Last Result'
+            value={payload.lastResult ?? '—'}
+          />
+        </div>
+
+        {payload.inFlightJobs.length > 0 ? (
+          <div className='space-y-2 border-t border-subtle pt-3'>
+            <SectionLabel>In-flight ledger</SectionLabel>
+            <div className='grid gap-2'>
+              {payload.inFlightJobs.map(job => (
+                <div
+                  key={`${job.repo}-${job.issue}-${job.startedAt}`}
+                  className='rounded-md bg-surface-1 px-3 py-2'
+                >
+                  <p className='text-app font-semibold text-primary-token'>
+                    #{job.issue}
+                    <span className='ml-2 font-normal text-secondary-token'>
+                      {job.branch}
+                    </span>
+                  </p>
+                  <p className='mt-1 text-2xs text-tertiary-token'>
+                    PID {job.pid} · {formatTimestamp(job.startedAt)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {payload.lastError || payload.recentErrors.length > 0 ? (
+          <div className='space-y-2 border-t border-subtle pt-3'>
+            <div className='flex items-center gap-2'>
+              <AlertTriangle
+                className='h-3.5 w-3.5 text-destructive'
+                aria-hidden='true'
+              />
+              <SectionLabel>Last errors</SectionLabel>
+            </div>
+            {payload.lastError ? (
+              <p className='text-app leading-5 text-secondary-token'>
+                {payload.lastError}
+              </p>
+            ) : null}
+            {payload.recentErrors.length > 0 ? (
+              <pre className='max-h-32 overflow-auto rounded-md bg-surface-1 p-3 text-2xs leading-5 text-tertiary-token'>
+                {payload.recentErrors.join('\n')}
+              </pre>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </ContentSurfaceCard>
   );
 }
@@ -186,55 +187,53 @@ function GithubRateLimitsPanel({
   return (
     <ContentSurfaceCard
       surface='details'
-      className='space-y-3 p-3'
       data-testid='hud-github-rate-limits-panel'
     >
-      <div className='flex items-center gap-2'>
-        <GitBranch
-          className='h-4 w-4 text-secondary-token'
-          aria-hidden='true'
-        />
-        <SectionLabel>GitHub rate limits</SectionLabel>
+      <div className='space-y-3 p-3'>
+        <div className='flex items-center gap-2'>
+          <GitBranch
+            className='h-4 w-4 text-secondary-token'
+            aria-hidden='true'
+          />
+          <SectionLabel>GitHub rate limits</SectionLabel>
+        </div>
+        <div className='grid gap-3 sm:grid-cols-2'>
+          <ContentMetricCard
+            label='Core REST'
+            value={payload.core?.remaining.toLocaleString('en-US') ?? '—'}
+            subtitle={rateLimitSubtitle(payload.core)}
+          />
+          <ContentMetricCard
+            label={GRAPHQL_LABEL}
+            value={payload.graphql?.remaining.toLocaleString('en-US') ?? '—'}
+            subtitle={rateLimitSubtitle(payload.graphql)}
+          />
+        </div>
+        {payload.availability === 'not_configured' ? (
+          <p className='text-app text-secondary-token'>
+            Configure HUD GitHub credentials to load rate limits.
+          </p>
+        ) : null}
+        {payload.errorMessage ? (
+          <p className='text-app text-secondary-token'>
+            {payload.errorMessage}
+          </p>
+        ) : null}
       </div>
-      <div className='grid gap-3 sm:grid-cols-2'>
-        <ContentMetricCard
-          label='Core REST'
-          value={payload.core?.remaining.toLocaleString('en-US') ?? '—'}
-          subtitle={rateLimitSubtitle(payload.core)}
-          className='p-3'
-          valueClassName='text-2xl font-[620] leading-none tracking-[-0.03em]'
-        />
-        <ContentMetricCard
-          label={GRAPHQL_LABEL}
-          value={payload.graphql?.remaining.toLocaleString('en-US') ?? '—'}
-          subtitle={rateLimitSubtitle(payload.graphql)}
-          className='p-3'
-          valueClassName='text-2xl font-[620] leading-none tracking-[-0.03em]'
-        />
-      </div>
-      {payload.availability === 'not_configured' ? (
-        <p className='text-app text-secondary-token'>
-          Configure HUD GitHub credentials to load rate limits.
-        </p>
-      ) : null}
-      {payload.errorMessage ? (
-        <p className='text-app text-secondary-token'>{payload.errorMessage}</p>
-      ) : null}
     </ContentSurfaceCard>
   );
 }
 
 function PanelSkeleton() {
   return (
-    <ContentSurfaceCard
-      surface='details'
-      className='flex min-h-40 items-center justify-center p-3'
-    >
-      <Loader2
-        className='h-5 w-5 animate-spin text-tertiary-token'
-        aria-hidden='true'
-      />
-      <span className='sr-only'>Loading HUD panel</span>
+    <ContentSurfaceCard surface='details'>
+      <div className='flex min-h-40 items-center justify-center p-3'>
+        <Loader2
+          className='h-5 w-5 animate-spin text-tertiary-token'
+          aria-hidden='true'
+        />
+        <span className='sr-only'>Loading HUD panel</span>
+      </div>
     </ContentSurfaceCard>
   );
 }
@@ -258,19 +257,23 @@ export function HudShipperNeedPanel({
     return (
       <ContentSurfaceCard
         surface='details'
-        className='space-y-3 p-3'
         data-testid='hud-shipper-status-panel'
       >
-        <div className='flex items-center justify-between gap-3'>
-          <div className='flex items-center gap-2'>
-            <Ship className='h-4 w-4 text-secondary-token' aria-hidden='true' />
-            <SectionLabel>Shipper</SectionLabel>
+        <div className='space-y-3 p-3'>
+          <div className='flex items-center justify-between gap-3'>
+            <div className='flex items-center gap-2'>
+              <Ship
+                className='h-4 w-4 text-secondary-token'
+                aria-hidden='true'
+              />
+              <SectionLabel>Shipper</SectionLabel>
+            </div>
+            <HudStatusPill label={NO_SIGNAL_LABEL} tone='neutral' />
           </div>
-          <HudStatusPill label={NO_SIGNAL_LABEL} tone='neutral' />
+          <p className='text-app text-secondary-token'>
+            Shipper status stays on the signed-in operator path.
+          </p>
         </div>
-        <p className='text-app text-secondary-token'>
-          Shipper status stays on the signed-in operator path.
-        </p>
       </ContentSurfaceCard>
     );
   }
@@ -280,17 +283,18 @@ export function HudShipperNeedPanel({
       return (
         <ContentSurfaceCard
           surface='details'
-          className='space-y-3 p-3'
           data-testid='hud-shipper-status-panel'
         >
-          <HudObservationStatus
-            state='unavailable'
-            message='Shipper status is unavailable.'
-            onRetry={() => {
-              shipperQuery.refetch().catch(() => {});
-            }}
-            testId='hud-shipper-observation'
-          />
+          <div className='space-y-3 p-3'>
+            <HudObservationStatus
+              state='unavailable'
+              message='Shipper status is unavailable.'
+              onRetry={() => {
+                shipperQuery.refetch().catch(() => {});
+              }}
+              testId='hud-shipper-observation'
+            />
+          </div>
         </ContentSurfaceCard>
       );
     }

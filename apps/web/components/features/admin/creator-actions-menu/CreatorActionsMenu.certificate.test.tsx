@@ -39,7 +39,7 @@ describe('CreatorActionsMenu certificate', () => {
   it('has an accessible closed trigger on desktop and mobile', async () => {
     const { container, unmount } = setup();
     expect(
-      screen.getByRole('button', { name: 'Open creator actions' })
+      screen.getByRole('button', { name: 'Open Creator Actions' })
     ).toBeEnabled();
     await expectNoA11yViolations(container);
     unmount();
@@ -53,7 +53,7 @@ describe('CreatorActionsMenu certificate', () => {
     const user = userEvent.setup();
     const { props } = setup();
     await user.click(
-      screen.getByRole('button', { name: 'Open creator actions' })
+      screen.getByRole('button', { name: 'Open Creator Actions' })
     );
     expect(screen.queryByRole('menuitem', { name: /Delete/ })).toBeNull();
     const featured = await screen.findByRole('menuitem', { name: 'Unfeature' });
@@ -67,13 +67,13 @@ describe('CreatorActionsMenu certificate', () => {
     const user = userEvent.setup();
     const { props, rerender } = setup();
     for (const [name, handler] of [
-      ['Send invite', props.onSendInvite],
-      ['Verify creator', props.onToggleVerification],
-      ['Disable marketing emails', props.onToggleMarketing],
-      ['Refresh ingest', props.onRefreshIngest],
+      ['Send Invite', props.onSendInvite],
+      ['Verify Creator', props.onToggleVerification],
+      ['Disable Marketing Emails', props.onToggleMarketing],
+      ['Refresh Ingest', props.onRefreshIngest],
     ] as const) {
       await user.click(
-        screen.getByRole('button', { name: 'Open creator actions' })
+        screen.getByRole('button', { name: 'Open Creator Actions' })
       );
       await user.click(await screen.findByRole('menuitem', { name }));
       expect(handler).toHaveBeenCalledOnce();
@@ -84,7 +84,7 @@ describe('CreatorActionsMenu certificate', () => {
   it('disables the trigger while an ingest refresh is loading', () => {
     setup({ refreshIngestStatus: 'loading' });
     expect(
-      screen.getByRole('button', { name: 'Open creator actions' })
+      screen.getByRole('button', { name: 'Open Creator Actions' })
     ).toBeDisabled();
   });
 });

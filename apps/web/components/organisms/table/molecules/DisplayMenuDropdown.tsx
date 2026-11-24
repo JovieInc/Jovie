@@ -2,6 +2,7 @@
 
 import {
   IconButton,
+  PlainButton,
   Popover,
   PopoverClose,
   PopoverContent,
@@ -74,8 +75,7 @@ const ColumnToggleButton = memo(function ColumnToggleButton({
   }, [onToggle, columnId, isVisible]);
 
   return (
-    <button
-      type='button'
+    <PlainButton
       onClick={handleClick}
       aria-pressed={isVisible}
       aria-label={`${isVisible ? 'Hide' : 'Show'} ${label} column`}
@@ -87,7 +87,7 @@ const ColumnToggleButton = memo(function ColumnToggleButton({
       )}
     >
       {label || 'Column'}
-    </button>
+    </PlainButton>
   );
 });
 
@@ -141,8 +141,7 @@ export function DisplayMenuDropdown({
   const hasGroupingOption = onGroupingToggle;
 
   const defaultTrigger = (
-    <button
-      type='button'
+    <PlainButton
       className={cn(
         PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
         'px-2 text-app text-secondary-token'
@@ -150,13 +149,13 @@ export function DisplayMenuDropdown({
     >
       <Settings2 className='h-4 w-4' />
       Display
-    </button>
+    </PlainButton>
   );
 
   return (
     <Popover>
       <PopoverTrigger asChild>{trigger ?? defaultTrigger}</PopoverTrigger>
-      <PopoverContent align='end' className='w-70'>
+      <PopoverContent align='end' className='w-70' aria-label='Display'>
         {/* ── Header ─────────────────────────────────────────────── */}
         <div className='flex items-center justify-between border-b border-subtle px-2.5 py-1.5'>
           <span className='text-app font-semibold text-primary-token'>
@@ -185,8 +184,7 @@ export function DisplayMenuDropdown({
                 aria-hidden='true'
               />
 
-              <button
-                type='button'
+              <PlainButton
                 onClick={() => onViewModeChange?.('list')}
                 className={cn(
                   'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded px-2.5 py-1 text-xs font-caption transition-colors duration-subtle',
@@ -199,10 +197,9 @@ export function DisplayMenuDropdown({
               >
                 <LayoutList className='h-4 w-4' />
                 <span>List</span>
-              </button>
+              </PlainButton>
 
-              <button
-                type='button'
+              <PlainButton
                 onClick={() => onViewModeChange?.('board')}
                 className={cn(
                   'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded px-2.5 py-1 text-xs font-caption transition-colors duration-subtle',
@@ -215,7 +212,7 @@ export function DisplayMenuDropdown({
               >
                 <LayoutGrid className='h-4 w-4' />
                 <span>Board</span>
-              </button>
+              </PlainButton>
             </fieldset>
           </div>
         )}
@@ -264,9 +261,8 @@ export function DisplayMenuDropdown({
             </p>
             <div className='grid grid-cols-3 gap-1'>
               {DENSITY_OPTIONS.map(option => (
-                <button
+                <PlainButton
                   key={option.value}
-                  type='button'
                   onClick={() => onDensityChange?.(option.value)}
                   aria-pressed={density === option.value}
                   className={cn(
@@ -277,7 +273,7 @@ export function DisplayMenuDropdown({
                   )}
                 >
                   {option.label}
-                </button>
+                </PlainButton>
               ))}
             </div>
           </div>

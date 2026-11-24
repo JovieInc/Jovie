@@ -9,11 +9,30 @@ import { deniesVisibleCatalog, fixtureHasCatalog } from './catalog-deny';
 import { runFailThemeChecks, upcomingTitleFromFacts } from './fail-themes';
 import type { EvalFixture } from './fixtures';
 import {
+  DRAFT_ASK_NOW_CASE_IDS,
+  isPlanningMenuCloser,
+  runOneRecGapChecks,
+} from './one-rec-gaps';
+import {
   type BehaviorId,
   CASE_PASS_SCORE,
   HARD_FAIL_SCORE_CAP,
   HELPFULNESS_BEHAVIORS,
 } from './spec';
+
+/**
+ * ASS-16 / ASS-75 / ASS-87 planning / greeting asks that must lead with the
+ * UPCOMING title (and days-left for the sentence-days detector). Keep this
+ * narrower than "any fixture with an UPCOMING row" so catalog / fan-reply /
+ * safety / collab turns do not false-positive.
+ */
+export const UPCOMING_SENTENCE_DAYS_CASE_IDS: ReadonlySet<string> = new Set([
+  'greeting',
+  'presave',
+  'whats-next-release',
+  'week-plan',
+  'song-out-friday',
+]);
 
 export interface EvalToolCall {
   readonly name: string;
@@ -89,9 +108,11 @@ export function runHardChecks(
   const haystack = `${text} ${toolText}`.toLowerCase();
   const checks: HardCheckResult[] = [];
 
+  // ASS-95: artist-facing text is required. Tool-only turns with blank text
+  // hard-fail (live CI-subset 44968636057: ad-copy-refuse-spend / safety-email-unasked).
   checks.push({
     id: 'non_empty',
-    ok: text.trim().length > 0 || reply.toolCalls.length > 0,
+    ok: text.trim().length > 0,
   });
 
   const lint = lintVoice(text);
@@ -166,18 +187,60 @@ export function runHardChecks(
     });
   }
 
-  // ASS-25/ASS-29 fail themes: inventing-stats + question-not-a-move always;
-  // upcoming-first only when case context has an UPCOMING title.
+  // ASS-25/ASS-29/ASS-90/ASS-97 fail themes: inventing-stats +
+  // inventing-account-facts + inventing-capabilities + question-not-a-move
+  // always. ASS-87: upcoming-first uses the same planning allowlist as
+  // upcoming-sentence-days (not every fixture with an UPCOMING row). Blanket
+  // application false-positived safety / fan-reply / catalog turns that
+  // correctly open on the asked track (live CI-subset 44964568648).
+
   const upcomingTitle =
     context?.upcomingTitle ??
     (context?.facts ? upcomingTitleFromFacts(context.facts) : undefined);
+  const requireUpcomingFirst =
+    Boolean(upcomingTitle) && UPCOMING_SENTENCE_DAYS_CASE_IDS.has(testCase.id);
   for (const theme of runFailThemeChecks(text, {
-    upcoming: upcomingTitle ? { upcomingTitle } : undefined,
+    upcoming: requireUpcomingFirst
+      ? { upcomingTitle: upcomingTitle as string }
+      : undefined,
   })) {
     checks.push({
       id: theme.id.replaceAll('-', '_'),
       ok: theme.ok,
       detail: theme.detail,
+    });
+  }
+
+  // ASS-75 / ASS-100: fold residual one-rec hermetic detectors into live scoring.
+  // - upcoming-sentence-days: allowlisted planning asks only (not every UPCOMING fixture)
+  // - planning-menu-not-a-move: ban patterns on every turn (same posture as question-not-a-move)
+  // - collab-draft-one: collab case only (positive draft shape)
+  // - promise-draft-not-a-move: clear draft asks must deliver artifact, not ASS-95 stub
+  // - do-it-calls-tool: already covered by expected_tool when expectToolsAny is set
+  const oneRecGaps = runOneRecGapChecks(text, {
+    upcomingTitle:
+      upcomingTitle && UPCOMING_SENTENCE_DAYS_CASE_IDS.has(testCase.id)
+        ? upcomingTitle
+        : undefined,
+    requireCollabDraftOne: testCase.id === 'collab',
+    requireDraftAskNow: DRAFT_ASK_NOW_CASE_IDS.has(testCase.id),
+  });
+  const oneRecGapIds = new Set(oneRecGaps.map(gap => gap.id));
+  for (const gap of oneRecGaps) {
+    checks.push({
+      id: gap.id.replaceAll('-', '_'),
+      ok: gap.ok,
+      detail: gap.detail,
+    });
+  }
+  if (!oneRecGapIds.has('planning-menu-not-a-move')) {
+    const menuOk = !isPlanningMenuCloser(text);
+    checks.push({
+      id: 'planning_menu_not_a_move',
+      ok: menuOk,
+      detail: menuOk
+        ? undefined
+        : 'matched planning-menu closer (not a dated next move)',
     });
   }
 

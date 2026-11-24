@@ -1,0 +1,145 @@
+name: Report run outcome
+description: >-
+  Turn a finished run into a repair or a success (Tim 2026-11-22: "nothing
+  should be able to fail without a repair or a sucess"). A red run opens or
+  updates one remediation issue (label remediation:<fingerprint>, P1, Todo,
+  agent-ready) that the lanes remediation loop picks up; the first green after
+  a red resolves it; steady green spends no Linear calls. A red after a repair
+  marked it Done reopens it and records the recurrence. Run it last, with
+  `if: always()`, in a job that needs every job of the workflow, guarded to
+  main (`github.ref == 'refs/heads/main'`, not workflow_dispatch). A chained
+  run reports only when its upstream ran on main. Needs a
+  checkout of this repository at the same commit.
+
+inputs:
+  results:
+    description: toJSON(needs) from the calling job; any failure is red, all success or skipped is green
+    required: false
+    default: ''
+  conclusion:
+    description: success, failure or cancelled, when there is no needs map to read
+    required: false
+    default: ''
+  fingerprint:
+    description: Remediation fingerprint; defaults to workflow-<workflow file stem>
+    required: false
+    default: ''
+  detail:
+    description: One line of evidence for the issue
+    required: false
+    default: ''
+  linear-api-key:
+    description: secrets.LINEAR_API_KEY
+    required: true
+  intake-disabled:
+    description: vars.REMEDIATION_INTAKE_DISABLED, the shared kill switch for remediation filing
+    required: false
+    default: ''
+  setup-node:
+    description: Set up Node from .nvmrc first (false when the job already did)
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Decide outcome
+      id: decide
+      shell: bash
+      env:
+        RESULTS: ${{ inputs.results }}
+        CONCLUSION: ${{ inputs.conclusion }}
+        FINGERPRINT: ${{ inputs.fingerprint }}
+        DETAIL: ${{ inputs.detail }}
+        WORKFLOW_REF: ${{ github.workflow_ref }}
+        EVENT_NAME: ${{ github.event_name }}
+        UPSTREAM_BRANCH: ${{ github.event.workflow_run.head_branch }}
+      run: |
+        set -euo pipefail
+        conclusion="$CONCLUSION"
+        DETAIL="${DETAIL//$'\n'/ }"
+        failed=''
+        if [ -n "$RESULTS" ]; then
+          failed="$(printf '%s' "$RESULTS" | jq -r '[to_entries[] | select(.value.result == "failure") | .key] | join(", ")')"
+          cancelled="$(printf '%s' "$RESULTS" | jq -r '[to_entries[] | select(.value.result == "cancelled")] | length')"
+          if [ -n "$failed" ]; then conclusion=failure
+          elif [ "$cancelled" != 0 ]; then conclusion=cancelled
+          else conclusion=success; fi
+        fi
+        # A cancelled run (superseded or stopped by hand) proves nothing either
+        # way: it neither files nor resolves.
+        case "$conclusion" in success|failure) ;; *) conclusion=skip ;; esac
+        # A chained run reports only when its upstream ran on main: a red
+        # chained run for a PR branch is that PR's business, not a repair.
+        if [ "$EVENT_NAME" = workflow_run ] && [ "$UPSTREAM_BRANCH" != main ]; then
+          conclusion=skip
+        fi
+        # Only unattended runs report: PR, label and manual events report on the PR or to the person.
+        case "$EVENT_NAME" in schedule|push|workflow_run|repository_dispatch) ;; *) conclusion=skip ;; esac
+        file="${WORKFLOW_REF%@*}"
+        file="${file##*/}"
+        fp="$FINGERPRINT"
+        if [ -z "$fp" ]; then
+          stem="$(printf '%s' "${file%.*}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+|-+$//g')"
+          fp="workflow-${stem:-unknown}"
+        fi
+        {
+          echo "conclusion=$conclusion"
+          echo "fingerprint=$fp"
+          echo "source=$file"
+          echo "failed=$failed"
+          echo "detail=${DETAIL:-${failed:+Failed jobs: $failed}}"
+        } >> "$GITHUB_OUTPUT"
+        echo "Outcome for $file: $conclusion (fingerprint $fp)${failed:+, failed jobs: $failed}"
+
+    - name: Restore last recorded outcome
+      if: steps.decide.outputs.conclusion != 'skip'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/outcome-state
+        key: outcome-v1-${{ steps.decide.outputs.fingerprint }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: outcome-v1-${{ steps.decide.outputs.fingerprint }}-
+
+    - name: Prime Node toolcache
+      if: steps.decide.outputs.conclusion != 'skip' && inputs.setup-node == 'true'
+      uses: ./.github/actions/prime-node-toolcache
+
+    - name: Set up Node
+      if: steps.decide.outputs.conclusion != 'skip' && inputs.setup-node == 'true'
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version-file: .nvmrc
+
+    - name: File, update or resolve the repair issue
+      id: intake
+      if: steps.decide.outputs.conclusion != 'skip'
+      shell: bash
+      env:
+        LINEAR_API_KEY: ${{ inputs.linear-api-key }}
+        REMEDIATION_INTAKE_DISABLED: ${{ inputs.intake-disabled }}
+        REMEDIATION_MODE: monitor
+        REMEDIATION_CONCLUSION: ${{ steps.decide.outputs.conclusion }}
+        REMEDIATION_FINGERPRINT: ${{ steps.decide.outputs.fingerprint }}
+        REMEDIATION_SOURCE: ${{ steps.decide.outputs.source }}
+        REMEDIATION_DETAIL: ${{ steps.decide.outputs.detail }}
+        REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        REMEDIATION_GATE_STEADY_GREEN: '1'
+        REMEDIATION_PREVIOUS_FILE: ${{ runner.temp }}/outcome-state/state
+        REMEDIATION_STATE_FILE: ${{ runner.temp }}/outcome-state/state
+        REMEDIATION_FAIL_OPEN: '1'
+      run: |
+        set -uo pipefail
+        status=0
+        node scripts/remediation-signal-intake.mjs || status=$?
+        if [ -f "$REMEDIATION_STATE_FILE" ]; then echo "saved=true" >> "$GITHUB_OUTPUT"; fi
+        if [ "$status" -ne 0 ] && [ "$status" -ne 75 ]; then
+          # The run's own red status still stands; liveness sees the gap.
+          echo "::error title=Outcome not reported::$REMEDIATION_FINGERPRINT could not file its repair issue (exit $status)."
+        fi
+
+    - name: Save recorded outcome
+      if: steps.intake.outputs.saved == 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/outcome-state
+        key: outcome-v1-${{ steps.decide.outputs.fingerprint }}-${{ github.run_id }}-${{ github.run_attempt }}

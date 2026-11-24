@@ -3,22 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { MarketingEnhancements } from './MarketingEnhancements';
 
-const { scrollUnlockMounted, scrollRevealMounted } = vi.hoisted(() => ({
+const { scrollUnlockMounted } = vi.hoisted(() => ({
   scrollUnlockMounted: vi.fn(),
-  scrollRevealMounted: vi.fn(),
 }));
 
 vi.mock('@/features/home/MarketingScrollUnlock', () => ({
   MarketingScrollUnlock: () => {
     scrollUnlockMounted();
     return <span data-testid='scroll-unlock' />;
-  },
-}));
-
-vi.mock('@/features/home/ScrollRevealInit', () => ({
-  ScrollRevealInit: () => {
-    scrollRevealMounted();
-    return <span data-testid='scroll-reveal' />;
   },
 }));
 
@@ -38,7 +30,7 @@ function restoreIdleApi() {
   }
 }
 
-/** Let the two dynamic imports resolve and React commit the bundle. */
+/** Let the dynamic import resolve and React commit the bundle. */
 async function flushImports() {
   await act(async () => {
     await vi.dynamicImportSettled();
@@ -49,7 +41,6 @@ async function flushImports() {
 describe('MarketingEnhancements', () => {
   beforeEach(() => {
     scrollUnlockMounted.mockClear();
-    scrollRevealMounted.mockClear();
   });
 
   afterEach(() => {
@@ -84,20 +75,17 @@ describe('MarketingEnhancements', () => {
       });
       expect(container).toBeEmptyDOMElement();
       expect(scrollUnlockMounted).not.toHaveBeenCalled();
-      expect(scrollRevealMounted).not.toHaveBeenCalled();
       await expectNoA11yViolations(container);
     });
 
-    it('mounts both enhancements once the idle callback loads them', async () => {
+    it('mounts scroll unlock once the idle callback loads it', async () => {
       const { container, getByTestId } = render(<MarketingEnhancements />);
 
       idleCallback?.({} as IdleDeadline);
       await flushImports();
 
       expect(getByTestId('scroll-unlock')).toBeInTheDocument();
-      expect(getByTestId('scroll-reveal')).toBeInTheDocument();
       expect(scrollUnlockMounted).toHaveBeenCalled();
-      expect(scrollRevealMounted).toHaveBeenCalled();
       await expectNoA11yViolations(container);
     });
 
@@ -118,7 +106,6 @@ describe('MarketingEnhancements', () => {
       await flushImports();
 
       expect(scrollUnlockMounted).not.toHaveBeenCalled();
-      expect(scrollRevealMounted).not.toHaveBeenCalled();
     });
   });
 
@@ -144,7 +131,6 @@ describe('MarketingEnhancements', () => {
       await flushImports();
 
       expect(queryByTestId('scroll-unlock')).toBeInTheDocument();
-      expect(queryByTestId('scroll-reveal')).toBeInTheDocument();
     });
 
     it('clears the pending timeout on unmount', async () => {

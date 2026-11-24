@@ -30,7 +30,7 @@ function makeTrace(
 }
 
 describe('failure-modes taxonomy', () => {
-  it('includes the six required failure modes', () => {
+  it('includes the required failure modes', () => {
     expect([...FAILURE_MODES]).toEqual([
       'hallucination',
       'retrieval-miss',
@@ -38,6 +38,7 @@ describe('failure-modes taxonomy', () => {
       'format-violation',
       'policy-violation',
       'prompt-leak',
+      'action-stall',
     ]);
   });
 

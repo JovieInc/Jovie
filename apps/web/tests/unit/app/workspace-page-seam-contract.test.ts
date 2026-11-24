@@ -63,8 +63,10 @@ describe('workspace page optical seam contract', () => {
     const tableStyles = read('components/organisms/table/table.styles.ts');
 
     expect(pageToolbar).not.toContain('px-3.5 py-2');
-    expect(tableStyles).toContain("cellPadding: 'px-3 py-1'");
-    expect(tableStyles).toContain("headerPadding: 'px-3 py-1.5'");
+    expect(tableStyles).toContain("cellPadding: 'px-3',");
+    expect(tableStyles).toContain("headerPadding: 'px-3',");
+    expect(tableStyles).not.toMatch(/cellPadding: 'px-3 py-/);
+    expect(tableStyles).not.toMatch(/headerPadding: 'px-3 py-/);
   });
 
   it('routes table cell seams through the canonical table presets', () => {
@@ -222,5 +224,48 @@ describe('workspace page optical seam contract', () => {
 
     expect(titleSlot).toBeGreaterThan(-1);
     expect(railSlot).toBeGreaterThan(titleSlot);
+  });
+});
+
+// Row lists put content on the 12px seam with the row's own px-3 inset
+// (.claude/rules/ui.md "Content rows"), so the list container adds no x padding
+// and the row frame adds no side border.
+describe('page content sits on the 12px seam', () => {
+  it.each([
+    [
+      'components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView.tsx',
+      "className='py-1.5 space-y-px'",
+    ],
+    [
+      'components/features/dashboard/tasks/TaskDataTable.tsx',
+      "'h-full overflow-y-auto overflow-x-hidden pb-2 pt-0.5'",
+    ],
+    [
+      'components/features/dashboard/tasks/TaskWorkspaceLoadingRows.tsx',
+      "'flex min-h-0 flex-1 flex-col gap-1.5 pb-2 pt-0.5 max-sm:px-4",
+    ],
+    [
+      'components/organisms/table/atoms/ShellListRowFrame.tsx',
+      'rounded-md border-y border-transparent',
+    ],
+  ])('%s keeps row content on the seam', (relativePath, expected) => {
+    expect(read(relativePath)).toContain(expected);
+  });
+
+  it.each([
+    [
+      'components/features/dashboard/organisms/dashboard-audience-table/DashboardAudienceTableUnified.tsx',
+      'border-subtle px-4 py-2',
+    ],
+    ['app/app/(shell)/threads/ThreadsPageClient.tsx', 'sm:px-6'],
+  ])('%s has no off-seam x padding (%s)', (relativePath, banned) => {
+    expect(read(relativePath)).not.toContain(banned);
+  });
+
+  it.each([
+    'components/features/dashboard/dashboard-pay/DashboardPay.tsx',
+    'components/features/dashboard/youtube/YouTubeChannelPilotPanel.tsx',
+  ])('%s starts its cards on the seam', relativePath => {
+    expect(read(relativePath)).not.toContain("contentPadding='compact'");
   });
 });

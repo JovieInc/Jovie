@@ -431,14 +431,26 @@ CTAs remain high-contrast light pills (not saturated Ion fills) per the
 neutral-CTA rule. Ion carries focus, links, selection, and active navigation.
 Every status also uses text, icon, shape, or pattern — color alone never carries meaning.
 
-Accent color follows the founder rotation rule (Tim, 2026-09-26). It applies
+Accent color follows the founder rotation rule (Tim, 2026-09-26; mood and
+light-only update 2026-11-22). The short contract is "Accent pack" in
+[.claude/rules/ui.md](../../.claude/rules/ui.md#accent-pack). It applies
 app-wide: web, mobile web, iOS, macOS, marketing, and public profiles.
 
 - **Neutral by default.** Color appears only through the rotation below. The
   interactive focus/link accent never rotates. Red and green keep their status
   meaning. CTAs stay neutral high-contrast pills.
-- **Background only.** A rotating accent fills a card or section background
-  (tint, gradient, shader). Text, glyphs, and CTAs stay neutral.
+- **Light, not paint.** Supersedes the earlier "background only" bullet. An
+  accent shows up as an edge, ring, dot, underline or glow, or at most as a
+  faint soft (.12) tint behind a single peer item. Never a solid fill on a
+  card, section, panel or button. Text and CTAs stay neutral, except the
+  focus/link ion.
+- **Neutrals dominate, peers stay equal.** Greys, black and white make up most
+  of every screen. Accents are small, and no accent carries more weight than
+  its peers: same tint and size per item.
+- **Peers rotate.** A section gets one accent. A set of peer items (series, spec
+  grid, carousel) gives each item one accent, rotating ion, ultra, pulse,
+  orange, mint, red. Green and red need a set of 6 or more; sets of 5 or fewer
+  use ion, ultra, pulse, orange and wrap.
 - **Visual-order rotation.** Assign blue (Ion) → purple (Ultra) → pink (Pulse) in
   reading order on each surface. Two consecutive sections or cards never share
   an accent. Orange enters only after those three are used on that surface.
@@ -829,7 +841,7 @@ or mutually exclusive surfaces, not additions to the four-item root IA.
 | Primary | Identity | `/app/presence` | Owns bio, profile, social, contact, and search representation |
 | Primary | Work | `/app/library` | Owns releases, videos, merch, products, events, writing, campaigns, and shareable links |
 | Primary | Audience | `/app/contacts?tab=audience` | Opens the audience context inside the Contacts workspace (sole Audience door; C3) |
-| Utility | Inbox | `/app` | Compact shell action for pending opportunities and runtime attention |
+| Utility | Home (bell) | `/app` | Compact shell action for pending opportunities and runtime attention; same Home root as the rail row |
 | Utility | New Chat | `/app/chat` | Compact shell action that starts a conversation |
 | Contextual | Links | `/app/chat?panel=profile` and existing destination routes | Represents or distributes Identity and Work without becoming a third top-level concept |
 | Contextual | Insights | Existing insights routes / chat cards | Same Audience job as contextual views — not an alternate root (C3) |
@@ -846,7 +858,7 @@ are completing; they do not need to understand Jovie's internal entity graph.
 
 | Type | Canonical scaffold | First action contract | Route rule |
 |------|--------------------|-----------------------|------------|
-| Inbox / work queue | Shell root + opportunity stack | The first actionable card exposes its decision; do not add a competing page-level CTA | `/app` is the signed-in home |
+| Home / work queue | Shell root + opportunity stack | The first actionable card exposes its decision; do not add a competing page-level CTA | `/app` is the signed-in Home |
 | Conversation | Chat workspace + composer | Focus the composer or the next required prompt; the composer owns the primary action | `/app/chat` and `/app/chat/[id]` |
 | Collection / workspace | `PageShell` + `PageToolbar` + framed content | Put at most one primary pill CTA at the toolbar end; filters, display, and navigation stay secondary/ghost | Use the canonical workspace route, never a new alias stub |
 | Entity detail | `EntitySidebarShell` inside the current workspace | Put the next entity action in the rail header or first rail section | Entity detail is rail-only; selecting a row must not create a second page scaffold or page-level entity route |

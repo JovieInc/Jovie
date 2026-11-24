@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { ArrowDown } from 'lucide-react';
 import {
   type ReactNode,
@@ -122,8 +123,7 @@ export function ThreadView({
         {/* system-b-allow: safe-area inset requires calc(); no spacing token covers env() (JOV-3532) */}
         <div className='relative mx-auto w-full max-w-[44rem] px-app-header pb-[calc(1rem+env(safe-area-inset-bottom))]'>
           {!atBottom && (
-            <button
-              type='button'
+            <PlainButton
               onClick={scrollToBottom}
               aria-label='Scroll To Bottom'
               className={cn(
@@ -131,7 +131,7 @@ export function ThreadView({
               )}
             >
               <ArrowDown className='h-3.5 w-3.5' strokeWidth={2.25} />
-            </button>
+            </PlainButton>
           )}
           {composer ?? (
             <ThreadComposer

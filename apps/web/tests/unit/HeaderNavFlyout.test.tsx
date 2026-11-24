@@ -20,6 +20,23 @@ vi.mock('@clerk/nextjs', () => ({
   SignedOut: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+// A flyout needs two or more links; one link renders as a plain link.
+const FEATURES_FLYOUT = [
+  {
+    id: 'features',
+    label: 'Features',
+    heading: 'Product',
+    links: [
+      {
+        href: '/artist-profiles',
+        label: 'Artist Profiles',
+        description: 'Artist profile pages',
+      },
+      { href: '/pricing', label: 'Pricing', description: 'Plans and pricing' },
+    ],
+  },
+];
+
 describe('HeaderNav flyout interactions', () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -97,26 +114,16 @@ describe('HeaderNav flyout interactions', () => {
       <HeaderNav
         authMode='public-static'
         presentation='marketing-glass'
-        flyoutMenus={[
-          {
-            id: 'features',
-            label: 'Features',
-            heading: 'Product',
-            links: [
-              {
-                href: '/artist-profiles',
-                label: 'Artist Profiles',
-                description: 'Artist profile pages',
-              },
-            ],
-          },
-        ]}
+        flyoutMenus={FEATURES_FLYOUT}
       />
     );
 
     const trigger = screen.getByRole('button', { name: /Features/ });
+    // Bare Focus must not open (Capture changed UI Tab-into-main).
     fireEvent.focus(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
 
+    fireEvent.keyDown(trigger, { key: 'Enter' });
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
 
     fireEvent.keyDown(document, { key: 'Escape' });
@@ -131,50 +138,40 @@ describe('HeaderNav flyout interactions', () => {
       <HeaderNav
         authMode='public-static'
         presentation='marketing-glass'
-        flyoutMenus={[
-          {
-            id: 'features',
-            label: 'Features',
-            heading: 'Product',
-            links: [
-              {
-                href: '/artist-profiles',
-                label: 'Artist Profiles',
-                description: 'Artist profile pages',
-              },
-            ],
-          },
-        ]}
+        flyoutMenus={FEATURES_FLYOUT}
       />
     );
 
     const trigger = screen.getByRole('button', { name: /Features/ });
     const header = screen.getByTestId('header-nav');
 
-    // After JOV-2147 (conditional render): flyout is not in the DOM when closed.
-    expect(
-      container.querySelector('#marketing-header-flyout-features')
-    ).toBeNull();
+    // JOV-14244: flyouts stay mounted for native popover/@starting-style, but
+    // closed panels are inert and lack the open class.
+    const flyoutClosed = container.querySelector(
+      '#marketing-header-flyout-features'
+    );
+    expect(flyoutClosed).not.toBeNull();
+    expect(flyoutClosed).not.toHaveClass(
+      'marketing-glass-header__flyout--open'
+    );
+    expect(flyoutClosed).toHaveAttribute('aria-hidden', 'true');
 
     fireEvent.pointerEnter(trigger);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
 
-    // Flyout mounts closed first, then gets the open class on the next frame so
-    // the CSS transition can run.
     const flyout = container.querySelector('#marketing-header-flyout-features');
     expect(flyout).not.toBeNull();
-    expect(flyout).not.toHaveClass('marketing-glass-header__flyout--open');
     act(() => {
       vi.advanceTimersByTime(16);
     });
     expect(flyout).toHaveClass('marketing-glass-header__flyout--open');
+    expect(flyout).not.toHaveAttribute('aria-hidden', 'true');
 
     fireEvent.pointerLeave(header, { relatedTarget: null });
     fireEvent.pointerEnter(flyout as Element);
     vi.advanceTimersByTime(220);
 
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    // Flyout stays mounted while open.
     expect(
       container.querySelector('#marketing-header-flyout-features')
     ).not.toBeNull();

@@ -40,8 +40,16 @@ describe('deterministic /app/chat prompt contract (ASS-9 + ASS-16)', () => {
     ],
     ['requiresRevenueFirstVoice', 'Revenue first'],
     ['requiresOneNextMoveWithReason', 'exactly one next move plus the reason'],
+    ['forbidsPermissionToPlanCloser', 'Never close with permission-to-plan'],
     ['forbidsInventedAccountStats', 'Never invent account stats'],
+    ['forbidsInventedAccountFacts', 'Never invent Spotify algorithm'],
+    ['forbidsInventedCapabilities', 'smart link is live or will live'],
     ['requiresDraftHoldOutbound', 'Draft every outbound artifact'],
+    ['requiresDraftClearAskNow', 'Never reply with only a promise to draft'],
+    [
+      'requiresRefuseDraftHoldOnlyForUnasked',
+      'That refuse→draft-hold line is only for unasked',
+    ],
     [
       'keepsGroundingToPromptOrTools',
       'must come from this prompt or from a tool result in this turn',
@@ -55,6 +63,24 @@ describe('deterministic /app/chat prompt contract (ASS-9 + ASS-16)', () => {
       'requiresVisibleCatalogFacts',
       'Never invent popularity, streams, peer benchmarks',
     ],
+    [
+      'requiresArtistFacingTextAfterTools',
+      'After any tool or useSkill result, always write the artist-facing reply',
+    ],
+    ['requiresShortDefaultPlans', 'Default advice and launch plans stay short'],
+    [
+      'requiresRefuseThenDraftHold',
+      'refusing an unasked send, post, auto-DM, scrape, or spend',
+    ],
+    [
+      'requiresRefuseThenDraftHold',
+      'name the release or artifact from the ask',
+    ],
+    [
+      'requiresRefusePrivateDataTrain',
+      'train on private DMs, demos, or other private data',
+    ],
+    ['requiresStreamCountNotCatalogDeny', 'cannot see stream counts or saves'],
   ] as const)('fails when %s needle is removed (%s)', (fact, needle) => {
     const prompt = buildSystemPrompt(baseContext, [], {
       aiCanUseTools: true,

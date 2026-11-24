@@ -20,9 +20,19 @@ vi.mock('@/hooks/useClerkSafe', () => ({
 
 // AuthShell is certified on its own; a labelled form stands in for it here.
 vi.mock('@/features/auth', () => ({
-  AuthShell: ({ claimHandle }: { claimHandle?: string }) => (
+  AuthShell: ({
+    claimHandle,
+    accessKind = 'claim',
+  }: {
+    claimHandle?: string;
+    accessKind?: 'claim' | 'waitlist';
+  }) => (
     <form aria-label='Create your account' data-testid='signup-surface'>
-      {claimHandle ? <h2>Claim @{claimHandle}</h2> : null}
+      {claimHandle ? (
+        <h2>
+          {accessKind === 'waitlist' ? 'Reserve' : 'Claim'} @{claimHandle}
+        </h2>
+      ) : null}
     </form>
   ),
 }));
@@ -151,13 +161,24 @@ describe('ChatProposeNextStepCard states', () => {
       authState.isSignedIn = signedIn;
       authState.canRenderClerkUi = canRender;
       const { container } = render(
-        <ChatProposeNextStepCard payload={payload('waitlist')} />
+        <ChatProposeNextStepCard
+          payload={payload('waitlist')}
+          claimHandle='wattwhite'
+        />
       );
 
       expect(screen.getByText(copy)).toBeInTheDocument();
       expect(Boolean(screen.queryByTestId('signup-surface'))).toBe(
         !signedIn && canRender
       );
+      if (!signedIn && canRender) {
+        expect(
+          screen.getByRole('heading', { name: 'Reserve @wattwhite' })
+        ).toBeInTheDocument();
+        expect(
+          screen.queryByRole('heading', { name: 'Claim @wattwhite' })
+        ).not.toBeInTheDocument();
+      }
       await expectNoA11yViolations(container);
     }
   );
@@ -186,5 +207,39 @@ describe('ChatProposeNextStepCard states', () => {
 
     expect(screen.getByTestId('signup-surface')).toBeInTheDocument();
     await expectNoA11yViolations(container);
+  });
+
+  it('anchors waitlist and instant-access AuthShell cards for top-fade clearance (ONB-27)', () => {
+    const handle = 'claimpathartist';
+    const waitlist = render(
+      <ChatProposeNextStepCard
+        payload={payload('waitlist')}
+        claimHandle='reservepath'
+      />
+    );
+    const waitlistAnchor = waitlist.container.querySelector(
+      '[data-onboarding-auth-anchor]'
+    );
+    expect(waitlistAnchor?.hasAttribute('data-onboarding-auth-anchor')).toBe(
+      true
+    );
+    expect(waitlistAnchor).toContainElement(
+      waitlist.getByRole('heading', { name: 'Reserve @reservepath' })
+    );
+    waitlist.unmount();
+
+    const claim = render(
+      <ChatProposeNextStepCard
+        payload={payload('instant_access')}
+        claimHandle={handle}
+      />
+    );
+    const claimAnchor = claim.container.querySelector(
+      '[data-onboarding-auth-anchor]'
+    );
+    expect(claimAnchor?.hasAttribute('data-onboarding-auth-anchor')).toBe(true);
+    expect(claimAnchor).toContainElement(
+      claim.getByRole('heading', { name: `Claim @${handle}` })
+    );
   });
 });

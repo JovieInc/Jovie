@@ -8,7 +8,6 @@ import {
   ChevronRight,
   House,
   type LucideIcon,
-  Mail,
   MapPin,
   MoreHorizontal,
   Music2,
@@ -34,7 +33,6 @@ import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
 import {
   getPublicProfileHistoryServerSnapshot,
   getPublicProfileHistorySnapshot,
-  PUBLIC_EVENTS_NO_SURFACE,
   resolveProfileSurfaceState,
   resolvePublicMusicSurface,
   shouldOfferPublicEventsDestination,
@@ -71,6 +69,8 @@ import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import type { PublicRelease } from '../releases/types';
 import { DesktopSurfaceImage } from './DesktopSurfaceImage';
+import { listenServiceProps } from './desktop-listen-services';
+import { useOverlayAnchor } from './useOverlayAnchor';
 
 // JOV-6201: reuse the 360px track at 1180px with min-w-0 on every desktop listen branch.
 export const PROFILE_LISTEN_DESKTOP_GRID_CLASSNAME =
@@ -147,6 +147,8 @@ interface ProfileDesktopSurfaceProps {
    *  mobile so cold desktop loads paint the real composition (JOV-6452). While
    *  hidden, portaled overlays (modal drawer, auto-open alerts) stay closed. */
   readonly overlaysEnabled?: boolean;
+  /** Shared with the credits popover so both anchor to the Menu button. */
+  readonly menuButtonRef?: React.RefObject<HTMLButtonElement | null>;
   /** JOV-8777: free public profiles carry the Jovie mark; opt-outs suppress it. */
   readonly hideJovieBranding?: boolean;
 }
@@ -217,6 +219,7 @@ function DesktopSurfaceCard({
   children,
   className,
   testId,
+  flat = false,
 }: Readonly<{
   title: string;
   actionLabel?: string;
@@ -224,11 +227,15 @@ function DesktopSurfaceCard({
   children: React.ReactNode;
   className?: string;
   testId?: string;
+  /** No surface: the content carries its own rows (no extra carding). */
+  flat?: boolean;
 }>) {
   return (
     <section
       className={cn(
-        'min-w-0 rounded-2xl border border-white/6 bg-white/[0.025] p-5',
+        flat
+          ? 'min-w-0 px-1'
+          : 'min-w-0 rounded-2xl border border-white/6 bg-white/[0.025] p-5',
         className
       )}
       data-testid={testId}
@@ -250,6 +257,91 @@ function DesktopSurfaceCard({
       </div>
       {children}
     </section>
+  );
+}
+
+function EventRow({
+  tourDate,
+  large = false,
+}: Readonly<{ tourDate: TourDateViewModel; large?: boolean }>) {
+  const place = [tourDate.city, tourDate.region].filter(Boolean).join(', ');
+  return (
+    <div
+      className={cn(
+        'grid items-center bg-white/[0.025]',
+        large
+          ? 'grid-cols-[68px_minmax(0,1fr)_auto] gap-4 rounded-3xl px-4 py-3'
+          : 'grid-cols-[52px_minmax(0,1fr)_auto] gap-3 rounded-2xl px-3 py-2'
+      )}
+    >
+      <div className='rounded-xl border border-white/10 bg-white/[0.07] px-2 py-2 text-center'>
+        <div className='text-3xs font-semibold tracking-wide text-white/58'>
+          {formatMonth(tourDate.startDate, tourDate.timezone)}
+        </div>
+        <div
+          className={cn(
+            'mt-1 font-semibold leading-none tracking-[-0.05em] text-white dark:text-white',
+            large ? 'text-2xl' : 'text-xl'
+          )}
+        >
+          {formatDay(tourDate.startDate, tourDate.timezone)}
+        </div>
+      </div>
+      <div className='min-w-0'>
+        <p
+          className={cn(
+            'truncate font-medium tracking-[-0.03em] text-white dark:text-white',
+            large ? 'text-xl' : 'text-lg'
+          )}
+        >
+          {tourDate.venueName}
+        </p>
+        <p className='flex items-center gap-2 truncate text-sm text-white/48'>
+          {large ? <MapPin className='h-4 w-4 shrink-0' /> : null}
+          <span className='truncate'>{place}</span>
+        </p>
+      </div>
+      {tourDate.ticketUrl ? (
+        <a
+          href={tourDate.ticketUrl}
+          aria-label={ticketLinkLabel(tourDate)}
+          className='inline-flex h-11 items-center rounded-full border border-white/12 px-3 text-xs font-medium text-white/82 transition-colors duration-subtle hover:bg-white/[0.04]'
+        >
+          Tickets
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
+function SideRailRow({
+  title,
+  subtitle,
+  testId,
+  onClick,
+}: Readonly<{
+  title: string;
+  subtitle: string;
+  testId: string;
+  onClick: React.MouseEventHandler<HTMLButtonElement>;
+}>) {
+  return (
+    <button
+      type='button'
+      onClick={onClick}
+      data-testid={testId}
+      className='group flex min-h-14 w-full items-center justify-between gap-4 rounded-xl px-1 py-3 text-left transition-colors duration-subtle hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+    >
+      <span className='min-w-0'>
+        <span className='block truncate text-mid font-semibold tracking-[-0.015em] text-white dark:text-white'>
+          {title}
+        </span>
+        <span className='block truncate text-xs leading-5 text-white/48'>
+          {subtitle}
+        </span>
+      </span>
+      <ChevronRight className='size-4 shrink-0 text-white/40' aria-hidden />
+    </button>
   );
 }
 
@@ -307,6 +399,7 @@ export function ProfileDesktopSurface({
   onReady,
   onOpenReleaseCredits,
   overlaysEnabled = true,
+  menuButtonRef: menuButtonRefProp,
   hideJovieBranding = false,
 }: ProfileDesktopSurfaceProps) {
   const [isHydrated, setIsHydrated] = useState(false);
@@ -342,7 +435,9 @@ export function ProfileDesktopSurface({
   const activePrimaryTab = resolvePublicProfileActiveDestination({
     mode: activeMode,
   });
-  const visiblePrimaryTabs = getPermittedPublicProfileNavigation();
+  const visiblePrimaryTabs = getPermittedPublicProfileNavigation().filter(
+    tab => tab.id !== 'tour' || hasEventsDestination
+  );
   const canGetUpdates =
     getPermittedPublicProfileActions({
       fanCaptureEnabled: allowFanCapture,
@@ -392,11 +487,21 @@ export function ProfileDesktopSurface({
     hasReleases,
     emptyState,
   } = surfaceState;
+  // One Get Updates entry: hero primary when that is the action; otherwise the
+  // side-rail card. Never both (JOV-14241).
+  const showUpdatesSideRailCard =
+    canGetUpdates && primaryAction.kind !== 'subscribe';
   const musicSurface = resolvePublicMusicSurface({
     releases: visibleReleases,
     hasPlayableDestinations: mergedDSPs.length > 0,
     catalogLoadFailed,
   });
+  const { menuButtonRef, anchorRef, lastTriggerRef } =
+    useOverlayAnchor(menuButtonRefProp);
+  const openDrawerFrom = (trigger: HTMLElement, view: DrawerView) => {
+    lastTriggerRef.current = trigger;
+    onDrawerViewChange(view);
+  };
   const shareContext = useMemo(
     () =>
       buildProfileShareContext({
@@ -599,6 +704,7 @@ export function ProfileDesktopSurface({
           data-testid='profile-desktop-secondary-grid'
         >
           <DesktopSurfaceCard
+            flat
             title='Selected work'
             actionLabel={
               musicSurface.kind === 'catalog' ? 'View all' : undefined
@@ -650,56 +756,20 @@ export function ProfileDesktopSurface({
             </div>
           </DesktopSurfaceCard>
 
-          <DesktopSurfaceCard
-            title='Events'
-            actionLabel={hasEventsDestination ? 'View Events' : undefined}
-            onAction={
-              hasEventsDestination ? () => onModeSelect('tour') : undefined
-            }
-          >
-            <div className='space-y-2'>
-              {upcomingTourDates.length > 0 ? (
-                upcomingTourDates.slice(0, 2).map(tourDate => (
-                  <div
-                    key={tourDate.id}
-                    className='grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl bg-white/[0.025] px-3 py-2'
-                  >
-                    <div className='rounded-xl border border-white/10 bg-white/[0.07] px-2 py-2 text-center'>
-                      <div className='text-3xs font-semibold tracking-wide text-white/58'>
-                        {formatMonth(tourDate.startDate, tourDate.timezone)}
-                      </div>
-                      <div className='mt-1 text-xl font-semibold leading-none tracking-[-0.05em] text-white dark:text-white'>
-                        {formatDay(tourDate.startDate, tourDate.timezone)}
-                      </div>
-                    </div>
-                    <div className='min-w-0'>
-                      <p className='truncate text-lg font-medium tracking-[-0.03em] text-white dark:text-white'>
-                        {tourDate.venueName}
-                      </p>
-                      <p className='truncate text-sm text-white/48'>
-                        {[tourDate.city, tourDate.region]
-                          .filter(Boolean)
-                          .join(', ')}
-                      </p>
-                    </div>
-                    {tourDate.ticketUrl ? (
-                      <a
-                        href={tourDate.ticketUrl}
-                        aria-label={ticketLinkLabel(tourDate)}
-                        className='inline-flex h-11 items-center rounded-full border border-white/12 px-3 text-xs font-medium text-white/82 transition-colors duration-subtle hover:bg-white/[0.04]'
-                      >
-                        Tickets
-                      </a>
-                    ) : null}
-                  </div>
-                ))
-              ) : (
-                <EmptySurfaceBlock>
-                  {PUBLIC_EVENTS_NO_SURFACE}
-                </EmptySurfaceBlock>
-              )}
-            </div>
-          </DesktopSurfaceCard>
+          {hasEventsDestination ? (
+            <DesktopSurfaceCard
+              flat
+              title='Events'
+              actionLabel='View Events'
+              onAction={() => onModeSelect('tour')}
+            >
+              <div className='space-y-2'>
+                {upcomingTourDates.slice(0, 2).map(tourDate => (
+                  <EventRow key={tourDate.id} tourDate={tourDate} />
+                ))}
+              </div>
+            </DesktopSurfaceCard>
+          ) : null}
         </div>
       </div>
 
@@ -712,88 +782,54 @@ export function ProfileDesktopSurface({
         )}
         data-testid='profile-desktop-side-rail'
       >
-        <DesktopSurfaceCard
-          title='Get updates'
-          testId='profile-desktop-alerts-card'
-          className={canGetUpdates ? undefined : 'hidden'}
+        <div
+          className={cn(
+            'min-w-0 divide-y divide-white/8',
+            !showUpdatesSideRailCard && 'hidden'
+          )}
+          data-testid='profile-desktop-alerts-card'
         >
-          <div className='space-y-4'>
-            <button
-              type='button'
-              onClick={() => onModeSelect('subscribe')}
-              data-testid={
-                isSubscribed
-                  ? 'profile-desktop-manage-updates'
-                  : 'profile-desktop-get-updates'
-              }
-              className='flex min-h-15 w-full items-center justify-between gap-4 rounded-2xl border border-white/8 bg-white/[0.035] px-4 text-left transition-colors duration-subtle hover:bg-white/[0.055]'
-            >
-              <span className='min-w-0'>
-                <span className='block truncate text-mid font-semibold tracking-[-0.015em] text-white dark:text-white'>
-                  {isSubscribed ? 'Updates on' : 'Get updates'}
-                </span>
-                <span className='block truncate text-xs leading-5 text-white/48'>
-                  {isSubscribed
-                    ? 'Manage what you hear about.'
-                    : 'New music, shows, and merch.'}
-                </span>
-              </span>
-              <span className='inline-flex h-8 shrink-0 items-center rounded-full bg-white dark:bg-white px-3 text-xs font-semibold text-black dark:text-black'>
-                {isSubscribed ? 'Manage' : 'Get updates'}
-              </span>
-            </button>
-
-            {showArtistEmailRow ? (
-              <>
-                <div className='h-px bg-white/8' />
-                <div className='space-y-3'>
-                  <div className='space-y-1'>
-                    <p className='text-app font-semibold tracking-tight text-white/44'>
-                      Sent by {artist.name}
-                    </p>
-                    <p className='text-sm leading-5 text-white/58'>
-                      Share your email with {artist.name} for occasional artist
-                      emails.
-                    </p>
-                  </div>
-                  <div className='flex items-center justify-between gap-4'>
-                    <div className='flex items-center gap-3'>
-                      <Mail className='size-4 text-white/62' />
-                      <span className='text-sm font-medium tracking-[-0.015em] text-white/84'>
-                        Artist Emails
-                      </span>
-                    </div>
-                    <Switch
-                      checked={isSubscribed}
-                      onCheckedChange={() => onModeSelect('subscribe')}
-                      aria-label='Artist Emails'
-                      className='data-[state=checked]:bg-white/36 data-[state=unchecked]:bg-white/14'
-                    />
-                  </div>
-                </div>
-              </>
-            ) : null}
-          </div>
-        </DesktopSurfaceCard>
-        {hasTip ? (
-          <DesktopSurfaceCard
-            title='Payments'
-            testId='profile-desktop-payments-card'
-          >
-            <div className='space-y-4'>
-              <p className='text-sm leading-5 text-white/48'>
-                Pay {artist.name} directly.
-              </p>
-              <button
-                type='button'
-                onClick={() => onDrawerViewChange('pay')}
-                data-testid='profile-desktop-open-payments'
-                className='inline-flex h-8 items-center rounded-full bg-white px-3 text-xs font-semibold text-black dark:bg-white dark:text-black'
-              >
-                Open payments
-              </button>
+          <SideRailRow
+            title={isSubscribed ? 'Updates on' : 'Get updates'}
+            subtitle={
+              isSubscribed
+                ? 'Manage what you hear about.'
+                : 'New music, shows, and merch.'
+            }
+            testId={
+              isSubscribed
+                ? 'profile-desktop-manage-updates'
+                : 'profile-desktop-get-updates'
+            }
+            onClick={() => onModeSelect('subscribe')}
+          />
+          {showArtistEmailRow ? (
+            <div className='flex items-center justify-between gap-4 px-1 py-3'>
+              <div className='min-w-0'>
+                <p className='text-sm font-medium text-white/84'>
+                  Artist Emails
+                </p>
+                <p className='text-xs leading-5 text-white/48'>
+                  Occasional emails from {artist.name}.
+                </p>
+              </div>
+              <Switch
+                checked={isSubscribed}
+                onCheckedChange={() => onModeSelect('subscribe')}
+                aria-label='Artist Emails'
+              />
             </div>
-          </DesktopSurfaceCard>
+          ) : null}
+        </div>
+        {hasTip ? (
+          <div data-testid='profile-desktop-payments-card'>
+            <SideRailRow
+              title={`Pay ${artist.name}`}
+              subtitle='Send support directly.'
+              testId='profile-desktop-open-payments'
+              onClick={event => openDrawerFrom(event.currentTarget, 'pay')}
+            />
+          </div>
         ) : null}
       </div>
     </div>
@@ -828,20 +864,21 @@ export function ProfileDesktopSurface({
           </div>
         </div>
       </DesktopSurfaceCard>
-      {hasTip ? (
+      {musicSurface.kind === 'catalog' && mergedDSPs.length > 0 ? (
         <DesktopSurfaceCard
-          title='Pay'
-          actionLabel='Open Pay'
-          onAction={() => onDrawerViewChange('pay')}
+          title='Listen on'
+          testId='profile-listen-desktop-services'
         >
-          <button
-            type='button'
-            onClick={() => onDrawerViewChange('pay')}
-            className='inline-flex h-12 items-center rounded-full border border-white/12 px-4 text-sm font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
-          >
-            Pay {artist.name}
-          </button>
+          <StaticListenInterface {...listenServiceProps(artist, mergedDSPs)} />
         </DesktopSurfaceCard>
+      ) : null}
+      {hasTip ? (
+        <SideRailRow
+          title={`Pay ${artist.name}`}
+          subtitle='Send support directly.'
+          testId='profile-listen-open-pay'
+          onClick={event => openDrawerFrom(event.currentTarget, 'pay')}
+        />
       ) : null}
     </div>
   );
@@ -875,15 +912,7 @@ export function ProfileDesktopSurface({
         className={PROFILE_LISTEN_RELEASES_COLUMN_CLASSNAME}
         testId='profile-primary-tab-artist-streaming'
       >
-        <StaticListenInterface
-          artist={artist}
-          handle={artist.handle}
-          dspsOverride={mergedDSPs}
-          containerClassName='max-w-none'
-          providerButtonClassName='rounded-2xl border-white/8 bg-white/[0.045] px-4 py-3.5 text-white dark:text-white hover:bg-white/[0.08]'
-          emptyStateClassName='rounded-2xl border-white/8 bg-white/[0.04] shadow-none'
-          hideHelpText
-        />
+        <StaticListenInterface {...listenServiceProps(artist, mergedDSPs)} />
       </DesktopSurfaceCard>
     );
     listenTabContent = latestVisibleRelease ? (
@@ -940,41 +969,7 @@ export function ProfileDesktopSurface({
         <div className='space-y-2'>
           {upcomingTourDates.length > 0 ? (
             upcomingTourDates.map(tourDate => (
-              <div
-                key={tourDate.id}
-                className='grid grid-cols-[68px_minmax(0,1fr)_auto] items-center gap-4 rounded-3xl bg-white/[0.025] px-4 py-3'
-              >
-                <div className='rounded-xl border border-white/10 bg-white/[0.07] px-2 py-2.5 text-center'>
-                  <div className='text-3xs font-semibold tracking-wide text-white/58'>
-                    {formatMonth(tourDate.startDate, tourDate.timezone)}
-                  </div>
-                  <div className='mt-1 text-2xl font-semibold leading-none tracking-[-0.05em] text-white dark:text-white'>
-                    {formatDay(tourDate.startDate, tourDate.timezone)}
-                  </div>
-                </div>
-                <div className='min-w-0'>
-                  <p className='truncate text-xl font-medium tracking-[-0.03em] text-white dark:text-white'>
-                    {tourDate.venueName}
-                  </p>
-                  <div className='mt-1 flex items-center gap-2 text-sm text-white/48'>
-                    <MapPin className='h-4 w-4' />
-                    <span className='truncate'>
-                      {[tourDate.city, tourDate.region]
-                        .filter(Boolean)
-                        .join(', ')}
-                    </span>
-                  </div>
-                </div>
-                {tourDate.ticketUrl ? (
-                  <a
-                    href={tourDate.ticketUrl}
-                    aria-label={ticketLinkLabel(tourDate)}
-                    className='inline-flex h-11 items-center rounded-full border border-white/12 px-4 text-sm font-medium text-white/84 transition-colors duration-subtle hover:bg-white/[0.04]'
-                  >
-                    Tickets
-                  </a>
-                ) : null}
-              </div>
+              <EventRow key={tourDate.id} tourDate={tourDate} large />
             ))
           ) : (
             <EmptySurfaceBlock>{emptyState.tour}</EmptySurfaceBlock>
@@ -983,8 +978,9 @@ export function ProfileDesktopSurface({
       </DesktopSurfaceCard>
     ) : activePrimaryTab === 'about' ? (
       <DesktopSurfaceCard
+        flat
         title='About'
-        className='flex-1'
+        className='max-w-2xl'
         testId='profile-primary-tab-about'
       >
         <AboutSection
@@ -1017,16 +1013,6 @@ export function ProfileDesktopSurface({
           data-testid='profile-desktop-top-chrome'
         >
           <div className='flex min-w-0 items-center gap-2'>
-            {onOpenReleaseCredits ? (
-              <button
-                type='button'
-                data-testid='profile-release-credits'
-                onClick={onOpenReleaseCredits}
-                className='inline-flex min-h-11 items-center rounded-full border border-white/16 bg-white px-4 text-sm font-semibold text-black dark:bg-white dark:text-black'
-              >
-                Release credits
-              </button>
-            ) : null}
             {onBack ? (
               /* D9kdx "Back + nav": the back slot stays reserved so the
                  pill nav never shifts between modes (the mode-history
@@ -1064,6 +1050,8 @@ export function ProfileDesktopSurface({
                     data-testid={`profile-primary-tab-${tab.id}`}
                     className={cn(
                       'inline-flex h-11 min-w-0 items-center gap-2 rounded-full px-3 text-app font-medium tracking-tight transition-colors duration-subtle active:bg-white/[0.08]',
+                      // Ring on keyboard focus only (:focus-visible), never after a click.
+                      'focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-transparent [&:focus:not(:focus-visible)]:shadow-none',
                       isActive
                         ? 'text-white dark:text-white'
                         : 'text-white/50 hover:text-white/78'
@@ -1085,7 +1073,17 @@ export function ProfileDesktopSurface({
 
           <button
             type='button'
-            onClick={onOpenMenu}
+            ref={menuButtonRef}
+            onClick={() => {
+              if (drawerOpen) {
+                onDrawerOpenChange(false);
+                return;
+              }
+              lastTriggerRef.current = menuButtonRef.current;
+              onOpenMenu();
+            }}
+            aria-haspopup='menu'
+            aria-expanded={drawerOpen && overlaysEnabled}
             className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-black/28 text-white dark:text-white backdrop-blur-xl transition-colors duration-subtle hover:bg-black/44'
             aria-label='Menu'
           >
@@ -1163,6 +1161,7 @@ export function ProfileDesktopSurface({
           releases={visibleReleases}
           onOpenReleaseCredits={onOpenReleaseCredits}
           presentation={presentation}
+          anchorRef={anchorRef}
         />
       </div>
     </div>

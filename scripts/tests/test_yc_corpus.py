@@ -97,11 +97,12 @@ class YcCorpusTest(unittest.TestCase):
         self.assertGreaterEqual(first_writes, len(yc.PLAYBOOKS) + 1)
         self.assertEqual(len(writes), first_writes, "content hashes prevent repeat GBrain writes")
         source = next(body for slug, _, body in writes if '"yc-library-embedded-transcript"' in body)
-        self.assertIn('"bounded-source-index"', source)
+        self.assertIn('"source-transcript"', source)
         self.assertIn('"yc-library-embedded-transcript"', source)
-        self.assertIn("link-and-bounded-excerpt", source)
+        self.assertIn(yc.yc_transcript.STORAGE, source)
+        self.assertIn("## Transcript\n\nTalk to users about specific past behavior", source)
         self.assertIn("source_content_hash", source)
-        self.assertIn("Full source material remains at the linked publisher", source)
+        self.assertTrue(source.rstrip().endswith(yc.yc_transcript.FOOTER))
         playbook = next(body for slug, _, body in writes if slug == yc.PLAYBOOK_PREFIX + "users-first-customers")
         self.assertIn('"derived-playbook"', playbook)
         self.assertIn("## Counterexamples and limits", playbook)
@@ -156,6 +157,64 @@ class YcCorpusTest(unittest.TestCase):
         self.assertEqual(second["status"], "current")
         self.assertEqual(len(spawned), 1)
         self.assertEqual(spawned[0][1:3], [str(ROOT / "scripts/lanes/yc_corpus.py"), "refresh"])
+
+
+class FullTranscriptTest(unittest.TestCase):
+    """JOV-14457: YC Library talks keep their whole transcript, not a 2,400-char teaser."""
+
+    def test_long_transcript_is_stored_whole_with_paragraphs(self):
+        sentences = " ".join(f"Sentence {i} is about talking to users and pricing." for i in range(400))
+        page = LIBRARY_PAGE.replace("Talk to users about specific past behavior, not hypotheticals.", sentences)
+        source = yc.parse_html_source(LIBRARY_URL, page, "2026-11-22T00:00:00Z")
+        _, _, body = yc.render_source(source)
+        self.assertGreater(len(sentences), yc.EXCERPT_CHARS * 5)
+        self.assertIn("Sentence 399 is about talking to users and pricing.", body)
+        self.assertEqual(source["excerpt"], "Interview current and potential users.")
+        self.assertIn("\n\n", source["transcript"], "chunker gets paragraph breaks")
+        self.assertIn(f'transcript_chars: {len(source["transcript"])}', body)
+        self.assertIn("pricing-unit-economics", source["tags"])
+
+    def test_normalize_caps_at_a_paragraph_and_handles_empty(self):
+        self.assertEqual(yc.yc_transcript.normalize(None), "")
+        text = "\n\n".join("x" * 1000 for _ in range(400))
+        capped = yc.yc_transcript.normalize(text)
+        self.assertLessEqual(len(capped), yc.yc_transcript.MAX_CHARS)
+        self.assertTrue(capped.endswith("x"))
+
+    def test_pages_from_the_old_renderer_are_refetched_past_304_and_rewritten(self):
+        writes = []
+        put = lambda slug, title, body: (writes.append(slug) or True, None)  # noqa: E731
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "yc.json"
+            yc.refresh(state, limit=10, fetch=FakeFetch(), put=put, allowed=lambda *_: True, now=1_797_000_000)
+            saved = json.loads(state.read_text())
+            video = yc.SOURCE_PREFIX + "z1if1c8w5lg"
+            entry = saved["documents"][LIBRARY_URL]
+            self.assertEqual(entry["render"], yc.yc_transcript.RENDER)
+            entry.pop("render")  # simulate a page written before full transcripts
+            saved["pageHashes"][video] = "old-render"
+            state.write_text(json.dumps(saved))
+            writes.clear()
+
+            class NotModified(FakeFetch):
+                def __call__(self, url, headers=None):
+                    if url == LIBRARY_URL and (headers or {}).get("If-None-Match"):
+                        self.calls.append((url, headers))
+                        return {"status": 304, "body": "", "etag": '"v1"', "lastModified": None}
+                    return super().__call__(url, headers)
+
+            fetch = NotModified()
+            yc.refresh(state, limit=1, fetch=fetch, put=put, allowed=lambda *_: True, now=1_797_090_000)
+            saved = json.loads(state.read_text())
+        library_calls = [headers for url, headers in fetch.calls if url == LIBRARY_URL]
+        self.assertEqual(library_calls, [{}], "stale page fetched without conditional headers")
+        self.assertIn(video, writes)
+        self.assertEqual(saved["documents"][LIBRARY_URL]["render"], yc.yc_transcript.RENDER)
+
+    def test_backfill_widens_the_daily_batch_only_while_pages_are_stale(self):
+        self.assertEqual(yc.yc_transcript.effective_limit(40, 0), 40)
+        self.assertEqual(yc.yc_transcript.effective_limit(40, 30), 70)
+        self.assertEqual(yc.yc_transcript.effective_limit(40, 900), yc.yc_transcript.BACKFILL_LIMIT)
 
 
 class SelftestIsolationTest(unittest.TestCase):

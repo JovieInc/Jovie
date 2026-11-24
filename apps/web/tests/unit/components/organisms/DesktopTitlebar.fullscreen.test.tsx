@@ -26,14 +26,6 @@ vi.mock('@/lib/desktop/electron-bridge', async importOriginal => {
   };
 });
 
-vi.mock('@/components/atoms/UpdateAvailablePill', () => ({
-  UpdateAvailablePill: () => (
-    <button type='button' data-testid='update-available-pill'>
-      Update
-    </button>
-  ),
-}));
-
 function renderTitlebar(
   overrides: Partial<
     import('@/components/organisms/sidebar/context').SidebarContextValue

@@ -180,6 +180,31 @@ const contentPrefs: Record<NotificationContentType, boolean> = {
   general: false,
 };
 
+const upcomingShowFixture = {
+  id: 'show-1',
+  profileId: artist.id,
+  externalId: null,
+  provider: 'manual',
+  eventType: 'tour',
+  confirmationStatus: 'confirmed',
+  reviewedAt: '2026-01-01T00:00:00.000Z',
+  title: null,
+  venueName: 'The Echo',
+  city: 'Los Angeles',
+  region: 'CA',
+  country: 'US',
+  startDate: '2026-10-20',
+  startTime: null,
+  timezone: null,
+  latitude: null,
+  longitude: null,
+  ticketUrl: 'https://tickets.example.com/show-1',
+  ticketStatus: 'available',
+  lastSyncedAt: null,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+} satisfies TourDateViewModel;
+
 function renderDesktopSurface(
   props: Partial<React.ComponentProps<typeof ProfileDesktopSurface>> = {},
   after?: React.ReactNode
@@ -318,7 +343,7 @@ describe('ProfileDesktopSurface', () => {
     });
     expect(navigation).toHaveAttribute(
       'data-public-profile-nav',
-      'profile,listen,tour,about'
+      'profile,listen,about'
     );
     expect(
       within(navigation).getByRole('button', { name: 'Home' })
@@ -326,9 +351,10 @@ describe('ProfileDesktopSurface', () => {
     expect(
       within(navigation).getByRole('button', { name: 'Music' })
     ).toBeInTheDocument();
+    // JOV-14241: hide Events in nav when there are no upcoming dates.
     expect(
-      within(navigation).getByRole('button', { name: 'Events' })
-    ).toBeInTheDocument();
+      within(navigation).queryByRole('button', { name: 'Events' })
+    ).not.toBeInTheDocument();
     expect(
       within(navigation).getByRole('button', { name: 'About' })
     ).toBeInTheDocument();
@@ -341,9 +367,9 @@ describe('ProfileDesktopSurface', () => {
     expect(
       within(navigation).queryByRole('button', { name: 'Get updates' })
     ).not.toBeInTheDocument();
-
-    fireEvent.click(within(navigation).getByRole('button', { name: 'Events' }));
-    expect(onModeSelect).toHaveBeenCalledWith('tour');
+    expect(
+      screen.queryByTestId('profile-desktop-cover-accent-line')
+    ).not.toBeInTheDocument();
 
     const listenCta = screen.getByRole('button', { name: 'Listen' });
     expect(listenCta).toHaveClass('h-auto', 'min-h-7');
@@ -642,7 +668,11 @@ describe('ProfileDesktopSurface', () => {
       expect(
         screen.queryByRole('button', { name: 'View Events' })
       ).not.toBeInTheDocument();
-      expect(screen.getByText('No live shows listed.')).toBeVisible();
+      // JOV-14241: empty Events card is omitted, not empty-state copy.
+      expect(screen.queryByText('Events')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('No live shows listed.')
+      ).not.toBeInTheDocument();
       expect(screen.queryByText('No upcoming shows.')).not.toBeInTheDocument();
 
       screen.getByTestId('profile-desktop-get-updates').click();
@@ -734,29 +764,10 @@ describe('ProfileDesktopSurface', () => {
     'uses the venue day in the desktop %s show row',
     activeMode => {
       const upcomingShow = {
-        id: 'show-1',
-        profileId: artist.id,
-        externalId: null,
-        provider: 'manual',
-        eventType: 'tour',
-        confirmationStatus: 'confirmed',
-        reviewedAt: '2026-01-01T00:00:00.000Z',
-        title: null,
-        venueName: 'The Echo',
-        city: 'Los Angeles',
-        region: 'CA',
-        country: 'US',
+        ...upcomingShowFixture,
         startDate: '2030-09-24T03:00:00Z',
-        startTime: null,
         timezone: 'America/Chicago',
-        latitude: null,
-        longitude: null,
-        ticketUrl: 'https://tickets.example.com/show-1',
-        ticketStatus: 'available',
-        lastSyncedAt: null,
-        createdAt: '2026-01-01T00:00:00.000Z',
-        updatedAt: '2026-01-01T00:00:00.000Z',
-      } satisfies TourDateViewModel;
+      };
       render(
         <ProfileDesktopSurface
           artist={artist}
@@ -848,38 +859,13 @@ describe('ProfileDesktopSurface', () => {
 
   it('offers View Events only when upcoming dates exist', () => {
     const onModeSelect = vi.fn();
-    const upcomingShow = {
-      id: 'show-1',
-      profileId: artist.id,
-      externalId: null,
-      provider: 'manual',
-      eventType: 'tour',
-      confirmationStatus: 'confirmed',
-      reviewedAt: '2026-01-01T00:00:00.000Z',
-      title: null,
-      venueName: 'The Echo',
-      city: 'Los Angeles',
-      region: 'CA',
-      country: 'US',
-      startDate: '2026-10-20',
-      startTime: null,
-      timezone: null,
-      latitude: null,
-      longitude: null,
-      ticketUrl: 'https://tickets.example.com/show-1',
-      ticketStatus: 'available',
-      lastSyncedAt: null,
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: '2026-01-01T00:00:00.000Z',
-    } satisfies TourDateViewModel;
-
     render(
       <ProfileDesktopSurface
         artist={artist}
         socialLinks={[]}
         contacts={contacts}
         photoDownloadSizes={[]}
-        tourDates={[upcomingShow]}
+        tourDates={[upcomingShowFixture]}
         drawerOpen={false}
         drawerView='menu'
         activeMode='profile'
@@ -892,6 +878,15 @@ describe('ProfileDesktopSurface', () => {
       />
     );
 
+    const navigation = screen.getByRole('navigation', {
+      name: 'Profile Navigation',
+    });
+    expect(navigation).toHaveAttribute(
+      'data-public-profile-nav',
+      'profile,listen,tour,about'
+    );
+    fireEvent.click(within(navigation).getByRole('button', { name: 'Events' }));
+    expect(onModeSelect).toHaveBeenCalledWith('tour');
     screen.getByRole('button', { name: 'View Events' }).click();
     expect(onModeSelect).toHaveBeenCalledWith('tour');
   });
@@ -996,7 +991,7 @@ describe('ProfileDesktopSurface', () => {
     expect(screen.getByTestId('mock-desktop-alerts-cta')).toBeInTheDocument();
   });
 
-  it('does not render artist-generic Listen beside an imported catalog', () => {
+  it('lists streaming services in the side rail, not as an artist-generic Listen card, beside an imported catalog', () => {
     render(
       <ProfileDesktopSurface
         artist={artist}
@@ -1030,9 +1025,10 @@ describe('ProfileDesktopSurface', () => {
     expect(
       screen.queryByTestId('profile-primary-tab-artist-streaming')
     ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('mock-static-listen-interface')
-    ).not.toBeInTheDocument();
+    // Every provider stays a visible desktop action (A11y/axe DSP admission).
+    const services = screen.getByTestId('profile-listen-desktop-services');
+    const spotify = within(services).getByRole('button', { name: 'Spotify' });
+    expect(spotify).toBeVisible();
   });
 
   it('routes selected credits into the drawer About destination (JOV-6199)', () => {
@@ -1136,6 +1132,7 @@ describe('ProfileDesktopSurface', () => {
         ]}
         contacts={contacts}
         photoDownloadSizes={[]}
+        tourDates={[upcomingShowFixture]}
         drawerOpen={false}
         drawerView='menu'
         activeMode='profile'
@@ -1176,7 +1173,7 @@ describe('ProfileDesktopSurface', () => {
     ).toBeInTheDocument();
     expect(within(secondary).getAllByRole('link')).toHaveLength(3);
     expect(screen.getByTestId('profile-desktop-payments-card')).toBeVisible();
-    expect(screen.getByText('Pay Tim White directly.')).toBeVisible();
+    expect(screen.getByText('Send support directly.')).toBeVisible();
     screen.getByTestId('profile-desktop-open-payments').click();
     expect(onDrawerViewChange).toHaveBeenCalledWith('pay');
   });

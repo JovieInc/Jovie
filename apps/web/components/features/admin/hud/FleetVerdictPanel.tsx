@@ -4,8 +4,12 @@ import { useQuery } from '@tanstack/react-query';
 import { HudStatusPill } from '@/app/app/(shell)/admin/ops/HudStatusPill';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { type FleetVerdict, fleetVerdict } from '@/lib/ovie/home/fleet-verdict';
+import { OVIE_METRICS_SYNCING_NOTICE } from '@/lib/ovie/metrics-presentation';
 import type { DeliveryLanes } from '@/lib/ovie/shipping-state/contract';
-import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
+import {
+  SHIPPING_STATE_REFETCH_MS,
+  shippingStateQueryOptions,
+} from '@/lib/queries/shipping-state';
 
 const LEVEL_TONE = {
   healthy: 'good',
@@ -18,7 +22,7 @@ const LEVEL_LABEL = {
   healthy: 'Healthy',
   degraded: 'Degraded',
   down: 'Not reporting',
-  unknown: 'Not measured',
+  unknown: 'Syncing',
 } as const;
 
 function reasonCounts(lanes: DeliveryLanes): readonly [string, number][] {
@@ -79,7 +83,13 @@ export function FleetVerdictPanelView({
 }
 
 export function FleetVerdictPanel() {
-  const query = useQuery(shippingStateQueryOptions);
+  const query = useQuery({
+    ...shippingStateQueryOptions,
+    // Same key and cadence as the Shipping observer: React Query dedupes into
+    // one request, and a cold-instance "not measured" answer heals itself.
+    refetchInterval: SHIPPING_STATE_REFETCH_MS,
+    refetchIntervalInBackground: false,
+  });
   const lanes = query.data?.delivery?.lanes ?? null;
   if (query.isPending) {
     return (
@@ -97,7 +107,7 @@ export function FleetVerdictPanel() {
           level: 'unknown',
           headline: query.isError
             ? 'Fleet health unavailable: the shipping read failed. Refresh to retry.'
-            : 'Fleet health not measured',
+            : OVIE_METRICS_SYNCING_NOTICE,
           reasons: [],
           capacity: null,
         }}

@@ -50,6 +50,7 @@ import {
   tableRowModeStyle,
   zIndex,
 } from '../table.styles';
+import { useEffectiveColumnVisibility } from '../utils/empty-columns';
 import { useTableGrouping } from '../utils/useTableGrouping';
 import { UnifiedTableHeader } from './UnifiedTableHeader';
 import { useTableKeyboardNav } from './useTableKeyboardNav';
@@ -538,20 +539,13 @@ function UnifiedTableContent<TData extends RowData>({
     prioritySpecs,
     hasColumnPriority ? scrollRoot : null
   );
-  const effectiveColumnVisibility = useMemo(() => {
-    if (!hasColumnPriority) return columnVisibility;
-    if (columnVisibility == null && autoLayout.hiddenIds.length === 0) {
-      return autoLayout.visibility;
-    }
-    const merged: VisibilityState = { ...(columnVisibility ?? {}) };
-    for (const id of autoLayout.hiddenIds) merged[id] = false;
-    return merged;
-  }, [
-    autoLayout.hiddenIds,
-    autoLayout.visibility,
+  const effectiveColumnVisibility = useEffectiveColumnVisibility({
+    columns,
+    data,
     columnVisibility,
+    autoLayout,
     hasColumnPriority,
-  ]);
+  });
   const columnCompacts = useMemo(() => {
     const primaryColumn = columns.find(column => column.meta?.primary === true);
     const primaryId = primaryColumn

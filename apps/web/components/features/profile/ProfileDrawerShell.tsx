@@ -2,6 +2,7 @@
 
 // @coverage-via apps/web/tests/components/profile/ProfileDrawerShell.interaction.test.tsx
 
+import { Popover, PopoverAnchor, PopoverContent } from '@jovie/ui';
 import { ChevronLeft, X } from 'lucide-react';
 import {
   useCallback,
@@ -46,6 +47,12 @@ interface ProfileDrawerShellProps {
    * a short task sheet ends on its own edge instead of the screen's.
    */
   readonly floating?: boolean;
+  /**
+   * Desktop / pointer-fine presentation: render a compact popover anchored to
+   * this element instead of a bottom sheet. Mobile callers omit it and keep the
+   * sheet. Resolved lazily (`current` is read when the popover opens).
+   */
+  readonly anchorRef?: React.RefObject<HTMLElement | null>;
 }
 
 export function ProfileDrawerShell({
@@ -62,6 +69,7 @@ export function ProfileDrawerShell({
   presentation = 'standalone',
   centerTitle = false,
   floating = false,
+  anchorRef,
 }: ProfileDrawerShellProps) {
   const titleId = useId();
   const [modalNode, attachModalRef] = useState<HTMLElement | null>(null);
@@ -95,6 +103,10 @@ export function ProfileDrawerShell({
     },
     [open, restoreOpenerFocus]
   );
+  const restoreAnchorFocus = useCallback(() => {
+    const anchor = anchorRef?.current;
+    if (anchor?.isConnected) anchor.focus({ preventScroll: true });
+  }, [anchorRef]);
   const subtitleId = useId();
   const accessibleDescriptionId = useId();
   const accessibleDescription = subtitle ?? 'Profile menu and actions.';
@@ -257,6 +269,72 @@ export function ProfileDrawerShell({
   );
 
   const body = <div className={bodyClasses}>{children}</div>;
+
+  if (anchorRef) {
+    const showHeader = isSecondaryHeader || isDirectHeader;
+    return (
+      <Popover open={open} onOpenChange={onOpenChange}>
+        <PopoverAnchor virtualRef={anchorRef as React.RefObject<HTMLElement>} />
+        <PopoverContent
+          align='end'
+          side='bottom'
+          sideOffset={8}
+          testId={dataTestId}
+          aria-labelledby={titleId}
+          className='w-80 max-w-80'
+          onCloseAutoFocus={event => {
+            event.preventDefault();
+            restoreAnchorFocus();
+          }}
+          onInteractOutside={event => {
+            // The trigger toggles the popover itself; closing here first would
+            // make its click reopen it.
+            const target = event.target;
+            if (target instanceof Node && anchorRef.current?.contains(target)) {
+              event.preventDefault();
+            }
+          }}
+        >
+          <h2 id={titleId} className='sr-only'>
+            {title}
+          </h2>
+          {showHeader ? (
+            <div
+              className='flex items-center gap-1 px-1 pb-1.5 pt-0.5'
+              data-testid='profile-popover-header'
+            >
+              {isSecondaryHeader ? (
+                <button
+                  type='button'
+                  onClick={onBack}
+                  className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-colors duration-subtle hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+                  aria-label='Back'
+                  data-testid='profile-drawer-back-button'
+                >
+                  <ChevronLeft className='h-4 w-4' />
+                </button>
+              ) : null}
+              <p
+                aria-hidden='true'
+                className={cn(
+                  'truncate text-sm font-semibold tracking-tight text-primary-token',
+                  !isSecondaryHeader && 'pl-2.5'
+                )}
+              >
+                {title}
+              </p>
+            </div>
+          ) : null}
+          <div
+            className='max-h-96 overflow-y-auto overscroll-contain px-0.5'
+            data-testid='profile-popover-body'
+          >
+            {children}
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  }
 
   if (presentation === 'embedded') {
     if (!open) {

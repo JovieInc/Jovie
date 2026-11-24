@@ -21,7 +21,8 @@ export type OneRecGapThemeId =
   | 'upcoming-sentence-days'
   | 'planning-menu-not-a-move'
   | 'collab-draft-one'
-  | 'do-it-calls-tool';
+  | 'do-it-calls-tool'
+  | 'promise-draft-not-a-move';
 
 export interface OneRecGapCheck {
   readonly id: OneRecGapThemeId;
@@ -29,9 +30,14 @@ export interface OneRecGapCheck {
   readonly detail?: string;
 }
 
-/** Relative-time cues that prove the opener used days-left, not a bare date. */
+/**
+ * Relative-time cues that prove the opener used days-left, not a bare calendar
+ * date. Includes bare "Friday" (and "this Friday") so quality-bar openers like
+ * "Night Swim is out Friday" fail-close only when the title or cue is missing —
+ * not when the weekday is named without the word "this".
+ */
 export const DAYS_LEFT_CUE_PATTERN =
-  /\b(?:tomorrow|today|tonight|in\s+\d+\s+days?|this\s+friday|\d+\s+days?\s+(?:left|out|away))\b/i;
+  /\b(?:tomorrow|today|tonight|in\s+\d+\s+days?|in\s+(?:a\s+)?(?:couple|few|two|three|four|five|six|seven)\s+days?|(?:this\s+)?friday|\d+\s+days?\s+(?:left|out|away))\b/i;
 
 /**
  * Planning menus that score next_action ≤1 even when an UPCOMING title appears.
@@ -39,6 +45,9 @@ export const DAYS_LEFT_CUE_PATTERN =
  */
 export const PLANNING_MENU_NOT_A_MOVE_PATTERNS: readonly RegExp[] = [
   /\bsay the word and i can help\b/i,
+  /\bsay the word and i(?:'|’)?ll\b/i,
+  /\blet me build the [\s\S]{0,60}(?:plan|launch)\b/i,
+  /\bwant me to (?:build|draft|start|plan|run)\b/i,
   /\bsmart links,\s*release plan\b/i,
   /\brelease plan,\s*promo strategy\b/i,
   /\bpromo strategy,?\s*or a pitch\b/i,
@@ -58,6 +67,31 @@ export const COLLAB_DRAFT_ONE_PATTERNS: readonly RegExp[] = [
   /\bdraft(?:ing)? (?:a |the )?(?:collab(?:orator)? |outreach |pitch ).{0,80}\bfor\b/i,
   /\bone (?:outreach|collab) (?:move|draft)\b/i,
   /\bdraft(?:ed|ing)? .{0,60}\b(?:outreach|collab(?:oration)?|pitch)\b.{0,40}\b(?:artist|for)\b/i,
+];
+
+/**
+ * Clear draft-ask cases (ASS-100 live 44983916780): ad-copy / outreach /
+ * playlist pitch. Promise-only "I will draft that and hold" stubs fail
+ * next_action + grounding when the artist already asked for the artifact.
+ */
+export const DRAFT_ASK_NOW_CASE_IDS: ReadonlySet<string> = new Set([
+  'ad-copy-presave-budget',
+  'ad-copy-ig-traffic',
+  'ad-copy-tip-boost',
+  'ad-copy-lapsed',
+  'specialist-outreach',
+  'specialist-posts-ig',
+  'playlist-ambient-evening',
+]);
+
+/**
+ * ASS-95 empty-reply fallback + close variants: promise to draft with no
+ * artifact body. Exact live red on ad-copy-presave-budget / specialist-outreach.
+ */
+export const PROMISE_ONLY_DRAFT_PATTERNS: readonly RegExp[] = [
+  /^i will draft that and hold it for your yes\.?\s*i do not send, post, or spend until you confirm\.?\s*$/i,
+  /^i(?:'|’)ll draft that and hold(?: it)? for your yes\b[\s\S]{0,120}$/i,
+  /^i will draft that and hold\b[\s\S]{0,120}$/i,
 ];
 
 function stripLeadingGreeting(text: string): string {
@@ -104,6 +138,12 @@ export function draftsOneCollabTarget(text: string): boolean {
   return COLLAB_DRAFT_ONE_PATTERNS.some(pattern => pattern.test(text));
 }
 
+/** True when the reply is only a hold-promise with no draft body. */
+export function isPromiseOnlyDraft(text: string): boolean {
+  const trimmed = text.trim();
+  return PROMISE_ONLY_DRAFT_PATTERNS.some(pattern => pattern.test(trimmed));
+}
+
 export function doItCallsExpectedTool(
   toolCalls: readonly { readonly name: string }[],
   expectedTool: string
@@ -120,6 +160,7 @@ export function runOneRecGapChecks(
   options?: {
     readonly upcomingTitle?: string;
     readonly requireCollabDraftOne?: boolean;
+    readonly requireDraftAskNow?: boolean;
     readonly expectedTool?: string;
     readonly toolCalls?: readonly { readonly name: string }[];
   }
@@ -154,6 +195,17 @@ export function runOneRecGapChecks(
       detail: ok
         ? undefined
         : 'collab reply did not draft one target (pick-menu or multi-candidate)',
+    });
+  }
+
+  if (options?.requireDraftAskNow) {
+    const ok = !isPromiseOnlyDraft(text);
+    checks.push({
+      id: 'promise-draft-not-a-move',
+      ok,
+      detail: ok
+        ? undefined
+        : 'clear draft ask got promise-only hold stub (no draft body)',
     });
   }
 

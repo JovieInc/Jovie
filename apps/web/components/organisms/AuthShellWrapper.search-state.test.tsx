@@ -133,8 +133,8 @@ vi.mock('@/lib/queries/useChatCapabilitiesQuery', () => ({
   }),
 }));
 vi.mock('@/lib/queries/cache-isolation', () => ({ applyCacheScope: vi.fn() }));
-vi.mock('@/features/workspace-lock/WorkspaceLockScreen', () => ({
-  WorkspaceLockScreen: () => <div>Unlock Ovie</div>,
+vi.mock('@/lib/app-shell/WorkspaceLockScreenLazy', () => ({
+  WorkspaceLockScreenLazy: () => <div>Unlock Ovie</div>,
 }));
 vi.mock('@/lib/workspace-lock/workspace-lock', () => ({
   getWorkspacePrivacyLockState: privacyState,

@@ -38,6 +38,19 @@ export function canaryResetConfigured(
   return !!(environment.CRON_SECRET && environment.SYNTHETIC_PASSAGE_KEY);
 }
 
+/**
+ * The endpoint's 409 when the fixed claim-walk canary has no account in this
+ * environment yet. The walk answers it by signing the canary up through the
+ * real email-code flow (`provisionClaimCanary` in the spec), so no person
+ * ever has to create the account by hand.
+ */
+export class ClaimCanaryNotProvisionedError extends Error {
+  constructor(detail: string) {
+    super(`canary reset HTTP 409: ${detail}`);
+    this.name = 'ClaimCanaryNotProvisionedError';
+  }
+}
+
 /** POST /api/internal/canary/reset and assert it completed. */
 export async function resetClaimCanary({
   request,
@@ -57,15 +70,30 @@ export async function resetClaimCanary({
     run: runTag.slice(0, 64),
     ttlSeconds: 300,
   });
+  const bypassSecret = process.env.PLAYWRIGHT_VERCEL_BYPASS_SECRET;
   const response = await request.post(`${origin}/api/internal/canary/reset`, {
     headers: {
       authorization: `Bearer ${cronSecret}`,
       'x-jovie-synthetic-passage': token,
+      // Exact `*.vercel.app` postdeploy targets are behind Vercel Authentication.
+      // Without the bypass header, Playwright follows the SSO redirect to an
+      // HTML 200 and a status-only check would soft-pass a no-op reset.
+      ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
     },
   });
+  const contentType = (response.headers()['content-type'] ?? '').toLowerCase();
+  const bodyText = await response.text();
+  if (response.status() === 409 && /not provisioned/iu.test(bodyText)) {
+    throw new ClaimCanaryNotProvisionedError(bodyText.slice(0, 300));
+  }
   if (response.status() !== 200) {
     throw new Error(
-      `canary reset HTTP ${response.status()}: ${(await response.text()).slice(0, 300)}`
+      `canary reset HTTP ${response.status()}: ${bodyText.slice(0, 300)}`
+    );
+  }
+  if (!contentType.includes('application/json')) {
+    throw new Error(
+      `canary reset returned non-JSON (${contentType || 'missing content-type'}): ${bodyText.slice(0, 200)}`
     );
   }
 }

@@ -10,7 +10,7 @@
  *
  *   node scripts/shipping-slo-report.mjs report [--input raw.json]
  *          [--workflows ci.yml,...] [--days 21] [--write-latest]
- *          [--ratchet] [--json out.json]
+ *          [--ratchet] [--json out.json] [--lanes lanes-view.json]
  *       Collect GitHub signals (or read a previously-collected raw snapshot),
  *       compute rolling 7d p50/p95 metrics, evaluate them against the
  *       committed baseline, and print a verdict. Options:
@@ -45,8 +45,12 @@ import {
   appendDailyHistory,
   buildGistSloBlock,
   ciWalltimeByEvent,
+  doraGistBlock,
+  doraMetrics,
   evaluateShippingSlo,
+  flattenDora,
   flattenMetrics,
+  lanesFlowBlock,
   leadTimeByLane,
   leadTimeByProvider,
   mergeQueueStats,
@@ -435,6 +439,7 @@ export function buildReport(
     stageManifest = null,
     ciCapacity = null,
     mergeQueueSpeed = null,
+    lanesView = null,
   } = {}
 ) {
   const nowMs = typeof now === 'number' ? now : Date.parse(now);
@@ -494,6 +499,26 @@ export function buildReport(
         ),
     }),
   };
+  // DORA keys from the controller runs the stage collector already reads.
+  // A snapshot taken before unsuccessful runs were kept would undercount
+  // failed deployments, so it reads as not measured rather than as healthy.
+  const controllers = raw.stages?.controllers;
+  metrics.dora = doraMetrics({
+    runs: controllers
+      ? [
+          ...(controllers.production ?? []),
+          ...(controllers.productionUnsuccessful ?? []),
+        ]
+      : undefined,
+    mergedPrs: merged,
+    sinceMs,
+    nowMs,
+    controllerSource: raw.stages?.sources?.['github-controller'] ?? null,
+    missing:
+      controllers && !Array.isArray(controllers.productionUnsuccessful)
+        ? 'unsuccessful production controller runs not collected'
+        : null,
+  });
   const blogPublishLatency = buildBlogPublishLatency(raw);
 
   // Top offenders for regression-issue bodies: slowest PRs by lead time and
@@ -526,6 +551,7 @@ export function buildReport(
   const flat = {
     ...flattenMetrics(metrics),
     ...flattenCiRounds(metrics.ciRounds),
+    ...flattenDora(metrics.dora),
   };
   // When no verification evidence was collected at all, a 0 is a collector
   // gap, not a throughput signal — null the derived keys so the evaluator
@@ -583,6 +609,10 @@ export function buildReport(
     }
     gistSlo.stages = buildStageSummary(stageTimings);
   }
+  // DORA four keys and per-lane flow in the one central snapshot. The lanes
+  // block is filled from the lanes doctor's view (work_lane.py `view()`).
+  gistSlo.dora = doraGistBlock(metrics.dora, flat);
+  gistSlo.lanes = lanesFlowBlock(lanesView, { nowMs });
   // Escape tracking (scripts/review-escapes.mjs) writes its snapshot before
   // this report runs; Summer reads it through the same lanes status feed.
   if (existsSync(ESCAPES_PATH)) {
@@ -660,6 +690,10 @@ export function buildReport(
       timelines: Object.keys(raw.timelines ?? {}).length,
       deployments: (raw.deployments ?? []).length,
       productionVerifications: (raw.productionVerifications ?? []).length,
+      productionControllerRuns: controllers
+        ? (controllers.production?.length ?? 0) +
+          (controllers.productionUnsuccessful?.length ?? 0)
+        : null,
       blogContentPrs: blogPublishLatency.sampleCount,
     },
     offenders: { slowestPrs: leadTimeRows, slowestCiRuns: slowRuns },
@@ -799,10 +833,22 @@ export async function main(args = process.argv.slice(2)) {
   } catch {
     // No merge-queue speed sample this run; the SLO report is unaffected.
   }
+  // Lanes doctor view ({team: {at, lanes}}), written where the doctor runs.
+  let lanesView = null;
+  const lanesPath = argValue(args, '--lanes', null);
+  if (lanesPath)
+    try {
+      lanesView = JSON.parse(readFileSync(lanesPath, 'utf8'));
+    } catch (error) {
+      console.error(
+        `[shipping-slo] warn: lanes view unreadable: ${error.message}`
+      );
+    }
   const report = buildReport(raw, baseline, {
     stageManifest,
     ciCapacity,
     mergeQueueSpeed,
+    lanesView,
   });
 
   let baselineDoc = baseline;

@@ -68,6 +68,10 @@ import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
 import { ProfileDesktopSurface } from './ProfileDesktopSurface';
 import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
+import {
+  getModeFromUrl,
+  useCanonicalProfileMode,
+} from './useCanonicalProfileMode';
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
@@ -204,25 +208,13 @@ function getInitialModeFromLocation(
   return modeParam === null ? fallbackMode : getProfileMode(modeParam);
 }
 
+// First client render matches the server; both sync in an effect post-hydration.
 function getInitialDrawerPresentation(): ProfileSurfacePresentation {
-  // Keep the first client render identical to the server render. The responsive
-  // presentation is synced in an effect immediately after hydration.
   return 'standalone';
 }
 
 function getInitialIsDesktopLayout(): boolean {
-  // Keep the first client render identical to the server render. The responsive
-  // layout is synced in an effect immediately after hydration.
   return false;
-}
-
-function getModeFromUrl(): ProfileMode {
-  if (globalThis.window === undefined) {
-    return 'profile';
-  }
-
-  const modeParam = new URLSearchParams(globalThis.location.search).get('mode');
-  return modeParam === null ? 'profile' : getProfileMode(modeParam);
 }
 
 function getModeFromDrawerView(view: DrawerView): ProfileMode | null {
@@ -355,8 +347,10 @@ export function ProfileCompactTemplate({
   const [requestedMode, setRequestedMode] = useState<ProfileMode>(() =>
     getInitialModeFromLocation(mode, false)
   );
+  useCanonicalProfileMode(requestedMode, setRequestedMode, tourDates.length);
   // Strip detector wake for the history effect below (see the effect).
   const [historyWakeTick, setHistoryWakeTick] = useState(0);
+  const desktopMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const revealNotificationsRef = useRef<(() => void) | null>(null);
   const closeResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const drawerOpenRef = useRef(initialDrawerView !== null);
@@ -1262,6 +1256,7 @@ export function ProfileCompactTemplate({
               <ProfileDesktopSurface
                 presentation='embedded'
                 overlaysEnabled={isDesktopLayout}
+                menuButtonRef={desktopMenuButtonRef}
                 onReady={handleDesktopSurfaceReady}
                 artist={artist}
                 socialLinks={socialLinks}
@@ -1312,6 +1307,7 @@ export function ProfileCompactTemplate({
                 onOpenChange={setCreditsOpen}
                 credits={visibleReleaseCredits}
                 presentation='embedded'
+                anchorRef={desktopMenuButtonRef}
               />
             </div>
           ) : null

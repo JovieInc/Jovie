@@ -238,6 +238,13 @@ export async function importMissingAppleMusicReleases(
       } catch {
         // Outside a request scope (scripts/tests); TTL refresh covers it.
       }
+      const { syncProfileCoverAccentThemeBestEffort } = await import(
+        '@/lib/profile/sync-cover-accent.server'
+      );
+      await syncProfileCoverAccentThemeBestEffort(
+        creatorProfileId,
+        'apple_music_import'
+      );
     }
   } catch (error) {
     result = {

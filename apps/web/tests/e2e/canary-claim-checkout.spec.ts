@@ -1,20 +1,22 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { PRODCERT_CLAIM_CANARY_EMAIL } from '@/lib/synthetic/prodcert-identities';
 import {
+  ClaimCanaryNotProvisionedError,
   canaryResetConfigured,
   resetClaimCanary,
 } from './helpers/canary-reset-client';
+import { ensureUserIsFree } from './helpers/ensure-user-is-free';
 import {
   createCheckoutSession,
   createSignedStripeWebhook,
   detachCustomerPaymentMethods,
-  ensureUserIsFree,
   expireRunOwnedTestCheckoutSession,
   getBillingStatus,
   getRequiredStripeTestContext,
   materializeTestCheckoutCompletion,
   postStripeWebhook,
+  vercelProtectionBypassHeaders,
 } from './helpers/stripe-helpers';
 import {
   certStep,
@@ -68,6 +70,39 @@ recordCertCapabilities({
     'cone-activation-continue-without-rescue',
   ],
 });
+
+/**
+ * Sign the fixed claim-walk canary up through the real production
+ * email-code flow. Used once per environment, when the reset endpoint
+ * reports the account missing; every later run just resets it.
+ */
+async function provisionClaimCanary(page: Page): Promise<void> {
+  await page.goto(APP_ROUTES.SIGNIN, { waitUntil: 'domcontentloaded' });
+  const { submitButton } = await prepareProductionAuthEmailForm(
+    page,
+    PRODCERT_CLAIM_CANARY_EMAIL
+  );
+  const requestedAtMs = Date.now();
+  await submitButton.click();
+  const codeInput = page
+    .locator('form[data-auth-email-code-step="code"]')
+    .first()
+    .locator(
+      '[data-testid="otp-autofill-input"], input[name="code"], input[autocomplete="one-time-code"], input[inputmode="numeric"]'
+    )
+    .first();
+  await expect(codeInput).toBeVisible({ timeout: 15_000 });
+  const code = await waitForProductionAuthOtp({
+    email: PRODCERT_CLAIM_CANARY_EMAIL,
+    startedAtMs: requestedAtMs,
+  });
+  const signedIn = page.waitForURL(
+    url => !url.pathname.startsWith(APP_ROUTES.SIGNIN),
+    { timeout: 30_000 }
+  );
+  await codeInput.fill(code);
+  await signedIn;
+}
 
 test.describe('Canary claim checkout producer (Stripe test mode)', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
@@ -139,7 +174,19 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
       );
     }
 
-    await resetClaimCanary({ request: page.request, origin, runTag: tag });
+    try {
+      await resetClaimCanary({ request: page.request, origin, runTag: tag });
+    } catch (error) {
+      if (!(error instanceof ClaimCanaryNotProvisionedError)) throw error;
+      // First run in this environment: the canary has no account yet.
+      // Create it through the REAL email-code signup (the canary address is
+      // admitted and its code is read from the auth table, exactly like the
+      // per-run new user), then reset it into its pre-claim state. Durable:
+      // no person ever has to sign this account up by hand.
+      await provisionClaimCanary(page);
+      await page.context().clearCookies();
+      await resetClaimCanary({ request: page.request, origin, runTag: tag });
+    }
 
     try {
       // Real production sign-in as the fixed claim-walk canary (fresh OTP).
@@ -182,9 +229,16 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
         'checkout',
         'cone-checkout-launches-owned-context',
         async () => {
-          const start = await page.request.get('/claim/start?new=1', {
-            maxRedirects: 0,
-          });
+          // Use the live page origin (often jov.ie after OTP), not Playwright
+          // baseURL pinned to the protected exact deployment URL.
+          const liveOrigin = new URL(page.url()).origin;
+          const start = await page.request.get(
+            `${liveOrigin}/claim/start?new=1`,
+            {
+              maxRedirects: 0,
+              headers: vercelProtectionBypassHeaders(),
+            }
+          );
           expect(start.status()).toBe(307);
           const cookies = await page.context().cookies();
           expect(cookies.find(c => c.name === 'jv_claim_flow')?.value).toBe(

@@ -72,6 +72,7 @@ jobs:
             scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
             scripts/lib/ci-typecheck-overlap.mjs
+            scripts/lib/source-guard-order.mjs
             scripts/lib/ci-fast-skip-lanes.mjs
             scripts/lib/ci-source-guard-pool.mjs
             scripts/lib/merged-with-base-pool-config.mjs
@@ -580,6 +581,7 @@ jobs:
             scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
             scripts/lib/ci-typecheck-overlap.mjs
+            scripts/lib/source-guard-order.mjs
             scripts/lib/ci-fast-skip-lanes.mjs
             scripts/lib/ci-source-guard-pool.mjs
             scripts/lib/merged-with-base-pool-config.mjs
@@ -874,6 +876,7 @@ jobs:
             scripts/lib/repo-hygiene-limits.mjs
             scripts/ci-fast-lanes.mjs
             scripts/lib/ci-typecheck-overlap.mjs
+            scripts/lib/source-guard-order.mjs
             scripts/lib/ci-fast-skip-lanes.mjs
             scripts/lib/ci-source-guard-pool.mjs
             scripts/lib/merged-with-base-pool-config.mjs
@@ -1023,6 +1026,7 @@ jobs:
             scripts/lib/test-planner-contract-tests.mjs
             scripts/ci-fast-lanes.mjs
             scripts/lib/ci-typecheck-overlap.mjs
+            scripts/lib/source-guard-order.mjs
             scripts/lib/ci-fast-skip-lanes.mjs
             scripts/lib/ci-source-guard-pool.mjs
             scripts/lib/merged-with-base-pool-config.mjs
@@ -1093,3 +1097,30 @@ jobs:
           COMMENT_BODY=$(cat "$RUNNER_TEMP/hosted-terminal/comment.md")
           export COMMENT_BODY
           bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" rolling-ci-dispatch "$COMMENT_BODY"
+
+  # Nothing fails without a repair or a success (JOV-14467): a red main run opens or updates this
+  # workflow's repair issue and the next green resolves it.
+  report-outcome:
+    name: Report outcome
+    needs: [plan, prepare, test, commit, finish, terminal]
+    if: ${{ always() && github.ref == 'refs/heads/main' && github.event_name != 'workflow_dispatch' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            .github/actions
+            .nvmrc
+            packages/api-client
+            scripts/lib
+            scripts/remediation-signal-intake.mjs
+      - uses: ./.github/actions/report-outcome
+        with:
+          results: ${{ toJSON(needs) }}
+          linear-api-key: ${{ secrets.LINEAR_API_KEY }}
+          intake-disabled: ${{ vars.REMEDIATION_INTAKE_DISABLED }}

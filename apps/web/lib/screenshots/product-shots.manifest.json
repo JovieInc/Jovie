@@ -4,7 +4,7 @@
     "profile-hero-desktop": {
       "width": 1640,
       "height": 1172,
-      "sourceHash": "4ffcfde391c8abdcdb0f0071727208fc12a0385282b58c098854d15faad3c960",
+      "sourceHash": "6560b91cb9ffa643fc7d93a32b069917db940b51c6c5e818f7487c308b2567eb",
       "specHash": "431d2bbda1f7a334f405179ebdc85d1f63359bf2683879cf776aa248037d998c",
       "renderedAt": "2026-11-05T21:47:18.256Z",
       "sources": [
@@ -22,10 +22,10 @@
         "webp": 43542
       },
       "sourceEquivalence": {
-        "capturedSourceHash": "46c710b30e3fd924481d76fad35b99dbc46116ff06be80180f2179bc67e744b0",
-        "sourceCommit": "jov-14240",
-        "change": "homepage-profile-preview-fixture.ts now reads TIM_WHITE_PROFILE.publicProfileHandle (tim) instead of .handle (timwhite). Image bytes stay the prior capture: the product-shot crop still paints the previous handle string until a dedicated re-render PR; this PR only refreshes the live fixture + marketing catalog phone PNG used on /solutions/artists.",
-        "evidence": "code-diff of homepage-profile-preview-fixture.ts; catalog PNG tim-white-profile-live-mobile.png recaptured separately for marketing"
+        "capturedSourceHash": "4ffcfde391c8abdcdb0f0071727208fc12a0385282b58c098854d15faad3c960",
+        "sourceCommit": "jov-14244",
+        "change": "ProfileIdentityHeader wraps avatar/title in React ViewTransition for route morph (JOV-14244). Image bytes stay the prior capture: product-shot render uses prefers-reduced-motion and default=none, so static crop pixels are unchanged. Merged with JOV-14241: homepage-profile-preview-fixture.ts also retargets the events-empty showcase helper and drawerView to menu; the cropped routes do not use state=events-empty, so captured pixels stay the prior render.",
+        "evidence": "code-diff of ProfileIdentityHeader.tsx; ViewTransition default=none + reduced-motion in shots:render"
       }
     },
     "setup-claim-handle": {
@@ -72,7 +72,7 @@
     "setup-share-profile": {
       "width": 764,
       "height": 568,
-      "sourceHash": "4dd22d0be44c03fa1ea538c10e0c92925d79748b1f19e0bf8789bb8549b404a5",
+      "sourceHash": "2f331c43fa9416f4a8be898b9637e4216e37c077314edb4b3352b469284d3168",
       "specHash": "b5e7b8c2e7283ac396ec5dfc619fad20ad240bb90a4f1c4cd23a2ef7f9d8b881",
       "renderedAt": "2026-11-17T03:01:03.193Z",
       "sources": [
@@ -89,7 +89,7 @@
       "sourceEquivalence": {
         "capturedSourceHash": "4dd22d0be44c03fa1ea538c10e0c92925d79748b1f19e0bf8789bb8549b404a5",
         "sourceCommit": "jov-14240",
-        "change": "homepage-profile-preview-fixture.ts now reads TIM_WHITE_PROFILE.publicProfileHandle (tim) instead of .handle (timwhite). Image bytes stay the prior capture: the product-shot crop still paints the previous handle string until a dedicated re-render PR; this PR only refreshes the live fixture + marketing catalog phone PNG used on /solutions/artists.",
+        "change": "homepage-profile-preview-fixture.ts now reads TIM_WHITE_PROFILE.publicProfileHandle (tim) instead of .handle (timwhite). Image bytes stay the prior capture: the product-shot crop still paints the previous handle string until a dedicated re-render PR; this PR only refreshes the live fixture + marketing catalog phone PNG used on /solutions/artists. Merged with JOV-14241: homepage-profile-preview-fixture.ts also retargets the events-empty showcase helper and drawerView to menu; the cropped routes do not use state=events-empty, so captured pixels stay the prior render.",
         "evidence": "code-diff of homepage-profile-preview-fixture.ts; catalog PNG tim-white-profile-live-mobile.png recaptured separately for marketing"
       }
     }

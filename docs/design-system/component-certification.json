@@ -561,15 +561,6 @@
       "frontend-rules",
       "forced-caps"
     ],
-    "apps/web/components/features/profile/ProfileAeoProofClaimCard.tsx": [
-      "ds-owner",
-      "tokens",
-      "states",
-      "tests",
-      "a11y",
-      "frontend-rules",
-      "forced-caps"
-    ],
     "apps/web/components/features/profile/ProfileFooter.tsx": [
       "ds-owner",
       "tokens",
@@ -1717,7 +1708,9 @@
       "permission-denied": "A public read-failure page with no gated action or permission input; the detector matched role='alert' (ErrorTransientRead)."
     },
     "apps/web/app/app/(shell)/DashboardLoadTracker.tsx": {
-      "error": "The tracker returns null in every state. Unreadable or full session storage is caught and falls through to a single tracked event, so there is no failure to draw; DashboardLoadTracker.test.tsx asserts the one event when storage throws and an axe-clean render."
+      "error": "The tracker returns null in every state. Unreadable or full session storage is caught and falls through to a single tracked event, so there is no failure to draw; DashboardLoadTracker.test.tsx asserts the one event when storage throws and an axe-clean render.",
+      "loading": "The tracker draws nothing while the dashboard loads; it only watches the page's own skeletons to time the first fully loaded frame (first-dashboard-ready.ts). The loading faces belong to shell-route-skeleton.tsx and OpportunityInboxRouteSkeleton.tsx, which carry the loading stories.",
+      "offline": "The tracker renders null with or without a network. Its first-dashboard sample goes out by a fire-and-forget beacon that never throws (json-beacon.ts), so an offline load records nothing and shows nothing; first-dashboard-ready.test.ts asserts no sink failure can throw."
     },
     "apps/web/app/app/(shell)/DashboardShellContent.tsx": {
       "loading": "DashboardShellContent is an async server component awaited inside the shell layout's Suspense boundary, so it never renders a loading frame of its own; that fallback is shell-route-skeleton.tsx, which carries the loading stories.",
@@ -1897,7 +1890,7 @@
       "offline": "It never fetches: the items stream in from the server page, and its isLoading flag only drives the static ActivityTableSkeleton (the Loading story)."
     },
     "apps/web/components/features/admin/AdminReadUnavailable.tsx": {
-      "loading": "The 'Reading current data\u2026' copy shows only while the Retry transition's router.refresh() is in flight; it has no prop, so no static story can hold it. Retry is driven in AdminReadUnavailable.test.tsx and AdminReadUnavailable.certificate.test.tsx.",
+      "loading": "The 'Reading current data…' copy shows only while the Retry transition's router.refresh() is in flight; it has no prop, so no static story can hold it. Retry is driven in AdminReadUnavailable.test.tsx and AdminReadUnavailable.certificate.test.tsx.",
       "offline": "It never fetches: Retry only calls router.refresh(), and a read that failed for lack of connectivity reaches it as the caller's message, which ErrorReadFailed shows.",
       "permission-denied": "It has no gated action or permission input; the detector matched role='status'. A read blocked by a missing admin step-up renders AdminVerificationRequired instead (its PermissionDeniedStepUpRequired story)."
     },
@@ -2098,9 +2091,6 @@
     },
     "apps/web/components/features/profile/DesktopQrOverlayClient.tsx": {
       "loading": "The wrapper renders null on the server and on first paint by design (JOV-2273, no CSR bailout), then shows the icon once matchMedia resolves in an effect, so there is no loading chrome to capture; DesktopQrOverlayClient.test.tsx asserts the empty server render."
-    },
-    "apps/web/components/features/profile/ProfileAeoProofClaimCard.tsx": {
-      "empty": "The proof claim card renders no collection: one heading, one note and one CTA, all required props; the detector matched the items-start class."
     },
     "apps/web/components/features/profile/ProfilePrimaryTabPanel.tsx": {
       "offline": "The panel fetches nothing itself: releases, tour dates and the catalog result arrive as props from the server-rendered profile, and a failed catalog read arrives as catalogLoadFailed (ErrorCatalogLoadFailed, whose Try Again reloads the page). The detector matched the word skeleton in the visitorAssignmentResolved doc comment, which LoadingAlertsAssignment shows."
@@ -2740,7 +2730,7 @@
       "empty": "The banner renders one card from scalar props (title, description, CTA) and owns no collection that could be empty; omitted copy falls back to defaults (PartialCustomTitle story). The detector matched the items-center class."
     },
     "apps/web/components/shell/LoopBtn.tsx": {
-      "long-content": "The button renders an icon and a one-glyph badge; its accessible name is derived from the three-value mode ('Loop: off', 'Loop: track 1', 'Loop: section \u2934'), so no caller text can grow. Every mode has a story."
+      "long-content": "The button renders an icon and a one-glyph badge; its accessible name is derived from the three-value mode ('Loop: off', 'Loop: track 1', 'Loop: section ⤴'), so no caller text can grow. Every mode has a story."
     },
     "apps/web/components/shell/LyricsRouteSkeleton.tsx": {
       "empty": "The skeleton takes no props: it maps a fixed constant list of six placeholder lines, so there is no collection that can be empty. The detector matched that .map call.",
@@ -2765,8 +2755,19 @@
       "permission-denied": "An app update has no account, role or gated action: every signed-in or signed-out viewer gets the same pill and status line. The detector matched the sr-only role='status' line.",
       "rtl-overflow": "Its visible UI is RuntimeUpdatePill, pinned with the logical end-4 offset and a truncating label, so a right-to-left document moves it to the opposite corner without overflow; the status line is sr-only."
     },
+    "apps/web/components/shell/SidebarDock.tsx": {
+      "partial": "Every card renders from complete props its owner builds (the updater control, the changelog entry, the install prompt). The one partial input was a track with only a title, and audio no longer renders here: it lives in the sidebar O, whose own test covers a title with no artist."
+    },
     "apps/web/components/shell/SidebarInboxLink.tsx": {
       "offline": "The link never fetches: pending work arrives from the server as availability, and an unreadable status falls back to the plain Inbox bell (StatusUnavailable). Opening it is a normal navigation. The detector matched the pending flag."
+    },
+    "apps/web/components/shell/SidebarOPresence.tsx": {
+      "loading": "The one lazy part is the OStroke chunk, and its loading fallback is the same rest glyph the O draws everywhere else, so nothing shows or shifts while it loads; SidebarOPresence.test.tsx waits for the chunk before asserting the pose.",
+      "offline": "The O and its title button never fetch: playback and the updater are owned upstream and arrive as props, so a lost connection changes nothing here.",
+      "empty": "The O is one link and a fixed status slot with no collection; the idle story is its empty face and the slot is always laid out. The detector matched the items-center layout classes.",
+      "partial": "It takes a few flags, a link and an optional player and has no partially loaded data; a title with no artist is the one partial player and is covered by its test. Updating shows the one partial state it has.",
+      "permission-denied": "The link and the status carry no gated action or permission input; the detector matched role='status', which only announces updater work.",
+      "rtl-overflow": "Its copy is the fixed English 'Updating' and a track title, both in a truncating flex slot that mirrors with the sidebar's direction; the row uses logical spacing and no left or right offsets."
     },
     "apps/web/components/shell/Sparkline.tsx": {
       "error": "The chart takes points from its caller and never loads anything; the detector matched the var(--color-error-text) stroke token for the down trend.",
@@ -2839,6 +2840,10 @@
     "packages/ui/atoms/button.tsx": {
       "empty": "Button renders one label slot and never a collection; the only .map( is over the morph face's two fixed edges ('left', 'right'), so there is no empty-data state.",
       "offline": "Button never fetches or mutates; its owner sets loading or disabled while a request is unavailable, which the Loading and PermissionDenied stories already show."
+    },
+    "packages/ui/atoms/card.tsx": {
+      "loading": "By the card intent contract (.claude/rules/ui.md, Card intent) a loading state never renders a card: skeletons sit flat on their surface. The partial state (PartialData story) covers cached content that is refreshing.",
+      "error": "By the card intent contract an error state never renders a card: error copy and its retry sit flat on the surface. Card holds no error branch; the offline content state is the only failure face it carries."
     },
     "packages/ui/atoms/close-button.tsx": {
       "empty": "CloseButtonIcon always renders the same X glyph and sr-only 'Close' text and takes no collection; the detector matched the items-center utility class.",
@@ -2930,6 +2935,12 @@
     "packages/ui/atoms/tooltip.tsx": {
       "empty": "TooltipContent only renders caller-supplied children and owns no data or collection; callers omit the Tooltip rather than open an empty one, and the detector matched the items-center utility class.",
       "partial": "Tooltip is a presentational overlay for caller content; its optional props (contentVariant, showArrow, testId, tone) are styling flags with defaults, so there is no partially-present data."
+    },
+    "packages/ui/brand/OStroke.tsx": {
+      "partial": "The mark takes a pose name and optional numbers, never partially loaded data; a missing label simply makes it decorative, which is its default.",
+      "long-content": "It draws one path in a fixed square and carries no text, so no caller content can grow it; the label, when given, is a screen-reader title only.",
+      "permission-denied": "A graphic has no account, role or gated action.",
+      "rtl-overflow": "It is a symmetric glyph with no text and no left or right offsets, so a right-to-left sidebar mirrors its box and nothing else."
     },
     "packages/ui/confirm-dialog.tsx": {
       "offline": "ConfirmDialog never fetches; it awaits the caller's onConfirm, so a request that fails offline surfaces as the ErrorState story's retry alert and connectivity is owned by the caller.",

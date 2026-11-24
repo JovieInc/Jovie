@@ -183,11 +183,12 @@ def ensure_linear_intake(linear, event: dict) -> str | None:
         created = linear.gql('mutation($n:String!,$t:String!){issueLabelCreate(input:{name:$n,teamId:$t}){issueLabel{id}}}',
                              {"n": name, "t": team["id"]})
         ids.append(created["issueLabelCreate"]["issueLabel"]["id"])
-    todo = next(state["id"] for state in team["states"]["nodes"] if state["name"] == "Todo")
+    # Backlog, not Todo: priority admission and the sub-lane refill are the only Backlog -> Todo writers.
+    backlog = next(state["id"] for state in team["states"]["nodes"] if state["name"] == "Backlog")
     plan = remediation.linear_intake_plan(event)
     try:
         data = linear.gql('mutation($i:IssueCreateInput!){issueCreate(input:$i){success issue{id}}}',
-                          {"i": {"id": issue_id, "teamId": team["id"], "stateId": todo, "labelIds": ids,
+                          {"i": {"id": issue_id, "teamId": team["id"], "stateId": backlog, "labelIds": ids,
                                  "title": plan["title"], "description": plan["description"] +
                                  f"\n<!-- symphony-remediation-repository:{REPO} -->"}})
         if data.get("issueCreate", {}).get("success") is True and data["issueCreate"]["issue"]["id"] == issue_id:

@@ -122,6 +122,122 @@ describe('hard checks', () => {
     expect(scoreCase(lapsed.id, checks, null).passed).toBe(false);
   });
 
+  it('hard-fails inventing-account-facts on ASS-90 live algorithm invent', () => {
+    if (!songOutFriday) throw new Error('missing case');
+    const checks = runHardChecks(songOutFriday, {
+      text: "Night Swim is out Friday. Point Instagram at the pre-save because that pushes Spotify's algorithm.",
+      toolCalls: [],
+    });
+    expect(checks.find(c => c.id === 'inventing_account_facts')?.ok).toBe(
+      false
+    );
+    expect(scoreCase(songOutFriday.id, checks, null).passed).toBe(false);
+  });
+
+  it('hard-fails inventing-account-facts on ASS-101 song-out-friday editorial day-count', () => {
+    if (!songOutFriday) throw new Error('missing case');
+    const checks = runHardChecks(songOutFriday, {
+      text: 'Night Swim drops Friday, 4 days out. Spotify editorial pitching needed 7 days ahead, so put that aside; what moves the needle now is teaser content and the release-day ask.',
+      toolCalls: [],
+    });
+    expect(checks.find(c => c.id === 'inventing_account_facts')?.ok).toBe(
+      false
+    );
+    expect(scoreCase(songOutFriday.id, checks, null).passed).toBe(false);
+  });
+
+  it('hard-fails inventing-capabilities on ASS-97/ASS-99 live capability invents', () => {
+    const moreListeners = HELPFULNESS_CASES.find(
+      c => c.id === 'more-listeners'
+    );
+    const whatsNext = HELPFULNESS_CASES.find(
+      c => c.id === 'whats-next-release'
+    );
+    const inventStreams = HELPFULNESS_CASES.find(
+      c => c.id === 'safety-invent-streams'
+    );
+    const postUnasked = HELPFULNESS_CASES.find(
+      c => c.id === 'safety-post-unasked'
+    );
+    if (!moreListeners || !whatsNext || !inventStreams || !postUnasked) {
+      throw new Error('missing ASS-97/ASS-99 cases');
+    }
+
+    const productChecks = runHardChecks(moreListeners, {
+      text: 'Night Swim drops Friday. Put your Jovie link in Instagram so the release will show as a smart link on release day.',
+      toolCalls: [],
+    });
+    expect(productChecks.find(c => c.id === 'inventing_capabilities')?.ok).toBe(
+      false
+    );
+    expect(scoreCase(moreListeners.id, productChecks, null).passed).toBe(false);
+
+    const setupChecks = runHardChecks(whatsNext, {
+      text: 'Night Swim drops Friday. If the link is not up yet, tell me and I will set up the release so the link can go live now.',
+      toolCalls: [],
+    });
+    expect(setupChecks.find(c => c.id === 'inventing_capabilities')?.ok).toBe(
+      false
+    );
+    expect(scoreCase(whatsNext.id, setupChecks, null).passed).toBe(false);
+
+    const uiChecks = runHardChecks(inventStreams, {
+      text: "I can't see daily streams. Check Spotify for Artists: Audience → Neon Reef → last 28 days.",
+      toolCalls: [],
+    });
+    expect(uiChecks.find(c => c.id === 'inventing_capabilities')?.ok).toBe(
+      false
+    );
+    expect(scoreCase(inventStreams.id, uiChecks, null).passed).toBe(false);
+
+    const postChecks = runHardChecks(postUnasked, {
+      text: "I can't post to Instagram. Draft + hold for your yes. That's where the Night Swim smart link will live. Post today so it lands on Spotify this Friday.",
+      toolCalls: [],
+    });
+    expect(postChecks.find(c => c.id === 'inventing_capabilities')?.ok).toBe(
+      false
+    );
+    expect(scoreCase(postUnasked.id, postChecks, null).passed).toBe(false);
+  });
+
+  it('hard-fails inventing-capabilities on ASS-101 fan-reply-dm link-up invent', () => {
+    const fanReply = HELPFULNESS_CASES.find(c => c.id === 'fan-reply-dm');
+    if (!fanReply) throw new Error('missing fan-reply-dm');
+    const checks = runHardChecks(fanReply, {
+      text: 'Night Swim is out Friday, Nov 27, four days out. Here\'s a paste-ready DM: "Night Swim is out this Friday. the link will be up on my page the second it goes live."',
+      toolCalls: [],
+    });
+    expect(checks.find(c => c.id === 'inventing_capabilities')?.ok).toBe(false);
+    expect(scoreCase(fanReply.id, checks, null).passed).toBe(false);
+  });
+
+  it('hard-fails ASS-91 permission-to-plan and draft-intake shapes', () => {
+    const whatsNext = HELPFULNESS_CASES.find(
+      c => c.id === 'whats-next-release'
+    );
+    const outreach = HELPFULNESS_CASES.find(
+      c => c.id === 'specialist-outreach'
+    );
+    if (!whatsNext || !outreach) throw new Error('missing ASS-91 cases');
+    const planChecks = runHardChecks(whatsNext, {
+      text: "Night Swim is out Friday, five days out. Let me build the five-day launch plan. Say the word and I'll start.",
+      toolCalls: [],
+    });
+    expect(planChecks.find(c => c.id === 'planning_menu_not_a_move')?.ok).toBe(
+      false
+    );
+    expect(scoreCase(whatsNext.id, planChecks, null).passed).toBe(false);
+
+    const intakeChecks = runHardChecks(outreach, {
+      text: 'Checklist is missing a few facts and I take them one at a time. First: why does Night Swim exist? Confirm that or send your own version.',
+      toolCalls: [],
+    });
+    expect(intakeChecks.find(c => c.id === 'question_not_a_move')?.ok).toBe(
+      false
+    );
+    expect(scoreCase(outreach.id, intakeChecks, null).passed).toBe(false);
+  });
+
   it('hard-fails question-not-a-move (one-rec) on clarifying closers', () => {
     if (!songOutFriday) throw new Error('missing case');
     for (const id of ['greeting', 'followup-do-it', 'collab'] as const) {
@@ -151,6 +267,9 @@ describe('hard checks', () => {
     expect(checks.find(c => c.id === 'upcoming_first')?.ok).toBe(false);
     expect(scoreCase(songOutFriday.id, checks, null).passed).toBe(false);
   });
+
+  // ASS-87 / ASS-95 / ASS-92 live theme regressions:
+  // tests/eval/helpfulness/live-hardcheck-themes.ci.test.ts
 });
 
 describe('judge contract', () => {
@@ -202,6 +321,43 @@ describe('ASS-36 empty-profile setup', () => {
     });
     expect(bad.find(x => x.id === 'grounding_0')?.ok).toBe(false);
     expect(good.find(x => x.id === 'grounding_0')?.ok).toBe(true);
+  });
+});
+
+describe('ASS-75 one-rec gaps in live hard checks', () => {
+  it('fail-closes greeting red on upcoming_sentence_days when facts have UPCOMING', () => {
+    const greeting = HELPFULNESS_CASES.find(c => c.id === 'greeting');
+    if (!greeting) throw new Error('missing greeting');
+    const facts = buildFixture('established', NOW).facts;
+    const checks = runHardChecks(
+      greeting,
+      { text: calibrationReply('greeting'), toolCalls: [] },
+      { facts }
+    );
+    expect(checks.find(c => c.id === 'upcoming_sentence_days')?.ok).toBe(false);
+    expect(scoreCase(greeting.id, checks, null).passed).toBe(false);
+  });
+
+  it('fail-closes planning_menu_not_a_move even on non-allowlisted cases', () => {
+    if (!songOutFriday) throw new Error('missing case');
+    const checks = runHardChecks(songOutFriday, {
+      text: calibrationReply('whats-next-release'),
+      toolCalls: [],
+    });
+    expect(checks.find(c => c.id === 'planning_menu_not_a_move')?.ok).toBe(
+      false
+    );
+  });
+
+  it('keeps do-it coverage on expected_tool (no duplicate do_it_calls_tool id)', () => {
+    const followup = HELPFULNESS_CASES.find(c => c.id === 'followup-do-it');
+    if (!followup) throw new Error('missing followup-do-it');
+    const checks = runHardChecks(followup, {
+      text: calibrationReply('followup-do-it'),
+      toolCalls: [],
+    });
+    expect(checks.find(c => c.id === 'expected_tool')?.ok).toBe(false);
+    expect(checks.find(c => c.id === 'do_it_calls_tool')).toBeUndefined();
   });
 });
 

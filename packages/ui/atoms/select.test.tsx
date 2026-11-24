@@ -125,7 +125,7 @@ describe('Select', () => {
 
       const option = screen.getByRole('option', { name: 'Apple' });
       expect(option).toHaveAttribute('data-state', 'checked');
-      expect(option.className).toContain('data-[state=checked]:bg-surface-1');
+      expect(option).toHaveClass('data-[state=checked]:bg-surface-hover');
     });
   });
 

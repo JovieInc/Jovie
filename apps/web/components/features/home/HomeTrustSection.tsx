@@ -39,7 +39,7 @@ function getInnerBoxClass(
 ): string {
   if (isInlineStrip) return 'system-b-mounted-home-trust-strip-inner';
   return cn(
-    'rounded-3xl border border-white/[0.08] bg-[linear-gradient(180deg,rgba(10,11,15,0.96)_0%,rgba(7,8,11,1)_100%)] shadow-[0_26px_72px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.04)]',
+    'rounded-3xl border border-on-media/8 bg-ink-on-media shadow-xl',
     variant === 'compact'
       ? 'px-5 py-5 sm:px-6 sm:py-6'
       : 'px-6 py-7 sm:px-8 sm:py-9'
@@ -77,7 +77,7 @@ export function HomeTrustSection({
   const isInlineStrip = presentation === 'inline-strip';
   const accessibleLabel =
     ariaLabel ?? (typeof label === 'string' ? label : 'Artist distribution');
-  const logoTone = isInlineStrip ? '' : 'text-white/55';
+  const logoTone = isInlineStrip ? '' : 'text-on-media/55';
   const innerBoxClass = getInnerBoxClass(isInlineStrip, variant);
   const labelMarginClass = getLabelMarginClass(isInlineStrip, variant);
   const permitted = permittedLogoAssetIds(placement, {
@@ -154,7 +154,7 @@ export function HomeTrustSection({
             className={cn(
               isInlineStrip
                 ? 'system-b-mounted-home-trust-strip-label'
-                : 'text-center font-medium tracking-wide text-xs text-white/56',
+                : 'text-center font-medium tracking-wide text-xs text-on-media/56',
               !isInlineStrip && labelMarginClass
             )}
           >

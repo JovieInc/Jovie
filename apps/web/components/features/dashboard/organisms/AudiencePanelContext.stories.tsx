@@ -9,7 +9,7 @@ function AudiencePanelDemo() {
   const { mode, toggle, close } = useAudiencePanel();
   return (
     <div className='flex items-center gap-2'>
-      {(['contact', 'analytics', 'ai-crawlers'] as const).map(panel => (
+      {(['contact', 'analytics'] as const).map(panel => (
         <Button
           key={panel}
           size='sm'
