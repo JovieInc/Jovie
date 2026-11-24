@@ -166,14 +166,14 @@ describe('buildStoryFirstBottleneck', () => {
     kind: 'certification',
     step: 'checkout_payment_entitlement',
     tone: 'bad',
-    text: 'Checkout fails certification, so nobody can pay yet',
+    text: 'The latest available certification report for checkout shows a failed check. See Certifications for details.',
     detailsHref: APP_ROUTES.ADMIN_CERTIFICATIONS,
     since: '2026-11-18T00:00:00.000Z',
     nextAction: 'Certify payment path',
     observedAt: '2026-11-21T00:00:00.000Z',
   };
 
-  it('names the revenue blocker as the hero story', () => {
+  it('names checkout certification as the hero story and links its evidence', () => {
     const story = buildStoryFirstBottleneck({
       revenue: checkout,
       revenueRead: true,
@@ -186,11 +186,30 @@ describe('buildStoryFirstBottleneck', () => {
     });
     expect(story).toMatchObject({
       tone: 'bad',
-      eyebrow: 'Bottleneck · Checkout',
-      title: 'Checkout is blocking revenue',
+      eyebrow: 'Certification · Checkout',
+      title: 'Checkout certification needs attention',
+      body: checkout.text,
+      detailsHref: APP_ROUTES.ADMIN_CERTIFICATIONS,
       needs: 'Certify payment path',
       since: 'Nov 18',
       moving: { label: 'Checkout cert' },
+    });
+  });
+
+  it.each([
+    ['homepage_entry', 'Homepage', 'Homepage entry'],
+    ['onboarding_auth_claim', 'Claim', 'Sign-up and claim'],
+    ['activation_dashboard', 'Activation', 'First use after paying'],
+  ] as const)('names %s as a certification issue', (step, eyebrow, name) => {
+    const story = buildStoryFirstBottleneck({
+      revenue: { ...checkout, id: `certification:${step}`, step },
+      revenueRead: true,
+      constraint: null,
+      highlight: null,
+    });
+    expect(story).toMatchObject({
+      eyebrow: `Certification · ${eyebrow}`,
+      title: `${name} certification needs attention`,
     });
   });
 
@@ -290,6 +309,7 @@ describe('buildStoryFirstBottleneck', () => {
     expect(story.title).toBe('Claim Attempted is blocking revenue');
     expect(story.body).toBe(funnel.text);
     expect(story.title).not.toBe(story.body);
+    expect(story.detailsHref).toBe(APP_ROUTES.ADMIN_GROWTH);
   });
 
   it('reads clear when revenue and shipping are quiet', () => {
