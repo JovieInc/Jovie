@@ -15,6 +15,12 @@ import {
 } from './constants';
 import { recordLeadFunnelEvent } from './funnel-events';
 import { pipelineLog, pipelineWarn } from './pipeline-logger';
+import {
+  mergePublicPageSnapshot,
+  type ObservedPublicLinkPage,
+  qualifyObservedPublicLink,
+  readObservedPublicPage,
+} from './public-link-observation';
 import { qualifyLead } from './qualify';
 import { qualifyFromSearchEvidence } from './search-evidence';
 
@@ -87,6 +93,14 @@ async function processOneLead(
     if (!lead) {
       pipelineLog('qualify', 'Lead not found in DB', { leadId });
       return 'error';
+    }
+
+    // A caller-supplied public page is scored here. That runs before the
+    // search-only path: Feature.fm and Linkfire rows keep the linktree enum
+    // default, and an empty search snapshot would otherwise defer them.
+    const publicPage = readObservedPublicPage(lead.signalSnapshot);
+    if (publicPage) {
+      return await qualifyFromPublicPage(leadId, lead, publicPage);
     }
 
     // Linktree and Beacons pages are never read; their leads are scored from
@@ -257,6 +271,72 @@ async function deferLead(leadId: string): Promise<'deferred'> {
     // Rotation is best-effort; the lead stays discovered either way.
   }
   return 'deferred';
+}
+
+/**
+ * Scores a lead from a public page the caller already fetched. Does not fetch
+ * the page, approve the lead, or start outreach.
+ */
+async function qualifyFromPublicPage(
+  leadId: string,
+  lead: SearchOnlyLead,
+  page: ObservedPublicLinkPage
+): Promise<'qualified' | 'disqualified'> {
+  const decision = qualifyObservedPublicLink(page, {
+    alternateHandle: lead.sourceHandle ?? lead.linktreeHandle,
+  });
+  const now = new Date();
+  const qualified = decision.outcome === 'qualified';
+  await db
+    .update(leads)
+    .set({
+      status: decision.outcome,
+      ...(decision.sourcePlatform
+        ? { sourcePlatform: decision.sourcePlatform }
+        : {}),
+      displayName: cleanScrapedDisplayName(decision.displayName),
+      bio: decision.bio,
+      musicToolsDetected: decision.musicToolsDetected,
+      fitScore: decision.fitScore,
+      fitScoreBreakdown: decision.fitScoreBreakdown,
+      disqualificationReason: decision.disqualificationReason,
+      hasRepresentation: decision.hasRepresentation,
+      representationSignal: decision.representationSignal,
+      hasSpotifyLink: decision.hasSpotifyLink,
+      spotifyUrl: decision.spotifyUrl,
+      hasInstagram: decision.hasInstagram,
+      instagramHandle: decision.instagramHandle,
+      allLinks: decision.allLinks,
+      hasTrackingPixels: decision.hasTrackingPixels,
+      sourceUrl: decision.sourceUrl,
+      sourceHandle: decision.sourceHandle,
+      signalSnapshot: mergePublicPageSnapshot(lead.signalSnapshot, page),
+      qualifiedAt: qualified ? now : undefined,
+      disqualifiedAt: qualified ? undefined : now,
+      updatedAt: now,
+    })
+    .where(eq(leads.id, leadId));
+
+  await recordLeadFunnelEvent(
+    {
+      leadId,
+      eventType: decision.outcome,
+      ...acquisitionFunnelAttribution(
+        experimentIdForLeadSource(
+          decision.sourcePlatform ?? lead.sourcePlatform
+        )
+      ),
+      metadata: {
+        qualificationSource: 'public_page',
+        disqualificationReason: decision.disqualificationReason,
+        fitScore: decision.fitScore,
+        musicToolsDetected: decision.musicToolsDetected,
+        hasRepresentation: decision.hasRepresentation,
+      },
+    },
+    { idempotent: true }
+  );
+  return decision.outcome;
 }
 
 /**

@@ -2,6 +2,7 @@
 /**
  * App Store graphics for the Jovie iOS app (JOV-4481).
  *
+ *   node apps/ios/scripts/app-store-graphics.mjs boot-status
  *   node apps/ios/scripts/app-store-graphics.mjs capture --app <Jovie.app> [--out <dir>]
  *   node apps/ios/scripts/app-store-graphics.mjs render [--out <dir>]
  *   node apps/ios/scripts/app-store-graphics.mjs verify [--out <dir>]
@@ -20,9 +21,14 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { inflateSync } from 'node:zlib';
 import {
+  BOOT_STATUS_TIMEOUT_MS,
   budgetRecap,
   CAPTURE_BUDGET_MS,
+  durationUntil,
   guardScreenStart,
+  LAUNCH_TIMEOUT_MS,
+  runBounded,
+  SCREEN_DEADLINE_MS,
   settleDeadline,
   sleep,
   withDeadline,
@@ -341,25 +347,22 @@ function sha256(buffer) {
 }
 
 function run(command, args, options = {}) {
-  return execFileSync(command, args, {
-    encoding: 'utf8',
-    timeout: 180_000,
-    ...options,
-  });
+  const { timeout = 180_000, cwd, stdio, env } = options;
+  return runBounded(command, args, { timeout, cwd, stdio, env });
 }
 
 /** For simctl calls whose failure means "already in that state". */
-function runQuietly(command, args) {
+async function runQuietly(command, args) {
   try {
-    run(command, args, { stdio: 'ignore' });
+    await run(command, args, { stdio: 'ignore' });
   } catch {
     // Already booted, not installed, or not running.
   }
 }
 
-function simulatorUdid(name) {
+async function simulatorUdid(name) {
   const { devices } = JSON.parse(
-    run('xcrun', ['simctl', 'list', 'devices', 'available', '-j'])
+    await run('xcrun', ['simctl', 'list', 'devices', 'available', '-j'])
   );
   for (const [runtime, list] of Object.entries(devices)) {
     if (!runtime.includes('SimRuntime.iOS')) continue;
@@ -391,9 +394,8 @@ async function captureSettled({ udid, file, spec, screen, settleMs }) {
   let difference = 1;
   while (true) {
     const shotStart = Date.now();
-    run('xcrun', ['simctl', 'io', udid, 'screenshot', '--type=png', file], {
-      stdio: 'ignore',
-    });
+    const shot = ['simctl', 'io', udid, 'screenshot', '--type=png', file];
+    await run('xcrun', shot, { stdio: 'ignore' });
     shotMs += Date.now() - shotStart;
     const buffer = readFileSync(file);
     frames++;
@@ -414,18 +416,28 @@ async function captureSettled({ udid, file, spec, screen, settleMs }) {
   }
 }
 
-/** Launch one fixture on the simulator and settle its capture. */
-async function launchAndSettle({ udid, file, spec, screen, settleMs }) {
-  runQuietly('xcrun', ['simctl', 'terminate', udid, BUNDLE_ID]);
-  run('xcrun', [
-    'simctl',
-    'launch',
-    udid,
-    BUNDLE_ID,
-    screen.launchArgument,
-    'UITest',
-  ]);
-  return captureSettled({ udid, file, spec, screen, settleMs });
+async function launchAndSettle({
+  udid,
+  file,
+  spec,
+  screen,
+  settleMs,
+  launchTimeoutMs,
+  settleDurationMs,
+}) {
+  const timeout = launchTimeoutMs?.() ?? LAUNCH_TIMEOUT_MS;
+  await runQuietly('xcrun', ['simctl', 'terminate', udid, BUNDLE_ID]);
+  console.log(`launching ${screen.id}`);
+  await run(
+    'xcrun',
+    ['simctl', 'launch', udid, BUNDLE_ID, screen.launchArgument, 'UITest'],
+    { timeout }
+  );
+  return withDeadline(
+    captureSettled({ udid, file, spec, screen, settleMs }),
+    settleDurationMs?.() ?? SCREEN_DEADLINE_MS,
+    `${screen.id} capture`
+  );
 }
 
 export { settleDeadline, sleep } from './capture-budget.mjs';
@@ -433,21 +445,25 @@ export { renderHtml } from './store-graphic-html.mjs';
 
 export const CAPTURE_ATTEMPTS = 2;
 
-/**
- * Capture one fixture screen with one bounded relaunch (JOV-7952). A first
- * launch on a cold simulator races system services and can stall before the
- * fixture seeds; the relaunch retries that window without loosening the
- * settle or content checks. The dimension contract stays with the caller.
- */
+/** One bounded relaunch (JOV-7952). A budget miss is not retried. */
 export async function captureScreen(
-  { udid, file, spec, screen, settleMs },
-  { attempt = launchAndSettle, attempts = CAPTURE_ATTEMPTS } = {}
+  input,
+  {
+    attempt,
+    attempts = CAPTURE_ATTEMPTS,
+    launchTimeoutMs,
+    settleDurationMs,
+  } = {}
 ) {
+  const runAttempt =
+    attempt ??
+    (args => launchAndSettle({ ...args, launchTimeoutMs, settleDurationMs }));
   let failure;
   for (let tryIndex = 1; tryIndex <= attempts; tryIndex++) {
     try {
-      return await attempt({ udid, file, spec, screen, settleMs });
+      return await runAttempt(input);
     } catch (error) {
+      if (error?.budgetExhausted) throw error;
       failure = error;
     }
   }
@@ -463,16 +479,19 @@ async function capture({
   const startedAt = Date.now();
   const spec = loadStorefront();
   if (!appPath) throw new Error('capture needs --app <path to Jovie.app>');
-  const udid = simulatorUdid(spec.device.simulator);
+  const udid = await simulatorUdid(spec.device.simulator);
   const rawDir = join(out, 'raw');
   mkdirSync(rawDir, { recursive: true });
   const bootStartedAt = Date.now();
-  runQuietly('xcrun', ['simctl', 'boot', udid]);
-  run('xcrun', ['simctl', 'bootstatus', udid, '-b'], { timeout: 600_000 });
+  await runQuietly('xcrun', ['simctl', 'boot', udid]);
+  console.log('waiting for simulator bootstatus');
+  await run('xcrun', ['simctl', 'bootstatus', udid, '-b'], {
+    timeout: 600_000,
+  });
   const bootMs = Date.now() - bootStartedAt;
   console.log(`simulator ready in ${(bootMs / 1000).toFixed(1)}s`);
-  run('xcrun', ['simctl', 'ui', udid, 'appearance', 'dark']);
-  run('xcrun', [
+  await run('xcrun', ['simctl', 'ui', udid, 'appearance', 'dark']);
+  await run('xcrun', [
     'simctl',
     'status_bar',
     udid,
@@ -497,8 +516,8 @@ async function capture({
     '100',
   ]);
   const installStartedAt = Date.now();
-  runQuietly('xcrun', ['simctl', 'uninstall', udid, BUNDLE_ID]);
-  run('xcrun', ['simctl', 'install', udid, appPath]);
+  await runQuietly('xcrun', ['simctl', 'uninstall', udid, BUNDLE_ID]);
+  await run('xcrun', ['simctl', 'install', udid, appPath]);
   const installMs = Date.now() - installStartedAt;
   console.log(`app installed in ${(installMs / 1000).toFixed(1)}s`);
   let captured = 0;
@@ -510,14 +529,18 @@ async function capture({
       total: spec.screens.length,
       startedAt,
     };
-    const screenMs = guardScreenStart({ budgetMs, ...recap });
+    guardScreenStart({ budgetMs, ...recap });
     const file = join(rawDir, `${screen.id}.png`);
+    const remainingMs = () =>
+      durationUntil(guardScreenStart({ budgetMs, ...recap }), Date.now());
     let buffer;
     try {
-      buffer = await withDeadline(
-        captureScreen({ udid, file, spec, screen, settleMs }),
-        screenMs,
-        `${screen.id} capture`
+      buffer = await captureScreen(
+        { udid, file, spec, screen, settleMs },
+        {
+          launchTimeoutMs: () => Math.min(LAUNCH_TIMEOUT_MS, remainingMs()),
+          settleDurationMs: remainingMs,
+        }
       );
     } catch (error) {
       throw new Error(`${error.message} — ${budgetRecap(recap)}`);
@@ -534,7 +557,17 @@ async function capture({
     captured += 1;
     console.log(`captured ${file}`);
   }
-  run('xcrun', ['simctl', 'status_bar', udid, 'clear']);
+  await run('xcrun', ['simctl', 'status_bar', udid, 'clear']);
+}
+
+async function bootStatus({ timeoutMs = BOOT_STATUS_TIMEOUT_MS } = {}) {
+  const spec = loadStorefront();
+  const udid = await simulatorUdid(spec.device.simulator);
+  console.log(`waiting for simulator ${spec.device.simulator} (${udid})`);
+  await run('xcrun', ['simctl', 'bootstatus', udid, '-b'], {
+    timeout: timeoutMs,
+  });
+  console.log('simulator bootstatus finished');
 }
 
 async function render({ out }) {
@@ -589,7 +622,9 @@ async function render({ out }) {
     schema: RECEIPT_SCHEMA,
     sourceHash: sourceHash(),
     marketingVersion: marketingVersion(readRepo(PBXPROJ_PATH)),
-    gitSha: run('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT }).trim(),
+    gitSha: (
+      await run('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT })
+    ).trim(),
     device: spec.device,
     pen: {
       file: spec.pen.file,
@@ -703,7 +738,11 @@ function option(args, name) {
 async function main(argv) {
   const [command, ...args] = argv;
   const out = resolve(option(args, '--out') ?? DEFAULT_OUT);
-  if (command === 'capture') {
+  if (command === 'boot-status') {
+    await bootStatus({
+      timeoutMs: Number(option(args, '--timeout-ms') ?? BOOT_STATUS_TIMEOUT_MS),
+    });
+  } else if (command === 'capture') {
     await capture({
       appPath: option(args, '--app'),
       out,
@@ -716,7 +755,7 @@ async function main(argv) {
     verify({ out });
   } else {
     throw new Error(
-      'usage: app-store-graphics.mjs capture|render|verify [--out dir] [--app Jovie.app]'
+      'usage: app-store-graphics.mjs boot-status|capture|render|verify [--out dir] [--app Jovie.app]'
     );
   }
 }

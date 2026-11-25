@@ -3,6 +3,10 @@
  * (JOV-7250). Providers (fal today) implement `generate`; the pipeline in
  * generate-image.ts owns provenance, the art evaluator gate and the
  * mediaExport.ts seam, so an adapter only turns a prompt into pixels.
+ *
+ * Subsystem lane: `marketing-media` (canonical). Do not add a parallel
+ * adapter tree. Routing inventory: docs/design-system/MEDIA_GENERATION.md
+ * (JOV-13852).
  */
 
 import type { MarketingMediaRecipeId } from '@/data/marketing/mediaRecipes';

@@ -247,6 +247,7 @@ describe('bounded collection correctness', () => {
     });
     expect(s.groupSuccessRate).toBeNull();
     expect(s.mergesPerHour).toBeNull();
+    expect(s.unfinishedGroupRuns).toBeNull();
     expect(s.batchSizeGate.eligible).toBe(false);
     expect(s.criticalPath).toEqual([]);
   });
@@ -268,6 +269,109 @@ it('withholds queue wait percentiles when bounded enqueue history is incomplete'
     collection: { queueEventsComplete: false },
   });
   expect(s.queueWaitSeconds).toEqual({ n: 1, p50: null, p95: null });
+});
+
+describe('native first admission for PRs merged to main', () => {
+  const pr = (number, baseRefName, firstAt, count, lastAt) => ({
+    number,
+    baseRefName,
+    mergedAt: at(1),
+    firstAdmission: { nodes: firstAt ? [{ createdAt: firstAt }] : [] },
+    timelineItems: {
+      totalCount: count,
+      nodes: lastAt ? [{ createdAt: lastAt }] : [],
+    },
+  });
+  /** @param {{ more?: boolean, errors?: Error | { message: string }[] }} [options] */
+  function collectRows(rows, options = {}) {
+    const { more = false, errors } = options;
+    const calls = [];
+    const runs = [
+      run(1, 'failure', 5),
+      run(2, null, 3, 0, { status: 'in_progress' }),
+    ];
+    const summary = collect({
+      repo: 'fixture/repo',
+      now: NOW,
+      hours: 3,
+      gh(args) {
+        if (args[0].includes('/jobs?')) return { jobs: [], total_count: 0 };
+        if (args[0] !== 'graphql') return { workflow_runs: runs };
+        calls.push(args.join(' '));
+        if (errors instanceof Error) throw errors;
+        const search = {
+          nodes: calls.length === 1 ? rows : [],
+          pageInfo: { hasNextPage: more, endCursor: 'next' },
+        };
+        return { errors, data: { search } };
+      },
+    });
+    return { summary, calls };
+  }
+  it('keeps an entry before the window across re-entry when the recent history is truncated', () => {
+    const { summary, calls } = collectRows([
+      pr(1, 'main', at(361), 12, at(4)),
+      pr(2, 'main', null, 0, null),
+      pr(3, 'release', at(3), 1, at(3)),
+    ]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatch(
+      /firstAdmission:\s*timelineItems\([^)]*first:\s*1/
+    );
+    expect(summary.queueWaitSeconds).toEqual({ n: 2, p50: null, p95: null });
+    expect(summary.mainFirstAdmission).toMatchObject({
+      firstEntryToMergeSeconds: { n: 1, p50: 21600, p95: 21600 },
+      mergedPrs: 2,
+      withoutNativeEntry: 1,
+      reenteredPrs: 1,
+      unknownPrs: 0,
+      complete: true,
+    });
+  });
+  it('withholds percentiles for missing or inconsistent boundaries or an incomplete outer inventory', () => {
+    const valid = pr(1, 'main', at(5), 1, at(5));
+    const cohort = (rows, options = {}) =>
+      collectRows(rows, options).summary.mainFirstAdmission;
+    const incomplete = {
+      firstEntryToMergeSeconds: { n: 1, p50: null, p95: null },
+      complete: false,
+    };
+    for (const invalid of [
+      pr(2, 'main', null, 2, at(3)),
+      pr(2, 'main', at(-3), 1, at(3)),
+      pr(2, undefined, at(3), 1, at(3)),
+      pr(2, 'main', at(3), 0, null),
+      pr(2, 'main', at(10), 1, at(3)),
+    ]) {
+      expect(cohort([valid, invalid])).toMatchObject({
+        ...incomplete,
+        unknownPrs: 1,
+      });
+    }
+    expect(cohort([valid, valid])).toMatchObject({
+      ...incomplete,
+      duplicateRows: 1,
+    });
+    expect(cohort([valid], { more: true })).toMatchObject(incomplete);
+  });
+  it('retains CI outcomes when the PR search fails or returns partial data', () => {
+    for (const errors of [
+      new Error('request failed'),
+      [{ message: 'partial' }],
+    ]) {
+      const { summary } = collectRows([], { errors });
+      expect(
+        summary.mainFirstAdmission.firstEntryToMergeSeconds.p50
+      ).toBeNull();
+      expect(summary.collection.mergedPrsComplete).toBe(false);
+      expect(summary.collection.mergedPrSearchError).toBeTruthy();
+      expect(summary.unfinishedGroupRuns).toBe(1);
+      expect(summary.groupOutcomes['24h'].failure).toBe(1);
+    }
+    expect(collectRows([null]).summary.collection.mergedPrsComplete).toBe(
+      false
+    );
+  });
 });
 
 it('publishes complete bounded collections and forwards pagination and the 24h coverage window', () => {

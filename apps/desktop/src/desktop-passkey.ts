@@ -101,7 +101,9 @@ export function describeWebAuthnAccounts(
   | { readonly kind: 'choose'; readonly labels: readonly string[] } {
   if (accounts.length === 0) return { kind: 'none' };
   if (accounts.length === 1) {
-    return { kind: 'single', credentialId: accounts[0].credentialId };
+    const only = accounts[0];
+    if (!only) return { kind: 'none' };
+    return { kind: 'single', credentialId: only.credentialId };
   }
   return {
     kind: 'choose',

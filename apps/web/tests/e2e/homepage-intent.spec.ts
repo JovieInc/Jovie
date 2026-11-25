@@ -68,6 +68,39 @@ test.describe('Homepage chat intake — ID-keyed intent store + /start handoff',
     expect(stored.expiresAt).toBeGreaterThan(Date.now());
   });
 
+  test('no-intent /start renders the default walkthrough and a pill starts the chat', async ({
+    page,
+  }) => {
+    // Fix B (signup-intent A/B fallback): a visitor whose signup carried no
+    // intent — no intent_id, nothing stored, no starter_prompt — must land
+    // in the full less-personalized onboarding: the default walkthrough
+    // pills, never an empty chat or a bare composer. No seeding, no
+    // injection: the walkthrough is the production blank-entry state.
+    await page.goto('/start');
+
+    const walkthrough = page.getByTestId('onboarding-starter-walkthrough');
+    await expect(walkthrough).toBeVisible();
+    const pills = page.getByTestId('onboarding-starter-suggestion');
+    await expect(pills).toHaveCount(4);
+    await expect(pills.first()).toHaveText('Find My Spotify Artist');
+
+    await pills.first().click();
+
+    // The pill sends its canonical prompt through the real submit path:
+    // the chat is non-empty with the visitor's first turn.
+    const prompt = "I'm an artist — help me find my Spotify profile.";
+    const userBubble = page.getByTestId('chat-user-bubble');
+    await expect
+      .poll(async () => {
+        if ((await userBubble.count()) > 0) {
+          const bubbleText = await userBubble.first().innerText();
+          if (bubbleText.includes(prompt)) return 'text';
+        }
+        return 'pending';
+      })
+      .toBe('text');
+  });
+
   test('free-form submit stores intent with pillId=null', async ({ page }) => {
     const input = await openHomepageIntentInput(page);
     await input.pressSequentially('something completely custom');

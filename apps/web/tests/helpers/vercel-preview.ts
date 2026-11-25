@@ -218,6 +218,14 @@ export async function assertPlaywrightCookieOriginBoundary(
   );
 }
 
+const primedDeploymentContexts = new WeakSet<BrowserContext>();
+
+export function isOriginBoundVercelBypassPrimed(
+  context: BrowserContext
+): boolean {
+  return primedDeploymentContexts.has(context);
+}
+
 export async function primeOriginBoundVercelBypass(
   context: BrowserContext,
   baseURL: string,
@@ -256,6 +264,7 @@ export async function primeOriginBoundVercelBypass(
         assertPlaywrightCookieOriginBoundary(context, targetUrl, cookies),
     }
   );
+  primedDeploymentContexts.add(context);
 }
 
 export async function primeAuthorizedVercelAliasBypass(

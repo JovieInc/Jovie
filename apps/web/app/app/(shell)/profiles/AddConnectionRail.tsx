@@ -161,7 +161,6 @@ function handleSuggestions(
         creatorName
       );
       if (!candidate) return [];
-
       return [
         {
           ...candidate,
@@ -230,7 +229,7 @@ function ChoiceRow({
     <button
       type='button'
       onClick={onClick}
-      className='group flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-colors duration-fast hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/50'
+      className='group flex w-full items-start gap-3 rounded-lg px-2 py-3 text-left transition-colors duration-fast hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/50'
     >
       <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-2 text-secondary-token group-hover:text-accent'>
         {icon}
@@ -356,6 +355,7 @@ export function AddConnectionRail({
       footerSurface='flat'
       entityHeader={
         <EntityHeader
+          className='px-3 pt-3'
           thumbnail={
             <div className='flex h-8 w-8 items-center justify-center rounded-md bg-surface-2 text-accent'>
               <Plus className='h-4 w-4' aria-hidden />
@@ -389,7 +389,7 @@ export function AddConnectionRail({
       }
     >
       {view === 'home' ? (
-        <DrawerSection sectionKind='details' surface='plain' className='py-1'>
+        <DrawerSection sectionKind='details' surface='plain' className='p-1'>
           <ChoiceRow
             icon={<Link2 className='h-4 w-4' aria-hidden />}
             title='Add Public Profile'
@@ -410,10 +410,10 @@ export function AddConnectionRail({
           title='Public profile'
           sectionKind='details'
           surface='plain'
-          className='flex h-full min-h-0 flex-col'
+          className='flex h-full min-h-0 flex-col px-3'
           contentClassName='flex min-h-0 flex-1 flex-col'
         >
-          <div className='flex min-h-72 flex-1 flex-col gap-3 px-3 pb-2'>
+          <div className='flex min-h-72 flex-1 flex-col gap-3 pb-2'>
             <Input
               aria-label='Public Profile URL'
               aria-controls={

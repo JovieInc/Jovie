@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildProfileAccentCssVars,
   mergeProfileTheme,
+  normalizeProfileAccentHex,
+  PROFILE_ACCENT_ION_FALLBACK,
   readProfileAccentTheme,
 } from '@/lib/profile/profile-theme';
 
@@ -107,8 +109,19 @@ describe('profile theme helpers', () => {
       '--profile-status-pill-bg': expect.stringContaining('rgba'),
       '--profile-rail-dot-active': expect.stringMatching(/^#/),
       '--profile-dock-bg': expect.stringContaining('rgba'),
+      '--profile-cover-accent-line': expect.stringContaining('rgba'),
       '--color-focus-ring': expect.stringMatching(/^#/),
     });
+    expect(vars).not.toHaveProperty('--profile-panel-gradient');
+  });
+
+  it('falls back to ion when accent is missing or invalid', () => {
+    expect(buildProfileAccentCssVars(null)['--profile-accent-primary']).toBe(
+      PROFILE_ACCENT_ION_FALLBACK
+    );
+    expect(normalizeProfileAccentHex('not-a-color')).toBe(
+      PROFILE_ACCENT_ION_FALLBACK
+    );
   });
 
   it('uses AA contrast text for medium-bright accent buttons', () => {

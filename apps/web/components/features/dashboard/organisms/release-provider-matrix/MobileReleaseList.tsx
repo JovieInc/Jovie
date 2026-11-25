@@ -2,6 +2,7 @@
 
 // @coverage-via apps/web/tests/components/release-provider-matrix/MobileReleaseList.test.tsx
 
+import { PlainButton } from '@jovie/ui';
 import { memo, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
@@ -126,7 +127,7 @@ const SwipeActions = memo(function SwipeActions({
 
   return (
     <div className='flex h-full items-stretch'>
-      <button
+      <PlainButton
         type='button'
         onClick={() => onEdit(release)}
         className={cn(
@@ -137,9 +138,9 @@ const SwipeActions = memo(function SwipeActions({
       >
         <Icon name='PencilLine' className='h-4 w-4' aria-hidden='true' />
         <span className={mobileReleaseTokens.swipeActions.label}>Edit</span>
-      </button>
+      </PlainButton>
       {canGenerateAlbumArt && onGenerateAlbumArt ? (
-        <button
+        <PlainButton
           type='button'
           onClick={() => onGenerateAlbumArt(release)}
           className={cn(
@@ -150,10 +151,10 @@ const SwipeActions = memo(function SwipeActions({
         >
           <Icon name='Sparkles' className='h-4 w-4' aria-hidden='true' />
           <span className={mobileReleaseTokens.swipeActions.label}>Art</span>
-        </button>
+        </PlainButton>
       ) : null}
       {onGeneratePitch ? (
-        <button
+        <PlainButton
           type='button'
           onClick={() => onGeneratePitch(release)}
           className={cn(
@@ -164,9 +165,9 @@ const SwipeActions = memo(function SwipeActions({
         >
           <Icon name='Sparkles' className='h-4 w-4' aria-hidden='true' />
           <span className={mobileReleaseTokens.swipeActions.label}>Pitch</span>
-        </button>
+        </PlainButton>
       ) : null}
-      <button
+      <PlainButton
         type='button'
         onClick={handleCopy}
         disabled={isLocked || !onCopy}
@@ -188,7 +189,7 @@ const SwipeActions = memo(function SwipeActions({
         <span className={mobileReleaseTokens.swipeActions.label}>
           {isLocked ? lockedLabel : 'Link'}
         </span>
-      </button>
+      </PlainButton>
     </div>
   );
 });

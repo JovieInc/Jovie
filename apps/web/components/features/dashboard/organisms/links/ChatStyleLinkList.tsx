@@ -147,9 +147,13 @@ export const ChatStyleLinkList = React.memo(function ChatStyleLinkList<
                       transform: `translateY(${virtualRow.start}px)`,
                     }}
                   >
-                    <div className='flex items-center gap-3 rounded-lg border border-subtle bg-surface-0 px-4 py-3 opacity-60'>
+                    {/* The dim lives on the skeleton tile only: an opacity
+                     * modifier on the row composites the secondary-token
+                     * text below the 4.5:1 AA floor on this surface (axe
+                     * color-contrast). */}
+                    <div className='flex items-center gap-3 rounded-lg border border-subtle bg-surface-0 px-4 py-3'>
                       <div className='h-4 w-4' />
-                      <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-lg skeleton' />
+                      <div className='h-10 w-10 shrink-0 items-center justify-center rounded-lg skeleton opacity-60' />
                       <div className='flex-1'>
                         <div className='text-app text-secondary-token'>
                           Adding...

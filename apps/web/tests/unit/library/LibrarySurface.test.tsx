@@ -44,7 +44,7 @@ import {
   applyCacheScope,
   resetCacheIsolationForTests,
 } from '@/lib/queries/cache-isolation';
-import { expectDesktop32Control } from './library-control-assertions';
+import { expectDesktop28Control } from './library-control-assertions';
 import { buildAsset } from './library-surface-fixtures';
 
 Element.prototype.scrollIntoView = vi.fn();
@@ -484,6 +484,10 @@ describe('LibrarySurface', () => {
       resolve(process.cwd(), LIBRARY_SURFACE_SOURCE),
       'utf8'
     );
+    const statusBarSource = readFileSync(
+      resolve(process.cwd(), 'app/app/(shell)/library/library-status-bar.tsx'),
+      'utf8'
+    );
 
     expect(source).toContain('LIBRARY_CONTENT_INSET_CLASS');
     expect(source).toContain(
@@ -492,7 +496,8 @@ describe('LibrarySurface', () => {
     expect(source).toContain('LIBRARY_GRID_DENSITY_LAYOUT');
     expect(source).toContain('useLibraryGridDensity');
     expect(source).toContain("containerClassName='h-full'");
-    expect(source).toContain('h-(--app-shell-footer-row-height)');
+    expect(source).toContain('LibraryStatusBar');
+    expect(statusBarSource).toContain('h-(--app-shell-footer-row-height)');
     expect(source).not.toContain('px-2.5 pb-2.5 pt-1');
     expect(source).not.toMatch(/grid gap-2\.5/u);
   });
@@ -661,7 +666,7 @@ describe('LibrarySurface', () => {
     );
   });
 
-  it('keeps desktop Library toolbar controls at 32px without desktop 44px hit targets', () => {
+  it('keeps desktop Library toolbar controls at 28px without desktop 44px hit targets', () => {
     window.matchMedia = vi.fn().mockImplementation(query => ({
       matches: query === '(min-width: 1024px)',
       media: query,
@@ -676,32 +681,31 @@ describe('LibrarySurface', () => {
 
     renderLibrary([buildAsset()]);
 
-    expectDesktop32Control(screen.getByRole('tab', { name: 'All' }));
-    expectDesktop32Control(screen.getByRole('tab', { name: 'Ideas' }));
-    expectDesktop32Control(
+    expectDesktop28Control(screen.getByRole('tab', { name: 'All' }));
+    expectDesktop28Control(screen.getByRole('tab', { name: 'Ideas' }));
+    expectDesktop28Control(
       screen.getByRole('button', { name: /^Show filters/i }),
       { square: true }
     );
-    expectDesktop32Control(
+    expectDesktop28Control(
       screen.getByRole('button', { name: 'Sort by Release Date' }),
       { square: true }
     );
-    expectDesktop32Control(
+    expectDesktop28Control(
       screen.getByRole('button', { name: /Small cards/u }),
       { square: true }
     );
-    expectDesktop32Control(
+    expectDesktop28Control(
       screen.getByRole('button', { name: /Medium cards/u }),
       { square: true }
     );
-    expectDesktop32Control(
+    expectDesktop28Control(
       screen.getByRole('button', { name: /Large cards/u }),
       { square: true }
     );
     // The view slider (2026-09-25 header/toolbar IA) is a single fixed-size
-    // sliding control rather than three independently-densified buttons, so
-    // it intentionally stays at the founder-specified 28px visible size
-    // instead of picking up the desktop 32px density override.
+    // sliding control rather than three independently-densified buttons. It
+    // sits at the same 28px visible size as every other desktop control.
     for (const name of ['Grid View', 'List View', 'Table View']) {
       const visibleOption = screen
         .getByRole('radio', { name })
@@ -932,23 +936,6 @@ describe('LibrarySurface', () => {
       ).toBeInTheDocument();
       expect(screen.queryByTestId('library-status-glyph-release-a')).toBeNull();
     });
-  });
-
-  it('marks archived work with the canceled glyph on rows and tiles (#10384)', () => {
-    renderLibrary([
-      buildAsset({
-        status: 'released',
-        approvalStatus: 'archived',
-      }),
-    ]);
-
-    const glyph = () => screen.getByTestId('library-status-glyph-release-1');
-    expect(glyph()).toHaveAccessibleName('Archived');
-    expect(glyph()).toHaveAttribute('data-status-glyph', 'canceled');
-
-    clickGridView();
-
-    expect(glyph()).toHaveAccessibleName('Archived');
   });
 
   it('keeps Approval Status once in the detail rail editor only', () => {
@@ -2149,14 +2136,14 @@ describe('LibrarySurface', () => {
     expect(next).toHaveFocus();
   });
 
-  it('gives two-line list rows the two-line row budget so the artist line is not clipped', () => {
+  it('keeps list rows on the canonical dense 32px budget', () => {
     renderLibrary([buildAsset()]);
     fireEvent.click(screen.getByRole('radio', { name: 'List View' }));
 
     const table = screen
       .getByTestId('library-release-row-release-1')
       .closest('table');
-    expect(table?.style.getPropertyValue('--table-row-height')).toBe('56px');
+    expect(table?.style.getPropertyValue('--table-row-height')).toBe('32px');
   });
 
   it('gives each tile one meta line: type then year, or type then price', () => {
@@ -2667,7 +2654,7 @@ describe('LibrarySurface', () => {
     const filterTrigger = screen.getByRole('button', {
       name: /^Show filters/i,
     });
-    expectDesktop32Control(filterTrigger, { square: true });
+    expectDesktop28Control(filterTrigger, { square: true });
     expect(
       screen.queryByTestId('library-filter-active-indicator')
     ).not.toBeInTheDocument();
@@ -2855,7 +2842,7 @@ describe('LibrarySurface', () => {
     const contentFrame = screen.getByTestId('library-content-frame');
     const before = contentFrame.getBoundingClientRect();
     const trigger = screen.getByRole('button', { name: /^Show filters/i });
-    expectDesktop32Control(trigger, { square: true });
+    expectDesktop28Control(trigger, { square: true });
     expect(trigger).toHaveClass(
       'before:h-full',
       'before:min-h-11',

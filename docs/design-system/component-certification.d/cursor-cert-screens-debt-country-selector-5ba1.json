@@ -1,0 +1,13 @@
+{
+  "gates": {
+    "apps/web/components/features/profile/notifications/CountrySelector.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  }
+}

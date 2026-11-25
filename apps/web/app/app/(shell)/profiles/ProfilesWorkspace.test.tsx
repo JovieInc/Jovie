@@ -249,7 +249,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(attempts).toBe(2);
     expect(screen.getByRole('table')).toHaveAttribute(
       'data-table-row-mode',
-      'list'
+      'dense'
     );
     const rowPhoto = within(screen.getByRole('table')).getByTestId(
       'presence-identity-photo'
@@ -1326,10 +1326,10 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     renderWorkspace(data);
 
     const table = screen.getByRole('table');
-    expect(table).toHaveAttribute('data-table-row-mode', 'list');
-    expect(table.style.getPropertyValue('--table-row-height')).toBe('44px');
+    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+    expect(table.style.getPropertyValue('--table-row-height')).toBe('32px');
     expect(table.style.getPropertyValue('--table-cell-content-height')).toBe(
-      '36px'
+      '24px'
     );
     expect(table.parentElement).toHaveClass(
       'overflow-auto',
@@ -1346,17 +1346,19 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     ).toBeInTheDocument();
   });
 
-  it('locks Presence controls to 32px desktop geometry with the 44px hit target on mobile only', () => {
+  it('locks Presence controls to their desktop geometry with the 44px hit target on mobile only', () => {
     renderWorkspace(data);
 
-    // Row overflow action: 44px mobile target, 32px visible on desktop.
+    // Row overflow: shared TableRowOverflowTrigger = IconButton sm (KEEP 28)
+    // with the base Button 44px hit target (taste decisions 5 + 8).
     const rowAction = screen.getByRole('button', {
       name: 'Actions for Spotify',
     });
-    expect(rowAction).toHaveClass('h-11', 'w-11', 'sm:h-8', 'sm:w-8');
+    expect(rowAction).toHaveClass('h-7', 'w-7');
+    expect(rowAction.className).toMatch(/before:h-11/);
     expect(rowAction.className).not.toContain('sm:h-7');
 
-    // Status pill renders at the locked 32px minimum.
+    // Status pill (a badge, not a control) keeps its 32px row minimum.
     const spotifyRow = rowAction.closest('tr');
     const status = within(spotifyRow as HTMLElement)
       .getAllByText('Limit Reached')[0]
@@ -1370,7 +1372,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
 
     // Text controls collapse both hit-target axes on desktop, not just height.
     expect(PRESENCE_BUTTON_DESKTOP_DENSITY.split(' ')).toEqual(
-      expect.arrayContaining(['sm:before:min-h-8', 'sm:before:min-w-0'])
+      expect.arrayContaining(['sm:before:min-h-7', 'sm:before:min-w-0'])
     );
   });
 

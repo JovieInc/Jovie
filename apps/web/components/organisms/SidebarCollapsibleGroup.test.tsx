@@ -50,6 +50,19 @@ describe('SidebarCollapsibleGroup', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
   });
 
+  it('unmounts closed content and restores focus on Escape when opted in', async () => {
+    const user = userEvent.setup();
+    render(<Group defaultOpen={false} dismissOnEscape unmountWhenClosed />);
+    const toggle = screen.getByRole('button', { name: 'Playlists' });
+    expect(screen.queryByRole('link', { name: 'Summer Mix' })).toBeNull();
+    await user.click(toggle);
+    screen.getByRole('link', { name: 'Summer Mix' }).focus();
+    await user.keyboard('{Escape}');
+    expect(toggle).toHaveFocus();
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('link', { name: 'Summer Mix' })).toBeNull();
+  });
+
   it('remembers the open state under its storage key', async () => {
     const user = userEvent.setup();
     const { unmount } = render(<Group storageKey='playlists' />);

@@ -1,0 +1,50 @@
+# Warden Configuration — LOCAL ONLY in this repo.
+#
+# Sentry Warden runs AI code review on the developer machine: the husky hooks
+# (scripts/hooks/warden-local-review.sh) run `warden --staged` before commit
+# and `warden` (branch vs default branch) before push.
+#
+# Triggers are typed `local` on purpose: they match local CLI runs only and
+# NEVER match GitHub events, so Warden cannot become a PR status check,
+# branch-protection rule, or merge gate here. Do not add a `pull_request`
+# trigger or a `.github/workflows/warden.yml` in this repo.
+#
+# Model: Claude Haiku 5.5 for every call (agent and auxiliary), paid by the
+# Anthropic API credits that come with the Claude plan. Set
+# WARDEN_ANTHROPIC_API_KEY in your environment (never ANTHROPIC_API_KEY, and
+# never commit keys); without it the hook skips the review. The model id is
+# newer than Warden's built-in catalog, so the hook supplies
+# scripts/hooks/warden-pi-models.json. Both models are pinned here on purpose:
+# an unpinned auxiliary model falls back to pi's default (an Opus model).
+
+version = 1
+
+# Default settings inherited by all skills
+[defaults]
+runtime = "pi"
+# Severity levels: critical, high, medium, low, info
+# failOn: minimum severity that fails the check
+failOn = "high"
+# reportOn: minimum severity that is reported
+reportOn = "medium"
+# Local review compares this branch to the default branch
+defaultBranch = "main"
+
+[defaults.agent]
+model = "anthropic/claude-haiku-5-5"
+
+[defaults.auxiliary]
+model = "anthropic/claude-haiku-5-5"
+effort = "low"
+
+[[skills]]
+name = "security-review"
+
+[[skills.triggers]]
+type = "local"
+
+[[skills]]
+name = "code-review"
+
+[[skills.triggers]]
+type = "local"

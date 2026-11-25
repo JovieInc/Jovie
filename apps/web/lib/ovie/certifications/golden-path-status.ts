@@ -1,15 +1,21 @@
 import {
-  PROD_GOLDEN_PATH_FRESHNESS_MS,
+  isSurfaceCertifiedOn,
+  ledgerServedSha,
+} from './prod-golden-path-carry';
+import {
   PROD_GOLDEN_PATH_SURFACE_IDS,
   PROD_GOLDEN_PATH_SURFACES,
   type ProdGoldenPathLedger,
+  type ProdGoldenPathReceipt,
+  type ProdGoldenPathSurfaceId,
 } from './prod-golden-path-ledger';
 
 /**
  * Compact production golden-path status for Summer's founder line (2026-11-01: her hourly report
  * said "reader missing" because no read existed). Projects the authoritative production receipts
  * (scripts/prod-cert.mjs -> /api/internal/ovie/golden-path-evidence -> this ledger) per surface:
- * certified (passed inside 24h), expired, failed, blocked or missing. No receipt is never "passed".
+ * certified (its pass belongs to the release the ledger speaks for; JOV-14402, no time window),
+ * expired (a pass for an older release only), failed, blocked or missing. No receipt is never "passed".
  */
 export type GoldenPathSurfaceStatus =
   | 'certified'
@@ -27,7 +33,7 @@ export type GoldenPathStatusSurface = {
   readonly blocker: string | null;
   readonly issueUrl: string | null;
 };
-/** The ten golden-path steps, in journey order, as prod-cert records them in each receipt's checks[]. */
+/** The ten golden-path steps, in journey order. */
 export const GOLDEN_PATH_STEPS = [
   'outreach',
   'claim-landing',
@@ -40,6 +46,7 @@ export const GOLDEN_PATH_STEPS = [
   'paid-value',
   'first-use',
 ] as const;
+export type GoldenPathStepId = (typeof GOLDEN_PATH_STEPS)[number];
 export type GoldenPathStepStatus =
   | 'passed'
   | 'failed'
@@ -48,7 +55,7 @@ export type GoldenPathStepStatus =
   | 'expired'
   | 'missing';
 export type GoldenPathStep = {
-  readonly id: (typeof GOLDEN_PATH_STEPS)[number];
+  readonly id: GoldenPathStepId;
   readonly status: GoldenPathStepStatus;
   readonly surface: string | null;
   /** The fix PR number when the failing surface links one (issueUrl or "fix #N" in the blocker). */
@@ -67,11 +74,154 @@ export type GoldenPathStatus = {
   readonly surfaces: readonly GoldenPathStatusSurface[];
 };
 
+export type ProdCertStepCheckSource = {
+  readonly surface: ProdGoldenPathSurfaceId;
+  readonly checkIds: readonly string[];
+};
+
+/**
+ * Authoritative mapping from `GOLDEN_PATH_STEPS` to the check IDs emitted by
+ * `scripts/lib/prod-cert.mjs` + `scripts/lib/prod-cert-probes.mjs`. Steps with
+ * no production-cert check (`outreach`, `hosted-test-checkout`, `paid-value`)
+ * remain unmapped so they report `missing` rather than false-passing.
+ */
+export const PROD_CERT_STEP_CHECKS: Readonly<
+  Partial<Record<GoldenPathStepId, readonly ProdCertStepCheckSource[]>>
+> = {
+  'claim-landing': [
+    { surface: 'claim', checkIds: ['claim-renders', 'claim-param-renders'] },
+  ],
+  start: [
+    {
+      surface: 'claim',
+      checkIds: ['start-renders', 'start-preserves-handle'],
+    },
+  ],
+  'qualify-chat': [{ surface: 'claim', checkIds: ['start-chat-first-reply'] }],
+  'profile-reveal': [
+    { surface: 'claim', checkIds: ['golden-path-preview-has-release'] },
+  ],
+  'claim-decision': [{ surface: 'claim', checkIds: ['claimed-profile-owned'] }],
+  upgrade: [
+    {
+      surface: 'checkout',
+      checkIds: [
+        'offer-canonical-pricing',
+        'checkout-entry-renders',
+        'fresh-user-checkout-entry',
+      ],
+    },
+  ],
+  'first-use': [
+    {
+      surface: 'onboarding',
+      checkIds: ['fresh-user-onboarding-first-value'],
+    },
+    { surface: 'chat', checkIds: ['first-reply'] },
+  ],
+};
+
+const STEP_PRIORITY: Readonly<Record<GoldenPathStepStatus, number>> = {
+  failed: 5,
+  blocked: 4,
+  missing: 3,
+  expired: 2,
+  held: 1,
+  passed: 0,
+};
+
+/** A passed check counts for the served release only (JOV-14402). */
+function checkToStepStatus(
+  checkStatus: string,
+  receipt: ProdGoldenPathReceipt,
+  servedSha: string | null
+): GoldenPathStepStatus {
+  if (checkStatus === 'skipped') return 'held';
+  if (checkStatus === 'blocked') return 'blocked';
+  if (checkStatus === 'passed') {
+    return receipt.sha === servedSha ? 'passed' : 'expired';
+  }
+  return 'failed';
+}
+
+function fixPrFromReceipt(
+  receipt: ProdGoldenPathReceipt | undefined,
+  status: GoldenPathStepStatus
+): number | null {
+  if (!receipt || status !== 'failed') return null;
+  const pr =
+    /\/pull\/(\d+)/u.exec(receipt.issueUrl ?? '')?.[1] ??
+    /fix #(\d+)/u.exec(receipt.blocker ?? '')?.[1];
+  return pr ? Number(pr) : null;
+}
+
+function projectStep(
+  id: GoldenPathStepId,
+  ledger: ProdGoldenPathLedger | null,
+  servedSha: string | null
+): GoldenPathStep {
+  for (const record of Object.values(ledger?.surfaces ?? {})) {
+    const receipt = record.latest;
+    const direct = receipt.checks.find(c => c.id === id);
+    if (!direct) continue;
+    const status = checkToStepStatus(direct.status, receipt, servedSha);
+    return {
+      id,
+      status,
+      surface: receipt.surface,
+      fixPr: fixPrFromReceipt(receipt, status),
+    };
+  }
+
+  const sources = PROD_CERT_STEP_CHECKS[id];
+  if (!sources || !ledger) {
+    return { id, status: 'missing', surface: null, fixPr: null };
+  }
+
+  let sawAnyMappedCheck = false;
+  let worst: {
+    status: GoldenPathStepStatus;
+    receipt: ProdGoldenPathReceipt | undefined;
+  } | null = null;
+
+  for (const source of sources) {
+    const receipt = ledger.surfaces[source.surface]?.latest;
+    for (const checkId of source.checkIds) {
+      const check = receipt?.checks.find(c => c.id === checkId);
+      let status: GoldenPathStepStatus = 'missing';
+      if (check && receipt) {
+        sawAnyMappedCheck = true;
+        status = checkToStepStatus(check.status, receipt, servedSha);
+      } else if (receipt?.carriedFrom && receipt.status === 'passed') {
+        // A carried receipt stands for every check of the pass it carries.
+        sawAnyMappedCheck = true;
+        status = checkToStepStatus('passed', receipt, servedSha);
+      } else if (receipt?.status === 'blocked') {
+        sawAnyMappedCheck = true;
+        status = 'blocked';
+      }
+      if (!worst || STEP_PRIORITY[status] > STEP_PRIORITY[worst.status]) {
+        worst = { status, receipt };
+      }
+    }
+  }
+
+  if (!sawAnyMappedCheck || !worst) {
+    return { id, status: 'missing', surface: null, fixPr: null };
+  }
+  return {
+    id,
+    status: worst.status,
+    surface: worst.receipt?.surface ?? null,
+    fixPr: fixPrFromReceipt(worst.receipt, worst.status),
+  };
+}
+
 export function goldenPathStatus(
   ledger: ProdGoldenPathLedger | null,
   now: Date
 ): GoldenPathStatus {
-  const nowMs = now.getTime();
+  const servedSha = ledgerServedSha(ledger);
   const surfaces = PROD_GOLDEN_PATH_SURFACE_IDS.map(
     (id): GoldenPathStatusSurface => {
       const receipt = ledger?.surfaces[id]?.latest;
@@ -89,9 +239,9 @@ export function goldenPathStatus(
         };
       const status: GoldenPathSurfaceStatus =
         receipt.status === 'passed'
-          ? nowMs - Date.parse(receipt.endedAt) > PROD_GOLDEN_PATH_FRESHNESS_MS
-            ? 'expired'
-            : 'certified'
+          ? isSurfaceCertifiedOn(ledger?.surfaces[id], servedSha)
+            ? 'certified'
+            : 'expired'
           : receipt.status;
       return {
         id,
@@ -108,36 +258,7 @@ export function goldenPathStatus(
       };
     }
   );
-  const steps = GOLDEN_PATH_STEPS.map((id): GoldenPathStep => {
-    for (const record of Object.values(ledger?.surfaces ?? {})) {
-      const receipt = record.latest;
-      const check = receipt.checks.find(c => c.id === id);
-      if (!check) continue;
-      const stale =
-        nowMs - Date.parse(receipt.endedAt) > PROD_GOLDEN_PATH_FRESHNESS_MS;
-      // blocked = could not be exercised on production; never a measured failure.
-      const status: GoldenPathStepStatus =
-        check.status === 'skipped'
-          ? 'held'
-          : check.status === 'blocked'
-            ? 'blocked'
-            : check.status === 'passed'
-              ? stale
-                ? 'expired'
-                : 'passed'
-              : 'failed';
-      const pr =
-        /\/pull\/(\d+)/u.exec(receipt.issueUrl ?? '')?.[1] ??
-        /fix #(\d+)/u.exec(receipt.blocker ?? '')?.[1];
-      return {
-        id,
-        status,
-        surface: receipt.surface,
-        fixPr: status === 'failed' && pr ? Number(pr) : null,
-      };
-    }
-    return { id, status: 'missing', surface: null, fixPr: null };
-  });
+  const steps = GOLDEN_PATH_STEPS.map(id => projectStep(id, ledger, servedSha));
   return {
     schema: 'jovie.summer-golden-path-status/v1',
     steps,

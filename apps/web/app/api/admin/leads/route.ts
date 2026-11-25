@@ -16,7 +16,7 @@ import {
 import { defineRoute } from '@/lib/api/route-pipeline';
 import { db } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
-import { leads } from '@/lib/db/schema/leads';
+import { type LeadSignalSnapshot, leads } from '@/lib/db/schema/leads';
 import { sqlArray } from '@/lib/db/sql-helpers';
 import {
   captureError,
@@ -25,6 +25,12 @@ import {
 } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { processLeadBatch } from '@/lib/leads/process-batch';
+import {
+  matchObservedPage,
+  type ObservedPublicLinkPage,
+  observePublicLinkPage,
+  publicPageSignalSnapshot,
+} from '@/lib/leads/public-link-observation';
 import { seedLeadFromUrl } from '@/lib/leads/url-intake';
 import { mapConcurrent } from '@/lib/utils/map-concurrent';
 import {
@@ -260,7 +266,8 @@ type LeadProcessResult = {
 };
 
 async function insertLeadOrFallback(
-  seed: Awaited<ReturnType<typeof seedLeadFromUrl>>
+  seed: Awaited<ReturnType<typeof seedLeadFromUrl>>,
+  snapshot: LeadSignalSnapshot | null
 ): Promise<string | null> {
   if (!seed) return null;
   try {
@@ -270,11 +277,24 @@ async function insertLeadOrFallback(
         linktreeHandle: seed.handle,
         linktreeUrl: seed.normalizedUrl,
         discoverySource: 'manual',
-        hasSpotifyLink: seed.hasSpotifyLink,
+        hasSpotifyLink:
+          seed.hasSpotifyLink || Boolean(snapshot?.hasSpotifyLink),
         spotifyUrl: seed.spotifyUrl,
-        hasInstagram: seed.hasInstagram,
+        hasInstagram: seed.hasInstagram || Boolean(snapshot?.hasInstagram),
         instagramHandle: seed.instagramHandle,
         musicToolsDetected: seed.kind === 'apple_music' ? ['apple_music'] : [],
+        ...(snapshot
+          ? {
+              signalSnapshot: snapshot,
+              sourcePlatform: snapshot.sourcePlatform,
+              sourceUrl: snapshot.publicPage?.url,
+              sourceHandle: snapshot.publicPage?.handle,
+              allLinks: snapshot.allLinks,
+              hasTrackingPixels: snapshot.hasTrackingPixels,
+              displayName: snapshot.publicPage?.displayName,
+              bio: snapshot.publicPage?.bio,
+            }
+          : {}),
       })
       .returning({ id: leads.id });
     return inserted?.id ?? null;
@@ -290,7 +310,8 @@ async function insertLeadOrFallback(
 }
 
 async function processLeadUrl(
-  url: string
+  url: string,
+  pages: readonly ObservedPublicLinkPage[]
 ): Promise<{ result: LeadProcessResult; leadId: string | null }> {
   const seed = seedLeadFromUrl(url);
   if (!seed) {
@@ -310,7 +331,13 @@ async function processLeadUrl(
     return { result: { url, status: 'duplicate' }, leadId: null };
   }
 
-  const leadId = await insertLeadOrFallback(seed);
+  const observed =
+    matchObservedPage(seed.normalizedUrl, pages) ??
+    matchObservedPage(url, pages);
+  const leadId = await insertLeadOrFallback(
+    seed,
+    observed ? publicPageSignalSnapshot(observed) : null
+  );
   const result: LeadProcessResult = leadId
     ? { url, status: 'created' }
     : { url, status: 'invalid', reason: 'Insert failed' };
@@ -338,8 +365,21 @@ async function postHandler({ request }: OperatorRouteInput) {
 
     // Deduplicate URLs to prevent TOCTOU race on parallel insert
     const uniqueUrls = [...new Set(validated.data.urls)];
+    const observedAt = new Date().toISOString();
+    const pages = (validated.data.pages ?? []).flatMap(page => {
+      const observed = observePublicLinkPage({
+        url: page.url,
+        displayName: page.displayName,
+        bio: page.bio,
+        text: page.text,
+        links: page.links,
+        hasTrackingPixels: page.hasTrackingPixels,
+        observedAt,
+      });
+      return observed ? [observed] : [];
+    });
     const urlResults = await mapConcurrent(uniqueUrls, 5, async url =>
-      processLeadUrl(url)
+      processLeadUrl(url, pages)
     );
 
     const results: LeadProcessResult[] = [];

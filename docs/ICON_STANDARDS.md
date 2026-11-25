@@ -24,19 +24,41 @@ small.
 
 ```tsx
 import { Check, ChevronRight, Settings } from 'lucide-react';
+import { iconStrokeForSize } from '@/lib/design/icon-stroke';
 
-<ChevronRight aria-hidden='true' />
+<ChevronRight
+  aria-hidden='true'
+  size={16}
+  strokeWidth={iconStrokeForSize(16)}
+/>
 <button type='button' aria-label='Settings'>
-  <Settings aria-hidden='true' />
+  <Settings size={16} strokeWidth={iconStrokeForSize(16)} aria-hidden='true' />
 </button>
 <span>
-  <Check aria-hidden='true' /> Saved
+  <Check size={16} strokeWidth={iconStrokeForSize(16)} aria-hidden='true' />{' '}
+  Saved
 </span>
 ```
 
+Prefer the shared `Icon` atom when the glyph is in its registry — it applies the
+optical stroke ladder automatically. Direct `lucide-react` imports must pass
+`iconStrokeForSize(size)` (or an intentional override) so chrome stays
+Cursor-clean and larger marks keep Linear-like weight (JOV-14004).
+
+### Optical stroke ladder (JOV-14004)
+
+| Painted size | Stroke | Intent |
+| --- | --- | --- |
+| ≤16px | 1.5 | Sidebar / controls — Cursor-clean |
+| 17–20px | 1.65 | Mid controls |
+| ≥21px | 1.75 | Feature / large marks — Linear weight |
+
+Do not reintroduce Lucide default `2` or dense `2.25–2.5` overrides unless a
+shared primitive documents screenshot evidence for that size. Size and color
+still come from the containing canonical component; do not bake presentation
+into a new wrapper.
+
 - Use the same semantic icon for the same action across surfaces.
-- Size and color come from the containing canonical component; do not bake
-  presentation into a new wrapper.
 - An icon-only control needs an accessible name. An icon that repeats adjacent
   text is hidden from assistive technology.
 

@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { DisplayMenuDropdown } from './DisplayMenuDropdown';
 
 const COLUMNS = [
@@ -115,5 +116,26 @@ describe('DisplayMenuDropdown', () => {
     await user.click(screen.getByRole('switch', { name: 'Group rows' }));
 
     expect(onGroupingToggle).toHaveBeenCalledWith(true);
+  });
+
+  it('has no axe violations closed or with every section open', async () => {
+    const user = userEvent.setup();
+    const { container, baseElement } = render(
+      <DisplayMenuDropdown
+        viewMode='list'
+        availableViewModes={['list', 'board']}
+        onViewModeChange={vi.fn()}
+        density='normal'
+        onDensityChange={vi.fn()}
+        availableColumns={COLUMNS}
+        onColumnVisibilityChange={vi.fn()}
+        onGroupingToggle={vi.fn()}
+      />
+    );
+    await expectNoA11yViolations(container);
+
+    await user.click(screen.getByRole('button', { name: /display/i }));
+    expect(screen.getByRole('switch', { name: 'Group rows' })).toBeVisible();
+    await expectNoA11yViolations(baseElement);
   });
 });

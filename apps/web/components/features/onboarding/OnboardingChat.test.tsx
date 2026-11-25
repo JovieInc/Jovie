@@ -9,6 +9,13 @@ import {
 import userEvent from '@testing-library/user-event';
 import type { UIMessage } from 'ai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  createHomepageIntent,
+  HOMEPAGE_ACTIVE_INTENT_KEY,
+  HOMEPAGE_INTENTS_KEY,
+  persistHomepageIntent,
+  readHomepageIntent,
+} from '@/components/homepage/intent-store';
 import { ONBOARDING_ENTRY_TITLE } from '@/lib/onboarding/empty-state';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { OnboardingChat } from './OnboardingChat';
@@ -54,6 +61,25 @@ vi.mock('@ai-sdk/react', () => ({
 
 vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
 vi.mock('@/lib/flags/client', () => ({ useAppFlag: () => false }));
+
+// ONB-27: OnboardingChat re-pins via pinTranscriptToLatest so AuthShell h1
+// clears the chat top-fade. Spy the deep import without replacing stick-to-bottom.
+const pinTranscript = vi.hoisted(() => ({
+  pinTranscriptToLatest: vi.fn(),
+}));
+vi.mock('@/components/jovie/hooks/useStickToBottom', async importOriginal => {
+  const actual =
+    await importOriginal<
+      typeof import('@/components/jovie/hooks/useStickToBottom')
+    >();
+  pinTranscript.pinTranscriptToLatest.mockImplementation(
+    actual.pinTranscriptToLatest
+  );
+  return {
+    ...actual,
+    pinTranscriptToLatest: pinTranscript.pinTranscriptToLatest,
+  };
+});
 
 // The composer reads releases and renders tooltips, as it does inside the app.
 function render(ui: React.ReactElement) {
@@ -105,6 +131,140 @@ describe('OnboardingChat states', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('textbox')).toBeInTheDocument();
     await expectNoA11yViolations(container);
+  });
+
+  it('shows the mobile profile peek above the composer without replacing it', async () => {
+    // JOV-14243: 390 peek strip sits above the keyboard; inputs stay put.
+    const { container } = render(
+      <OnboardingChat
+        {...verified}
+        profilePeekState={{
+          artistConfirmed: true,
+          handle: 'testartist',
+          handleConfirmed: false,
+          socialLinks: [],
+          artist: {
+            id: 'a1',
+            name: 'Test Artist',
+            url: 'https://open.spotify.com/artist/a1',
+          },
+        }}
+      />
+    );
+
+    expect(
+      await screen.findByTestId('onboarding-profile-peek-strip')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('restores a real stored intent through the golden path and auto-sends it', async () => {
+    // Real intent: created and persisted through the production store — the
+    // exact write the homepage performs. Nothing is mocked or injected into
+    // the composer; this covers the /start side of the golden path (restore
+    // → composer → auto-send → consume).
+    const intent = createHomepageIntent({
+      finalPrompt: 'Plan a release for my new EP',
+      pillId: 'plan_a_release',
+      pillLabel: 'Plan A Release',
+      insertedPrompt: 'Plan a release for ',
+    });
+    persistHomepageIntent(intent);
+
+    render(<OnboardingChat {...verified} intentId={intent.id} />);
+
+    // The restored intent auto-sends through the real submit path. (The
+    // prompt_handoff empty intro is transient — once the starter send fires,
+    // the view swaps to the transcript — so the send itself is the proof.)
+    await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(1));
+    expect(chat.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'Plan a release for my new EP' })
+    );
+
+    // Consumption is part of the one-shot contract: the intent is deleted
+    // from the store and the per-tab active pointer is cleared after render.
+    expect(readHomepageIntent(intent.id)).toBeNull();
+    expect(
+      globalThis.sessionStorage.getItem(HOMEPAGE_ACTIVE_INTENT_KEY)
+    ).toBeNull();
+  });
+
+  it('lands in the full onboarding entry when the intent id holds no stored intent', async () => {
+    // Signup can return with ?intent_id= set while the browser no longer
+    // holds the intent (cleared storage, or a different device across the
+    // auth round-trip). The visitor must land in the complete,
+    // less-personalized onboarding entry — never an empty chat or a
+    // blank /start.
+    render(
+      <OnboardingChat
+        {...verified}
+        intentId='11111111-1111-4111-8111-111111111111'
+      />
+    );
+
+    const intro = await screen.findByTestId('onboarding-empty-intro');
+    expect(intro).toHaveAttribute('data-entry-mode', 'blank');
+    expect(
+      screen.getByRole('heading', { name: ONBOARDING_ENTRY_TITLE })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('textbox')).toBeEnabled();
+    expect(chat.sendMessage).not.toHaveBeenCalled();
+
+    // The full less-personalized entry includes the default walkthrough:
+    // the canonical starter pills are offered instead of a bare composer.
+    expect(screen.getAllByTestId('onboarding-starter-suggestion')).toHaveLength(
+      4
+    );
+  });
+
+  it('starts the conversation from a walkthrough pill when no intent is present', async () => {
+    // Walking the fallback: the visitor with no stored intent clicks a
+    // starter pill and the real submit path sends its canonical prompt —
+    // the /start entry never dead-ends on an empty chat.
+    const user = userEvent.setup();
+    render(
+      <OnboardingChat
+        {...verified}
+        intentId='11111111-1111-4111-8111-111111111111'
+      />
+    );
+
+    const pills = await screen.findAllByTestId('onboarding-starter-suggestion');
+    await user.click(pills[0]!);
+
+    await waitFor(() => expect(chat.sendMessage).toHaveBeenCalledTimes(1));
+    expect(chat.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: "I'm an artist — help me find my Spotify profile.",
+      })
+    );
+  });
+
+  it('lands in the full onboarding entry when the stored intent expired', async () => {
+    const intent = createHomepageIntent({
+      finalPrompt: 'Generate album art for my single',
+      pillId: 'generate_album_art',
+      pillLabel: 'Generate Album Art',
+      insertedPrompt: 'Generate album art for ',
+    });
+    persistHomepageIntent(intent);
+    // Simulate TTL passage by expiring the stored intent in place — the
+    // expiry is the only field the 30-minute read gate checks.
+    const raw = globalThis.localStorage.getItem(HOMEPAGE_INTENTS_KEY);
+    expect(raw).not.toBeNull();
+    const map = JSON.parse(raw!) as Record<string, { expiresAt: number }>;
+    map[intent.id].expiresAt = Date.now() - 1;
+    globalThis.localStorage.setItem(HOMEPAGE_INTENTS_KEY, JSON.stringify(map));
+
+    render(<OnboardingChat {...verified} intentId={intent.id} />);
+
+    const intro = await screen.findByTestId('onboarding-empty-intro');
+    expect(intro).toHaveAttribute('data-entry-mode', 'blank');
+    expect(
+      screen.getByRole('heading', { name: ONBOARDING_ENTRY_TITLE })
+    ).toBeInTheDocument();
+    expect(chat.sendMessage).not.toHaveBeenCalled();
   });
 
   // The transcript scroll area is the scrollable region (axe
@@ -241,5 +401,45 @@ describe('OnboardingChat states', () => {
       await screen.findByRole('region', { name: 'Jovie Onboarding Chat' })
     ).toBeInTheDocument();
     await expectNoA11yViolations(container);
+  });
+
+  it('auto-sends an arriving starterHandoff prompt when landing from / -> /start', async () => {
+    const { rerender } = render(<OnboardingChat {...verified} />);
+    await screen.findByRole('textbox');
+    expect(chat.sendMessage).not.toHaveBeenCalled();
+
+    rerender(
+      <OnboardingChat
+        {...verified}
+        starterHandoff={{
+          kind: 'prompt',
+          prompt: 'I want to claim jov.ie/neonpulse.',
+        }}
+      />
+    );
+
+    await waitFor(() =>
+      expect(chat.sendMessage).toHaveBeenCalledWith({
+        text: 'I want to claim jov.ie/neonpulse.',
+      })
+    );
+  });
+
+  it('re-pins through pinTranscriptToLatest once the composer docks (ONB-27)', async () => {
+    pinTranscript.pinTranscriptToLatest.mockClear();
+    const turns = [
+      text('u0', 'user', 'First question about my release'),
+      text('a0', 'assistant', 'First answer with the next step'),
+      text('u1', 'user', 'Second question about timing'),
+      text('a1', 'assistant', 'Second answer about the schedule'),
+    ];
+    render(<OnboardingChat {...verified} initialMessages={turns} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('onboarding-composer-dock')).toBeInTheDocument()
+    );
+    await waitFor(() =>
+      expect(pinTranscript.pinTranscriptToLatest).toHaveBeenCalled()
+    );
   });
 });

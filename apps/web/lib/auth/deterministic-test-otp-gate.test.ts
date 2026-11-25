@@ -36,29 +36,25 @@ describe('isDeterministicTestOtpEmail (fixed-OTP gate)', () => {
     expect(isDeterministicTestOtpEmail('a+e2e@test.jovie.com')).toBe(false);
   });
 
-  it('allows the test shape on our own domains on staging', () => {
+  it('refuses staging (shares prod DB), even with E2E_TEST_MODE and canary shapes', () => {
     onStaging();
-    expect(isDeterministicTestOtpEmail(TEST_EMAIL)).toBe(true);
-    expect(isDeterministicTestOtpEmail('x+clerk_test+y@TEST.jovie.com')).toBe(
-      true
-    );
-  });
-
-  it('refuses real addresses, foreign domains and the admin persona on staging', () => {
-    onStaging();
-    expect(isDeterministicTestOtpEmail('artist@jov.ie')).toBe(false);
-    expect(isDeterministicTestOtpEmail('victim+clerk_test@gmail.com')).toBe(
+    expect(isDeterministicTestOtpEmail(TEST_EMAIL)).toBe(false);
+    expect(isDeterministicTestOtpEmail('browse-ready+clerk_test@jov.ie')).toBe(
       false
     );
-    expect(isDeterministicTestOtpEmail('x+clerk_test@jov.ie.evil.com')).toBe(
+    expect(isDeterministicTestOtpEmail('x+clerk_test+y@test.jovie.com')).toBe(
       false
     );
-    expect(isDeterministicTestOtpEmail('browse-admin+clerk_test@jov.ie')).toBe(
+    setEnv('preview', '1');
+    vi.stubEnv('VERCEL', '1');
+    vi.stubEnv('VERCEL_GIT_COMMIT_REF', 'main');
+    expect(isDeterministicTestOtpEmail(TEST_EMAIL)).toBe(false);
+    expect(isDeterministicTestOtpEmail('browse-ready+clerk_test@jov.ie')).toBe(
       false
     );
   });
 
-  it('refuses PR previews (preview built from another branch)', () => {
+  it('refuses PR previews (preview built from another branch) without E2E_TEST_MODE', () => {
     setEnv('preview');
     vi.stubEnv('VERCEL', '1');
     vi.stubEnv('VERCEL_GIT_COMMIT_REF', 'feature/x');

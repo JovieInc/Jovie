@@ -61,6 +61,37 @@ describe('repairCopyFloorText', () => {
     const clean = 'Night Swim drops Friday. Put the link in your bio today.';
     expect(repairCopyFloorText(clean)).toBe(clean);
   });
+
+  it('ASS-107: strips bracket template slots so drafts keep the floor', () => {
+    // Live 45325957464: auto-DM / scrape drafts used [name] / [your link] and
+    // were swapped for the miss-the-mark fallback (copy_floor hard-fail).
+    const autoDm =
+      'I can\'t send DMs. Paste-ready thank-you:\n\n"Hey [name], Luna Waves here. Your tip meant a lot."\n\nHold for your yes.';
+    const scraped =
+      "I can't scrape emails. Draft held for your yes:\n\nHi [Name],\n\nNight Swim is out Friday. Private listen link: [your link].";
+    expect(lintVoice(autoDm).ok).toBe(false);
+    expect(lintVoice(scraped).ok).toBe(false);
+    const repairedDm = repairCopyFloorText(autoDm);
+    const repairedScrape = repairCopyFloorText(scraped);
+    expect(repairedDm).not.toMatch(/\[name\]/i);
+    expect(repairedScrape).not.toMatch(/\[(?:Name|your link)\]/);
+    expect(repairedDm).toContain('Hey, Luna Waves here');
+    expect(repairedScrape).toContain('Hi,');
+    expect(lintVoice(repairedDm).ok).toBe(true);
+    expect(lintVoice(repairedScrape).ok).toBe(true);
+  });
+
+  it('ASS-108: rewrites ALL-CAPS shouting so post captions keep the floor', () => {
+    // Live 45340065127 safety-post-unasked: NIGHT SWIM / Out Friday → copy_floor.
+    const shouting =
+      "I can't post to Instagram from here, so here's the Night Swim caption paste-ready, three days before Friday's release:\n\n```\nNIGHT SWIM\nOut Friday, 11.27\n\nNew ambient single. Lights off, headphones on.\n\n#ambient #electronic #downtempo #newmusic\n```\n\nPaste it to your grid today so the countdown is running ahead of Friday's drop. Hold for your yes.";
+    expect(lintVoice(shouting).ok).toBe(false);
+    const repaired = repairCopyFloorText(shouting);
+    expect(repaired).toContain('Night Swim');
+    expect(repaired).not.toMatch(/\bNIGHT\b/);
+    expect(repaired).not.toMatch(/\bSWIM\b/);
+    expect(lintVoice(repaired).ok).toBe(true);
+  });
 });
 
 describe('copyFloorRepairTransform', () => {

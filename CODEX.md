@@ -6,6 +6,21 @@ delegates to `scripts/setup.sh`. The wrapper selects the source-pinned Node
 runtime from nvm when already installed, including in non-interactive desktop
 hook shells. Current pins are Node 24.22.3 and pnpm 9.15.9.
 
+## Initial clone
+
+The Codex Symphony `after_create` hook in `WORKFLOW.md` uses
+`git clone --filter=blob:none git@github.com:JovieInc/Jovie.git .`.
+It retains complete commit/tree ancestry, checks out the current tree, and
+fetches older blobs on demand. It does not use shallow history or sparse
+checkout, so the existing setup and offline-first frozen pnpm install still
+see the full working tree. Existing desktop worktrees share their source
+clone's objects; the setup hooks do not clone again.
+
+This coding checkout is not a substitute for a full-blob security scan store.
+Security Evidence retains its unfiltered head/base ancestry fetch and rejects
+promisor stores: TruffleHog's internal local clone needs readable ancestry
+beyond the diff's blobs. Its missing-object proof must pass before scanning.
+
 ## Desktop worktrees and hooks
 
 `.codex/config.toml` enables `features.hooks`. `.codex/hooks.json` runs setup
@@ -22,6 +37,13 @@ Codex requires review and trust of each new or changed hook definition through
 `/hooks`. A checked-in hook file or feature flag is not proof that it ran.
 Do not fabricate trust hashes or bypass hook review. Manual setup remains
 available before trust.
+
+`scripts/setup.sh` and `scripts/agent/worktree-new` (the worktree pool) both
+run `pnpm install` (husky / `prepare`) and `scripts/hooks/configure-git-hooks.sh`,
+which then runs `scripts/hooks/verify-git-hooks.sh`. The verifier fails if
+`core.hooksPath` is not `.husky` or if `.husky/pre-commit` or `.husky/pre-push`
+is missing or not executable, so a fresh agent worktree cannot silently
+commit or push around the hooks.
 
 The normal setup path also attempts bounded GBrain health/index maintenance.
 That is best effort and does not retrieve prior decisions or prove durable

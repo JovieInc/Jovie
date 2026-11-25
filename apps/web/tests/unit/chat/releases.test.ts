@@ -326,9 +326,18 @@ describe('chat route release-query wiring', () => {
     const routePath = path.join(process.cwd(), 'app/api/chat/route.ts');
     const source = await readFile(routePath, 'utf8');
 
-    expect(source).toContain(
-      "import { resolveChatRelease } from '@/lib/chat/catalog-query'"
-    );
+    // Release-taking tools live in their own modules and resolve through the
+    // catalog query, so a release past the prompt slice is still found.
+    for (const tool of ['release-pitch', 'canvas-status']) {
+      expect(source).toContain(`from '@/lib/chat/tools/${tool}'`);
+      const toolSource = await readFile(
+        path.join(process.cwd(), `lib/chat/tools/${tool}.ts`),
+        'utf8'
+      );
+      expect(toolSource).toContain(
+        "import { resolveChatRelease } from '../catalog-query'"
+      );
+    }
     // The in-memory-only resolver is gone; resolution is catalog-aware.
     expect(source).not.toContain('function findReleaseByTitle');
     expect(source).not.toContain('createLookupReleaseTool');

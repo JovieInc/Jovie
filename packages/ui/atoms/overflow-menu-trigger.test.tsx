@@ -89,9 +89,7 @@ describe('OverflowMenuTrigger', () => {
 
     expect(trigger.className).toContain('before:h-11');
     expect(trigger.className).toContain('before:w-11');
-    expect(trigger.className).toContain('duration-subtle');
-    expect(trigger.className).toContain('ease-subtle');
-    expect(trigger.className).toContain('motion-reduce:transition-none');
+    expect(trigger).toHaveClass('press');
     expect(trigger.className).toContain('hover:bg-interactive-hover');
     expect(trigger.className).toContain('focus-visible:bg-interactive-hover');
     expect(trigger.className).toContain('active:bg-interactive-active');
@@ -174,5 +172,14 @@ describe('OverflowMenuTrigger accessibility', () => {
     const dot = container.querySelector('.rounded-full.bg-accent');
     expect(dot).toHaveClass('-end-0.5');
     expect(dot?.className).not.toContain('-right-');
+  });
+});
+
+describe('OverflowMenuTrigger press', () => {
+  it('presses through the shared press utility', () => {
+    render(<OverflowMenuTrigger />);
+    expect(screen.getByRole('button', { name: 'More tabs' })).toHaveClass(
+      'press'
+    );
   });
 });

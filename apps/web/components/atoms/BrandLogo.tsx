@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import {
+  BRAND_MARK_MUTED_CLASS,
   BRAND_WORDMARKS,
   type BrandMarkSize,
   type BrandVariant,
@@ -25,7 +26,7 @@ const TONE_CLASSES: Record<BrandLogoTone, string | undefined> = {
   auto: undefined,
   white: 'text-on-media',
   color: 'text-accent',
-  muted: 'text-muted-foreground/50',
+  muted: BRAND_MARK_MUTED_CLASS,
 };
 
 export function BrandLogo({

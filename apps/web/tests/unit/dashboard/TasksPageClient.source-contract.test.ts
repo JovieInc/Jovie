@@ -16,12 +16,13 @@ const source = readFileSync(
 );
 
 describe('TasksPageClient source contract', () => {
-  it('keeps task stage and priority metadata controls at 32px on desktop', () => {
+  it('keeps task stage and priority metadata controls at 28px on desktop', () => {
     expect(source).toContain(
-      '-mx-1 relative inline-flex h-8 min-w-0 items-center rounded-full px-2'
+      '-mx-2 relative inline-flex h-7 min-w-0 items-center rounded-full px-2'
     );
     expect(source).toContain('before:h-11 before:min-w-11 before:w-full');
-    expect(source).toContain('sm:before:h-8 sm:before:min-w-0');
+    expect(source).toContain('sm:before:h-7 sm:before:min-w-0');
+    expect(source).not.toContain('inline-flex h-8 min-w-0');
     expect(source).toContain(
       "<TaskMetaTrigger ariaLabel='Change Task Status'>"
     );

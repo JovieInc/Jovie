@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { YoutubeThumbnailsLanding } from '@/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding';
+import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';
 import { MARKETING_PAGE_CONTRACTS } from '@/data/marketing/pageContracts';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
@@ -18,6 +19,20 @@ vi.mock('next/navigation', async importOriginal => {
 });
 
 describe('PublicPageShell', () => {
+  it('forwards the shared marketing claim action through the page layout', () => {
+    pathnameRef.current = '/pricing';
+    render(
+      <PublicPageShell canonicalMarketingHeader footerVariant='expanded'>
+        Pricing
+      </PublicPageShell>
+    );
+    const nav = screen.getByRole('navigation', { name: 'Primary Navigation' });
+    expect(
+      within(nav).getByRole('link', { name: HOME_MARKETING_HEADER_CTA.label })
+    ).toHaveAttribute('href', HOME_MARKETING_HEADER_CTA.href);
+    pathnameRef.current = '/';
+  });
+
   it('keeps YouTube acquisition content inside the sole page main', () => {
     render(
       <PublicPageShell>

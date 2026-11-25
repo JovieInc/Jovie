@@ -176,13 +176,13 @@ describe('OperatorMobileNavigation', () => {
     ).toHaveLength(1);
   });
 
-  it('exposes Inbox directly and selects it without selecting Home', () => {
+  it('exposes Operator Inbox directly and selects it without selecting Home', () => {
     pathnameMock.mockReturnValue(APP_ROUTES.ADMIN_INBOX);
     render(<OperatorMobileNavigation />);
     const tabs = screen.getByRole('navigation', {
       name: 'OV Mobile Navigation',
     });
-    const inbox = within(tabs).getByRole('link', { name: 'Inbox' });
+    const inbox = within(tabs).getByRole('link', { name: 'Operator Inbox' });
     expect(inbox).toHaveAttribute('href', APP_ROUTES.ADMIN_INBOX);
     expect(inbox).toHaveAttribute('aria-current', 'page');
     expect(

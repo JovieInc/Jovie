@@ -98,6 +98,8 @@ describe('Admin Impersonate API', () => {
       expect(response.status).toBe(200);
       expect(data.enabled).toBe(false);
       expect(data.isImpersonating).toBe(false);
+      expect(mockRequireAdmin).toHaveBeenCalledWith({ session: 'fresh' });
+      expect(mockAuth).toHaveBeenCalledWith({ session: 'fresh' });
     });
 
     it('returns not impersonating when no active session', async () => {

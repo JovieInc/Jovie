@@ -7,7 +7,8 @@ being wired. The countermeasure is a single fail-closed audit that runs
 **locally and weekly** (informational / issue-only). It is **not** a `ci-fast`
 or PR Ready merge gate.
 
-Related: [Certification Operating Loop](./CERTIFICATION_OPERATING_LOOP.md).
+Related: [Certification Operating Loop](./CERTIFICATION_OPERATING_LOOP.md),
+[Data-backed ship path](./DATA_BACKED_SHIP_PATH.md) (no `.pen` through CI).
 
 - **Audit:** `pnpm design:governance:audit` → `scripts/design-governance-audit.mjs`
 - **Local:** run `pnpm design:governance:audit` (and `pnpm design:tokens:export:check`)

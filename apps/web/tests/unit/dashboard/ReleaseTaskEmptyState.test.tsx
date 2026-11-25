@@ -1,9 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ReleaseTaskEmptyState } from '@/components/features/dashboard/release-tasks/ReleaseTaskEmptyState';
+import { expectFlatState } from '@/tests/utils/flat-state';
 
 describe('ReleaseTaskEmptyState', () => {
-  it('preserves the release playbook anatomy inside the canonical card', () => {
+  it('preserves the release playbook anatomy flat, with no card', () => {
     const onSetUp = vi.fn();
     const { container } = render(
       <ReleaseTaskEmptyState onSetUp={onSetUp} isLoading={false} />
@@ -18,14 +19,10 @@ describe('ReleaseTaskEmptyState', () => {
       )
     ).toBeVisible();
 
-    const card = screen.getByTestId('release-task-empty-state-card');
-    expect(card).toHaveClass(
-      'rounded-lg',
-      'border',
-      'border-(--app-shell-border)',
-      'bg-surface-0'
-    );
-    expect(card).not.toHaveClass('bg-surface-1');
+    expect(
+      screen.queryByTestId('release-task-empty-state-card')
+    ).not.toBeInTheDocument();
+    expectFlatState(screen.getByTestId('release-task-empty-state-content'));
     expect(container.querySelector('svg')).toHaveAttribute(
       'aria-hidden',
       'true'

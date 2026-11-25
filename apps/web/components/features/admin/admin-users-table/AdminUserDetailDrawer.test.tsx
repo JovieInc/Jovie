@@ -242,4 +242,17 @@ describe('AdminUserDetailDrawer', () => {
       'grid'
     );
   });
+
+  it('drops the identity rows below the floating cluster overhang', () => {
+    // The card-top-right cluster is 28px tall anchored 12px from the card
+    // top, so its bottom sits 40px down; the identity column's Copy Email
+    // button started at 32px and its safe clickable space was 16px. pt-6
+    // drops the rows 12px so the button's free span clears 24px (axe
+    // target-size).
+    render(<AdminUserDetailDrawer user={longContentUser} onClose={vi.fn()} />);
+
+    const header = screen.getByTestId('admin-user-entity-header');
+    expect(header.parentElement).toHaveClass('pt-6');
+    expect(header.parentElement).not.toHaveClass('pt-3');
+  });
 });

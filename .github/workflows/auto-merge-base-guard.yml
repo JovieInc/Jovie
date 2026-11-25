@@ -73,7 +73,7 @@ jobs:
             exit 0
           fi
           node packages/api-client/cli.ts gh --priority merge -- api graphql \
-            -f query='mutation($id:ID!){disablePullRequestAutoMerge(input:{pullRequestId:$id}){pullRequest{id}}}' \
+            -f query="mutation(\$id:ID!){disablePullRequestAutoMerge(input:{pullRequestId:\$id}){pullRequest{id}}}" \
             -f id="$PR_NODE_ID" >/dev/null
           echo "disabled auto-merge on #$PR (base=$live_base)"
           bash scripts/lib/upsert-pr-comment.sh "$PR" auto-merge-base-guard \

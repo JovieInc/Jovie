@@ -28,10 +28,7 @@ export default function PricingLoading() {
         <div>
           <div className='grid md:grid-cols-3 gap-6'>
             {TIER_SKELETON_KEYS.map(key => (
-              <div
-                key={key}
-                className='rounded-xl border border-subtle bg-surface-1 p-8'
-              >
+              <div key={key} className='p-8'>
                 {/* Tier name */}
                 <div className='h-4 w-16 skeleton rounded-md mb-4' />
                 {/* Description */}

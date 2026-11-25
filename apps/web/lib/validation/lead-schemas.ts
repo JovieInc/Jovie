@@ -1,8 +1,19 @@
 import { z } from 'zod';
 import { ACQUISITION_REJECTION_REASONS } from '@/lib/acquisition';
 
+const observedPublicLinkSchema = z.object({
+  url: z.string().url(),
+  displayName: z.string().max(200).nullable().optional(),
+  bio: z.string().max(2000).nullable().optional(),
+  text: z.string().max(2000).nullable().optional(),
+  links: z.array(z.object({ url: z.string().url() })).max(40),
+  hasTrackingPixels: z.boolean().optional(),
+});
+
 export const manualLeadSubmitSchema = z.object({
   urls: z.array(z.string().url()).min(1).max(500),
+  /** Public pages already fetched by the caller. No email field. */
+  pages: z.array(observedPublicLinkSchema).max(500).optional(),
 });
 
 export const leadListQuerySchema = z.object({

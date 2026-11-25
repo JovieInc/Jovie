@@ -21,10 +21,7 @@ export default function PresenceLoading() {
       <div className='flex-1 min-h-0 overflow-hidden p-4'>
         <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3'>
           {CARD_KEYS.map(key => (
-            <div
-              key={key}
-              className='rounded-xl border border-subtle bg-surface-0 p-3 animate-pulse'
-            >
+            <div key={key} className='p-3 animate-pulse'>
               <div className='flex items-center gap-2'>
                 <LoadingSkeleton
                   height='h-6'

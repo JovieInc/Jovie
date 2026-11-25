@@ -36,7 +36,30 @@ const read = (file: string) => {
   if (source === undefined) throw new Error(`Missing canvas source: ${file}`);
   return source;
 };
-const selector = '.dark [data-app-shell-workspace="ov"]';
+const shellFrameSelector = '.dark [data-app-shell-frame="true"]';
+const shellFrameMarker = 'NOIR ION D — workspace state surfaces (shell-scoped)';
+
+function extractShellFrameBlock(css: string): string {
+  const markerIndex = css.indexOf(shellFrameMarker);
+  expect(markerIndex, 'shell frame Noir Ion marker').toBeGreaterThan(-1);
+  const fromMarker = css.slice(markerIndex);
+  const selectorStart = fromMarker.search(
+    /\[data-app-shell-frame=(['"])true\1\]/
+  );
+  expect(selectorStart).toBeGreaterThan(-1);
+  const blockStart = fromMarker.lastIndexOf('\n', selectorStart) + 1;
+  const openBrace = fromMarker.indexOf('{', blockStart);
+  let depth = 0;
+  for (let i = openBrace; i < fromMarker.length; i++) {
+    const ch = fromMarker[i];
+    if (ch === '{') depth += 1;
+    if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) return fromMarker.slice(blockStart, i + 1);
+    }
+  }
+  throw new Error('Unclosed shell frame block');
+}
 
 function rawBackgrounds(source: string) {
   const utilityOrDirectColor =
@@ -66,26 +89,28 @@ function rawBackgrounds(source: string) {
 }
 
 describe('Ovie Home and dashboard background contract', () => {
-  it('limits the palette override to dark Ovie frames, including placeholders', () => {
-    const start = workspaceCss.indexOf(selector);
-    const selectors = workspaceCss.slice(
-      start,
-      workspaceCss.indexOf('{', start)
-    );
+  it('shares the dark shell-frame ZiaWI ladder (no Ovie-only carbon override)', () => {
+    // Drift T1.1: Ovie no longer needs a parallel workspace palette; the
+    // authenticated shell frame binds every workspace to --noir-ion-*.
+    expect(workspaceCss).not.toContain('.dark [data-app-shell-workspace="ov"]');
+    const block = extractShellFrameBlock(workspaceCss);
+    const selectors = block.slice(0, block.indexOf('{')).trim();
+    expect(selectors).toContain(shellFrameSelector);
+
     const theme = document.createElement('div');
     const frame = document.createElement('div');
+    frame.dataset.appShellFrame = 'true';
     theme.append(frame);
     for (const mode of ['light', 'dark']) {
       theme.className = mode;
       for (const workspace of ['ov', 'jovie']) {
         frame.dataset.appShellWorkspace = workspace;
         expect(frame.matches(selectors), `${mode} ${workspace}`).toBe(
-          mode === 'dark' && workspace === 'ov'
+          mode === 'dark'
         );
       }
     }
     theme.className = '';
-    frame.dataset.appShellWorkspace = 'ov';
     frame.className = 'dark';
     expect(frame.matches(selectors)).toBe(true);
   });
@@ -93,26 +118,28 @@ describe('Ovie Home and dashboard background contract', () => {
   it('uses the canonical Noir Ion canvas throughout the Ovie shell', () => {
     expect(Object.keys(stylesheetOwner)).toEqual(['/styles/system-b-app.css']);
     expect(Object.keys(canvasOwners).length).toBeGreaterThan(40);
-    const start = workspaceCss.indexOf(selector);
-    expect(
-      start,
-      'Ovie must override the duplicate workspace graphite ramp'
-    ).toBeGreaterThan(-1);
-    const block = workspaceCss.slice(start, workspaceCss.indexOf('}', start));
+    const block = extractShellFrameBlock(workspaceCss);
     expect(block).toContain(
       '--app-shell-content-surface: var(--noir-ion-card)'
     );
+    expect(block).toContain('--color-bg-surface-0: var(--noir-ion-shell)');
     expect(block).toContain('--color-bg-surface-1: var(--noir-ion-card)');
-    expect(rawBackgrounds(block)).toEqual([]);
+    expect(block).toContain('--color-bg-surface-2: var(--noir-ion-elevated)');
+    expect(block).toContain('--color-bg-surface-3: var(--noir-ion-floating)');
+    // Surface ladder values must be noir-ion aliases (not carbon hexes).
+    expect(block).not.toMatch(/#101114|#0b0c0f|#14161a|#1b1d22|#24272d/i);
     expect(read('/components/organisms/AppShellFrame.tsx')).toContain(
       "data-app-shell-workspace={brandVariant === 'ov' ? 'ov' : undefined}"
     );
-    // Background definitions in this scoped override can only alias existing tokens.
-    const values = [...block.matchAll(/--[\w-]+:\s*([^;]+);/g)].map(
-      match => match[1]
-    );
-    expect(values.length).toBeGreaterThanOrEqual(8);
-    for (const value of values) expect(value).toMatch(/^var\(--[\w-]+\)$/);
+    const surfaceValues = [
+      ...block.matchAll(
+        /--(?:app-shell-content-surface|color-bg-surface-\d|color-bg-elevated|color-bg-tooltip|color-bg-input|color-skeleton-base):\s*([^;]+);/g
+      ),
+    ].map(match => match[1]);
+    expect(surfaceValues.length).toBeGreaterThanOrEqual(8);
+    for (const value of surfaceValues) {
+      expect(value).toMatch(/^var\(--noir-ion-[\w-]+\)$/);
+    }
   });
 
   it.each(['dock', 'surface', 'scroll-fade'])(

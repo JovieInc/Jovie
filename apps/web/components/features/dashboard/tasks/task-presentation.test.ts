@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getReleasePanelStatus,
   getTaskAssigneeVisual,
   getTaskCategoryLabel,
   getTaskPriorityVisual,
@@ -114,5 +115,17 @@ describe('task-presentation', () => {
     expect(isTaskAgentWorking('human', 'in_progress', 'drafting')).toBe(false);
     expect(isTaskAgentWorking('jovie', 'todo', 'drafting')).toBe(false);
     expect(isTaskAgentWorking('jovie', 'done', 'approved')).toBe(false);
+  });
+
+  it('prefers the error state, then loading, for the release rail', () => {
+    expect(getReleasePanelStatus({ isError: true, isLoading: true })).toBe(
+      'error'
+    );
+    expect(getReleasePanelStatus({ isError: false, isLoading: true })).toBe(
+      'loading'
+    );
+    expect(getReleasePanelStatus({ isError: false, isLoading: false })).toBe(
+      'empty'
+    );
   });
 });

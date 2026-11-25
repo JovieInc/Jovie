@@ -73,8 +73,15 @@ struct AuthScreenStyleGuardTests {
     let buttonEnd = try #require(source.range(of: "private struct AuthErrorText: View"))
     let buttonSource = source[buttonStart.lowerBound..<buttonEnd.lowerBound]
 
-    #expect(buttonSource.contains("private static let minimumHitTargetHeight: CGFloat = 44"))
+    // #26134: the 44pt hit target now comes from the projected metrics, not a local constant.
+    #expect(JovieActionButtonMetrics.hitTarget == 44)
+    #expect(!buttonSource.contains("minimumHitTargetHeight"))
     #expect(buttonSource.contains("private static var minimumHitTargetPadding: CGFloat"))
+    #expect(
+      buttonSource.contains(
+        "max((JovieActionButtonMetrics.hitTarget - JovieActionButtonMetrics.height) / 2, 0)"
+      )
+    )
     let hasHitTargetPaddingInsideLabel = buttonSource.range(
       of: #"\.padding\(\.vertical,\s*Self\.minimumHitTargetPadding\)\s*\.contentShape\(Rectangle\(\)\)"#,
       options: .regularExpression
@@ -125,7 +132,7 @@ struct AuthScreenStyleGuardTests {
     #expect(source.contains("static let artist = JovieColor.accentPurple"))
     #expect(source.contains("static let event = JovieColor.accentOrange"))
     // These existing motion contracts are outside the palette slice and remain protected.
-    #expect(source.contains("pressScale: CGFloat = 0.96"))
+    #expect(source.contains("pressScale: CGFloat = 0.98"))
     #expect(source.contains("timingCurve(0.4, 0, 0.2, 1, duration: subtleDuration)"))
     #expect(source.contains("timingCurve(0.22, 1, 0.36, 1, duration: cinematicDuration)"))
   }
@@ -148,10 +155,13 @@ struct AuthScreenStyleGuardTests {
   }
 
   @Test func neutralPillKeepsCompactPaintAndAtLeast44PointHitArea() {
-    #expect(JoviePillButtonStyle.visibleHeight == 28)
+    #expect(JoviePillButtonStyle.visibleHeight == JovieActionButtonMetrics.height)
+    #expect(JoviePillButtonStyle.minimumHitHeight == JovieActionButtonMetrics.hitTarget)
+    #expect(JovieActionButtonMetrics.height == 28)
+    #expect(JovieActionButtonMetrics.hitTarget == 44)
     #expect(JoviePillButtonStyle.visibleHeight + 2 * JoviePillButtonStyle.hitInset >= JoviePillButtonStyle.minimumHitHeight)
-    // Locked chat controls retain their independent existing 32-point geometry.
-    #expect(JovieActionButtonMetrics.height == 32)
+    // Chat face stays 32 (not ActionButton KEEP).
+    #expect(ChatComposerMetrics.lockedControlSize == 32)
   }
 
   /// Staged entrance guard: the auth screen's first-appearance animation

@@ -1,6 +1,11 @@
 'use client';
 
-import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import {
+  PlainButton,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@jovie/ui';
 import { Globe, HelpCircle, Link2, MapPin, Monitor } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { ComponentType, SVGProps } from 'react';
@@ -66,13 +71,12 @@ function DashboardAnalyticsMetricCard({
   const definitionTooltip = definition ? (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
-          type='button'
+        <PlainButton
           className='flex text-tertiary-token transition-colors hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
           aria-label={`About ${label}`}
         >
           <HelpCircle className='h-3 w-3' />
-        </button>
+        </PlainButton>
       </TooltipTrigger>
       <TooltipContent side='top' className='max-w-50'>
         <p className='text-app'>{definition}</p>
@@ -132,9 +136,9 @@ function ListSection({
       <div className='min-h-52 p-4 lg:p-5'>
         <div className='mb-3 flex items-center gap-2'>
           <Icon className='h-4 w-4 text-tertiary-token' />
-          <h3 className='text-app font-caption text-secondary-token'>
+          <h2 className='text-balance text-app font-caption text-secondary-token'>
             {title}
-          </h3>
+          </h2>
         </div>
 
         {loading && (

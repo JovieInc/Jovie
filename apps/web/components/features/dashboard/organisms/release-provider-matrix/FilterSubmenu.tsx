@@ -117,6 +117,15 @@ export function FilterSubmenu<T extends string = string>({
         sideOffset={4}
         alignOffset={-4}
         collisionPadding={8}
+        /* A text input is not an allowed child of role="menu" (axe
+           aria-required-children), so a searchable submenu presents its
+           surface as a group (the shared dropdown's group-plus-inner-menu
+           structure) and keeps the option rows in an inner menu. Radix
+           hardcodes aria-orientation on the content; orientation is not an
+           allowed aria-* attribute on role="group" (axe aria-allowed-attr),
+           so strip it in the group form. */
+        role='group'
+        aria-orientation={undefined}
         className='flex max-h-65 min-w-49 max-w-[calc(100vw-16px)] flex-col overflow-hidden p-0'
       >
         <FilterSearchInput
@@ -130,11 +139,11 @@ export function FilterSubmenu<T extends string = string>({
           inputRef={searchRef}
         />
 
-        <div className='flex-1 overflow-y-auto p-1.5'>
-          {filteredOptions.length === 0 ? (
-            <DropdownEmptyRow message='No options found' />
-          ) : (
-            filteredOptions.map(opt => (
+        {filteredOptions.length === 0 ? (
+          <DropdownEmptyRow message='No options found' />
+        ) : (
+          <div role='menu' className='flex-1 overflow-y-auto p-1.5'>
+            {filteredOptions.map(opt => (
               <FilterCheckboxItem
                 key={opt.id}
                 label={opt.label}
@@ -148,9 +157,9 @@ export function FilterSubmenu<T extends string = string>({
                 onCheckedChange={() => onToggle(opt.id)}
                 searchInputRef={searchRef}
               />
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </DropdownMenuSubContent>
     </DropdownMenuSub>
   );

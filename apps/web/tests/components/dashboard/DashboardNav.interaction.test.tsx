@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
+import { useSidebar } from '@/components/shell/SidebarContext';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   mockOpenPreviewPanel,
@@ -22,6 +23,19 @@ vi.mock('@/lib/queries/prefetch-dashboard', () => ({
   prefetchForRoute: prefetchForRouteMock,
 }));
 
+function conversationsResult(result: Record<string, unknown>) {
+  return result as unknown as ReturnType<typeof mockUseChatConversationsQuery>;
+}
+
+function RouteRefresh() {
+  const { setOpenMobile } = useSidebar();
+  return (
+    <button type='button' onClick={() => setOpenMobile(true)}>
+      Refresh route
+    </button>
+  );
+}
+
 const PRIMARY_LABELS = ['New Chat', 'Identity', 'Work', 'Audience'] as const;
 
 describe('DashboardNav interactions', () => {
@@ -41,11 +55,14 @@ describe('DashboardNav interactions', () => {
       expect(link.querySelector('svg')).toBeTruthy();
       expect(link).toHaveAccessibleName(label);
     }
-    const homeLinks = screen.getAllByRole('link', { name: 'Inbox' });
-    expect(homeLinks).toHaveLength(2);
+    // Exact "Home" is the nav row; the rail bell uses a qualified name.
+    const homeLinks = screen.getAllByRole('link', { name: /^Home$/ });
+    expect(homeLinks).toHaveLength(1);
     for (const link of homeLinks) {
       expect(link.querySelector('svg')).toBeTruthy();
     }
+    const attention = document.querySelector('[data-inbox-attention]');
+    expect(attention?.querySelector('svg')).toBeTruthy();
   });
 
   it('keeps New Chat a compact create CTA with a larger utility-to-navigation gap', () => {
@@ -58,10 +75,10 @@ describe('DashboardNav interactions', () => {
     const searchSlot = container.querySelector<HTMLElement>(
       '[data-sidebar-search-slot="true"]'
     );
-    const inbox = container.querySelector('[data-navigation-item-id="inbox"]');
+    const inbox = container.querySelector('[data-navigation-item-id="home"]');
     expect(inbox).toBeInstanceOf(HTMLElement);
     if (!(inbox instanceof HTMLElement)) return;
-    expect(inbox).toHaveAccessibleName('Inbox');
+    expect(inbox).toHaveAccessibleName('Home — notifications');
 
     expect(newChat).toHaveClass('size-6', 'rounded-md', 'text-sidebar-muted');
     expect(newChat.parentElement).toHaveAttribute('data-sidebar-search-slot');
@@ -154,47 +171,96 @@ describe('DashboardNav interactions', () => {
     ).not.toHaveAttribute('aria-current');
   });
 
-  it('renders recent chats as App Router links', () => {
-    mockUseChatConversationsQuery.mockReturnValue({
-      data: [
-        {
-          id: 'thread-newer',
-          title: 'Pitch tasks',
-          createdAt: '2026-05-02T00:00:00.000Z',
-          updatedAt: '2026-05-12T00:00:00.000Z',
-        },
-      ],
-    });
+  it('hides recent chats until history is opened', async () => {
+    const user = userEvent.setup();
+    mockUseChatConversationsQuery.mockReturnValue(
+      conversationsResult({
+        data: [
+          {
+            id: 'thread-newer',
+            title: 'Pitch tasks',
+            createdAt: '2026-05-02T00:00:00.000Z',
+            updatedAt: '2026-05-12T00:00:00.000Z',
+          },
+        ],
+      })
+    );
 
     renderDashboardNav({
       renderFn: render,
     });
 
+    const history = screen.getByRole('button', { name: 'Chat History' });
+    expect(history).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('link', { name: 'Pitch tasks' })).toBeNull();
+    await user.click(history);
+    expect(history).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('Earlier')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Pitch tasks' })).toHaveAttribute(
       'href',
       '/app/chat/thread-newer'
     );
+    screen.getByRole('link', { name: 'Pitch tasks' }).focus();
+    await user.keyboard('{Escape}');
+    expect(history).toHaveAttribute('aria-expanded', 'false');
+    expect(history).toHaveFocus();
+    expect(screen.queryByRole('link', { name: 'Pitch tasks' })).toBeNull();
+  });
+
+  it('keeps history available on Work and updates the selected chat on route changes', async () => {
+    const user = userEvent.setup();
+    mockUsePathname.mockReturnValue(APP_ROUTES.LIBRARY);
+    mockUseChatConversationsQuery.mockReturnValue(
+      conversationsResult({
+        data: [
+          {
+            id: 'thread-1',
+            title: 'Saved chat',
+            createdAt: '2026-05-01T00:00:00.000Z',
+            updatedAt: '2026-05-12T00:00:00.000Z',
+          },
+        ],
+      })
+    );
+    renderDashboardNav({ renderFn: render, children: <RouteRefresh /> });
+    const history = screen.getByRole('button', { name: 'Chat History' });
+    expect(history).toHaveAttribute('aria-expanded', 'false');
+    await user.click(history);
+    expect(
+      screen.getByRole('link', { name: 'Saved chat' })
+    ).not.toHaveAttribute('aria-current');
+    mockUsePathname.mockReturnValue(`${APP_ROUTES.CHAT}/thread-1`);
+    await user.click(screen.getByRole('button', { name: 'Refresh route' }));
+    expect(history).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('link', { name: 'Saved chat' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
   });
 
   it('keeps compact loading and empty thread states free of duplicate New Chat controls', () => {
-    mockUseChatConversationsQuery.mockReturnValue({
-      data: undefined,
-      isLoading: true,
-    });
+    mockUseChatConversationsQuery.mockReturnValue(
+      conversationsResult({
+        data: undefined,
+        isLoading: true,
+      })
+    );
     const loading = renderDashboardNav({
       renderFn: render,
     });
 
+    fireEvent.click(screen.getByRole('button', { name: 'Chat History' }));
     expect(document.querySelector('.skeleton')).toBeInTheDocument();
     expect(screen.queryByText('Loading chats')).not.toBeInTheDocument();
     loading.unmount();
 
-    mockUseChatConversationsQuery.mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-    });
+    mockUseChatConversationsQuery.mockReturnValue(
+      conversationsResult({
+        data: [],
+        isLoading: false,
+        isError: false,
+      })
+    );
     renderDashboardNav({
       renderFn: render,
     });
@@ -205,19 +271,21 @@ describe('DashboardNav interactions', () => {
 
   it('marks an active thread read without changing primary navigation', async () => {
     mockUsePathname.mockReturnValue(`${APP_ROUTES.CHAT}/thread-1`);
-    mockUseChatConversationsQuery.mockReturnValue({
-      data: [
-        {
-          id: 'thread-1',
-          title: 'Active thread',
-          createdAt: '2026-05-01T00:00:00.000Z',
-          updatedAt: '2026-05-12T00:00:00.000Z',
-        },
-      ],
-      isLoading: false,
-      isError: false,
-      refetch: vi.fn(),
-    });
+    mockUseChatConversationsQuery.mockReturnValue(
+      conversationsResult({
+        data: [
+          {
+            id: 'thread-1',
+            title: 'Active thread',
+            createdAt: '2026-05-01T00:00:00.000Z',
+            updatedAt: '2026-05-12T00:00:00.000Z',
+          },
+        ],
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      })
+    );
 
     renderDashboardNav({
       renderFn: render,

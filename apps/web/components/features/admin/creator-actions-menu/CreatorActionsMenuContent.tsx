@@ -98,7 +98,7 @@ export function CreatorActionsMenuContent({
             <Star
               className={cn(
                 'h-3.5 w-3.5',
-                profile.isFeatured && 'fill-yellow-400 text-yellow-400'
+                profile.isFeatured && 'fill-warning text-warning'
               )}
             />
             {profile.isFeatured ? 'Unfeature' : 'Feature'}

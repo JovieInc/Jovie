@@ -262,14 +262,27 @@ export async function grantDogfoodAdminStepUp(
 /**
  * Repair a persona whose stored subscription no longer exists in Stripe test
  * mode (an interrupted earlier run). Test database only.
+ *
+ * Also clears the derived price-lock state (price_locks, stripe_price_id):
+ * since the price lock landed (JOV-INV-048), a stale lock or a stale
+ * subscription price row makes every later checkout for the persona fail
+ * closed, and the route's price-error mapping masks it as a 400
+ * "Invalid pricing configuration" — the red JOV-8805 dogfood class of
+ * 2026-11-17..19. Derived state only; the persona's profile, posts and
+ * claim-verification rows are untouched.
  */
 export async function resetDogfoodBilling(email: string): Promise<void> {
   const sql = dogfoodSql();
   await sql`
     UPDATE users
     SET is_pro = false, plan = 'free', stripe_subscription_id = NULL,
+        stripe_price_id = NULL,
         billing_version = billing_version + 1, updated_at = now()
     WHERE email = ${email}
+  `;
+  await sql`
+    DELETE FROM price_locks
+    WHERE user_id IN (SELECT id FROM users WHERE email = ${email})
   `;
 }
 
@@ -279,20 +292,19 @@ export async function resetDogfoodBilling(email: string): Promise<void> {
 
 /**
  * Email pattern for golden-path test accounts; only their bindings are
- * ever released by the self-cleaning teardown.
+ * ever released as stale before a real run selects its artist.
  */
 export const GOLDEN_PATH_TEST_EMAIL_LIKE = 'gp-%+e2e@test.jovie.com';
 
-/** Broader golden-path account pattern (Clerk may rewrite +e2e to +clerk_test). */
-export const GOLDEN_PATH_TEST_PROFILE_EMAIL_LIKE = 'gp-%@test.jovie.com';
-
 /**
  * Release all creator_profiles spotify bindings owned by golden-path test
- * accounts. Called in beforeAll (to clear stale runs) and afterAll (teardown).
- * Keeps the fixture pool clean so subsequent runs never hit ownership_conflict:v1.
+ * accounts. Database-wide, so only a run that executes the journey calls it
+ * (via selectGoldenPathArtist) to clear stale runs before it claims; teardown
+ * is teardownGoldenPathRun. Keeps the fixture pool clean so subsequent runs
+ * never hit ownership_conflict:v1.
  */
 export async function releaseGoldenPathTestBindings(
-  sql: ReturnType<typeof neon>
+  sql: ReturnType<typeof dogfoodSql>
 ): Promise<void> {
   await sql`
     UPDATE creator_profiles
@@ -305,21 +317,23 @@ export async function releaseGoldenPathTestBindings(
 }
 
 /**
- * Unpublish profiles owned by golden-path test accounts so finished runs never
- * leave public test profiles behind. Idempotent, never deletes, never touches
- * non-golden-path rows. The broader sweep (all test-account classes) is
+ * Teardown for one Golden Path run: release the Spotify binding of, and
+ * unpublish, only the profiles of identities this run created. The per-run
+ * Neon branch is shared by every CI lane that lists golden-path.spec.ts;
+ * lanes that skip the journey must never release another lane's live claim.
+ * Idempotent, never deletes. The broader sweep is
  * `scripts/cleanup-test-profiles.ts`.
  */
-export async function unpublishGoldenPathTestProfiles(
-  sql: ReturnType<typeof neon>
+export async function teardownGoldenPathRun(
+  sql: ReturnType<typeof dogfoodSql>,
+  emails: readonly string[]
 ): Promise<void> {
+  if (emails.length === 0) return;
   await sql`
     UPDATE creator_profiles
-    SET is_public = false, updated_at = NOW()
-    WHERE is_public = true
-      AND user_id IN (
-        SELECT id FROM users WHERE email LIKE ${GOLDEN_PATH_TEST_PROFILE_EMAIL_LIKE}
-      )
+    SET spotify_id = NULL, spotify_url = NULL, is_public = false,
+        updated_at = NOW()
+    WHERE user_id IN (SELECT id FROM users WHERE email = ANY(${emails}))
   `;
 }
 
@@ -328,7 +342,7 @@ export async function unpublishGoldenPathTestProfiles(
  * SHARED_E2E_ARTIST_POOL whose Spotify id has no bound creator_profiles row.
  */
 export async function selectGoldenPathArtist(
-  sql: ReturnType<typeof neon>
+  sql: ReturnType<typeof dogfoodSql>
 ): Promise<{ id: string; name: string; url: string }> {
   await releaseGoldenPathTestBindings(sql);
   return selectUnclaimedCertArtist(SHARED_E2E_ARTIST_POOL, async spotifyId => {

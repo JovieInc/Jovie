@@ -42,7 +42,7 @@ describe('threads page System B source contract', () => {
 
     expect(source).toContain("className='flex h-full min-h-0 flex-col'");
     expect(source).toContain(
-      "className='min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6'"
+      "className='min-h-0 flex-1 overflow-y-auto px-3 py-3'"
     );
     expect(source).toContain('<ChatListSkeleton />');
     expect(source).toContain('<PageErrorState');

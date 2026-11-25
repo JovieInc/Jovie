@@ -586,7 +586,7 @@ def growth_bounds(state: Path, limits: dict) -> list[dict]:
         ("worktree-scan", count("worktrees"), limits.get("worktreeScan", 256), "dirs",
          "maintenance_preserved scans at most 256 checkouts"),
         ("outcome-candidate-scan", queue_scanned(), 200, "issues",
-         "outcome_lane.candidates stops after 200 Validating issues; later issues never get a receipt"),
+         "outcome scan page budget; inspect successive passes for cursor progress through the remaining Validating issues"),
     ]
     out = []
     for ident, used, limit, unit, effect in rows:

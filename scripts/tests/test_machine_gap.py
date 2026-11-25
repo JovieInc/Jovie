@@ -79,6 +79,31 @@ class GateTest(unittest.TestCase):
         self.assertNotEqual(
             solo, "fix-red-" + hashlib.sha256(b"Source Validation|Tently").hexdigest()[:10])
 
+    def test_a_dequeued_merge_group_log_names_the_check_when_the_rollup_is_empty(self):
+        # 2026-11-17 #24748: the queue ejected the PR, the head rollup was green, and
+        # queue_failure's "### merge group: CI" log still hashed fix-red-e3b0c44298.
+        empty = "fix-red-" + hashlib.sha256(b"").hexdigest()[:10]
+        self.assertEqual(empty, "fix-red-e3b0c44298")
+        log = "\n".join([
+            "### merge group: CI",
+            "AssertionError [ERR_ASSERTION]: stub warden was invoked",
+            "Error: ENOENT: marker file missing",
+        ])
+        named = gap.check_fingerprint({
+            "statusCheckRollup": [{"name": "CI", "conclusion": "SUCCESS"}],
+            "queueFailure": log,
+        })
+        ci = "fix-red-" + hashlib.sha256(b"CI").hexdigest()[:10]
+        self.assertEqual(named, ci)
+        self.assertNotEqual(named, empty)
+        self.assertEqual(gap.merge_group_check_names({"mergeGroupLog": log}), ["CI"])
+        rollup = gap.check_fingerprint({
+            "statusCheckRollup": [{"name": "Source Validation", "conclusion": "FAILURE"}],
+            "queueFailure": log,
+        })
+        self.assertEqual(rollup, "fix-red-" + hashlib.sha256(b"Source Validation").hexdigest()[:10])
+        self.assertEqual(gap.check_fingerprint({"statusCheckRollup": [], "queueFailure": ""}), empty)
+
     def test_a_lone_pr_ready_failure_is_not_the_empty_fix_red_class(self):
         empty = "fix-red-" + hashlib.sha256(b"").hexdigest()[:10]
         self.assertEqual(empty, "fix-red-e3b0c44298")

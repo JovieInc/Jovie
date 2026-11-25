@@ -6,7 +6,7 @@ import { isSizeExcluded } from './pr-size-exclusions.mjs';
 import { evaluatePrSizePolicy } from './pr-size-guard-policy.mjs';
 import {
   HYGIENE_LIMITS,
-  trackedBytesBudgetWarning,
+  logTrackedBytesBudgetWarnings,
 } from './repo-hygiene-limits.mjs';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
@@ -940,8 +940,7 @@ function syntheticRateLimitedPull(member, headSha) {
 }
 
 function logTrackedPayload(payload, log) {
-  const warning = trackedBytesBudgetWarning(payload.bytes);
-  if (warning) log(`::warning::Combined tree: ${warning}`);
+  logTrackedBytesBudgetWarnings(payload.bytes, log, 'Combined tree: ');
   log(
     `Combined tree: PASS — ${payload.bytes} tracked regular-file bytes across ${payload.files} files.`
   );

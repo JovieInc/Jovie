@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
@@ -277,6 +279,7 @@ const mockSetViewMode = vi.fn((viewMode: 'board' | 'list') => {
   mockViewMode = viewMode;
 });
 const mockRefetchTasks = vi.fn();
+const mockRefetchRelease = vi.fn();
 const mockRefetchTaskBoard = vi.fn();
 
 function createMockTaskBoardResult(
@@ -369,7 +372,7 @@ vi.mock('@/lib/queries/useReleaseEntityQuery', () => ({
       data: releaseId ? mockReleaseEntityData : null,
       isError: mockReleaseEntityIsError,
       isLoading: mockReleaseEntityIsLoading,
-      refetch: vi.fn(),
+      refetch: mockRefetchRelease,
     };
   },
 }));
@@ -660,6 +663,48 @@ vi.mock('@/components/organisms/table', () => ({
       />
     );
   },
+  TableRowOverflowTrigger: ({
+    ariaLabel = 'More actions',
+    disabled,
+    onClick,
+    children,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    ariaLabel?: string;
+    visibility?: string;
+  }) => (
+    <button
+      type='button'
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={onClick}
+      {...props}
+    >
+      {children}
+    </button>
+  ),
+  TableRowActionBar: ({
+    actions,
+    overflowAriaLabel = 'More actions',
+  }: {
+    actions?: readonly {
+      id: string;
+      label: string;
+      onClick?: () => void;
+    }[];
+    overflowAriaLabel?: string;
+  }) => (
+    <div data-testid='table-row-action-bar'>
+      {(actions ?? []).map(action => (
+        <button key={action.id} type='button' onClick={action.onClick}>
+          {action.label}
+        </button>
+      ))}
+      <button type='button' aria-label={overflowAriaLabel}>
+        More
+      </button>
+    </div>
+  ),
   convertContextMenuItems: vi.fn(() => []),
 }));
 
@@ -697,6 +742,17 @@ function HeaderActionsHost() {
 
 function renderPage() {
   return render(
+    <TooltipProvider>
+      <HeaderActionsProvider>
+        <HeaderActionsHost />
+        <TasksPageClient />
+      </HeaderActionsProvider>
+    </TooltipProvider>
+  );
+}
+
+function rerenderPage(view: ReturnType<typeof render>) {
+  view.rerender(
     <TooltipProvider>
       <HeaderActionsProvider>
         <HeaderActionsHost />
@@ -1144,7 +1200,7 @@ describe('TasksPageClient', () => {
     );
     expect(screen.getByTestId('tasks-table')).toHaveAttribute(
       'data-container-class-name',
-      'h-full overflow-y-auto overflow-x-hidden px-2.5 pb-2 pt-0.5'
+      'h-full overflow-y-auto overflow-x-hidden pb-2 pt-0.5'
     );
   });
 
@@ -1257,7 +1313,7 @@ describe('TasksPageClient', () => {
   });
 
   it('registers the release side panel from the selected task document', () => {
-    renderPage();
+    const view = renderPage();
     openTask();
 
     fireEvent.click(screen.getByRole('button', { name: 'QA Release' }));
@@ -1266,11 +1322,11 @@ describe('TasksPageClient', () => {
       'profile-1',
       'release-1'
     );
-    expect(mockRegisterRightPanel).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        type: expect.any(Function),
-      })
-    );
+    const panel = mockRegisterRightPanel.mock.calls.at(-1)?.[0];
+    expect(panel?.type).toEqual(expect.any(Function));
+    // A page render with the same selection must reuse the panel element.
+    rerenderPage(view);
+    expect(mockRegisterRightPanel.mock.calls.at(-1)?.[0]).toBe(panel);
   });
 
   it.each([
@@ -1536,14 +1592,7 @@ describe('TasksPageClient', () => {
       mockTask,
     ];
 
-    view.rerender(
-      <TooltipProvider>
-        <HeaderActionsProvider>
-          <HeaderActionsHost />
-          <TasksPageClient />
-        </HeaderActionsProvider>
-      </TooltipProvider>
-    );
+    rerenderPage(view);
 
     expect(screen.getByLabelText('Task Title')).toHaveValue(
       'Unsaved metadata-safe title'
@@ -2124,14 +2173,7 @@ describe('TasksPageClient', () => {
       vi.advanceTimersByTime(500);
     });
     mockTasksData = [{ ...mockTaskTwo, title: 'Optimistic title' }, mockTask];
-    view.rerender(
-      <TooltipProvider>
-        <HeaderActionsProvider>
-          <HeaderActionsHost />
-          <TasksPageClient />
-        </HeaderActionsProvider>
-      </TooltipProvider>
-    );
+    rerenderPage(view);
     fireEvent.click(
       screen.getByRole('button', { name: 'Emit unchanged editor update' })
     );
@@ -2317,5 +2359,23 @@ describe('TasksPageClient', () => {
 
     expect(screen.queryByLabelText('Task Title')).not.toBeInTheDocument();
     expect(screen.getByTestId('mobile-task-list')).toBeInTheDocument();
+  });
+});
+
+describe('TasksPageClient metadata controls (JOV-12567)', () => {
+  it('draws stage and priority pills at the 28px control height on their column', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../components/features/dashboard/tasks/TasksPageClient.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain(
+      '-mx-2 relative inline-flex h-7 min-w-0 items-center rounded-full px-2'
+    );
+    expect(source).toContain('sm:before:h-7 sm:before:min-w-0');
+    expect(source).not.toContain('-mx-1 relative inline-flex h-8');
   });
 });

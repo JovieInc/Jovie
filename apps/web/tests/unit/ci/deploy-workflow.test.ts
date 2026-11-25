@@ -19,6 +19,12 @@ import {
   triggerNames,
   workflowTriggers,
 } from '../../../../../scripts/lib/workflow-triggers.mjs';
+import {
+  getJobBlock,
+  getShellRunBlocks,
+  getStepBlock,
+  getStepRunScript,
+} from './deploy-workflow-yaml';
 
 type CheckoutStep = {
   uses?: string;
@@ -143,86 +149,12 @@ afterAll(() => {
   );
 });
 
-function getStepBlock(workflow: string, stepName: string): string {
-  const lines = workflow.split('\n');
-  const start = lines.findIndex(line => line.trim() === `- name: ${stepName}`);
-
-  expect(start, `Missing workflow step: ${stepName}`).toBeGreaterThanOrEqual(0);
-
-  const block: string[] = [];
-
-  for (let index = start; index < lines.length; index++) {
-    const line = lines[index]!;
-
-    if (index > start && line.startsWith('      - name: ')) break;
-    if (index > start && /^[a-zA-Z0-9_-]+:/.test(line)) break;
-
-    block.push(line);
-  }
-
-  return block.join('\n');
-}
-
 function getSentryStatsRequests(action: string): string[] {
   return (
     action.match(
       /STATS_RESPONSE=\$\(sentry_read_json[\s\S]*?"https:\/\/sentry\.io\/api\/0\/organizations\/\$SENTRY_ORG\/events-stats\/"\)/g
     ) ?? []
   );
-}
-
-function getJobBlock(workflow: string, jobKey: string): string {
-  const lines = workflow.split('\n');
-  const start = lines.findIndex(line => line === `  ${jobKey}:`);
-
-  expect(start, `Missing workflow job: ${jobKey}`).toBeGreaterThanOrEqual(0);
-
-  const block: string[] = [];
-
-  for (let index = start; index < lines.length; index++) {
-    const line = lines[index]!;
-
-    if (index > start && /^  [a-zA-Z0-9_-]+:/.test(line)) break;
-
-    block.push(line);
-  }
-
-  return block.join('\n');
-}
-
-function getShellRunBlocks(workflow: string): string[] {
-  const lines = workflow.split('\n');
-  const blocks: string[] = [];
-  for (let index = 0; index < lines.length; index++) {
-    const line = lines[index]!;
-    const match = /^(\s*)run:\s*(.*)$/.exec(line);
-    if (!match) continue;
-    const indentation = match[1]!.length;
-    const block = [match[2]!];
-    while (index + 1 < lines.length) {
-      const next = lines[index + 1]!;
-      if (next.trim() && next.search(/\S/) <= indentation) break;
-      block.push(next);
-      index += 1;
-    }
-    blocks.push(block.join('\n'));
-  }
-  return blocks;
-}
-
-function getStepRunScript(step: string): string {
-  const lines = step.split('\n');
-  const run = lines.findIndex(line => /^\s+run:\s*\|\s*$/.test(line));
-
-  expect(run, 'Missing multiline run script').toBeGreaterThanOrEqual(0);
-
-  const body = lines.slice(run + 1);
-  const indentation = Math.min(
-    ...body.filter(line => line.trim()).map(line => line.search(/\S/))
-  );
-  return body
-    .map(line => (line.trim() ? line.slice(indentation) : ''))
-    .join('\n');
 }
 
 describe('source PR path-output reachability contract', () => {
@@ -454,12 +386,32 @@ describe('CI test-performance path gate', () => {
       /TEST_PATTERN=[\s\S]*?else\n\s+RUN_TEST=false([\s\S]*?)\n\s+fi/
     )?.[1];
     expect(generalTestElse).not.toContain('run_test_performance');
-    const forkGuard = detectStep.slice(
-      detectStep.indexOf('if [[ "$IS_FORK" == "true" ]]')
-    );
-    expect(forkGuard).toContain(
-      'echo "run_test_performance=false" >> "$GITHUB_OUTPUT"'
-    );
+    const forkGuard = getStepRunScript(detectStep).match(
+      /^if \[\[ "\$IS_FORK" == "true" \]\]; then[\s\S]*?^fi$/m
+    )?.[0];
+    expect(forkGuard, 'fork path override').toBeDefined();
+    const dir = mkdtempSync(resolve(tmpdir(), 'fork-performance-output-'));
+    try {
+      const output = resolve(dir, 'step-output');
+      for (const isFork of ['true', 'false']) {
+        writeFileSync(output, 'run_test_performance=true\n');
+        const result = spawnSync('bash', ['-ec', forkGuard!], {
+          encoding: 'utf8',
+          env: { ...process.env, IS_FORK: isFork, GITHUB_OUTPUT: output },
+        });
+        expect(result.status, result.stderr).toBe(0);
+        const values = readFileSync(output, 'utf8')
+          .split('\n')
+          .filter(line => line.startsWith('run_test_performance='));
+        expect(values).toEqual(
+          isFork === 'true'
+            ? ['run_test_performance=true', 'run_test_performance=false']
+            : ['run_test_performance=true']
+        );
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
 
     expect(performanceJob).toContain(
       "github.event_name == 'workflow_dispatch'"
@@ -1023,7 +975,9 @@ describe('deploy workflow Vercel env resolution', () => {
     );
     expect(authorization).toContain('.aggregatePassed == true');
     expect(authorization).toContain('.total_count == (.jobs | length)');
-    expect(authorization).not.toContain('gh api --paginate --slurp');
+    expect(authorization).toMatch(
+      /gh api --paginate --slurp[^\n]*\n[^\n]*attempts\/\$source_run_attempt\/jobs\?per_page=100[^\n]*\n[^\n]*\| node scripts\/lib\/exact-github-listing\.mjs/
+    );
     expect(releaseCaller).not.toContain('concurrency:');
     expect(verified).not.toContain('concurrency:');
     expect(verified).toContain(
@@ -1156,6 +1110,11 @@ describe('deploy workflow Vercel env resolution', () => {
         fakeVercel,
         `#!/usr/bin/env bash
 set -euo pipefail
+# Post-upload settle calls inspect; capture deploy argv only.
+if [[ " $* " == *" inspect "* ]]; then
+  printf '%s\\n' '{"readyState":"READY","id":"dpl_argv"}'
+  exit 0
+fi
 printf '%s\\0' "$@" > "$ARGV_CAPTURE"
 printf 'raw-cli-output:%s\\n' "$VERCEL_TOKEN"
 printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
@@ -2043,12 +2002,26 @@ describe('unit-test runner capacity', () => {
     expect(unitJob).not.toContain('&& 5 || 3');
     // fileParallelism: !isCI in the fast config clamps maxWorkers to 1 unless
     // the shard opts back in; forks track nproc (4 hosted, 2 self-hosted).
-    expect(unitJob).toContain(
-      'VITEST_CI_FLAGS="--pool=forks --maxWorkers=$(nproc) --fileParallelism"'
-    );
-    expect(unitJob).not.toContain(
-      'VITEST_CI_FLAGS="--pool=forks --maxWorkers=3"'
-    );
+    const runUnits = getStepRunScript(getStepBlock(unitJob, 'Run unit tests'));
+    const flags = runUnits.match(/^ *VITEST_CI_FLAGS=.*$/m)?.[0];
+    expect(flags, 'missing worker options').toBeDefined();
+    for (const cpus of ['2', '7']) {
+      const shell = [
+        'nproc() { echo "$CPUS"; }',
+        flags!,
+        'printf "%s\\n" "${VITEST_CI_FLAGS[@]}"',
+      ].join('\n');
+      const result = spawnSync('bash', ['-ec', shell], {
+        encoding: 'utf8',
+        env: { ...process.env, CPUS: cpus },
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout.trim().split('\n')).toEqual([
+        '--pool=forks',
+        '--maxWorkers=' + cpus,
+        '--fileParallelism',
+      ]);
+    }
     // Each isolated fork re-parses the DOM environment and other externals;
     // the shared V8 compile cache lets later forks load bytecode instead.
     const compileCacheEnv =
@@ -3256,7 +3229,15 @@ describe('CI E2E smoke workflow', () => {
       'Golden path requires the dedicated real-auth lane'
     );
     expect(goldenPathSpec).toContain('prepareBetterAuthEmailOtp(page, {');
-    expect(goldenPathSpec).toContain('beforeResponseFulfill: ensureDbUser,');
+    // Keep → auth (JOV-14011): approve the app user and record operator
+    // proof before the claim response so the mount claim can publish.
+    expect(goldenPathSpec).toContain(
+      'beforeResponseFulfill: async betterAuthUserId => {'
+    );
+    expect(goldenPathSpec).toContain('await ensureDbUser(betterAuthUserId);');
+    expect(goldenPathSpec).toContain(
+      'await recordOperatorApproval(sql, betterAuthUserId, email);'
+    );
     expect(authHelper).toContain(
       "const signInRoute = '**/api/auth/sign-in/email-otp'"
     );

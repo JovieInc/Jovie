@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { HomepageNameSearch } from './HomepageNameSearch';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -162,5 +164,21 @@ describe('homepage read-only name discovery', () => {
     expect(
       screen.getByRole('link', { name: getClaimProfileIntent().label })
     ).toHaveAttribute('href', '/start');
+  });
+
+  it('types into the host-drawn field and stays axe-clean idle and after an error', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
+    const { container } = render(<HomepageNameSearch />);
+    await expectNoA11yViolations(container);
+
+    const field = screen.getByRole('textbox', { name: 'Search your name' });
+    expect(field).toHaveAttribute('data-host-drawn');
+    await user.type(field, 'Alex Example');
+    expect(field).toHaveValue('Alex Example');
+    expect(field.className).not.toMatch(/text-|bg-/);
+    await user.click(screen.getByRole('button', { name: 'Find me' }));
+    expect(await screen.findByRole('alert')).toBeVisible();
+    await expectNoA11yViolations(container);
   });
 });

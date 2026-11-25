@@ -60,6 +60,7 @@ describe('ActivityTableUnified', () => {
 
     expect(source).toContain("'@/lib/tanstack-table'");
     expect(source).not.toContain("'@tanstack/react-table'");
+    expect(source).toContain("rowMode='dense'");
   });
 
   it('scopes the noExplicitAny suppression to the TanStack column memo', () => {

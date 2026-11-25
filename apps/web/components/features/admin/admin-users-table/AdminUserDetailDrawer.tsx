@@ -95,7 +95,7 @@ export function AdminUserDetailDrawer({
       emptyMessage='Select a user to view details.'
       entityHeader={
         user ? (
-          <div className='px-3 pt-3'>
+          <div className='px-3 pt-6'>
             <EntityHeader
               title={user.name ?? 'Unnamed user'}
               stableLayout

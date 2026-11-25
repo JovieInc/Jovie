@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -41,9 +42,41 @@ describe('authoritative web unit selector', () => {
     expect(web.scripts['typecheck:tests']).toContain(
       'scripts/typecheck-web-tests.mjs'
     );
-    expect(read('.github/workflows/ci.yml')).toContain(
-      'pnpm turbo test:fast --filter=@jovie/web -- $VITEST_CI_FLAGS'
-    );
+    const webShard = read('.github/workflows/ci.yml')
+      .split('\n')
+      .find(
+        line =>
+          line.trimStart().startsWith('pnpm turbo ') &&
+          line.includes('--passWithNoTests=false')
+      );
+    expect(webShard, 'required merge-group web shard').toBeDefined();
+    const command = (webShard ?? '')
+      .replaceAll('${{ matrix.shard }}', '2/7')
+      .replaceAll('${{ steps.quarantine.outputs.unit_excludes }}', '');
+    const probe = [
+      'pnpm() { printf "%s\\0" "$@"; }',
+      'VITEST_CI_FLAGS=(--pool=forks "--reporter=with space")',
+      'RETRY_FLAG=--retry=2',
+      'WEB_CACHE_FLAG=--force',
+      'OUTPUT_FLAG="--outputFile=report name.xml"',
+      command,
+    ].join('\n');
+    const args = execFileSync('bash', ['-euc', probe], { encoding: 'utf8' })
+      .split('\0')
+      .slice(0, -1);
+    expect(args).toEqual([
+      'turbo',
+      AUTHORITATIVE_WEB_UNIT_TURBO_TASK,
+      '--filter=@jovie/web',
+      '--force',
+      '--',
+      '--pool=forks',
+      '--reporter=with space',
+      '--retry=2',
+      '--passWithNoTests=false',
+      '--shard=2/7',
+      '--outputFile=report name.xml',
+    ]);
 
     const tsconfig = json('apps/web/tsconfig.test.json');
     expect(tsconfig.exclude).toEqual(

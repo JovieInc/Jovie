@@ -1,3 +1,4 @@
+import AuthenticationServices
 import SwiftUI
 
 struct AuthScreen: View {
@@ -87,6 +88,52 @@ func mobileAuthFailureMessage(for error: Error) -> String {
   return MobileAuthCopy.failure
 }
 
+func isAuthSessionCancellation(_ error: Error) -> Bool {
+  if error is CancellationError {
+    return true
+  }
+
+  if let error = error as? ASWebAuthenticationSessionError {
+    return error.code == .canceledLogin
+  }
+
+  return false
+}
+
+/// Stable machine reason for `auth_failed` breadcrumbs. Never user content.
+func mobileAuthFailureReason(for error: Error) -> String {
+  if let coordinatorError = error as? MobileAuthCoordinatorError {
+    switch coordinatorError {
+    case .invalidAuthURL:
+      return "invalid_auth_url"
+    case .sessionStartFailed:
+      return "session_start_failed"
+    case .missingCallbackURL:
+      return "missing_callback_url"
+    case .providerError:
+      return "provider_error"
+    case .randomGenerationFailed:
+      return "random_generation_failed"
+    }
+  }
+
+  if isAuthSessionPresentationContextInvalid(error) {
+    return "presentation_context_invalid"
+  }
+
+  return "browser_auth_failed"
+}
+
+func isAuthSessionPresentationContextInvalid(_ error: Error) -> Bool {
+  if let error = error as? ASWebAuthenticationSessionError {
+    return error.code == .presentationContextInvalid
+  }
+
+  let nsError = error as NSError
+  return nsError.domain == ASWebAuthenticationSessionErrorDomain
+    && nsError.code == ASWebAuthenticationSessionError.Code.presentationContextInvalid.rawValue
+}
+
 private struct BrowserAuthActions: View {
   let isOpening: Bool
   let isDisabled: Bool
@@ -114,10 +161,8 @@ private struct ContinueInBrowserButton: View {
   let hasRecoveryMessage: Bool
   let action: () -> Void
 
-  private static let minimumHitTargetHeight: CGFloat = 44
-
   private static var minimumHitTargetPadding: CGFloat {
-    max((minimumHitTargetHeight - JovieActionButtonMetrics.height) / 2, 0)
+    max((JovieActionButtonMetrics.hitTarget - JovieActionButtonMetrics.height) / 2, 0)
   }
 
   var body: some View {

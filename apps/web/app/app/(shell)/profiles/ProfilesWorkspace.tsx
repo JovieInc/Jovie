@@ -17,7 +17,6 @@ import {
   CircleX,
   ExternalLink,
   Globe2,
-  MoreHorizontal,
   Orbit,
   Plus,
   RefreshCw,
@@ -75,6 +74,7 @@ import {
   convertToCommonDropdownItems,
   PageToolbar,
   TableEmptyState,
+  TableRowOverflowTrigger,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
@@ -1692,16 +1692,10 @@ function ProfilesWorkspaceContent({
                 </Button>
               ) : null}
               <TableActionMenu items={actionItems} align='end' trigger='custom'>
-                <button
-                  type='button'
-                  aria-label={`Actions for ${row.label}`}
+                <TableRowOverflowTrigger
                   ref={node => registerRemovalTrigger(row.id, node)}
-                  onClick={event => event.stopPropagation()}
-                  onKeyDown={event => event.stopPropagation()}
-                  className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-colors duration-fast hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/50 sm:h-8 sm:w-8'
-                >
-                  <MoreHorizontal className='h-4 w-4' aria-hidden />
-                </button>
+                  ariaLabel={`Actions for ${row.label}`}
+                />
               </TableActionMenu>
             </div>
           );
@@ -1720,13 +1714,28 @@ function ProfilesWorkspaceContent({
     ]
   );
 
-  useRegisterRightPanel(
-    data ? (
-      isAddConnectionOpen ? (
+  // Memoized: built inline, this panel was a new element on every render of
+  // the workspace, which re-rendered the shell frame and header each time.
+  const selectedId = selected?.id ?? null;
+  const selectedSourceQuery =
+    data && selectedId
+      ? sourceIdentityQueries[
+          (data.rows ?? []).findIndex(row => row.id === selectedId)
+        ]
+      : undefined;
+  const selectedSourceIdentity = selectedSourceQuery?.data;
+  const selectedSourceLoading = selectedSourceQuery?.isFetching ?? false;
+  const refetchSelectedSource = selectedSourceQuery?.refetch;
+  const suggestedCount = connectionSuggestions.length;
+  const suggestionsLoading = connectionSuggestionsQuery.isLoading;
+  const rightPanel = useMemo(() => {
+    if (!data) return null;
+    if (isAddConnectionOpen) {
+      return (
         <AddConnectionRail
           data={data}
-          suggestedCount={connectionSuggestions.length}
-          suggestionsLoading={connectionSuggestionsQuery.isLoading}
+          suggestedCount={suggestedCount}
+          suggestionsLoading={suggestionsLoading}
           onClose={() => {
             setPendingCandidate(null);
             setIsAddConnectionOpen(false);
@@ -1748,34 +1757,39 @@ function ProfilesWorkspaceContent({
             setIsAddConnectionOpen(false);
           }}
         />
-      ) : selected ? (
-        <ConnectionRail
-          data={data}
-          row={selected}
-          onClose={() => setSelected(null)}
-          onIdentityDecision={handleIdentityDecision}
-          sourceIdentity={
-            sourceIdentityQueries[
-              (data.rows ?? []).findIndex(row => row.id === selected.id)
-            ]?.data
-          }
-          sourceLoading={
-            sourceIdentityQueries[
-              (data.rows ?? []).findIndex(row => row.id === selected.id)
-            ]?.isFetching ?? false
-          }
-          onRetrySource={() => {
-            void sourceIdentityQueries[
-              (data.rows ?? []).findIndex(row => row.id === selected.id)
-            ]?.refetch();
-          }}
-          contextMenuItems={convertToCommonDropdownItems(
-            getContextMenuItems(selected)
-          )}
-        />
-      ) : null
-    ) : null
-  );
+      );
+    }
+    if (!selected) return null;
+    return (
+      <ConnectionRail
+        data={data}
+        row={selected}
+        onClose={() => setSelected(null)}
+        onIdentityDecision={handleIdentityDecision}
+        sourceIdentity={selectedSourceIdentity}
+        sourceLoading={selectedSourceLoading}
+        onRetrySource={() => {
+          void refetchSelectedSource?.();
+        }}
+        contextMenuItems={convertToCommonDropdownItems(
+          getContextMenuItems(selected)
+        )}
+      />
+    );
+  }, [
+    data,
+    getContextMenuItems,
+    handleIdentityDecision,
+    isAddConnectionOpen,
+    refetchSelectedSource,
+    selected,
+    selectedSourceIdentity,
+    selectedSourceLoading,
+    setSelected,
+    suggestedCount,
+    suggestionsLoading,
+  ]);
+  useRegisterRightPanel(rightPanel);
 
   if (!data) {
     return (
@@ -1889,7 +1903,7 @@ function ProfilesWorkspaceContent({
           }
         }}
         getContextMenuItems={getContextMenuItems}
-        rowMode='list'
+        rowMode='dense'
         containerClassName={cn('min-h-0 flex-1', styles.identityContainer)}
         minWidth='0'
         className={styles.table}

@@ -26,8 +26,8 @@ const codexSetupSh = readFileSync(
 );
 
 const tempRoots = [];
-const { makeWorktree, makeLinkedWorktreeWithBarePrimary } =
-  createWorktreeFixtures(makeTempDir);
+const { makeWorktree, makeLinkedWorktreeWithBarePrimary, makeToolStubs } =
+  createWorktreeFixtures(makeTempDir, writeExecutable);
 afterEach(() => {
   for (const root of tempRoots.splice(0)) {
     rmSync(root, { recursive: true, force: true });
@@ -43,16 +43,6 @@ function makeTempDir(prefix) {
 function writeExecutable(filePath, contents) {
   writeFileSync(filePath, contents);
   chmodSync(filePath, 0o755);
-}
-
-function makeToolStubs({
-  nodeVersion = 'v24.21.0',
-  pnpmVersion = '9.15.9',
-} = {}) {
-  const bin = makeTempDir('jovie-setup-health-bin-');
-  writeExecutable(join(bin, 'node'), `#!/bin/sh\necho ${nodeVersion}\n`);
-  writeExecutable(join(bin, 'pnpm'), `#!/bin/sh\necho ${pnpmVersion}\n`);
-  return bin;
 }
 
 /**
@@ -349,6 +339,13 @@ describe('package prepare hook lifecycle', () => {
       configurator
     );
     writeFileSync(
+      join(root, 'scripts/hooks/verify-git-hooks.sh'),
+      readFileSync(
+        resolve(repoRoot, 'scripts/hooks/verify-git-hooks.sh'),
+        'utf8'
+      )
+    );
+    writeFileSync(
       join(root, 'package.json'),
       JSON.stringify({
         name: 'prepare-fixture',
@@ -356,6 +353,7 @@ describe('package prepare hook lifecycle', () => {
         scripts: { prepare },
       })
     );
+    writeExecutable(join(root, '.husky/pre-commit'), '#!/bin/sh\nexit 0\n');
     writeExecutable(
       join(root, '.husky/pre-push'),
       '#!/bin/sh\nprintf "gate executed\\n" > "$HOOK_MARKER"\nexit 17\n'
@@ -390,7 +388,7 @@ describe('package prepare hook lifecycle', () => {
     expect(prepare).toContain('scripts/hooks/configure-git-hooks.sh');
     expect(prepare).toContain('[ -f scripts/hooks/configure-git-hooks.sh ]');
     expect(prepare).toContain('${VERCEL:-}');
-    expect(prepare).toContain('${CI:-}');
+    expect(prepare).toContain('${GITHUB_ACTIONS:-}');
   });
 
   it('keeps tracked push gates active in another linked worktree after package prepare', () => {
@@ -406,6 +404,7 @@ describe('package prepare hook lifecycle', () => {
       'add',
       'package.json',
       'scripts/hooks/configure-git-hooks.sh',
+      '.husky/pre-commit',
       '.husky/pre-push',
     ]);
     git(['commit', '-m', 'seed fixture']);
@@ -451,13 +450,13 @@ describe('package prepare hook lifecycle', () => {
     ).toBe('');
   });
 
-  it('skips hook setup on Vercel and CI even when the helper is present', () => {
+  it('skips hook setup on Vercel and GitHub Actions even when the helper is present', () => {
     const { root, env, run } = fixture();
     expect(run('git', ['init', '--initial-branch=main']).status).toBe(0);
     expect(run('git', ['config', 'core.hooksPath', '.husky/_']).status).toBe(0);
     for (const [key, value] of [
       ['VERCEL', '1'],
-      ['CI', 'true'],
+      ['GITHUB_ACTIONS', 'true'],
     ]) {
       const result = spawnSync('pnpm', ['run', 'prepare'], {
         cwd: root,
@@ -472,6 +471,21 @@ describe('package prepare hook lifecycle', () => {
         run('git', ['config', '--get', 'core.hooksPath']).stdout.trim()
       ).toBe('.husky/_');
     }
+  });
+
+  it('configures hooks when only CI is set so agent containers keep the gate', () => {
+    const { root, env, run } = fixture();
+    expect(run('git', ['init', '--initial-branch=main']).status).toBe(0);
+    const result = spawnSync('pnpm', ['run', 'prepare'], {
+      cwd: root,
+      env: { ...env, CI: 'true' },
+      encoding: 'utf8',
+      timeout: 10000,
+    });
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+    expect(
+      run('git', ['config', '--get', 'core.hooksPath']).stdout.trim()
+    ).toBe('.husky');
   });
 
   it('propagates a broken tracked-hook configuration inside Git', () => {

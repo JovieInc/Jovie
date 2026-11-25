@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
 import { fetchRows, main, summarize } from '../../ai-gateway-report.mjs';
 
 const rows = [
@@ -36,7 +39,15 @@ describe('ai-gateway-report', () => {
     expect(out[2].reasoningTokensPerRequest).toBeNull();
   });
 
-  it('reads rows through the shared client with the key as a bearer token', async () => {
+  it('reads rows through the shared client with the key as a bearer token', async ({
+    onTestFinished,
+  }) => {
+    const stateDir = mkdtempSync(join(tmpdir(), 'ai-gateway-report-'));
+    onTestFinished(() => {
+      vi.unstubAllEnvs();
+      rmSync(stateDir, { recursive: true, force: true });
+    });
+    vi.stubEnv('JOVIE_API_STATE_DIR', stateDir);
     const seen = [];
     const fetchImpl = async (url, init) => {
       seen.push({

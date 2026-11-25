@@ -1,6 +1,6 @@
 'use client';
 
-import { MENU_ITEM_BASE } from '@jovie/ui';
+import { MENU_ITEM_BASE, PlainButton } from '@jovie/ui';
 import { Check } from 'lucide-react';
 import { type ReactNode, useCallback } from 'react';
 import { cn } from '@/lib/utils';
@@ -72,7 +72,7 @@ export function FilterCheckboxItem({
     ) : null;
 
   return (
-    <button
+    <PlainButton
       type='button'
       aria-checked={checked}
       data-filter-item
@@ -109,6 +109,6 @@ export function FilterCheckboxItem({
         label={label}
         trailingVisual={trailingVisual}
       />
-    </button>
+    </PlainButton>
   );
 }

@@ -376,14 +376,28 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
 
   private func presentBrowserFailure(_ error: Error) {
     if isAuthSessionCancellation(error) {
-      Observability.addBreadcrumb(.authSessionClosed, context: ["reason": "user_cancelled"])
+      Observability.addBreadcrumb(
+        .authCancelled,
+        context: ["reason": "user_cancelled"]
+      )
     } else if case MobileAuthCoordinatorError.providerError = error {
       // The callback parser already recorded the provider failure.
     } else {
-      Observability.addBreadcrumb(.authSessionClosed, level: .warning,
-        context: ["reason": "browser_auth_failed"])
-      Observability.captureError(error, event: .authSessionClosed,
-        context: ["stage": "browser_auth", "error_type": String(describing: type(of: error))])
+      let reason = mobileAuthFailureReason(for: error)
+      Observability.addBreadcrumb(
+        .authFailed,
+        level: .warning,
+        context: ["reason": reason]
+      )
+      Observability.captureError(
+        error,
+        event: .authFailed,
+        context: [
+          "stage": "browser_auth",
+          "reason": reason,
+          "error_type": String(describing: type(of: error)),
+        ]
+      )
       Logger(subsystem: Bundle.main.bundleIdentifier ?? "ie.jov.Jovie", category: "Auth")
         .error("Mobile browser auth failed: \(error.localizedDescription, privacy: .public)")
     }
@@ -428,11 +442,7 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
       codeChallenge: codeChallenge,
       nativeAttempt: nativeAttempt
     ) else {
-      Observability.addBreadcrumb(
-        .authSessionClosed,
-        level: .warning,
-        context: ["reason": "invalid_auth_url"]
-      )
+      // presentBrowserFailure classifies this as auth_failed once.
       MobileAuthDiagnostics.record("auth_url_invalid")
       completion(.failure(MobileAuthCoordinatorError.invalidAuthURL))
       return
@@ -501,7 +511,7 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
             attempt: attempt
           ) {
             Observability.addBreadcrumb(
-              .authSessionClosed,
+              .authPresentationRetry,
               level: .warning,
               context: [
                 "reason": "presentation_context_invalid_retry",
@@ -517,13 +527,7 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
             return
           }
 
-          Observability.addBreadcrumb(
-            .authSessionClosed,
-            context: [
-              "reason": "session_error",
-              "error_type": String(describing: type(of: error)),
-            ]
-          )
+          // presentBrowserFailure is the single cancel-vs-fail classifier.
           self.pendingStore.clear(matching: pending)
           MobileAuthDiagnostics.record("auth_session_error", detail: error.localizedDescription)
           completion(.failure(error))
@@ -604,11 +608,7 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
       self.sessionID = nil
       self.session = nil
       cancelSession = nil
-      Observability.addBreadcrumb(
-        .authSessionClosed,
-        level: .warning,
-        context: ["reason": "missing_presentation_anchor"]
-      )
+      // presentBrowserFailure classifies this as auth_failed once.
       pendingStore.clear(matching: pending)
       MobileAuthDiagnostics.record(
         "auth_session_start_failed",
@@ -622,11 +622,7 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
       self.sessionID = nil
       self.session = nil
       cancelSession = nil
-      Observability.addBreadcrumb(
-        .authSessionClosed,
-        level: .warning,
-        context: ["reason": "session_start_failed"]
-      )
+      // presentBrowserFailure classifies this as auth_failed once.
       pendingStore.clear(matching: pending)
       MobileAuthDiagnostics.record("auth_session_start_failed")
       completion(.failure(MobileAuthCoordinatorError.sessionStartFailed))
@@ -915,28 +911,6 @@ final class MobileAuthCoordinator: NSObject, ObservableObject, ASWebAuthenticati
     let digest = SHA256.hash(data: Data(verifier.utf8))
     return Data(digest).base64URLEncodedString()
   }
-}
-
-func isAuthSessionCancellation(_ error: Error) -> Bool {
-  if error is CancellationError {
-    return true
-  }
-
-  if let error = error as? ASWebAuthenticationSessionError {
-    return error.code == .canceledLogin
-  }
-
-  return false
-}
-
-func isAuthSessionPresentationContextInvalid(_ error: Error) -> Bool {
-  if let error = error as? ASWebAuthenticationSessionError {
-    return error.code == .presentationContextInvalid
-  }
-
-  let nsError = error as NSError
-  return nsError.domain == ASWebAuthenticationSessionErrorDomain
-    && nsError.code == ASWebAuthenticationSessionError.Code.presentationContextInvalid.rawValue
 }
 
 private extension String {

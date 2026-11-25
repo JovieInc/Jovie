@@ -23,6 +23,7 @@ export const OVIE_MCP_TOOLS = [
   'get_proof_brief',
   'list_linear_issues',
   'create_linear_issue',
+  'publish_view',
   'list_github_pull_requests',
   'get_github_pull_request',
   'list_github_issues',
@@ -51,6 +52,7 @@ export const OVIE_MCP_TOOL_SCOPES = {
   get_proof_brief: 'ovie:read',
   list_linear_issues: 'ovie:read',
   create_linear_issue: 'ovie:write',
+  publish_view: 'ovie:write',
   list_github_pull_requests: 'ovie:read',
   get_github_pull_request: 'ovie:read',
   list_github_issues: 'ovie:read',
@@ -81,6 +83,8 @@ export class OvieMcpInputError extends Error {
       | 'state must be open, closed, or all'
       | 'number must be a positive integer'
       | 'invalid initiative handoff'
+      | 'invalid view spec'
+      | 'view not found'
       | 'audience must be investor, customer, manager, founder, or internal'
       | 'kind must be observed, inference, proposal, or approved-decision'
       | 'verification requires action and repository together with actor'

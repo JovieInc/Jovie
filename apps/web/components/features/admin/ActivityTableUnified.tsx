@@ -9,7 +9,6 @@ import {
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
 import type { AdminActivityItem, AdminActivityStatus } from '@/lib/admin/types';
-import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { CellContext, ColumnDef } from '@/lib/tanstack-table';
 import { createColumnHelper } from '@/lib/tanstack-table';
 
@@ -215,7 +214,7 @@ export function ActivityTableSkeleton({
           isLoading
           skeletonRows={rows}
           skeletonColumnConfig={ACTIVITY_SKELETON_COLUMN_CONFIG}
-          rowHeight={TABLE_ROW_HEIGHTS.STANDARD}
+          rowMode='dense'
         />
       </div>
     </div>

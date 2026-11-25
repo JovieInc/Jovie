@@ -93,6 +93,7 @@ export async function updateUserBillingStatus(
     plan,
     stripeCustomerId,
     stripeSubscriptionId,
+    expectedSubscriptionId,
     stripePriceId,
     stripeEventId,
     stripeEventTimestamp,
@@ -123,12 +124,28 @@ export async function updateUserBillingStatus(
     const currentUser = userResult.data;
     affectedUserId = currentUser.id;
 
+    if (
+      !isPro &&
+      expectedSubscriptionId &&
+      currentUser.stripeSubscriptionId &&
+      currentUser.stripeSubscriptionId !== expectedSubscriptionId
+    ) {
+      return {
+        success: true,
+        appUserId: currentUser.id,
+        skipped: true,
+        skipReason: 'subscription_mismatch',
+        reason: 'Active subscription replaced before downgrade',
+      };
+    }
+
     // Event ordering: Skip if this event is older than the last processed event
     if (isEventStale(stripeEventTimestamp, currentUser.lastBillingEventAt)) {
       return {
         success: true,
         appUserId: currentUser.id,
         skipped: true,
+        skipReason: 'stale_event',
         reason: 'Event is older than last processed event',
       };
     }
@@ -182,6 +199,7 @@ export async function updateUserBillingStatus(
       success: true,
       appUserId: result.appUserId,
       skipped: result.deduplicated,
+      skipReason: result.deduplicated ? 'duplicate_event' : undefined,
       reason: result.deduplicated ? 'Stripe event already applied' : undefined,
     };
   } catch (error) {
@@ -229,6 +247,7 @@ async function retryUpdateWithFreshData(
     plan,
     stripeCustomerId,
     stripeSubscriptionId,
+    expectedSubscriptionId,
     stripePriceId,
     stripeEventId,
     stripeEventTimestamp,
@@ -272,12 +291,28 @@ async function retryUpdateWithFreshData(
     const freshUser = freshUserResult.data;
     affectedUserId = freshUser.id;
 
+    if (
+      !isPro &&
+      expectedSubscriptionId &&
+      freshUser.stripeSubscriptionId &&
+      freshUser.stripeSubscriptionId !== expectedSubscriptionId
+    ) {
+      return {
+        success: true,
+        appUserId: freshUser.id,
+        skipped: true,
+        skipReason: 'subscription_mismatch',
+        reason: 'Active subscription replaced before downgrade',
+      };
+    }
+
     // Re-check event ordering with fresh data
     if (isEventStale(stripeEventTimestamp, freshUser.lastBillingEventAt)) {
       return {
         success: true,
         appUserId: freshUser.id,
         skipped: true,
+        skipReason: 'stale_event',
         reason: 'Event is older than last processed event (on retry)',
       };
     }
@@ -351,6 +386,7 @@ async function retryUpdateWithFreshData(
       success: true,
       appUserId: result.appUserId,
       skipped: result.deduplicated,
+      skipReason: result.deduplicated ? 'duplicate_event' : undefined,
       reason: result.deduplicated ? 'Stripe event already applied' : undefined,
     };
   } catch (error) {

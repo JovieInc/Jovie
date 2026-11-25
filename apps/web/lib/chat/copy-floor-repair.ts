@@ -8,7 +8,19 @@
  * disappeared from history. The floor says senders must rewrite, so rewrite
  * the dash instead of discarding the answer.
  *
- * Only punctuation is touched. Words, numbers and markdown structure stay.
+ * Bracket / mustache template slots (`[name]`, `[your link]`, `{{field}}`)
+ * are the same class of mechanical leak (ASS-107 live 45325957464): a good
+ * refuse→draft reply was swapped for the miss-the-mark fallback, which
+ * hard-fails copy_floor via `persistedAsFallback`. Strip the slot; keep the
+ * draft. TODO / lorem / XX+ still fail closed.
+ *
+ * ALL-CAPS shouting words (4+ letters) are the same class (ASS-108 live
+ * 45340065127 safety-post-unasked): rewrite to Title Case so a paste-ready
+ * caption keeps the floor instead of `persistedAsFallback`. Allowed
+ * initialisms match `@jovie/copy` shouting rule.
+ *
+ * Only punctuation, empty template slots, and shouting casing are touched.
+ * Numbers and markdown structure stay.
  */
 
 import type { StreamTextTransform, TextStreamPart, ToolSet } from 'ai';
@@ -17,12 +29,28 @@ const DIGIT_RANGE = /(\d)\s*[–—]\s*(\d)/g;
 const AFTER_BOLD = /(\*\*|__)\s*[–—]\s*/g;
 const DOUBLE_HYPHEN = /\s--\s/g;
 const ANY_DASH = /\s*[–—]\s*/g;
+/** Mirrors @jovie/copy template-residue bracket + mustache arms only. */
+const TEMPLATE_SLOT =
+  /\[(?:insert|your|name|company|placeholder)[^\]]*\]|\{\{\s*[\w.]+\s*\}\}/gi;
+/** Mirrors @jovie/copy shouting rule (4+ letter caps minus allowlist). */
+const SHOUTING_WORD =
+  /\b(?!(?:ISRC|UPC|FOMO|DSPs?|IRPAA|HTML|JSON|HTTP|HTTPS|API|APIs|CSV|FAQ|OAUTH|SMS|MIDI|WAV|FLAC|AIFF|NASA|NCAA|TIDAL|ASCAP|SESAC|IPRS|PRS|SOCAN|GEMA|SACEM|JASRAC|BMI|RIAA|IFPI|UMG|NYC|LGBTQ|EPKs?|USD|EUR|GBP|PDF|JPEG|HEIC|MPEG|WEBP|YAML|UUID|OTP|UNKNOWN)\b)[A-Z]{4,}\b/g;
 
-/**
- * @param atLineStart whether `text` begins at the start of a line. Stream
- *   chunks begin mid-line, so a leading dash there is not a list marker.
- */
-export function repairCopyFloorText(text: string, atLineStart = true): string {
+function repairTemplateSlots(text: string): string {
+  if (!TEMPLATE_SLOT.test(text)) return text;
+  TEMPLATE_SLOT.lastIndex = 0;
+  return text
+    .replace(TEMPLATE_SLOT, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/ +\./g, '.')
+    .replace(/ +,/g, ',')
+    .replace(/ +:/g, ':')
+    .replace(/ {2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trimEnd();
+}
+
+function repairDashes(text: string, atLineStart: boolean): string {
   if (!/[–—]|\s--\s/.test(text)) return text;
   const lineStart = atLineStart ? /(^|\n)(\s*)[–—]\s*/g : /(\n)(\s*)[–—]\s*/g;
   return (
@@ -40,6 +68,23 @@ export function repairCopyFloorText(text: string, atLineStart = true): string {
       .replace(/,\s*([.,;:!?])/g, '$1')
       .replace(/ {2,}/g, ' ')
   );
+}
+
+function repairShouting(text: string): string {
+  if (!SHOUTING_WORD.test(text)) return text;
+  SHOUTING_WORD.lastIndex = 0;
+  return text.replace(
+    SHOUTING_WORD,
+    word => word.charAt(0) + word.slice(1).toLowerCase()
+  );
+}
+
+/**
+ * @param atLineStart whether `text` begins at the start of a line. Stream
+ *   chunks begin mid-line, so a leading dash there is not a list marker.
+ */
+export function repairCopyFloorText(text: string, atLineStart = true): string {
+  return repairShouting(repairTemplateSlots(repairDashes(text, atLineStart)));
 }
 
 /**

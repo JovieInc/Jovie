@@ -131,7 +131,7 @@ jobs:
           PORT: '3917'
         run: |
           nohup node apps/web/scripts/dev-fast.mjs > "$RUNNER_TEMP/dev.log" 2>&1 &
-          for i in $(seq 1 60); do
+          for ((i = 1; i <= 60; i++)); do
             code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 120 http://localhost:3917/ || true)"
             if [ "$code" = 200 ]; then
               # Prove test sign-in works before any capture; a 500 here is the

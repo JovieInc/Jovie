@@ -15,61 +15,20 @@ import { delimiter, resolve } from 'node:path';
 import { load as parseYaml } from 'js-yaml';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import {
+  type ActionStep,
+  actionStep,
+  actionSteps,
+  coldHosted,
+  evaluateCondition,
+  setupAction,
+  stepIndex,
+} from './runner-setup-fixture';
+import { registerPreparedWorkspaceTests } from './runner-setup-prepared-workspace';
+
 const repoRoot = resolve(import.meta.dirname, '../../../../..');
 
-// JOV-7707: the setup action is checked from its parsed YAML. Step `if:`
-// expressions are evaluated for each event, and the prune shell runs against
-// a fixture .pnpm tree.
-type ActionStep = {
-  id?: string;
-  name?: string;
-  if?: string;
-  uses?: string;
-  run?: string;
-  env?: Record<string, string>;
-  with?: Record<string, unknown>;
-};
-const setupAction = parseYaml(
-  readFileSync(
-    resolve(repoRoot, '.github/actions/setup-node-pnpm/action.yml'),
-    'utf8'
-  )
-) as {
-  inputs: Record<string, { default?: string }>;
-  runs: { steps: ActionStep[] };
-};
-const actionSteps = setupAction.runs.steps;
-const actionStep = (name: string) => {
-  const found = actionSteps.find(step => step.name === name);
-  expect(found, name).toBeDefined();
-  return found as ActionStep;
-};
-const stepIndex = (name: string) =>
-  actionSteps.findIndex(step => step.name === name);
-
-// Minimal GitHub Actions expression evaluator: literals, context paths,
-// ==, !=, !, &&, || and parentheses (all the setup action uses).
-function evaluateCondition(
-  expression: string | undefined,
-  context: Record<string, string>
-): boolean {
-  if (!expression) return true;
-  const tokens =
-    expression
-      .replace(/^\$\{\{|\}\}$/g, '')
-      .match(/'[^']*'|==|!=|&&|\|\||!|\(|\)|[A-Za-z_][\w.-]*/g) ?? [];
-  const source = tokens
-    .map(token => {
-      if (token.startsWith("'")) return JSON.stringify(token.slice(1, -1));
-      if (token === '==') return '===';
-      if (token === '!=') return '!==';
-      if (['&&', '||', '!', '(', ')'].includes(token)) return token;
-      if (token === 'true' || token === 'false') return `'${token}'`;
-      return `(ctx[${JSON.stringify(token)}] ?? '')`;
-    })
-    .join(' ');
-  return Boolean(new Function('ctx', `return (${source});`)(context));
-}
+registerPreparedWorkspaceTests();
 
 describe('self-hosted runner setup action', () => {
   const pruneRoots: string[] = [];
@@ -77,20 +36,6 @@ describe('self-hosted runner setup action', () => {
     for (const root of pruneRoots.splice(0))
       rmSync(root, { recursive: true, force: true });
   });
-  const coldHosted = {
-    'steps.runner-prereqs.outputs.dependencies_warm': 'false',
-    'runner.environment': 'github-hosted',
-    'runner.os': 'Linux',
-    'inputs.package_cache': 'true',
-    'inputs.reuse_merge_group_workspace': 'false',
-    'inputs.save_merge_group_workspace': 'false',
-    'steps.node-modules-cache.outcome': 'success',
-    'steps.node-modules-cache.outputs.cache-hit': 'false',
-    'steps.node-modules-cache.outputs.cache-matched-key': '',
-    'github.event_name': 'push',
-    'github.repository': 'JovieInc/Jovie',
-    'github.event.pull_request.head.repo.full_name': 'JovieInc/Jovie',
-  };
 
   it('uses the warning-free pinned installer without saving pnpm stores', () => {
     expect(

@@ -67,11 +67,11 @@ read_state() {  # read_state <num>
   local name="${REPO#*/}"
   [[ -n "$owner" && -n "$name" && "$owner" != "$name" ]]
   gh_retry api graphql \
-    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){isDraft headRefOid headRefName body state autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{id} labels(first:100){nodes{name}}}}}' \
+    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){isDraft headRefOid headRefName body state reviewDecision autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{id} labels(first:100){nodes{name}}}}}' \
     -f owner="$owner" \
     -f name="$name" \
     -F number="$n" \
-    --jq '.data.repository.pullRequest | {draft: .isDraft, head: ((.headRefOid // "") | ascii_downcase), branch: .headRefName, body: (.body // ""), labels: [.labels.nodes[].name], state: .state, autoMerge: (.autoMergeRequest != null), queued: (.isInMergeQueue == true or .mergeQueueEntry != null)}'
+    --jq '.data.repository.pullRequest | {draft: .isDraft, head: ((.headRefOid // "") | ascii_downcase), branch: .headRefName, body: (.body // ""), labels: [.labels.nodes[].name], state: .state, reviewDecision: (.reviewDecision // ""), autoMerge: (.autoMergeRequest != null), queued: (.isInMergeQueue == true or .mergeQueueEntry != null)}'
 }
 
 state_needs_promotion() {  # state_needs_promotion <json> <expected-head> <expected-branch>
@@ -80,6 +80,7 @@ state_needs_promotion() {  # state_needs_promotion <json> <expected-head> <expec
     and .head == $expected_head
     and .branch == $expected_branch
     and ([.labels[] | select(test($hold_re))] | length == 0)
+    and ((.reviewDecision // "") != "CHANGES_REQUESTED")
     and .draft == true
   ' <<<"$1" >/dev/null
 }
@@ -288,10 +289,11 @@ echo "$SNAP" | jq -c --arg hold_re "$HOLD_LABEL_RE" '.[]
     draft_after="$(jq -r '.draft' <<<"$after")"
     state_after="$(jq -r '.state // "UNKNOWN"' <<<"$after")"
     held_after="$(jq -r --arg hold_re "$HOLD_LABEL_RE" '[.labels[] | select(test($hold_re))] | join(",")' <<<"$after")"
+    review_after="$(jq -r '.reviewDecision // ""' <<<"$after")"
 
     if [[ "$state_after" != "OPEN" ]]; then
       upsert_status_comment "$n" "🤖 Auto-ready: the exact head reached terminal state=${state_after} during verification. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
-    elif [[ "$draft_after" == "false" && "$head_after" == "$expected_head" && "$branch_after" == "$expected_branch" && -z "$held_after" ]]; then
+    elif [[ "$draft_after" == "false" && "$head_after" == "$expected_head" && "$branch_after" == "$expected_branch" && -z "$held_after" && "$review_after" != "CHANGES_REQUESTED" ]]; then
       upsert_status_comment "$n" "🤖 Auto-ready: marked the exact head ready. Merge Queue Green Enroll admits it once required checks pass. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
     elif [[ "$draft_after" == "false" ]]; then
       if ! undo_ready "$n"; then

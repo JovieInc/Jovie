@@ -19,7 +19,12 @@ import { useIsAuthenticated } from '@/hooks/useIsAuthenticated';
 import { usePublicPathname } from '@/lib/navigation/use-public-pathname';
 import { cn } from '@/lib/utils';
 
-type NavLink = { href: string; label: string };
+type NavLink = { readonly href: string; readonly label: string };
+type NavGroup = {
+  readonly id: string;
+  readonly label: string;
+  readonly links: readonly NavLink[];
+};
 
 // ── Hoisted style objects (avoid re-creating on every render → less GC pressure) ──
 
@@ -106,12 +111,14 @@ function MobileNavCta({
 
 export function MobileNav({
   navLinks: customNavLinks,
+  groups,
   includePublicLogin = true,
   publicCtaHref,
   publicCtaLabel,
   authenticatedUserSlot,
 }: {
-  readonly navLinks?: ReadonlyArray<{ href: string; label: string }>;
+  readonly navLinks?: readonly NavLink[];
+  readonly groups?: readonly NavGroup[];
   readonly includePublicLogin?: boolean;
   readonly publicCtaHref?: string;
   readonly publicCtaLabel?: string;
@@ -119,6 +126,7 @@ export function MobileNav({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
   const pathname = usePublicPathname();
   const isAuthed = useIsAuthenticated();
   const { isSignedIn: clerkSignedIn } = useAuthSafe();
@@ -143,6 +151,10 @@ export function MobileNav({
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    if (isOpen) panelRef.current?.querySelector('a')?.focus();
+  }, [isOpen]);
+
   // Close on Escape key
   useEffect(() => {
     if (!isOpen) return;
@@ -161,6 +173,28 @@ export function MobileNav({
     showAuthenticatedAction,
     includePublicLogin
   );
+
+  function renderLink(link: NavLink, index: number) {
+    return (
+      <Link
+        key={`${link.href}-${link.label}`}
+        href={link.href}
+        aria-current={pathname === link.href ? 'page' : undefined}
+        className={cn(
+          'flex items-center h-13 px-4 rounded-xl focus-ring-themed',
+          'text-base font-medium text-primary-token',
+          'transition-colors duration-subtle ease-subtle motion-reduce:transition-none',
+          'hover:bg-(--linear-bg-hover)',
+          pathname === link.href && 'bg-(--linear-bg-hover)',
+          'animate-[mobile-nav-item-in_400ms_ease-out_both] motion-reduce:animate-none'
+        )}
+        style={{ animationDelay: `${80 + index * 50}ms` }}
+        onClick={close}
+      >
+        {link.label}
+      </Link>
+    );
+  }
 
   // Portal target for overlay + nav panel (avoids backdrop-filter containing block)
   const portalTarget = typeof document === 'undefined' ? null : document.body;
@@ -214,6 +248,7 @@ export function MobileNav({
 
             {/* Navigation panel */}
             <nav
+              ref={panelRef}
               id='mobile-nav-panel'
               className={cn(
                 'fixed inset-x-0 bottom-0 z-[100]',
@@ -231,30 +266,29 @@ export function MobileNav({
 
               {/* Nav links */}
               <div className='flex flex-col gap-1 px-4 pt-1'>
-                {navLinks.map((link, index) => (
-                  <Link
-                    key={`${link.href}-${link.label}`}
-                    href={link.href}
-                    className={cn(
-                      'flex items-center h-13 px-4 rounded-xl',
-                      'text-base font-medium',
-                      'text-primary-token',
-                      'transition-colors duration-subtle ease-subtle',
-                      'hover:bg-(--linear-bg-hover)',
-                      'animate-[mobile-nav-item-in_400ms_ease-out_both]'
-                    )}
-                    style={{
-                      animationDelay: `${80 + index * 50}ms`,
-                    }}
-                    onClick={close}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
+                {groups?.map(group => {
+                  const [first, second] = group.links;
+                  if (!first) return null;
+                  if (!second) {
+                    return renderLink(
+                      { href: first.href, label: group.label },
+                      0
+                    );
+                  }
+                  return (
+                    <section key={group.id} aria-label={group.label}>
+                      <p className='px-4 pt-2 text-sm text-secondary-token'>
+                        {group.label}
+                      </p>
+                      {group.links.map(renderLink)}
+                    </section>
+                  );
+                })}
+                {navLinks.map(renderLink)}
 
                 {/* Primary CTA */}
                 <div
-                  className='pt-2 animate-[mobile-nav-item-in_400ms_ease-out_both]'
+                  className='pt-2 animate-[mobile-nav-item-in_400ms_ease-out_both] motion-reduce:animate-none'
                   style={{
                     animationDelay: `${80 + navLinks.length * 50}ms`,
                   }}

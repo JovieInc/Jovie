@@ -2,6 +2,32 @@ import { createHash } from 'node:crypto';
 import { extractDailyReceipts } from './daily-changelog.mjs';
 import { readCustomerNote } from './daily-changelog-publication.mjs';
 
+/** Follow only bounded same-origin HTTPS redirects for customer-path proof. */
+export async function fetchCustomerEvidence(url, fetchPage) {
+  let current = new URL(url);
+  const origin = current.origin;
+  if (
+    current.protocol !== 'https:' ||
+    !['jov.ie', 'docs.jov.ie'].includes(current.hostname) ||
+    current.username ||
+    current.password ||
+    current.port
+  )
+    throw new Error('Invalid customer evidence origin');
+  for (let redirects = 0; redirects <= 5; redirects += 1) {
+    const response = await fetchPage(current.href);
+    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
+    const location = response.headers?.get('location');
+    if (!location || redirects === 5)
+      throw new Error('Invalid customer evidence redirect');
+    const next = new URL(location, current);
+    if (next.origin !== origin || next.username || next.password)
+      throw new Error('Invalid customer evidence redirect');
+    current = next;
+  }
+  throw new Error('Customer evidence redirect limit exceeded');
+}
+
 /** Batch PR reads; no per-commit API polling and no title-to-copy fallback. */
 export async function collectCustomerCandidates({
   markdown,
@@ -85,7 +111,7 @@ export async function collectCustomerCandidates({
           candidate.evidencePassed = true;
           for (const evidence of note.evidence) {
             try {
-              const page = await fetchPage(evidence.url);
+              const page = await fetchCustomerEvidence(evidence.url, fetchPage);
               const text = await page.text();
               const passed = page.ok && text.includes(evidence.contains);
               candidate.evidencePassed &&= passed;

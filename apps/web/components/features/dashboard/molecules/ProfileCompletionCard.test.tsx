@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -174,5 +176,19 @@ describe('ProfileCompletionCard', () => {
       await screen.findByText('أضف صورة للملف الشخصي')
     ).toBeInTheDocument();
     await expectNoA11yViolations(container);
+  });
+
+  it('loads the motion engine lazily so it stays out of first-load JS', () => {
+    const source = readFileSync(
+      resolve(__dirname, './ProfileCompletionCard.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain("import * as m from 'motion/react-m'");
+    expect(source).toContain('<LazyDomAnimationMotion>');
+    expect(source).not.toMatch(
+      /import\s*\{[^}]*\bmotion\b[^}]*\}\s*from\s*'motion\/react'/
+    );
+    expect(source).not.toContain('<motion.');
   });
 });

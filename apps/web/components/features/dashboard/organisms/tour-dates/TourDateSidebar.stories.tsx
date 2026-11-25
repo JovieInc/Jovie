@@ -67,3 +67,21 @@ export const Empty: Story = {
     tourDate: null,
   },
 };
+
+export const LongContentVenue: Story = {
+  args: {
+    tourDate: {
+      ...tourDate,
+      title:
+        'The Extended Anniversary World Tour With Special Guests And Orchestra',
+      venueName:
+        'The Grand Municipal Auditorium And Convention Centre At Riverside',
+    },
+  },
+};
+
+export const PartialNoTicketLink: Story = {
+  args: {
+    tourDate: { ...tourDate, ticketUrl: null, region: null, startTime: null },
+  },
+};

@@ -127,6 +127,9 @@ describe('Actions cache GC', () => {
     expect(turboFamily('Linux-next-build-web-v1-abc-20260922')).toBe(
       'Linux-next-build-web'
     );
+    expect(turboFamily('Linux-next-build-ovie-v1-abc-20260922')).toBe(
+      'Linux-next-build-ovie'
+    );
     expect(turboFamily('jovie-production-next-cache-v1-Linux-abc')).toBeNull();
     expect(turboFamily('jovie-web-tsbuildinfo-v2-Linux-abc-h2026092610')).toBe(
       'jovie-web-tsbuildinfo'

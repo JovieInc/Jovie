@@ -49,6 +49,7 @@ printf authenticated >"$out"`
   const env = {
     ...process.env,
     PATH: `${dir}:${process.env.PATH}`,
+    JOVIE_API_STATE_DIR: dir,
     CALLS: join(dir, 'calls'),
     TEST_ANONYMOUS: anonymous,
     TEST_GH: gh,

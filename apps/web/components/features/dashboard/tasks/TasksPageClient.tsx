@@ -140,10 +140,12 @@ import {
 } from './task-action-registry';
 import { taskSearchFromPills } from './task-header-search';
 import {
+  getReleasePanelStatus,
   getTaskAssigneeVisual,
   getTaskPriorityVisual,
   getTaskStageVisual,
   getTaskStatusVisual,
+  type ReleasePanelStatus,
   TASK_STATUS_LABEL_CLASSNAME,
 } from './task-presentation';
 
@@ -177,7 +179,6 @@ const TASK_WORKSPACE_PANE_CLASSNAME = 'min-h-0 overflow-hidden';
 const TASK_VIEW_MODES: Array<'board' | 'list'> = ['board', 'list'];
 
 type MobileTaskScope = 'all' | 'open' | 'done';
-type ReleasePanelStatus = 'loading' | 'error' | 'empty';
 type TaskEditorSaveStatus =
   | 'idle'
   | 'dirty'
@@ -489,7 +490,7 @@ const TaskMetaTrigger = forwardRef<
       ref={ref}
       type='button'
       className={cn(
-        '-mx-1 relative inline-flex h-8 min-w-0 items-center rounded-full px-2 text-secondary-token transition-[background-color,color] duration-subtle before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,transparent)] hover:text-primary-token data-[state=open]:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,transparent)] data-[state=open]:text-primary-token sm:before:h-8 sm:before:min-w-0',
+        '-mx-2 relative inline-flex h-7 min-w-0 items-center rounded-full px-2 text-secondary-token transition-[background-color,color] duration-subtle before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,transparent)] hover:text-primary-token data-[state=open]:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,transparent)] data-[state=open]:text-primary-token sm:before:h-7 sm:before:min-w-0',
         className
       )}
       {...props}
@@ -2097,12 +2098,12 @@ export function TasksPageClient() {
     };
   }, [handleCloseShortcut, handleRowNavigationShortcut]);
 
-  const closeReleaseSidebar = useCallback(() => {
-    setSelectedReleaseId(null);
-  }, []);
-
-  const sidebarPanel = selectedReleaseId ? (
-    selectedRelease ? (
+  const closeReleaseSidebar = useCallback(() => setSelectedReleaseId(null), []);
+  const releasePanelStatus = getReleasePanelStatus(selectedReleaseQuery);
+  const refetchRelease = selectedReleaseQuery.refetch;
+  const sidebarPanel = useMemo(() => {
+    if (!selectedReleaseId) return null;
+    return selectedRelease ? (
       <ReleaseSidebar
         release={selectedRelease}
         mode='admin'
@@ -2114,20 +2115,19 @@ export function TasksPageClient() {
       />
     ) : (
       <TaskReleasePanelStatus
-        status={
-          selectedReleaseQuery.isError
-            ? 'error'
-            : selectedReleaseQuery.isLoading
-              ? 'loading'
-              : 'empty'
-        }
+        status={releasePanelStatus}
         onClose={closeReleaseSidebar}
-        onRetry={() => {
-          Promise.resolve(selectedReleaseQuery.refetch()).catch(() => {});
-        }}
+        onRetry={() => void Promise.resolve(refetchRelease()).catch(() => {})}
       />
-    )
-  ) : null;
+    );
+  }, [
+    artistName,
+    closeReleaseSidebar,
+    refetchRelease,
+    releasePanelStatus,
+    selectedRelease,
+    selectedReleaseId,
+  ]);
   useRegisterRightPanel(sidebarPanel);
 
   const showAssigneeInListRows = assigneeFilter === 'all';

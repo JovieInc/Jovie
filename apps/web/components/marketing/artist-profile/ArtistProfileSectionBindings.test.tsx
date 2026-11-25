@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import type { ImgHTMLAttributes } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
+import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 import { ArtistProfileCaptureSection } from './ArtistProfileCaptureSection';
 import { ArtistProfileFaq } from './ArtistProfileFaq';
 import { ArtistProfileFinalCta } from './ArtistProfileFinalCta';
@@ -28,7 +29,7 @@ vi.mock('next/image', () => ({
 }));
 
 describe('Artist profile section delegation', () => {
-  it('keeps the hero and adaptive product split as distinct semantic roots, with no unpermissioned logo strip', () => {
+  it('keeps one left-aligned hero with the mode-morphing mock inside, and no unpermissioned logo strip', () => {
     render(
       <ArtistProfileHeroAdaptiveIntro
         hero={ARTIST_PROFILE_COPY.hero}
@@ -37,11 +38,16 @@ describe('Artist profile section delegation', () => {
       />
     );
     const hero = screen.getByTestId('marketing-section-hero');
-    const adaptive = screen.getByTestId('marketing-section-feature-split');
     expect(hero.tagName).toBe('SECTION');
-    expect(adaptive.tagName).toBe('SECTION');
-    expect(hero.contains(adaptive)).toBe(false);
-    expect(adaptive).toHaveAttribute('data-marketing-occurrence', 'adaptive');
+    expect(hero).toHaveAttribute('data-marketing-variant', 'left-phone');
+    expect(
+      screen.getByTestId('artist-profile-section-adaptive')
+    ).toBeInTheDocument();
+    expect(
+      hero.contains(screen.getByTestId('artist-profile-section-adaptive'))
+    ).toBe(true);
+    // Cut sections no longer mount a second feature-split phone.
+    expect(screen.queryByTestId('marketing-section-feature-split')).toBeNull();
     // No brand has granted permission for this page (JOV-7795).
     expect(screen.queryByTestId('marketing-section-logo-cloud')).toBeNull();
   });
@@ -87,7 +93,7 @@ describe('Artist profile section delegation', () => {
     );
     expect(screen.getByTestId('final-cta-action')).toHaveAttribute(
       'href',
-      '/start'
+      getClaimProfileIntent().href
     );
   });
 });

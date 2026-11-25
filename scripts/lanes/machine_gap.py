@@ -32,6 +32,9 @@ ESTIMATE_TEXT = re.compile(r"(?:est(?:imate)?[-_ ]?usd|estimated cost)[:= ]+\$?(
 STOP = frozenset({"the", "a", "an", "of", "to", "for", "in", "on", "and", "or", "fix", "feat", "chore", "test", "when", "with", "is", "not"})
 MAX_BYTES = 4 * 1024 * 1024
 MACHINE_LINE = re.compile(r"^(?:machine-gap|machine):\s*(\S.*)$", re.IGNORECASE | re.MULTILINE)
+# queue_failure() writes this heading. The PR rollup stays green after a dequeue, so
+# without it every merge-group repair hashes the empty name list (fix-red-e3b0c44298).
+MERGE_GROUP_HEADING = re.compile(r"^### merge group:\s*(\S.*?)\s*$", re.MULTILINE)
 
 
 def fingerprint(title: str, labels=()) -> str:
@@ -130,6 +133,22 @@ def red_checks(checks: list, red: set[str], aggregate: tuple[str, ...] = ("pr re
     return without_aggregate_sibling(reds, hard=hard)
 
 
+def merge_group_check_names(pr: dict) -> list[str]:
+    """Workflow names from a dequeued merge-group log, in heading order.
+
+    `queue_failure` prefixes the failed workflow (`### merge group: CI`). The PR head's
+    rollup does not carry that check, so a fingerprint that reads only the rollup is the
+    empty-name class. A missing or blank heading contributes nothing.
+    """
+    text = "\n".join(str(pr.get(key) or "") for key in ("queueFailure", "mergeGroupLog"))
+    names: list[str] = []
+    for match in MERGE_GROUP_HEADING.finditer(text):
+        name = match.group(1).strip()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
 def check_fingerprint(pr: dict) -> str:
     """Hash the latest failing check names.
 
@@ -139,6 +158,9 @@ def check_fingerprint(pr: dict) -> str:
     PR Ready is skipped unless it is the only hard failure.
     An empty name list is fix-red-e3b0c44298. empty_review.stale_review_only refuses that
     dispatch when the only signal is a loaded review with no current-head body.
+    When the rollup names nothing, a `### merge group: <workflow>` heading on
+    queueFailure or mergeGroupLog names that workflow instead of the empty class.
+    A rollup that already names a check is unchanged, so the log cannot open a second class.
     """
     red = {"FAILURE", "TIMED_OUT", "CANCELLED"}
     hard = {"FAILURE", "TIMED_OUT"}
@@ -148,7 +170,9 @@ def check_fingerprint(pr: dict) -> str:
     if any(str(check.get("conclusion") or "").upper() in hard for check in checks):
         checks = [check for check in checks if str(check.get("conclusion") or "").upper() in hard]
     checks = without_aggregate_sibling(checks, hard=hard)
-    names = sorted({str(check.get("name")) for check in checks})
+    names = sorted({str(check.get("name")) for check in checks if str(check.get("name") or "")})
+    if not names:
+        names = sorted(merge_group_check_names(pr))
     return "fix-red-" + hashlib.sha256("|".join(names).encode()).hexdigest()[:10]
 
 

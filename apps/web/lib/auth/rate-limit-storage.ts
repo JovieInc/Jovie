@@ -1,9 +1,16 @@
 import 'server-only';
 
 import type { BetterAuthOptions } from 'better-auth';
+import { env } from '@/lib/env-server';
 import { getRedis } from '@/lib/redis';
+import {
+  redisStoreEnvFrom,
+  selectRedisStore,
+  warnRedisStoreDecision,
+} from '@/lib/redis-store';
 import { withTimeout } from '@/lib/resilience/primitives';
 import { logger } from '@/lib/utils/logger';
+import { isSensitiveAuthRateLimitPath } from './rate-limit-rules';
 
 /**
  * Better Auth path rate limits only.
@@ -13,9 +20,21 @@ import { logger } from '@/lib/utils/logger';
  * counter Better Auth used to run through `secondaryStorage.increment`. It
  * does not get, set, or delete session records.
  *
- * Failures degrade open: a Redis outage must not block sign-in. The counter
- * and its TTL are one Redis script. A separate INCR then EXPIRE can leave a
- * key with no TTL, and later counts never reset.
+ * Outage policy (SEC-02): when the selected store is Upstash or local Redis
+ * and that backend is missing, times out, or cannot establish a TTL,
+ * sensitive auth paths (email OTP, passwordless, phone OTP, credential
+ * mutation) fail closed — deny with Retry-After = window. Non-abuse paths
+ * still degrade open.
+ *
+ * Non-production intentionally selects the in-memory store
+ * (`selectRedisStore` → `memory`). That is not an outage: use a process-local
+ * fixed-window counter (same split as `RateLimiter.failClosed` which only
+ * fails closed when `storeKind === 'upstash'`). Do not treat intentional
+ * memory as Redis-down fail-closed — that blocks OTP/sign-in in preview,
+ * local, CI, and E2E.
+ *
+ * The Redis counter and its TTL are one script; a separate INCR then EXPIRE
+ * can leave a key with no TTL, and later counts never reset.
  */
 
 const OP_TIMEOUT_MS = 500;
@@ -47,15 +66,139 @@ type AuthRateLimitStorage = NonNullable<
   NonNullable<BetterAuthOptions['rateLimit']>['customStorage']
 >;
 
+type AuthRateLimitRule = Parameters<AuthRateLimitStorage['consume']>[1];
+
+type AuthRateLimitDecision = Awaited<
+  ReturnType<AuthRateLimitStorage['consume']>
+>;
+
+type MemoryEntry = { count: number; resetAtMs: number };
+
+/** Process-local counters for intentional non-prod memory store only. */
+const memoryCounters = new Map<string, MemoryEntry>();
+
+/** Soft cap so a pathological high-cardinality spray cannot pin the process. */
+const MEMORY_COUNTER_MAX_ENTRIES = 10_000;
+
+/**
+ * Drop expired windows. Same probabilistic pattern as
+ * `MemoryRateLimiter` — non-security Math.random for cleanup sampling.
+ */
+function cleanupExpiredMemoryCounters(now: number): void {
+  for (const [key, entry] of memoryCounters) {
+    if (now >= entry.resetAtMs) {
+      memoryCounters.delete(key);
+    }
+  }
+}
+
+function maybeCleanupMemoryCounters(now: number): void {
+  // NOSONAR (S2245) - Non-security use: probabilistic in-memory cleanup
+  if (Math.random() < 0.1) {
+    cleanupExpiredMemoryCounters(now);
+  }
+  if (memoryCounters.size <= MEMORY_COUNTER_MAX_ENTRIES) {
+    return;
+  }
+  // Hard overflow: drop oldest-reset entries until under the cap.
+  const overflow = memoryCounters.size - MEMORY_COUNTER_MAX_ENTRIES;
+  const byReset = [...memoryCounters.entries()].sort(
+    (a, b) => a[1].resetAtMs - b[1].resetAtMs
+  );
+  for (let i = 0; i < overflow; i += 1) {
+    const entry = byReset[i];
+    if (!entry) break;
+    memoryCounters.delete(entry[0]);
+  }
+}
+
+/** Better Auth keys are `${ip}|${pathname}`. */
+export function pathFromAuthRateLimitKey(key: string): string {
+  const sep = key.indexOf('|');
+  return sep === -1 ? key : key.slice(sep + 1);
+}
+
+function denyWithRetryAfter(rule: AuthRateLimitRule): AuthRateLimitDecision {
+  return { allowed: false, retryAfter: rule.window };
+}
+
+function allowOpen(): AuthRateLimitDecision {
+  return { allowed: true, retryAfter: null };
+}
+
+function decisionOnBackendFailure(
+  key: string,
+  rule: AuthRateLimitRule,
+  reason: string
+): AuthRateLimitDecision {
+  const path = pathFromAuthRateLimitKey(key);
+  if (isSensitiveAuthRateLimitPath(path)) {
+    logger.warn(
+      '[auth/rate-limit] Redis unavailable, denying sensitive auth request',
+      { key, path, reason }
+    );
+    return denyWithRetryAfter(rule);
+  }
+  logger.warn(
+    '[auth/rate-limit] Redis unavailable, allowing non-sensitive auth request',
+    { key, path, reason }
+  );
+  return allowOpen();
+}
+
+/**
+ * Fixed-window counter for intentional `memory` store selection.
+ * Not shared across instances; only used when Redis is not the selected store.
+ */
+function consumeFromMemory(
+  key: string,
+  rule: AuthRateLimitRule
+): AuthRateLimitDecision {
+  const now = Date.now();
+  maybeCleanupMemoryCounters(now);
+  const windowMs = rule.window * 1000;
+  const redisKey = `${KEY_PREFIX}${key}`;
+  const existing = memoryCounters.get(redisKey);
+
+  if (!existing || now >= existing.resetAtMs) {
+    memoryCounters.set(redisKey, { count: 1, resetAtMs: now + windowMs });
+    return allowOpen();
+  }
+
+  const count = existing.count + 1;
+  memoryCounters.set(redisKey, { count, resetAtMs: existing.resetAtMs });
+  if (count <= rule.max) {
+    return allowOpen();
+  }
+  const retryAfter = Math.max(1, Math.ceil((existing.resetAtMs - now) / 1000));
+  return { allowed: false, retryAfter };
+}
+
+/** Test-only: clear intentional-memory counters between cases. */
+export function resetAuthRateLimitMemoryForTests(): void {
+  memoryCounters.clear();
+}
+
+/** Test-only: inspect process-local counter cardinality. */
+export function authRateLimitMemorySizeForTests(): number {
+  return memoryCounters.size;
+}
+
 export const authRateLimitStorage = {
   async consume(key, rule) {
+    const decision = selectRedisStore(redisStoreEnvFrom(env));
+    warnRedisStoreDecision(decision);
+
+    // Intentional non-prod memory store — not a Redis outage.
+    if (decision.kind === 'memory') {
+      return consumeFromMemory(key, rule);
+    }
+
     const redis = getRedis();
     if (!redis) {
-      logger.warn(
-        '[auth/rate-limit] Redis unavailable, allowing auth request',
-        { key }
-      );
-      return { allowed: true, retryAfter: null };
+      // Upstash/local Redis selected but client unavailable (missing creds,
+      // quota circuit, init cooldown, transient failure).
+      return decisionOnBackendFailure(key, rule, 'redis-missing');
     }
 
     try {
@@ -73,17 +216,20 @@ export const authRateLimitStorage = {
       );
       const count = typeof raw === 'number' ? raw : Number(raw);
       if (!Number.isFinite(count) || count < 0) {
-        return { allowed: true, retryAfter: null };
+        // Script returned -1 (TTL could not be set) or a non-numeric result.
+        // Sensitive paths must not treat an untrustworthy counter as a pass.
+        return decisionOnBackendFailure(key, rule, 'counter-untrusted');
       }
       if (count <= rule.max) {
         return { allowed: true, retryAfter: null };
       }
       return { allowed: false, retryAfter: rule.window };
     } catch (error) {
-      logger.warn('[auth/rate-limit] increment failed, allowing auth request', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return { allowed: true, retryAfter: null };
+      return decisionOnBackendFailure(
+        key,
+        rule,
+        error instanceof Error ? error.message : String(error)
+      );
     }
   },
 } satisfies AuthRateLimitStorage;

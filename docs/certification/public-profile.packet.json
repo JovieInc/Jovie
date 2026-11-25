@@ -1,0 +1,24 @@
+{
+  "schema": "jovie.certification-packet-file/v1",
+  "domain": "public_profiles",
+  "surface": "Public Profile",
+  "owner": null,
+  "packetUpdatedAt": "2026-11-22T00:00:00.000Z",
+  "links": [],
+  "packet": {
+    "contract": "jovie.certification/v1",
+    "subject": {
+      "id": "public-profile",
+      "kind": "surface",
+      "title": "Public Profile"
+    },
+    "source": null,
+    "canonicalReferences": [],
+    "invariantEvaluation": [],
+    "testsCoverage": [],
+    "visualProof": [],
+    "requiredVariants": [],
+    "itemMedia": [],
+    "operational": {}
+  }
+}

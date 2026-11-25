@@ -122,12 +122,8 @@ export function Bars({
         const isToday = index === lastIndex;
         const isBest =
           summary.best !== null && point.date === summary.best.date;
-        const height =
-          point.count === null
-            ? 0
-            : Math.max(4, Math.round((point.count / max) * (PLOT_HEIGHT - 44)));
-        const showValue =
-          point.count !== null && (showEveryValue || isBest || isToday);
+        const height = ((point.count ?? 0) / max) * (PLOT_HEIGHT - 44);
+        const showValue = showEveryValue || isBest || isToday;
         return (
           <div
             key={point.date}
@@ -156,17 +152,19 @@ export function Bars({
             >
               {point.count === null ? '–' : format(point.count)}
             </div>
-            {point.count === null ? (
+            {point.count === null && !showValue && (
               <div
                 style={{
                   display: 'flex',
                   width: '100%',
-                  height: 4,
-                  borderRadius: 2,
-                  backgroundColor: CHART_TOKENS.borderDefault,
+                  maxWidth: 8,
+                  height: 2,
+                  marginBottom: 3,
+                  backgroundColor: CHART_TOKENS.secondary,
                 }}
               />
-            ) : (
+            )}
+            {height > 0 && (
               <div
                 style={{
                   display: 'flex',
@@ -176,9 +174,10 @@ export function Bars({
                   backgroundColor: isToday
                     ? CHART_TOKENS.selected
                     : CHART_TOKENS.ion,
-                  border: isToday
-                    ? `2px solid ${CHART_TOKENS.ion}`
-                    : `0px solid ${CHART_TOKENS.ion}`,
+                  border:
+                    isToday && height >= 4
+                      ? `2px solid ${CHART_TOKENS.ion}`
+                      : `0px solid ${CHART_TOKENS.ion}`,
                   opacity: isToday || isBest ? 1 : 0.78,
                 }}
               />
@@ -414,9 +413,7 @@ export function ShippingChart({
         }}
       >
         <div style={{ display: 'flex' }}>
-          {org.complete
-            ? repoParts.join('  ·  ')
-            : 'Some days are still loading'}
+          {org.complete ? repoParts.join('  ·  ') : '– Not measured'}
         </div>
         <div style={{ display: 'flex' }}>
           {clock ? `Pacific days · as of ${clock}` : 'Pacific days'}

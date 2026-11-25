@@ -407,11 +407,57 @@ describe('ShippingMatrix rendering (JOV-6893)', () => {
     renderMatrix();
 
     expect(
-      await screen.findByText(/In-flight work is unknown until the next sync/)
-    ).toBeInTheDocument();
+      await screen.findAllByText(
+        /In-flight work is unknown until the next sync/
+      )
+    ).not.toHaveLength(0);
     expect(
       screen.queryByText('No open lane pull requests.')
     ).not.toBeInTheDocument();
+    // Header and empty table share one freshness decision: never "0 open" on stale.
+    expect(screen.queryByText(/0 open/)).not.toBeInTheDocument();
+  });
+
+  it('keeps known stale rows labeled stale instead of inventing zero', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        projection(
+          [
+            task(9, {
+              title: 'Cached release',
+              pullRequest: pullRequest({
+                number: 109,
+                checks: { rollup: 'success', failing: [] },
+              }),
+            }),
+          ],
+          { syncState: 'stale' }
+        )
+      )
+    );
+
+    renderMatrix();
+
+    expect(
+      await screen.findByText(/1 open · 0 need attention · stale cache/)
+    ).toBeInTheDocument();
+    expect(screen.getByText('Cached release')).toBeInTheDocument();
+    expect(
+      screen.queryByText('No open lane pull requests.')
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not invent zero while the cache is still syncing', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(projection([], { syncState: 'syncing' }))
+    );
+
+    renderMatrix();
+
+    expect(
+      await screen.findAllByText('Syncing in-flight work…')
+    ).not.toHaveLength(0);
+    expect(screen.queryByText(/0 open/)).not.toBeInTheDocument();
   });
 
   it('rejects an invalid shipping receipt', async () => {

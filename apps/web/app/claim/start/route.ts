@@ -21,10 +21,11 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { isReservedPublicProfileIdentity } from '@/lib/profile/public-profile-identity-policy';
 import {
-  allowIfRateLimitBackendDegraded,
   claimTokenAccessLimiter,
   createRateLimitHeaders,
   getClientIP,
+  rateLimitDenialMessage,
+  rateLimitDenialStatus,
 } from '@/lib/rate-limit';
 import { isSpotifyAvailable, spotifyClient } from '@/lib/spotify';
 import { ACQUISITION_COOKIE_NAME } from '@/lib/tracking/consent';
@@ -133,15 +134,22 @@ function redirectWithClaimCookies(
  * proof-checked claim, sign-up, onboarding or checkout step.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const rateLimit = allowIfRateLimitBackendDegraded(
-    await claimTokenAccessLimiter.limit(`claim-start:${getClientIP(request)}`),
-    { route: '/claim/start' }
+  // Fail closed on Redis outage — claim-start records funnel + sets cookies.
+  const rateLimit = await claimTokenAccessLimiter.limit(
+    `claim-start:${getClientIP(request)}`
   );
   if (!rateLimit.success) {
-    return new NextResponse('Too many requests', {
-      status: 429,
-      headers: createRateLimitHeaders(rateLimit),
-    });
+    return new NextResponse(
+      rateLimitDenialMessage(
+        rateLimit,
+        'Too many requests',
+        'Claim start is temporarily unavailable. Please try again later.'
+      ),
+      {
+        status: rateLimitDenialStatus(rateLimit),
+        headers: createRateLimitHeaders(rateLimit),
+      }
+    );
   }
 
   const spotifyParam = request.nextUrl.searchParams.get('spotify');

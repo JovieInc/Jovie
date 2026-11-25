@@ -233,3 +233,14 @@ export function getTaskCategoryLabel(
   if (!trimmed) return null;
   return capitalizeFirst(trimmed);
 }
+
+export type ReleasePanelStatus = 'loading' | 'error' | 'empty';
+
+/** Recovery state of the release rail while a task's release is not loaded. */
+export function getReleasePanelStatus(query: {
+  readonly isError: boolean;
+  readonly isLoading: boolean;
+}): ReleasePanelStatus {
+  if (query.isError) return 'error';
+  return query.isLoading ? 'loading' : 'empty';
+}

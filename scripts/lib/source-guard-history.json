@@ -1,0 +1,6 @@
+{
+  "schema": "jovie.source-guard-history/v1",
+  "window": null,
+  "entries": {},
+  "_refresh": "Set entries[<guardId>] = { \"failures\": <int>, \"runs\": <int>, \"durationMs\": <int> } from the '[source-guards] <id>: exit <code>; duration_ms=<n>' receipt lines that Source Validation's 'Validate disk-read source contracts' step prints for every guard run. window is the ISO date range the counts cover. Guards without an entry keep manifest order after guards that have one (deterministic fallback, JOV-13111); empty entries = the pre-JOV-13111 manifest order."
+}

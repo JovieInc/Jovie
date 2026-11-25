@@ -1,0 +1,78 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: TimWhite
+# capability-gap: GBrain compounding is a control-plane job (local health probes + CLI put/read-back). CI has no gbrain daemon; this workflow only verifies the fixture → needs-probe degrade path.
+# removal-trigger: Remove when Gem/Hermes hosts always run scripts/gbrain-compounding/run.mjs after the daily health summary and a live put+read-back receipt is registered in automation-liveness.
+name: GBrain Compounding
+# clock-class: none — workflow_dispatch only (JOV-INV-042: no new cron).
+# Live schedule remains the Hermes/Gem health-summary host; see docs/spikes/gbrain-knowledge-compounding.md.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gbrain-compounding
+  cancel-in-progress: true
+
+jobs:
+  verify-needs-probe:
+    name: Verify needs-probe degrade path
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Unit tests
+        run: node --test scripts/gbrain-compounding/gbrain-compounding.test.mjs
+      - name: Fixture run expects needs-probe without gbrain
+        run: |
+          set -euo pipefail
+          FIXTURE="$RUNNER_TEMP/gbrain-digest.json"
+          OUT_DIR="$RUNNER_TEMP/gbrain-compound-buffer"
+          mkdir -p "$OUT_DIR"
+          node --input-type=module -e "
+          import { writeFileSync } from 'node:fs';
+          import { buildHealthDigest } from './scripts/gbrain-compounding/digest.mjs';
+          const generatedAt = new Date().toISOString();
+          const digest = buildHealthDigest({
+            generatedAt,
+            checks: [
+              { name: 'http-health', ok: true, detail: 'status=ok', durationMs: 1, required: true },
+              { name: 'doctor', ok: true, detail: 'status=ok', durationMs: 1, required: false },
+              { name: 'source-freshness', ok: true, detail: 'fresh', durationMs: 1, required: true },
+              { name: 'serve-processes', ok: true, detail: 'one', durationMs: 1, required: true },
+            ],
+          });
+          writeFileSync(process.argv[1], JSON.stringify(digest));
+          " "$FIXTURE"
+          SUMMARY=$(node scripts/gbrain-compounding/run.mjs \
+            --digest-file "$FIXTURE" \
+            --buffer-dir "$OUT_DIR" \
+            --out "$RUNNER_TEMP/gbrain-compound-result.json")
+          echo "$SUMMARY"
+          echo "$SUMMARY" | node --input-type=module -e '
+          import { readFileSync } from "node:fs";
+          const summary = JSON.parse(readFileSync(0, "utf8").trim());
+          if (summary.status !== "needs-probe") {
+            console.error("expected needs-probe, got", summary.status);
+            process.exit(1);
+          }
+          if (summary.reason !== "gbrain-unavailable") {
+            console.error("expected gbrain-unavailable, got", summary.reason);
+            process.exit(1);
+          }
+          console.log("needs-probe degrade path verified");
+          '
+          {
+            echo "## GBrain compounding verify"
+            echo '```json'
+            echo "$SUMMARY"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

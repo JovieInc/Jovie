@@ -60,6 +60,8 @@ describe('DashboardNav states', () => {
     );
     const { container } = renderDashboardNav({ renderFn: render });
 
+    expect(nav().querySelector('.skeleton')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Chat History' }));
     expect(nav().querySelector('.skeleton')).not.toBeNull();
     expect(screen.queryByText('Conversations unavailable')).toBeNull();
     await expectNoA11yViolations(container);
@@ -71,6 +73,8 @@ describe('DashboardNav states', () => {
     );
     const { container } = renderDashboardNav({ renderFn: render });
 
+    fireEvent.click(screen.getByRole('button', { name: 'Chat History' }));
+    expect(screen.getByText('No chats yet')).toBeInTheDocument();
     expect(nav().querySelector('[data-sidebar-history-header]')).toBeNull();
     expect(screen.getByRole('link', { name: 'New Chat' })).toBeInTheDocument();
     await expectNoA11yViolations(container);
@@ -83,6 +87,7 @@ describe('DashboardNav states', () => {
     );
     const { container } = renderDashboardNav({ renderFn: render });
 
+    fireEvent.click(screen.getByRole('button', { name: 'Chat History' }));
     expect(screen.getByText('Conversations unavailable')).toBeInTheDocument();
     await expectNoA11yViolations(container);
 
@@ -99,6 +104,7 @@ describe('DashboardNav states', () => {
     );
     const { container } = renderDashboardNav({ renderFn: render });
 
+    fireEvent.click(screen.getByRole('button', { name: 'Chat History' }));
     fireEvent.click(screen.getByRole('button', { name: 'Retry Chats' }));
     fireEvent.click(screen.getByRole('button', { name: 'Retry Chats' }));
     expect(refetch).toHaveBeenCalledTimes(2);
@@ -114,6 +120,7 @@ describe('DashboardNav states', () => {
     );
     const { container } = renderDashboardNav({ renderFn: render });
 
+    fireEvent.click(screen.getByRole('button', { name: 'Chat History' }));
     expect(within(nav()).getAllByText(title).length).toBeGreaterThan(0);
     await expectNoA11yViolations(container);
   });
@@ -127,6 +134,7 @@ describe('DashboardNav states', () => {
       renderFn: ui => render(<div dir='rtl'>{ui}</div>),
     });
 
+    fireEvent.click(screen.getByRole('button', { name: 'Chat History' }));
     expect(within(nav()).getAllByText(title).length).toBeGreaterThan(0);
     await expectNoA11yViolations(container);
   });

@@ -306,7 +306,7 @@ jobs:
             echo "::group::Storybook dev server log"
             cat "$RUNNER_TEMP/storybook-dev.log" 2>/dev/null || true
             echo "::endgroup::"' EXIT
-          for attempt in $(seq 1 150); do
+          for ((attempt = 1; attempt <= 150; attempt++)); do
             kill -0 "$STORYBOOK_PID" 2>/dev/null || {
               echo "::error::Storybook dev server died"
               exit 1

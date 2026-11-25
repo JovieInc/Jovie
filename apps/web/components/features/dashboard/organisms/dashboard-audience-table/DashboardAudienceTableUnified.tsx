@@ -27,8 +27,6 @@ import {
 } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { useAudiencePanel } from '@/features/dashboard/organisms/AudiencePanelContext';
-import { AiCrawlerDetailPanel } from '@/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel';
-import { AiCrawlerIntelligenceCard } from '@/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard';
 import {
   AnalyticsSidebar,
   StaticAnalyticsSidebar,
@@ -641,8 +639,6 @@ export const DashboardAudienceTableUnified = memo(
       }),
       [columnVisibility]
     );
-    const hasMetadataSubtitle =
-      hiddenMetadataColumns.engagement || hiddenMetadataColumns.lastSeen;
     const tableMinWidth = `${audienceTableMinWidthForLayout(columnLayout)}px`;
 
     // Stable context: callbacks that rarely change — consumers won't re-render on selection/menu toggle
@@ -704,13 +700,12 @@ export const DashboardAudienceTableUnified = memo(
       (row: AudienceMember) => {
         const isSelected = selectedMember?.id === row.id;
         return cn(
-          hasMetadataSubtitle ? 'h-12' : 'h-10',
           isSelected
             ? 'bg-(--linear-row-selected)'
             : 'bg-transparent hover:bg-(--linear-row-hover)'
         );
       },
-      [hasMetadataSubtitle, selectedMember]
+      [selectedMember]
     );
 
     // Issue 4: Arrow keys update sidebar when panel is open
@@ -765,9 +760,6 @@ export const DashboardAudienceTableUnified = memo(
         }
 
         return <AnalyticsSidebar isOpen onClose={handleClosePanel} />;
-      }
-      if (panelMode === 'ai-crawlers') {
-        return <AiCrawlerDetailPanel isOpen onClose={handleClosePanel} />;
       }
       // Panel closed — render closed drawer to animate out
       return (
@@ -892,13 +884,6 @@ export const DashboardAudienceTableUnified = memo(
               <p className='sr-only'>{getSrDescription(rows.length === 0)}</p>
 
               <div className='flex-1 min-h-0 flex flex-col'>
-                <div className='shrink-0 border-b border-subtle px-4 py-2'>
-                  <AiCrawlerIntelligenceCard
-                    onOpenDetail={() => {
-                      openPanel('ai-crawlers');
-                    }}
-                  />
-                </div>
                 {/* Scrollable content area */}
                 <div className='flex-1 min-h-0 overflow-auto'>
                   {rows.length === 0 ? (

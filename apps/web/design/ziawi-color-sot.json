@@ -1,10 +1,10 @@
 {
   "schema": "ziawi-color-sot-v1",
   "penNode": "ZiaWI",
-  "authority": "pen-node",
+  "authority": "figma-tokens-board",
   "locked": "2026-09-25",
   "keep": ["2026-09-10T13:26-07:00", "2026-09-10T13:34-07:00"],
-  "note": "Pen node ZiaWI is the canonical color source of truth. React tokens, OKLCH, and CSS emitters project these hexes. Do not invent a parallel React-only color root. Live Pen native semantic manifest remains unavailable in this workspace; hexes are the founder KEEP from ZiaWI.",
+  "note": "The Figma Tokens board is the canonical color canvas (Tim, 2026-11-22; it replaces the Pen node ZiaWI, whose hexes are kept here with their lock dates). React tokens, OKLCH, and CSS emitters project these hexes. Do not invent a parallel React-only color root. Code tokens export to Figma variables via pnpm design:tokens-export; Figma frames come back into code 1:1.",
   "elevations": {
     "count": 5,
     "roles": ["canvas", "shell", "card", "elevated", "floating"],

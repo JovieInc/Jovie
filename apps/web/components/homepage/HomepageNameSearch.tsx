@@ -2,6 +2,7 @@
 
 import { Button } from '@jovie/ui/atoms/button';
 import { CompositeField } from '@jovie/ui/atoms/composite-field';
+import { HostDrawnInput } from '@jovie/ui/atoms/host-drawn-field';
 import Link from 'next/link';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { HOMEPAGE_SEARCH_COPY } from '@/data/homepageSearchCopy';
@@ -99,35 +100,37 @@ export function HomepageNameSearch({
         </p>
       </noscript>
       <form onSubmit={search}>
-        <CompositeField shape='pill' size='md' surface='page'>
-          <input
-            id='homepage-claim-handle'
-            ref={input}
-            name='name'
-            value={name}
-            onChange={event => {
-              request.current?.abort();
-              setName(event.target.value);
-              setMatches([]);
-              setState('idle');
-            }}
-            aria-label={HOMEPAGE_SEARCH_COPY.label}
-            placeholder={HOMEPAGE_SEARCH_COPY.placeholder}
-            autoComplete='name'
-            minLength={2}
-            maxLength={80}
-            required
-            className='min-w-0 flex-1 bg-transparent text-base text-primary-token'
-          />
-          <Button
-            type='submit'
-            variant='secondary'
-            size='marketing'
-            disabled={state === 'loading'}
-          >
-            {state === 'loading' ? HOMEPAGE_SEARCH_COPY.loading : action}
-          </Button>
-        </CompositeField>
+        <div className='text-base text-primary-token'>
+          <CompositeField shape='pill' size='md' surface='page'>
+            <HostDrawnInput
+              id='homepage-claim-handle'
+              ref={input}
+              name='name'
+              value={name}
+              onChange={event => {
+                request.current?.abort();
+                setName(event.target.value);
+                setMatches([]);
+                setState('idle');
+              }}
+              aria-label={HOMEPAGE_SEARCH_COPY.label}
+              placeholder={HOMEPAGE_SEARCH_COPY.placeholder}
+              autoComplete='name'
+              minLength={2}
+              maxLength={80}
+              required
+              className='min-w-0 flex-1'
+            />
+            <Button
+              type='submit'
+              variant='secondary'
+              size='marketing'
+              disabled={state === 'loading'}
+            >
+              {state === 'loading' ? HOMEPAGE_SEARCH_COPY.loading : action}
+            </Button>
+          </CompositeField>
+        </div>
       </form>
       <div
         className='homepage-discovery__result'

@@ -66,3 +66,10 @@ describe('TitleMenuTrigger', () => {
     await expectNoA11yViolations(container);
   });
 });
+
+describe('TitleMenuTrigger press', () => {
+  it('presses through the shared press utility', () => {
+    render(<TitleMenuTrigger label='Chats' />);
+    expect(screen.getByRole('button', { name: /chats/i })).toHaveClass('press');
+  });
+});

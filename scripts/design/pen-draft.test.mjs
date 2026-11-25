@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join, resolve } from 'node:path';
@@ -25,30 +25,14 @@ import {
 } from './pen-draft.mjs';
 
 test('every checked-in brief parses and names a unique frame', () => {
-  for (const b of loadBriefs())
-    assert.ok(b.context.length, `${b.file} names the screens it builds on`);
   const briefs = loadBriefs();
-  assert.deepEqual(
-    briefs.map(b => b.frame),
-    [
-      'audience-analytics',
-      'billing-success',
-      'chat-history-switcher-states',
-      'chat-history-switcher',
-      'claim',
-      'empty-states',
-      'homepage',
-      'insights-empty',
-      'insights',
-      'page-skeletons-2',
-      'page-skeletons-3',
-      'page-skeletons',
-      'profile-analytics-card',
-      'request-access',
-      'tour-dates-connect',
-      'workspace-table',
-    ]
-  );
+  for (const b of briefs) {
+    assert.ok(b.context.length, `${b.file} names the screens it builds on`);
+    assert.equal(basename(b.file, '.md'), b.frame, `${b.file} names its frame`);
+  }
+  const frames = briefs.map(b => b.frame);
+  assert.equal(new Set(frames).size, frames.length, 'frame names are unique');
+  assert.ok(frames.includes('workspace-table-states'));
   for (const b of briefs) assert.ok(b.prompt.length > 100, b.frame);
 });
 
@@ -308,6 +292,24 @@ test('a frame without its .pen or preview is not drafted', () => {
   );
 });
 
+test('a blocked run names secrets in CI and keeps local output unchanged', () => {
+  const want = 'missing PEN_CLI_KEY and PEN_GOLDEN_PATH_FILE_URL';
+  const script = new URL('./pen-draft.mjs', import.meta.url).pathname;
+  const out = mkdtempSync(join(tmpdir(), 'pen-draft-blocked-'));
+  for (const githubActions of ['true', 'false']) {
+    const res = spawnSync(process.execPath, [script, '--out', out], {
+      encoding: 'utf8',
+      cwd: new URL('../..', import.meta.url).pathname,
+      env: { PATH: process.env.PATH, GITHUB_ACTIONS: githubActions },
+    });
+    assert.equal(res.status, 1);
+    assert.match(res.stdout, /^pen-draft: blocked, missing/m);
+    const annotated = res.stdout.includes('::error title=pen-draft blocked::');
+    assert.equal(annotated, githubActions === 'true');
+    assert.ok(readFileSync(join(out, 'receipt.json'), 'utf8').includes(want));
+  }
+});
+
 test('a draft counts only when it adds the named top-level frame', () => {
   const before = { children: [{ id: 'a', name: 'pricing' }] };
   const added = { children: [...before.children, { id: 'b', name: 'claim' }] };
@@ -375,7 +377,7 @@ test('a drafter change, a manual run or --only picks the right frames', () => {
   ];
   assert.deepEqual(
     planFrames({ briefs, changed: ['scripts/design/pen-draft.mjs'] }),
-    ['claim', 'homepage']
+    ['claim']
   );
   assert.deepEqual(planFrames({ briefs }), ['claim', 'homepage']);
   assert.deepEqual(planFrames({ briefs, only: ['homepage'] }), ['homepage']);

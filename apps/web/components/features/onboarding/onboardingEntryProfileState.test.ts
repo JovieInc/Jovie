@@ -25,6 +25,7 @@ describe('buildEntryProfileBuilderState (JOV-7753)', () => {
         genres: ['hip hop'],
       },
       artistConfirmed: false,
+      handleConfirmed: false,
       handle: 'megaran',
       socialLinks: ['https://instagram.com/megaran'],
     });
@@ -41,6 +42,7 @@ describe('buildEntryProfileBuilderState (JOV-7753)', () => {
     ).toEqual({
       artist: null,
       artistConfirmed: false,
+      handleConfirmed: false,
       handle: 'timwhite',
       socialLinks: [],
     });

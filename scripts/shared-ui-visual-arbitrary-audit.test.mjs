@@ -129,8 +129,8 @@ export function CssVarVisualDeliberateRed() {
 
 const ZERO_BASELINE_SOURCE_CONTRACT = {
   'packages/ui/atoms/icon-button.tsx': [
-    'bg-icon-button-frosted',
-    'hover:bg-icon-button-frosted-hover',
+    // Frosted glass material lives on Button (Drift T2.3); IconButton projects
+    // through variant='frosted' and keeps pearl/quiet chrome here.
     'hover:bg-icon-button-pearl-quiet-hover',
     'hover:shadow-sm',
     'focus-visible:shadow-sm',
@@ -138,7 +138,9 @@ const ZERO_BASELINE_SOURCE_CONTRACT = {
   'packages/ui/atoms/button.tsx': [
     'bg-btn-destructive',
     'text-btn-destructive-foreground',
-    'active:scale-press',
+    ' press ',
+    'bg-icon-button-frosted',
+    'hover:bg-icon-button-frosted-hover',
   ],
   'packages/ui/atoms/progress.tsx': ['animate-progress-indeterminate'],
   'packages/ui/atoms/sheet.tsx': [

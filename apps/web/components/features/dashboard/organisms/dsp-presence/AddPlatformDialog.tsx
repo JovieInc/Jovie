@@ -1,8 +1,6 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/dashboard/AddPlatformDialog.test.tsx
-
-import { Button } from '@jovie/ui';
+import { Button, Input, PlainButton } from '@jovie/ui';
 import { useId, useState, useTransition } from 'react';
 import { addManualDspMatch } from '@/app/app/(shell)/dashboard/presence/actions';
 import { toast } from '@/components/feedback';
@@ -126,9 +124,8 @@ export function AddPlatformDialog({
         ) : (
           <div className='grid grid-cols-3 gap-2'>
             {availableProviders.map(id => (
-              <button
+              <PlainButton
                 key={id}
-                type='button'
                 aria-pressed={selectedProvider === id}
                 onClick={() => {
                   setSelectedProvider(id);
@@ -143,7 +140,7 @@ export function AddPlatformDialog({
                 <span className='w-full text-center'>
                   {PROVIDER_LABELS[id]}
                 </span>
-              </button>
+              </PlainButton>
             ))}
           </div>
         )}
@@ -155,26 +152,24 @@ export function AddPlatformDialog({
               <label htmlFor={nameId} className='sr-only'>
                 Artist name
               </label>
-              <input
+              <Input
                 id={nameId}
                 type='text'
                 value={artistName}
                 onChange={e => setArtistName(e.target.value)}
                 placeholder='Artist name on this platform'
-                className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-app text-primary-token placeholder:text-quaternary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/50'
               />
             </div>
             <div>
               <label htmlFor={urlId} className='sr-only'>
                 Profile URL
               </label>
-              <input
+              <Input
                 id={urlId}
                 type='url'
                 value={url}
                 onChange={e => setUrl(e.target.value)}
                 placeholder={PROVIDER_PLACEHOLDERS[selectedProvider]}
-                className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-app text-primary-token placeholder:text-quaternary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/50'
               />
             </div>
             {error && (

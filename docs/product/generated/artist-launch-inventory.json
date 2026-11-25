@@ -2369,6 +2369,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/cron/chat-outcome-judge/route.ts",
+      "kind": "handler",
+      "route": "/api/cron/chat-outcome-judge",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/cron/cleanup-dogfood-accounts/route.ts",
       "kind": "handler",
       "route": "/api/cron/cleanup-dogfood-accounts",
@@ -2412,6 +2420,14 @@
       "source": "apps/web/app/api/cron/data-retention/route.ts",
       "kind": "handler",
       "route": "/api/cron/data-retention",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/cron/dogfood-truth/route.ts",
+      "kind": "handler",
+      "route": "/api/cron/dogfood-truth",
       "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
@@ -2601,14 +2617,6 @@
       "classification": "C"
     },
     {
-      "source": "apps/web/app/api/dashboard/ai-crawlers/route.ts",
-      "kind": "handler",
-      "route": "/api/dashboard/ai-crawlers",
-      "methods": ["GET"],
-      "surface": "deferred",
-      "classification": "C"
-    },
-    {
       "source": "apps/web/app/api/dashboard/analytics/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/analytics",
@@ -2685,6 +2693,14 @@
       "kind": "handler",
       "route": "/api/dashboard/earnings",
       "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/dashboard/first-ready/route.ts",
+      "kind": "handler",
+      "route": "/api/dashboard/first-ready",
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4244,7 +4260,7 @@
       "source": "apps/web/app/api/ovie/inbox/route.ts",
       "kind": "handler",
       "route": "/api/ovie/inbox",
-      "methods": ["GET"],
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4997,6 +5013,14 @@
       "kind": "handler",
       "route": "/api/version",
       "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/views/[token]/save/route.ts",
+      "kind": "handler",
+      "route": "/api/views/[token]/save",
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6802,6 +6826,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/app/(shell)/dashboards/page.tsx",
+      "kind": "page",
+      "route": "/app/dashboards",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/app/(shell)/earnings/page.tsx",
       "kind": "page",
       "route": "/app/earnings",
@@ -7858,6 +7890,14 @@
       "source": "apps/web/app/unavailable/page.tsx",
       "kind": "page",
       "route": "/unavailable",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/v/[token]/page.tsx",
+      "kind": "page",
+      "route": "/v/[token]",
       "methods": [],
       "surface": "deferred",
       "classification": "C"

@@ -1,11 +1,11 @@
 'use client';
 
 import { memo } from 'react';
-import { cn } from '@/lib/utils';
+import { StatusCell } from '@/components/organisms/table/cells/StatusCell';
 import type { AudienceMember } from '@/types';
 import {
   AUDIENCE_STATE_LABELS,
-  AUDIENCE_STATE_STYLES,
+  AUDIENCE_STATE_TONES,
   getAudienceDisplayState,
 } from '../row-contract';
 import { isSsrNowMs, useNowMs } from './NowMsContext';
@@ -28,14 +28,9 @@ export const AudienceStateCell = memo(function AudienceStateCell({
   });
   const label = AUDIENCE_STATE_LABELS[state];
   return (
-    <span
-      className={cn(
-        'inline-flex items-center rounded-md px-1.5 py-0.5 text-2xs font-medium tabular-nums ring-1 ring-inset',
-        AUDIENCE_STATE_STYLES[state]
-      )}
-    >
+    <StatusCell tone={AUDIENCE_STATE_TONES[state]}>
       <span className='sr-only'>State: </span>
       {label}
-    </span>
+    </StatusCell>
   );
 });

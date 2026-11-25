@@ -137,13 +137,13 @@ echo "  Node.js: $NODE_VER $NODE_OK"
 echo "  pnpm:    $PNPM_VER $PNPM_OK"
 echo "  jq:      $(jq --version 2>/dev/null || echo 'not installed (hooks will use fallbacks)')"
 echo "  gh CLI:  $(gh --version 2>/dev/null | head -1 || echo 'not installed')"
-echo "  Biome:   $(pnpm exec biome --version 2>/dev/null || echo 'run pnpm install first')"
+echo "  Biome:   $(pnpm exec biome --version 2>/dev/null || echo 'run pnpm install --offline --frozen-lockfile first')"
 
 # 4. Check for node_modules/.bin in PATH
 if [ -d "node_modules/.bin" ]; then
   echo "  Binaries: available"
 else
-  echo "  Binaries: not found (run pnpm install)"
+  echo "  Binaries: not found (run pnpm install --offline --frozen-lockfile)"
 fi
 
 echo ""

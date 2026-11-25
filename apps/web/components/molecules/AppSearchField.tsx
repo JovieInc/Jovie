@@ -1,10 +1,9 @@
 'use client';
 
-import { Input } from '@jovie/ui';
+import { IconButton, Input } from '@jovie/ui';
 import { CompositeField } from '@jovie/ui/atoms/composite-field';
 import { Search, X } from 'lucide-react';
 import * as React from 'react';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { cn } from '@/lib/utils';
 
 export interface AppSearchFieldProps {
@@ -63,7 +62,9 @@ export function AppSearchField({
         )}
       />
       {showClearButton && value ? (
-        <AppIconButton
+        <IconButton
+          size='sm'
+          variant='control'
           type='button'
           ariaLabel='Clear search'
           className='border-transparent bg-transparent text-tertiary-token hover:border-transparent hover:bg-surface-1 hover:text-secondary-token'
@@ -74,7 +75,7 @@ export function AppSearchField({
           }}
         >
           <X />
-        </AppIconButton>
+        </IconButton>
       ) : null}
     </CompositeField>
   );

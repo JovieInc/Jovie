@@ -1,5 +1,6 @@
 'use client';
 
+import { IconButton } from '@jovie/ui';
 import {
   Calendar,
   DollarSign,
@@ -10,7 +11,6 @@ import {
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ArtistInfo } from '@/components/molecules/ArtistInfo';
 import { ProfileNavButton } from '@/components/molecules/ProfileNavButton';
 import { SocialLink as SocialLinkComponent } from '@/components/molecules/SocialLink';
@@ -275,66 +275,57 @@ export function ProfileShell({
                         aria-label='Profile Modes'
                         data-testid='profile-mode-nav'
                       >
-                        <CircleIconButton
-                          size='md'
-                          variant='pearl'
+                        <IconButton
+                          size='lg'
+                          variant={
+                            !mode || mode === 'profile' ? 'pearl' : 'pearlQuiet'
+                          }
                           ariaLabel='Profile'
+                          aria-pressed={!mode || mode === 'profile'}
                           data-testid='profile-trigger'
-                          className={`transition-[background-color,color,box-shadow] ${
-                            !mode || mode === 'profile'
-                              ? 'bg-(--profile-pearl-bg-active) text-primary-token'
-                              : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-(--profile-pearl-border) hover:bg-(--profile-pearl-bg) hover:text-primary-token'
-                          }`}
                           onClick={() => {
                             router.push(`/${artist.handle}`);
                           }}
                         >
                           <UserRound className='h-4 w-4' aria-hidden='true' />
-                        </CircleIconButton>
+                        </IconButton>
                         {hasContacts && (
-                          <CircleIconButton
-                            size='md'
-                            variant='pearl'
+                          <IconButton
+                            size='lg'
+                            variant={
+                              mode === 'contact' ? 'pearl' : 'pearlQuiet'
+                            }
                             ariaLabel='Contact'
+                            aria-pressed={mode === 'contact'}
                             data-testid='contact-trigger'
-                            className={`transition-[background-color,color,box-shadow] ${
-                              mode === 'contact'
-                                ? 'bg-(--profile-pearl-bg-active) text-primary-token'
-                                : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-(--profile-pearl-border) hover:bg-(--profile-pearl-bg) hover:text-primary-token'
-                            }`}
                             onClick={() => {
                               router.push(`/${artist.handle}?mode=contact`);
                             }}
                           >
                             <Mail className='h-4 w-4' aria-hidden='true' />
-                          </CircleIconButton>
+                          </IconButton>
                         )}
                         {showTourButton && (
-                          <CircleIconButton
-                            size='md'
-                            variant='pearl'
+                          <IconButton
+                            size='lg'
+                            variant={isTourModeActive ? 'pearl' : 'pearlQuiet'}
                             ariaLabel='Tour Dates'
+                            aria-pressed={isTourModeActive}
                             data-testid='tour-trigger'
-                            className={`transition-[background-color,color,box-shadow] ${
-                              isTourModeActive
-                                ? 'bg-(--profile-pearl-bg-active) text-primary-token'
-                                : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-(--profile-pearl-border) hover:bg-(--profile-pearl-bg) hover:text-primary-token'
-                            }`}
                             onClick={() => {
                               router.push(`/${artist.handle}?mode=tour`);
                             }}
                           >
                             <Calendar className='h-4 w-4' aria-hidden='true' />
-                          </CircleIconButton>
+                          </IconButton>
                         )}
 
                         {showShopButton && (
-                          <CircleIconButton
-                            size='md'
-                            variant='pearl'
+                          <IconButton
+                            size='lg'
+                            variant='pearlQuiet'
                             ariaLabel='Shop'
                             data-testid='shop-trigger'
-                            className='border-transparent bg-transparent text-tertiary-token shadow-none transition-[background-color,color,box-shadow] hover:border-(--profile-pearl-border) hover:bg-(--profile-pearl-bg) hover:text-primary-token'
                             onClick={() => {
                               window.open(
                                 `/${artist.handle}/shop`,
@@ -347,20 +338,16 @@ export function ProfileShell({
                               className='h-4 w-4'
                               aria-hidden='true'
                             />
-                          </CircleIconButton>
+                          </IconButton>
                         )}
 
                         {hasPaySupport && venmoLink && (
-                          <CircleIconButton
-                            size='md'
-                            variant='pearl'
+                          <IconButton
+                            size='lg'
+                            variant={isPayModeActive ? 'pearl' : 'pearlQuiet'}
                             ariaLabel='Pay'
+                            aria-pressed={isPayModeActive}
                             data-testid='pay-trigger'
-                            className={`transition-[background-color,color,box-shadow] ${
-                              isPayModeActive
-                                ? 'bg-(--profile-pearl-bg-active) text-primary-token'
-                                : 'border-transparent bg-transparent text-tertiary-token shadow-none hover:border-(--profile-pearl-border) hover:bg-(--profile-pearl-bg) hover:text-primary-token'
-                            }`}
                             onClick={() => {
                               if (isMobile) {
                                 setPayDrawerOpen(true);
@@ -373,7 +360,7 @@ export function ProfileShell({
                               className='h-4 w-4'
                               aria-hidden='true'
                             />
-                          </CircleIconButton>
+                          </IconButton>
                         )}
                       </nav>
                     </PublicSurfaceFooter>

@@ -8,6 +8,13 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 
+def make_synthetic_worktree(path):
+    installer = Path(path) / "scripts/hooks/configure-git-hooks.sh"
+    installer.parent.mkdir(parents=True, exist_ok=True)
+    installer.write_text("#!/usr/bin/env bash\nexit 0\n")
+    installer.chmod(0o755)
+
+
 class CloudLaneGateMixin:
     """JOV-10357: the claimed-execution cloud gate and the draft-only origin guards (R3/R4/R7)."""
 
@@ -35,7 +42,7 @@ class CloudLaneGateMixin:
         def fake_sh(args, cwd=None, timeout=600, env=None, log=None):
             self.calls.append(list(args))
             if args[:3] == ["git", "worktree", "add"]:
-                Path(args[-2]).mkdir(parents=True)
+                make_synthetic_worktree(args[-2])
             return SimpleNamespace(returncode=0, stdout="", stderr="")
         self.real_sh = self.runner.sh
         self.runner.sh = fake_sh

@@ -39,6 +39,10 @@ describe('MusicServiceDial', () => {
       name: 'Stream Now with Apple Music',
     });
     expect(action).toHaveAttribute('href', 'https://music.apple.com/song');
+    expect(screen.getByTestId('action-dial')).toHaveAttribute(
+      'data-preferred',
+      'true'
+    );
     fireEvent.click(action);
     expect(onStream).toHaveBeenCalledWith('apple_music');
   });
@@ -70,6 +74,25 @@ describe('MusicServiceDial', () => {
       screen.getByRole('link', { name: 'Stream Now with Spotify' })
     ).toBeInTheDocument();
     expect(screen.queryByText(/Swipe to switch/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('action-dial-selection')).toHaveTextContent(
+      'Spotify'
+    );
+  });
+
+  it('coaches swipe quietly without competing with Remembered', () => {
+    document.cookie = `${LISTEN_COOKIE}=spotify; path=/`;
+    render(
+      <MusicServiceDial
+        providers={PROVIDERS}
+        utmParams={{}}
+        onStream={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Swipe to switch.')).toBeInTheDocument();
+    expect(screen.queryByText(/Always remembered/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('action-dial-selection')).toHaveTextContent(
+      'Remembered'
+    );
   });
 
   it('persists a newly settled choice before the next visit', () => {

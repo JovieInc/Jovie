@@ -217,6 +217,17 @@ def tick_one(state_dir: Path, clock: Clock, run, now: float) -> dict:
                 state["nextAttemptAt"] = now + clock.interval_s
             except (OSError, subprocess.SubprocessError, RuntimeError) as error:
                 result = {**result, "status": "dispatch-uncertain", "error": type(error).__name__}
+        elif (
+            result.get("status") == "current"
+            and isinstance(result.get("ageSeconds"), int)
+            and 0 <= result["ageSeconds"] < clock.interval_s
+        ):
+            # Wake when this run becomes due. Sleeping a full interval from
+            # this tick ignores a heartbeat that landed between ticks (a push
+            # on security-advisory-loop). The next dispatch then lands almost
+            # two intervals after that heartbeat and trips maxSilenceMinutes
+            # (JOV-9993: 314m silent against a 300m budget on a 4h clock).
+            state["nextAttemptAt"] = now + (clock.interval_s - result["ageSeconds"])
         state["lastResult"] = result
         save(path, state)
         return result

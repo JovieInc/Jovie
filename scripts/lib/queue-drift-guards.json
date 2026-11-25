@@ -50,6 +50,7 @@
     "baselines": [
       "apps/web/composite-field.baseline.json",
       "apps/web/contrast-ratchet.baseline.json",
+      "apps/web/lib/eval/assistants-ratchet/baseline-medians.json",
       "apps/web/tests/unit/design-system/arbitrary-radius.baseline.json",
       "apps/web/tests/unit/design-system/canonical-nav-metric.baseline.json",
       "apps/web/tests/unit/design-system/destructive-red-drift.baseline/",
@@ -59,10 +60,14 @@
       "apps/web/tests/unit/design-system/spacing-scale.baseline.json",
       "apps/web/touch-target-ratchet.baseline.json",
       "apps/web/ui-feel-ratchet.baseline.json",
+      "canon/outcome-coverage-baseline.json",
       "packages/copy/dead-ends.baseline.json",
+      "scripts/invariants/art-direction/accent-pack.baseline.json",
+      "scripts/invariants/card-intent-ratchet.baseline.json",
       "scripts/invariants/duplicate-literals.baseline.json",
       "scripts/invariants/native-spacing-scale.baseline.json",
       "scripts/invariants/shell-ia.baseline.json",
+      "scripts/invariants/type-safety-ratchet.baseline.json",
       "scripts/shared-ui-visual-arbitrary.baseline.json"
     ]
   },
@@ -77,10 +82,12 @@
       "reason": "Not migrated: id-set ratchet (art-direction/ratchet.mjs); resolved ids must be deleted in the same tree. Can fail a combined head.",
       "baselines": [
         "scripts/invariants/art-direction/accent.baseline.json",
+        "scripts/invariants/art-direction/empty-affordance.baseline.json",
         "scripts/invariants/art-direction/hero-scroll.baseline.json",
         "scripts/invariants/art-direction/hue.baseline.json",
         "scripts/invariants/art-direction/imagery-provenance.baseline.json",
         "scripts/invariants/art-direction/images.baseline.json",
+        "scripts/invariants/art-direction/press-state.baseline.json",
         "scripts/invariants/art-direction/surface-media.baseline.json"
       ]
     },

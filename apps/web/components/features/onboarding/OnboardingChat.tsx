@@ -32,6 +32,7 @@ import {
   composeMessage,
   useChipTray,
 } from '@/components/jovie/hooks/useChipTray';
+import { pinTranscriptToLatest } from '@/components/jovie/hooks/useStickToBottom';
 import type { ChatError, MessagePart } from '@/components/jovie/types';
 import {
   extractErrorMetadata,
@@ -59,7 +60,7 @@ import {
   type OnboardingEntryMode,
 } from './OnboardingChatEmptyIntro';
 import { OnboardingMessageRecoveryRow } from './OnboardingMessageRecoveryRow';
-import { OnboardingProfileRail } from './OnboardingProfileRailLazy';
+import { OnboardingProfilePeekStrip } from './OnboardingProfilePeekStrip';
 import { OnboardingSecurityCheckRecovery } from './OnboardingSecurityCheckRecovery';
 import {
   OnboardingArtistConfirmedCard,
@@ -176,6 +177,11 @@ interface OnboardingChatProps {
   readonly onProfileBuilderChange?: (
     state: OnboardingProfileBuilderState
   ) => void;
+  /**
+   * Shell-resolved preview state (entry handle fallback included) for the
+   * mobile peek strip. lg+ keeps the side rail; 390 must not push inputs.
+   */
+  readonly profilePeekState?: OnboardingProfileBuilderState | null;
   /** Validated URL-provided context for an automatic first message. */
   readonly starterHandoff?: StartEntryHandoff | null;
   /** The real page behind `?handle=`; drafts (never sends) the claim message. */
@@ -704,13 +710,15 @@ interface OnboardingMessageRegionProps {
   readonly onAttachAccount: (url: string) => void;
   readonly onNoneOfTheseArtists: () => void;
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
-  readonly profileBuilderState: OnboardingProfileBuilderState;
+  readonly selectedArtistId: string | null;
   readonly shouldDockComposer: boolean;
   /** Starter handoff paints the thread slot at the top, where the first message lands. */
   readonly pinThreadToTop: boolean;
   readonly entryMode: OnboardingEntryMode;
   readonly entryProfile: StartEntryProfile | null;
   readonly onTryAnotherName: () => void;
+  /** Sends the selected default-walkthrough prompt through the real submit path. */
+  readonly onSuggestionSelect: (prompt: string) => void;
   readonly composerPickerOpen: boolean;
 }
 
@@ -730,9 +738,10 @@ function OnboardingMessageRegion({
   onAttachAccount,
   onNoneOfTheseArtists,
   onSelectArtist,
-  profileBuilderState,
+  selectedArtistId,
   shouldDockComposer,
   pinThreadToTop,
+  onSuggestionSelect,
 }: OnboardingMessageRegionProps) {
   if (shouldDockComposer) {
     return (
@@ -747,9 +756,8 @@ function OnboardingMessageRegion({
           onAttachAccount={onAttachAccount}
           onNoneOfTheseArtists={onNoneOfTheseArtists}
           onSelectArtist={onSelectArtist}
-          selectedArtistId={profileBuilderState.artist?.id ?? null}
+          selectedArtistId={selectedArtistId}
         />
-        <OnboardingProfileRail placement='inline' state={profileBuilderState} />
       </div>
     );
   }
@@ -769,6 +777,7 @@ function OnboardingMessageRegion({
               mode={entryMode}
               entryProfile={entryProfile}
               onTryAnotherName={onTryAnotherName}
+              onSuggestionSelect={onSuggestionSelect}
             />
           </div>
         }
@@ -798,9 +807,8 @@ function OnboardingMessageRegion({
         onAttachAccount={onAttachAccount}
         onNoneOfTheseArtists={onNoneOfTheseArtists}
         onSelectArtist={onSelectArtist}
-        selectedArtistId={profileBuilderState.artist?.id ?? null}
+        selectedArtistId={selectedArtistId}
       />
-      <OnboardingProfileRail placement='inline' state={profileBuilderState} />
     </div>
   );
 
@@ -821,6 +829,7 @@ export function OnboardingChat({
   intentId,
   onConversationActivity,
   onProfileBuilderChange,
+  profilePeekState = null,
   onTurnstileRejected,
   onTurnstileRequired,
   starterHandoff,
@@ -1134,8 +1143,15 @@ export function OnboardingChat({
   useEffect(() => {
     if (hasInjectedStarterPromptRef.current) return;
     let nextPrompt: string | null = null;
+    let nextMode: OnboardingEntryMode = 'prompt_handoff';
 
-    if (intentId) {
+    if (!takenHandleEntry && starterHandoff?.prompt) {
+      nextPrompt = starterHandoff.prompt;
+      nextMode =
+        starterHandoff.kind === 'spotify_artist'
+          ? 'spotify_handoff'
+          : 'prompt_handoff';
+    } else if (intentId) {
       const intent = readHomepageIntent(intentId);
       if (intent) {
         nextPrompt = sanitizeHomepagePrompt(intent.finalPrompt);
@@ -1147,11 +1163,17 @@ export function OnboardingChat({
       setComposerInput(nextPrompt);
       pendingStarterPromptRef.current = nextPrompt;
       hasInjectedStarterPromptRef.current = true;
-      setEntryMode('prompt_handoff');
+      setEntryMode(nextMode);
     } else {
       setEntryMode(entryProfile ? 'handle_entry' : 'blank');
     }
-  }, [entryProfile, intentId, setComposerInput]);
+  }, [
+    entryProfile,
+    intentId,
+    setComposerInput,
+    starterHandoff,
+    takenHandleEntry,
+  ]);
 
   useEffect(() => {
     const prompt = pendingStarterPromptRef.current;
@@ -1315,14 +1337,13 @@ export function OnboardingChat({
     }
     scrollContainer.scrollTop = 0;
   }, [displayMessages.length, scrollContainerRef, shouldDockComposer, status]);
-  // Docking hands the transcript to stick-to-bottom while it is still at the
-  // top (the undocked thread is pinned up). Re-pin on dock and on every user
-  // turn so the active tool card scrolls above the composer (JOV-10131).
+  // Docking hands the transcript to stick-to-bottom; re-pin on dock and every
+  // user turn so the active tool card scrolls above the composer (JOV-10131).
   useLayoutEffect(() => {
     if (!shouldDockComposer || userTurnCount === 0) return;
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) return;
-    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    pinTranscriptToLatest(scrollContainer);
     setStuckToBottom(true);
   }, [scrollContainerRef, setStuckToBottom, shouldDockComposer, userTurnCount]);
 
@@ -1353,8 +1374,13 @@ export function OnboardingChat({
     onAddEntity: chipTray.addEntity,
   } as const;
   const sendLocalError = chatError;
+  const peekState = profilePeekState ?? profileBuilderState;
   const onboardingComposerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
+      <OnboardingProfilePeekStrip
+        state={peekState}
+        className='mb-2 lg:hidden'
+      />
       {isSecurityCheckRecovery || !flowStatus ? null : (
         <div ref={starterBannerWrapRef}>{flowStatus}</div>
       )}
@@ -1445,9 +1471,10 @@ export function OnboardingChat({
             onAttachAccount={handleAttachAccount}
             onNoneOfTheseArtists={handleNoneOfTheseArtists}
             onSelectArtist={handleArtistSelect}
-            profileBuilderState={profileBuilderState}
+            selectedArtistId={profileBuilderState.artist?.id ?? null}
             shouldDockComposer={shouldDockComposer}
             pinThreadToTop={hasInitialStarterPrompt}
+            onSuggestionSelect={submitText}
           />
         </div>
       </section>

@@ -7,7 +7,6 @@ const state = vi.hoisted(() => ({
   cookieReads: 0,
   entitlementRead: vi.fn(),
   dashboardRead: vi.fn(),
-  crawlerRead: vi.fn(),
 }));
 
 vi.mock('@/lib/redis', () => ({ getRedis: () => null }));
@@ -35,10 +34,6 @@ vi.mock('@/lib/db/queries/analytics', () => ({
       { userId: args[0], profileId: state.profileId },
       ...args.slice(1)
     ),
-}));
-vi.mock('@/lib/db/queries/ai-crawler-analytics', () => ({
-  getAiCrawlerAnalyticsForProfile: (...args: unknown[]) =>
-    state.crawlerRead(...args),
 }));
 
 function deferred<T>() {
@@ -72,15 +67,6 @@ beforeEach(() => {
     unique_views: 0,
     unique_users: 0,
     tip_link_visits: 0,
-  }));
-  state.crawlerRead.mockReset().mockImplementation(async scope => ({
-    totalRequests: views(scope),
-    weeklyRequests: 0,
-    crawlers: [],
-    dailyTrend: [],
-    syncedAt: null,
-    isPro: true,
-    isTeaser: false,
   }));
 });
 
@@ -192,66 +178,6 @@ describe('dashboard profile binding with actual authorized reader and cache', ()
       read({ userId: '11111111-1111-4111-8111-111111111111' })
     ).rejects.toThrow('Profile not found');
     expect(state.dashboardRead).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('AI crawler sibling uses the same authorized boundary', () => {
-  it('isolates warm profile and account results', async () => {
-    const { readAuthorizedAiCrawlerAnalytics: read } = await import(
-      '@/lib/analytics/authorized-ai-crawler-read'
-    );
-    expect(
-      (await read('11111111-1111-4111-8111-111111111111')).totalRequests
-    ).toBe(101);
-    state.profileId = 'profile-B';
-    expect(
-      (await read('11111111-1111-4111-8111-111111111111')).totalRequests
-    ).toBe(202);
-    state.userId = '22222222-2222-4222-8222-222222222222';
-    expect(
-      (await read('22222222-2222-4222-8222-222222222222')).totalRequests
-    ).toBe(303);
-    state.userId = '11111111-1111-4111-8111-111111111111';
-    state.profileId = 'profile-A';
-    expect(
-      (await read('11111111-1111-4111-8111-111111111111')).totalRequests
-    ).toBe(101);
-    expect(state.crawlerRead).toHaveBeenCalledTimes(3);
-  });
-
-  it('keeps a late A response out of B after an origin request overlaps the switch', async () => {
-    const gate = deferred<unknown>();
-    state.crawlerRead.mockImplementationOnce(async scope => {
-      await gate.promise;
-      return { totalRequests: views(scope) };
-    });
-    const { readAuthorizedAiCrawlerAnalytics: read } = await import(
-      '@/lib/analytics/authorized-ai-crawler-read'
-    );
-    const oldRead = read('11111111-1111-4111-8111-111111111111');
-    await vi.waitFor(() => expect(state.crawlerRead).toHaveBeenCalledTimes(1));
-    state.profileId = 'profile-B';
-    expect(
-      (await read('11111111-1111-4111-8111-111111111111')).totalRequests
-    ).toBe(202);
-    gate.resolve(undefined);
-    expect((await oldRead).totalRequests).toBe(101);
-    expect(
-      (await read('11111111-1111-4111-8111-111111111111')).totalRequests
-    ).toBe(202);
-    expect(state.crawlerRead).toHaveBeenCalledTimes(2);
-  });
-
-  it('rejects an inconsistent trusted user context on a warm cache', async () => {
-    const { readAuthorizedAiCrawlerAnalytics: read } = await import(
-      '@/lib/analytics/authorized-ai-crawler-read'
-    );
-    await read('11111111-1111-4111-8111-111111111111');
-    state.userId = '22222222-2222-4222-8222-222222222222';
-    await expect(read('11111111-1111-4111-8111-111111111111')).rejects.toThrow(
-      'Unauthorized'
-    );
-    expect(state.crawlerRead).toHaveBeenCalledTimes(1);
   });
 });
 

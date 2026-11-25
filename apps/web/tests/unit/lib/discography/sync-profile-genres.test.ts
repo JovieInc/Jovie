@@ -63,6 +63,10 @@ vi.mock('@/lib/discography/track-provider-links', () => ({
   resolveTrackProviderLinks: vi.fn(),
 }));
 
+vi.mock('@/lib/profile/sync-cover-accent.server', () => ({
+  syncProfileCoverAccentThemeBestEffort: vi.fn().mockResolvedValue(undefined),
+}));
+
 // The function under test uses DB queries which are mocked above.
 // Instead, we test the genre aggregation logic directly by extracting it.
 // Since the function is tightly coupled to DB, we test via the mock.

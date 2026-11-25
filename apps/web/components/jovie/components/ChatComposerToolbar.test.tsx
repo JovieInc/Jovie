@@ -1,5 +1,6 @@
 import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -187,5 +188,27 @@ describe('ComposerSendButton', () => {
     const focusable = container.querySelectorAll('[tabindex="0"]');
     expect(focusable).toHaveLength(0);
     expect(screen.getByRole('button', { name: 'Send message' })).toBeDisabled();
+  });
+});
+
+describe('ComposerSendButton PlainButton', () => {
+  it('is a type=button that sends on userEvent.click when sendable', async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn();
+    render(
+      <TooltipProvider>
+        <ComposerSendButton
+          canSend
+          isStreaming={false}
+          reducedMotion
+          onMouseDown={vi.fn()}
+          onSend={onSend}
+        />
+      </TooltipProvider>
+    );
+    const send = screen.getByRole('button', { name: 'Send message' });
+    expect(send).toHaveAttribute('type', 'button');
+    await user.click(send);
+    expect(onSend).toHaveBeenCalledOnce();
   });
 });

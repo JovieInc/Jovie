@@ -18,3 +18,7 @@ export {
   HomeLoopStageRows,
 } from './HomeLoopStageRows';
 export { HomeLoopStageStrip } from './HomeLoopStageStrip';
+export {
+  StoryFirstCanvas,
+  type StoryFirstCanvasProps,
+} from './StoryFirstCanvas';

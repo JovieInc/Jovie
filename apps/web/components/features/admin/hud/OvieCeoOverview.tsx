@@ -1,13 +1,19 @@
 'use client';
 
 // @coverage-via apps/web/tests/unit/components/features/admin/hud/OvieCeoOverview.test.tsx
+import { PlainButton } from '@jovie/ui';
 import { ChevronRight, ExternalLink, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { OVIE_METRIC_ANCHORS } from '@/constants/routes';
 import {
   type CompanyMetricState,
   deriveOvieCompanyOverview,
 } from '@/lib/ovie/company-operations';
+import {
+  isUnmeasuredDisplayValue,
+  OVIE_METRICS_SYNCING_NOTICE,
+} from '@/lib/ovie/metrics-presentation';
 import type { HudMetrics } from '@/types/hud';
 
 const STATE_LABELS = {
@@ -70,18 +76,32 @@ export function OvieCeoOverview({
     ? Math.max(now, generatedAt)
     : now;
   const overview = deriveOvieCompanyOverview(metrics, evaluationNow);
+  const visibleMetrics = overview.metrics.filter(
+    metric =>
+      !isUnmeasuredDisplayValue(metric.value) && metric.state !== 'unknown'
+  );
+  const syncingNotice = visibleMetrics.length < overview.metrics.length;
 
   return (
     <ContentSurfaceCard
+      id={OVIE_METRIC_ANCHORS.companyNow}
       surface='default'
-      className='overflow-hidden'
+      className='scroll-mt-4 overflow-hidden'
       data-testid='ovie-ceo-overview'
     >
       <div className='border-b border-subtle px-4 py-3 sm:px-5'>
         <p className='text-xs font-semibold text-primary-token'>Company Now</p>
+        {syncingNotice ? (
+          <p
+            className='mt-2 text-2xs text-tertiary-token'
+            data-testid='ovie-ceo-syncing'
+          >
+            {OVIE_METRICS_SYNCING_NOTICE}
+          </p>
+        ) : null}
       </div>
       <div className='divide-y divide-subtle'>
-        {overview.metrics.map(metric => (
+        {visibleMetrics.map(metric => (
           <section
             key={metric.id}
             className='grid h-72 overflow-hidden gap-3 px-4 py-4 sm:px-5 lg:h-40 lg:grid-cols-[minmax(9rem,0.7fr)_minmax(12rem,1fr)_minmax(16rem,1.5fr)] lg:items-start'
@@ -157,14 +177,14 @@ export function OvieCeoOverview({
                   'degraded',
                   'unknown',
                 ].includes(metric.state) ? (
-                  <button
+                  <PlainButton
                     type='button'
                     onClick={onRetry}
                     className='inline-flex min-h-11 shrink-0 items-center gap-1 font-medium text-secondary-token transition-colors hover:text-primary-token'
                   >
                     <RefreshCw className='h-3 w-3' aria-hidden='true' />
                     Retry
-                  </button>
+                  </PlainButton>
                 ) : null}
                 <a
                   href={metric.drillDownHref}

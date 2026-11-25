@@ -133,7 +133,7 @@ export function WrappedSocialLink({
           <SocialIcon platform={platform} size={20} />
           <span>{wrappedData.alias}</span>
           {wrappedData.kind === 'sensitive' && (
-            <span className='text-xs rounded px-1.5 py-0.5 bg-yellow-100 text-yellow-800 dark:bg-yellow-950/30 dark:text-yellow-200'>
+            <span className='text-xs rounded px-1.5 py-0.5 bg-warning-subtle text-warning-text'>
               Verification Required
             </span>
           )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, PlainButton } from '@jovie/ui';
 import {
   Camera,
   DollarSign,
@@ -132,7 +132,7 @@ function SuggestionPill({
   const title = disabledReason ?? suggestion.label;
 
   return (
-    <button
+    <PlainButton
       type='button'
       onClick={() => {
         if (!disabled) {
@@ -165,7 +165,7 @@ function SuggestionPill({
       <span className='min-w-0 flex-1 truncate leading-none'>
         {suggestion.label}
       </span>
-    </button>
+    </PlainButton>
   );
 }
 

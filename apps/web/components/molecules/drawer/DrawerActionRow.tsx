@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -19,7 +20,7 @@ export function DrawerActionRow({
   className,
 }: DrawerActionRowProps) {
   return (
-    <button
+    <PlainButton
       type='button'
       onClick={onClick}
       className={cn(
@@ -32,6 +33,6 @@ export function DrawerActionRow({
       {icon ? <span className='shrink-0'>{icon}</span> : null}
       <span>{label}</span>
       {trailing ? <span className='ml-auto min-w-0'>{trailing}</span> : null}
-    </button>
+    </PlainButton>
   );
 }

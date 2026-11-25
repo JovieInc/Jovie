@@ -138,9 +138,11 @@ jobs:
             HEAD_SHA="${{ github.event.pull_request.head.sha }}"
           fi
 
-          echo "is_fork=$IS_FORK" >> "$GITHUB_OUTPUT"
-          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
-          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          {
+            echo "is_fork=$IS_FORK"
+            echo "pr_number=$PR_NUMBER"
+            echo "head_sha=$HEAD_SHA"
+          } >> "$GITHUB_OUTPUT"
           echo "PR #$PR_NUMBER | fork=$IS_FORK | sha=$HEAD_SHA"
 
       - name: Auto-pass for non-fork PRs

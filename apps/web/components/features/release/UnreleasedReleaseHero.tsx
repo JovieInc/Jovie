@@ -11,7 +11,7 @@
 import { PlainButton } from '@jovie/ui';
 import { Share2 } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, ViewTransition } from 'react';
 import { ProfileDrawerShell } from '@/features/profile/ProfileDrawerShell';
 import { SmartLinkPoweredByFooter } from '@/features/release/SmartLinkPagePrimitives';
 import {
@@ -22,6 +22,11 @@ import {
   SmartLinkShell,
 } from '@/features/release/SmartLinkShell';
 import { PublicShareActionList } from '@/features/share/PublicShareMenu';
+import {
+  artistTitleTransitionName,
+  releaseCoverTransitionName,
+  releaseTitleTransitionName,
+} from '@/lib/motion/view-transition-names';
 import { buildReleaseShareContext } from '@/lib/share/context';
 import type { Artist } from '@/types/db';
 import { PreSaveActions } from './PreSaveActions';
@@ -81,15 +86,28 @@ export function UnreleasedReleaseHero({
         onMenuOpen={() => setMenuOpen(true)}
         returnHref={`/${artist.handle}`}
         returnLabel={`Back to ${artist.name}`}
+        artworkViewTransitionName={releaseCoverTransitionName(release.slug)}
         heroMeta={
           <div>
-            <h1 className={SMART_LINK_HERO_TITLE_CLASS}>{release.title}</h1>
-            <Link
-              href={`/${artist.handle}`}
-              className={SMART_LINK_HERO_ARTIST_CLASS}
+            <ViewTransition
+              name={releaseTitleTransitionName(release.slug)}
+              share='jovie-morph'
+              default='none'
             >
-              {artist.name}
-            </Link>
+              <h1 className={SMART_LINK_HERO_TITLE_CLASS}>{release.title}</h1>
+            </ViewTransition>
+            <ViewTransition
+              name={artistTitleTransitionName(artist.handle)}
+              share='jovie-morph'
+              default='none'
+            >
+              <Link
+                href={`/${artist.handle}`}
+                className={SMART_LINK_HERO_ARTIST_CLASS}
+              >
+                {artist.name}
+              </Link>
+            </ViewTransition>
           </div>
         }
       >

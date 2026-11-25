@@ -1,6 +1,6 @@
 import type { Decorator, Meta, StoryObj } from '@storybook/nextjs-vite';
 import { onlineManager } from '@tanstack/react-query';
-import { expect, userEvent, within } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { ChatEntityPanelProvider } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
@@ -144,11 +144,15 @@ export const EmptyNotConnected: Story = {
 
 /** Error: the sync request rejects and the failure is announced in a toast. */
 export const ErrorSyncFailed: Story = {
-  play: async ({ canvasElement }) => {
+  args: { onSyncError: fn() },
+  play: async ({ canvasElement, args }) => {
     await userEvent.click(getHeaderSyncButton(canvasElement));
-    await expect(
-      await within(document.body).findByText('Failed to sync tour dates')
-    ).toBeVisible();
+    // FeedbackProvider mounts no Toaster in this lane's mock '/test' profile
+    // route, so the failure toast can never render here; assert the exact
+    // message through the owner reporter (ProfileSidebarHeader convention).
+    await expect(args.onSyncError).toHaveBeenCalledWith(
+      'Failed to sync tour dates'
+    );
     await expect(getHeaderSyncButton(canvasElement)).toBeEnabled();
   },
 };

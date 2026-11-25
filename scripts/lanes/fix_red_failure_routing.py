@@ -39,6 +39,16 @@ _ALIAS_ERROR = re.compile(
 _ANSI = re.compile(r'\x1b\[[0-9;]*m')
 # `gh run view --log-failed` prefixes each line `job \t step \t` before the timestamp.
 _LOG_FAILED_PREFIX = re.compile(r'^[^\t]+\t[^\t]+\t(?=\d{4}-\d\d-\d\dT|##\[error\])')
+def design_source_paths(text):
+    """Retain diagnostic paths for the bounded main-sync probe, never as edit authority."""
+    clean = _ANSI.sub('', str(text or ''))
+    if not DESIGN_SOURCE_CLI.search(clean):
+        return []
+    return sorted(set(re.findall(
+        r'new design identity: ((?:apps/web|packages/ui)/[^\t\n]+)\t'
+        r'(?:raw-hex-color|raw-palette-class|off-scale-step|duplicate-component)\t[^\n]+', clean)))
+
+
 _HOLD = re.compile(r'class=deterministic-source;n=[1-9]\d*;run=([1-9]\d*);try=([1-9]\d*)')
 _SHA = re.compile(r'[0-9a-f]{40}')
 _ROLLUPS = {'ci-fast', 'PR Ready', 'Product Lane Receipt'}

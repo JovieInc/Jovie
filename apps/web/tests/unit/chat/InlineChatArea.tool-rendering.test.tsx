@@ -83,6 +83,15 @@ vi.mock('@jovie/ui', () => ({
       </div>
     );
   },
+  PlainButton: ({
+    children,
+    type = 'button',
+    ...props
+  }: ComponentProps<'button'>) => (
+    <button type={type} {...props}>
+      {children}
+    </button>
+  ),
   SimpleTooltip: ({ children }: { readonly children: ReactNode }) => (
     <>{children}</>
   ),

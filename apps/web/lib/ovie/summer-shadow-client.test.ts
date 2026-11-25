@@ -51,6 +51,33 @@ describe('Summer production OIDC transport', () => {
     expect(boundedFetch).not.toHaveBeenCalled();
   });
 
+  it('lets staging (preview) reach only the founder chat paths', async () => {
+    vi.stubEnv('VERCEL_ENV', 'preview');
+    for (const path of [
+      '/ovie/v1/summer-shadow/conversation/events',
+      '/ovie/v1/summer-shadow/conversation/events/evt_1/result',
+      '/ovie/v1/summer-shadow/sessions/ses_1/stream',
+      '/ovie/v1/summer-chat/stream',
+    ]) {
+      await fetchSummerShadow(path, { method: 'POST', body: '{}' });
+    }
+    expect(boundedFetch).toHaveBeenCalledTimes(4);
+    for (const path of [
+      '/ovie/v1/summer-shadow/events',
+      '/ovie/v1/summer-shadow/commercial/evt_1',
+      '/ovie/v1/customer-voice/messages',
+    ]) {
+      await expect(fetchSummerShadow(path)).rejects.toThrow(
+        'production_origin_required'
+      );
+    }
+    vi.stubEnv('VERCEL_ENV', 'development');
+    await expect(
+      fetchSummerShadow('/ovie/v1/summer-chat/stream')
+    ).rejects.toThrow('production_origin_required');
+    expect(boundedFetch).toHaveBeenCalledTimes(4);
+  });
+
   it('uses the production alias, short-lived OIDC, no redirects and no mutation retries', async () => {
     vi.stubEnv('VERCEL_ENV', 'production');
     vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', 'legacy-ignored');

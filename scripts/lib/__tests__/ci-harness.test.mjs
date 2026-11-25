@@ -304,12 +304,9 @@ describe('ci-harness manifest', () => {
       workflow,
       'ci-merge-group-ready'
     );
-    for (const jobId of [
-      'ci-lighthouse-dashboard-pr',
-      'ci-lighthouse-onboarding-pr',
-    ]) {
-      expect(mergeGroupReady).toContain(jobId);
-    }
+    expect(mergeGroupReady).not.toMatch(
+      /ci-lighthouse-(dashboard|onboarding)-pr/
+    );
     expect(
       extractWorkflowJobBlock(workflow, 'ci-pr-vercel-preview')
     ).not.toContain(
@@ -616,7 +613,9 @@ describe('ci-harness manifest', () => {
     expect(mergeReady).toContain('ci-build-layout');
     expect(mergeReady).toContain('ci-build-ovie');
     expect(mergeReady).toContain('ci-typecheck-ovie');
-    expect(mergeReady).toContain('ci-storybook-surfaces');
+    expect(mergeReady).not.toMatch(
+      /ci-storybook-surfaces|ci-lighthouse-(dashboard|onboarding)-pr/
+    );
     expect(mergeReady).toContain('ci-ios');
     expect(mergeReady).toContain('ci-macos');
     expect(mergeReady).toContain('ci-cross-product-integration');

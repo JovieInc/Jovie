@@ -3,6 +3,8 @@
 import {
   Badge,
   Button,
+  HostDrawnInput,
+  Input,
   Select,
   SelectContent,
   SelectItem,
@@ -34,7 +36,6 @@ import {
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 
-/** Serialized canonical contact row (dates as ISO strings for the client). */
 export interface AdminContactRow {
   dedupeKey: string;
   stage: ContactLifecycleStage;
@@ -169,7 +170,7 @@ const ADMIN_CONTACT_COLUMNS = [
   }),
 ] as ColumnDef<AdminContactRow, unknown>[];
 
-/** One discovered fact with Yes / No / Unsure; reused by Ovie Outbound. */
+/** One discovered fact with Yes / No / Unsure; `active` is the y / n / u target in Ovie Outbound. */
 export function EvidenceItemCard({
   item,
   pending,
@@ -178,7 +179,6 @@ export function EvidenceItemCard({
 }: Readonly<{
   item: ContactEvidenceItem;
   pending: boolean;
-  /** Keyboard target for y / n / u in Ovie Outbound. */
   active?: boolean;
   onDecision: (
     item: ContactEvidenceItem,
@@ -238,12 +238,13 @@ export function EvidenceItemCard({
             if (correction.trim()) void onDecision(item, 'no', correction);
           }}
         >
-          <input
+          <Input
+            inputSize='sm'
             aria-label={`Correct ${item.label}`}
             value={correction}
             onChange={event => setCorrection(event.target.value)}
             placeholder='Correct value'
-            className='h-7 min-w-0 flex-1 rounded-md border border-strong bg-surface-0 px-2 text-xs text-primary-token'
+            className='min-w-0 flex-1'
           />
           <Button
             size='sm'
@@ -597,12 +598,6 @@ export function AdminContactsTable({
     [selected]
   );
   useAdminPeopleRightPanel(detailPanel);
-
-  const stageHref = useCallback(
-    (value: string | null) => buildHref({ stage: value, page: null }),
-    [buildHref]
-  );
-
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const from = rows.length === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = rows.length === 0 ? 0 : (page - 1) * pageSize + rows.length;
@@ -619,7 +614,12 @@ export function AdminContactsTable({
               <Select
                 value={stage ?? 'all'}
                 onValueChange={value =>
-                  router.push(stageHref(value === 'all' ? null : value))
+                  router.push(
+                    buildHref({
+                      stage: value === 'all' ? null : value,
+                      page: null,
+                    })
+                  )
                 }
               >
                 <SelectTrigger aria-label='Filter By Lifecycle Stage'>
@@ -644,17 +644,18 @@ export function AdminContactsTable({
               action=''
               className='ml-auto flex items-center gap-1'
             >
-              <input type='hidden' name='view' value='contacts' />
+              <HostDrawnInput type='hidden' name='view' value='contacts' />
               {stage ? (
-                <input type='hidden' name='stage' value={stage} />
+                <HostDrawnInput type='hidden' name='stage' value={stage} />
               ) : null}
-              <input
+              <Input
+                inputSize='sm'
                 type='search'
                 name='q'
                 defaultValue={search}
                 placeholder='Search name, email, handle'
                 aria-label='Search Contacts'
-                className='h-7 w-48 rounded-md border border-strong bg-surface-0 px-2 text-xs text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+                className='w-48'
               />
             </form>
           }
@@ -700,7 +701,6 @@ export function AdminContactsTable({
               previous === row.dedupeKey ? null : row.dedupeKey
             )
           }
-          // Page-level useAdminTableKeyboardNavigation owns j/k here.
           enableKeyboardNavigation={false}
           emptyState={
             <div className='px-app-header py-10 text-center text-sm text-secondary-token'>

@@ -81,16 +81,16 @@ describe('FounderFunnelBand', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders the death-step funnel without MRR or velocity tiles', () => {
+  it('renders the customer funnel without MRR or velocity tiles', () => {
     renderWithQuery(<FounderFunnelBand initialFunnel={makeFunnel()} />);
 
     expect(
       screen.getByTestId('founder-funnel-stage-onboarding_chats')
     ).toBeInTheDocument();
-    expect(screen.getByText('Biggest drop-off · −60')).toBeInTheDocument();
+    expect(screen.getByText('Largest count gap · −20')).toBeInTheDocument();
     expect(
       screen.getByRole('link', {
-        name: '40 Accounts created; inspect underlying entities',
+        name: /^Accounts created 40 .*; inspect underlying entities$/,
       })
     ).toHaveAttribute(
       'href',

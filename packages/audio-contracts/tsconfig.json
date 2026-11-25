@@ -5,7 +5,12 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "noEmit": true,
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals"],
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true
   },
   "include": ["**/*.ts"],
   "exclude": ["node_modules"]

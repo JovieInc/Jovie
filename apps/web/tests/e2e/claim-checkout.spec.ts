@@ -17,11 +17,11 @@ import {
   routeDogfoodArtistSearch,
   seedDogfoodArtists,
 } from './helpers/claim-dogfood-fixtures';
+import { ensureUserIsFree } from './helpers/ensure-user-is-free';
 import {
   createCheckoutSession,
   createSignedStripeWebhook,
   detachCustomerPaymentMethods,
-  ensureUserIsFree,
   expireRunOwnedTestCheckoutSession,
   getBillingStatus,
   getStripeContextOrSkip,
@@ -75,7 +75,11 @@ test.describe('Self-serve artist profile checkout', () => {
     const { stripeClient, priceId } = await getStripeContextOrSkip();
     await interceptTrackingRoutes(page);
     await setTestAuthBypassSession(page, 'creator');
-    await ensureUserIsFree(page, stripeClient);
+    await ensureUserIsFree(
+      page,
+      stripeClient,
+      DEFAULT_DEV_TEST_AUTH_EMAILS.creator
+    );
     // JOV-8805: the persona's Stripe customer persists across runs; clear
     // attached test PaymentMethods so checkout.sessions.create stays under
     // Stripe's per-customer cap.
@@ -138,29 +142,24 @@ test.describe('Self-serve artist profile checkout', () => {
         .toBe(true);
       expect((await getBillingStatus(page)).plan).toBe('pro');
 
-      // Paid value (golden-path step): the buyer lands on the unlock screen,
-      // not a bare receipt. This is the only run that can pay, so it asserts it.
-      // ponytail: Stripe forbids automating hosted Checkout, so this session
-      // never reaches status 'complete' and /api/billing/checkout-session
-      // answers { plan: null }. The paid entitlement is already proven by the
-      // signed webhook above; stub only that read to render the paid screen.
-      await page.route('**/api/billing/checkout-session**', route =>
-        route.fulfill({
-          json: {
-            plan: 'pro',
-            priceId,
-            needsProfile: false,
-            proofPending: false,
-            profileShareUrl: null,
-          },
-        })
-      );
+      // An open Stripe session and a direct visit without that session both
+      // stay on recovery. Paid success requires the session receipt and the
+      // current entitlement together.
       await page.goto(`/billing/success?session_id=${sessionId}`, {
         waitUntil: 'domcontentloaded',
       });
-      await expect(page.getByText(/You're on .+: unlocked/)).toBeVisible({
+      await expect(page.getByTestId('checkout-success-recovery')).toBeVisible({
         timeout: 30_000,
       });
+
+      await page.goto('/billing/success', {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(page.getByTestId('checkout-success-recovery')).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect(page.getByTestId('checkout-success-paid')).toHaveCount(0);
+      await expect(page.getByText(/You're on .+: unlocked/)).toHaveCount(0);
 
       // An existing subscriber is never charged twice.
       const again = await page.request.get('/claim/start?new=1', {
@@ -172,7 +171,11 @@ test.describe('Self-serve artist profile checkout', () => {
     } finally {
       // The persona keeps its Stripe customer; only the test subscription
       // is canceled so the next run starts free.
-      await ensureUserIsFree(page, stripeClient);
+      await ensureUserIsFree(
+        page,
+        stripeClient,
+        DEFAULT_DEV_TEST_AUTH_EMAILS.creator
+      );
       await detachCustomerPaymentMethods(
         stripeClient,
         DEFAULT_DEV_TEST_AUTH_EMAILS.creator
@@ -302,9 +305,13 @@ test.describe('Claim checkout dogfood', () => {
 
     await interceptTrackingRoutes(page);
     await setTestAuthBypassSession(page, 'creator-ready');
-    await ensureUserIsFree(page, stripeClient).catch(async () => {
-      await resetDogfoodBilling(buyerEmail);
-    });
+    // Reset the persona's derived billing state up front: the price-lock era
+    // (JOV-INV-048) fails checkout closed on a stale lock or subscription row,
+    // and one poisoned run then fails every later run with a masked 400
+    // (JOV-8805, red 2026-11-17..19). This normalizes pre-existing persona
+    // state only; the checkout under test is still exercised end to end.
+    await resetDogfoodBilling(buyerEmail);
+    await ensureUserIsFree(page, stripeClient, buyerEmail);
     await detachCustomerPaymentMethods(stripeClient, buyerEmail);
     const { profileId } = await readActiveClaimVerification(buyerEmail);
     await clearDogfoodClaim(profileId, artist);
@@ -373,6 +380,21 @@ test.describe('Claim checkout dogfood', () => {
       expect(pending.spotifyId).not.toBe(artist.id);
       expect(pending.record?.paidAt).toBeTruthy();
       expect((await getBillingStatus(page)).isPro).toBe(true);
+
+      // Direct return without a checkout session must not celebrate, and must
+      // not claim the unproven profile is live.
+      await page.goto('/billing/success?source=onboarding', {
+        waitUntil: 'domcontentloaded',
+      });
+      await expect(page.getByTestId('checkout-success-recovery')).toBeVisible({
+        timeout: 30_000,
+      });
+      await expect(page.getByTestId('checkout-success-paid')).toHaveCount(0);
+      await expect(
+        page.getByRole('heading', { name: 'Your plan is active' })
+      ).toHaveCount(0);
+      await expect(page.getByTestId('paid-share-prompt')).toHaveCount(0);
+      await expect(page.getByRole('heading', { name: /live/i })).toHaveCount(0);
 
       // Ovie inbox card for Tim's queue.
       await expect
@@ -451,7 +473,7 @@ test.describe('Claim checkout dogfood', () => {
       );
     } finally {
       await clearDogfoodClaim(profileId, artist);
-      await ensureUserIsFree(page, stripeClient).catch(async () => {
+      await ensureUserIsFree(page, stripeClient, buyerEmail).catch(async () => {
         await resetDogfoodBilling(buyerEmail);
       });
       await detachCustomerPaymentMethods(stripeClient, buyerEmail).catch(

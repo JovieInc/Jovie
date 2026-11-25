@@ -150,6 +150,9 @@ jobs:
       # installation budget is exhausted (2026-10-31 5 h queue stall).
       pull-requests: write
       issues: write
+      # Failover must be able to stamp jovie-merge-group-eject-hold/v1; without
+      # this, status POST 403s and reconcile clears lane-fix-red (Sentry #26143).
+      statuses: write
     env:
       GH_FALLBACK_TOKEN: ${{ github.token }}
     steps:

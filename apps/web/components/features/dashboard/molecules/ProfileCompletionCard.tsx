@@ -2,11 +2,12 @@
 
 import { PlainButton } from '@jovie/ui';
 import { AlertCircle, ArrowRight, Sparkles, X } from 'lucide-react';
-import { motion } from 'motion/react';
+import * as m from 'motion/react-m';
 import Link from 'next/link';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { LazyDomAnimationMotion } from '@/lib/animation/LazyMotionFeatures';
 import { captureWarning } from '@/lib/error-tracking';
 
 const SPRING = {
@@ -114,12 +115,14 @@ export const ProfileCompletionCard = memo(
                 aria-valuemax={100}
                 aria-label='Profile Completion'
               >
-                <motion.div
-                  className='h-full rounded-full bg-accent'
-                  initial={{ width: 0 }}
-                  animate={{ width: `${completionPercentage}%` }}
-                  transition={SPRING}
-                />
+                <LazyDomAnimationMotion>
+                  <m.div
+                    className='h-full rounded-full bg-accent'
+                    initial={{ width: 0 }}
+                    animate={{ width: `${completionPercentage}%` }}
+                    transition={SPRING}
+                  />
+                </LazyDomAnimationMotion>
               </div>
 
               <ul className='space-y-1.5'>

@@ -209,7 +209,7 @@ export class Mailbox extends DurableObject<Env> {
   }
 
   /** WebSocket stream for a relay: pushes everything not yet received. */
-  async fetch(request: Request): Promise<Response> {
+  override async fetch(request: Request): Promise<Response> {
     if (request.headers.get('Upgrade') !== 'websocket')
       return new Response('expected websocket', { status: 426 });
     if (this.ctx.getWebSockets().length >= LIMITS.socketsPerKind)
@@ -240,7 +240,7 @@ export class Mailbox extends DurableObject<Env> {
     for (const ws of sockets) this.sendBatch(ws, batch);
   }
 
-  async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer) {
+  override async webSocketMessage(ws: WebSocket, raw: string | ArrayBuffer) {
     this.touch();
     let frame: { type?: string; ids?: unknown };
     try {
@@ -267,7 +267,7 @@ export class Mailbox extends DurableObject<Env> {
     }
   }
 
-  async webSocketClose(ws: WebSocket, code: number) {
+  override async webSocketClose(ws: WebSocket, code: number) {
     try {
       ws.close(code === 1005 ? 1000 : code, 'closed');
     } catch {
@@ -383,7 +383,7 @@ export class Mailbox extends DurableObject<Env> {
     );
   }
 
-  async alarm(): Promise<void> {
+  override async alarm(): Promise<void> {
     const now = Date.now();
     const due = this.outbox.dueTasks(now);
     try {

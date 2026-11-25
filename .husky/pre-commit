@@ -11,6 +11,11 @@ pnpm run skill-governance:check -- --staged
 pnpm run next:proxy-guard
 pnpm exec lint-staged --no-stash
 
+# Non-blocking size-500 warning on staged files: same pinned JovieInc/ci guard,
+# limit and baseline as the pre-push hard fail and CI Company Guards. Never fails
+# the commit (exit 0, < 1 s budget, skips without node/cached guard).
+bash scripts/hooks/company-size-local.sh --staged || true
+
 # Bind the final staged rule bodies to their reviewed integrity record.
 if git diff --cached --name-only --diff-filter=ACMD | grep -qE '^\.claude/rules/.*\.md$|^scripts/agent-context/rule-scopes\.(json|mjs)$'; then
   node scripts/agent-context/rule-scopes.mjs --staged
@@ -21,3 +26,6 @@ if git diff --cached --name-only --diff-filter=ACM | grep -qE '^apps/ios/.*\.swi
   echo "[gate-ladder] ios format-lint rung (staged Swift)"
   pnpm run ios:lint
 fi
+
+# Advisory local AI review (Sentry Warden): reports findings, never blocks.
+bash scripts/hooks/warden-local-review.sh staged

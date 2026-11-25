@@ -1,10 +1,10 @@
 {
   "schema": "jovie-merge-queue-speed/v1",
-  "generatedAt": "2026-11-07T14:05:38.603Z",
+  "generatedAt": "2026-11-23T19:19:16.064Z",
   "windowHours": 24,
   "collection": {
     "status": "collected",
-    "collectionId": "42379175042/1",
+    "collectionId": "45246206626/1",
     "prRunsComplete": true,
     "groupRunsComplete": true,
     "mergedPrsComplete": true,
@@ -15,111 +15,126 @@
   "timingBasis": "latest-attempt-start-to-workflow-update",
   "runnerMinutesBasis": "latest-attempt-jobs; null unless all completed runs and job pages covered",
   "prCiSeconds": {
-    "n": 62,
-    "p50": 509,
-    "p95": 1058
+    "n": 13,
+    "p50": 377,
+    "p95": 1032
   },
   "mergeGroupCiSeconds": {
-    "n": 20,
-    "p50": 496,
-    "p95": 613
+    "n": 9,
+    "p50": 596,
+    "p95": 1053
   },
   "groupOutcomes": {
     "2h": {
-      "success": 3,
+      "success": 0,
       "failure": 0,
       "cancelled": 0,
       "other": 0,
-      "successRate": 1,
-      "successRateInclCancelled": 1
+      "successRate": null,
+      "successRateInclCancelled": null
     },
     "6h": {
-      "success": 5,
+      "success": 0,
+      "failure": 0,
+      "cancelled": 0,
+      "other": 0,
+      "successRate": null,
+      "successRateInclCancelled": null
+    },
+    "24h": {
+      "success": 9,
       "failure": 0,
       "cancelled": 0,
       "other": 0,
       "successRate": 1,
       "successRateInclCancelled": 1
-    },
-    "24h": {
-      "success": 20,
-      "failure": 5,
-      "cancelled": 0,
-      "other": 0,
-      "successRate": 0.8,
-      "successRateInclCancelled": 0.8
     }
   },
-  "groupSuccessRate": 0.8,
-  "mergesPerHour": 0.79,
-  "merges": 19,
+  "unfinishedGroupRuns": 0,
+  "groupSuccessRate": 1,
+  "mergesPerHour": 0.38,
+  "merges": 9,
+  "mainFirstAdmission": {
+    "basis": "First native ADD through GitHub mergedAt for PRs merged to main during the window. Excludes still-open and closed-unmerged PRs.",
+    "firstEntryToMergeSeconds": {
+      "n": 9,
+      "p50": 623,
+      "p95": 80089
+    },
+    "mergedPrs": 9,
+    "withoutNativeEntry": 0,
+    "reenteredPrs": 9,
+    "unknownPrs": 0,
+    "duplicateRows": 0,
+    "complete": true
+  },
   "queueWaitSeconds": {
-    "n": 19,
+    "n": 9,
     "p50": null,
     "p95": null
   },
   "criticalPath": [
     {
-      "name": "ci-fast (remaining)",
-      "n": 20,
-      "p50": 340,
-      "p95": 467,
+      "name": "Lighthouse (dashboard gate)",
+      "n": 5,
+      "p50": 648,
+      "p95": 716,
       "lastShare": 0
     },
     {
-      "name": "ci-fast (structural lanes)",
-      "n": 20,
-      "p50": 293,
-      "p95": 392,
+      "name": "Database Certification (isolated Neon)",
+      "n": 1,
+      "p50": 337,
+      "p95": 337,
       "lastShare": 0
     },
     {
-      "name": "Storybook Surface Matrix (combined) (2)",
-      "n": 15,
-      "p50": 263,
-      "p95": 530,
+      "name": "ci-fast (structural lanes shard ab)",
+      "n": 9,
+      "p50": 336,
+      "p95": 399,
       "lastShare": 0
     },
     {
-      "name": "Storybook Surface Matrix (combined) (1)",
-      "n": 15,
-      "p50": 236,
-      "p95": 527,
+      "name": "ci-fast (structural python)",
+      "n": 9,
+      "p50": 292,
+      "p95": 340,
       "lastShare": 0
     },
     {
-      "name": "Storybook Surface Matrix (combined) (3)",
-      "n": 15,
-      "p50": 226,
-      "p95": 508,
+      "name": "ci-fast (remaining shard 1/3)",
+      "n": 9,
+      "p50": 287,
+      "p95": 463,
       "lastShare": 0
     },
     {
-      "name": "Unit Tests (9/14)",
-      "n": 15,
-      "p50": 215,
-      "p95": 231,
+      "name": "Unit Tests (5/14)",
+      "n": 7,
+      "p50": 262,
+      "p95": 323,
       "lastShare": 0
     },
     {
       "name": "Merge Suite Scope / full_web_units",
-      "n": 20,
+      "n": 9,
       "p50": 4,
-      "p95": 4,
+      "p95": 6,
       "lastShare": 1
     }
   ],
-  "mergeGroupRunnerMinutesPerMerge": 95.4,
+  "mergeGroupRunnerMinutesPerMerge": 114.4,
   "sampled": {
-    "prRuns": 99,
-    "groupRuns": 25,
-    "groupRunsWithJobs": 25,
-    "mergedPrs": 19
+    "prRuns": 49,
+    "groupRuns": 9,
+    "groupRunsWithJobs": 9,
+    "mergedPrs": 9
   },
   "batchSizeGate": {
     "target": 0.85,
-    "success2h": 1,
-    "eligible": true
+    "success2h": null,
+    "eligible": false
   },
   "repo": "JovieInc/Jovie"
 }

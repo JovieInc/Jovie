@@ -10,6 +10,10 @@ inputs:
     description: 'Require the prepared merge-group installed tree and skip dependency fetch/install'
     required: false
     default: 'false'
+  prefer_prepared_workspace:
+    description: 'Use a verified web workspace on an exact hosted merge-group hit, with frozen install fallback'
+    required: false
+    default: 'false'
   save_merge_group_workspace:
     description: 'Allow the merge-group workspace producer to save the exact installed tree'
     required: false
@@ -187,15 +191,35 @@ runs:
       run: pnpm fetch --frozen-lockfile
 
     - name: Install dependencies
+      id: install-dependencies
       if: github.event_name != 'merge_group' || inputs.reuse_merge_group_workspace != 'true'
       shell: bash
       env:
         ONNXRUNTIME_NODE_INSTALL: skip
+        USE_PREPARED_WORKSPACE: ${{ github.event_name == 'merge_group' && runner.environment == 'github-hosted' && inputs.prefer_prepared_workspace == 'true' && steps.node-modules-cache.outputs.cache-hit == 'true' }}
       run: |
+        web_tools_ready() {
+          local tool
+          for tool in next next-sitemap tsx vitest playwright lhci; do
+            [[ -x "apps/web/node_modules/.bin/$tool" ]] || return 1
+          done
+          # The cache can outlive a hosted image update. Load the same native
+          # compiler that the web build resolves before trusting this tree.
+          (cd apps/web && node -e '
+            const fromNext = require("node:module").createRequire(require.resolve("next/package.json"));
+            fromNext("@next/swc-linux-" + process.arch + "-gnu");
+          ')
+        }
         if [[ "${{ steps.runner-prereqs.outputs.dependencies_warm }}" == "true" ]]; then
           .github/runner-image/restore-installed-tree.sh \
             "${{ steps.runner-prereqs.outputs.installed_tree_archive_path }}" \
             "${{ steps.runner-prereqs.outputs.installed_tree_archive_sha256 }}"
+        elif [[ "$USE_PREPARED_WORKSPACE" == "true" ]] &&
+          node scripts/lib/ci-dependency-workspace.mjs validate &&
+          web_tools_ready &&
+          node scripts/lib/verify-patched-dependencies.mjs; then
+          echo "Using the verified installed web workspace."
+          echo "prepared-workspace-reused=true" >> "$GITHUB_OUTPUT"
         else
           pnpm install --frozen-lockfile
           # A restored tree can survive the frozen install still linking an
@@ -271,7 +295,7 @@ runs:
       uses: ./.github/actions/setup-playwright
 
     - name: Stamp installed workspace receipt
-      if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && runner.environment == 'github-hosted' && inputs.package_cache == 'true' && !(github.event_name == 'merge_group' && inputs.reuse_merge_group_workspace == 'true')
+      if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && runner.environment == 'github-hosted' && inputs.package_cache == 'true' && steps.install-dependencies.outputs.prepared-workspace-reused != 'true' && !(github.event_name == 'merge_group' && inputs.reuse_merge_group_workspace == 'true')
       shell: bash
       run: node scripts/lib/ci-dependency-workspace.mjs prepare
 

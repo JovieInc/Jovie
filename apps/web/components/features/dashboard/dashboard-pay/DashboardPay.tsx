@@ -7,13 +7,11 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  Input,
+  PlainButton,
 } from '@jovie/ui';
 import {
   BarChart3,
   Check,
-  Copy,
-  Link2,
   Link2Off,
   MoreHorizontal,
   MousePointerClick,
@@ -33,9 +31,13 @@ import {
 } from '@/components/organisms/Dialog';
 import { PageShell } from '@/components/organisms/PageShell';
 import { BASE_URL } from '@/constants/domains';
-import { CopyToClipboardButton } from '@/features/dashboard/molecules/CopyToClipboardButton';
 import { EarningsTab } from '@/features/dashboard/organisms/EarningsTab';
 import { ShopifyStoreCard } from '@/features/dashboard/organisms/shopify/ShopifyStoreCard';
+import {
+  TipLinkSection,
+  VenmoConnectDialog,
+  VenmoEditForm,
+} from './DashboardPay.parts';
 import { useDashboardPay } from './useDashboardPay';
 import { formatCount } from './utils';
 
@@ -66,8 +68,7 @@ const VenmoConnectedBadge = memo(function VenmoConnectedBadge({
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
-        <button
-          type='button'
+        <PlainButton
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
           className='inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-1 px-2.5 py-1 text-app font-caption text-secondary-token transition-colors hover:bg-surface-2 sm:gap-2 sm:px-3 sm:py-1.5 sm:text-sm'
@@ -79,7 +80,7 @@ const VenmoConnectedBadge = memo(function VenmoConnectedBadge({
           ) : (
             <Check className='h-3.5 w-3.5 text-success sm:h-4 sm:w-4' />
           )}
-        </button>
+        </PlainButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' sideOffset={6}>
         <DropdownMenuItem
@@ -102,196 +103,6 @@ const VenmoConnectedBadge = memo(function VenmoConnectedBadge({
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-});
-
-// -----------------------------------------------------------------------------
-
-interface VenmoEditFormProps {
-  readonly venmoHandle: string;
-  readonly onVenmoHandleChange: (value: string) => void;
-  readonly onSave: () => void;
-  readonly onCancel: () => void;
-  readonly isSaving: boolean;
-}
-
-const VenmoEditForm = memo(function VenmoEditForm({
-  venmoHandle,
-  onVenmoHandleChange,
-  onSave,
-  onCancel,
-  isSaving,
-}: VenmoEditFormProps) {
-  return (
-    <div className='space-y-3'>
-      <div className='flex items-center gap-2'>
-        <span className='text-app text-secondary-token'>@</span>
-        <Input
-          type='text'
-          value={venmoHandle}
-          onChange={e => onVenmoHandleChange(e.target.value)}
-          placeholder='your-username'
-          autoFocus
-          className='h-8 min-w-0 flex-1'
-        />
-      </div>
-      <div className='flex items-center gap-2'>
-        <Button
-          onClick={onSave}
-          disabled={isSaving || !venmoHandle.trim()}
-          variant='secondary'
-          size='sm'
-        >
-          {isSaving ? 'Saving…' : 'Save'}
-        </Button>
-        <Button
-          onClick={onCancel}
-          disabled={isSaving}
-          variant='ghost'
-          size='sm'
-        >
-          Cancel
-        </Button>
-      </div>
-    </div>
-  );
-});
-
-// -----------------------------------------------------------------------------
-
-interface VenmoConnectDialogProps {
-  readonly open: boolean;
-  readonly onClose: () => void;
-  readonly venmoHandle: string;
-  readonly onVenmoHandleChange: (value: string) => void;
-  readonly onSave: () => void;
-  readonly isSaving: boolean;
-  readonly saveSuccess: string | null;
-}
-
-const VenmoConnectDialog = memo(function VenmoConnectDialog({
-  open,
-  onClose,
-  venmoHandle,
-  onVenmoHandleChange,
-  onSave,
-  isSaving,
-  saveSuccess,
-}: VenmoConnectDialogProps) {
-  return (
-    <Dialog open={open} onClose={onClose} size='sm'>
-      <div className='flex items-start gap-3'>
-        <div
-          className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-accent/20 bg-accent/10'
-          aria-hidden='true'
-        >
-          <Wallet className='h-4 w-4 text-accent-token' />
-        </div>
-        <div className='min-w-0 flex-1'>
-          <DialogTitle className='text-mid font-semibold tracking-[-0.011em] text-primary-token'>
-            Connect Venmo
-          </DialogTitle>
-          <DialogDescription className='mt-0.5 text-app leading-5 text-secondary-token'>
-            Link your Venmo to start receiving payments from fans.
-          </DialogDescription>
-        </div>
-      </div>
-
-      <DialogBody>
-        <div className='space-y-3'>
-          <div>
-            <label
-              htmlFor='venmo-handle'
-              className='mb-1.5 block text-app font-caption text-secondary-token'
-            >
-              Venmo Username
-            </label>
-            <div className='flex items-center gap-2'>
-              <span className='text-app text-tertiary-token'>@</span>
-              <Input
-                type='text'
-                id='venmo-handle'
-                value={venmoHandle}
-                onChange={e => onVenmoHandleChange(e.target.value)}
-                placeholder='your-username'
-                autoFocus
-                className='flex-1'
-              />
-            </div>
-          </div>
-          <div className='flex items-center gap-2'>
-            <Button
-              onClick={onSave}
-              disabled={isSaving || !venmoHandle.trim()}
-              variant='secondary'
-              size='sm'
-            >
-              {isSaving ? 'Connecting…' : 'Connect'}
-            </Button>
-            <Button
-              onClick={onClose}
-              disabled={isSaving}
-              variant='ghost'
-              size='sm'
-            >
-              Cancel
-            </Button>
-          </div>
-          {saveSuccess && (
-            <output
-              className='flex items-center gap-2 rounded-lg border border-subtle bg-surface-1 px-3 py-2 text-app font-caption text-success'
-              aria-live='polite'
-            >
-              <Check className='h-3.5 w-3.5' />
-              {saveSuccess}
-            </output>
-          )}
-        </div>
-      </DialogBody>
-    </Dialog>
-  );
-});
-
-// -----------------------------------------------------------------------------
-
-interface TipLinkSectionProps {
-  readonly tipUrl: string;
-  readonly tipRelativePathLink: string;
-}
-
-const TipLinkSection = memo(function TipLinkSection({
-  tipUrl,
-  tipRelativePathLink,
-}: TipLinkSectionProps) {
-  return (
-    <div>
-      <div className='mb-3 flex items-center gap-2'>
-        <div
-          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-subtle bg-surface-1'
-          aria-hidden='true'
-        >
-          <Link2 className='h-3.5 w-3.5 text-blue-500 dark:text-blue-400' />
-        </div>
-        <h3 className='text-app font-caption text-primary-token'>Pay Link</h3>
-      </div>
-
-      <div className='flex items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-3 py-2.5'>
-        <Copy className='max-sm:hidden h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-        <span className='min-w-0 flex-1 truncate text-app text-secondary-token'>
-          {tipUrl}
-        </span>
-        <CopyToClipboardButton
-          relativePath={tipRelativePathLink}
-          idleLabel='Copy'
-          successLabel='Copied'
-          errorLabel='Failed'
-          className='h-7 shrink-0 px-2.5 text-app'
-        />
-      </div>
-      <p className='mt-2 text-2xs text-tertiary-token sm:text-app'>
-        Share this link anywhere to receive payments.
-      </p>
-    </div>
   );
 });
 
@@ -357,7 +168,7 @@ export function DashboardPay() {
       <PageShell
         frame='none'
         maxWidth='wide'
-        contentPadding='compact'
+        contentPadding='default'
         data-testid='dashboard-earnings-workspace'
       >
         <div
@@ -420,7 +231,7 @@ export function DashboardPay() {
             <>
               <ContentSurfaceCard className='overflow-hidden p-0'>
                 <div className='grid grid-cols-1 gap-0 sm:grid-cols-[minmax(0,1fr)_320px]'>
-                  <div className='grid grid-cols-2 gap-0 [&>*]:border-b [&>*]:border-[color-mix(in_oklab,var(--app-shell-border)_72%,transparent)] sm:grid-cols-3 sm:[&>*]:border-b-0 sm:[&>*]:border-r sm:[&>*:last-child]:border-r-0'>
+                  <div className='grid grid-cols-2 gap-0 [&>*]:border-b [&>*]:border-subtle sm:grid-cols-3 sm:[&>*]:border-b-0 sm:[&>*]:border-r sm:[&>*:last-child]:border-r-0'>
                     <ContentMetricCard
                       as='section'
                       layout='icon-chip'
@@ -455,7 +266,7 @@ export function DashboardPay() {
                       tone='accent'
                     />
                   </div>
-                  <div className='border-t border-[color-mix(in_oklab,var(--app-shell-border)_72%,transparent)] px-4 py-4 sm:border-l sm:border-t-0 sm:px-5'>
+                  <div className='border-t border-subtle px-4 py-4 sm:border-l sm:border-t-0 sm:px-5'>
                     <TipLinkSection
                       tipUrl={tipUrls.tipUrl}
                       tipRelativePathLink={tipUrls.tipRelativePathLink}

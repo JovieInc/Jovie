@@ -1,8 +1,8 @@
 'use client';
 
+import { IconButton } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 
 interface ActiveFilterPillProps {
   readonly groupLabel: string;
@@ -39,13 +39,15 @@ export function ActiveFilterPill({
           {displayValue}
         </span>
       </div>
-      <DrawerInlineIconButton
+      <IconButton
+        size='xs'
+        variant='inline'
+        fade='visible'
         onClick={onClear}
-        className='h-full rounded-r-full px-1 py-1 text-tertiary-token'
         aria-label={`Clear ${groupLabel} filter`}
       >
-        <Icon name='X' className='h-3 w-3' />
-      </DrawerInlineIconButton>
+        <Icon name='X' className='h-3 w-3 text-tertiary-token' />
+      </IconButton>
     </div>
   );
 }

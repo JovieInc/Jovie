@@ -194,7 +194,7 @@ describe('golden path visual review', () => {
       verdict: 'blocker',
       findings: ['layout: CTA clipped'],
     });
-    expect(body?.model).toBe('@cf/zai-org/glm-5.3-flash');
+    expect(body?.model).toBe('@cf/deepseek-ai/deepseek-v4.1-flash-1017');
     expect(body?.messages[0]?.content.map(part => part.type)).toEqual([
       'text',
       'image_url',
@@ -619,7 +619,9 @@ describe('reviewWithWorkersAi (Cloudflare only)', () => {
     expect(result).toMatchObject({ verdict: 'pass' });
     expect(calls).toHaveLength(1);
     expect(calls[0]?.url).toContain('workers.dev');
-    expect(calls[0]?.body.model).toBe('@cf/zai-org/glm-5.3-flash');
+    expect(calls[0]?.body.model).toBe(
+      '@cf/deepseek-ai/deepseek-v4.1-flash-1017'
+    );
     expect(calls[0]?.body).not.toHaveProperty('providerOptions');
   });
 

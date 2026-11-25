@@ -16,7 +16,10 @@ import {
   resolveHomepageHeroPrimaryAction,
 } from '@/data/homepageStartCta';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
-import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
+import {
+  CLAIM_PROFILE_STARTER_PROMPT,
+  getClaimProfileIntent,
+} from '@/data/marketingCtaIntents';
 import { HOME_SPEC } from './v3/home-spec';
 import { Orbit } from './v3/Orbit';
 import { AppWindow, CatalogPlate } from './v3/ProductUi';
@@ -76,7 +79,7 @@ function ChapterRule({
 /**
  * Hero: the locked line beside the lede and actions, then Jovie for Mac shot
  * straight on, its release page lifted out of the window, standing in one
- * key light from above. No rings or glow blobs: light, edge and shadow only.
+ * key light from above. No rings or glow blobs: hairline light, edge and shadow only.
  */
 export function HomepageStoryHero({
   copy = HOMEPAGE_EDITORIAL_COPY.hero,
@@ -327,12 +330,23 @@ function ClaimCloseBody() {
         <h2 className='hv3-statement text-balance'>{lines(claim.headline)}</h2>
         <p className='hv3-lede hv3-lede--center'>{claim.subhead}</p>
         <div className='hv3-form'>
+          {/*
+            Native GET: valid handles keep handle=. Display names fail the
+            pattern (reject) so handle=Taylor+Swift never lands. /start also
+            rewrites any poisoned claim+display-name URL to a Spotify search
+            prior (JOV-10127 entry hygiene).
+          */}
           <form
             method='get'
             action={intent.href}
             data-testid='homepage-claim-entry'
             className='hv3-claim'
           >
+            <Input
+              type='hidden'
+              name='starter_prompt'
+              value={CLAIM_PROFILE_STARTER_PROMPT}
+            />
             <label
               className='hv3-claim__label'
               htmlFor='homepage-claim-entry-handle'
@@ -348,6 +362,11 @@ function ClaimCloseBody() {
               maxLength={30}
               placeholder={claim.handlePlaceholder}
               aria-label={claim.handleLabel}
+              // Escape hyphen for HTML pattern unicodeSets(v) mode — unescaped
+              // `-` fails compilation and browsers drop the constraint (Seer).
+              // Use a JS expression: JSX string attributes keep `\\` as two
+              // literal backslashes, which then fails under `v` as well.
+              pattern={'[A-Za-z0-9._\\-]{3,30}'}
             />
             <Button type='submit' data-testid='homepage-close-cta'>
               {intent.label}

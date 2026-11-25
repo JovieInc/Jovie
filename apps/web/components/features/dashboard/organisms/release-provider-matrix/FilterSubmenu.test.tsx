@@ -23,9 +23,23 @@ vi.mock('@jovie/ui', async importOriginal => {
     ),
     DropdownMenuSubContent: ({
       children,
+      role,
+      'aria-orientation': ariaOrientation,
     }: {
       readonly children?: ReactNode;
-    }) => <div data-testid='dropdown-sub-content'>{children}</div>,
+      readonly role?: string;
+      readonly 'aria-orientation'?: React.AriaAttributes['aria-orientation'];
+    }) => (
+      <div
+        data-testid='dropdown-sub-content'
+        role={role}
+        {...(ariaOrientation === undefined
+          ? {}
+          : { 'aria-orientation': ariaOrientation })}
+      >
+        {children}
+      </div>
+    ),
   };
 });
 
@@ -74,6 +88,49 @@ describe('FilterSubmenu', () => {
     );
 
     expect(screen.getByText('1')).toBeInTheDocument();
+  });
+
+  it('presents the searchable surface as a group with the options in an inner menu', () => {
+    // A text input is not an allowed child of role="menu" (axe
+    // aria-required-children): the content presents as a group and the
+    // option rows live in an inner menu (shared-dropdown structure).
+    render(
+      <FilterSubmenu
+        label='Release Type'
+        iconName='Layers'
+        options={OPTIONS}
+        selectedIds={[]}
+        onToggle={vi.fn()}
+      />
+    );
+
+    const content = screen.getByTestId('dropdown-sub-content');
+    expect(content).toHaveAttribute('role', 'group');
+    expect(content).not.toHaveAttribute('aria-orientation');
+    const innerMenu = content.querySelector('[role="menu"]');
+    expect(innerMenu).not.toBeNull();
+    expect(
+      innerMenu
+        ? Array.from(innerMenu.querySelectorAll('[role="menuitemcheckbox"]'))
+            .length
+        : 0
+    ).toBe(OPTIONS.length);
+  });
+
+  it('renders the empty note outside the inner menu', () => {
+    render(
+      <FilterSubmenu
+        label='Release Type'
+        iconName='Layers'
+        options={[]}
+        selectedIds={[]}
+        onToggle={vi.fn()}
+      />
+    );
+
+    const content = screen.getByTestId('dropdown-sub-content');
+    expect(screen.getByText('No options found')).toBeInTheDocument();
+    expect(content.querySelector('[role="menu"]')).toBeNull();
   });
 
   it('renders nothing when isVisible is false', () => {

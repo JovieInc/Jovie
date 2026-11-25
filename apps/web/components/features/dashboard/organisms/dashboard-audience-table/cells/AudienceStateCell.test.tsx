@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type { AudienceMember } from '@/types';
+import { AUDIENCE_STATE_TONES } from '../row-contract';
 import { AudienceStateCell } from './AudienceStateCell';
 import { NowMsProvider } from './NowMsContext';
 
@@ -89,5 +90,13 @@ describe('AudienceStateCell certificate', () => {
     const { container } = renderCell(member, 'subscribers', 'rtl');
     expect(screen.getByText('Subscriber')).toBeInTheDocument();
     await expectNoA11yViolations(container);
+  });
+
+  it('maps states to ion, ultra and neutral dots, never mint or orange', () => {
+    expect(AUDIENCE_STATE_TONES.high).toBe('info');
+    expect(AUDIENCE_STATE_TONES.rising).toBe('ultra');
+    expect(AUDIENCE_STATE_TONES.dormant).toBe('neutral');
+    expect(Object.values(AUDIENCE_STATE_TONES)).not.toContain('positive');
+    expect(Object.values(AUDIENCE_STATE_TONES)).not.toContain('attention');
   });
 });

@@ -30,14 +30,42 @@ async function geometry(page: Page) {
             violations.push('art size');
           if (image.top < content.top - 1 || image.bottom > content.bottom + 1)
             violations.push('art clipping');
+          // ArtworkFrame thumbnail = 2px; competing shell --radius-md = 10px.
+          const radius = Number.parseFloat(
+            getComputedStyle(art).borderRadius.split(' ')[0] ?? ''
+          );
+          if (!(radius >= 1.5 && radius <= 3))
+            violations.push(`art radius ${getComputedStyle(art).borderRadius}`);
         }
         const title = row.querySelector('.system-b-library-release-title')!;
         if (title.getBoundingClientRect().width < 160)
           violations.push('title budget');
+        const type = row.querySelector(
+          'td [title="Single"], td [title="Preview"], td [title="EP"]'
+        );
+        if (type) {
+          const label = (type.textContent ?? '').trim();
+          const expected = type.getAttribute('title') ?? '';
+          if (!label || label.includes('…') || label.endsWith('...'))
+            violations.push(`type truncated ${label}`);
+          if (expected && label !== expected)
+            violations.push(`type mismatch ${label}!=${expected}`);
+          if (
+            type.classList.contains('system-b-library-fluid-cell') ||
+            type.scrollWidth > type.clientWidth + 1
+          ) {
+            violations.push(`type overflow ${label}`);
+          }
+        }
       }
       return { count: rows.length, violations };
     });
 }
+
+/** Historical unlayered route rule that beat ArtworkFrame utilities (JOV-7752). */
+const BROKEN_ARTWORK_SHELL_RADIUS_CSS = `:where(.system-b-library-artwork-shell) {
+  border-radius: var(--radius-md);
+}`;
 
 for (const story of ['dense-scan-with-inspector', 'virtualized-dense-scan']) {
   test(`dense Library fits with its actual inspector: ${story}`, async ({
@@ -130,6 +158,35 @@ for (const story of ['dense-scan-with-inspector', 'virtualized-dense-scan']) {
     await expect
       .poll(async () => (await geometry(page)).violations)
       .toEqual([]);
+
+    // Deliberate-red: unlayered shell radius (--radius-md / 10px) must fail the
+    // same detector that the fixed route CSS + ArtworkFrame passes at 2px.
+    const brokenRadius = await page.addStyleTag({
+      content: BROKEN_ARTWORK_SHELL_RADIUS_CSS,
+    });
+    await expect
+      .poll(async () =>
+        (await geometry(page)).violations.some(value =>
+          value.startsWith('art radius')
+        )
+      )
+      .toBe(true);
+    const brokenComputed = await art.evaluate(
+      element => getComputedStyle(element).borderRadius
+    );
+    expect(Number.parseFloat(brokenComputed)).toBeGreaterThanOrEqual(8);
+    await brokenRadius.evaluate(node => node.remove());
+    await expect
+      .poll(async () => (await geometry(page)).violations)
+      .toEqual([]);
+    const fixedComputed = await art.evaluate(
+      element => getComputedStyle(element).borderRadius
+    );
+    expect(Number.parseFloat(fixedComputed)).toBeGreaterThanOrEqual(1.5);
+    expect(Number.parseFloat(fixedComputed)).toBeLessThanOrEqual(3);
+
+    await expect(first.getByTitle('Single').first()).toHaveText('Single');
+
     await page.screenshot({
       path: testInfo.outputPath(`${story}.png`),
       fullPage: true,

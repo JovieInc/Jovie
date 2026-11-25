@@ -17,9 +17,9 @@ import {
   proofBriefProvenance,
 } from './contract';
 
-export function proofBriefImagePath(brief: CertifiedProofBrief): string {
-  return `/api/share/proof-brief?brief=${encodeURIComponent(brief.briefId)}&rev=${brief.revision}`;
-}
+import { availableProofBriefImagePath } from './image-layout';
+
+export { proofBriefImagePath } from './image-layout';
 
 export function buildProofBriefOpsCard(
   brief: CertifiedProofBrief,
@@ -40,9 +40,8 @@ export function buildProofBriefOpsCard(
       value: point.value ?? 'Verified',
     });
   }
-  if (brief.privacy === 'public') {
-    facts.push({ label: 'Share image', value: proofBriefImagePath(brief) });
-  }
+  const imagePath = availableProofBriefImagePath(brief);
+  if (imagePath) facts.push({ label: 'Share image', value: imagePath });
 
   return {
     schema: SUMMER_OPS_CARD_SCHEMA,

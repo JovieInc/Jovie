@@ -1,4 +1,5 @@
 // Pure claim, measurement and replay decisions for the existing mutation producer.
+import { MIN_RATCHET_VALID } from '../../scripts/lib/mutation-sweep.mjs';
 import {
   artifactMatches,
   digest,
@@ -99,6 +100,10 @@ export function finishMeasurement(claim, measurement) {
     const sequence = state?.sweepSequences?.['packages/ui'];
     const module = state?.modules?.[claim.file];
     const evidence = module?.evidence;
+    const completeSmallSample =
+      evidence?.verdict === 'unknown' &&
+      evidence.reason === 'insufficient mutation sample' &&
+      module.valid < MIN_RATCHET_VALID;
     if (
       state?.schemaVersion !== 1 ||
       sequence !== claim.previousSequence + 1 ||
@@ -117,7 +122,8 @@ export function finishMeasurement(claim, measurement) {
       !Number.isFinite(Date.parse(module.at)) ||
       evidence?.schemaVersion !== 1 ||
       evidence.runId !== sequence ||
-      !['pass', 'regression'].includes(evidence.verdict) ||
+      (!['pass', 'regression'].includes(evidence.verdict) &&
+        !completeSmallSample) ||
       !['configDigest', 'selectionDigest', 'inputDigest'].every(key =>
         HASH.test(evidence[key] ?? '')
       ) ||
