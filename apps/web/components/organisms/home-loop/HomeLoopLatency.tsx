@@ -98,7 +98,7 @@ export function HomeLoopLatency({
         data={data}
         columns={COLUMNS}
         caption='Slowest stages by 7-day p95'
-        rowMode='dense'
+        rowMode='compact'
         minWidth='0'
         columnSnap={false}
         getRowId={getRowId}

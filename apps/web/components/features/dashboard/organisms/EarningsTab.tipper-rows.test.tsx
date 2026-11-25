@@ -80,7 +80,7 @@ describe('EarningsTab tipper rows', () => {
     renderTab();
 
     const table = screen.getByRole('table');
-    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+    expect(table).toHaveAttribute('data-table-row-mode', 'compact');
     expect(
       within(table)
         .getAllByRole('columnheader')

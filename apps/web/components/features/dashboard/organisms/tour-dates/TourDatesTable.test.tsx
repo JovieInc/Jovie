@@ -40,11 +40,11 @@ function renderTable(tourDates: TourDateViewModel[]) {
 }
 
 describe('TourDatesTable', () => {
-  it('keeps stacked date and time on the canonical dense row', () => {
+  it('keeps stacked date and time on the canonical compact row', () => {
     renderTable([baseTourDate]);
 
     const table = screen.getByRole('table');
-    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+    expect(table).toHaveAttribute('data-table-row-mode', 'compact');
     const row = within(table).getAllByRole('row')[1];
     expect(within(row).getByText('8:00 PM')).toBeInTheDocument();
   });

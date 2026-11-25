@@ -105,7 +105,7 @@ describe('table System B style exports', () => {
     expect(source).not.toMatch(/group-(?:hover|focus-visible)\/task-row:bg-/);
   });
 
-  it('keeps reduced motion and the dense 32px row invariant in the canonical stylesheet', () => {
+  it('keeps reduced motion and the table-row-height CSS invariant', () => {
     const designSystemSource = readFileSync(
       join(process.cwd(), 'styles/system-b-app.css'),
       'utf8'

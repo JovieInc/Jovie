@@ -98,7 +98,7 @@ export function ReleaseTablePendingShell({
         columns={RELEASE_LOADING_COLUMNS}
         skeletonRows={SKELETON_ROW_COUNT.TABLE}
         skeletonColumnConfig={RELEASE_LOADING_SKELETON_CONFIG}
-        rowMode='dense'
+        rowMode='compact'
         minWidth='0'
         containerClassName='h-full'
       />

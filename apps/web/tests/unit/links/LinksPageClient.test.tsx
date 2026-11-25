@@ -123,7 +123,7 @@ describe('LinksPageClient', () => {
     );
 
     const table = screen.getByRole('table');
-    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+    expect(table).toHaveAttribute('data-table-row-mode', 'compact');
     const row = screen.getByTestId('links-row-row-1');
     expect(row.className).toContain('system-b-table-row-shell');
     expect(row.className).toContain('system-b-table-row-hover');

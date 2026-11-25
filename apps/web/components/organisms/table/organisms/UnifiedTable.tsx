@@ -109,7 +109,7 @@ export interface UnifiedTableProps<TData extends RowData> {
    */
   readonly enableVirtualization?: boolean;
 
-  /** Legacy px when `rowMode` omitted; prefer dense mode. */
+  /** Legacy px when `rowMode` omitted; prefer compact (Linear-parity) mode. */
   readonly rowHeight?: number;
   /** Fixed geometry; defaults to dense 32px (DRI-21). */
   readonly rowMode?: TableRowMode;

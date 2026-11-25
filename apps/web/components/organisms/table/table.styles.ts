@@ -8,11 +8,12 @@ import type { CSSProperties } from 'react';
 // Typography Scale - Visual Hierarchy
 export const typography = {
   tableHeader: 'text-app font-caption text-secondary-token tracking-normal',
-  cellPrimary: 'text-app font-caption text-primary-token', // Main content
+  // Linear-parity primary: 13px medium (JOV-14412 / ui.md). Meta stays text-app.
+  cellPrimary: 'system-b-table-primary-text font-medium text-primary-token',
   cellSecondary: 'text-app text-secondary-token', // Supporting info
-  cellTertiary: 'text-xs text-tertiary-token', // Metadata, timestamps
+  cellTertiary: 'text-app text-tertiary-token', // Metadata, timestamps
   rowNumber: 'text-app tabular-nums text-tertiary-token', // Monospace numbers
-  groupHeader: 'text-app font-semibold text-primary-token', // Group headers
+  groupHeader: 'system-b-table-primary-text font-semibold text-primary-token', // Group headers
 } as const;
 
 // Alignment & Spacing - Perfect Vertical Alignment
@@ -20,7 +21,7 @@ export const alignment = {
   workspaceSeamX: 'px-3',
   checkboxCell: 'flex items-center justify-center', // Center checkbox
   numberCell: 'flex items-center justify-end tabular-nums', // Right-align numbers
-  rowHeight: 'system-b-table-row-height', // Dense 32px — sole table row height
+  rowHeight: 'system-b-table-row-height', // Resolved via TABLE_ROW_MODES / rowMode
   cellPadding: 'px-3', // Shared page seam; vertical space comes from the row mode content height
   headerPadding: 'px-3', // Shared page seam; header row height is fixed (h-8)
   checkboxSize: 'h-3.5 w-3.5', // 14px checkbox
@@ -182,15 +183,21 @@ export const presets = {
 } as const;
 
 /**
- * Canonical table row geometry (DRI-21 / taste #7).
- * One row height for every customer/dashboard (and admin) table — no density forks.
+ * Canonical customer/dashboard geometry (JOV-14412 / ui.md Linear parity).
+ * User-facing tables default to compact 40px; dense 32px is admin/debug only.
  */
-export const TABLE_CANONICAL_ROW_MODE = 'dense' as const;
+export const TABLE_CANONICAL_ROW_MODE = 'compact' as const;
 
 /** Fixed content budgets shared by real rows, loading rows, and virtualization. */
 export const TABLE_ROW_MODES = {
-  /** Sole mode: 32px row / 24px stable cell content; matches header `h-8`. */
+  /** 32px. Admin/debug/dev-only surfaces. Not Linear-scale: Linear's list is 40-44px, so user-facing tables use `compact` or `list`. */
   dense: { rowHeight: 32, contentHeight: 24 },
+  compact: { rowHeight: 40, contentHeight: 32 },
+  /** Measured Linear issue list: 88 backing pixels at Retina 2x. */
+  list: { rowHeight: 44, contentHeight: 36 },
+  'two-line': { rowHeight: 56, contentHeight: 48 },
+  description: { rowHeight: 72, contentHeight: 64 },
+  controls: { rowHeight: 96, contentHeight: 88 },
 } as const;
 
 export type TableRowMode = keyof typeof TABLE_ROW_MODES;

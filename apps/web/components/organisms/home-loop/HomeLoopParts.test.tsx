@@ -396,7 +396,7 @@ describe('HomeLoopLatency', () => {
     expect(rows[1]).not.toHaveTextContent('Regressed');
     expect(
       screen.getByRole('table', { name: 'Slowest stages by 7-day p95' })
-    ).toHaveAttribute('data-table-row-mode', 'dense');
+    ).toHaveAttribute('data-table-row-mode', 'compact');
     expect(
       screen.getAllByRole('columnheader').map(header => header.textContent)
     ).toEqual(['Stage', 'P50', 'P95', 'Runs']);
@@ -423,7 +423,7 @@ describe('HomeLoopLatency', () => {
     expect(within(stage).getAllByText('Not measured')).toHaveLength(2);
     expect(within(stage).getByText('0')).toBeVisible();
     expect(stage).not.toHaveAttribute('tabindex');
-    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+    expect(table).toHaveAttribute('data-table-row-mode', 'compact');
 
     rerender(
       <HomeLoopLatency
@@ -436,7 +436,7 @@ describe('HomeLoopLatency', () => {
     expect(stage).toHaveTextContent('Regressed');
     expect(stage).toHaveTextContent('6.5h');
     expect(stage).not.toHaveTextContent('Not measured');
-    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+    expect(table).toHaveAttribute('data-table-row-mode', 'compact');
   });
 
   it('keeps the named table and headers when empty, with optional footer details', () => {

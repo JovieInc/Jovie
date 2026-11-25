@@ -110,7 +110,7 @@ describe('LibraryLoadingState', () => {
     );
   });
 
-  it('matches the dense default catalog geometry', () => {
+  it('matches the compact catalog geometry', () => {
     expect(geometry(LIBRARY_CATALOG_SKELETON_COLUMNS)).toEqual(
       geometry(LIBRARY_CATALOG_SCAN_COLUMNS)
     );

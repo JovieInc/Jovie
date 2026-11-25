@@ -26,11 +26,11 @@ import type { LibraryReleaseAsset } from './library-data';
  */
 
 /**
- * Library list + catalog share dense 32px rows (DRI-21). Truncate secondary
- * lines in cells; do not fork row height for two-line content.
+ * Library list keeps two-line geometry; catalog uses Linear-parity compact
+ * (JOV-14412). Truncate secondary lines in cells.
  */
-export const LIBRARY_LIST_ROW_MODE = 'dense' satisfies TableRowMode;
-export const LIBRARY_CATALOG_ROW_MODE = 'dense' satisfies TableRowMode;
+export const LIBRARY_LIST_ROW_MODE = 'two-line' satisfies TableRowMode;
+export const LIBRARY_CATALOG_ROW_MODE = 'compact' satisfies TableRowMode;
 export const LIBRARY_TABLE_MIN_WIDTH = '0';
 
 export const LIBRARY_STAGE_CHIP_KEYS = [

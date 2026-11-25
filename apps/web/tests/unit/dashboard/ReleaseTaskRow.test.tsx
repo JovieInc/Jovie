@@ -43,8 +43,9 @@ describe('ReleaseTaskRow', () => {
       container.querySelectorAll('[data-shell-list-row="true"]')
     ).toHaveLength(1);
     const row = container.querySelector('[data-shell-list-row="true"]');
-    expect(row?.className).toContain('min-h-8');
-    expect(row?.className).toContain('py-1');
+    // Dense = TABLE_ROW_MODES.dense (32px fixed). Nested compact uses `tight`.
+    expect(row?.className).toContain('h-8');
+    expect(row?.className).not.toContain('min-h-8');
   });
 
   it('toggles the shared checkbox control from the full row', () => {

@@ -103,6 +103,21 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
       '&:has([data-rail-presentation="overlay"]:not([data-rail-phase="closed"]))'
     );
     expect(rail).not.toMatch(/lg:flex-col lg:self-start lg:overflow-hidden/);
+
+    // JOV-8944: AppShellFrame must mount the rail as the main plane's next
+    // column (sibling of the route column), never inside the route surface.
+    const frameSource = readFileSync(
+      path.join(webRoot, 'components/organisms/AppShellFrame.tsx'),
+      'utf8'
+    );
+    const frameOpen =
+      frameSource.indexOf('{rightPanel ? (') >= 0
+        ? frameSource.slice(frameSource.indexOf('{rightPanel ? ('))
+        : '';
+    expect(frameOpen).toContain('<AppShellRightRail');
+    expect(frameSource).not.toMatch(
+      /data-app-shell-main-content[\s\S]{0,800}<AppShellRightRail/
+    );
   });
 
   it('keeps the sidebar collapse toggle borderless (JOV-3959)', () => {

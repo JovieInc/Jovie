@@ -11,7 +11,7 @@ import type { LinkRow } from './links-model';
  * only own content, width and numeric alignment.
  */
 
-export const LINKS_ROW_MODE = 'dense' as const;
+export const LINKS_ROW_MODE = 'compact' as const;
 
 const STATUS_LABELS: Record<LinkRow['status'], string> = {
   active: 'Active',

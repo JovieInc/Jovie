@@ -209,7 +209,7 @@ describe('UnifiedTable keyboard interaction', () => {
   });
 
   it('reserves at least the empty state min-height in skeleton rows while loading', () => {
-    const rowHeight = 32;
+    const rowHeight = 40;
 
     render(
       <UnifiedTable
@@ -218,7 +218,7 @@ describe('UnifiedTable keyboard interaction', () => {
         hideHeader
         isLoading
         skeletonRows={2}
-        rowHeight={rowHeight}
+        rowMode='compact'
         getRowId={row => row.id}
         onRowClick={vi.fn()}
       />

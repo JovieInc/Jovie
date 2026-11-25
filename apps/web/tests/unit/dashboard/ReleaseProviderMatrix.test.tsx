@@ -1160,3 +1160,22 @@ describe('ReleaseProviderMatrix', () => {
     });
   });
 });
+
+describe('ReleaseProviderMatrix density contract', () => {
+  it('drives the signed-in matrix from Linear-parity compact rows', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const webRoot = process.cwd().endsWith('/apps/web')
+      ? process.cwd()
+      : resolve(process.cwd(), 'apps/web');
+    const source = readFileSync(
+      resolve(
+        webRoot,
+        'components/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix.tsx'
+      ),
+      'utf8'
+    );
+    expect(source).toContain("rowMode='compact'");
+    expect(source).not.toContain("rowMode='dense'");
+  });
+});

@@ -40,7 +40,7 @@ describe('TaskDataTable certificate', () => {
 
     const table = screen.getByRole('table');
     expect(table).toHaveClass(TASK_DATA_TABLE_CLASSNAME);
-    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+    expect(table).toHaveAttribute('data-table-row-mode', 'compact');
     const first = screen.getByText('Review provider mapping').closest('tr');
     const second = screen.getByText('Confirm release metadata').closest('tr');
     for (const className of TASK_DATA_TABLE_ROW_CLASSNAME.split(' ')) {

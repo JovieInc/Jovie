@@ -1,47 +1,31 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { type ComponentPropsWithoutRef, forwardRef } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ReleaseViewModel } from '@/lib/discography/types';
+import {
+  audioHarness,
+  fakeRelease,
+  fetchMock,
+  resetShellReleaseRowTestState,
+  TestLink,
+  toggleTrack,
+} from './ShellReleaseRow.test-utils';
 
-const toggleTrack = vi.fn().mockResolvedValue(undefined);
-const fetchMock = vi.fn();
 global.fetch = fetchMock;
-let playbackState: {
-  activeTrackId: string | null;
-  isPlaying: boolean;
-  playbackStatus: 'idle' | 'loading' | 'playing' | 'paused' | 'error';
-} = {
-  activeTrackId: null,
-  isPlaying: false,
-  playbackStatus: 'idle',
-};
 
 beforeEach(() => {
-  toggleTrack.mockClear();
-  fetchMock.mockReset();
-  fetchMock.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
-  playbackState = {
-    activeTrackId: null,
-    isPlaying: false,
-    playbackStatus: 'idle',
-  };
+  resetShellReleaseRowTestState();
 });
 
-// Expose the Next Link contract without starting a router in jsdom.
 vi.mock('next/link', () => ({
-  default: forwardRef<
-    HTMLAnchorElement,
-    ComponentPropsWithoutRef<'a'> & { readonly prefetch?: boolean }
-  >(function TestLink({ prefetch, ...props }, ref) {
-    return <a {...props} data-prefetch={String(prefetch)} ref={ref} />;
-  }),
+  default: TestLink,
 }));
 
 vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => ({
-    playbackState,
+    get playbackState() {
+      return audioHarness.playbackState;
+    },
     toggleTrack,
     seek: vi.fn(),
     stop: vi.fn(),
@@ -52,24 +36,6 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
 const { ShellReleaseRow } = await import(
   '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow'
 );
-
-function fakeRelease(
-  partial: Partial<ReleaseViewModel> & { id: string; title: string }
-): ReleaseViewModel {
-  return {
-    profileId: 'p',
-    artistNames: ['Bahamas'],
-    status: 'released',
-    artworkUrl: 'https://x.invalid/a.jpg',
-    slug: partial.title.toLowerCase().replace(/\s+/g, '-'),
-    smartLinkPath: `/${partial.title.toLowerCase().replace(/\s+/g, '-')}`,
-    providers: [],
-    releaseType: 'single',
-    isExplicit: false,
-    totalTracks: 1,
-    ...partial,
-  } as ReleaseViewModel;
-}
 
 describe('ShellReleaseRow audio affordance', () => {
   it('renders multi-artist credits through the canonical conjunction formatter', () => {
@@ -158,7 +124,7 @@ describe('ShellReleaseRow audio affordance', () => {
     });
 
     expect(row?.className).toContain('system-b-table-row-shell');
-    expect(row?.className).toContain('h-8');
+    expect(row?.className).toContain('h-10');
     expect(slot).toHaveClass('system-b-table-contextual-action');
     expect(slot.className).not.toContain('group-hover/row');
     expect(trigger.className).not.toContain('group-hover/row');
@@ -183,11 +149,20 @@ describe('ShellReleaseRow audio affordance', () => {
     const title = screen.getByText('Lost in the Light');
     expect(title).toHaveClass('truncate', 'min-w-0');
     expect(title).not.toHaveClass('inline-flex');
-    expect(title.parentElement).toHaveClass('font-caption', 'leading-[1.2]');
-    expect(screen.getByText('Bahamas')).toHaveClass('text-2xs', 'shrink-9999');
+    expect(title.parentElement).toHaveClass(
+      'system-b-table-primary-text',
+      'font-medium',
+      'leading-[1.2]'
+    );
+    // twMerge drops text-app when paired with text-*-token color utilities;
+    // tertiary color is the visible contract for the artist subtitle.
+    expect(screen.getByText('Bahamas')).toHaveClass(
+      'text-tertiary-token',
+      'shrink-9999'
+    );
   });
 
-  it('keeps the title target at the 24px WCAG 2.5.8 floor in the dense row', () => {
+  it('keeps the title target at the 24px WCAG 2.5.8 floor in the compact row', () => {
     render(
       <ShellReleaseRow
         release={fakeRelease({
@@ -200,7 +175,7 @@ describe('ShellReleaseRow audio affordance', () => {
       />
     );
 
-    // The h-8 dense row renders the title as the EntityHoverLink button;
+    // The h-10 compact row renders the title as the EntityHoverLink button;
     // axe target-size (WCAG 2.2 AA, not allowlistable) measures its box.
     expect(screen.getByText('Lost in the Light').parentElement).toHaveClass(
       'min-h-6'
@@ -301,7 +276,7 @@ describe('ShellReleaseRow audio affordance', () => {
 
   it('forwards a resume request without re-loading the audio source', async () => {
     const user = userEvent.setup();
-    playbackState = {
+    audioHarness.playbackState = {
       activeTrackId: 'r1',
       isPlaying: false,
       playbackStatus: 'paused',
@@ -332,7 +307,7 @@ describe('ShellReleaseRow audio affordance', () => {
   });
 
   it('reflects the active track in aria-pressed and data attributes', () => {
-    playbackState = {
+    audioHarness.playbackState = {
       activeTrackId: 'r1',
       isPlaying: true,
       playbackStatus: 'playing',
@@ -538,7 +513,7 @@ describe('ShellReleaseRow enrichment', () => {
       />
     );
     const idleRow = idle.container.querySelector('[data-shell-release-row]');
-    expect(idleRow?.className).toContain('h-8');
+    expect(idleRow?.className).toContain('h-10');
     idle.unmount();
 
     const syncing = render(
@@ -555,7 +530,7 @@ describe('ShellReleaseRow enrichment', () => {
     // Same fixed row height token in both states — the sync chrome lives
     // inside the existing single-line subtitle and an absolutely-positioned
     // pulse, so adding it cannot reflow the row.
-    expect(syncingRow?.className).toContain('h-8');
+    expect(syncingRow?.className).toContain('h-10');
   });
 });
 
