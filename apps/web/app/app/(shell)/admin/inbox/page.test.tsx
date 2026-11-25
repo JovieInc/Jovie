@@ -5,8 +5,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const requireCurrentAdminPageAccess = vi.fn();
 vi.mock('@/lib/admin/page-access', () => ({ requireCurrentAdminPageAccess }));
 vi.mock('@/components/features/admin/hud/OvieInbox', () => ({
-  OvieInbox: ({ caseId }: { readonly caseId?: string }) => (
-    <section data-testid='existing-unified-inbox' data-case-id={caseId} />
+  OvieInbox: ({
+    caseId,
+    showHeading,
+  }: {
+    readonly caseId?: string;
+    readonly showHeading?: boolean;
+  }) => (
+    <section
+      data-testid='existing-unified-inbox'
+      data-case-id={caseId}
+      data-show-heading={showHeading}
+    />
   ),
 }));
 vi.mock(
@@ -60,6 +70,10 @@ describe('guarded Ovie Operator Inbox destination', () => {
     const { default: InboxPage } = await import('./page');
     render(await InboxPage({ searchParams: Promise.resolve({}) }));
     expect(requireCurrentAdminPageAccess).toHaveBeenCalledOnce();
+    expect(screen.getByTestId('existing-unified-inbox')).toHaveAttribute(
+      'data-show-heading',
+      'false'
+    );
     expect(screen.getByTestId('existing-unified-inbox')).not.toHaveAttribute(
       'data-case-id'
     );

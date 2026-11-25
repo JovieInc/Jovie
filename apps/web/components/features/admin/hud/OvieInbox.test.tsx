@@ -71,6 +71,24 @@ const response = (cases: readonly OvieInboxCase[]) =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Ovie Inbox', () => {
+  it('preserves Refresh when the page supplies the Inbox heading', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response([])));
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <OvieInbox showHeading={false} />
+      </QueryClientProvider>
+    );
+
+    expect(screen.queryByRole('heading', { name: 'Inbox' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+    expect(
+      await screen.findByText('Summer has nothing for you right now.')
+    ).toBeVisible();
+  });
+
   it('reserves decision content while loading without moving Refresh', async () => {
     let resolveRead!: (response: Response) => void;
     vi.stubGlobal(

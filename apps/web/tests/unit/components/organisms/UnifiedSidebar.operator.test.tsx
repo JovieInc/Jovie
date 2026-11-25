@@ -149,7 +149,7 @@ describe('UnifiedSidebar operator navigation', () => {
     expect(
       within(operatorNavigation).getByRole('link', { name: 'Home' })
     ).toBeVisible();
-    for (const link of ['Shipping', 'Fleet', 'Capacity']) {
+    for (const link of ['Shipping', 'Fleet', 'Costs']) {
       expect(
         within(operatorNavigation).getByRole('link', { name: link })
       ).toBeVisible();
@@ -166,6 +166,9 @@ describe('UnifiedSidebar operator navigation', () => {
     expect(
       within(operatorNavigation).getByRole('link', { name: 'Presence' })
     ).toBeVisible();
+    expect(
+      within(operatorNavigation).getByRole('link', { name: 'Capacity' })
+    ).toHaveAttribute('href', APP_ROUTES.ADMIN_CAPACITY);
     const business = within(operatorNavigation).getByRole('button', {
       name: 'Company',
     });
