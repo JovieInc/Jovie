@@ -96,7 +96,7 @@ const ciReporters: ReporterDescription[] = [
     ? []
     : ([
         [
-          'json',
+          isFullMatrix ? './tests/e2e/reporters/matrix-outcomes.mjs' : 'json',
           {
             // Quarantine (and other second invocations) must set a distinct
             // path or they overwrite the primary suite's flaky status.
