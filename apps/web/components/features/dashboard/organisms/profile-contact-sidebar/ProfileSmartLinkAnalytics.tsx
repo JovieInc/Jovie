@@ -7,7 +7,9 @@ import {
   type DrawerAnalyticsSummaryMetric,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
+import { STAT_TILE_NOT_MEASURED_LABEL } from '@/components/molecules/drawer/StatTile';
 import { copyToClipboard } from '@/hooks/useClipboard';
+import { readMeasuredDashboardCount } from '@/lib/analytics/evidence-receipt';
 import { CANONICAL_METRICS } from '@/lib/analytics/metrics';
 import { getTimeRangeLabel } from '@/lib/analytics/time-range';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
@@ -49,26 +51,35 @@ function ProfileSmartLinkControl({
 
 /** Profile views and link clicks for the window, or none when both are zero. */
 export function buildProfileSmartLinkMetrics(
-  data: Pick<DashboardAnalyticsResponse, 'profile_views' | 'total_clicks'>,
+  data: Pick<
+    DashboardAnalyticsResponse,
+    'profile_views' | 'total_clicks' | 'evidence'
+  >,
   range: AnalyticsRange
 ): DrawerAnalyticsSummaryMetric[] {
-  const views = data.profile_views ?? 0;
-  const clicks = data.total_clicks ?? 0;
-  if (views <= 0 && clicks <= 0) return [];
+  const views = readMeasuredDashboardCount(data, 'profile_views');
+  const clicks = readMeasuredDashboardCount(data, 'total_clicks');
+  if (views === 0 && clicks === 0) return [];
 
   const hint = getTimeRangeLabel(range, 'description');
   return [
     {
       id: 'profile-views',
       label: CANONICAL_METRICS.profile_views.label,
-      value: numberFormatter.format(views),
+      value:
+        views === undefined
+          ? STAT_TILE_NOT_MEASURED_LABEL
+          : numberFormatter.format(views),
       hint,
     },
     {
       // Display alias for CANONICAL_METRICS.total_clicks
       id: 'link-clicks',
       label: 'Link Clicks',
-      value: numberFormatter.format(clicks),
+      value:
+        clicks === undefined
+          ? STAT_TILE_NOT_MEASURED_LABEL
+          : numberFormatter.format(clicks),
       hint,
     },
   ];

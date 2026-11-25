@@ -201,7 +201,7 @@ export function MetricChart({
         }}
       >
         <div style={{ display: 'flex' }}>
-          {summary.complete ? '' : 'Some days are still loading'}
+          {summary.complete ? '' : '– Not measured'}
         </div>
         <div style={{ display: 'flex' }}>
           {clock ? `Pacific days · as of ${clock}` : 'Pacific days'}
