@@ -11,6 +11,7 @@
  */
 
 import { z } from 'zod';
+import { type FunnelView, funnelViewSchema } from '@/lib/analytics/funnel-view';
 import type {
   CountMeasurement,
   DurationMeasurement,
@@ -26,6 +27,7 @@ export const SUMMER_OPS_CARD_KINDS = [
   'ai-spend',
   'cohort',
   'generic',
+  'funnel',
 ] as const;
 
 export type SummerOpsCardKind = (typeof SUMMER_OPS_CARD_KINDS)[number];
@@ -55,6 +57,7 @@ export const summerOpsCardSchema = z
     state: z.enum(SUMMER_OPS_CARD_STATES),
     observedAt: z.iso.datetime({ offset: true }).nullable(),
     source: text(160).optional(),
+    funnel: funnelViewSchema.optional(),
     facts: z
       .array(
         z
@@ -91,6 +94,28 @@ export const summerOpsCardSchema = z
 
 export type SummerOpsCard = z.infer<typeof summerOpsCardSchema>;
 export type SummerOpsCardFact = SummerOpsCard['facts'][number];
+
+export function buildFunnelOpsCard(
+  funnel: FunnelView,
+  state?: SummerOpsCardState
+): SummerOpsCard {
+  const hasCurrentStage = funnel.stages.some(
+    stage => stage.status !== 'unknown' && stage.status !== 'stale'
+  );
+  const hasStaleStage = funnel.stages.some(stage => stage.status === 'stale');
+  return {
+    schema: SUMMER_OPS_CARD_SCHEMA,
+    kind: 'funnel',
+    title: funnel.title,
+    state:
+      state ??
+      (hasCurrentStage ? 'fresh' : hasStaleStage ? 'stale' : 'unknown'),
+    observedAt: null,
+    funnel,
+    facts: [],
+    series: null,
+  };
+}
 
 export function isSummerOpsCard(value: unknown): value is SummerOpsCard {
   return summerOpsCardSchema.safeParse(value).success;
@@ -243,6 +268,16 @@ export function renderOpsCardText(card: SummerOpsCard): string {
   if (card.summary) lines.push(card.summary);
   for (const fact of card.facts) {
     lines.push(`${fact.label}: ${fact.value}`);
+  }
+  if (card.funnel) {
+    if (card.funnel.caption) lines.push(card.funnel.caption);
+    for (const stage of card.funnel.stages) {
+      const bottleneck =
+        stage.id === card.funnel.bottleneckId ? ' (bottleneck)' : '';
+      lines.push(
+        `${stage.label}: ${stage.count ?? stage.status}${stage.rate ? ` · ${stage.rate}` : ''}${bottleneck}`
+      );
+    }
   }
   if (card.series) {
     const points = card.series.points
