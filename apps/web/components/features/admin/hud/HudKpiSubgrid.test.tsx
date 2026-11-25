@@ -45,10 +45,15 @@ function payload(
   };
 }
 
-function renderGrid() {
+function renderGrid(seed?: ShippingVelocityResponse) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
+  if (seed) {
+    queryClient.setQueryData(['hud', 'kpi', 'shipping-velocity', '30d'], seed, {
+      updatedAt: 1,
+    });
+  }
   return render(
     <QueryClientProvider client={queryClient}>
       <HudKpiSubgrid metrics={metrics} />
@@ -152,6 +157,33 @@ describe('HudKpiSubgrid', () => {
     expect(screen.getByTestId('hud-kpi-merge-time')).toHaveTextContent('—');
     await expectNoA11yViolations(container);
   });
+
+  it.each([
+    [401, 'Sign In', '/signin?redirect_url=%2Fapp%2Fov%2Fops'],
+    [403, 'Open Dashboard', '/app'],
+  ] as const)(
+    'hides cached shipping observations after a %s read and offers the right action',
+    async (status, action, href) => {
+      stubFetch(async () => new Response(null, { status }));
+      renderGrid(payload(twoWeeks()));
+      fireEvent.click(screen.getByText('Daily Shipping Data'));
+
+      expect(await screen.findByRole('link', { name: action })).toHaveAttribute(
+        'href',
+        href
+      );
+      expect(screen.queryByRole('img')).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('list', { name: 'Daily Shipping Observations' })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Retry' })
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId('hud-kpi-ship-velocity')).not.toHaveTextContent(
+        '21'
+      );
+    }
+  );
 
   it('retries the request and retains an in-place disabled action until the read resolves', async () => {
     const retry = Promise.withResolvers<Response>();

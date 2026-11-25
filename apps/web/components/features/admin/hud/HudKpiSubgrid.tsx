@@ -2,6 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type {
   DailyBucket,
@@ -10,10 +11,13 @@ import type {
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricDelta } from '@/components/molecules/ContentMetricDelta';
 import { Sparkline } from '@/components/shell/Sparkline';
+import { APP_ROUTES } from '@/constants/routes';
+import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import type { MetricPolarity } from '@/lib/design/metric-tone';
 import { medianNumber } from '@/lib/hud/number-series';
 import { isSuccessfulHudObservation } from '@/lib/hud/observation';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
+import { FetchHttpError } from '@/lib/queries/fetch';
 import { formatTimestampUTC } from '@/lib/utils/date-formatting';
 import type { HudMetrics } from '@/types/hud';
 
@@ -58,7 +62,11 @@ async function fetchShippingVelocity(
     cache: 'no-store',
   });
   if (!response.ok) {
-    throw new Error(`Request failed (${response.status})`);
+    throw new FetchHttpError(
+      `Request failed (${response.status})`,
+      response.status,
+      response
+    );
   }
   return (await response.json()) as ShippingVelocityResponse;
 }
@@ -154,8 +162,15 @@ export function HudKpiSubgrid({
   });
 
   const observation = velocityQuery.data?.observation;
+  const status =
+    velocityQuery.error instanceof FetchHttpError
+      ? velocityQuery.error.status
+      : null;
+  const denied = status === 401 || status === 403;
   const hasVelocityData =
-    observation !== undefined && isSuccessfulHudObservation(observation);
+    !denied &&
+    observation !== undefined &&
+    isSuccessfulHudObservation(observation);
   const buckets = hasVelocityData ? (velocityQuery.data?.data ?? []) : [];
   const last7 = buckets.slice(-7);
   const prior7 = buckets.slice(-14, -7);
@@ -266,6 +281,25 @@ export function HudKpiSubgrid({
                 );
               })}
             </ol>
+          </div>
+        ) : denied ? (
+          <div className='mt-2 flex flex-wrap items-center gap-2'>
+            <p role='status'>
+              {status === 401
+                ? 'Sign in to view shipping data.'
+                : 'Only Ovie operators can view shipping data.'}
+            </p>
+            <Button asChild size='sm' variant='ghost'>
+              <Link
+                href={
+                  status === 401
+                    ? buildAppShellSignInUrl(APP_ROUTES.ADMIN_OPS)
+                    : APP_ROUTES.DASHBOARD
+                }
+              >
+                {status === 401 ? 'Sign In' : 'Open Dashboard'}
+              </Link>
+            </Button>
           </div>
         ) : hasVelocityData ? (
           <p className='mt-2' role='status'>

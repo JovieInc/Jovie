@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
+import { expect, userEvent, within } from 'storybook/test';
 import type {
   DailyBucket,
   ShippingVelocityResponse,
@@ -174,4 +175,16 @@ const sparse = velocity(
 export const MissingAndMeasuredZero: Story = {
   beforeEach: stubVelocity(answerWith(sparse)),
   render: args => <KpiStory metrics={args.metrics} seed={sparse} />,
+};
+
+export const PermissionDenied: Story = {
+  beforeEach: stubVelocity(async () => new Response(null, { status: 403 })),
+  render: renderUnseeded,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByText('Daily Shipping Data'));
+    await expect(
+      await canvas.findByRole('link', { name: 'Open Dashboard' })
+    ).toBeVisible();
+  },
 };
