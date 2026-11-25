@@ -15,9 +15,11 @@ import {
 } from '@/tests/e2e/utils/smoke-test-utils';
 import {
   setTestAuthBypassSession,
-  waitForAuthenticatedHealth,
   waitForClerkSignInApi,
 } from '@/tests/helpers/auth';
+import { ensureServerAuthenticated } from './server-auth';
+
+export { ensureServerAuthenticated };
 
 /* ------------------------------------------------------------------ */
 /*  Environment gates                                                   */
@@ -714,22 +716,6 @@ export async function completeOnboardingV2(
   await expect(
     page.getByRole('button', { name: 'Open dashboard' })
   ).toBeEnabled({ timeout: 30_000 });
-}
-
-export async function ensureServerAuthenticated(
-  page: Page,
-  clerkUserId: string
-): Promise<void> {
-  const shouldAttachTestBypass =
-    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
-    process.env.E2E_ATTACH_TEST_AUTH_BYPASS_AFTER_SIGNUP === '1';
-
-  if (!shouldAttachTestBypass) {
-    return;
-  }
-
-  await setTestAuthBypassSession(page, null, clerkUserId);
-  await waitForAuthenticatedHealth(page, clerkUserId);
 }
 
 async function fetchOnboardingDiscoverySnapshot(
