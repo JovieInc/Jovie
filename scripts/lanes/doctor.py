@@ -66,8 +66,7 @@ import doctor_filer  # noqa: E402  (JOV-14452 filer engine: per-family cap, damp
 import doctor_keys  # noqa: E402  (JOV-14452 filer guardrails: stable keys, rollup, damping)
 import doctor_release  # noqa: E402  (JOV-14764: Done needs a host install receipt, never merge)
 
-# factory_watchdog borrows this window for its own local reuse decision; the filer itself
-# never refiles past it — a closed owner is reopened by its doctor-key marker.
+# factory_watchdog borrows this window locally; the filer never refiles past it (marker reopen).
 COOL_OFF_S = 6 * 3600
 # High (P1), not Urgent, though under an Urgent prefix: a stale build is a lag signal, not an outage.
 P1_KEYS = frozenset({"production-deploy:build-stale"})
@@ -1930,7 +1929,7 @@ class Tracker:
         self.last_error = None
         self.existing_error = None
         stable, impact = doctor_keys.stable_of(key)
-        if impact:  # no-impact class (JOV-14452): one rollup line, never its own Triage issue
+        if impact:  # no-impact class (JOV-14452): one rollup line, never a Triage issue
             return self.filer.rollup_upsert(impact, stable, text)
         found = self.existing(key)
         if found:
@@ -1938,7 +1937,7 @@ class Tracker:
             return found
         if found is None and getattr(self, "existing_error", None):
             self.last_error = f"lookup-failed:{self.existing_error}"
-        if self.filer.cap_hit(doctor_keys.family_of(key)):  # family cap (P0 2026-11-24): -> rollup
+        if self.filer.cap_hit(doctor_keys.family_of(key)):  # family cap (P0 2026-11-24)
             self.filer.note_overflow(doctor_keys.family_of(key))
             return self.filer.rollup_upsert(stable, stable, text)
         try:
@@ -1975,25 +1974,10 @@ class Tracker:
             return None
 
     def flush(self) -> None:
-        self.filer.publish_if_dirty()  # one batched rollup checklist publish per tick (JOV-14452)
+        self.filer.publish_if_dirty()  # one batched rollup publish per tick (JOV-14452)
 
     def contradict_invariant(self, event: dict) -> None:
-        """Reopen the liveness owner only when a new typed generation contradicts its proof."""
-        try:
-            data = self.linear.gql(
-                'query($n:Float!){issues(filter:{team:{key:{eq:"JOV"}},number:{eq:$n}})'
-                '{nodes{id state{type}}}}', {"n": 6004.0})
-            owner = data["issues"]["nodes"][0]
-            if owner["state"]["type"] == "completed":
-                self.linear.move(owner["id"], "Triage")
-            self.linear.comment(
-                owner["id"],
-                f"🤖 liveness contradiction `{event['idempotencyKey']}`: {event['evidence']}\n\n"
-                f"First observed: {event['firstObservedAt']}; deadline: {event['deadlineAt']}; "
-                f"next: `{event['nextAction']}`.",
-            )
-        except Exception:
-            pass
+        doctor_filer.contradict_liveness(self.linear, event)  # extracted (JOV-14452 size budget)
 
     def _move_acknowledged(self, issue_id: str, target: str) -> bool:
         """The shared client's move is best-effort; only readback proves the state."""
@@ -2019,7 +2003,7 @@ class Tracker:
             stable, impact = doctor_keys.stable_of(key)
             if impact or self.filer.is_rollup(issue_id):
                 return self.filer.rollup_upsert(impact or stable, stable, text) is not None
-            if self.filer.damped(stable):  # flapping (JOV-14452): frozen in place, ≤1 comment/day
+            if self.filer.damped(stable):  # flapping (JOV-14452): frozen, ≤1 comment/day
                 self.filer.damp(issue_id, stable, text)
                 return True
             if self.filer.cap_hit(doctor_keys.family_of(key)):  # reopens feed the family cap (P0)
@@ -2043,9 +2027,9 @@ class Tracker:
             if impact or self.filer.is_rollup(issue_id):
                 return self.filer.rollup_remove(impact or stable, stable)
             if self.filer.damped(stable):
-                return True  # frozen in place (JOV-14452); the local alert lifecycle still completes
+                return True  # frozen (JOV-14452); the local alert lifecycle still completes
             if doctor_release.awaiting_install(self, issue_id, stable):
-                return False  # merged but not live on the host (JOV-14764): fail closed, one daily note
+                return False  # not live on the host (JOV-14764): fail closed, one daily note
         if not self._move_acknowledged(issue_id, "Done"):
             return False
         try:
@@ -2094,11 +2078,10 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
         hysteresis[stable] = {"absentTicks": 0, "lastSeenAt": now}
         entry = doctor_keys.owner_entry(key, issues)
         if entry and entry.get("closedAt") is None and entry.get("id") and not entry.get("pendingAction"):
-            issues.setdefault(key, {"id": entry["id"], "closedAt": None})  # variant fold: one stable key, one owner
+            issues.setdefault(key, {"id": entry["id"], "closedAt": None})  # variant fold: one owner
             continue  # still open
         if entry and entry.get("id") and (entry.get("pendingAction") or entry.get("closedAt") is not None):
-            # Reuse the owner across every refire (JOV-14452): a closed issue is reopened, never
-            # twinned past a cool-off; an uncertain transition is retried, not replaced.
+            # Reuse the owner across every refire (JOV-14452): reopen, never twin or refile.
             if tracker and tracker.reopen(entry["id"], text, key) is True:
                 issues[key] = {"id": entry["id"], "closedAt": None}
                 contradict = getattr(tracker, "contradict_invariant", None)
@@ -2161,7 +2144,7 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
     engine = getattr(tracker, "filer", None) if tracker is not None else None
     report = engine.report(now) if engine is not None and callable(getattr(engine, "report", None)) else None
     if isinstance(report, dict):
-        filer.update(report)  # self-monitor (JOV-14452) into doctor.json
+        filer.update(report)  # self-monitor (JOV-14452)
     return {"at": epoch_iso(now), "alerts": alerts, "issues": issues, "conditions": receipts, "filer": filer}
 
 

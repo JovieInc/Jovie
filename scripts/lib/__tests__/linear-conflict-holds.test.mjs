@@ -74,11 +74,11 @@ describe('reconcileIssueLifecycle doctor exclusion (JOV-14764)', () => {
   it('skips doctor-owned issues: only the lanes doctor moves them', async () => {
     const logs = [];
     const result = await reconcileIssueLifecycle({
-      issue: {
+      issue: /** @type {any} */ ({
         id: 'i1',
         identifier: 'JOV-1',
         description: 'alert\n<!-- doctor-key:deadbeef -->',
-      },
+      }),
       log: message => {
         logs.push(message);
       },
@@ -90,7 +90,7 @@ describe('reconcileIssueLifecycle doctor exclusion (JOV-14764)', () => {
   it('still enters the lifecycle for ordinary issues', async () => {
     await expect(
       reconcileIssueLifecycle({
-        issue: { id: 'i2', identifier: 'JOV-2', description: 'plain body' },
+        issue: /** @type {any} */ ({ id: 'i2', identifier: 'JOV-2', description: 'plain body' }),
         log: () => {},
       })
     ).rejects.toThrow();

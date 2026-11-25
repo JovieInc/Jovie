@@ -377,3 +377,24 @@ class Filer:
                 "rollupClasses": sorted(self.ledger.rollup_classes()),
                 "dampened": dampened,
                 "anomaly": self.ledger.overflow_within(CAP_WINDOW_S, now)}
+
+LIVENESS_OWNER_NUMBER = 6004.0  # JOV-6004: the control-plane liveness tracker issue
+
+
+def contradict_liveness(linear, event: dict) -> None:
+    """Reopen the liveness owner only when a new typed generation contradicts its proof."""
+    try:
+        data = linear.gql(
+            'query($n:Float!){issues(filter:{team:{key:{eq:"JOV"}},number:{eq:$n}})'
+            '{nodes{id state{type}}}}', {"n": LIVENESS_OWNER_NUMBER})
+        owner = data["issues"]["nodes"][0]
+        if owner["state"]["type"] == "completed":
+            linear.move(owner["id"], "Triage")
+        linear.comment(
+            owner["id"],
+            f"🤖 liveness contradiction `{event['idempotencyKey']}`: {event['evidence']}\n\n"
+            f"First observed: {event['firstObservedAt']}; deadline: {event['deadlineAt']}; "
+            f"next: `{event['nextAction']}`.",
+        )
+    except Exception:
+        pass
