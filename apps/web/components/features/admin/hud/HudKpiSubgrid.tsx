@@ -166,7 +166,11 @@ export function HudKpiSubgrid({
     velocityQuery.error instanceof FetchHttpError
       ? velocityQuery.error.status
       : null;
-  const denied = status === 401 || status === 403;
+  const needsSignIn = status === 401;
+  const denied = needsSignIn || status === 403;
+  const accessMessage = needsSignIn
+    ? 'Sign in to view shipping data.'
+    : 'Only Ovie operators can view shipping data.';
   const hasVelocityData =
     !denied &&
     observation !== undefined &&
@@ -284,20 +288,16 @@ export function HudKpiSubgrid({
           </div>
         ) : denied ? (
           <div className='mt-2 flex flex-wrap items-center gap-2'>
-            <p role='status'>
-              {status === 401
-                ? 'Sign in to view shipping data.'
-                : 'Only Ovie operators can view shipping data.'}
-            </p>
+            <p role='status'>{accessMessage}</p>
             <Button asChild size='sm' variant='ghost'>
               <Link
                 href={
-                  status === 401
+                  needsSignIn
                     ? buildAppShellSignInUrl(APP_ROUTES.ADMIN_OPS)
                     : APP_ROUTES.DASHBOARD
                 }
               >
-                {status === 401 ? 'Sign In' : 'Open Dashboard'}
+                {needsSignIn ? 'Sign In' : 'Open Dashboard'}
               </Link>
             </Button>
           </div>
