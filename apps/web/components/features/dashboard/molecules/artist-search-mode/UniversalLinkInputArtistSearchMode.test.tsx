@@ -90,7 +90,9 @@ describe('UniversalLinkInputArtistSearchMode', () => {
     const user = userEvent.setup();
     const onExit = vi.fn();
     render(<Harness onExit={onExit} />);
-    await user.click(screen.getByRole('button', { name: 'Exit Search Mode' }));
+    const exit = screen.getByRole('button', { name: 'Exit Search Mode' });
+    expect(exit).toHaveClass('size-6');
+    await user.click(exit);
     expect(onExit).toHaveBeenCalled();
   });
 

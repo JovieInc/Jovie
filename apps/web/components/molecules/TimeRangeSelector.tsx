@@ -81,7 +81,7 @@ export function TimeRangeSelector<T extends AnalyticsRange>({
               'inline-flex h-6 items-center gap-1 rounded-full border border-transparent px-1.5 py-0 text-2xs font-normal text-tertiary-token transition-colors duration-subtle hover:bg-surface-0 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30',
               className
             )}
-            aria-label={ariaLabel ?? 'Analytics Time Range'}
+            aria-label={`${getTimeRangeLabel(value, 'menu')}, ${ariaLabel ?? 'Analytics Time Range'}`}
           >
             <span>{getTimeRangeLabel(value, 'menu')}</span>
             <ChevronDown

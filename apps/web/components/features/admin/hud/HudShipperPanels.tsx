@@ -76,7 +76,9 @@ function HudStatusPill({
         color:
           tone === 'neutral'
             ? 'var(--color-text-secondary-token)'
-            : accent.solid,
+            : tone === 'bad'
+              ? 'var(--color-error-text)'
+              : accent.solid,
       }}
     >
       {label}

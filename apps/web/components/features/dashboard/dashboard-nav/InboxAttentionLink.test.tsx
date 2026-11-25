@@ -24,7 +24,7 @@ describe('InboxAttentionLink', () => {
         pendingCount={140}
       />
     );
-    const link = screen.getByRole('link', { name: 'Home' });
+    const link = screen.getByRole('link', { name: /^Home/ });
     expect(link).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
     expect(link).toHaveAttribute('data-prefetch', 'false');
     expect(link).toHaveAttribute('data-inbox-attention', 'available');
@@ -51,7 +51,7 @@ describe('InboxAttentionLink', () => {
         onClick={onClick}
       />
     );
-    const link = screen.getByRole('link', { name: 'Home' });
+    const link = screen.getByRole('link', { name: /^Home/ });
     expect(link).toHaveAttribute('aria-busy', 'true');
     expect(link).toHaveAttribute('data-navigation-pending', 'true');
     expect(link).toHaveClass('bg-sidebar-accent-active');

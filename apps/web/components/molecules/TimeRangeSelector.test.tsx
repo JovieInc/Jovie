@@ -76,7 +76,7 @@ describe('TimeRangeSelector', () => {
 
     await expectNoA11yViolations(container);
     await user.click(
-      screen.getByRole('button', { name: 'Analytics Time Range' })
+      screen.getByRole('button', { name: /Analytics Time Range/ })
     );
     const items = await screen.findAllByRole('menuitem');
     expect(items[2]).toHaveAttribute('aria-disabled', 'true');

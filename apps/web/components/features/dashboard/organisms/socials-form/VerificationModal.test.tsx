@@ -70,9 +70,9 @@ describe('VerificationModal', () => {
     expect(
       await screen.findByTestId('check-verification-button')
     ).toBeDisabled();
-    expect(screen.getByTestId('verification-error')).toHaveTextContent(
-      /Too many verification attempts/
-    );
+    const error = screen.getByText(/Too many verification attempts/);
+    expect(screen.getByTestId('verification-error')).toContainElement(error);
+    expect(error).toHaveClass('text-error-text');
     await expectNoA11yViolations(document.body);
   });
 

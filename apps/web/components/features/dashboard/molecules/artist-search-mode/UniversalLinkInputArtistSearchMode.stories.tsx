@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import type { ReactNode } from 'react';
+import { type ReactNode, useRef } from 'react';
 import { fn } from 'storybook/test';
 import { UniversalLinkInputArtistSearchModeView } from './UniversalLinkInputArtistSearchMode';
 
@@ -37,6 +37,17 @@ const meta = {
       );
     },
   ],
+  render: function ArtistSearchStory(args) {
+    const inputRef = useRef<HTMLInputElement>(null);
+    const resultsListRef = useRef<HTMLDivElement>(null);
+    return (
+      <UniversalLinkInputArtistSearchModeView
+        {...args}
+        inputRef={inputRef}
+        resultsListRef={resultsListRef}
+      />
+    );
+  },
   args: {
     inputRef: { current: null },
     resultsListRef: { current: null },

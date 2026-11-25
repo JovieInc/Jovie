@@ -108,7 +108,9 @@ export const OfflineSubmit: Story = {
       (() => Promise.reject(new TypeError('offline'))) as typeof fetch,
       async () => {
         const canvas = await answerEverything(canvasElement);
-        await expect(await canvas.findByRole('alert')).toBeVisible();
+        await expect(
+          await canvas.findByRole('heading', { name: "We Couldn't Save This" })
+        ).toBeVisible();
       }
     )(),
 };

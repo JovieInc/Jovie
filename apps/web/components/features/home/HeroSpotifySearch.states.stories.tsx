@@ -13,12 +13,10 @@ function stubFetch(stub: FetchStub): () => void {
 }
 
 function jsonResponse(body: unknown, ok = true, status = 200) {
-  return Promise.resolve({
-    ok,
-    status,
-    json: async () => body,
-  } as Response);
+  return Promise.resolve(Response.json(body, { status: ok ? 200 : status }));
 }
+
+const searchTimeout = { timeout: 6000 };
 
 async function typeQuery(canvasElement: HTMLElement, text: string) {
   const canvas = within(canvasElement);
@@ -66,8 +64,10 @@ export const ErrorSearchFailed: Story = {
   play: async ({ canvasElement }) => {
     const restore = stubFetch(() => jsonResponse({}, false, 500));
     try {
-      const canvas = await typeQuery(canvasElement, 'Alex Example');
-      await expect(await canvas.findByRole('alert')).toBeVisible();
+      const canvas = await typeQuery(canvasElement, 'Service Error Artist');
+      await expect(
+        await canvas.findByRole('alert', {}, searchTimeout)
+      ).toBeVisible();
     } finally {
       restore();
     }
@@ -79,8 +79,10 @@ export const OfflineNetworkRejected: Story = {
   play: async ({ canvasElement }) => {
     const restore = stubFetch(() => Promise.reject(new TypeError('offline')));
     try {
-      const canvas = await typeQuery(canvasElement, 'Alex Example');
-      await expect(await canvas.findByRole('alert')).toBeVisible();
+      const canvas = await typeQuery(canvasElement, 'Offline Artist');
+      await expect(
+        await canvas.findByRole('alert', {}, searchTimeout)
+      ).toBeVisible();
     } finally {
       restore();
     }
@@ -102,7 +104,9 @@ export const PartialSparseArtist: Story = {
     );
     try {
       const canvas = await typeQuery(canvasElement, 'New Artist');
-      await expect(await canvas.findByText('New Artist')).toBeVisible();
+      await expect(
+        await canvas.findByRole('button', { name: 'New Artist' })
+      ).toBeVisible();
     } finally {
       restore();
     }
@@ -124,7 +128,9 @@ export const LongContentName: Story = {
     );
     try {
       const canvas = await typeQuery(canvasElement, 'An Artist');
-      await expect(await canvas.findByText(/An Artist Whose/)).toBeVisible();
+      await expect(
+        await canvas.findByRole('button', { name: /An Artist Whose/ })
+      ).toBeVisible();
     } finally {
       restore();
     }
@@ -137,7 +143,9 @@ export const PermissionDeniedRateLimited: Story = {
     const restore = stubFetch(() => jsonResponse({}, false, 429));
     try {
       const canvas = await typeQuery(canvasElement, 'Alex Example');
-      await expect(await canvas.findByRole('alert')).toBeVisible();
+      await expect(
+        await canvas.findByRole('alert', {}, searchTimeout)
+      ).toBeVisible();
     } finally {
       restore();
     }

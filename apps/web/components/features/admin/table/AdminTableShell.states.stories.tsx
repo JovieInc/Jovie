@@ -42,11 +42,18 @@ export const LongContentScrollingBody: Story = {
       </div>
     ),
     children: () => (
-      <div className='h-96 overflow-y-auto p-4 text-sm text-secondary-token'>
-        {Array.from({ length: 60 }, (_, i) => (
-          <p key={i}>Row {i + 1}</p>
+      <section
+        className='h-96 overflow-y-auto p-4 text-sm text-secondary-token'
+        aria-label='Table Contents'
+      >
+        <a href='#table-preview-last-row' className='underline'>
+          Jump to last row
+        </a>
+        {Array.from({ length: 59 }, (_, i) => `Row ${i + 1}`).map(row => (
+          <p key={row}>{row}</p>
         ))}
-      </div>
+        <p id='table-preview-last-row'>Row 60</p>
+      </section>
     ),
   },
 };

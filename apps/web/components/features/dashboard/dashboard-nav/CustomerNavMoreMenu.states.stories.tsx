@@ -30,10 +30,10 @@ const meta = {
     isItemActive: (_item: NavItem): boolean => false,
   },
   decorators: [
-    function NavFrame(Story) {
+    function NavFrame(Story, { parameters }) {
       return (
         <SidebarProvider>
-          <ul className='w-56'>
+          <ul dir={parameters.direction} className='w-56'>
             <Story />
           </ul>
         </SidebarProvider>
@@ -64,13 +64,5 @@ export const LongContentItemName: Story = {
 
 /** Rtl: the trigger inside a right-to-left sidebar. */
 export const RtlTrigger: Story = {
-  decorators: [
-    function RtlFrame(Story) {
-      return (
-        <div dir='rtl'>
-          <Story />
-        </div>
-      );
-    },
-  ],
+  parameters: { direction: 'rtl' },
 };

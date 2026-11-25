@@ -145,16 +145,6 @@ function FunnelStageTile({
   readonly isBiggestLeak: boolean;
 }>) {
   const footer = founderFunnelStageFooter(stage, index, isBiggestLeak);
-  // The accessible name starts with the visible text, in visible order
-  // (WCAG 2.5.3 label in name), then adds the drill-down hint.
-  const visibleText = [
-    stage.label,
-    stage.count.toLocaleString('en-US'),
-    footer,
-    stage.identifiable ? null : 'Anonymous · aggregate only',
-  ]
-    .filter(Boolean)
-    .join(' ');
   const content = (
     <>
       <p className='text-2xs font-semibold text-tertiary-token'>
@@ -202,9 +192,9 @@ function FunnelStageTile({
       className={tileClass}
       data-testid={`founder-funnel-stage-${stage.key}`}
       title={stage.description}
-      aria-label={`${visibleText}; inspect underlying entities`}
     >
       {content}
+      <span className='sr-only'>Inspect underlying entities</span>
     </Link>
   );
 }

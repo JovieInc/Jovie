@@ -17,7 +17,9 @@ function useHeader(label: string, placeholder: boolean): Header<Row, unknown> {
   });
   const header = table.getFlatHeaders()[0];
   if (!header) throw new Error('the story table has one column');
-  return placeholder ? { ...header, isPlaceholder: true } : header;
+  return placeholder
+    ? { ...header, getSize: () => header.getSize(), isPlaceholder: true }
+    : header;
 }
 
 const meta: Meta<typeof TableHeaderCell<Row>> = {

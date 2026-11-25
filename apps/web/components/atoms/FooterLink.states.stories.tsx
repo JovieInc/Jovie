@@ -19,7 +19,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /** Empty: a link with no label yet keeps its hit area. */
-export const EmptyLabel: Story = { args: { children: null } };
+export const EmptyLabel: Story = {
+  args: { children: null, 'aria-label': 'Privacy' },
+};
 
 /** Partial: only the required href and label, every option left at its default. */
 export const PartialRequiredOnly: Story = {

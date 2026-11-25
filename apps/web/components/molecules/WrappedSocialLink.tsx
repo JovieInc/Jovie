@@ -107,7 +107,7 @@ export function WrappedSocialLink({
         target={target}
         rel={securityRel}
         className={className}
-        aria-label={ariaLabel || `${crawlerSafeLabel} link`}
+        aria-label={ariaLabel}
       >
         {children || (
           <div className='flex items-center gap-2'>
@@ -125,7 +125,7 @@ export function WrappedSocialLink({
       target={target}
       rel={securityRel}
       className={className}
-      aria-label={ariaLabel || `${wrappedData.alias} link`}
+      aria-label={ariaLabel}
       data-link-kind={wrappedData.kind}
     >
       {children || (

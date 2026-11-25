@@ -55,9 +55,11 @@ describe('AuthUnavailableCard', () => {
     const submit = vi.fn((event: Event) => event.preventDefault());
     form.addEventListener('submit', submit);
 
-    await user.click(
-      screen.getByRole('button', { name: 'Reset session and retry' })
-    );
+    const reset = screen.getByRole('button', {
+      name: 'Reset session and retry',
+    });
+    expect(reset).toHaveClass('bg-on-media', 'text-ink-on-media');
+    await user.click(reset);
 
     expect(submit).toHaveBeenCalledTimes(1);
     expect(form).toHaveAttribute('action', '/api/auth/reset');

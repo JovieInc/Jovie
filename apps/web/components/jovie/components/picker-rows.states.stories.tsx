@@ -79,7 +79,7 @@ export const RtlRow: Story = {
   decorators: [
     function RtlFrame(Story) {
       return (
-        <div dir='rtl' role='listbox' aria-label='مرفقات' className='w-72'>
+        <div dir='rtl'>
           <Story />
         </div>
       );

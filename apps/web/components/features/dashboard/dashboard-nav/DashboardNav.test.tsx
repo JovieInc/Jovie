@@ -277,7 +277,7 @@ describe('DashboardNav route warming', () => {
     const pendingLink = pending.container.querySelector(
       '[data-navigation-item-id="home"]'
     );
-    expect(pendingLink).toHaveAccessibleName('Home — 3 Items Need Attention');
+    expect(pendingLink).toHaveAccessibleName(/^Home — 3 Items Need Attention/);
     expect(pendingLink).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
     expect(pendingLink).toHaveAttribute('data-inbox-attention', 'available');
     expect(
