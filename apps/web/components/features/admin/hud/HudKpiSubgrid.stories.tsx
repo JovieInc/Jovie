@@ -188,3 +188,16 @@ export const PermissionDenied: Story = {
     ).toBeVisible();
   },
 };
+
+export const ErrorReadingVelocity: Story = {
+  beforeEach: stubVelocity(async () => new Response(null, { status: 503 })),
+  render: renderUnseeded,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByText('Daily Shipping Data'));
+    await expect(
+      await canvas.findByText(/Retry to load the daily observations/)
+    ).toBeVisible();
+    await expect(canvas.getByRole('button', { name: 'Retry' })).toBeEnabled();
+  },
+};
