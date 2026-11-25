@@ -3,9 +3,9 @@ import { expect, test } from '@playwright/test';
 /**
  * Audience table visual regression (Linear-parity density).
  *
- * Populated Audience table at 1440 wide in light and dark: compact 40px rows,
+ * Populated Audience table at 1440 wide in light and dark: dense 32px rows,
  * quiet dot status, no row numbers, no empty columns, flat crawler status.
- * Contract: `.claude/rules/ui.md` "Tables and lists (Linear parity)".
+ * Contract: DRI-21 canonical table row density.
  *
  * Story: `DashboardAudienceTableUnified.stories.tsx`
  * (`dashboard-audience-dashboardaudiencetableunified--populated`).
@@ -35,7 +35,7 @@ test.describe('audience table', () => {
       const height = await row.evaluate(
         element => element.getBoundingClientRect().height
       );
-      expect(height).toBeGreaterThanOrEqual(40);
+      expect(height).toBe(32);
 
       await expect(page).toHaveScreenshot(`audience-table-${theme}.png`);
     });
