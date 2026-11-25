@@ -190,6 +190,14 @@ describe('DashboardShellContent privacy decision', () => {
         (tree as { type?: unknown }).type === Symbol.for('react.suspense')
     ).toBe(true);
     expect(JSON.stringify(tree)).toContain('Contacts page');
+    // The streamed fallback still mounts while the resolved shell streams in,
+    // so it must not carry the live frame landmark — two frames collide and
+    // Playwright's strict shell locator aborts (JOV-14936).
+    expect(JSON.stringify(tree)).not.toContain('data-app-shell-frame');
+    expect(JSON.stringify(tree)).not.toContain('"id":"main-content"');
+    // This boundary is mocked here. AuthShell and AppShellFrame tests prove
+    // that the forwarded flag removes both live attributes in the DOM.
+    expect(JSON.stringify(tree)).toContain('"framePlaceholder":true');
     expect(mocks.shellDashboard).toHaveBeenCalledOnce();
   });
 
