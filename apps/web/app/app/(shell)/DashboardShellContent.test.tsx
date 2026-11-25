@@ -195,7 +195,9 @@ describe('DashboardShellContent privacy decision', () => {
     // Playwright's strict shell locator aborts (JOV-14936).
     expect(JSON.stringify(tree)).not.toContain('data-app-shell-frame');
     expect(JSON.stringify(tree)).not.toContain('"id":"main-content"');
-    expect(JSON.stringify(tree)).toContain('data-app-shell-placeholder');
+    // This boundary is mocked here. AuthShell and AppShellFrame tests prove
+    // that the forwarded flag removes both live attributes in the DOM.
+    expect(JSON.stringify(tree)).toContain('"framePlaceholder":true');
     expect(mocks.shellDashboard).toHaveBeenCalledOnce();
   });
 

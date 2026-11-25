@@ -59,6 +59,11 @@ import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
 import { createInspectPressSourceTool } from '@/lib/ai/tools/inspect-press-source';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
 import { createVoicePromoTool } from '@/lib/ai/tools/voice-promo';
+import { readAuthorizedDashboardAnalytics } from '@/lib/analytics/authorized-read';
+import {
+  asksForAudienceFunnel,
+  audienceFunnelView,
+} from '@/lib/analytics/funnel-view';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import { getSessionContext } from '@/lib/auth/session';
 import { resolveChatAccountContext } from '@/lib/chat/account-context';
@@ -174,7 +179,9 @@ import {
   prefetchSummerSession,
 } from '@/lib/ovie/chat-route-helpers';
 import { createOvieTurnTiming, ovieServerTiming } from '@/lib/ovie/chat-timing';
+import { loadRequestedOpsFunnel } from '@/lib/ovie/funnel-card.server';
 import { getOvieOperatingStore } from '@/lib/ovie/mcp/runtime-store';
+import { buildFunnelOpsCard, type SummerOpsCard } from '@/lib/ovie/ops-card';
 import {
   assertModelMustNotSelfIdentifyAsOvie,
   assertOvieDoorDoesNotUseArtistJovieGeneration,
@@ -327,6 +334,7 @@ function createAssistantTextStreamResponse(input: {
   readonly corsHeaders: Record<string, string>;
   readonly headers?: Record<string, string>;
   readonly metadata?: Record<string, unknown>;
+  readonly funnelCard?: SummerOpsCard;
 }) {
   const messageId = randomUUID();
   const textId = randomUUID();
@@ -341,6 +349,22 @@ function createAssistantTextStreamResponse(input: {
       writer.write({ type: 'text-start', id: textId });
       writer.write({ type: 'text-delta', id: textId, delta: input.text });
       writer.write({ type: 'text-end', id: textId });
+      if (input.funnelCard) {
+        const toolCallId = randomUUID();
+        writer.write({
+          type: 'tool-input-available',
+          toolCallId,
+          toolName: 'showFunnel',
+          input: {},
+          dynamic: true,
+        });
+        writer.write({
+          type: 'tool-output-available',
+          toolCallId,
+          output: { success: true, card: input.funnelCard },
+          dynamic: true,
+        });
+      }
       writer.write({ type: 'finish-step' });
       writer.write({
         type: 'finish',
@@ -738,7 +762,8 @@ function createMerchPayoutsTool(profileId: string | null) {
 
 function createShowTopInsightsTool(
   profileId: string | null,
-  lastUserText: string
+  lastUserText: string,
+  userId: string
 ) {
   return tool({
     description:
@@ -752,6 +777,25 @@ function createShowTopInsightsTool(
           totalActive: 0,
           insights: [],
         };
+      }
+
+      if (asksForAudienceFunnel(lastUserText)) {
+        const requestedRange = /\b(?:7d|7 days|last week)\b/i.test(lastUserText)
+          ? '7d'
+          : '30d';
+        const read = await readAuthorizedDashboardAnalytics({
+          userId,
+          range: requestedRange,
+        }).catch(() => null);
+        const funnel = audienceFunnelView(
+          read?.analytics,
+          read?.range ?? 'Analytics unavailable'
+        );
+        const card = buildFunnelOpsCard(
+          funnel,
+          read ? undefined : 'unavailable'
+        );
+        return { success: true, card };
       }
 
       if (!isShowTopInsightsTurnRelevant(lastUserText)) {
@@ -962,7 +1006,8 @@ function buildChatTools(
       ? {
           showTopInsights: createShowTopInsightsTool(
             resolvedProfileId,
-            lastUserText
+            lastUserText,
+            clerkUserId
           ),
         }
       : {}),
@@ -1714,6 +1759,37 @@ export async function POST(req: Request) {
       destination: receipt.destination,
       ack: receipt.ack,
     }));
+    const funnelCard = userText
+      ? await loadRequestedOpsFunnel(userText).catch(error => {
+          logger.warn('Operational funnel unavailable', { requestId, error });
+          return null;
+        })
+      : null;
+    if (funnelCard) {
+      const bottleneck = funnelCard.funnel?.stages.find(
+        stage => stage.id === funnelCard.funnel?.bottleneckId
+      );
+      return createAssistantTextStreamResponse({
+        text: bottleneck
+          ? `Current certification bottleneck: ${bottleneck.label}.`
+          : funnelCard.state === 'unknown'
+            ? 'The latest evidence is unavailable.'
+            : 'Here’s the latest tracked evidence.',
+        funnelCard,
+        requestId,
+        corsHeaders,
+        headers: {
+          'x-ovie-door': '1',
+          'server-timing': ovieServerTiming(timing.snapshot()),
+        },
+        metadata: {
+          requestId,
+          chatMode: 'ov',
+          eveIdentity: eveTurn.pack.id,
+          ovieIngest: ingestMeta,
+        },
+      });
+    }
     const eveSpeaker = getBoundSummerSpeaker();
     // Interactive turns stream from Summer's fast chat endpoint; durable work
     // and any fast-path outage fall back to the Eve conversation (still Summer).

@@ -1,12 +1,23 @@
 'use client';
 
-import { type MouseEvent as ReactMouseEvent, useRef } from 'react';
+import {
+  type MouseEvent as ReactMouseEvent,
+  useId,
+  useMemo,
+  useRef,
+} from 'react';
 import {
   DELTA_FILL,
   DELTA_STROKE,
   deltaSentiment,
   type MetricPolarity,
 } from '@/lib/design/metric-tone';
+import {
+  isMeasurement,
+  SPARKLINE_HEIGHT,
+  SPARKLINE_WIDTH,
+  sparklineGeometry,
+} from './sparkline-geometry';
 
 export type SparklineTrend = 'up' | 'down' | 'flat';
 
@@ -14,10 +25,9 @@ export type SparklineVariant = 'area' | 'pulse';
 
 export interface SparklineProps {
   /**
-   * Y-values for each evenly-spaced x. Must contain at least two points;
-   * fewer entries collapse the chart into a single point.
+   * One observation per equal period. Use null for an unmeasured period.
    */
-  readonly points: readonly number[];
+  readonly points: readonly (number | null)[];
   /** Tone palette — tints the line, fill, and hover playhead. */
   readonly trend: SparklineTrend;
   /**
@@ -38,9 +48,6 @@ export interface SparklineProps {
   readonly ariaLabel?: string;
   readonly className?: string;
 }
-
-const VIEWBOX_W = 340;
-const VIEWBOX_H = 120;
 
 // Colors come from the shared delta sentiment maps, which use the status
 // TEXT tokens (not the neon fills) so the line clears 3:1 in both modes.
@@ -77,22 +84,11 @@ export function Sparkline({
   ariaLabel = 'Trend over time',
   className,
 }: SparklineProps) {
-  const max = Math.max(...points, 1);
-  const min = Math.min(...points, 0);
-  const range = max - min || 1;
-  // Pulse charts keep vertical padding so a flat series is not a hard edge.
-  const padY = variant === 'pulse' ? VIEWBOX_H * 0.18 : 0;
-  const xFor = (i: number) =>
-    points.length <= 1 ? VIEWBOX_W / 2 : (i / (points.length - 1)) * VIEWBOX_W;
-  const yFor = (v: number) =>
-    VIEWBOX_H - padY - ((v - min) / range) * (VIEWBOX_H - padY * 2);
-  const path = points
-    .map(
-      (p, i) =>
-        `${i === 0 ? 'M' : 'L'} ${xFor(i).toFixed(1)} ${yFor(p).toFixed(1)}`
-    )
-    .join(' ');
-  const fillPath = `${path} L ${VIEWBOX_W} ${VIEWBOX_H} L 0 ${VIEWBOX_H} Z`;
+  const { path, fillPath, description, samplingNote, xFor, yFor } = useMemo(
+    () => sparklineGeometry(points, variant),
+    [points, variant]
+  );
+  const descriptionId = useId();
   const sentiment = deltaSentiment(trend, polarity);
   const stroke = DELTA_STROKE[sentiment];
   const fill = DELTA_FILL[sentiment];
@@ -102,55 +98,59 @@ export function Sparkline({
   function handleMove(e: ReactMouseEvent<SVGSVGElement>) {
     if (!onHover) return;
     const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const px = ((e.clientX - rect.left) / rect.width) * VIEWBOX_W;
+    if (!rect || rect.width <= 0 || points.length === 0) {
+      onHover(null);
+      return;
+    }
+    const fraction = (e.clientX - rect.left) / rect.width;
     const idx = Math.max(
       0,
-      Math.min(
-        points.length - 1,
-        Math.round((px / VIEWBOX_W) * (points.length - 1))
-      )
+      Math.min(points.length - 1, Math.round(fraction * (points.length - 1)))
     );
     onHover(idx);
   }
 
   const playheadX = hoverIdx != null ? xFor(hoverIdx) : null;
-  const playheadY =
-    hoverIdx != null && points[hoverIdx] != null
-      ? yFor(points[hoverIdx])
-      : null;
+  const selectedValue = hoverIdx == null ? null : points[hoverIdx];
+  const playheadY = isMeasurement(selectedValue) ? yFor(selectedValue) : null;
 
   return (
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: chart canvas; hover is a mouse-only affordance, exact values are surfaced in adjacent Stat blocks
     <svg
       ref={svgRef}
-      viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`}
+      viewBox={`0 0 ${SPARKLINE_WIDTH} ${SPARKLINE_HEIGHT}`}
       className={className ?? 'mt-3 w-full h-32 block cursor-crosshair'}
       preserveAspectRatio='none'
       role='img'
       aria-label={ariaLabel}
+      aria-describedby={descriptionId}
       onMouseMove={handleMove}
       onMouseLeave={() => onHover?.(null)}
     >
-      <title>{ariaLabel}</title>
-      {variant === 'area' ? <path d={fillPath} fill={fill} /> : null}
-      <path
-        d={path}
-        fill='none'
-        stroke={stroke}
-        strokeWidth={strokeWidth}
-        strokeLinecap='round'
-        strokeLinejoin='round'
-        vectorEffect='non-scaling-stroke'
-        data-sparkline-variant={variant}
-      />
+      <title>
+        {samplingNote ? `${ariaLabel}. ${samplingNote}` : ariaLabel}
+      </title>
+      <desc id={descriptionId}>{description}</desc>
+      {fillPath ? <path d={fillPath} fill={fill} /> : null}
+      {path ? (
+        <path
+          d={path}
+          fill='none'
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          strokeLinecap='round'
+          strokeLinejoin='round'
+          vectorEffect='non-scaling-stroke'
+          data-sparkline-variant={variant}
+        />
+      ) : null}
       {playheadX != null && playheadY != null && (
         <>
           <line
             x1={playheadX}
             y1={0}
             x2={playheadX}
-            y2={VIEWBOX_H}
+            y2={SPARKLINE_HEIGHT}
             stroke={PLAYHEAD_STROKE}
             strokeWidth={1}
             vectorEffect='non-scaling-stroke'

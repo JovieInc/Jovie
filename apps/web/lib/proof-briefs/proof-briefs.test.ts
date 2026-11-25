@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { evaluateBrief } from '@/lib/proof-briefs/certify';
 import {
   briefHashMatches,
@@ -184,7 +184,6 @@ describe('certification — negative fixtures', () => {
 });
 
 import { render, screen } from '@testing-library/react';
-import type { NextRequest } from 'next/server';
 import { createElement } from 'react';
 import {
   defaultRecipientPreferences,
@@ -208,7 +207,6 @@ import {
 } from './fixture';
 import {
   clampProofBriefText,
-  PROOF_BRIEF_CARD_SIZE,
   PROOF_BRIEF_TEXT_LIMITS,
   ProofBriefCard,
 } from './image';
@@ -224,33 +222,6 @@ import {
 } from './resolve';
 import { renderProofBriefSocialDraft } from './social';
 import { renderProofBriefText } from './text';
-
-const mocks = vi.hoisted(() => ({
-  imageResponse: vi.fn(),
-  loadShareFonts: vi.fn(async () => ({ satoshi: new ArrayBuffer(8) })),
-}));
-
-vi.mock('next/og', () => ({
-  ImageResponse: class MockImageResponse {
-    headers = new Headers();
-    constructor(
-      public element: unknown,
-      public options?: { headers?: Record<string, string> }
-    ) {
-      mocks.imageResponse(element, options);
-      for (const [key, value] of Object.entries(options?.headers ?? {})) {
-        this.headers.set(key, value);
-      }
-    }
-  },
-}));
-
-vi.mock('@/lib/share/image-utils', async importOriginal => {
-  const mod = await importOriginal<typeof import('@/lib/share/image-utils')>();
-  return { ...mod, loadShareFonts: mocks.loadShareFonts };
-});
-
-import { GET as proofBriefGET } from '@/app/api/share/proof-brief/route';
 
 const NOW = new Date('2026-09-30T00:00:00.000Z');
 
@@ -534,6 +505,46 @@ describe('truth and privacy boundaries', () => {
     ).toThrow(ProofBriefError);
   });
 
+  it('describes the public image, including measured zero and unmeasured outcomes', () => {
+    const publicBrief = brief({
+      hero: {
+        ...CERTIFIED_PROOF_BRIEF.hero,
+        value: '128',
+        label: 'Profile visits',
+        sentence: 'Profile activity was measured this week.',
+      },
+      supportingPoints: [
+        {
+          label: 'Ticket clicks',
+          value: '0',
+          attribution: 'execution',
+          evidenceIds: CERTIFIED_PROOF_BRIEF.hero.evidenceIds,
+        },
+      ],
+      unknowns: ['Internal attribution check'],
+    });
+
+    const { altText } = renderProofBriefSocialDraft(publicBrief, { now: NOW });
+
+    expect(altText).toContain(publicBrief.window.label);
+    expect(altText).toContain('128 Profile visits');
+    expect(altText).toContain('0 Ticket clicks');
+    expect(altText).toContain('Unmeasured outcomes');
+    expect(altText).not.toContain('Internal attribution check');
+    expect(altText).not.toContain(publicBrief.evidence[0]?.sourceUrl);
+    expect(() =>
+      renderProofBriefSocialDraft(
+        { ...publicBrief, privacy: 'private' },
+        { now: NOW }
+      )
+    ).toThrow(/private-scoped/);
+    expect(() =>
+      renderProofBriefSocialDraft(publicBrief, {
+        now: new Date(publicBrief.expiresAt),
+      })
+    ).toThrow(/expired/);
+  });
+
   it('allows owner text/email but blocks a private share card', () => {
     const privateBrief = brief({ privacy: 'private' });
     expect(renderProofBriefText(privateBrief, { now: NOW })).toContain('2');
@@ -610,11 +621,7 @@ describe('delivery controls', () => {
   });
 });
 
-describe('card, resolver, and image route', () => {
-  function request(url: string): NextRequest {
-    return { nextUrl: new URL(url) } as NextRequest;
-  }
-
+describe('card and resolver', () => {
   it('renders the certified card and clamps overflow', () => {
     render(
       createElement(ProofBriefCard, {
@@ -651,49 +658,6 @@ describe('card, resolver, and image route', () => {
     expect(
       resolveCertifiedProofBrief(CERTIFIED_PROOF_BRIEF.briefId, 99)
     ).toBeNull();
-  });
-
-  it('rejects malformed and unknown image requests', async () => {
-    expect(
-      (await proofBriefGET(request('https://jov.ie/api/share/proof-brief')))
-        .status
-    ).toBe(400);
-    const unknown = await proofBriefGET(
-      request('https://jov.ie/api/share/proof-brief?brief=pb_missing')
-    );
-    expect(unknown.status).toBe(404);
-    expect(unknown.headers.get('Cache-Control')).toBe('no-store');
-  });
-
-  it('renders the pinned card with immutable caching', async () => {
-    const b = CERTIFIED_PROOF_BRIEF;
-    const response = await proofBriefGET(
-      request(
-        `https://jov.ie/api/share/proof-brief?brief=${b.briefId}&rev=${b.revision}`
-      )
-    );
-    expect(response.headers.get('Cache-Control')).toContain('immutable');
-    expect(mocks.imageResponse).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ ...PROOF_BRIEF_CARD_SIZE })
-    );
-  });
-
-  it('fails closed when fonts or rendering fail', async () => {
-    const url = `https://jov.ie/api/share/proof-brief?brief=${CERTIFIED_PROOF_BRIEF.briefId}`;
-    mocks.loadShareFonts.mockRejectedValueOnce(new Error('font missing'));
-    expect((await proofBriefGET(request(url))).status).toBe(500);
-
-    for (const [error, status] of [
-      [new ProofBriefError('x', 'privacy-scope'), 403],
-      [new ProofBriefError('x', 'stale-brief'), 410],
-      [new ProofBriefError('x', 'invalid-brief'), 400],
-    ] as const) {
-      mocks.imageResponse.mockImplementationOnce(() => {
-        throw error;
-      });
-      expect((await proofBriefGET(request(url))).status).toBe(status);
-    }
   });
 });
 

@@ -12,7 +12,6 @@
     "apps/web/app/app/(shell)/admin/investors/settings/page.tsx: title='Investor Settings'"
   ],
   "dashboardColor": [
-    "accent-on-data apps/web/components/features/admin/hud/HudKpiSubgrid.tsx: stroke='var(--color-accent)'",
     "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-accent'",
     "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-accent'",
     "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-info'",

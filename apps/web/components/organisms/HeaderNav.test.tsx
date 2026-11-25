@@ -48,6 +48,25 @@ function primaryNav() {
 }
 
 describe('HeaderNav states', () => {
+  it('marks the current marketing destination in the primary nav', () => {
+    render(
+      <HeaderNav
+        presentation='marketing-glass'
+        marketingPathname='/pricing'
+        navLinks={[
+          { href: '/pricing', label: 'Pricing' },
+          { href: '/product', label: 'Product' },
+        ]}
+      />
+    );
+    expect(
+      within(primaryNav()).getByRole('link', { name: 'Pricing' })
+    ).toHaveAttribute('aria-current', 'page');
+    expect(
+      within(primaryNav()).getByRole('link', { name: 'Product' })
+    ).not.toHaveAttribute('aria-current');
+  });
+
   it('renders the public header with the logo, nav links and both auth actions', async () => {
     const { container } = render(
       <HeaderNav

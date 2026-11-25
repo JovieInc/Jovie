@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import {
   applySweep,
@@ -19,6 +20,32 @@ const run = (id, file, conclusion, extra = {}) => ({
   html_url: `https://github.com/o/r/actions/runs/${id}`,
   head_sha: 'abcdef1234',
   ...extra,
+});
+
+it('loads the hosted outcome sweep without workspace dependencies', () => {
+  const sweepUrl = new URL('../outcome-sweep.mjs', import.meta.url);
+  const output = execFileSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '--eval',
+      `
+      import { registerHooks } from 'node:module';
+      registerHooks({
+        resolve(specifier, context, nextResolve) {
+          if (!/^(?:node:|file:|\\.|\\/)/.test(specifier)) {
+            throw new Error('Hosted checkout has no package: ' + specifier);
+          }
+          return nextResolve(specifier, context);
+        },
+      });
+      const { sweepOutcomes } = await import(${JSON.stringify(sweepUrl.href)});
+      console.log(typeof sweepOutcomes);
+    `,
+    ],
+    { encoding: 'utf8' }
+  );
+  expect(output.trim()).toBe('function');
 });
 
 describe('latestVerdicts', () => {

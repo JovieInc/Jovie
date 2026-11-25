@@ -113,7 +113,7 @@ function computeDefaultStatusDetail(
   isAlive: boolean
 ): string {
   if (netBurn <= 0) {
-    return 'Revenue already exceeds spend at the current run rate.';
+    return 'Measured revenue covers measured spend at the current run rate.';
   }
   if (monthsToProfitability == null) {
     return 'Revenue growth is not yet outpacing burn at the current trajectory.';

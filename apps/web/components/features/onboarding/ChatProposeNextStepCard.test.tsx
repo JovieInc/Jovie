@@ -335,7 +335,9 @@ describe('ChatProposeNextStepCard states', () => {
   });
 
   it.each([
-    [true, true, /saving your request/i],
+    // ONB-46: without a claim-handoff provider, status stays idle → preparing
+    // copy (not forever-receipt).
+    [true, true, /preparing to save your request/i],
     [false, false, /save your spot/i],
     [false, true, /save your spot/i],
   ])(

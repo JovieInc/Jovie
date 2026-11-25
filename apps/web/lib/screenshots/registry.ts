@@ -380,7 +380,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       title: 'Tim White Profile — Events Empty',
       route: '/demo/showcase/tim-white-profile?state=events-empty',
       viewport: 'mobile',
-      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile-state"]',
       publicExportPath: 'tim-white-profile-events-empty-phone.png',
     },
     {

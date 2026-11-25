@@ -29,13 +29,14 @@ import { OvieInbox } from '@/components/features/admin/hud/OvieInbox';
 import { OvieLauncherRail } from '@/components/features/admin/hud/OvieLauncherRail';
 import { OvieShippingStateCard } from '@/components/features/admin/hud/OvieShippingStateCard';
 import type { DailyBucket } from '@/components/features/admin/ShippingVelocityChart';
-import { PipelineBottleneckBanner } from '@/components/features/home/PipelineBottleneckBanner';
 import { toast } from '@/components/feedback';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { FunnelTracker } from '@/components/molecules/FunnelTracker';
 import { ShellListRowFrame } from '@/components/organisms/table';
 import type { FounderFunnelData } from '@/lib/admin/types';
 import type { AgentRunArtifact } from '@/lib/agent-os/artifact';
+import type { FunnelView } from '@/lib/analytics/funnel-view';
 import {
   composeHudForPresentation,
   type HudComposedSection,
@@ -667,6 +668,7 @@ export interface HudDashboardClientProps {
   readonly initialFixtureAgentRuns?: readonly AgentRunArtifact[];
   /** Prefetched founder funnel for the signed-in Ops need band. */
   readonly initialFunnel?: FounderFunnelData | null;
+  readonly goldenPath?: FunnelView | null;
 }
 
 function resolveAgentOsArtifacts(
@@ -715,6 +717,7 @@ export function HudDashboardClient({
   initialShippingCachedAt,
   initialFixtureAgentRuns = [],
   initialFunnel = null,
+  goldenPath = null,
 }: HudDashboardClientProps) {
   const { data: metrics, refetch } = useHudMetricsQuery(
     initialMetrics,
@@ -814,11 +817,7 @@ export function HudDashboardClient({
           </ContentSurfaceCard>
         ) : (
           <div data-testid={section.testId} className='space-y-3'>
-            {metrics.accessMode === 'admin' ? (
-              <div className='h-20'>
-                <PipelineBottleneckBanner isAdmin />
-              </div>
-            ) : null}
+            {goldenPath ? <FunnelTracker view={goldenPath} /> : null}
             <FounderFunnelBand initialFunnel={initialFunnel} />
           </div>
         );

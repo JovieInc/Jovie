@@ -4,6 +4,22 @@ import { buildGoldenPathReport } from '@/lib/acquisition/artist-offer-funnel';
 import { GoldenPathFunnelPanel } from './GoldenPathFunnelPanel';
 
 describe('GoldenPathFunnelPanel', () => {
+  it('shows total paid arrivals alongside the matched checkout rate', () => {
+    const checkout = new Date('2026-11-24T10:00:00Z');
+    const paid = new Date('2026-11-24T10:00:06Z');
+    render(
+      <GoldenPathFunnelPanel
+        report={buildGoldenPathReport({
+          totalVisits: 50,
+          timelines: [{ checkout, paid }, { checkout }, { paid }, { paid }],
+        })}
+      />
+    );
+    const [paidStage] = screen.getAllByText('Paid');
+    expect(paidStage?.closest('li')).toHaveTextContent('Paid350.0%');
+    expect(screen.queryByText('150.0%')).toBeNull();
+  });
+
   it('says a small cohort is not a result', () => {
     render(
       <GoldenPathFunnelPanel

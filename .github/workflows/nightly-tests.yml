@@ -72,10 +72,12 @@ jobs:
       github.event.inputs.suite == 'all' ||
       github.event.inputs.suite == 'unit'
     runs-on: ubuntu-24.04
-    # The unsharded suite was still making steady progress when the 30m cap
-    # cancelled it repeatedly (Jul 15-20, JOV-4326). The suite grew ~11.5m on
-    # Oct 8 (15 new test files in ~50 commits) and the 17:19Z run was cancelled
-    # AT the 60m ceiling; 75m = measured 49.7m + ~50% headroom.
+    # Run the same full file set across two runners on the daily clock.
+    # Manual diagnostics retain the single run and optional combined coverage.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(github.event_name == 'repository_dispatch' && '["1/2","2/2"]' || '["full"]') }}
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -90,8 +92,12 @@ jobs:
       - uses: ./.github/actions/setup-playwright
 
       - name: Run full unit test suite
+        env:
+          UNIT_SHARD: ${{ matrix.shard }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.coverage }}" = "true" ]; then
+          if [ "$UNIT_SHARD" != "full" ]; then
+            pnpm --filter=@jovie/web run test --shard="$UNIT_SHARD"
+          elif [ "${{ inputs.coverage }}" = "true" ]; then
             pnpm --filter=@jovie/web run test -- --coverage
           else
             pnpm --filter=@jovie/web run test
@@ -280,6 +286,8 @@ jobs:
           NODE_ENV: test
           BASE_URL: http://127.0.0.1:3100
           E2E_SKIP_WARMUP: '1'
+          # Match the local QA server: fresh users use persisted Better Auth fixtures.
+          E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}

@@ -69,15 +69,18 @@ describe('ChatProposeNextStepCard waitlist truthfulness', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows a non-terminal saving state after authentication', () => {
+  it('shows a non-terminal preparing state after authentication (ONB-46 idle)', () => {
     authState.isSignedIn = true;
     render(<ChatProposeNextStepCard payload={waitlistPayload} />);
 
+    // Without a claim-handoff provider, status stays idle — preparing copy,
+    // not forever-receipt while nothing is in flight yet.
     expect(
-      screen.getByText(
-        /saving your request and reserving your name and profile/i
-      )
+      screen.getByText(/preparing to save your request/i)
     ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/until the receipt appears/i)
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(/you're on the list/i)).not.toBeInTheDocument();
   });
 

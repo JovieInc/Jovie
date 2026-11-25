@@ -27,5 +27,14 @@
     "sentry.edge.config.ts",
     "proxy.ts"
   ],
-  "exclude": ["node_modules", ".next/types/validator.ts", "**/*.stories.*"]
+  "exclude": [
+    "node_modules",
+    ".next/types/validator.ts",
+    "**/*.stories.*",
+    // Co-located unit tests run in the dedicated test typecheck program.
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx"
+  ]
 }

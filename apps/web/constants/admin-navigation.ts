@@ -204,13 +204,13 @@ const ADMIN_NAV_ITEMS: readonly Omit<AdminNavRegistryItem, 'section'>[] = [
   },
   {
     id: 'costs',
-    label: 'Capacity',
+    label: 'Costs',
     href: APP_ROUTES.ADMIN_COSTS,
-    description: 'Provider capacity and vendor spend (30-day view)',
+    description: 'Recorded vendor spend over the last 30 days',
   },
   {
     id: 'capacity',
-    label: 'Agent Plans',
+    label: 'Capacity',
     href: APP_ROUTES.ADMIN_CAPACITY,
     description:
       'Agent plans, cost, remaining quota and credits, and pace per provider',

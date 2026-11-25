@@ -9,6 +9,7 @@ import {
   resetClaimCanary,
 } from './helpers/canary-reset-client';
 import { ensureUserIsFree } from './helpers/ensure-user-is-free';
+import { requireCanaryCheckout } from './helpers/require-canary-checkout';
 import {
   createCheckoutSession,
   createSignedStripeWebhook,
@@ -190,13 +191,17 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
       await resetClaimCanary({ request: page.request, origin, runTag: tag });
     } catch (error) {
       if (error instanceof CanaryResetRateLimitedError) {
-        // Budget, not config: the reset budget is shared across runs
-        // and every Playwright retry that reaches reset burns it again
-        // (post-fix red 45336880733 retry #2). Name the condition and fail —
-        // the walk never skips, but the red must say "hourly budget", not
-        // an opaque 429.
+        // Budget, not config: the shared canary-walk passage-grant window is
+        // the cross-run ceiling, and the reset window is PER RUN TAG — a
+        // single walk's retries can never be denied by another run's
+        // consumption (red 45366385483: the prior GLOBAL reset key was
+        // burned by every run and retry, so deploy storms exhausted any
+        // fixed size). Name the condition and fail — the walk never skips,
+        // but the red must say "hourly budget", not an opaque 429 (and
+        // never the opaque 401 the passage-budget denial masqueraded as,
+        // red 45350750159).
         blockConeWalk(
-          'Canary reset budget exhausted (429): the hourly reset budget is shared across runs; retrying cannot help until the hourly window clears'
+          'Canary reset budget exhausted (429): the hourly canary-walk passage-grant budget is shared across all runs and the reset budget is per run tag; retrying cannot help until the window clears'
         );
         throw error;
       }
@@ -241,7 +246,13 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
       await waitForProductionDashboardContent(page);
 
       // Payment authority ordering: BEFORE any payment the canary is free.
-      await ensureUserIsFree(page, stripeClient);
+      // The personaEmail sweep is load-bearing for the canary (JOV-8805
+      // class, red 45369972300): a previous walk whose teardown died — or
+      // whose reset 401/429'd — leaves the subscription active Stripe-side
+      // while the canary reset clears the local rows, and the next checkout
+      // is then answered with the already-subscribed billing-portal session
+      // (`bps_...`) instead of a checkout session.
+      await ensureUserIsFree(page, stripeClient, PRODCERT_CLAIM_CANARY_EMAIL);
       await detachCustomerPaymentMethods(
         stripeClient,
         PRODCERT_CLAIM_CANARY_EMAIL
@@ -274,10 +285,16 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
         }
       );
 
-      const { sessionId } = await createCheckoutSession(page, priceId, {
-        source: 'onboarding',
-        returnTo: '/chat?from=onboarding',
-      });
+      // Both checkout attempts must reject a portal result before using it.
+      const startCanaryCheckout = async () =>
+        requireCanaryCheckout(
+          await createCheckoutSession(page, priceId, {
+            source: 'onboarding',
+            returnTo: '/chat?from=onboarding',
+          }),
+          blockConeWalk
+        );
+      const { sessionId } = await startCanaryCheckout();
 
       const session = await stripeClient.checkout.sessions.retrieve(sessionId);
       expect(session.livemode).toBe(false);
@@ -306,10 +323,7 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
         return 'cancel URL truthful; expired session granted no entitlement';
       });
       // The success walk needs a live session; create a fresh one.
-      const successSession = await createCheckoutSession(page, priceId, {
-        source: 'onboarding',
-        returnTo: '/chat?from=onboarding',
-      });
+      const successSession = await startCanaryCheckout();
 
       // Failure path: a documented attachable-but-declining fixture never
       // grants an entitlement either.
@@ -444,10 +458,12 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
       );
     } finally {
       // The canary returns to its exact pre-claim state: subscription
-      // canceled Stripe-side (with webhook), test payment methods detached,
-      // then the canary-reset endpoint unclaims the reserved handle.
+      // canceled Stripe-side (with the persona orphan sweep so no
+      // provider-only subscription survives the local reset), test payment
+      // methods detached, then the canary-reset endpoint unclaims the
+      // reserved handle.
       try {
-        await ensureUserIsFree(page, stripeClient);
+        await ensureUserIsFree(page, stripeClient, PRODCERT_CLAIM_CANARY_EMAIL);
       } finally {
         try {
           await detachCustomerPaymentMethods(

@@ -84,6 +84,27 @@ const RETRY_DELAY_MS = 1_500;
 /** Bound hung claim fetches so Keep card can settle to error recovery (ONB-42). */
 export const CLAIM_TIMEOUT_MS = 20_000;
 
+/**
+ * Wait until the next paint(s) so Keep handoff can commit idle preparing
+ * before claim flips to `pending` (ONB-50 / JOV-14952).
+ *
+ * Double-rAF is the smallest reversible signal that the browser has had a
+ * chance to paint the idle Keep card; setting `pending` in the same turn as
+ * sign-in made handoff born-pending (ONB-49).
+ */
+export function waitForClaimHandoffPaint(): Promise<void> {
+  return new Promise(resolve => {
+    const raf = globalThis.requestAnimationFrame;
+    if (typeof raf !== 'function') {
+      queueMicrotask(resolve);
+      return;
+    }
+    raf.call(globalThis, () => {
+      raf.call(globalThis, () => resolve());
+    });
+  });
+}
+
 export function useOnboardingClaim(
   claimTrigger = 0,
   enabled = true
@@ -116,6 +137,13 @@ export function useOnboardingClaim(
     };
 
     const attemptClaim = async (attempt: number): Promise<void> => {
+      // ONB-50: first attempt stays `idle` until Keep handoff can paint
+      // preparing. Retries already left idle (retry-after-webhook / later
+      // trigger) and must not re-open an idle window.
+      if (attempt === 1) {
+        await waitForClaimHandoffPaint();
+        if (cancelled) return;
+      }
       // Keep an unresolved ownership conflict visible while a later turn is
       // checked; an in-flight retry is not evidence the conflict cleared.
       setStatus(current =>

@@ -265,9 +265,9 @@ export async function recordBlindSource(
 /**
  * Run the planned closes against the scanned candidates. Fail-closed by
  * construction: any close failure marks the result not ok, and the caller
- * exits 1 unless EVERY failure is the shared Linear quota (which defers, exit
- * 75). Rate-limited closes stop the loop; the remaining groups are deferred
- * with ok:false so incomplete Linear work is never green.
+ * exits 1 unless EVERY failure is the shared Linear quota (which defers,
+ * non-fatal — the next run resumes it). Rate-limited closes stop the loop;
+ * remaining groups defer with ok:false, recorded in the receipt.
  */
 /**
  * @typedef {Object} AdvisoryCloseResult
@@ -458,8 +458,8 @@ async function main() {
   );
   console.log(JSON.stringify({ ...receipt, actions: receipt.actions.length }));
   // Classify Linear failures once: quota-only failures re-attempt on the next
-  // loop run (defer, exit 75); any hard failure keeps exit 1. Upsert failures
-  // already logged and exited 1 above; scan/close failures log here.
+  // loop run and are non-fatal (it resumes them; a red main here would only
+  // file a repair issue the next green resolves). GitHub quota still exits 75.
   const failures = receipt.actions.filter(a => !a.ok);
   if (failures.length > 0) {
     if (failures.every(isLinearRateLimitedAction)) {
@@ -467,7 +467,7 @@ async function main() {
         console.warn(
           `::warning title=Linear quota deferred::${failures.length} Linear action(s) deferred on the workspace budget; the next loop run (4h clock or dependency push) resumes them.`
         );
-        process.exitCode = 75;
+        process.exitCode = 0;
       }
     } else {
       for (const a of failures) if (a.op !== 'upsert') logFailedLinearAction(a);

@@ -27,6 +27,7 @@ import {
   type ProofBriefAudience,
   proofBriefProvenance,
 } from '@/lib/proof-briefs/contract';
+import { availableProofBriefImagePath } from '@/lib/proof-briefs/image-layout';
 import {
   resolveCertifiedProofBrief,
   resolveLatestCertifiedProofBrief,
@@ -579,10 +580,7 @@ function getProofBrief(args: Record<string, unknown>) {
     provenance: proofBriefProvenance(brief),
     hero: brief.hero.sentence,
     text: renderProofBriefText(brief),
-    imageUrl:
-      brief.privacy === 'public'
-        ? `/api/share/proof-brief?brief=${encodeURIComponent(brief.briefId)}&rev=${brief.revision}`
-        : null,
+    imageUrl: availableProofBriefImagePath(brief),
     card: buildProofBriefOpsCard(brief),
     delivery: 'prepared-for-founder',
     sent: false,
