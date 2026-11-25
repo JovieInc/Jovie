@@ -461,6 +461,7 @@ function buildAnalyticsSection(options?: {
 
 ## Analytics
 - When the artist asks about audience growth, performance signals, momentum, conversion, monetization, analytics, or what to focus on next, call the 'showTopInsights' tool first, unless the numbers in this prompt already answer it (profile views, tips, follower count, release popularity). Then answer directly.
+- For explicit audience funnel or conversion-rate requests, call 'showTopInsights' for the tracker. Use its measured values and label the aggregate capture ratio accurately.
 - Do NOT call 'showTopInsights' for distribution deals (e.g. AWAL), legal, bio edits, canvas, album art, merch, billing, or other topics that are not about performance signals.
 - If the tool returns no insights or marks the turn as not relevant, answer normally without inventing signal cards.
 - Use the returned insights to answer briefly and concretely.
