@@ -659,25 +659,27 @@ esac
       }
       if (url.includes('/actions/runs/41/jobs?') && url.includes('page=2')) {
         return jsonResponse({
-          total_count: 102,
+          total_count: 101,
           jobs: [
             {
               name: mergeSuiteScopeJobName(MERGE_SUITE_SCOPE_ORDINARY),
               status: 'completed',
               conclusion: 'success',
             },
-            { name: 'PR Ready', status: 'completed', conclusion: 'success' },
           ],
         });
       }
       if (url.includes('/actions/runs/41/jobs?')) {
         return jsonResponse({
-          total_count: 102,
-          jobs: Array.from({ length: RUN_JOBS_PAGE_SIZE }, (_, i) => ({
-            name: `Unit Tests (${i + 1}/10)`,
-            status: 'completed',
-            conclusion: 'success',
-          })),
+          total_count: 101,
+          jobs: [
+            { name: 'PR Ready', status: 'completed', conclusion: 'success' },
+            ...Array.from({ length: RUN_JOBS_PAGE_SIZE - 1 }, (_, i) => ({
+              name: `Unit Tests (${i + 1}/10)`,
+              status: 'completed',
+              conclusion: 'success',
+            })),
+          ],
         });
       }
       throw new Error(`Unexpected URL: ${url}`);
