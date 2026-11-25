@@ -5,6 +5,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { readExactGithubListing } from './exact-github-listing.mjs';
 import { classifyProductLanes } from './product-lane-classifier.mjs';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
@@ -364,19 +365,6 @@ function ghJson(endpoint) {
   return JSON.parse(run('gh', ['api', endpoint]));
 }
 
-function exactListing(payload, label, key) {
-  if (
-    !payload ||
-    typeof payload !== 'object' ||
-    !Number.isSafeInteger(payload.total_count) ||
-    !Array.isArray(payload[key]) ||
-    payload.total_count !== payload[key].length
-  ) {
-    throw new Error(`GitHub returned an incomplete ${label} listing`);
-  }
-  return payload[key];
-}
-
 function downloadFinalReceipt(repository, artifactId) {
   const root = mkdtempSync(join(tmpdir(), 'jovie-product-lane-evidence-'));
   const archive = join(root, 'artifact.zip');
@@ -464,20 +452,18 @@ function discoverExactCiReceiptCandidates({
     );
     for (const runRecord of listing.workflow_runs ?? []) {
       if (!validateRun(runRecord, repository, sha, event)) continue;
-      const jobs = exactListing(
-        ghJsonImpl(
-          `repos/${repository}/actions/runs/${runRecord.id}/attempts/${runRecord.run_attempt}/jobs?per_page=100`
-        ),
-        'exact CI jobs',
-        'jobs'
+      const jobs = readExactGithubListing(
+        ghJsonImpl,
+        `repos/${repository}/actions/runs/${runRecord.id}/attempts/${runRecord.run_attempt}/jobs`,
+        'jobs',
+        'exact CI jobs'
       );
       if (!hasExactGate(jobs, runRecord, sha, gateName)) continue;
-      const artifacts = exactListing(
-        ghJsonImpl(
-          `repos/${repository}/actions/runs/${runRecord.id}/artifacts?per_page=100`
-        ),
-        'exact CI artifacts',
-        'artifacts'
+      const artifacts = readExactGithubListing(
+        ghJsonImpl,
+        `repos/${repository}/actions/runs/${runRecord.id}/artifacts`,
+        'artifacts',
+        'exact CI artifacts'
       );
       const expectedName = `product-lane-final-${sha}-${runRecord.run_attempt}`;
       const matchingArtifacts = artifacts.filter(
