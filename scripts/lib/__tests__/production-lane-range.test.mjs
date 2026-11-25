@@ -22,6 +22,17 @@ import {
 } from '../production-lane-range.mjs';
 
 const sha = character => character.repeat(40);
+function exactHistoryJob(run) {
+  return {
+    id: run.id + 300,
+    name: run.event === 'push' ? 'Main Release Ready' : 'PR Ready',
+    run_id: run.id,
+    run_attempt: run.run_attempt,
+    head_sha: run.head_sha,
+    status: 'completed',
+    conclusion: 'success',
+  };
+}
 const testDir = dirname(fileURLToPath(import.meta.url));
 const productionController = readFileSync(
   resolve(testDir, '../../../.github/workflows/production-controller.yml'),
@@ -338,17 +349,7 @@ describe('production lane range', () => {
       if (endpoint.includes('/jobs?')) {
         return {
           total_count: 1,
-          jobs: [
-            {
-              id: 301,
-              name: 'PR Ready',
-              run_id: runId,
-              run_attempt: runAttempt,
-              head_sha: evidenceSha,
-              status: 'completed',
-              conclusion: 'success',
-            },
-          ],
+          jobs: [exactHistoryJob(runRecord)],
         };
       }
       if (endpoint.includes('/artifacts?')) {
@@ -439,18 +440,7 @@ describe('production lane range', () => {
           if (endpoint.includes('/jobs?'))
             return {
               total_count: 1,
-              jobs: [
-                {
-                  id: run.id + 300,
-                  name:
-                    run.event === 'push' ? 'Main Release Ready' : 'PR Ready',
-                  run_id: run.id,
-                  run_attempt: 1,
-                  head_sha: evidenceSha,
-                  status: 'completed',
-                  conclusion: 'success',
-                },
-              ],
+              jobs: [exactHistoryJob(run)],
             };
           if (endpoint.includes('/artifacts?'))
             return {
@@ -734,17 +724,7 @@ describe('range Web evidence carryover', () => {
         if (endpoint.includes('/jobs?'))
           return {
             total_count: 1,
-            jobs: [
-              {
-                id: run.id + 300,
-                name: run.event === 'push' ? 'Main Release Ready' : 'PR Ready',
-                run_id: run.id,
-                run_attempt: run.run_attempt,
-                head_sha: run.head_sha,
-                status: 'completed',
-                conclusion: 'success',
-              },
-            ],
+            jobs: [exactHistoryJob(run)],
           };
         if (endpoint.includes('/artifacts?'))
           return {

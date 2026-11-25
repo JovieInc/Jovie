@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 const PAGE_SIZE = 100;
@@ -44,27 +44,21 @@ if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
-  const [repository, runId, attempt] = process.argv.slice(2);
   try {
-    if (
-      !/^[\w.-]+\/[\w.-]+$/.test(repository ?? '') ||
-      !/^[1-9]\d*$/.test(runId ?? '') ||
-      !/^[1-9]\d*$/.test(attempt ?? '')
-    ) {
-      throw new Error('Expected repository, exact CI run ID and attempt');
+    const pages = JSON.parse(readFileSync(0, 'utf8'));
+    if (!Array.isArray(pages)) {
+      throw new Error('Expected paginated exact CI job evidence');
     }
+    let index = 0;
     const jobs = readExactGithubListing(
-      endpoint =>
-        JSON.parse(
-          execFileSync('gh', ['api', endpoint], {
-            encoding: 'utf8',
-            maxBuffer: 16 * 1024 * 1024,
-          })
-        ),
-      `repos/${repository}/actions/runs/${runId}/attempts/${attempt}/jobs`,
+      () => pages[index++],
+      '',
       'jobs',
       'exact CI jobs'
     );
+    if (index !== pages.length) {
+      throw new Error('GitHub returned unexpected extra CI job pages');
+    }
     process.stdout.write(JSON.stringify({ total_count: jobs.length, jobs }));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));

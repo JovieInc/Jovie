@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import test from 'node:test';
+import { readExactGithubListing } from './lib/exact-github-listing.mjs';
 
 const { load } = createRequire(import.meta.url)('js-yaml');
 const root = resolve(import.meta.dirname, '..');
@@ -55,4 +57,69 @@ test('heal-interrupted-marker is the only controller job still on github.token',
     )
     .map(([name]) => name);
   assert.deepEqual(holders, ['heal-interrupted-marker']);
+});
+
+const jobsEndpoint = 'repos/JovieInc/Jovie/actions/runs/42/attempts/3/jobs';
+const firstPage = {
+  total_count: 102,
+  jobs: Array.from({ length: 100 }, (_, index) => ({ id: index + 1 })),
+};
+const secondPage = {
+  total_count: 102,
+  jobs: [{ id: 101 }, { id: 102, name: 'Main Release Ready' }],
+};
+
+test('exact evidence reads both pages of the same CI attempt', () => {
+  const calls = [];
+  const jobs = readExactGithubListing(
+    endpoint => {
+      calls.push(endpoint);
+      return calls.length === 1 ? firstPage : secondPage;
+    },
+    jobsEndpoint,
+    'jobs',
+    'CI jobs'
+  );
+  assert.deepEqual(calls, [
+    `${jobsEndpoint}?per_page=100`,
+    `${jobsEndpoint}?per_page=100&page=2`,
+  ]);
+  assert.deepEqual(jobs, [...firstPage.jobs, ...secondPage.jobs]);
+});
+
+test('controller normalizes only complete exact CI job evidence', () => {
+  const reader = wf.jobs['authorize-production'].steps.find(
+    step => step.id === 'authorize'
+  );
+  assert.match(
+    reader.run,
+    /gh api --paginate --slurp[\s\S]*?attempts\/\$source_run_attempt\/jobs\?per_page=100[\s\S]*?node scripts\/lib\/exact-github-listing\.mjs/
+  );
+  const parse = pages =>
+    spawnSync(
+      process.execPath,
+      [resolve(root, 'scripts/lib/exact-github-listing.mjs')],
+      {
+        input: JSON.stringify(pages),
+        encoding: 'utf8',
+      }
+    );
+  const result = parse([firstPage, secondPage]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), {
+    total_count: 102,
+    jobs: [...firstPage.jobs, ...secondPage.jobs],
+  });
+  const invalid = [
+    [firstPage],
+    [firstPage, { ...secondPage, jobs: [{ id: 101 }] }],
+    [firstPage, { ...secondPage, total_count: 103 }],
+    [firstPage, { ...secondPage, jobs: [{ id: 100 }, { id: 102 }] }],
+    [firstPage, secondPage, secondPage],
+  ];
+  for (const pages of invalid) {
+    const rejected = parse(pages);
+    assert.equal(rejected.status, 1, rejected.stderr);
+    assert.equal(rejected.stdout, '');
+  }
 });
