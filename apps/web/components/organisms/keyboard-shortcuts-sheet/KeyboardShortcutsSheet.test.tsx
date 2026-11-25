@@ -69,7 +69,7 @@ describe('KeyboardShortcutsSheet', () => {
     expect(screen.getByText('Go to operator inbox')).toBeInTheDocument();
     expect(screen.getByText('Go to shipping')).toBeInTheDocument();
     expect(screen.getByText('Go to fleet')).toBeInTheDocument();
-    expect(screen.getByText('Go to capacity')).toBeInTheDocument();
+    expect(screen.getByText('Go to costs')).toBeInTheDocument();
     expect(screen.queryByText('Go to contacts')).not.toBeInTheDocument();
     expect(screen.getByText('Open command menu')).toBeInTheDocument();
   });

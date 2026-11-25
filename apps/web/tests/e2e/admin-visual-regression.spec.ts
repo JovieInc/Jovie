@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Locator, test } from '@playwright/test';
 import {
   ensureSignedInUser,
   getAdminCredentials,
@@ -424,6 +424,28 @@ const CAPTURE_ALLOWED_COPY: Readonly<Record<string, readonly RegExp[]>> = {
   'share-studio': [/when native file\s+share is unavailable/i],
 };
 
+async function expectOvieRouteControls(root: Locator, id: string) {
+  if (id === 'shipping') {
+    const history = root.getByRole('region', { name: 'Source Merge History' });
+    const work = root.getByTestId('shipping-matrix');
+    await expect(history).toBeVisible();
+    await expect(work).toBeVisible();
+    expect((await history.boundingBox())?.y).toBeLessThan(
+      (await work.boundingBox())?.y ?? 0
+    );
+  }
+  if (id === 'costs') {
+    const capacity = root.getByRole('link', { name: 'View capacity' });
+    await expect(capacity).toBeVisible();
+    await expect(capacity).toHaveAttribute('href', '/app/ov/capacity');
+  }
+  if (id === 'inbox') {
+    const inbox = root.getByTestId('ovie-inbox');
+    await expect(inbox.getByRole('heading', { name: 'Inbox' })).toHaveCount(0);
+    await expect(inbox.getByRole('button', { name: 'Refresh' })).toBeVisible();
+  }
+}
+
 test.describe('admin visual regression', () => {
   test.beforeEach(async ({ page }) => {
     test.skip(!hasAdminCredentials(), 'Admin auth not available');
@@ -441,6 +463,7 @@ test.describe('admin visual regression', () => {
   for (const surface of ADMIN_RENDER_SURFACES) {
     test(`${surface.name} desktop`, async ({ page }) => {
       const root = await openSurface(page, surface, DESKTOP_VIEWPORT);
+      await expectOvieRouteControls(root, surface.id);
       const locator = surface.snapshotAccordion
         ? await openedAccordion(page, surface.snapshotAccordion)
         : root;
@@ -457,6 +480,7 @@ test.describe('admin visual regression', () => {
   for (const surface of ADMIN_MOBILE_SNAPSHOT_SURFACES) {
     test(`${surface.name} mobile`, async ({ page }) => {
       const locator = await openSurface(page, surface, MOBILE_VIEWPORT);
+      await expectOvieRouteControls(locator, surface.id);
 
       await expectCaptureReady(locator, {
         allowCopy: CAPTURE_ALLOWED_COPY[surface.id],

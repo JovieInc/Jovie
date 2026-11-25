@@ -5,6 +5,7 @@ import { PlainButton } from '@jovie/ui';
 import { ChevronRight, ExternalLink, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { OVIE_METRIC_ANCHORS } from '@/constants/routes';
 import {
   type CompanyMetricState,
   deriveOvieCompanyOverview,
@@ -83,8 +84,9 @@ export function OvieCeoOverview({
 
   return (
     <ContentSurfaceCard
+      id={OVIE_METRIC_ANCHORS.companyNow}
       surface='default'
-      className='overflow-hidden'
+      className='scroll-mt-4 overflow-hidden'
       data-testid='ovie-ceo-overview'
     >
       <div className='border-b border-subtle px-4 py-3 sm:px-5'>

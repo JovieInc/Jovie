@@ -47,7 +47,13 @@ function useNowMinute(): number {
   return now;
 }
 
-export function OvieInbox({ caseId }: { readonly caseId?: string }) {
+export function OvieInbox({
+  caseId,
+  showHeading = true,
+}: {
+  readonly caseId?: string;
+  readonly showHeading?: boolean;
+}) {
   const [captureOpen, setCaptureOpen] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const now = useNowMinute();
@@ -85,12 +91,15 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
         className='flex h-64 flex-col overflow-hidden p-4'
       >
         <div className='flex shrink-0 items-center justify-between gap-3'>
-          <h2 className='whitespace-nowrap text-sm font-semibold text-primary-token'>
-            Inbox
-          </h2>
+          {showHeading ? (
+            <h2 className='whitespace-nowrap text-sm font-semibold text-primary-token'>
+              Inbox
+            </h2>
+          ) : null}
           <DrawerButton
             type='button'
             tone='secondary'
+            className='ml-auto'
             disabled={busy}
             onClick={refresh}
           >

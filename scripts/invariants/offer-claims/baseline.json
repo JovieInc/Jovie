@@ -115,9 +115,6 @@
     "billing_claim": 1,
     "plan_price": 1
   },
-  "apps/web/constants/admin-navigation.ts": {
-    "trial_claim": 1
-  },
   "apps/web/content/legal/terms.md": {
     "billing_claim": 2,
     "trial_claim": 3,

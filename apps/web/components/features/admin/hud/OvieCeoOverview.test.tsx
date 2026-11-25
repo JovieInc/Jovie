@@ -44,6 +44,10 @@ describe('OvieCeoOverview certificate', () => {
   it('renders the company metrics axe-clean', async () => {
     const { container } = render(<OvieCeoOverview metrics={buildMetrics()} />);
     expect(screen.getByTestId('ovie-ceo-overview')).toBeVisible();
+    expect(screen.getByTestId('ovie-ceo-overview')).toHaveAttribute(
+      'id',
+      'company-now'
+    );
     expect(screen.getByText('Company Now')).toBeVisible();
     await expectNoA11yViolations(container);
   });

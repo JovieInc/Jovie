@@ -19,17 +19,20 @@ const {
 vi.mock('@/components/features/admin/layout/AdminPage', () => ({
   AdminPage: ({
     children,
+    actions,
     title,
     description,
     testId,
   }: {
     children: ReactNode;
+    actions?: ReactNode;
     title: string;
     description: string;
     testId: string;
   }) => (
     <section data-testid={testId} data-page-title={title}>
       <p>{description}</p>
+      {actions}
       {children}
     </section>
   ),
@@ -110,6 +113,10 @@ describe('AdminCostsPage', () => {
     expect(
       screen.queryByRole('heading', { name: 'Costs' })
     ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View capacity' })).toHaveAttribute(
+      'href',
+      '/app/ov/capacity'
+    );
     expect(mockCaptureError).toHaveBeenCalledWith(
       'Admin costs page failed to load cost items',
       expect.any(Error),

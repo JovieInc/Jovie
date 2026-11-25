@@ -27,7 +27,7 @@ export default async function InboxPage({
   return (
     <AdminPage title='Operator Inbox' testId='founder-inbox-page'>
       {pilotEnabled ? <ReviewInboxPilotWorkbench /> : null}
-      {reviewItem ? null : <OvieInbox caseId={caseId} />}
+      {reviewItem ? null : <OvieInbox caseId={caseId} showHeading={false} />}
     </AdminPage>
   );
 }

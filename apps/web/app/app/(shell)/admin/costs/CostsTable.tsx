@@ -127,7 +127,7 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
           cell: info => info.getValue(),
         }),
         columnHelper.accessor('externalUrl', {
-          header: '',
+          header: () => <span className='sr-only'>Provider dashboard</span>,
           cell: info => {
             const url = info.getValue();
             if (!url) return null;
