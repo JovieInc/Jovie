@@ -602,8 +602,8 @@ jobs:
             source_run_id="$TRIGGER_RUN_ID"
             source_run_attempt="$TRIGGER_RUN_ATTEMPT"
 
-            jobs_json="$(gh api \
-              "repos/$REPOSITORY/actions/runs/$source_run_id/attempts/$source_run_attempt/jobs?per_page=100")"
+            jobs_json="$(node scripts/lib/exact-github-listing.mjs \
+              "$REPOSITORY" "$source_run_id" "$source_run_attempt")"
             jq -e '
               type == "object" and
               (.total_count | type == "number") and

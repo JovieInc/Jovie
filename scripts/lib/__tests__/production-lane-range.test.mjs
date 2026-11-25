@@ -340,6 +340,7 @@ describe('production lane range', () => {
           total_count: 1,
           jobs: [
             {
+              id: 301,
               name: 'PR Ready',
               run_id: runId,
               run_attempt: runAttempt,
@@ -440,6 +441,7 @@ describe('production lane range', () => {
               total_count: 1,
               jobs: [
                 {
+                  id: run.id + 300,
                   name:
                     run.event === 'push' ? 'Main Release Ready' : 'PR Ready',
                   run_id: run.id,
@@ -734,6 +736,7 @@ describe('range Web evidence carryover', () => {
             total_count: 1,
             jobs: [
               {
+                id: run.id + 300,
                 name: run.event === 'push' ? 'Main Release Ready' : 'PR Ready',
                 run_id: run.id,
                 run_attempt: run.run_attempt,
