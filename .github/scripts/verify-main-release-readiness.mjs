@@ -266,6 +266,40 @@ async function githubApi(
   }
 }
 
+export const RUN_JOBS_PAGE_SIZE = 100;
+export const RUN_JOBS_MAX_PAGES = 10;
+
+/**
+ * Page through a run's complete job list. Merge-group CI runs now exceed
+ * 100 jobs, and the proof jobs (PR Ready, Merge Suite Scope) can land on
+ * page 2; reading one page silently misses them and re-proves nothing, or
+ * worse resolves an unscoped run as legacy. Shares the caller's rest
+ * options and deadline. The page-1 URL stays byte-identical to the
+ * historical single-page read so its rate-limit diagnostics do not move.
+ * @param {string} repository
+ * @param {number | string} runId
+ * @param {{ token: string, apiUrl: string, fetchImpl: typeof fetch, now: () => number, sleep: (ms: number) => Promise<void>, deadlineMs: number }} rest
+ * @returns {Promise<Array<Record<string, unknown>>>}
+ */
+export async function listAllRunJobs(repository, runId, rest) {
+  const basePath = `/repos/${repository}/actions/runs/${runId}/jobs?filter=latest&per_page=${RUN_JOBS_PAGE_SIZE}`;
+  const jobs = [];
+  for (let page = 1; page <= RUN_JOBS_MAX_PAGES; page += 1) {
+    const payload = await githubApi(
+      page === 1 ? basePath : `${basePath}&page=${page}`,
+      rest
+    );
+    const pageJobs = payload.jobs ?? [];
+    jobs.push(...pageJobs);
+    if (pageJobs.length < RUN_JOBS_PAGE_SIZE) return jobs;
+    const totalCount = Number(payload.total_count);
+    if (Number.isFinite(totalCount) && jobs.length >= totalCount) return jobs;
+  }
+  throw new Error(
+    `GitHub API run ${runId} lists more than ${RUN_JOBS_MAX_PAGES} pages of jobs; refusing a partial proof.`
+  );
+}
+
 function runProcess(command, args, env) {
   return new Promise(resolve => {
     const child = spawn(command, args, {
@@ -364,11 +398,8 @@ export async function findExactQueueProof({
   for (const run of exactRuns) {
     // Run 38869365703 failed this jobs list on an installation 403 whose
     // reset was outside a 90s budget. The shared deadline can wait that out.
-    const jobsPayload = await githubApi(
-      `/repos/${repository}/actions/runs/${run.id}/jobs?filter=latest&per_page=100`,
-      rest
-    );
-    jobsByRun.set(run.id, jobsPayload.jobs ?? []);
+    // Runs exceed 100 jobs, so every page must be read before deciding.
+    jobsByRun.set(run.id, await listAllRunJobs(repository, run.id, rest));
   }
 
   const proven = hasExactSuccessfulMergeGroupProof({

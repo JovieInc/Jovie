@@ -20,6 +20,7 @@ import {
   mergeSuiteScopeJobName,
   PROVENANCE_JOB_TIMEOUT_MINUTES,
   planGitHubRestHold,
+  RUN_JOBS_PAGE_SIZE,
   resolveMainSha,
   resolveMergeSuiteScope,
   restHoldBudgetMs,
@@ -592,6 +593,209 @@ esac
     expect(described.line).toContain('not a pass');
     expect(described.line).not.toContain('queue_proven=true');
     expect(described.line).not.toContain('queueProven=true');
+  });
+
+  it('finds a page-2 PR Ready in a 103-job merge-group run', async () => {
+    const calls = [];
+    const filler = n => ({
+      name: `Unit Tests (${n}/10)`,
+      status: 'completed',
+      conclusion: 'success',
+    });
+    const fetchImpl = async url => {
+      calls.push(String(url));
+      if (url.includes('/actions/workflows/ci.yml/runs?')) {
+        return jsonResponse({ workflow_runs: [exactSuccessfulRun()] });
+      }
+      if (
+        url.includes('/actions/runs/41/jobs?filter=latest&per_page=100&page=2')
+      ) {
+        return jsonResponse({
+          total_count: 103,
+          jobs: [
+            filler(101),
+            { name: 'PR Ready', status: 'completed', conclusion: 'success' },
+            {
+              name: mergeSuiteScopeJobName(MERGE_SUITE_SCOPE_FULL),
+              status: 'completed',
+              conclusion: 'success',
+            },
+          ],
+        });
+      }
+      if (url.includes('/actions/runs/41/jobs?filter=latest&per_page=100')) {
+        return jsonResponse({
+          total_count: 103,
+          jobs: Array.from({ length: RUN_JOBS_PAGE_SIZE }, (_, i) =>
+            filler(i + 1)
+          ),
+        });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    await expect(
+      findExactQueueProof({
+        repository: 'JovieInc/Jovie',
+        sha: SHA,
+        token: 'token',
+        apiUrl: 'https://api.github.test',
+        fetchImpl,
+      })
+    ).resolves.toEqual({ proven: true, runId: 41 });
+    expect(calls).toHaveLength(3);
+    expect(calls[1]).toBe(
+      'https://api.github.test/repos/JovieInc/Jovie/actions/runs/41/jobs?filter=latest&per_page=100'
+    );
+    expect(calls[2]).toBe(
+      'https://api.github.test/repos/JovieInc/Jovie/actions/runs/41/jobs?filter=latest&per_page=100&page=2'
+    );
+  });
+
+  it('refuses to skip when the ordinary scope job lands on page 2', async () => {
+    const fetchImpl = async url => {
+      if (url.includes('/actions/workflows/ci.yml/runs?')) {
+        return jsonResponse({ workflow_runs: [exactSuccessfulRun()] });
+      }
+      if (url.includes('/actions/runs/41/jobs?') && url.includes('page=2')) {
+        return jsonResponse({
+          total_count: 102,
+          jobs: [
+            {
+              name: mergeSuiteScopeJobName(MERGE_SUITE_SCOPE_ORDINARY),
+              status: 'completed',
+              conclusion: 'success',
+            },
+            { name: 'PR Ready', status: 'completed', conclusion: 'success' },
+          ],
+        });
+      }
+      if (url.includes('/actions/runs/41/jobs?')) {
+        return jsonResponse({
+          total_count: 102,
+          jobs: Array.from({ length: RUN_JOBS_PAGE_SIZE }, (_, i) => ({
+            name: `Unit Tests (${i + 1}/10)`,
+            status: 'completed',
+            conclusion: 'success',
+          })),
+        });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    await expect(
+      findExactQueueProof({
+        repository: 'JovieInc/Jovie',
+        sha: SHA,
+        token: 'token',
+        apiUrl: 'https://api.github.test',
+        fetchImpl,
+      })
+    ).resolves.toEqual({ proven: false, runId: 41 });
+  });
+
+  it('refuses a partial proof instead of deciding past the page cap', async () => {
+    const fetchImpl = async url => {
+      if (url.includes('/actions/workflows/ci.yml/runs?')) {
+        return jsonResponse({ workflow_runs: [exactSuccessfulRun()] });
+      }
+      if (url.includes('/actions/runs/41/jobs?')) {
+        return jsonResponse({
+          total_count: 5000,
+          jobs: Array.from({ length: RUN_JOBS_PAGE_SIZE }, (_, i) => ({
+            name: `Job ${i}`,
+            status: 'completed',
+            conclusion: 'success',
+          })),
+        });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    await expect(
+      findExactQueueProof({
+        repository: 'JovieInc/Jovie',
+        sha: SHA,
+        token: 'token',
+        apiUrl: 'https://api.github.test',
+        fetchImpl,
+      })
+    ).rejects.toThrow(/refusing a partial proof/);
+  });
+
+  it('keeps a page-2 rate limit on the jobs list a rate_limit_hold', async () => {
+    const limited = {
+      ok: false,
+      status: 403,
+      headers: {
+        get(name) {
+          if (name === 'x-ratelimit-remaining') return '0';
+          if (name === 'x-ratelimit-reset') return '999999';
+          return null;
+        },
+      },
+      async text() {
+        return '{"message":"API rate limit exceeded for installation ID 123"}';
+      },
+    };
+    const fetchImpl = async url => {
+      if (url.includes('/actions/workflows/ci.yml/runs?')) {
+        return jsonResponse({ workflow_runs: [exactSuccessfulRun()] });
+      }
+      if (url.includes('/actions/runs/41/jobs?') && url.includes('page=2')) {
+        return limited;
+      }
+      if (url.includes('/actions/runs/41/jobs?')) {
+        return jsonResponse({
+          total_count: 101,
+          jobs: Array.from({ length: RUN_JOBS_PAGE_SIZE }, (_, i) => ({
+            name: `Unit Tests (${i + 1}/10)`,
+            status: 'completed',
+            conclusion: 'success',
+          })),
+        });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+
+    await expect(
+      checkMainQueueProvenance({
+        repository: 'JovieInc/Jovie',
+        sha: SHA,
+        token: 'token',
+        apiUrl: 'https://api.github.test',
+        fetchImpl: /** @type {any} */ (fetchImpl),
+        resolveMain: async () => SHA,
+        now: () => 0,
+        sleep: async () => {
+          throw new Error('slept');
+        },
+        budgetMs: 1_000,
+      })
+    ).resolves.toMatchObject({
+      isCurrent: true,
+      queueProven: false,
+      proofRunId: null,
+      disposition: 'rate_limit_hold',
+    });
+  });
+
+  it('keeps every /jobs read inside listAllRunJobs', () => {
+    const source = readFileSync(
+      new URL(
+        '../../../.github/scripts/verify-main-release-readiness.mjs',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    const start = source.indexOf('export async function listAllRunJobs');
+    expect(start).toBeGreaterThan(0);
+    const end = source.indexOf('function runProcess(', start);
+    expect(end).toBeGreaterThan(start);
+    const outside = `${source.slice(0, start)}${source.slice(end)}`
+      .split('\n')
+      .filter(line => line.includes('githubApi(') && line.includes('/jobs'));
+    expect(outside).toEqual([]);
   });
 
   it('keeps a permission 403 and a missing reset fatal', async () => {
