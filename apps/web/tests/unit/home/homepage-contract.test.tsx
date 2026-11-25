@@ -191,22 +191,14 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     }
   });
 
-  it('leads the hero with what listeners open, not the back office', async () => {
+  it('links the featured release from the real homepage entry point', async () => {
     const { container } = await renderHomePage();
-    const hero = container.querySelector('.hv3-hero');
-    // The lifted panel is the release page a listener opens; the metadata
-    // inspector stays in 03 specs.
-    expect(hero?.querySelector('.hv3-lift--page .hv3-rp')).not.toBeNull();
-    expect(hero?.querySelector('.hv3-insp')).toBeNull();
+    const hero = within(screen.getByTestId('marketing-section-hero'));
+    expect(
+      hero.getByRole('link', { name: 'Open release page for Supernova Girl' })
+    ).toHaveAttribute('href', 'https://jov.ie/tim/supernova-girl');
+    expect(hero.queryByText('Search chats')).toBeNull();
     expect(container.querySelector('#specs .hv3-insp')).not.toBeNull();
-    // No callout here: any label beside the page crosses the release list
-    // or the box's frame guide, so the selected row and its page speak alone.
-    expect(hero?.querySelector('.hv3-callout')).toBeNull();
-    // The masked lift drops outer shadows, so the page keeps an inner edge.
-    expect(read('components/homepage/v3/chapters.css')).toMatch(
-      /\.hv3-phone\.hv3-phone--hero\s*\{[^}]*box-shadow: inset 0 0 0 1px var\(--hv3-b2\);/
-    );
-    // One anchor per id, so each connector finds its own phone.
     const ids = [...container.querySelectorAll('[data-hv3-anchor]')].map(node =>
       node.getAttribute('data-hv3-anchor')
     );
@@ -445,21 +437,7 @@ describe('homepage contract', { timeout: 60_000 }, () => {
       /\.hv3-frame\s*\{\s*margin-inline: calc\(var\(--hv3-side\) \/ var\(--hv3-z\)\);/
     );
     expect(chapters).toMatch(
-      /\.hv3-stage--hero\s*\{[^}]*right: calc\(var\(--hv3-side\) \/ var\(--hv3-z\)\);\s*left: calc\(var\(--hv3-side\) \/ var\(--hv3-z\)\);/
-    );
-    for (const rig of ['hero', 'releases']) {
-      expect(chapters).toMatch(
-        new RegExp(
-          `\\.hv3-rig--${rig}\\s*\\{[^}]*left: 0;\\s*width: var\\(--hv3-box\\);`
-        )
-      );
-    }
-    // The hero rig scales from its top-left corner, so the 390 crop keeps the
-    // approved window region (the list, not the inspector) only with the
-    // offset recomputed for that origin.
-    expect(chapters).toMatch(/\.hv3-rig--hero\s*\{[^}]*transform-origin: 0 0;/);
-    expect(v3[5]).toMatch(
-      /\.hv3-rig--hero\s*\{[^}]*left: calc\(-9\.705rem - var\(--hv3-gutter\)\);[^}]*scale\(0\.72\)/
+      /\.hv3-rig--releases\s*\{[^}]*left: 0;\s*width: var\(--hv3-box\);/
     );
     // The nav's backing runs edge to edge once scrolled.
     expect(strip('components/homepage/v3/form.css')).toMatch(

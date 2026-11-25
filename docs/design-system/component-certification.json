@@ -2234,6 +2234,7 @@
     },
     "apps/web/components/homepage/HomepageEditorial.tsx": {
       "empty": "Every list in the chapters (chapter index, profile rows, release captions, invite steps) maps over typed copy checked into data/homepageEditorialCopy.ts and is never fetched, so none can be empty; the detector matched those .map( calls.",
+      "loading": "The release proof is rendered with the homepage from a checked-in catalog record. Its artwork has a reserved square, and both the release and claim links are available while the browser loads the image. The eager image attribute does not introduce a component loading state.",
       "partial": "Each chapter takes one complete copy object whose fields are all required strings (HeroCopy maps every key to string; chapter copy needs headline and body), defaulting to HOMEPAGE_EDITORIAL_COPY, so a chapter cannot render with part of its copy. The detector counted the optional copy and headingId props.",
       "permission-denied": "The homepage chapters are public marketing with no gated action; whether an invite is granted is decided after the request, outside this component. The detector matched role='img' on the product mockups and the word locked in a comment."
     },

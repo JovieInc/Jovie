@@ -4,6 +4,10 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  DEMO_ARTIST_IVO_LINDQVIST,
+  HOMEPAGE_FEATURED_ARTIST,
+} from '@/data/demoArtists';
+import {
   HOMEPAGE_EDITORIAL_COPY,
   HOMEPAGE_INVITE_ANCHOR,
 } from '@/data/homepageEditorialCopy';
@@ -82,22 +86,43 @@ describe('HomepageEditorial chapters', () => {
       'href',
       COPY.hero.secondaryHref
     );
-    expect(
-      screen.getByRole('img', { name: COPY.hero.windowLabel })
-    ).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 
-  it('shows the selected release page beside the app, with no label across the list', () => {
-    const { container } = render(<HomepageStoryHero />);
+  it('shows approved catalog art and a direct link to the real release page', () => {
+    render(<HomepageStoryHero />);
 
-    const page = container.querySelector('.hv3-lift--page');
-    expect(page).toHaveAttribute('aria-hidden', 'true');
-    expect(page?.querySelector('[data-hv3-anchor="htitle"]')).not.toBeNull();
+    const proof = within(screen.getByTestId('homepage-release-proof'));
     expect(
-      container.querySelector('.hv3-stage--hero [data-hv3-callout]')
-    ).toBeNull();
-    expect(container.querySelector('.hv3-lift--inspector')).toBeNull();
+      proof.getByRole('img', { name: 'Supernova Girl artwork' })
+    ).toHaveAttribute('src', '/img/releases/supernova-girl.webp');
+    expect(proof.getByText('Tim White')).toBeVisible();
+    expect(
+      proof.getAllByRole('listitem').map(item => item.textContent)
+    ).toEqual(['Spotify', 'Apple Music', 'Deezer']);
+    expect(
+      proof.getByRole('link', { name: 'Open release page for Supernova Girl' })
+    ).toHaveAttribute('href', 'https://jov.ie/tim/supernova-girl');
+    expect(proof.getAllByRole('link')).toHaveLength(1);
+  });
+
+  it.each([
+    DEMO_ARTIST_IVO_LINDQVIST,
+    {
+      ...HOMEPAGE_FEATURED_ARTIST,
+      inspected: {
+        ...HOMEPAGE_FEATURED_ARTIST.inspected,
+        publicPage: undefined,
+      },
+    },
+  ])('omits live release proof without a real public page', featuredArtist => {
+    render(<HomepageStoryHero featuredArtist={featuredArtist} />);
+
+    expect(screen.queryByTestId('homepage-release-proof')).toBeNull();
+    expect(screen.getByTestId('homepage-primary-cta')).toHaveAttribute(
+      'href',
+      getClaimProfileIntent().href
+    );
   });
 
   it('indexes every chapter and reaches the hero actions by keyboard', async () => {
@@ -120,6 +145,10 @@ describe('HomepageEditorial chapters', () => {
     expect(screen.getByTestId('homepage-primary-cta')).toHaveFocus();
     await user.tab();
     expect(screen.getByTestId('homepage-hero-live-profile')).toHaveFocus();
+    await user.tab();
+    expect(
+      screen.getByRole('link', { name: 'Open release page for Supernova Girl' })
+    ).toHaveFocus();
   });
 
   it('renders the profile chapter with its rows as a description list', async () => {

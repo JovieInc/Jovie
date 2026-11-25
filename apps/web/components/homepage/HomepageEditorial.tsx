@@ -3,8 +3,13 @@ import { Button, Input } from '@jovie/ui';
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { Fragment, type ReactNode } from 'react';
+import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
+import { DspServiceIcon } from '@/components/atoms/DspLogo';
 import { WaitlistRoleForm } from '@/components/features/waitlist/WaitlistRoleForm';
 import { HomepageProfilePhone } from '@/components/homepage/HomepageProfilePhone';
+import { ImageryStage } from '@/components/marketing/ImageryStage';
+import { HOMEPAGE_FEATURED_ARTIST } from '@/data/demoArtists';
+import type { FeaturedArtistProfile } from '@/data/featuredArtists';
 import {
   HOMEPAGE_EDITORIAL_COPY,
   HOMEPAGE_HEADLINE_BREAKS,
@@ -20,9 +25,10 @@ import {
   CLAIM_PROFILE_STARTER_PROMPT,
   getClaimProfileIntent,
 } from '@/data/marketingCtaIntents';
+import { getDspDisplayName } from '@/lib/dsp-registry';
 import { HOME_SPEC } from './v3/home-spec';
 import { Orbit } from './v3/Orbit';
-import { AppWindow, CatalogPlate } from './v3/ProductUi';
+import { CatalogPlate } from './v3/ProductUi';
 import { Callout, ReleasePage } from './v3/Surfaces';
 import './v3/stage.css';
 import './v3/product-ui.css';
@@ -76,15 +82,59 @@ function ChapterRule({
   );
 }
 
-/**
- * Hero: the locked line beside the lede and actions, then Jovie for Mac shot
- * straight on, its release page lifted out of the window, standing in one
- * key light from above. No rings or glow blobs: hairline light, edge and shadow only.
- */
+function HomepageReleaseProof({
+  artist,
+}: Readonly<{ artist: FeaturedArtistProfile }>) {
+  const { title, src, publicPage } = artist.inspected;
+  if (artist.demo || !publicPage) return null;
+  const copy = COPY.releaseProof;
+
+  return (
+    <figure className='hv3-release-proof' data-testid='homepage-release-proof'>
+      <ArtworkFrame size='hero' className='hv3-release-proof__art'>
+        <ImageryStage
+          src={src}
+          alt={copy.artworkAlt(title)}
+          width={320}
+          height={320}
+          sizes='(max-width: 1023px) 208px, 272px'
+          loading='eager'
+        />
+      </ArtworkFrame>
+      <figcaption>
+        <p className='hv3-release-proof__title'>{title}</p>
+        <p className='hv3-release-proof__artist'>{artist.name}</p>
+        <ul className='hv3-release-proof__services' aria-label={copy.services}>
+          {publicPage.providers.map(provider => (
+            <li key={provider}>
+              <DspServiceIcon provider={provider} className='size-4 shrink-0' />
+              {getDspDisplayName(provider)}
+            </li>
+          ))}
+        </ul>
+        <Link
+          href={publicPage.href}
+          prefetch={false}
+          className='hv3-btn hv3-btn--ghost hv3-release-proof__link'
+          aria-label={copy.actionName(title)}
+        >
+          {copy.action}
+          <ArrowRight className='size-4' aria-hidden />
+        </Link>
+      </figcaption>
+    </figure>
+  );
+}
+
 export function HomepageStoryHero({
   copy = HOMEPAGE_EDITORIAL_COPY.hero,
   headingId = 'home-hero-heading',
-}: Readonly<{ copy?: HeroCopy; headingId?: string }>) {
+  featuredArtist = HOMEPAGE_FEATURED_ARTIST,
+}: Readonly<{
+  copy?: HeroCopy;
+  headingId?: string;
+  featuredArtist?: FeaturedArtistProfile;
+}>) {
   const primary = resolveHomepageHeroPrimaryAction(copy);
   return (
     <section
@@ -96,14 +146,14 @@ export function HomepageStoryHero({
       aria-labelledby={headingId}
       className='hv3 hv3-hero marketing-hero-dock'
     >
-      <div className='hv3-hero__copy'>
-        <h1
-          id={headingId}
-          className='hv3-display marketing-hero-headline text-balance'
-        >
-          {lines(HOMEPAGE_EDITORIAL_COPY.hero.headline)}
-        </h1>
-        <div className='hv3-hero__side'>
+      <div className='hv3-hero__grid'>
+        <div className='hv3-hero__copy'>
+          <h1
+            id={headingId}
+            className='hv3-display marketing-hero-headline text-balance'
+          >
+            {lines(HOMEPAGE_EDITORIAL_COPY.hero.headline)}
+          </h1>
           <p className='hv3-lede marketing-hero-subtitle'>{copy.subhead}</p>
           <div className='hv3-ctas'>
             <Link
@@ -129,38 +179,7 @@ export function HomepageStoryHero({
             <p className='hv3-mono hv3-hero__note'>{COPY.hero.note}</p>
           ) : null}
         </div>
-      </div>
-      {/* Product mockups under the 3D camera: their boxes overlap by projection,
-          not by layout, so the DOM layout detectors skip them. */}
-      <div
-        className='hv3-stage hv3-stage--hero'
-        data-dom-certification='ignore'
-      >
-        {/* The key light: one Ion wedge from above the frame, falling onto the
-            selected release. The window stands in it; it shows only as haze
-            above the window and as spill below it. */}
-        <div aria-hidden className='hv3-keylight' />
-        <div
-          className='hv3-rig hv3-rig--hero'
-          role='img'
-          aria-label={COPY.hero.windowLabel}
-        >
-          <div className='hv3-window hv3-edge'>
-            <AppWindow />
-            <div className='hv3-sheen' />
-          </div>
-          {/* What a listener gets from the selected row: its release page,
-              on the third column, down to its first listen rows. */}
-          <div
-            aria-hidden
-            className='hv3-lift hv3-lift--page hv3-edge'
-            data-hv3-parallax
-          >
-            <div className='hv3-phone hv3-phone--hero'>
-              <ReleasePage titleAnchor='htitle' />
-            </div>
-          </div>
-        </div>
+        <HomepageReleaseProof artist={featuredArtist} />
       </div>
       <nav className='hv3-index' aria-label={COPY.chaptersLabel}>
         {chapterLabels().map((label, index) => (

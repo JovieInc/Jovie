@@ -2,8 +2,7 @@
    small tablets) and fluid display type in between. */
 
 @media (min-width: 64rem) and (max-width: 89.9375rem) {
-  .hv3-display,
-  .hv3-hero .marketing-hero-headline {
+  .hv3-display {
     font-size: clamp(4rem, 7.78vw, 7rem);
     line-height: 0.9;
   }
@@ -42,8 +41,7 @@
 
 /* Below 1024: the approved 390 composition (stages anchored left). */
 @media (max-width: 63.9375rem) {
-  .hv3-display,
-  .hv3-hero .marketing-hero-headline {
+  .hv3-display {
     font-size: 3.25rem;
     letter-spacing: -0.045em;
     line-height: 3.125rem;
@@ -64,63 +62,26 @@
     padding-bottom: 6rem;
   }
 
-  /* Hero */
-  .hv3-hero {
-    height: 70rem;
-    padding-top: 7.5rem;
+  .hv3-hero .marketing-hero-headline {
+    font-size: clamp(2.625rem, 11vw, 3.25rem);
   }
 
-  .hv3-hero__copy {
-    grid-template-columns: 1fr;
-    row-gap: 1.25rem;
+  .hv3-hero__grid {
+    padding-bottom: 2.5rem;
   }
 
   .hv3-ctas {
-    flex-wrap: wrap;
-    margin-top: 1.5rem;
+    column-gap: 0.75rem;
   }
 
-  /* Each stage is the content box; a mockup wider than a phone is cropped at
-     the box's edges rather than running to the screen's. */
+  /* The remaining product stages crop within their content box. */
   .hv3-stage {
     overflow-x: clip;
-  }
-
-  .hv3-stage--hero {
-    top: 29.375rem;
-    height: 35rem;
-  }
-
-  /* The rig now scales from its top-left corner, so the offset that kept the
-     approved 390 crop (sidebar edge into the list) when it scaled from its
-     top centre gains 39rem x (1 - 0.72) = 10.92rem. */
-  .hv3-rig--hero {
-    top: 0.625rem;
-    left: calc(-9.705rem - var(--hv3-gutter));
-    transform: var(--hv3-cam) scale(0.72);
   }
 
   .hv3-app :is(.hv3-main__search, .hv3-rrow__y, .hv3-rrow__m),
   .hv3-app .hv3-main__cols span:nth-child(3) {
     visibility: hidden;
-  }
-
-  /* The 390 crop shows the sidebar edge into the list: the beam lands there. */
-  .hv3-keylight {
-    top: -12rem;
-    left: 2rem;
-    width: 20rem;
-    height: 40rem;
-  }
-
-  /* The lifted release page lands past the stage's right edge at this crop,
-     where overflow clips it: take it out, so its cover is never fetched. */
-  .hv3-rig--hero .hv3-lift--page {
-    display: none;
-  }
-
-  .hv3-stage--hero .hv3-callout {
-    display: none;
   }
 
   .hv3-index {
@@ -313,24 +274,11 @@
   .hv3-moment__stage {
     zoom: var(--hv3-z);
   }
-
-  /* zoom scales the stage's own offset too; keep it 450px below the top. */
-  .hv3-stage--hero {
-    top: calc(28.125rem / var(--hv3-z));
-  }
-
-  .hv3-hero {
-    height: 83rem;
-  }
 }
 
 @media (min-width: 64rem) and (max-width: 79.9375rem) {
   .hv3 {
     --hv3-z: 0.74;
-  }
-
-  .hv3-hero {
-    height: 72rem;
   }
 
   /* The stages are zoomed to about three quarters here; the air between

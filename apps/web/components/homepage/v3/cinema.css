@@ -4,9 +4,7 @@
  *
  * 1. Horizon: the key light carries across each chapter boundary as a thin
  *    accent hairline over the rule and one small point on it, no wash.
- * 2. Dolly: each chapter's stage travels up into the approved v3 pose as it
- *    enters, and the hero stage sinks back as the page leaves it, so the
- *    sections hand off in depth instead of cutting.
+ * 2. Dolly: the chapter stages travel into the approved v3 pose as they enter.
  *
  * Transform and opacity only, scroll-driven (no script, no scroll hijack).
  * The rest state is the approved v3 frame: under prefers-reduced-motion, in
@@ -58,8 +56,8 @@
 
 /* ── Timeline scope ───────────────────────────────────────────────── */
 
-/* view() binds to the nearest scroll container. overflow: hidden makes the
-   hero and each chapter one (with no scroll range), which would leave the
+/* view() binds to the nearest scroll container. overflow: hidden makes
+   each chapter one (with no scroll range), which would leave the
    dolly and the copy reveals idle. overflow: clip clips the same edges
    without creating a scroll container, so the timelines follow the page. */
 @supports (animation-timeline: view()) {
@@ -79,12 +77,6 @@
       animation-range: entry 5% cover 45%;
       animation-timeline: view();
     }
-
-    .hv3-stage--hero {
-      animation: hv3-recede linear forwards;
-      animation-range: exit 0% exit 100%;
-      animation-timeline: view();
-    }
   }
 }
 
@@ -92,13 +84,6 @@
   from {
     opacity: 0.4;
     transform: translate3d(0, 4rem, 0) scale(0.94);
-  }
-}
-
-@keyframes hv3-recede {
-  to {
-    opacity: 0.5;
-    transform: translate3d(0, 6rem, 0) scale(0.96);
   }
 }
 

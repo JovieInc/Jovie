@@ -1,5 +1,4 @@
 import {
-  featuredArtistPossessive,
   featuredArtistPossessiveTitle,
   HOMEPAGE_FEATURED_ARTIST,
 } from '@/data/demoArtists';
@@ -46,7 +45,12 @@ export const HOMEPAGE_EDITORIAL_COPY = {
     secondaryAction: 'See a live profile',
     secondaryHref: TIM_WHITE_PROFILE.publicProfilePath,
     note: 'two fields · we email when your spot opens',
-    windowLabel: `Jovie for Mac: ${featuredArtistPossessive(HOMEPAGE_FEATURED_ARTIST)} Releases list, beside the ${HOMEPAGE_FEATURED_ARTIST.inspected.title} release page listeners open`,
+  },
+  releaseProof: {
+    action: 'Open release page',
+    actionName: (title: string) => `Open release page for ${title}`,
+    artworkAlt: (title: string) => `${title} artwork`,
+    services: 'Streaming services',
   },
   /** Chapter index (mono, lowercase, as approved). */
   chapters: ['profile', 'releases', 'specs', 'waitlist'],
