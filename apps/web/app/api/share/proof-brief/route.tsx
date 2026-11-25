@@ -5,10 +5,11 @@ import {
   assertProofBriefRenderable,
   ProofBriefError,
 } from '@/lib/proof-briefs/contract';
+import { ProofBriefCard } from '@/lib/proof-briefs/image';
 import {
-  PROOF_BRIEF_CARD_SIZE,
-  ProofBriefCard,
-} from '@/lib/proof-briefs/image';
+  isProofBriefImageFormat,
+  proofBriefImageLayout,
+} from '@/lib/proof-briefs/image-layout';
 import { resolveCertifiedProofBrief } from '@/lib/proof-briefs/resolve';
 import { loadShareFonts } from '@/lib/share/image-utils';
 
@@ -19,12 +20,15 @@ const briefIdSchema = /^[a-zA-Z0-9_-]{1,64}$/;
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   const briefId = params.get('brief');
+  const [format = 'landscape', duplicateFormat] = params.getAll('format');
   const [revParam, duplicateRevision] = params.getAll('rev');
   const revision = revParam === undefined ? undefined : Number(revParam);
   if (
     !briefId ||
     !briefIdSchema.test(briefId) ||
     duplicateRevision !== undefined ||
+    duplicateFormat !== undefined ||
+    !isProofBriefImageFormat(format) ||
     (revision !== undefined &&
       (!/^\d+$/.test(revParam) ||
         !Number.isSafeInteger(revision) ||
@@ -48,19 +52,23 @@ export async function GET(req: NextRequest) {
     // ImageResponse renders lazily. Reject an ineligible snapshot before
     // scheduling image work, then finish rendering before returning a 200.
     assertProofBriefRenderable(brief, { requirePublic: true });
+    const { size } = proofBriefImageLayout(brief, format);
     const fonts = await loadShareFonts();
-    const image = new ImageResponse(<ProofBriefCard brief={brief} />, {
-      ...PROOF_BRIEF_CARD_SIZE,
-      fonts: [
-        {
-          name: 'Satoshi',
-          data: fonts.satoshi,
-          weight: 700,
-          style: 'normal',
-        },
-      ],
-      headers: NO_STORE_HEADERS,
-    });
+    const image = new ImageResponse(
+      <ProofBriefCard brief={brief} format={format} />,
+      {
+        ...size,
+        fonts: [
+          {
+            name: 'Satoshi',
+            data: fonts.satoshi,
+            weight: 700,
+            style: 'normal',
+          },
+        ],
+        headers: NO_STORE_HEADERS,
+      }
+    );
     return new Response(await image.arrayBuffer(), { headers: image.headers });
   } catch (error) {
     const status =
