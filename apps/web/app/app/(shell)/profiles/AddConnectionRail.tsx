@@ -24,6 +24,7 @@ import { DrawerHeaderActions } from '@/components/molecules/drawer-header/Drawer
 import { canonicalizeSurfaceUrl } from '@/lib/profile-surfaces/contracts';
 import { cn } from '@/lib/utils';
 import { detectPlatform, normalizeUrl } from '@/lib/utils/platform-detection';
+import { describeSuggestionCount } from './connection-suggestion-helpers';
 import type { ProfilesWorkspaceData } from './data';
 import { PRESENCE_BUTTON_DESKTOP_DENSITY } from './PresenceStatusParts';
 
@@ -260,7 +261,7 @@ export function AddConnectionRail({
   onReviewSuggestions,
 }: Readonly<{
   data: ProfilesWorkspaceData;
-  suggestedCount: number;
+  suggestedCount: number | null;
   suggestionsLoading: boolean;
   onClose: () => void;
   onCandidatePreview: (candidate: ConnectionIntakeCandidate | null) => void;
@@ -320,13 +321,6 @@ export function AddConnectionRail({
 
   const title =
     view === 'profile' ? 'Add Public Profile' : 'Add Profile Or Site';
-  let suggestionDescription = 'No suggested profiles are waiting for review.';
-  if (suggestionsLoading) {
-    suggestionDescription = 'Checking saved suggestions.';
-  } else if (suggestedCount > 0) {
-    const suggestionLabel = suggestedCount === 1 ? 'profile' : 'profiles';
-    suggestionDescription = `${suggestedCount} suggested ${suggestionLabel} to review.`;
-  }
 
   return (
     <EntitySidebarShell
@@ -399,7 +393,10 @@ export function AddConnectionRail({
           <ChoiceRow
             icon={<ReviewIcon />}
             title='Review Suggestions'
-            description={suggestionDescription}
+            description={describeSuggestionCount(
+              suggestedCount,
+              suggestionsLoading
+            )}
             onClick={onReviewSuggestions}
           />
         </DrawerSection>

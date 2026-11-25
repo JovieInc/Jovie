@@ -13,6 +13,7 @@ describe('ProfilesRouteSkeleton', () => {
     const region = screen.getByLabelText('Loading Profiles');
     expect(region).toHaveAttribute('aria-busy', 'true');
     expect(region).toHaveAttribute('aria-live', 'polite');
+    expect(region.firstElementChild).toHaveClass('w-full', 'max-w-none');
     expect(within(region).getByText('Profiles')).toBeInTheDocument();
 
     const headers = within(region).getAllByRole('columnheader');

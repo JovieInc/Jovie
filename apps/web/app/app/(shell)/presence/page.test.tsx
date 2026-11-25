@@ -54,7 +54,14 @@ describe('Profiles public page route', () => {
     mocks.flag.mockResolvedValue(true);
     mocks.shell.mockResolvedValue({
       user: { id: 'database-user-1' },
-      selectedProfile: { id: 'identity-1' },
+      selectedProfile: {
+        id: 'identity-1',
+        userId: 'database-user-1',
+        username: 'artist',
+        displayName: 'Artist',
+        bio: 'Current bio',
+        createdAt: new Date('2026-11-25T00:00:00.000Z'),
+      },
       needsOnboarding: false,
     });
     mocks.loadProfiles.mockResolvedValue({ profileId: 'identity-1' });
@@ -95,6 +102,12 @@ describe('Profiles public page route', () => {
       expect(isValidElement(result)).toBe(true);
       if (!isValidElement(result)) throw new Error('Expected workspace');
       expect(result.props).toMatchObject({
+        editableArtist: {
+          id: 'identity-1',
+          name: 'Artist',
+          handle: 'artist',
+          tagline: 'Current bio',
+        },
         removalPrincipal: {
           appActorId: 'actor-1',
           authUserId: 'ba-actor-1',
