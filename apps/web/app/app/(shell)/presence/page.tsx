@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { APP_ROUTES } from '@/constants/routes';
+import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import {
   loadAppShellRouteContext,
   requireAppShellDashboardUserId,
@@ -45,11 +46,17 @@ export default async function PresencePage() {
   const removalPrincipal = await loadPresenceRemovalPrincipal(
     routeContext.userId
   );
+  const profile = routeContext.dashboardData.selectedProfile;
   return (
     <ProfilesWorkspace
       data={data}
       scope={scope}
       removalPrincipal={removalPrincipal}
+      editableArtist={
+        profile?.id === identityId
+          ? convertDrizzleCreatorProfileToArtist(profile)
+          : undefined
+      }
     />
   );
 }

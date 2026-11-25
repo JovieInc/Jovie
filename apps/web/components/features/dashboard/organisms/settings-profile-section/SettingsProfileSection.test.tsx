@@ -16,6 +16,7 @@ vi.mock('./useSettingsProfile', () => ({
     const [formData, setFormData] = useState({
       displayName: '',
       username: 'ada',
+      bio: 'Original bio',
       location: '',
       hometown: '',
       careerHighlights: '',
@@ -100,9 +101,31 @@ describe('SettingsProfileSection behaviour', () => {
     expect(saveProfileMock).toHaveBeenLastCalledWith(
       expect.objectContaining({ displayName: 'Ada L' })
     );
+    expect(saveProfileMock.mock.lastCall?.[0]).not.toHaveProperty('bio');
     await user.tab();
     expect(flushSaveMock).toHaveBeenCalled();
     expect(screen.getByLabelText('Display name')).toHaveValue('Ada L');
+  });
+
+  it('edits bio in the contact drawer and omits the pitching fields', async () => {
+    const user = userEvent.setup();
+    render(
+      <SettingsProfileSection
+        artist={artist}
+        presentation='drawer'
+        onRefresh={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Profile Details', { exact: true })).toBeVisible();
+    expect(
+      screen.queryByLabelText('Career highlights')
+    ).not.toBeInTheDocument();
+    const bio = screen.getByRole('textbox', { name: 'Bio' });
+    await user.clear(bio);
+    await user.type(bio, 'Updated bio');
+    expect(saveProfileMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ bio: 'Updated bio' })
+    );
   });
 
   it('counts career highlights in the shared Textarea atom', async () => {

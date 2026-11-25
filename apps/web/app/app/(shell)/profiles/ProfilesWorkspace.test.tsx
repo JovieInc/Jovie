@@ -277,14 +277,16 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       )
     );
     renderWorkspace(data);
-    await user.click(
-      screen.getByRole('button', { name: /Review Suggestions/ })
-    );
+    const review = screen.getByRole('button', { name: 'Review Suggestions' });
+    await user.click(review);
     expect(await screen.findByText("Couldn't Load Suggestions")).toBeVisible();
     expect(
       screen.queryByText('Saved suggestions are still available. Try again.')
     ).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Close Suggestions' }));
+    expect(review).toHaveAccessibleName('Review Suggestions');
+    await user.click(review);
     await user.click(screen.getByRole('button', { name: 'Try Again' }));
     expect(
       await screen.findByRole('list', {
@@ -407,7 +409,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     });
     expect(review).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Review Suggestions (0)' })
+      await screen.findByRole('button', { name: 'Review Suggestions (0)' })
     ).toBeVisible();
     // Keyboard activation opens the existing inspector, never an approval.
     review.focus();
@@ -468,7 +470,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       screen.queryByRole('button', { name: /Review Identities/ })
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Review Suggestions (0)' })
+      screen.getByRole('button', { name: 'Review Suggestions' })
     ).toBeVisible();
   });
 
@@ -930,6 +932,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(
       screen.getByRole('button', { name: 'Close Suggestions' })
     ).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('suggested-connections-review')).toHaveFocus();
     expect(navigationMock.replace).toHaveBeenCalledWith('/app/presence');
     expect(navigationMock.replace).not.toHaveBeenCalledWith(
       '/app/settings/connectors'
@@ -1273,6 +1276,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     ).toBeEnabled();
 
     expect(screen.getByText('Preview only · not saved')).toBeInTheDocument();
+    expect(screen.getByText('3 profiles', { exact: true })).toBeVisible();
 
     const previewRow = screen
       .getByText('Preview only · not saved')
