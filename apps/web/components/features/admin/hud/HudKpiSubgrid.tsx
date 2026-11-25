@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import type {
@@ -239,40 +240,56 @@ export function HudKpiSubgrid({
             : ''}
         </summary>
         {buckets.length > 0 ? (
-          <table className='mt-2 w-full max-w-xl text-left tabular-nums'>
-            <caption className='pb-2 text-left'>
-              GitHub · As of {formatTimestampUTC(velocityQuery.data?.cachedAt)}
-            </caption>
-            <thead>
-              <tr>
-                <th scope='col'>Date (UTC)</th>
-                <th scope='col'>Merged PRs</th>
-                <th scope='col'>Daily Median Hours to Merge</th>
-              </tr>
-            </thead>
-            <tbody>
-              {buckets.map(bucket => (
-                <tr key={bucket.date}>
-                  <th
-                    scope='row'
-                    className='whitespace-nowrap py-1 font-normal'
+          <div className='mt-2'>
+            <p>
+              GitHub · UTC days · As of{' '}
+              {formatTimestampUTC(velocityQuery.data?.cachedAt)}
+            </p>
+            <ol
+              aria-label='Daily Shipping Observations'
+              className='mt-1 space-y-1 tabular-nums'
+            >
+              {buckets.map(bucket => {
+                const hours = dailyMergeHours(bucket);
+                return (
+                  <li
+                    key={bucket.date}
+                    className='flex flex-wrap items-baseline gap-x-3'
                   >
-                    {bucket.date}
-                  </th>
-                  <td>{bucket.merged}</td>
-                  <td>{dailyMergeHours(bucket) ?? 'Not measured'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p className='mt-2'>
-            {velocityQuery.isPending
-              ? 'Loading shipping data.'
-              : hasVelocityData
-                ? 'No daily observations.'
-                : 'Shipping data unavailable.'}
+                    <time dateTime={bucket.date}>{bucket.date}</time>
+                    <span>Merged PRs: {bucket.merged}</span>
+                    <span>
+                      Median merge time:{' '}
+                      {hours === null ? 'Not measured' : `${hours} h`}
+                    </span>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        ) : hasVelocityData ? (
+          <p className='mt-2' role='status'>
+            GitHub reported no daily observations.
           </p>
+        ) : (
+          <div className='mt-2 flex items-center gap-2'>
+            <p role='status'>
+              {velocityQuery.isFetching
+                ? 'Loading shipping data.'
+                : 'GitHub shipping data is unavailable. Retry to load the daily observations.'}
+            </p>
+            <Button
+              type='button'
+              size='sm'
+              variant='ghost'
+              disabled={velocityQuery.isFetching}
+              onClick={() => {
+                void velocityQuery.refetch({ cancelRefetch: false });
+              }}
+            >
+              Retry
+            </Button>
+          </div>
         )}
       </details>
     </div>

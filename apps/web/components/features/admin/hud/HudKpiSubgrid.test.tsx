@@ -112,17 +112,21 @@ describe('HudKpiSubgrid', () => {
     const path = chart.querySelector('path')?.getAttribute('d');
     expect(path?.match(/M/g)).toHaveLength(2);
     fireEvent.click(screen.getByText('Daily Shipping Data · Cached'));
-    const table = screen.getByRole('table', {
-      name: /GitHub.*2026-09-14 12:00 UTC/,
-    });
-    expect(within(table).getAllByRole('row')).toHaveLength(15);
-    const missing = within(table).getByRole('row', { name: /2026-09-09/ });
-    expect(within(missing).getByText('0')).toBeInTheDocument();
-    expect(within(missing).getByText('Not measured')).toBeInTheDocument();
     expect(
-      within(table).getByRole('row', { name: /2026-09-10/ })
-    ).toHaveTextContent(/0$/);
-    expect(within(table).getByText('1.2345')).toBeInTheDocument();
+      screen.getByText(/GitHub.*UTC days.*2026-09-14 12:00 UTC/)
+    ).toBeInTheDocument();
+    const observations = screen.getByRole('list', {
+      name: 'Daily Shipping Observations',
+    });
+    const entries = within(observations).getAllByRole('listitem');
+    expect(entries).toHaveLength(14);
+    expect(entries[8]).toHaveTextContent(
+      '2026-09-09Merged PRs: 0Median merge time: Not measured'
+    );
+    expect(entries[9]).toHaveTextContent(
+      '2026-09-10Merged PRs: 3Median merge time: 0 h'
+    );
+    expect(entries[10]).toHaveTextContent('Median merge time: 1.2345 h');
     await expectNoA11yViolations(container);
   });
 
@@ -149,6 +153,29 @@ describe('HudKpiSubgrid', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('retries the request and retains an in-place disabled action until the read resolves', async () => {
+    const retry = Promise.withResolvers<Response>();
+    const request = stubFetch(async () =>
+      Response.json(payload([], 'unavailable'))
+    );
+    renderGrid();
+    fireEvent.click(screen.getByText('Daily Shipping Data'));
+    await screen.findByText(/Retry to load the daily observations/);
+    request.mockImplementationOnce(() => retry.promise);
+    const button = screen.getByRole('button', { name: 'Retry' });
+    fireEvent.click(button);
+    await waitFor(() => expect(button).toBeDisabled());
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Loading shipping data.'
+    );
+    expect(request).toHaveBeenCalledTimes(2);
+    retry.resolve(Response.json(payload([], 'empty')));
+    await screen.findByText('GitHub reported no daily observations.');
+    expect(
+      screen.queryByRole('button', { name: 'Retry' })
+    ).not.toBeInTheDocument();
+  });
+
   it('keeps dashes when the source is unavailable or the request fails', async () => {
     const fetchMock = stubFetch(async () =>
       Response.json(payload(twoWeeks(), 'unavailable'))
@@ -156,9 +183,11 @@ describe('HudKpiSubgrid', () => {
     const first = renderGrid();
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     fireEvent.click(screen.getByText('Daily Shipping Data'));
-    await screen.findByText('Shipping data unavailable.');
+    await screen.findByText(/GitHub shipping data is unavailable/);
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
-    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('list', { name: 'Daily Shipping Observations' })
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId('hud-kpi-ship-velocity')).not.toHaveTextContent(
       '50.0%'
     );
