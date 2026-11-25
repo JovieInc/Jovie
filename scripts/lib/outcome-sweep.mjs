@@ -9,7 +9,7 @@
 // api-budget: github-actions-token 15/hr - automation-liveness bucket every 20 minutes: 3-5 completed-run list pages on main
 import { GITHUB_API } from '../../packages/api-client/github.ts';
 import { readGithubJson } from './github-json-read.mjs';
-import { outcomeFingerprint, readSweptList } from './outcome-coverage.mjs';
+import { outcomeFingerprint, readSweptList } from './outcome-sweep-config.mjs';
 import { noteRecurrence } from './remediation-recurrence.mjs';
 import { applyRemediationDecisionWithRetry } from './remediation-signal.mjs';
 

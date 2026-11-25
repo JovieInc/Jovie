@@ -8,8 +8,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { load as yamlLoad } from 'js-yaml';
 import { triggersOf } from './ci-trigger-registry.mjs';
+import { BASELINE_PATH, readSweptList } from './outcome-sweep-config.mjs';
 
-export const BASELINE_PATH = 'canon/outcome-coverage-baseline.json';
+export {
+  BASELINE_PATH,
+  outcomeFingerprint,
+  readSweptList,
+} from './outcome-sweep-config.mjs';
 
 /**
  * Ways a run reports its outcome. `# outcome-owner: <who>` names an owner
@@ -107,30 +112,4 @@ export function readOutcomeBaseline(root) {
     fs.readFileSync(path.join(root, BASELINE_PATH), 'utf8')
   );
   return /** @type {string[]} */ (raw.uncovered ?? []);
-}
-
-/**
- * Busy workflows the automation-liveness outcome sweep reports for
- * (scripts/lib/outcome-sweep.mjs), so they need no job of their own.
- * @param {string} root
- */
-export function readSweptList(root) {
-  const raw = JSON.parse(
-    fs.readFileSync(path.join(root, BASELINE_PATH), 'utf8')
-  );
-  return /** @type {string[]} */ (raw.swept ?? []);
-}
-
-/**
- * Stable remediation fingerprint for a workflow file:
- * `.github/workflows/visual-regression.yml` -> `workflow-visual-regression`.
- * @param {string} file
- */
-export function outcomeFingerprint(file) {
-  const stem = path
-    .basename(String(file), path.extname(String(file)))
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return `workflow-${stem || 'unknown'}`;
 }
