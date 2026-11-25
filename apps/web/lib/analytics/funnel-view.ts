@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { FounderFunnelData } from '@/lib/admin/types';
+import { readMeasuredDashboardCount } from '@/lib/analytics/evidence-receipt';
 import { CANONICAL_METRICS } from '@/lib/analytics/metrics';
 import { formatAnalyticsStageRate } from '@/lib/utils/analytics-growth';
 import type { DashboardAnalyticsResponse } from '@/types/analytics';
@@ -52,29 +53,13 @@ export function audienceFunnelView(
   analytics: DashboardAnalyticsResponse | null | undefined,
   window: string
 ): FunnelView {
-  function measuredCount(
-    key: 'profile_views' | 'unique_users' | 'subscribers'
-  ) {
-    const receipt = analytics?.evidence?.metrics.find(
-      metric => metric.metric === key
-    );
-    if (
-      receipt &&
-      receipt.availability !== 'measured' &&
-      receipt.availability !== 'measured_zero'
-    ) {
-      return undefined;
-    }
-    return receipt?.value ?? analytics?.[key];
-  }
-
-  const visitors = measuredCount('unique_users');
-  const subscribers = measuredCount('subscribers');
+  const visitors = readMeasuredDashboardCount(analytics, 'unique_users');
+  const subscribers = readMeasuredDashboardCount(analytics, 'subscribers');
   const audienceStages = [
     {
       id: 'views',
       label: CANONICAL_METRICS.profile_views.label,
-      count: measuredCount('profile_views'),
+      count: readMeasuredDashboardCount(analytics, 'profile_views'),
     },
     {
       id: 'visitors',

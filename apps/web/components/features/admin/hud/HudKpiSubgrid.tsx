@@ -7,14 +7,15 @@ import type {
   ShippingVelocityResponse,
 } from '@/app/api/admin/hud/shipping-velocity/route';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
+import { ContentMetricDelta } from '@/components/molecules/ContentMetricDelta';
+import { Sparkline } from '@/components/shell/Sparkline';
+import type { MetricPolarity } from '@/lib/design/metric-tone';
 import { medianNumber } from '@/lib/hud/number-series';
 import { isSuccessfulHudObservation } from '@/lib/hud/observation';
-import type { HudTone } from '@/lib/hud/tone-determination';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
-import { getAccentCssVars, HUD_TONE_ACCENT } from '@/lib/ui/accent-palette';
+import { formatTimestampUTC } from '@/lib/utils/date-formatting';
 import type { HudMetrics } from '@/types/hud';
 
-const KPI_TILE_CLASS = 'rounded-(--radius-md) p-3 shadow-card-elevated';
 const KPI_VALUE_CLASS =
   'text-2xl font-[620] leading-none tracking-[-0.03em] tabular-nums sm:text-3xl';
 
@@ -36,13 +37,16 @@ function sumMerged(buckets: readonly DailyBucket[]): number {
   return buckets.reduce((total, bucket) => total + bucket.merged, 0);
 }
 
-function mergeP50Values(buckets: readonly DailyBucket[]): number[] {
-  const values: number[] = [];
-  for (const bucket of buckets) {
-    const value = bucket.mergeP50Hours ?? null;
-    if (value !== null && Number.isFinite(value)) values.push(value);
-  }
-  return values;
+function dailyMergeHours({ mergeP50Hours }: DailyBucket): number | null {
+  return typeof mergeP50Hours === 'number' && Number.isFinite(mergeP50Hours)
+    ? mergeP50Hours
+    : null;
+}
+
+function medianDailyMergeHours(buckets: readonly DailyBucket[]): number | null {
+  return medianNumber(
+    buckets.map(dailyMergeHours).filter(value => value !== null)
+  );
 }
 
 async function fetchShippingVelocity(
@@ -58,82 +62,51 @@ async function fetchShippingVelocity(
   return (await response.json()) as ShippingVelocityResponse;
 }
 
-function Sparkline({
-  values,
-}: Readonly<{ readonly values: readonly number[] }>) {
-  if (values.length < 2) return null;
-  const max = Math.max(...values);
-  const min = Math.min(...values);
-  const span = max - min || 1;
-  const step = 100 / (values.length - 1);
-  const points = values
-    .map((value, index) => {
-      const x = index * step;
-      const y = 26 - ((value - min) / span) * 24;
-      return `${x.toFixed(2)},${y.toFixed(2)}`;
-    })
-    .join(' ');
-
+function DailyTrend({
+  points,
+  label,
+}: Readonly<{ points: readonly (number | null)[]; label: string }>) {
   return (
-    <svg
-      viewBox='0 0 100 28'
-      preserveAspectRatio='none'
-      className='mt-1.5 h-7 w-full'
-      aria-hidden='true'
-    >
-      <title>Trend</title>
-      <polyline
-        points={points}
-        fill='none'
-        stroke='var(--color-accent)'
-        strokeWidth='1.5'
-        vectorEffect='non-scaling-stroke'
-      />
-    </svg>
+    <div className='mt-1.5 h-7'>
+      {points.length > 0 && (
+        <Sparkline
+          points={points}
+          variant='pulse'
+          trend='flat'
+          polarity='neutral'
+          ariaLabel={label}
+          className='block h-full w-full'
+        />
+      )}
+    </div>
   );
 }
 
 function DeltaLine({
   deltaPct,
-  goodDirection,
+  polarity,
 }: Readonly<{
   readonly deltaPct: number | null;
-  readonly goodDirection: 'up' | 'down';
+  readonly polarity: MetricPolarity;
 }>) {
   if (deltaPct === null) {
     return (
       <span className='text-2xs text-tertiary-token'>{'—'} vs prior 7d</span>
     );
   }
-  const isFlat = Math.abs(deltaPct) < 0.05;
-  const isGood = goodDirection === 'up' ? deltaPct > 0 : deltaPct < 0;
-  const tone: HudTone = getDeltaTone(isFlat, isGood);
-  const accent = getAccentCssVars(HUD_TONE_ACCENT[tone]);
-  const arrow = getDeltaArrow(isFlat, deltaPct);
-
+  const direction =
+    Math.abs(deltaPct) < 0.05 ? 'flat' : deltaPct > 0 ? 'up' : 'down';
+  const value = `${Math.abs(deltaPct).toFixed(1)}% vs prior 7d`;
   return (
-    <span
-      className='text-2xs font-medium tabular-nums'
-      style={{
-        color:
-          tone === 'neutral'
-            ? 'var(--color-text-secondary-token)'
-            : accent.solid,
-      }}
-    >
-      {arrow} {Math.abs(deltaPct).toFixed(1)}% vs prior 7d
-    </span>
+    <ContentMetricDelta
+      direction={direction}
+      polarity={polarity}
+      value={value}
+      aria-label={`${direction === 'flat' ? 'Flat' : direction === 'up' ? 'Up' : 'Down'} ${value}`}
+      className='text-2xs'
+      iconClassName='size-3'
+    />
   );
-}
-
-function getDeltaTone(isFlat: boolean, isGood: boolean): HudTone {
-  if (isFlat) return 'neutral';
-  return isGood ? 'good' : 'bad';
-}
-
-function getDeltaArrow(isFlat: boolean, deltaPct: number): string {
-  if (isFlat) return '→';
-  return deltaPct > 0 ? '↑' : '↓';
 }
 
 function MetricSubtitle({
@@ -158,7 +131,6 @@ function KpiMetricCard({
       label={label}
       value={value}
       subtitle={subtitle}
-      className={KPI_TILE_CLASS}
       valueClassName={KPI_VALUE_CLASS}
       data-testid={testId}
     />
@@ -180,21 +152,20 @@ export function HudKpiSubgrid({
     refetchOnWindowFocus: true,
   });
 
-  const buckets = velocityQuery.data?.data ?? [];
+  const observation = velocityQuery.data?.observation;
+  const hasVelocityData =
+    observation !== undefined && isSuccessfulHudObservation(observation);
+  const buckets = hasVelocityData ? (velocityQuery.data?.data ?? []) : [];
   const last7 = buckets.slice(-7);
   const prior7 = buckets.slice(-14, -7);
-
-  const velocityObservation = velocityQuery.data?.observation;
-  const hasVelocityData =
-    velocityObservation !== undefined &&
-    isSuccessfulHudObservation(velocityObservation);
   const mergedLast7 = sumMerged(last7);
-  const velocityDelta = deltaPercent(mergedLast7, sumMerged(prior7));
+  const velocityDelta =
+    prior7.length === 7 ? deltaPercent(mergedLast7, sumMerged(prior7)) : null;
 
-  const mergeTimeLast7 = medianNumber(mergeP50Values(last7));
-  const mergeTimePrior7 = medianNumber(mergeP50Values(prior7));
+  const mergeTimeLast7 = medianDailyMergeHours(last7);
+  const mergeTimePrior7 = medianDailyMergeHours(prior7);
   const mergeTimeDelta =
-    mergeTimeLast7 !== null && mergeTimePrior7 !== null
+    prior7.length === 7 && mergeTimeLast7 !== null && mergeTimePrior7 !== null
       ? deltaPercent(mergeTimeLast7, mergeTimePrior7)
       : null;
   const cards: Array<{
@@ -209,8 +180,11 @@ export function HudKpiSubgrid({
       subtitle: (
         <MetricSubtitle>
           <span>PRs merged, last 7d</span>
-          <DeltaLine deltaPct={velocityDelta} goodDirection='up' />
-          <Sparkline values={buckets.map(bucket => bucket.merged)} />
+          <DeltaLine deltaPct={velocityDelta} polarity='higher-is-better' />
+          <DailyTrend
+            points={buckets.map(bucket => bucket.merged)}
+            label='Daily Merged Pull Requests'
+          />
         </MetricSubtitle>
       ),
       testId: 'hud-kpi-ship-velocity',
@@ -220,9 +194,12 @@ export function HudKpiSubgrid({
       value: hasVelocityData ? formatHours(mergeTimeLast7) : '—',
       subtitle: (
         <MetricSubtitle>
-          <span>P50, last 7d</span>
-          <DeltaLine deltaPct={mergeTimeDelta} goodDirection='down' />
-          <Sparkline values={mergeP50Values(buckets)} />
+          <span>Median of daily P50s, last 7d</span>
+          <DeltaLine deltaPct={mergeTimeDelta} polarity='lower-is-better' />
+          <DailyTrend
+            points={buckets.map(dailyMergeHours)}
+            label='Daily Median Hours To Merge'
+          />
         </MetricSubtitle>
       ),
       testId: 'hud-kpi-merge-time',
@@ -247,13 +224,57 @@ export function HudKpiSubgrid({
   ];
 
   return (
-    <div
-      className='grid grid-cols-1 gap-3 md:grid-cols-3'
-      data-testid='hud-kpi-subgrid'
-    >
-      {cards.map(card => (
-        <KpiMetricCard key={card.testId} {...card} />
-      ))}
+    <div className='space-y-2' data-testid='hud-kpi-subgrid'>
+      <div className='grid grid-cols-1 gap-3 md:grid-cols-3'>
+        {cards.map(card => (
+          <KpiMetricCard key={card.testId} {...card} />
+        ))}
+      </div>
+      <details className='text-xs text-secondary-token'>
+        <summary className='w-fit cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'>
+          Daily Shipping Data
+          {hasVelocityData &&
+          (observation === 'stale' || velocityQuery.isRefetchError)
+            ? ' · Cached'
+            : ''}
+        </summary>
+        {buckets.length > 0 ? (
+          <table className='mt-2 w-full max-w-xl text-left tabular-nums'>
+            <caption className='pb-2 text-left'>
+              GitHub · As of {formatTimestampUTC(velocityQuery.data?.cachedAt)}
+            </caption>
+            <thead>
+              <tr>
+                <th scope='col'>Date (UTC)</th>
+                <th scope='col'>Merged PRs</th>
+                <th scope='col'>Daily Median Hours to Merge</th>
+              </tr>
+            </thead>
+            <tbody>
+              {buckets.map(bucket => (
+                <tr key={bucket.date}>
+                  <th
+                    scope='row'
+                    className='whitespace-nowrap py-1 font-normal'
+                  >
+                    {bucket.date}
+                  </th>
+                  <td>{bucket.merged}</td>
+                  <td>{dailyMergeHours(bucket) ?? 'Not measured'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className='mt-2'>
+            {velocityQuery.isPending
+              ? 'Loading shipping data.'
+              : hasVelocityData
+                ? 'No daily observations.'
+                : 'Shipping data unavailable.'}
+          </p>
+        )}
+      </details>
     </div>
   );
 }

@@ -161,3 +161,17 @@ export const RtlTiles: Story = {
   beforeEach: stubVelocity(answerWith(measured)),
   render: renderRtl,
 };
+
+const sparse = velocity(
+  buckets(1).map((day, index) => {
+    if (index === 12) return { ...day, merged: 0, mergeP50Hours: null };
+    if (index === 13) return { ...day, mergeP50Hours: 0 };
+    return day;
+  }),
+  'stale'
+);
+
+export const MissingAndMeasuredZero: Story = {
+  beforeEach: stubVelocity(answerWith(sparse)),
+  render: args => <KpiStory metrics={args.metrics} seed={sparse} />,
+};

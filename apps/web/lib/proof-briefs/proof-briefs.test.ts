@@ -534,6 +534,46 @@ describe('truth and privacy boundaries', () => {
     ).toThrow(ProofBriefError);
   });
 
+  it('describes the public image, including measured zero and unmeasured outcomes', () => {
+    const publicBrief = brief({
+      hero: {
+        ...CERTIFIED_PROOF_BRIEF.hero,
+        value: '128',
+        label: 'Profile visits',
+        sentence: 'Profile activity was measured this week.',
+      },
+      supportingPoints: [
+        {
+          label: 'Ticket clicks',
+          value: '0',
+          attribution: 'execution',
+          evidenceIds: CERTIFIED_PROOF_BRIEF.hero.evidenceIds,
+        },
+      ],
+      unknowns: ['Internal attribution check'],
+    });
+
+    const { altText } = renderProofBriefSocialDraft(publicBrief, { now: NOW });
+
+    expect(altText).toContain(publicBrief.window.label);
+    expect(altText).toContain('128 Profile visits');
+    expect(altText).toContain('0 Ticket clicks');
+    expect(altText).toContain('Unmeasured outcomes');
+    expect(altText).not.toContain('Internal attribution check');
+    expect(altText).not.toContain(publicBrief.evidence[0]?.sourceUrl);
+    expect(() =>
+      renderProofBriefSocialDraft(
+        { ...publicBrief, privacy: 'private' },
+        { now: NOW }
+      )
+    ).toThrow(/private-scoped/);
+    expect(() =>
+      renderProofBriefSocialDraft(publicBrief, {
+        now: new Date(publicBrief.expiresAt),
+      })
+    ).toThrow(/expired/);
+  });
+
   it('allows owner text/email but blocks a private share card', () => {
     const privateBrief = brief({ privacy: 'private' });
     expect(renderProofBriefText(privateBrief, { now: NOW })).toContain('2');

@@ -3,7 +3,11 @@ import {
   type CertifiedProofBrief,
   proofBriefBrand,
 } from './contract';
-import { PROOF_BRIEF_CARD_SIZE } from './image';
+import {
+  clampProofBriefText,
+  PROOF_BRIEF_CARD_SIZE,
+  PROOF_BRIEF_TEXT_LIMITS,
+} from './image';
 
 export interface ProofBriefSocialDraft {
   /** Draft copy only — posting is a separate, human-authorized step. */
@@ -41,9 +45,36 @@ export function renderProofBriefSocialDraft(
     `${brief.window.label} | proof from ${proofBriefBrand(brief).product}.`,
   ].join('\n');
 
+  const limits = PROOF_BRIEF_TEXT_LIMITS;
+  const { hero } = brief;
+  const heroText = [
+    hero.value != null && clampProofBriefText(hero.value, limits.heroValue),
+    hero.label && clampProofBriefText(hero.label, limits.heroLabel),
+    hero.value == null &&
+      clampProofBriefText(hero.sentence, limits.heroSentence),
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const altText = [
+    `Proof card for ${brief.subject}, ${clampProofBriefText(brief.window.label, limits.window)}`,
+    heroText,
+    ...brief.supportingPoints.map(point =>
+      [
+        point.value != null &&
+          clampProofBriefText(point.value, limits.pointValue),
+        clampProofBriefText(point.label, limits.pointLabel),
+      ]
+        .filter(Boolean)
+        .join(' ')
+    ),
+    brief.unknowns.length > 0 && 'Unmeasured outcomes remain unknown.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
   return {
     copy,
-    altText: `Proof card for ${brief.subject}, ${brief.window.label}: ${brief.hero.sentence}`,
+    altText,
     image: {
       url: `/api/share/proof-brief?brief=${encodeURIComponent(brief.briefId)}&rev=${brief.revision}`,
       width: PROOF_BRIEF_CARD_SIZE.width,
