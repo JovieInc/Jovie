@@ -59,11 +59,6 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Request filed',
     errorTitle: "Couldn't file the request",
   },
-  showFunnel: {
-    label: 'Funnel',
-    uiHint: 'artifact',
-    renderer: 'artifact',
-  },
   showTopInsights: {
     label: 'Insights',
     uiHint: 'artifact',
