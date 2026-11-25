@@ -88,13 +88,6 @@ test('exact evidence reads both pages of the same CI attempt', () => {
 });
 
 test('controller normalizes only complete exact CI job evidence', () => {
-  const reader = wf.jobs['authorize-production'].steps.find(
-    step => step.id === 'authorize'
-  );
-  assert.match(
-    reader.run,
-    /gh api --paginate --slurp[\s\S]*?attempts\/\$source_run_attempt\/jobs\?per_page=100[\s\S]*?node scripts\/lib\/exact-github-listing\.mjs/
-  );
   const parse = pages =>
     spawnSync(
       process.execPath,

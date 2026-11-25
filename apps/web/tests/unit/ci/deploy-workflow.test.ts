@@ -975,7 +975,9 @@ describe('deploy workflow Vercel env resolution', () => {
     );
     expect(authorization).toContain('.aggregatePassed == true');
     expect(authorization).toContain('.total_count == (.jobs | length)');
-    expect(authorization).not.toContain('gh api --paginate --slurp');
+    expect(authorization).toMatch(
+      /gh api --paginate --slurp[^\n]*\n[^\n]*attempts\/\$source_run_attempt\/jobs\?per_page=100[^\n]*\n[^\n]*\| node scripts\/lib\/exact-github-listing\.mjs/
+    );
     expect(releaseCaller).not.toContain('concurrency:');
     expect(verified).not.toContain('concurrency:');
     expect(verified).toContain(
