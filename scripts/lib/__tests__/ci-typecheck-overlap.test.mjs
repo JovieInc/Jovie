@@ -9,10 +9,37 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { shouldOverlapTypecheckLanes } from '../ci-typecheck-overlap.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
+
+it('keeps co-located web tests in the dedicated test typecheck program', () => {
+  const web = resolve(REPO_ROOT, 'apps/web');
+  const readConfig = file =>
+    ts.readConfigFile(join(web, file), ts.sys.readFile).config;
+  const rootFiles = config =>
+    ts.parseJsonConfigFileContent(config, ts.sys, web).fileNames;
+  const source = readConfig('tsconfig.typecheck.json');
+  const productFiles = new Set(rootFiles(source));
+  const testFiles = new Set(rootFiles(readConfig('tsconfig.test.json')));
+  const formerSourceRoots = rootFiles({
+    ...source,
+    exclude: source.exclude.filter(
+      pattern => !/\.(?:test|spec)\.tsx?$/.test(pattern)
+    ),
+  });
+  const coLocatedTests = formerSourceRoots.filter(file =>
+    /\.(?:test|spec)\.tsx?$/.test(file)
+  );
+
+  expect(coLocatedTests.length).toBeGreaterThan(0);
+  expect(formerSourceRoots.filter(file => !productFiles.has(file))).toEqual(
+    coLocatedTests
+  );
+  expect(coLocatedTests.filter(file => !testFiles.has(file))).toEqual([]);
+});
 
 describe('typecheck lane overlap policy', () => {
   it('overlaps on merge_group and workflow_dispatch; serializes pull_request', () => {
