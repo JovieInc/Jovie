@@ -87,6 +87,7 @@ export interface MarketingHeaderProps
      * says "Jovie").
      */
     readonly brand?: MarketingHeaderBrand;
+    readonly canonicalMarketing?: boolean;
     readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
     readonly logoVariant?: LogoVariant;
     readonly navLinks?: readonly MarketingHeaderNavLink[];
@@ -154,6 +155,7 @@ function plainLinks(
 
 export function MarketingHeader({
   brand,
+  canonicalMarketing = false,
   logoSize = 'xs',
   logoVariant = 'word',
   navLinks,
@@ -176,8 +178,9 @@ export function MarketingHeader({
   const isMinimal = variant === 'minimal';
   const isHomepage = variant === 'homepage';
   const isArtistProfiles =
-    pathname === APP_ROUTES.ARTIST_PROFILES ||
-    pathname === APP_ROUTES.ARTIST_PROFILE_LEGACY;
+    !canonicalMarketing &&
+    (pathname === APP_ROUTES.ARTIST_PROFILES ||
+      pathname === APP_ROUTES.ARTIST_PROFILE_LEGACY);
   const usesHomepageChrome = isHomepage;
   const presentation = isMinimal
     ? 'default'
@@ -218,7 +221,10 @@ export function MarketingHeader({
     chromeNav
   );
   const resolvedPrimaryCta =
-    primaryCta ?? resolveMarketingHeaderPrimaryCta(pathname);
+    primaryCta ??
+    (canonicalMarketing
+      ? HOME_MARKETING_HEADER_CTA
+      : resolveMarketingHeaderPrimaryCta(pathname));
   // leftWordmark (the homepage) renders the mark with its reveal wordmark; the
   // homepage stylesheet keeps that wordmark shown beside the 28px mark.
   const resolvedLogoVariant = leftWordmark
@@ -238,6 +244,7 @@ export function MarketingHeader({
       logoMarkSize='marketing'
       logoReveal={resolvedLogoVariant === 'icon'}
       authMode='public-static'
+      marketingPathname={canonicalMarketing ? pathname : undefined}
       hideNav={isMinimal}
       hideDesktopNav={hideCenterNav}
       minimalAuth={isMinimal}

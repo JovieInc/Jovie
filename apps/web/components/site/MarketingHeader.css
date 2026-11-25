@@ -202,6 +202,10 @@
 .marketing-glass-header[data-presentation="marketing-glass"]
   .marketing-glass-header__nav-link--active,
 .marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__nav-link[aria-current="page"],
+.marketing-glass-header[data-presentation="marketing-glass"]
+  .marketing-glass-header__flyout-link[aria-current="page"],
+.marketing-glass-header[data-presentation="marketing-glass"]
   .marketing-glass-header__text-link:hover,
 .marketing-glass-header[data-presentation="marketing-glass"]
   .marketing-glass-header__text-link:focus-visible {

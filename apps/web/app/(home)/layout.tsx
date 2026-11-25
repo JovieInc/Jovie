@@ -5,9 +5,6 @@ import '../../components/marketing/MarketingSnapRail.css';
 import { WebMcpTools } from '@/components/marketing/WebMcpTools';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
-import { APP_ROUTES } from '@/constants/routes';
-import { resolveMarketingHeaderBrand } from '@/data/marketing/headerBrand';
-import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';
 import { getMarketingPageContractForRouteGlob } from '@/data/marketing/pageContracts';
 import { getSiteChrome } from '@/lib/content-records/site-chrome.server';
 
@@ -28,8 +25,6 @@ const geistMono = localFont({
 // the default /signup CTA and an extra footer CTA). The browser then rendered both from "/" and React
 // threw hydration error #418 on every visit. Resolve the route-owned values
 // here, once, so the server and the client render identical markup.
-const HOME_HEADER_CTA = HOME_MARKETING_HEADER_CTA;
-const HOME_HEADER_BRAND = resolveMarketingHeaderBrand(APP_ROUTES.HOME);
 const HOME_PAGE_CONTRACT =
   getMarketingPageContractForRouteGlob('(home)/page.tsx') ?? undefined;
 
@@ -63,11 +58,7 @@ export default async function HomeLayout({
         footerPenSection='footer'
         footerShowCta={false}
         footerVariant='expanded'
-        headerBrand={HOME_HEADER_BRAND}
-        headerCta={HOME_HEADER_CTA}
-        headerHidePrimaryCta
-        headerLeftWordmark
-        logoSize='sm'
+        canonicalMarketingHeader
         pageContract={HOME_PAGE_CONTRACT}
       >
         {children}
