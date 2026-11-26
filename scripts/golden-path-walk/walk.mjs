@@ -8,7 +8,7 @@
 //
 //   CRON_SECRET=… DATABASE_URL=… node scripts/golden-path-walk/walk.mjs
 //     FLOW=./flow-new-user.mjs (default) | ./flow-returning.mjs
-//     OUT=<dir> MOBILE=1 HANDLE=<homepage handle> REPLY1=<typed handle>
+//     OUT=<dir> MOBILE=1 HANDLE=<chosen handle>
 //     EMAIL=<canary> (flow-returning: browse-ready+clerk_test@jov.ie)
 //
 // Safety: only prodcert canary addresses (lib/synthetic/prodcert-identities.ts);
@@ -192,7 +192,8 @@ if (POOL.length) {
     sql`SELECT set_config('app.clerk_user_id', 'system_golden_path_walk', true)`,
     sql`UPDATE creator_profiles SET spotify_id = NULL, spotify_url = NULL, updated_at = now()
       WHERE spotify_id = ANY(${POOL}) AND user_id IN (
-        SELECT id FROM users WHERE email LIKE 'browse-ready+synthetic-prodcert-%@jov.ie')`,
+        SELECT id FROM users WHERE email = ${email}
+          AND email LIKE 'browse-ready+synthetic-prodcert-%@jov.ie')`,
   ]);
 }
 await browser.close();
@@ -236,3 +237,4 @@ writeFileSync(
 process.stderr.write(
   `done ${OUT} failure=${failure ? failure.split('\n')[0] : 'none'}\n`
 );
+if (failure) process.exitCode = 1;

@@ -1,139 +1,174 @@
-// Golden path flow: homepage -> claim handle -> ... (exploratory, extended as we learn the flow)
+import assert from 'node:assert/strict';
+
+/**
+ * Record the signed-out claim through first value. The public profile must
+ * belong to the artist and handle selected in this run.
+ * @param {{
+ *   page: import('playwright').Page,
+ *   snap: (title: string, extra?: object) => Promise<void>,
+ *   otp: (startedAt: number) => Promise<string>,
+ *   email: string, ARTIST: string, ARTIST_SPOTIFY: string, ORIGIN: string
+ * }} ctx
+ */
 export default async function flow({
   page,
   snap,
-  settle,
   otp,
   email,
   ARTIST,
+  ARTIST_SPOTIFY,
   ORIGIN,
 }) {
-  await page.goto(ORIGIN, { waitUntil: 'domcontentloaded' });
-  await settle(2500);
-  await snap('homepage');
-  const reject = page.getByRole('button', { name: /reject all/i });
-  if (await reject.isVisible().catch(() => false)) {
-    await reject.click();
-    await settle(800);
+  const origin = new URL(ORIGIN).origin;
+  const timeout = 60_000;
+  const handle =
+    process.env.REPLY1 ?? process.env.HANDLE ?? `gp${Date.now().toString(36)}`;
+  assert.match(handle, /^[a-z0-9][a-z0-9_-]{0,29}$/u);
+
+  let waitlistVisited = false;
+  function recordNavigation(url) {
+    const { pathname } = new URL(url);
+    if (/^\/waitlist(?:\/|$)/u.test(pathname)) waitlistVisited = true;
   }
-  const handle = process.env.HANDLE ?? `gp${Date.now().toString(36).slice(-6)}`;
-  const input = page.getByRole('textbox').first();
-  await input.click();
-  await input.pressSequentially(handle, { delay: 70 });
-  await settle(1500);
-  await snap('homepage handle typed');
-  await page
-    .getByRole('button', { name: /^claim$/i })
-    .first()
-    .click();
-  await page.waitForLoadState('domcontentloaded');
-  await settle(4000);
-  await snap('after claim click');
-  await settle(6000);
-  await snap('after claim settle');
-  await pickArtist(arguments[0]);
-  // A fresh handle per walk that differs from the homepage one, so every walk
-  // exercises the handle-change path without colliding with an earlier walk's
-  // reservation (2026-10-31 pm: a fixed default was already reserved).
-  const typed = process.env.REPLY1 ?? `${handle}x`;
-  await say(arguments[0], typed, 'reply handle');
-  const ctx = arguments[0];
-  const btn = ctx.page.getByTestId('onboarding-confirm-handle').last();
-  if (await btn.isDisabled().catch(() => true)) {
-    const change = ctx.page
-      .getByRole('button', { name: /change handle/i })
-      .last();
-    if (await change.isVisible().catch(() => false)) await change.click();
-    const f = ctx.page.getByLabel(/edit (proposed )?handle/i).last();
-    await f.fill('');
-    await f.pressSequentially(`${typed}y`.slice(0, 30), { delay: 60 });
-    await ctx.settle(2500);
-    await ctx.snap('handle edited');
+  /** @param {import('playwright').Request} request */
+  function onRequest(request) {
+    if (request.isNavigationRequest()) recordNavigation(request.url());
   }
-  await clickIf(arguments[0], /confirm handle/i, 'confirm handle');
-  await say(arguments[0], 'Under 500', 'reply audience');
-  if (process.env.SOCIAL)
-    await say(arguments[0], process.env.SOCIAL, 'reply social');
-  const signedUpAt = Date.now();
-  await emailSignup(arguments[0]);
-  // Time to the waitlist receipt is the walk's exit metric; a walk that never
-  // reaches it in 45s is a defect, not a slow pass.
-  const reached = await page
-    .waitForURL(u => u.pathname.startsWith('/waitlist'), { timeout: 45000 })
-    .then(() => true)
-    .catch(() => false);
-  await settle(2500);
-  await snap('post signup final', {
-    receiptReached: reached,
-    receiptMs: reached ? Date.now() - signedUpAt : null,
-  });
-}
+  /** @param {import('playwright').Frame} frame */
+  function onNavigation(frame) {
+    if (frame === page.mainFrame()) recordNavigation(frame.url());
+  }
+  page.on('request', onRequest);
+  page.on('framenavigated', onNavigation);
 
-export async function pickArtist({ page, snap, settle, ARTIST }) {
-  const s = page.getByPlaceholder(/search spotify artists/i).first();
-  await s.click();
-  await s.pressSequentially(ARTIST, { delay: 60 });
-  await settle(3000);
-  await snap('spotify search results');
-  const opt = page
-    .getByRole('option', { name: new RegExp(ARTIST, 'i') })
-    .first();
-  if (await opt.isVisible().catch(() => false)) await opt.click();
-  else await page.getByText(ARTIST, { exact: true }).first().click();
-  await settle(3000);
-  await snap('artist picked');
-  await settle(8000);
-  await snap('artist picked settle');
-}
+  try {
+    await page.goto(origin, { waitUntil: 'domcontentloaded' });
+    await snap('homepage');
+    const reject = page.getByRole('button', { name: /reject all/i });
+    if (await reject.isVisible()) await reject.click();
 
-export async function say({ page, snap, settle }, text, label) {
-  const input = page
-    .locator('textarea, [aria-label="Chat message input" i]')
-    .first();
-  await input.click();
-  await input.pressSequentially(text, { delay: 40 });
-  await settle(500);
-  await input.press('Enter');
-  await settle(4000);
-  await snap(`${label} sent`);
-  await settle(8000);
-  await snap(`${label} settle`);
-}
+    await page
+      .getByRole('link', { name: 'Claim your profile', exact: true })
+      .and(page.getByTestId('homepage-primary-cta'))
+      .click({ timeout });
+    await page.waitForURL(
+      url => url.origin === origin && url.pathname === '/start',
+      { timeout }
+    );
+    await snap('claim chat');
 
-export async function clickIf(
-  { page, snap, settle },
-  nameRe,
-  label,
-  wait = 8000
-) {
-  const b = page.getByRole('button', { name: nameRe }).last();
-  await b.waitFor({ state: 'visible', timeout: 20000 });
-  await b.click();
-  await settle(3000);
-  await snap(`${label} clicked`);
-  await settle(wait);
-  await snap(`${label} settle`);
-}
+    const input = page.getByLabel('Chat Message Input', { exact: true });
+    const send = page.getByRole('button', {
+      name: 'Send message',
+      exact: true,
+    });
+    await input.fill(ARTIST_SPOTIFY, { timeout });
+    await send.click({ timeout });
+    await page
+      .getByText(ARTIST, { exact: true })
+      .filter({ visible: true })
+      .first()
+      .waitFor({ timeout });
+    await page
+      .locator(
+        '[data-testid^="onboarding-profile-rail"][data-catalog-releases]:not([data-catalog-releases="0"]):visible'
+      )
+      .first()
+      .waitFor({ timeout });
+    await snap('artist catalog preview');
 
-export async function emailSignup({ page, snap, settle, otp, email }) {
-  const field = page.getByRole('textbox', { name: /^email/i }).last();
-  await field.click();
-  await field.pressSequentially(email, { delay: 25 });
-  await settle(800);
-  await snap('signup email typed');
-  const started = Date.now();
-  await page
-    .getByRole('button', { name: /send sign-in code/i })
-    .last()
-    .click();
-  const code = await otp(started);
-  await settle(1500);
-  await snap('signup otp step');
-  const codeInput = page.getByLabel(/one-time password/i).first();
-  await codeInput.focus().catch(() => {});
-  await page.keyboard.type(code, { delay: 90 });
-  await settle(2500);
-  await snap('signup code entered');
-  await settle(10000);
-  await snap('after signup settle');
+    // Some chat turns already offer a handle after the artist selection.
+    const handleCard = page.getByTestId('onboarding-handle-check').last();
+    if (!(await handleCard.isVisible())) {
+      await input.fill('Set my profile handle', { timeout });
+      await send.click({ timeout });
+    }
+    await handleCard.getByTestId('onboarding-edit-handle').click({ timeout });
+    await handleCard
+      .getByLabel('Edit Proposed Handle')
+      .fill(handle, { timeout });
+    await handleCard
+      .getByTestId('onboarding-confirm-handle')
+      .click({ timeout });
+    await snap('handle confirmed');
+
+    const field = page.getByRole('textbox', { name: /^email/i }).last();
+    await field.fill(email, { timeout });
+    const signedUpAt = Date.now();
+    await page
+      .getByRole('button', { name: /send sign-in code/i })
+      .last()
+      .click({ timeout });
+    const code = await otp(signedUpAt);
+    const codeInput = page.getByTestId('otp-autofill-input').first();
+    await codeInput.waitFor({ timeout });
+    await snap('signup otp step');
+    const [claim] = await Promise.all([
+      page.waitForResponse(
+        response => {
+          const url = new URL(response.url());
+          return (
+            url.origin === origin &&
+            url.pathname === '/api/onboarding/claim' &&
+            response.request().method() === 'POST'
+          );
+        },
+        { timeout }
+      ),
+      codeInput.fill(code, { timeout }),
+    ]);
+    assert.ok(!waitlistVisited, 'Walk visited /waitlist');
+    assert.ok(claim.ok(), `Onboarding claim returned HTTP ${claim.status()}`);
+    const result = await claim.json();
+    assert.ok(
+      !result.waitlist && !result.waitlistIntakeRequired,
+      'Claim hit a waitlist wall'
+    );
+    assert.ok(
+      !result.proofPending,
+      'Claim requires operator proof before publication'
+    );
+    assert.equal(
+      result.profile?.handle,
+      handle,
+      'Claim did not keep the chosen handle'
+    );
+    assert.ok(result.profile?.profileId, 'Claim did not materialize a profile');
+    await snap('signed in and onboarding claimed');
+
+    const profilePath = `/${handle}`;
+    const response = await page.goto(`${origin}${profilePath}?mode=listen`, {
+      waitUntil: 'domcontentloaded',
+      timeout,
+    });
+    assert.equal(
+      response?.status(),
+      200,
+      'Public profile did not return HTTP 200'
+    );
+    assert.equal(
+      new URL(page.url()).pathname,
+      profilePath,
+      'Profile redirected'
+    );
+    await page
+      .getByRole('heading', { level: 1, name: ARTIST, exact: true })
+      .waitFor({ timeout });
+    await page
+      .locator(`a[href^="${profilePath}/"]:visible`)
+      .first()
+      .waitFor({ timeout });
+    assert.ok(!waitlistVisited, 'Walk visited /waitlist');
+    await snap('profile live', {
+      receiptReached: true,
+      receiptMs: Date.now() - signedUpAt,
+    });
+  } catch (error) {
+    if (waitlistVisited)
+      throw new Error('Walk visited /waitlist', { cause: error });
+    throw error;
+  } finally {
+    page.off('request', onRequest);
+    page.off('framenavigated', onNavigation);
+  }
 }
