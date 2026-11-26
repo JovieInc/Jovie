@@ -42,6 +42,8 @@ export const ServerEnvSchema = z.object({
   VERCEL_ENV: z.enum(['development', 'preview', 'production']).optional(),
   NEXT_PUBLIC_APP_VERSION: z.string().optional(),
   NEXT_PUBLIC_BUILD_SHA: z.string().optional(),
+  // Read the deployment's profile hostname at runtime for auth-origin validation.
+  NEXT_PUBLIC_PROFILE_HOSTNAME: z.string().optional(),
   NEXT_PUBLIC_SENTRY_RELEASE: z.string().optional(),
   VERCEL_GIT_COMMIT_SHA: z.string().optional(),
   // Present on every GitHub Actions step; lets standalone CI servers answer
@@ -524,6 +526,7 @@ export const ENV_KEYS = [
   'VERCEL_ENV',
   'NEXT_PUBLIC_APP_VERSION',
   'NEXT_PUBLIC_BUILD_SHA',
+  'NEXT_PUBLIC_PROFILE_HOSTNAME',
   'NEXT_PUBLIC_SENTRY_RELEASE',
   'VERCEL_GIT_COMMIT_SHA',
   'GITHUB_SHA',
