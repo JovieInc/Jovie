@@ -28,7 +28,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from pr_event_queries import linear_issue, RETIREMENT_QUERY
+from pr_event_queries import (  # noqa: E402
+    RETIREMENT_QUERY, linear_issue, list_open_prs,
+)
 import cloud_lane  # noqa: E402  (JOV-10357 draft-only origin check; leaf module, no runner import)
 import disk_guard  # noqa: E402
 import lifecycle, pr_wip, repair_order, repair_win  # noqa: E402  (pr_wip: per-producer WIP census; repair_order: fair claims)
@@ -700,6 +702,9 @@ def terminal_signal(pr: dict) -> bool:
 
 
 POISON_LABEL = "queue-poison"
+BACKLOG_PROTECTED_LABELS = HOLD_LABELS | {
+    "needs-outside-review", "do-not-ready", "duplicate", "last-repair-try", POISON_LABEL,
+} | {PREFIX + kind for kind in FIX_KINDS + TICK_KINDS + (EXHAUSTED, "escalating")}
 POISON_WINDOW_S = 24 * 3600
 # Only a failed merge group says something about the PR's code (not manual, merged, conflict).
 FAILED_DEQUEUE = "failed_checks"
@@ -1380,10 +1385,11 @@ def backlog_targets(prs: list[dict], disabled: set[str], kinds=("conflict", "gre
     return targets
 
 
-def list_open(sh=run) -> list[dict]:
-    listed = sh(["gh", "pr", "list", "--repo", REPO, "--state", "open", "--limit", "300", "--json",
-                 "number,headRefName,headRefOid,isDraft,mergeable,mergeStateStatus,isCrossRepository,labels"], timeout=180)
-    return json.loads(listed.stdout or "[]") if listed.returncode == 0 else []
+def list_open(sh=run, *, enrich_conflicted_drafts: bool = False) -> list[dict]:
+    return list_open_prs(REPO, lambda args: red_repair.gh_read(args, None if sh is run else sh),
+                         red_repair.writer_active, LANE_BRANCH.match,
+                         BACKLOG_PROTECTED_LABELS, AGENT_DRAFT_S,
+                         enrich_conflicted_drafts=enrich_conflicted_drafts)
 
 
 def label_backlog(sh=run, disabled: set[str] | None = None, kinds=("conflict", "green", "orphan"),
@@ -1391,10 +1397,10 @@ def label_backlog(sh=run, disabled: set[str] | None = None, kinds=("conflict", "
     """GitHub computes mergeability lazily after main moves: a first read starts it, so PRs
     still UNKNOWN are read once more after `settle_s`."""
     disabled = disabled_lanes() if disabled is None else disabled
-    prs = list_open(sh)
+    prs = list_open(sh, enrich_conflicted_drafts="conflict" in kinds)
     if "conflict" in kinds and any(pr.get("mergeable") == "UNKNOWN" for pr in prs) and settle_s:
         time.sleep(settle_s)
-        prs = list_open(sh) or prs
+        prs = list_open(sh, enrich_conflicted_drafts="conflict" in kinds) or prs
     by_number = {pr["number"]: pr for pr in prs}
     added = []
     for number, kind in backlog_targets(prs, disabled, kinds):
