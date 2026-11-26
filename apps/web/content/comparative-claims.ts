@@ -113,18 +113,6 @@ export const COMPARATIVE_CLAIMS = [
     robustness: 'robust',
   },
   {
-    id: 'benchmark.vs-linktree.third-party',
-    metric: 'third-party-hosts',
-    direction: 'lower-is-better',
-    wording:
-      'No third-party requests on load. Linktree’s page contacts {n} third-party hosts.',
-    baseline: { jovie: 0, competitor: 5 },
-    spread: { jovie: [0, 0], competitor: [5, 5] },
-    minMargin: 2,
-    jovieExact: 0,
-    robustness: 'robust',
-  },
-  {
     id: 'benchmark.vs-linktree.performance-score',
     metric: 'performance-score',
     direction: 'higher-is-better',

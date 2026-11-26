@@ -122,17 +122,24 @@ describe('comparative claims registry', () => {
     ).toBe(false);
   });
 
-  it('requires an exact zero for the no-third-party claim', () => {
-    const thirdParty = COMPARATIVE_CLAIMS.find(
-      c => c.metric === 'third-party-hosts'
+  it('keeps the contradicted zero-third-party claim out of the comparison', () => {
+    expect(COMPARATIVE_CLAIMS.map(claim => claim.id)).not.toContain(
+      'benchmark.vs-linktree.third-party'
     );
+  });
+
+  it('flags an exact-zero claim even when the ratio meets its floor', () => {
+    const claim = {
+      id: 'benchmark.vs-linktree.example',
+      direction: 'lower-is-better',
+      minMargin: 2,
+      jovieExact: 0,
+    } as const;
     expect(
-      evaluateComparativeClaim(thirdParty as never, { jovie: 0, competitor: 5 })
-        .holds
+      evaluateComparativeClaim(claim, { jovie: 0, competitor: 5 }).holds
     ).toBe(true);
     expect(
-      evaluateComparativeClaim(thirdParty as never, { jovie: 1, competitor: 5 })
-        .holds
+      evaluateComparativeClaim(claim, { jovie: 2, competitor: 5 }).holds
     ).toBe(false);
   });
 
