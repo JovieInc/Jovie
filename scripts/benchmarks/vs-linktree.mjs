@@ -166,8 +166,7 @@ async function main() {
       metric: claim.metric,
       live: live[claim.metric],
     }));
-    // Name the hosts on the Jovie side so a flagged exact-zero claim is
-    // diagnosable from the run output alone (receipt and CLAIM-FLAG line).
+    // Keep the observed third-party hosts in the receipt for diagnostics.
     const jovieThirdPartyHosts = [
       ...new Set(samples.jovie.flatMap(sample => sample.thirdPartyHosts)),
     ].sort();
@@ -183,11 +182,7 @@ async function main() {
     };
     if (outPath) writeFileSync(outPath, JSON.stringify(receipt, null, 2));
     for (const evaluation of evaluations) {
-      const hostNote =
-        evaluation.metric === 'third-party-hosts' && !evaluation.holds
-          ? ` jovie-hosts=[${jovieThirdPartyHosts.join(', ')}]`
-          : '';
-      const line = `${evaluation.holds ? 'ok  ' : 'CLAIM-FLAG'} ${evaluation.claimId} jovie=${evaluation.live.jovie} linktree=${evaluation.live.competitor} ${evaluation.reason}${hostNote}`;
+      const line = `${evaluation.holds ? 'ok  ' : 'CLAIM-FLAG'} ${evaluation.claimId} jovie=${evaluation.live.jovie} linktree=${evaluation.live.competitor} ${evaluation.reason}`;
       console.log(line);
     }
     process.exitCode = evaluations.every(item => item.holds) ? 0 : 1;

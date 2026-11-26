@@ -122,6 +122,20 @@ describe('comparative claims registry', () => {
     ).toBe(false);
   });
 
+  it('requires at least a 2x Total Blocking Time improvement', () => {
+    const claim = COMPARATIVE_CLAIMS.find(item => item.metric === 'tbt-ms');
+    if (!claim) throw new Error('Missing Total Blocking Time claim');
+
+    expect(claim.minMargin).toBe(2);
+    expect(
+      evaluateComparativeClaim(claim, { jovie: 1459.0765, competitor: 2711 })
+        .holds
+    ).toBe(false);
+    expect(
+      evaluateComparativeClaim(claim, { jovie: 100, competitor: 200 }).holds
+    ).toBe(true);
+  });
+
   it('keeps the contradicted zero-third-party claim out of the comparison', () => {
     expect(COMPARATIVE_CLAIMS.map(claim => claim.id)).not.toContain(
       'benchmark.vs-linktree.third-party'
