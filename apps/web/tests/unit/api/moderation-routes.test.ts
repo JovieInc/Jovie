@@ -20,10 +20,16 @@ vi.mock('@/lib/feedback', () => ({
   createFeedbackItem: hoisted.createFeedbackItem,
 }));
 vi.mock('@/lib/rate-limit', () => ({
-  allowIfRateLimitBackendDegraded: (r: unknown) => r,
   createRateLimitHeaders: () => ({}),
   getClientIP: () => '127.0.0.1',
   publicClickLimiter: { limit: hoisted.rateLimit },
+  rateLimitDenialStatus: (result: { unavailable?: boolean }) =>
+    result.unavailable === true ? 503 : 429,
+  rateLimitDenialMessage: (
+    result: { unavailable?: boolean },
+    exhausted: string,
+    unavailable = 'Temporarily unavailable.'
+  ) => (result.unavailable === true ? unavailable : exhausted),
 }));
 vi.mock('@/lib/utils/bot-detection', () => ({
   detectBot: vi.fn().mockReturnValue({ isBot: false }),
@@ -137,6 +143,13 @@ it('report intake rejects invalid input, rate limits, and maps errors', async ()
 
   hoisted.rateLimit.mockResolvedValue({ success: false });
   expect((await reportPost(report(validReport))).status).toBe(429);
+
+  hoisted.rateLimit.mockResolvedValue({
+    success: false,
+    unavailable: true,
+  });
+  expect((await reportPost(report(validReport))).status).toBe(503);
+  expect(hoisted.createFeedbackItem).not.toHaveBeenCalled();
 
   hoisted.rateLimit.mockResolvedValue({ success: true });
   hoisted.createFeedbackItem.mockRejectedValue(new Error('db down'));

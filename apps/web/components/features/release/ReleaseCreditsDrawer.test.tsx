@@ -100,6 +100,27 @@ describe('ReleaseCreditsDrawer', () => {
   });
 });
 
+describe('ReleaseCreditsDrawer desktop popover', () => {
+  it('opens a compact popover anchored to the trigger, not a sheet', () => {
+    const trigger = document.createElement('button');
+    document.body.appendChild(trigger);
+    render(
+      <ReleaseCreditsDrawer
+        open
+        onOpenChange={vi.fn()}
+        credits={credits}
+        anchorRef={{ current: trigger }}
+      />
+    );
+
+    expect(screen.getByTestId('popover-content')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Close Modal Overlay' })
+    ).not.toBeInTheDocument();
+    trigger.remove();
+  });
+});
+
 describe('ReleaseCreditsDrawer text contrast contract (JOV-8873)', () => {
   it('raises credit section labels to on-media/50', async () => {
     const { readFileSync } = await import('node:fs');

@@ -4,6 +4,7 @@
  *
  *   node scripts/prod-cert.mjs [--origin https://jov.ie] [--steps steps.json]
  *     [--out receipts.json] [--post] [--file-issues]
+ *     [--surfaces "chat checkout"] [--carry carry-plan.json]
  *
  * Reads the served build, probes every golden-path surface on production,
  * folds in the browser steps from the post-deploy Playwright run, writes one
@@ -11,6 +12,10 @@
  * (CRON_SECRET) and files or closes one owned Linear issue per failing
  * surface (deduped by fingerprint). Exit 1 when any surface failed; blocked
  * surfaces are reported, not failed.
+ *
+ * JOV-14402: with --carry, only the plan's recertify steps run; every carried
+ * step gets a carried receipt for the served SHA naming the run it came from.
+ * --surfaces narrows the steps that run further.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
@@ -30,6 +35,14 @@ import {
   runProductionCertification,
   SURFACE_IDS,
 } from './lib/prod-cert.mjs';
+import {
+  carriedReceipts,
+  currentStandIns,
+  inLaunchOrder,
+  loadCarryPlan,
+  parseSurfaceList,
+  surfacesToCertify,
+} from './lib/prod-cert-carry.mjs';
 import {
   coneScoreboard as buildConeScoreboard,
   formatConeScoreboardLine,
@@ -136,7 +149,7 @@ Production golden-path certification (JOV-9822), served build \`${verdict.served
 ${verdict.notGreen.map(n => `- \`${n.surface}\`: ${n.why}`).join('\n')}
 ${uncovered ? `\n## Uncovered JOV-6920 cone cases (fixed 31-case denominator; not run — no producer, never passed silently)\n${uncovered}\n` : ''}
 ## Why it matters
-The recovery email gate, agent-marketplace readiness and launch certification all require every surface to pass on the current production SHA within 24h.
+The recovery email gate, agent-marketplace readiness and launch certification all require every surface to pass, or carry a pass forward, on the current production SHA.
 
 ## Acceptance criteria or triage question
 A production certification run passes all eight surfaces on the served SHA; this issue closes itself then.
@@ -251,13 +264,21 @@ async function main() {
       out: { type: 'string', default: 'prod-cert-receipts.json' },
       post: { type: 'boolean', default: false },
       'file-issues': { type: 'boolean', default: false },
+      surfaces: { type: 'string' },
+      carry: { type: 'string' },
     },
   });
   const runUrl = process.env.GITHUB_RUN_ID
     ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
     : null;
   const steps = loadCertSteps(values.steps);
-  const { served, receipts } = await runProductionCertification({
+  const plan = loadCarryPlan(values.carry);
+  if (values.carry && !plan)
+    console.error(
+      'carry plan unreadable or malformed; certifying every requested step'
+    );
+  const surfaces = surfacesToCertify(plan, parseSurfaceList(values.surfaces));
+  const { served, receipts: certified } = await runProductionCertification({
     origin: values.origin,
     steps,
     authStatus: process.env.AUTH_SMOKE_STATUS || 'unknown',
@@ -270,7 +291,12 @@ async function main() {
         : null,
     // JOV-6920: the runner always certifies the full cone registry.
     coneCases: true,
+    surfaces,
   });
+  const receipts = inLaunchOrder([
+    ...certified,
+    ...carriedReceipts(plan, { served, runUrl }),
+  ]);
   // JOV-6920 fixed-denominator cone scoreboard (31 cases; uncovered is
   // reported, never passed).
   const coneScoreboard = buildConeScoreboard(receipts);
@@ -287,6 +313,9 @@ async function main() {
     console.log(
       `${r.status.padEnd(7)} ${r.surface.padEnd(15)} ${r.sha.slice(0, 8)}  ${
         r.blocker ??
+        (
+          r.carriedFrom ? `carried from ${r.carriedFrom.sha.slice(0, 8)}` : null
+        ) ??
         r.checks
           .filter(c => c.status === 'failed')
           .map(c => c.id)
@@ -294,13 +323,15 @@ async function main() {
       }`
     );
   }
-  const verdict = certificationVerdict(receipts, { servedSha: served.sha });
+  // Steps already certified on this SHA are judged green, never re-posted.
+  const judged = inLaunchOrder([...receipts, ...currentStandIns(plan, served)]);
+  const verdict = certificationVerdict(judged, { servedSha: served.sha });
   console.log(
     verdict.certified
       ? `certified: all surfaces passed on ${served.sha}`
       : `not certified on ${served.sha}: ${verdict.notGreen.map(n => `${n.surface} (${n.why})`).join(', ')}`
   );
-  console.log(splitLine(verdictSplit(receipts, SURFACE_IDS)));
+  console.log(splitLine(verdictSplit(judged, SURFACE_IDS)));
   if (values['file-issues'] && remediationTriggersEnabled()) {
     console.log(JSON.stringify(await fileSurfaceIssues(receipts, { runUrl })));
     console.log(
@@ -311,7 +342,7 @@ async function main() {
     // The one issue the fleet admits first: the topmost surface not green.
     console.log(
       JSON.stringify(
-        await fileBottleneckIssue(receipts, {
+        await fileBottleneckIssue(judged, {
           servedSha: served.sha,
           surfaceOrder: paidPathOrder(SURFACE_IDS),
           runUrl,

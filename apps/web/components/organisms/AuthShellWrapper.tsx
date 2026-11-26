@@ -66,6 +66,8 @@ export interface AuthShellWrapperProps {
   readonly persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
   readonly sidebarDefaultOpen?: boolean;
   readonly previewPanelDefaultOpen?: boolean;
+  /** Streamed fallback: keep the live frame landmark off the placeholder shell. */
+  readonly framePlaceholder?: boolean;
   readonly children: ReactNode;
 }
 
@@ -91,6 +93,7 @@ function AuthShellWrapperInner({
   persistSidebarCollapsed,
   sidebarDefaultOpen,
   previewPanelDefaultOpen,
+  framePlaceholder = false,
   children,
 }: Readonly<{
   mode: AppShellMode;
@@ -98,6 +101,7 @@ function AuthShellWrapperInner({
   persistSidebarCollapsed?: AuthShellWrapperProps['persistSidebarCollapsed'];
   sidebarDefaultOpen?: boolean;
   previewPanelDefaultOpen?: boolean;
+  framePlaceholder?: boolean;
   children: ReactNode;
 }>) {
   const config = useAuthRouteConfig(mode);
@@ -302,6 +306,7 @@ function AuthShellWrapperInner({
                 isChatRoute={config.isChatRoute}
                 onSidebarOpenChange={handleSidebarOpenChange}
                 sidebarDefaultOpen={sidebarDefaultOpen}
+                framePlaceholder={framePlaceholder}
               >
                 {shellChildren}
               </AuthShell>
@@ -331,6 +336,7 @@ export function AuthShellWrapper({
   persistSidebarCollapsed,
   sidebarDefaultOpen,
   previewPanelDefaultOpen,
+  framePlaceholder,
   children,
 }: Readonly<AuthShellWrapperProps>) {
   return (
@@ -345,6 +351,7 @@ export function AuthShellWrapper({
                 persistSidebarCollapsed={persistSidebarCollapsed}
                 sidebarDefaultOpen={sidebarDefaultOpen}
                 previewPanelDefaultOpen={previewPanelDefaultOpen}
+                framePlaceholder={framePlaceholder}
               >
                 {children}
               </AuthShellWrapperInner>

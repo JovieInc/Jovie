@@ -214,9 +214,9 @@ describe('signup page', () => {
         showFormTitle: false,
         showFooterPrompt: false,
         layoutVariant: 'stack',
-        contentPlacement: 'center',
       })
     );
+    expect(authLayoutMock.mock.calls[0]?.[0].contentPlacement).toBeUndefined();
     expect(authLayoutMock.mock.calls[0]?.[0].chrome).not.toBe('splash-b');
     expect(
       screen.queryByText('Start your private launch request.')

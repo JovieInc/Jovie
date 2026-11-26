@@ -14,6 +14,10 @@ inputs:
     description: "'true' restores and saves caches; 'restore' only restores them (jobs that run PR-controlled code); 'false' uses none"
     required: false
     default: 'true'
+  visual_baselines:
+    description: "'true' replaces the Git LFS pointers of the visual-test baselines with their images; 'false' leaves them as pointers"
+    required: false
+    default: 'true'
 
 runs:
   using: 'composite'
@@ -184,3 +188,13 @@ runs:
       run: |
         os_name="$(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME" || uname -sr)"
         echo "::error title=Playwright cannot install on this runner image::runner image ${ImageOS:-unknown} ${ImageVersion:-unknown} (${os_name}); runs-on may be a floating label. Pin it to a supported image such as ubuntu-24.04; see scripts/workflow-runner-pin-check.mjs."
+
+    # Visual-test baselines are Git LFS files (.gitattributes); checkout leaves
+    # pointers, and toHaveScreenshot cannot read one. A cache keyed by the
+    # pointers means LFS bandwidth is spent only when a baseline changes.
+    - name: Pull visual-test baselines (Git LFS)
+      if: inputs.visual_baselines == 'true'
+      uses: ./.github/actions/lfs-pull
+      with:
+        include: apps/web/tests/e2e/__snapshots__/**
+        cache: ${{ inputs.cache }}

@@ -133,4 +133,23 @@ describe('ContentSurfaceCard', () => {
     expect(screen.getByRole('region', { name: 'Plan summary' })).toBeVisible();
     await expectNoA11yViolations(container);
   });
+
+  it('passes the card intent through as data-card-intent', () => {
+    render(
+      <>
+        <ContentSurfaceCard intent='selectable' data-testid='typed'>
+          Option
+        </ContentSurfaceCard>
+        <ContentSurfaceCard data-testid='untyped'>Legacy</ContentSurfaceCard>
+      </>
+    );
+
+    expect(screen.getByTestId('typed')).toHaveAttribute(
+      'data-card-intent',
+      'selectable'
+    );
+    expect(screen.getByTestId('untyped')).not.toHaveAttribute(
+      'data-card-intent'
+    );
+  });
 });

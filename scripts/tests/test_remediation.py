@@ -52,7 +52,6 @@ def providers():
     }
 
 
-
 def ask_classify(*args, **kwargs):
     """Detection view of classify_blocker. EVENT 2026-10-28: a reserved decision never changes the
     class (nothing parks); it rides along as `decisionAsk`. These tests keep asserting what counts
@@ -798,6 +797,7 @@ class DoctorAndIntakeTest(unittest.TestCase):
         self.assertIsNone(remediation.non_pr_event("workflow_run", {"workflow_run": {
             "event": "pull_request", "conclusion": "failure", "pull_requests": [{"number": 1}]}}))
 
+
     def test_registry_hyperagent_is_a_remote_only_regular_lane(self):
         # JOV-7706: Hyperagent is enabled, on a deliberate auto-mode agent id, but it cannot
         # continue a local worktree, so handoff and escalation never pick it.
@@ -845,7 +845,7 @@ def linear_issue(identifier, fingerprint, *, state="unstarted", title="", descri
         "url": f"https://linear.app/jov/{identifier}",
         "state": {"name": name, "type": state},
         "team": {"key": team, "states": {"nodes": [
-            {"id": f"todo-{team}", "name": "Todo", "type": "unstarted"},
+            {"id": f"todo-{team}", "name": "Todo", "type": "unstarted"}, {"id": f"backlog-{team}", "name": "Backlog"},
             {"id": f"ip-{team}", "name": "In Progress", "type": "started"},
         ]}},
         "labels": {"nodes": [{"id": "lab-" + fingerprint, "name": f"remediation:{fingerprint}"}]},
@@ -1095,7 +1095,7 @@ class LabeledEventTest(unittest.TestCase):
         finally:
             os.environ.pop("LANES_ESCALATION", None)
         self.assertEqual(recur["events"]["e2e-login-timeout"]["identifier"], "JOV-1")
-        self.assertEqual(recur["reopens"], [{"id": "id-JOV-1", "stateId": "todo-JOV"}])
+        self.assertEqual(recur["reopens"], [{"id": "id-JOV-1", "stateId": "backlog-JOV"}], "reopened into Backlog for admission")
 
     def test_stuck_pr_ladder_is_on_and_sweep_labels_are_ordinary_events(self):
         os.environ.pop("LANES_ESCALATION_STUCK_PRS", None)

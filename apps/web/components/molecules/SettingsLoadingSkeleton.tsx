@@ -28,9 +28,7 @@ export function SettingsLoadingSkeleton({
             <div className={`h-7 ${titleWidth} rounded skeleton`} />
             <div className={`h-4 ${descriptionWidth} rounded skeleton`} />
           </div>
-          <div className='space-y-4 rounded-2xl border border-subtle bg-surface-0 p-4 sm:p-5'>
-            {children}
-          </div>
+          <div className='space-y-4 py-4 sm:py-5'>{children}</div>
         </section>
       </div>
     </div>
@@ -58,7 +56,7 @@ export function ToggleRowSkeleton({
   labelWidth?: string;
 }>) {
   return (
-    <div className='flex items-center justify-between gap-4 rounded-xl bg-surface-0 px-3 py-2.5'>
+    <div className='flex items-center justify-between gap-4 px-3 py-2.5'>
       <div className={`h-4 ${labelWidth} rounded skeleton`} />
       <div className='h-6 w-10 rounded-full skeleton' />
     </div>
@@ -131,7 +129,7 @@ export function PixelsSectionSkeleton() {
       </div>
 
       {[1, 2, 3].map(i => (
-        <div key={i} className='space-y-3 rounded-lg bg-surface-0 p-4'>
+        <div key={i} className='space-y-3 p-4'>
           <div className='flex items-center justify-between'>
             <div className='h-4 w-44 rounded skeleton' />
             <div className='h-3 w-24 rounded skeleton' />
@@ -158,7 +156,7 @@ export function PixelsSectionSkeleton() {
 export function ContactsSectionSkeleton() {
   return (
     <div className='space-y-3' aria-hidden='true'>
-      <div className='divide-y divide-subtle/60 rounded-lg bg-surface-0'>
+      <div className='divide-y divide-subtle/60'>
         <div className='space-y-1.5 px-3 py-3'>
           <div className='h-3 w-20 rounded skeleton' />
           <div className='flex items-center gap-2'>

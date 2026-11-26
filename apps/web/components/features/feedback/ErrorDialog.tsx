@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import {
   Dialog,
   DialogActions,
@@ -52,22 +53,22 @@ export function ErrorDialog({
         </DialogBody>
         <DialogActions>
           {secondaryActionLabel ? (
-            <button
+            <PlainButton
               type='button'
               onClick={onSecondaryAction ?? onClose}
               className='inline-flex items-center justify-center rounded-md border border-subtle px-4 py-2 text-sm font-medium text-secondary-token transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
             >
               {secondaryActionLabel}
-            </button>
+            </PlainButton>
           ) : null}
-          <button
+          <PlainButton
             type='button'
             onClick={onPrimaryAction ?? onClose}
             className='inline-flex items-center justify-center rounded-md bg-btn-primary px-4 py-2 text-sm font-medium text-btn-primary-foreground transition hover:bg-btn-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ring'
             data-testid='error-dialog-primary-action'
           >
             {primaryActionLabel ?? 'Retry'}
-          </button>
+          </PlainButton>
         </DialogActions>
       </div>
     </Dialog>

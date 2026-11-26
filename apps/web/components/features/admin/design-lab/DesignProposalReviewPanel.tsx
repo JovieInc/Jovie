@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Textarea } from '@jovie/ui';
 
 import {
   Check,
@@ -481,7 +481,7 @@ export function DesignProposalReviewPanel() {
 
       {pendingNotes ? (
         <div
-          className='fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center'
+          className='fixed inset-0 z-50 flex items-end justify-center bg-ink-on-media/40 p-4 sm:items-center'
           role='dialog'
           aria-modal='true'
           aria-label={notesDialogTitle(pendingNotes.decision)}
@@ -513,11 +513,11 @@ export function DesignProposalReviewPanel() {
               </p>
             </div>
 
-            <textarea
+            <Textarea
               value={notesDraft}
               onChange={event => setNotesDraft(event.target.value)}
               rows={5}
-              className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-app text-primary-token outline-none'
+              aria-label='Decision Notes'
               placeholder='Add notes for this decision'
             />
 

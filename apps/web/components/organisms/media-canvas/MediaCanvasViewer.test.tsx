@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -185,5 +187,18 @@ describe('MediaCanvasViewer', () => {
       play.mockRestore();
       pause.mockRestore();
     }
+  });
+});
+
+describe('MediaCanvasViewer play glyph', () => {
+  it('draws the play triangle through PlayIcon (JOV-12568)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './MediaCanvasViewer.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain('<PlayIcon');
+    expect(source).toContain("from '@/components/atoms/PlayIcon'");
+    expect(source).not.toContain('translate-x-px');
   });
 });

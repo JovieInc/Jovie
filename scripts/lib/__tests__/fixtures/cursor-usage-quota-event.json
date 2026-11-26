@@ -1,0 +1,10 @@
+{
+  "accountId": "company-ultra",
+  "pool": "included-auto",
+  "observedAt": "2026-11-18T20:16:12Z",
+  "providerEventId": "c7e2f8a91b0d4e6f9a2c1d3b5e7f8091",
+  "plan": { "tier": "ultra" },
+  "limitScope": "included-usage",
+  "remaining": null,
+  "transcript": "error: You're out of usage for the default model pool. Switch to Auto or try again in 5 hours.\nResets at 2026-11-19T01:16:12Z"
+}

@@ -14,6 +14,7 @@ import {
 } from '@/lib/auth/auth-offer-optimization';
 import {
   AUTH_TROUBLE_SIGNING_IN_LABEL,
+  type AuthShellAccessKind,
   type AuthShellBackLink,
   type AuthShellIntent,
   type AuthShellMode,
@@ -51,7 +52,7 @@ import { preserveAuthTouchOwnership } from './constants';
 import { EmailCodeAuthForm } from './EmailCodeAuthForm';
 import { GoogleOneTap } from './GoogleOneTap';
 
-export type { AuthShellIntent, AuthShellMode };
+export type { AuthShellAccessKind, AuthShellIntent, AuthShellMode };
 
 const AUTH_LEGAL_FALLBACK_HREFS = {
   privacy: APP_ROUTES.LEGAL_PRIVACY,
@@ -145,8 +146,13 @@ interface AuthShellProps {
    * Email prefill for the email-code form (e.g. `?email=` deep links).
    */
   readonly initialValues?: { readonly emailAddress?: string };
-  /** Claim handle for "Claim @handle". Falls back to `?handle=`. */
+  /** Claim handle for "Claim @handle" / "Reserve @handle". Falls back to `?handle=`. */
   readonly claimHandle?: string;
+  /**
+   * Product access bind (JOV-8052 / ONB-23). Waitlist decisions must not
+   * title the shell as Claim. Default `claim` preserves existing callers.
+   */
+  readonly accessKind?: AuthShellAccessKind;
   /** Quiet unboxed back. Compact/modal callers own their own back. */
   readonly back?: AuthShellBackLink | null;
   /**
@@ -182,6 +188,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     forceOppositeModeHardNavigation = false,
     compact = false,
     claimHandle: claimHandleProp,
+    accessKind = 'claim',
     back: backProp,
     marketingCapture = false,
   } = props;
@@ -250,7 +257,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
       normalizeAuthClaimHandle(claimHandleProp ?? searchParams.get('handle')),
     [claimHandleProp, searchParams]
   );
-  const intent = resolveAuthShellIntent({ mode, claimHandle });
+  const intent = resolveAuthShellIntent({ mode, claimHandle, accessKind });
   const back = compact
     ? null
     : (backProp ?? resolveAuthShellBackLink(searchParams));

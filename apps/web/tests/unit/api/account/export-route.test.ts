@@ -93,6 +93,7 @@ describe('GET /api/account/export (JOV-6267)', () => {
     );
 
     expect(response.status).toBe(200);
+    expect(mockGetCachedAuth).toHaveBeenCalledWith({ session: 'fresh' });
     expect(query.sql).toContain('"users"."id" =');
     expect(query.sql).not.toContain('clerk_id');
     expect(query.params).toEqual([APP_UUID]);

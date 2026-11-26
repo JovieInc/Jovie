@@ -39,7 +39,7 @@ describe('shipping reviewer policy', () => {
       route: 'workers-ai-only',
       fallback: null,
       gatewayKey: null,
-      models: ['@cf/zai-org/glm-5.3-flash'],
+      models: ['@cf/deepseek-ai/deepseek-v4.1-flash-1017'],
     });
     expect(
       evaluateRouting({

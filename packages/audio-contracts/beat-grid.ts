@@ -36,7 +36,12 @@ function requireStrictlyIncreasing(
   values: readonly number[],
   field: string
 ): void {
-  if (values.slice(1).some((value, index) => value <= values[index])) {
+  if (
+    values.slice(1).some((value, index) => {
+      const previous = values[index];
+      return previous !== undefined && value <= previous;
+    })
+  ) {
     throw new RangeError(`${field} must be strictly increasing`);
   }
 }

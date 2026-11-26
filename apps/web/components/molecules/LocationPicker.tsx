@@ -1,9 +1,17 @@
 'use client';
 
-import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
+import {
+  HostDrawnInput,
+  PlainButton,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@jovie/ui';
 import { Check, Search } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { POPULAR_CITIES } from '@/constants/cities';
+import { cn } from '@/lib/utils';
+import './LocationPicker.search.css';
 
 /** Top cities shown before the full alphabetical list */
 const FEATURED_CITIES = POPULAR_CITIES.slice(0, 10);
@@ -24,20 +32,22 @@ const CityOption = memo(function CityOption({
   }, [onSelect, label]);
 
   return (
-    <button
+    <PlainButton
       type='button'
       onClick={handleClick}
-      className={`w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-app transition-colors ${
+      className={cn(
+        'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-app transition-colors',
         isSelected
-          ? 'bg-interactive-hover text-primary-token font-medium'
+          ? 'bg-interactive-hover font-medium text-primary-token'
           : 'text-secondary-token hover:bg-interactive-hover hover:text-primary-token'
-      }`}
+      )}
+      data-testid='location-picker-option'
     >
       <span className='flex-1 text-left capitalize'>{label}</span>
-      {isSelected && (
-        <Check className='w-3.5 h-3.5 shrink-0 text-primary-token' />
-      )}
-    </button>
+      {isSelected ? (
+        <Check className='h-3.5 w-3.5 shrink-0 text-primary-token' />
+      ) : null}
+    </PlainButton>
   );
 });
 
@@ -91,35 +101,34 @@ export function LocationPicker({
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-      <PopoverContent align='start' sideOffset={4} className='w-64 p-0'>
-        {/* Search input */}
-        <div className='flex items-center gap-2 border-b border-subtle px-3 py-2'>
+      <PopoverContent align='start' sideOffset={4} size='bare' className='w-64'>
+        <div className='location-picker-search flex items-center gap-2 border-b border-subtle px-3 py-2'>
           <Search className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-          <input
+          <HostDrawnInput
             ref={searchRef}
             type='text'
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={placeholder ?? 'Search cities...'}
-            className='flex-1 bg-transparent text-app text-primary-token placeholder:text-tertiary-token outline-none'
+            aria-label='Search Cities'
+            className='min-w-0 flex-1'
           />
         </div>
 
         <div className='max-h-64 overflow-y-auto p-1.5'>
-          {/* Free-text option */}
-          {showFreeText && (
-            <button
+          {showFreeText ? (
+            <PlainButton
               type='button'
               onClick={() => handleSelect(search.trim())}
-              className='w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-app text-secondary-token hover:bg-interactive-hover hover:text-primary-token'
+              className='flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-app text-secondary-token hover:bg-interactive-hover hover:text-primary-token'
+              data-testid='location-picker-free-text'
             >
               <span className='flex-1 text-left'>
                 Use &ldquo;{search.trim()}&rdquo;
               </span>
-            </button>
-          )}
+            </PlainButton>
+          ) : null}
 
-          {/* When searching: show filtered results */}
           {filteredCities !== null &&
             filteredCities.length > 0 &&
             filteredCities.map(city => (
@@ -131,17 +140,16 @@ export function LocationPicker({
               />
             ))}
           {filteredCities !== null &&
-            filteredCities.length === 0 &&
-            showFreeText === false && (
-              <p className='px-2.5 py-3 text-app text-tertiary-token text-center'>
-                No matching cities
-              </p>
-            )}
-          {filteredCities === null && (
+          filteredCities.length === 0 &&
+          showFreeText === false ? (
+            <p className='px-2.5 py-3 text-center text-app text-tertiary-token'>
+              No matching cities
+            </p>
+          ) : null}
+          {filteredCities === null ? (
             <>
-              {/* Popular cities */}
-              <div className='px-2.5 pt-1 pb-1'>
-                <span className='text-3xs font-medium uppercase tracking-wider text-quaternary-token'>
+              <div className='px-2.5 pb-1 pt-1'>
+                <span className='text-3xs font-medium tracking-wider text-quaternary-token'>
                   Popular
                 </span>
               </div>
@@ -154,9 +162,8 @@ export function LocationPicker({
                 />
               ))}
 
-              {/* All cities */}
-              <div className='px-2.5 pt-3 pb-1'>
-                <span className='text-3xs font-medium uppercase tracking-wider text-quaternary-token'>
+              <div className='px-2.5 pb-1 pt-3'>
+                <span className='text-3xs font-medium tracking-wider text-quaternary-token'>
                   All Cities
                 </span>
               </div>
@@ -169,7 +176,7 @@ export function LocationPicker({
                 />
               ))}
             </>
-          )}
+          ) : null}
         </div>
       </PopoverContent>
     </Popover>

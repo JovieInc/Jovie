@@ -74,10 +74,55 @@ function runMatrixMember(shard, exitCode = 0) {
 }
 
 describe('combined-head Storybook certification deduplication', () => {
-  it('runs one certification beside all three browser shards only on merge groups', () => {
-    expect(matrixFor('merge_group')).toEqual([1, 2, 3, 'certification']);
-    expect(matrixFor('push')).toEqual([1, 2, 3]);
-    expect(matrixFor('workflow_dispatch')).toEqual([1, 2, 3]);
+  it('keeps exactly the pre-shard browser spec union', () => {
+    expect(
+      matrixStep.run.match(/tests\/e2e\/storybook-[\w-]+\.spec\.ts/g)
+    ).toEqual([
+      'tests/e2e/storybook-agent-status.spec.ts',
+      'tests/e2e/storybook-chat-composer-streaming.spec.ts',
+      'tests/e2e/storybook-destructive-button.spec.ts',
+      'tests/e2e/storybook-download-visual.spec.ts',
+      'tests/e2e/storybook-elevation.spec.ts',
+      'tests/e2e/storybook-input.spec.ts',
+      'tests/e2e/storybook-status-copy.spec.ts',
+      'tests/e2e/storybook-marketing-faq.spec.ts',
+      'tests/e2e/storybook-marketing-h1.spec.ts',
+      'tests/e2e/storybook-skeleton.spec.ts',
+      'tests/e2e/storybook-separator.spec.ts',
+      'tests/e2e/storybook-scoped-theme.spec.ts',
+      'tests/e2e/storybook-sheet.spec.ts',
+      'tests/e2e/storybook-overlay-collisions.spec.ts',
+      'tests/e2e/storybook-profile-claim-name.spec.ts',
+      'tests/e2e/storybook-spotify-connect.spec.ts',
+      'tests/e2e/storybook-ovie-privacy-boundary.spec.ts',
+      'tests/e2e/storybook-onboarding-dsp-strip-clearance.spec.ts',
+      'tests/e2e/storybook-onboarding-recovery.spec.ts',
+      'tests/e2e/storybook-task-row-geometry.spec.ts',
+      'tests/e2e/storybook-desktop-update-modal.spec.ts',
+      'tests/e2e/storybook-desktop-update-control.spec.ts',
+      'tests/e2e/storybook-dsp-details.spec.ts',
+      'tests/e2e/storybook-smart-link-reachability.spec.ts',
+    ]);
+    expect(
+      readFileSync(
+        join(repoRoot, 'apps/web/playwright.config.storybook.ts'),
+        'utf8'
+      )
+    ).toContain('fullyParallel: true');
+  });
+
+  it('runs one certification beside all six browser shards only on merge groups', () => {
+    expect(matrixFor('merge_group')).toEqual([
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      'certification',
+    ]);
+    expect(matrixFor('push')).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(matrixFor('workflow_dispatch')).toEqual([1, 2, 3, 4, 5, 6]);
     expect(matrixStep.env.STORYBOOK_SHARD).toBe('${{ matrix.shard }}');
     expect(job['continue-on-error']).not.toBe(true);
     expect(matrixStep['continue-on-error']).not.toBe(true);
@@ -98,7 +143,7 @@ describe('combined-head Storybook certification deduplication', () => {
     expect(result.stdout).not.toContain('playwright test');
   }, 40_000);
 
-  it.each([1, 2, 3])(
+  it.each([1, 2, 3, 4, 5, 6])(
     'keeps the complete browser spec list in shard %s without repeating certification',
     shard => {
       const result = runMatrixMember(shard);
@@ -119,12 +164,12 @@ describe('combined-head Storybook certification deduplication', () => {
       expect(
         result.stdout.match(/tests\/e2e\/storybook-scoped-theme\.spec\.ts/g)
       ).toHaveLength(1);
-      expect(result.stdout).toContain(`--workers=2 --shard=${shard}/3`);
+      expect(result.stdout).toContain(`--workers=2 --shard=${shard}/6`);
     },
     40_000
   );
 
-  it.each(['certification', 1, 2, 3])(
+  it.each(['certification', 1, 2, 3, 4, 5, 6])(
     'propagates failure from matrix member %s',
     shard => {
       const result = runMatrixMember(shard, 23);

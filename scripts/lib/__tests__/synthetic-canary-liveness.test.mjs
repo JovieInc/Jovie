@@ -386,6 +386,7 @@ describe('synthetic canary dead-man', () => {
       const output = readFileSync(env.GITHUB_OUTPUT, 'utf8');
       const summary = readFileSync(env.GITHUB_STEP_SUMMARY, 'utf8');
       expect(output).toContain('test_status=deferred\n');
+      expect(output).toContain('missed_slot=false\n');
       expect(output).not.toContain(secret);
       expect(summary).toContain('**deferred**');
       expect(summary).not.toContain(secret);
@@ -418,6 +419,9 @@ describe('synthetic canary dead-man', () => {
         ).toBe(healthy ? 0 : 1);
         expect(readFileSync(env.GITHUB_OUTPUT, 'utf8')).toContain(
           `test_status=${healthy ? 'passed' : 'failed'}\n`
+        );
+        expect(readFileSync(env.GITHUB_OUTPUT, 'utf8')).toContain(
+          `missed_slot=${healthy ? 'false' : 'true'}\n`
         );
         expect(readFileSync(env.GITHUB_OUTPUT, 'utf8')).toContain(
           'run_url=https://github.com/JovieInc/Jovie/actions/'

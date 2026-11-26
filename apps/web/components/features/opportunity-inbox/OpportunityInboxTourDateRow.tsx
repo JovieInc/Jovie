@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { type TouchEvent as ReactTouchEvent, useCallback, useRef } from 'react';
 import { formatTourDateDisplay } from '@/lib/connectors/opportunity-inbox-tour-dates';
 import type { OpportunityInboxTourDateItem } from '@/lib/connectors/opportunity-inbox-types';
@@ -150,7 +151,7 @@ export function OpportunityInboxTourDateRow({
             )}
           >
             {/* Ghost accent ring pill — 2px border, no fill */}
-            <button
+            <PlainButton
               type='button'
               className={cn(
                 'inline-flex items-center justify-center',
@@ -169,11 +170,11 @@ export function OpportunityInboxTourDateRow({
               aria-label={isPersistent ? 'Confirmed' : 'Confirm Tour Date'}
             >
               ✓
-            </button>
+            </PlainButton>
 
             {/* Dismiss (reject) button — only visible on hover for pending */}
             {!isPersistent && isActionable ? (
-              <button
+              <PlainButton
                 type='button'
                 className={cn(
                   'inline-flex items-center justify-center',
@@ -190,7 +191,7 @@ export function OpportunityInboxTourDateRow({
                 aria-label='Reject Tour Date'
               >
                 &times;
-              </button>
+              </PlainButton>
             ) : null}
           </div>
         ) : null}

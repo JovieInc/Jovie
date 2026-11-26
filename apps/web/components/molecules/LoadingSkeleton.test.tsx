@@ -14,6 +14,7 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { expectFlatState } from '@/tests/utils/flat-state';
 import {
   inspectLoadingOwners,
   loadingOwnerIssueCodes,
@@ -130,6 +131,7 @@ describe('LoadingSkeleton', () => {
       expect(loadingOwnerIssueCodes(inspectLoadingOwners(container))).toEqual(
         []
       );
+      expectFlatState(container);
       await expectNoA11yViolations(container);
     }
   );

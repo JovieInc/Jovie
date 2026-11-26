@@ -1,7 +1,13 @@
 'use client';
 
-import { Switch, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
+import {
+  IconButton,
+  PlainButton,
+  Switch,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@jovie/ui';
 import { cn } from '@/lib/utils';
 import { MoonIcon, SunIcon } from './ThemeIcons';
 import {
@@ -84,7 +90,7 @@ function ThemeOptionGrid({
       </span>
       <div className='grid grid-cols-3 gap-2'>
         {THEME_OPTIONS.map(option => (
-          <button
+          <PlainButton
             type='button'
             key={option.value}
             onClick={() => onThemeChange(option.value)}
@@ -106,7 +112,7 @@ function ThemeOptionGrid({
                 ({resolvedTheme})
               </span>
             )}
-          </button>
+          </PlainButton>
         ))}
       </div>
       <p className='text-2xs text-secondary-token'>
@@ -136,13 +142,15 @@ function ThemeToggleButton({
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <AppIconButton
+          <IconButton
+            variant='control'
             ariaLabel={tooltipText}
             disabled={isUpdating}
             onClick={onToggle}
+            size='sm'
           >
             <ThemeIcon className='h-4 w-4 text-secondary-token' />
-          </AppIconButton>
+          </IconButton>
         </TooltipTrigger>
         <TooltipContent side='right'>{tooltipText}</TooltipContent>
       </Tooltip>

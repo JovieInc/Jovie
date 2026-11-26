@@ -1,0 +1,7 @@
+/*
+ * Collapsed-rail header. The header row keeps only the collapse control, so
+ * the workspace, identity or brand text on the left leaves the rail entirely.
+ */
+.group[data-collapsible="icon"] [data-sidebar-brand-slot] {
+  display: none;
+}

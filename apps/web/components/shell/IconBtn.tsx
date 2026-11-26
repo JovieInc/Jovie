@@ -1,3 +1,4 @@
+import { PlainButton } from '@jovie/ui';
 import type { ShortcutHint } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
 import { Tooltip } from './Tooltip';
@@ -37,28 +38,28 @@ export function IconBtn({
   const isGhost = tone === 'ghost';
   return (
     <Tooltip label={label} shortcut={shortcut} side={tooltipSide}>
-      <button
+      <PlainButton
         type='button'
         onClick={onClick}
         onPointerEnter={onPointerEnter}
         onFocus={onFocus}
         data-testid={testId}
         className={cn(
-          // Square at rest (no border); full circle + soft fill on hover only (JOV-3511).
-          'h-7 w-7 grid place-items-center rounded-md border border-transparent transition-[background-color,color,border-color,border-radius] duration-subtle ease-subtle focus-ring-themed hover:rounded-full hover:border-subtle',
+          // Circle at every state; fill and border appear on hover (icon-button rule).
+          'h-7 w-7 grid place-items-center rounded-full border border-transparent transition-colors duration-subtle ease-subtle focus-ring-themed hover:border-subtle',
           isGhost
             ? active
-              ? 'rounded-full border-subtle text-primary-token bg-surface-1/40'
+              ? 'border-subtle text-primary-token bg-surface-1/40'
               : 'text-quaternary-token hover:bg-surface-1/50 hover:text-primary-token'
             : active
-              ? 'rounded-full border-subtle text-primary-token bg-surface-1/60'
+              ? 'border-subtle text-primary-token bg-surface-1/60'
               : 'text-quaternary-token hover:bg-surface-1/60 hover:text-primary-token',
           className
         )}
         aria-label={label}
       >
         {children}
-      </button>
+      </PlainButton>
     </Tooltip>
   );
 }

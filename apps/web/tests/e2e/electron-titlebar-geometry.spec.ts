@@ -329,6 +329,17 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       const settingsShellBox = settingsShell?.getBoundingClientRect();
       const settingsColumnBox = settingsColumn?.getBoundingClientRect();
       const mainContentBox = mainContent?.getBoundingClientRect();
+      // JOV-8940 measures the title against the route's OWN content column.
+      // Dashboard-header routes (chat/calendar/tasks/library) hang the header
+      // directly off the app-shell content column. Settings routes instead
+      // center a narrower shared column ([data-settings-layout-column], max
+      // --app-shell-content-max-form, asserted below) and put the shared
+      // header inside it — an intended layout older than this assertion — so
+      // their title baseline is the settings column start, not the outer
+      // app-shell column start (which would read the column's centering
+      // offset, 120px at 1440, as a regression).
+      const titleAlignmentColumnLeft =
+        settingsColumnBox?.left ?? contentColumnBox.left;
       return {
         bodyPaddingTop: Number.parseFloat(getComputedStyle(body).paddingTop),
         bodyPaddingLeft: Number.parseFloat(getComputedStyle(body).paddingLeft),
@@ -344,7 +355,7 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
           title && headerPaddingLeft !== null
             ? Math.abs(
                 title.getBoundingClientRect().left -
-                  (contentColumnBox.left + headerPaddingLeft)
+                  (titleAlignmentColumnLeft + headerPaddingLeft)
               )
             : null,
         mainContentRight: mainContentBox?.right ?? null,
@@ -396,21 +407,22 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
         `${route} title aligns with the content column start`
       ).toBeLessThanOrEqual(1);
     }
-    // JOV-8941: the native window owns the right and bottom edges in
-    // Electron, so the main panel meets the window frame instead of reading
-    // as a floating card with a gutter on those edges. Fractional layout can
-    // round rects, so allow the same 1px tolerance the alignment checks use.
+    // JOV-8974: the main panel keeps the shell gutter on the right and
+    // bottom, equal to the top gutter. Allow 1px for fractional layout.
+    const gap = geometry?.shellGap ?? 0;
     expect(
       Math.abs(
-        (geometry?.mainContentRight ?? 0) - (geometry?.viewportWidth ?? 0)
+        (geometry?.viewportWidth ?? 0) - (geometry?.mainContentRight ?? 0) - gap
       ),
-      `${route} main panel is flush with the window right edge (JOV-8941)`
+      `${route} main panel keeps the shell gap on the right edge`
     ).toBeLessThanOrEqual(1);
     expect(
       Math.abs(
-        (geometry?.mainContentBottom ?? 0) - (geometry?.viewportHeight ?? 0)
+        (geometry?.viewportHeight ?? 0) -
+          (geometry?.mainContentBottom ?? 0) -
+          gap
       ),
-      `${route} main panel is flush with the window bottom edge (JOV-8941)`
+      `${route} main panel keeps the shell gap on the bottom edge`
     ).toBeLessThanOrEqual(1);
 
     if (route.startsWith(APP_ROUTES.SETTINGS)) {

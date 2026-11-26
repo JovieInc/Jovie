@@ -43,7 +43,7 @@ export function DemoReleaseTrackedLinksSurface() {
                       'Unknown artist'}
                   </p>
                 </div>
-                <div className='rounded-full border border-subtle bg-surface-0 px-3 py-1.5 text-xs font-medium text-secondary-token'>
+                <div className='rounded-full bg-surface-2 px-3 py-1.5 text-xs font-medium text-secondary-token'>
                   Share
                 </div>
               </div>
@@ -77,7 +77,7 @@ export function DemoReleaseTrackedLinksSurface() {
                           {preset.detail}
                         </p>
                       </div>
-                      <span className='rounded-full border border-subtle px-2.5 py-1 text-2xs font-medium text-secondary-token'>
+                      <span className='rounded-full bg-surface-2 px-2.5 py-1 text-2xs font-medium text-secondary-token'>
                         Copy
                       </span>
                     </div>

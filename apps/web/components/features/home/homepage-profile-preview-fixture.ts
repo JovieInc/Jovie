@@ -169,7 +169,8 @@ const createSuccessStatusShowcaseState = (
 export const HOMEPAGE_PROFILE_PREVIEW_ARTIST: Artist = {
   id: 'homepage-preview-artist',
   owner_user_id: 'homepage-preview-owner',
-  handle: TIM_WHITE_PROFILE.handle,
+  // Public ICP mock must match the live handle (/tim), not the legacy slug.
+  handle: TIM_WHITE_PROFILE.publicProfileHandle,
   spotify_id: TIM_WHITE_PROFILE.spotifyArtistId,
   name: TIM_WHITE_PROFILE.name,
   image_url: TIM_WHITE_PROFILE.avatarSrc,
@@ -836,8 +837,8 @@ export const HOMEPAGE_PROFILE_SHOWCASE_STATES: Readonly<
     id: 'events-empty',
     latestReleaseKey: 'none',
     label: 'Events Empty',
-    helper: 'The empty Events tab should still offer alerts.',
-    drawerView: 'tour',
+    helper: 'Empty Events stays hidden; Get Updates remains the entry.',
+    drawerView: 'menu',
   }),
   'more-menu': createQuietButtonShowcaseState({
     id: 'more-menu',

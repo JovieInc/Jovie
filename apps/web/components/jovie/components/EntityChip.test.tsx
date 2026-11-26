@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { fastRender } from '@/tests/utils/fast-render';
@@ -157,5 +158,23 @@ describe('EntityChip', () => {
       />
     );
     expect(screen.getByRole('button', { name: /Remove Sober/i })).toBeTruthy();
+  });
+});
+
+describe('EntityChip remove PlainButton', () => {
+  it('renders a type=button remove control that fires onRemove on userEvent.click', async () => {
+    const user = userEvent.setup();
+    const onRemove = vi.fn();
+    fastRender(
+      <EntityChip
+        data={{ kind: 'release', id: 'rel_1', label: 'Sober' }}
+        variant='transcript'
+        onRemove={onRemove}
+      />
+    );
+    const remove = screen.getByRole('button', { name: 'Remove Sober' });
+    expect(remove).toHaveAttribute('type', 'button');
+    await user.click(remove);
+    expect(onRemove).toHaveBeenCalledOnce();
   });
 });

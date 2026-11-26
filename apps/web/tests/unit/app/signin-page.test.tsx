@@ -91,9 +91,9 @@ describe('signin page', () => {
         showFormTitle: false,
         showFooterPrompt: false,
         layoutVariant: 'stack',
-        contentPlacement: 'center',
       })
     );
+    expect(authLayoutMock.mock.calls[0]?.[0].contentPlacement).toBeUndefined();
     expect(authLayoutMock.mock.calls[0]?.[0].chrome).not.toBe('splash-b');
     expect(routerPrefetchMock).toHaveBeenCalledWith(APP_ROUTES.SIGNUP);
     expect(authShellMock).toHaveBeenCalledWith(

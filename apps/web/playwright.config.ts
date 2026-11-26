@@ -1,9 +1,11 @@
+import path from 'node:path';
 import {
   defineConfig,
   devices,
   type ReporterDescription,
 } from '@playwright/test';
 import { worktreeMetadata } from './scripts/playwright-worktree';
+import { resolveE2eDefaultRetries } from './tests/e2e/utils/e2e-retry-budget';
 import {
   E2E_DEFAULT_GEO_HEADERS,
   vercelAutomationHeaders,
@@ -57,9 +59,13 @@ const webServerCommand = process.env.DATABASE_URL
   ? stableLocalServerCommand
   : `doppler run --project jovie-web --config dev -- ${stableLocalServerCommand}`;
 
+// CI retries come from the quarantine ledger's retryBudget.e2eDefaultRetries
+// (apps/web/tests/quarantine.json); smoke and full runs share one budget.
 function getRetries(): number {
-  if (!isCI) return 0;
-  return isSmokeOnly ? 2 : 2;
+  return resolveE2eDefaultRetries({
+    isCI,
+    ledgerPath: path.join(__dirname, 'tests', 'quarantine.json'),
+  });
 }
 
 function getWorkers(): number | undefined {
@@ -81,11 +87,24 @@ function getWorkers(): number | undefined {
 
 const ciReporters: ReporterDescription[] = [
   ['line'],
-  ...(vercelAutomation.active ||
-  process.env.PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE === 'true'
+  // Always emit JSON in CI (including producer-stage lanes). The flakiness
+  // report counts Playwright status "flaky" from this file; `--reporter=line`
+  // overrides and green-run upload-on-failure both made retries invisible
+  // (JOV-12621). Skip only under Vercel automation bypass, where report
+  // payloads can carry protection secrets.
+  ...(vercelAutomation.active
     ? []
     : ([
-        ['json', { outputFile: 'test-results/results.json' }],
+        [
+          isFullMatrix ? './tests/e2e/reporters/matrix-outcomes.mjs' : 'json',
+          {
+            // Quarantine (and other second invocations) must set a distinct
+            // path or they overwrite the primary suite's flaky status.
+            outputFile:
+              process.env.PLAYWRIGHT_JSON_OUTPUT_FILE ||
+              'test-results/results.json',
+          },
+        ],
       ] as ReporterDescription[])),
 ];
 
@@ -116,7 +135,6 @@ export default defineConfig({
   testIgnore: ['**/nightly/**', '**/storybook-*.spec.ts'],
   fullyParallel: !shouldSerializeLocalBypassRuns,
   forbidOnly: isCI,
-  // Smoke tests: fewer retries for faster feedback; full suite: more resilience
   retries: getRetries(),
   // Smoke tests: more parallelism since tests are faster
   // Increased from 6 to 8 for smoke - tests are I/O-bound, not CPU-bound
@@ -129,14 +147,20 @@ export default defineConfig({
   expect: {
     timeout: 25_000,
     // Visual regression snapshot settings
+    // Baselines are rendered and compared on the same CI image, where two
+    // runs of the same page are byte-identical, so the old cross-platform
+    // allowance (8% at threshold 0.2) only hid real changes. On dark screens a
+    // wrong page differs in few pixels at 0.2: the retired Clerk error card
+    // passed as /signin for weeks at 1.7%. At threshold 0.1 the same swap
+    // differs in 8% of pixels, four times the 2% allowed here.
     toHaveScreenshot: {
-      maxDiffPixelRatio: 0.08, // 8% pixel difference allowed (cross-platform font rendering)
-      threshold: 0.2, // Per-pixel color threshold
+      maxDiffPixelRatio: 0.02,
+      threshold: 0.1,
       animations: 'disabled',
     },
     toMatchSnapshot: {
-      maxDiffPixelRatio: 0.08,
-      threshold: 0.2,
+      maxDiffPixelRatio: 0.02,
+      threshold: 0.1,
     },
   },
 

@@ -1,0 +1,448 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { GITHUB_API } from '../../packages/api-client/github.ts';
+import {
+  fetchDesktopPublishInFlight,
+  nextLinkUrl,
+} from './artifact-freshness-stamp.mjs';
+
+const REPO = 'JovieInc/Jovie';
+const STAMP_REF = 'cursor/stable-desktop-publish-abc1234';
+const PULLS_PAGE_2 = `${GITHUB_API}/repos/${REPO}/pulls?page=2`;
+
+function stampListRow(overrides = {}) {
+  return {
+    number: 42,
+    html_url: 'https://github.com/JovieInc/Jovie/pull/42',
+    draft: false,
+    base: { ref: 'main' },
+    head: { ref: STAMP_REF, repo: { full_name: REPO } },
+    labels: [],
+    ...overrides,
+  };
+}
+
+function listResponse(body, link = null) {
+  return {
+    ok: true,
+    headers: { get: name => (name.toLowerCase() === 'link' ? link : null) },
+    json: async () => body,
+  };
+}
+
+function releaseRunsResponse(runs) {
+  return { ok: true, json: async () => ({ workflow_runs: runs }) };
+}
+
+/** Empty release + controller run pages after stamp miss (no in-flight). */
+function emptyPublishFallback(url) {
+  const u = String(url);
+  if (
+    u.includes('/workflows/desktop-release.yml/runs') ||
+    u.includes('/workflows/production-controller.yml/runs')
+  ) {
+    return releaseRunsResponse([]);
+  }
+  return null;
+}
+
+function controllerTitle(sha) {
+  return `Production Controller ${sha} from CI 1 attempt 1`;
+}
+
+test('nextLinkUrl reads rel=next from Link header', () => {
+  assert.equal(nextLinkUrl(`<${PULLS_PAGE_2}>; rel="next"`), PULLS_PAGE_2);
+  assert.equal(nextLinkUrl(null), null);
+});
+
+test('non-OK stamp detail GET is incomplete observation (not confirmed absence)', async () => {
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    fetchImpl: async url => {
+      if (String(url).includes('/pulls?') || /\/pulls$/.test(String(url))) {
+        return listResponse([stampListRow()]);
+      }
+      return { ok: false, status: 502, json: async () => ({}) };
+    },
+  });
+  assert.equal(result.inFlight, null);
+  assert.match(result.reason, /stamp detail returned 502/);
+});
+
+test('non-OK stamp list is incomplete observation', async () => {
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    fetchImpl: async () => ({ ok: false, status: 503, json: async () => ({}) }),
+  });
+  assert.equal(result.inFlight, null);
+  assert.match(result.reason, /stamp list returned 503/);
+});
+
+test('enriched dirty stamp is not in-flight', async () => {
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    fetchImpl: async url => {
+      if (String(url).includes('/pulls?') || /\/pulls$/.test(String(url))) {
+        return listResponse([stampListRow()]);
+      }
+      return {
+        ok: true,
+        json: async () => stampListRow({ mergeable_state: 'dirty' }),
+      };
+    },
+  });
+  assert.equal(result.inFlight, false);
+  assert.match(result.reason, /mergeable_state=dirty/);
+});
+
+test('enriched clean stamp is in-flight', async () => {
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    fetchImpl: async url => {
+      if (String(url).includes('/pulls?') || /\/pulls$/.test(String(url))) {
+        return listResponse([stampListRow()]);
+      }
+      return {
+        ok: true,
+        json: async () => stampListRow({ mergeable_state: 'clean' }),
+      };
+    },
+  });
+  assert.equal(result.inFlight, true);
+  assert.match(result.reason, /mergeable_state=clean/);
+});
+
+test('blocked keep-owned stamp within dwell grace stays in-flight', async () => {
+  const nowMs = Date.parse('2026-11-20T18:00:00.000Z');
+  const created = new Date(nowMs - 2 * 60 * 60 * 1000).toISOString();
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    nowMs,
+    fetchImpl: async url => {
+      if (String(url).includes('/pulls?') || /\/pulls$/.test(String(url))) {
+        return listResponse([stampListRow({ created_at: created })]);
+      }
+      return {
+        ok: true,
+        json: async () =>
+          stampListRow({ mergeable_state: 'blocked', created_at: created }),
+      };
+    },
+  });
+  assert.equal(result.inFlight, true);
+  assert.match(result.reason, /mergeable_state=blocked/);
+});
+
+test('blocked keep-owned stamp past dwell max is not in-flight', async () => {
+  const nowMs = Date.parse('2026-11-20T18:00:00.000Z');
+  const created = new Date(nowMs - 7 * 60 * 60 * 1000).toISOString();
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    nowMs,
+    fetchImpl: async url => {
+      if (String(url).includes('/pulls?') || /\/pulls$/.test(String(url))) {
+        return listResponse([stampListRow({ created_at: created })]);
+      }
+      return {
+        ok: true,
+        json: async () =>
+          stampListRow({ mergeable_state: 'blocked', created_at: created }),
+      };
+    },
+  });
+  assert.equal(result.inFlight, false);
+  assert.match(result.reason, /stamp-dwell-exceeded/);
+});
+
+const SHA_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const SHA_B = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+test('no open stamp + in_progress desktop-release for certified SHA is in-flight', async () => {
+  const seen = [];
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    headSha: SHA_A,
+    fetchImpl: async url => {
+      const u = String(url);
+      seen.push(u);
+      if (u.includes('/pulls')) return listResponse([]);
+      if (u.includes('/workflows/desktop-release.yml/runs')) {
+        assert.doesNotMatch(u, /head_sha=/);
+        if (u.includes('status=queued')) return releaseRunsResponse([]);
+        if (u.includes('status=in_progress')) {
+          // Tip SHA advanced; generation SHA is only in display_title.
+          return releaseRunsResponse([
+            {
+              head_sha: SHA_B,
+              status: 'in_progress',
+              display_title: `Desktop release ${SHA_A}`,
+            },
+          ]);
+        }
+      }
+      throw new Error(`unexpected url ${u}`);
+    },
+  });
+  assert.equal(result.inFlight, true);
+  assert.equal(result.reason, 'desktop-release-in_progress');
+  assert.ok(seen.some(u => u.includes('status=queued')));
+  assert.ok(seen.some(u => u.includes('status=in_progress')));
+});
+
+test('no open stamp + queued desktop-release for certified SHA is in-flight', async () => {
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    headSha: SHA_A,
+    fetchImpl: async url => {
+      const u = String(url);
+      if (u.includes('/pulls')) return listResponse([]);
+      if (u.includes('/workflows/desktop-release.yml/runs')) {
+        if (u.includes('status=queued')) {
+          return releaseRunsResponse([
+            {
+              head_sha: SHA_B,
+              status: 'queued',
+              display_title: `Desktop release ${SHA_A}`,
+            },
+          ]);
+        }
+        return releaseRunsResponse([]);
+      }
+      throw new Error(`unexpected url ${u}`);
+    },
+  });
+  assert.equal(result.inFlight, true);
+  assert.equal(result.reason, 'desktop-release-queued');
+});
+
+test('no open stamp + in_progress desktop-release for other generation is not in-flight', async () => {
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    headSha: SHA_A,
+    fetchImpl: async url => {
+      const u = String(url);
+      if (u.includes('/pulls')) return listResponse([]);
+      if (u.includes('/workflows/desktop-release.yml/runs')) {
+        return releaseRunsResponse([
+          {
+            head_sha: SHA_A,
+            status: 'in_progress',
+            display_title: `Desktop release ${SHA_B}`,
+          },
+        ]);
+      }
+      const empty = emptyPublishFallback(url);
+      if (empty) return empty;
+      throw new Error(`unexpected url ${u}`);
+    },
+  });
+  assert.equal(result.inFlight, false);
+  assert.equal(result.reason, 'no-open-stamp');
+});
+
+test('head_sha-only match without display_title is not in-flight', async () => {
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    headSha: SHA_A,
+    fetchImpl: async url => {
+      const u = String(url);
+      if (u.includes('/pulls')) return listResponse([]);
+      if (u.includes('/workflows/desktop-release.yml/runs')) {
+        return releaseRunsResponse([
+          {
+            head_sha: SHA_A,
+            status: 'in_progress',
+            display_title: 'Desktop release',
+          },
+        ]);
+      }
+      const empty = emptyPublishFallback(url);
+      if (empty) return empty;
+      throw new Error(`unexpected url ${u}`);
+    },
+  });
+  assert.equal(result.inFlight, false);
+  assert.equal(result.reason, 'no-open-stamp');
+});
+
+test('desktop-release lookup failure is incomplete observation', async () => {
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    headSha: SHA_A,
+    fetchImpl: async url => {
+      const u = String(url);
+      if (u.includes('/pulls')) return listResponse([]);
+      if (u.includes('/workflows/desktop-release.yml/runs')) {
+        return { ok: false, status: 503, json: async () => ({}) };
+      }
+      throw new Error(`unexpected url ${u}`);
+    },
+  });
+  assert.equal(result.inFlight, null);
+  assert.match(result.reason, /desktop-release queued lookup returned 503/);
+});
+
+test('no stamp + no release + production-controller for newer SHA is in-flight', async () => {
+  const seen = [];
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    headSha: SHA_A,
+    fetchImpl: async url => {
+      const u = String(url);
+      seen.push(u);
+      if (u.includes('/pulls')) return listResponse([]);
+      if (u.includes('/workflows/desktop-release.yml/runs')) {
+        return releaseRunsResponse([]);
+      }
+      if (u.includes('/workflows/production-controller.yml/runs')) {
+        assert.doesNotMatch(u, /head_sha=/);
+        if (u.includes('status=queued')) return releaseRunsResponse([]);
+        if (u.includes('status=in_progress')) {
+          return releaseRunsResponse([
+            {
+              head_sha: SHA_B,
+              status: 'in_progress',
+              display_title: controllerTitle(SHA_B),
+            },
+          ]);
+        }
+      }
+      throw new Error(`unexpected url ${u}`);
+    },
+  });
+  assert.equal(result.inFlight, true);
+  assert.equal(result.reason, 'production-controller-in_progress');
+  assert.ok(
+    seen.some(u => u.includes('/workflows/production-controller.yml/runs'))
+  );
+});
+
+test('production-controller for certified SHA alone is not in-flight', async () => {
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    headSha: SHA_A,
+    fetchImpl: async url => {
+      const u = String(url);
+      if (u.includes('/pulls')) return listResponse([]);
+      if (u.includes('/workflows/desktop-release.yml/runs')) {
+        return releaseRunsResponse([]);
+      }
+      if (u.includes('/workflows/production-controller.yml/runs')) {
+        return releaseRunsResponse([
+          {
+            head_sha: SHA_A,
+            status: 'in_progress',
+            display_title: controllerTitle(SHA_A),
+          },
+        ]);
+      }
+      throw new Error(`unexpected url ${u}`);
+    },
+  });
+  assert.equal(result.inFlight, false);
+  assert.equal(result.reason, 'no-open-stamp');
+});
+
+test('production-controller lookup failure is incomplete observation', async () => {
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    headSha: SHA_A,
+    fetchImpl: async url => {
+      const u = String(url);
+      if (u.includes('/pulls')) return listResponse([]);
+      if (u.includes('/workflows/desktop-release.yml/runs')) {
+        return releaseRunsResponse([]);
+      }
+      if (u.includes('/workflows/production-controller.yml/runs')) {
+        return { ok: false, status: 503, json: async () => ({}) };
+      }
+      throw new Error(`unexpected url ${u}`);
+    },
+  });
+  assert.equal(result.inFlight, null);
+  assert.match(
+    result.reason,
+    /production-controller queued lookup returned 503/
+  );
+});
+
+test('dwell-exceeded is not masked by production-controller for newer SHA', async () => {
+  const nowMs = Date.parse('2026-11-20T18:00:00.000Z');
+  const created = new Date(nowMs - 7 * 60 * 60 * 1000).toISOString();
+  const seen = [];
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    headSha: SHA_A,
+    nowMs,
+    fetchImpl: async url => {
+      const u = String(url);
+      seen.push(u);
+      if (u.includes('/pulls?') || /\/pulls$/.test(u)) {
+        return listResponse([stampListRow({ created_at: created })]);
+      }
+      if (/\/pulls\/\d+$/.test(u)) {
+        return {
+          ok: true,
+          json: async () =>
+            stampListRow({ mergeable_state: 'blocked', created_at: created }),
+        };
+      }
+      if (u.includes('/workflows/desktop-release.yml/runs')) {
+        return releaseRunsResponse([]);
+      }
+      if (u.includes('/workflows/production-controller.yml/runs')) {
+        throw new Error('controller fallback must not run on dwell-exceeded');
+      }
+      throw new Error(`unexpected url ${u}`);
+    },
+  });
+  assert.equal(result.inFlight, false);
+  assert.match(result.reason, /stamp-dwell-exceeded/);
+  assert.ok(
+    !seen.some(u => u.includes('/workflows/production-controller.yml/runs'))
+  );
+});
+
+test('dirty stamp is not masked by production-controller for newer SHA', async () => {
+  const result = await fetchDesktopPublishInFlight({
+    repo: REPO,
+    token: 't',
+    headSha: SHA_A,
+    fetchImpl: async url => {
+      const u = String(url);
+      if (u.includes('/pulls?') || /\/pulls$/.test(u)) {
+        return listResponse([stampListRow()]);
+      }
+      if (/\/pulls\/\d+$/.test(u)) {
+        return {
+          ok: true,
+          json: async () => stampListRow({ mergeable_state: 'dirty' }),
+        };
+      }
+      if (u.includes('/workflows/desktop-release.yml/runs')) {
+        return releaseRunsResponse([]);
+      }
+      if (u.includes('/workflows/production-controller.yml/runs')) {
+        throw new Error('controller fallback must not run on dirty stamp');
+      }
+      throw new Error(`unexpected url ${u}`);
+    },
+  });
+  assert.equal(result.inFlight, false);
+  assert.match(result.reason, /mergeable_state=dirty/);
+});

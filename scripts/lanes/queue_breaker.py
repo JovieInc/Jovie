@@ -290,9 +290,10 @@ def poison_signals(run, repo: str, runs: list[dict], now: float, cache: dict, gr
 
 
 def _file_intake(run, event: dict):
-    import pr_events  # lazy: pr_events pulls in remediation and the gh CLI wrappers
-    # upsert_intake builds full `gh ...` argv; the sweep's runner (throughput_sentinel._budgeted_gh -> run_gh) takes
-    # argv without the leading `gh`, like _gh() above, so strip it or every call runs as `gh gh issue ...`.
+    import pr_events  # lazy: pr_events pulls in remediation and the Linear client
+    # upsert_intake files Linear directly (JOV-13077) and ignores `sh`; the strip keeps the
+    # wrapper correct for any future gh-argv consumer: the sweep's runner
+    # (throughput_sentinel._budgeted_gh -> run_gh) takes argv without the leading `gh`.
     def sh(args):
         argv = list(args)
         return run(argv[1:] if argv[:1] == ["gh"] else argv, capture_output=True, text=True, timeout=60)

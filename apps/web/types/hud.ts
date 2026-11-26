@@ -36,6 +36,8 @@ export interface HudOverviewMetrics {
   defaultStatusDetail: string;
   /** True when Stripe and Mercury data are available; false means financial fields are partial or stubs */
   financialDataAvailable: boolean;
+  /** True when Stripe alone is available, so MRR is a real read even without Mercury. */
+  mrrAvailable?: boolean;
   /** Stripe baseline 7 days ago (net of churn); absent when Stripe is unavailable. */
   weekAgo?: { mrrUsd: number; activeSubscribers: number };
 }

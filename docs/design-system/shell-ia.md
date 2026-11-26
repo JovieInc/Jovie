@@ -125,14 +125,78 @@ Motion tokens and rules live in `.claude/rules/motion.md`. Shell additions:
 ## IA across surfaces
 
 - **App and Ovie.** Home first (what matters, then what is blocked on you, in
-  flight, done today, releases). Four Jovie roots: Inbox (Home), Identity, Work,
-  Audience. Ovie: Home plus one collapsed Tools group.
+  flight, done today, releases). Four Jovie roots: **Home**, Identity, Work,
+  Audience. Ovie: Home plus Operator Inbox and one collapsed Tools group.
 - **Public profile.** One right thing per visitor. Destinations come only from
   `PUBLIC_PROFILE_NAVIGATION` (Home, Music, Events, About).
 - **Smart link.** One release, one primary action, no site nav.
 - **Marketing.** Header and footer come only from the site-chrome content
   record. Page order and sections come from page specs and the certified section
   library. Every nav label names its destination (`JOV-INV-038`).
+
+## Shared IA contracts (Drift W1)
+
+These contracts lock meaning. They do **not** authorize public tab reshuffles,
+root renames, or settings UI migrations — those land in later tracks after the
+contract is stable.
+
+### C1 — Creator root job tuple (Home)
+
+EVENT: Creator root visible label is **Home** (Drift T0.2; JOV-7159). Stable
+semantic id remains `home`. `/app` still hosts the opportunity / attention
+stack; chrome, breadcrumbs, tab titles, and the header bell all say Home —
+never Inbox, Presence, Profiles, or Library.
+
+- Visible labels: **Home · Identity · Work · Audience**
+  (`primaryNavigation` / `CREATOR_ROOT_LABELS`).
+- Stable semantic ids may lag routes only with an explicit compatibility map;
+  UI copy never uses `previousLabels`.
+- Capacity: ≤4 roots; More overflow only for `experimental` tier.
+- **Ovie Operator Inbox** is a separate operator job (`/app/ov/inbox`). Cross-
+  workspace copy and Ovie chrome use the qualified label **Operator Inbox** so
+  it never collides with creator Home.
+
+### C2 — Profile representation isomorphism
+
+The shared **Profile** object has one logical IA across visitor, editor, and
+creator app. Surfaces may use specialist nouns; they must map to the same job
+facets. Unjustified peer systems (Earn↔Events, Social↔Home) need a mapping row
+or a merge — not a second taxonomy.
+
+| Job facet | Visitor (`PUBLIC_PROFILE_NAVIGATION`) | Editor | Creator app |
+|---|---|---|---|
+| Landing / overview | Home | Summary | Identity |
+| Published work | Music (specialist) under Work umbrella | Music | Work |
+| Live appearances | Events | Touring settings / Work contextual | Work contextual |
+| Bio & story | About | About | Identity |
+| Social presence | Under Home / About | Social | Identity; Links contextual |
+| Monetization | Pay modes / actions | Earn | Earnings / Money contextual + Payments settings |
+
+Marketing “Artist profiles” / “Smart links” explain these jobs; they do not
+invent a fourth Profile taxonomy. Vocabulary: [`docs/marketing/LANGUAGE.md`](../marketing/LANGUAGE.md).
+
+### C3 — Audience absorption
+
+- **Primary door:** `/app/contacts?tab=audience` (or one future canonical path —
+  never two).
+- **Contextual views:** Insights and chat cards are views of the same Audience
+  job, not alternate roots.
+- **Settings “Audience & Tracking”:** consent / preference / verification only.
+  The row must not read as a second Audience workspace.
+- Retained `/app/audience` is redirect / compatibility only — never a second
+  mental model in chrome or copy.
+
+### C4 — Settings admission monopoly
+
+- **SoT:** `userSettingsNavigation` + `artistSettingsNavigation` (+ gated
+  `paymentsNavItem`) in `dashboard-nav/config.ts`, with admission metadata from
+  `settings-decision-admission.ts`.
+- Every settings row carries `userJob` + scope + canonical route. Groups stay
+  Account | Profile (workspace scope only when a real multi-member product job
+  ships).
+- `/exp/shell-v1` and future shells must project `SETTINGS_ADMISSION_GROUPS` /
+  the live admission lists, or stay labeled non-customer demos outside customer
+  IA claims. Parallel `SETTINGS_SECTIONS` inventories are drift.
 
 ## Guardrails
 
@@ -155,4 +219,6 @@ does not replace them.
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-11-20 | Drift T0.2: lock creator root label Home (C1); ban previousLabels in UI; qualify Ovie Operator Inbox. | Tim White taste decisions |
+| 2026-11-20 | Drift W1 contracts: Profile isomorphism (C2), Audience absorption (C3), settings admission monopoly (C4). | Drift remediation plan |
 | 2026-10-29 | Created: one shell and IA registry for app, Ovie, public and marketing; canvas north star; JOV-INV-047. | Design lead; Tim White (JOV-9748) |

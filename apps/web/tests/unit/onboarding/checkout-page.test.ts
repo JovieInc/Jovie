@@ -6,58 +6,7 @@
  * get their chosen plan.
  */
 import { describe, expect, it } from 'vitest';
-import type { PlanIntentTier } from '@/lib/auth/plan-intent';
-import {
-  DEFAULT_UPSELL_PLAN,
-  getPlanIntentFromCookies,
-  isPaidIntent,
-  recommendPlan,
-  validatePlan,
-} from '@/lib/auth/plan-intent';
-
-/**
- * Simulate the server-side plan resolution logic from page.tsx.
- * This mirrors the actual code without requiring Next.js RSC infrastructure.
- */
-function resolveCheckoutPlan(params: {
-  cookieHeader: string;
-  planParam: string | null;
-  sourceParam: string | null;
-  spotifyFollowers: number | null;
-  maxPlanEnabled?: boolean;
-}): { plan: PlanIntentTier; isDefaultUpsell: boolean } {
-  // Step 1: Read plan intent from cookie
-  let planIntent: PlanIntentTier | null = getPlanIntentFromCookies(
-    params.cookieHeader
-  );
-
-  // Step 2: Fall back to query param
-  if (!planIntent) {
-    planIntent = validatePlan(params.planParam);
-  }
-
-  // Step 3: Determine organic vs explicit from source param
-  const isDefaultUpsell = params.sourceParam !== 'intent';
-
-  // Step 4: Default to pro if no paid intent
-  if (!planIntent || !isPaidIntent(planIntent)) {
-    planIntent = DEFAULT_UPSELL_PLAN;
-  }
-
-  // Step 5: Smart recommendation only for organic users with no expressed paid intent
-  const hadPaidIntentFromCookie = isPaidIntent(
-    getPlanIntentFromCookies(params.cookieHeader)
-  );
-  if (isDefaultUpsell && !hadPaidIntentFromCookie) {
-    let recommended = recommendPlan(params.spotifyFollowers);
-    if (recommended === 'max' && params.maxPlanEnabled === false) {
-      recommended = DEFAULT_UPSELL_PLAN;
-    }
-    planIntent = recommended;
-  }
-
-  return { plan: planIntent, isDefaultUpsell };
-}
+import { resolveCheckoutPlan } from '@/lib/onboarding/checkout-plan-resolution';
 
 describe('onboarding checkout page plan resolution', () => {
   it('organic user with no followers defaults to Pro', () => {

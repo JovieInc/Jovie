@@ -1,7 +1,6 @@
 'use client';
 
 import { ListChecks } from 'lucide-react';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { EmptyState } from '@/components/molecules/EmptyState';
 
 interface ReleaseTaskEmptyStateProps {
@@ -18,10 +17,7 @@ export function ReleaseTaskEmptyState({
   isLoading,
 }: ReleaseTaskEmptyStateProps) {
   return (
-    <ContentSurfaceCard
-      surface='nested'
-      data-testid='release-task-empty-state-card'
-    >
+    <div data-testid='release-task-empty-state-content'>
       <EmptyState
         icon={<ListChecks className='h-5 w-5' aria-hidden='true' />}
         heading='Your Release Playbook'
@@ -33,6 +29,6 @@ export function ReleaseTaskEmptyState({
         }}
         className='min-h-55 px-4 py-12'
       />
-    </ContentSurfaceCard>
+    </div>
   );
 }

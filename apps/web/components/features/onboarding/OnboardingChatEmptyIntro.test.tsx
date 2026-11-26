@@ -155,4 +155,48 @@ describe('OnboardingChatEmptyIntro states', () => {
     expect(screen.queryByText(ONBOARDING_ENTRY_TITLE)).toBeNull();
     await expectNoA11yViolations(container);
   });
+
+  it('walks the blank entry through the default starter suggestions', async () => {
+    // Fix B (signup-intent A/B): a blank /start — no homepage intent, no
+    // entry profile — must offer the default less-personalized walkthrough
+    // instead of a bare composer. Labels are the canonical
+    // ONBOARDING_STARTER_SUGGESTIONS copy, used verbatim.
+    const user = userEvent.setup();
+    const onSuggestionSelect = vi.fn();
+    const { container } = render(
+      <OnboardingChatEmptyIntro
+        mode='blank'
+        onSuggestionSelect={onSuggestionSelect}
+      />
+    );
+
+    const walkthrough = screen.getByTestId('onboarding-starter-walkthrough');
+    const pills = screen.getAllByTestId('onboarding-starter-suggestion');
+    expect(pills).toHaveLength(4);
+    expect(pills.map(pill => pill.textContent)).toEqual([
+      'Find My Spotify Artist',
+      'Plan A Release',
+      'Build Artist Profile',
+      'Set Up My Link Page',
+    ]);
+
+    await user.click(pills[0]!);
+    expect(onSuggestionSelect).toHaveBeenCalledTimes(1);
+    expect(onSuggestionSelect).toHaveBeenCalledWith(
+      "I'm an artist — help me find my Spotify profile."
+    );
+    await expectNoA11yViolations(container);
+    expect(walkthrough).toBeInTheDocument();
+  });
+
+  it('hides the walkthrough once an entry mode has a flow of its own', () => {
+    render(
+      <OnboardingChatEmptyIntro
+        mode='prompt_handoff'
+        onSuggestionSelect={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByTestId('onboarding-starter-walkthrough')).toBeNull();
+  });
 });

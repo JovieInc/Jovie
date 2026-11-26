@@ -22,9 +22,10 @@ Legacy `human-review-required`, `needs-human`, `no-auto`, `tim-hold`, `tim:hold`
 2026-10-28: nothing waits on a human; reserved decisions are one non-blocking
 Ovie card with a default and a deadline). Remove them when encountered and continue through the normal
 machine gates. Product taste is steered before PR creation or certified after
-landing behind a feature flag. A physical or external action ships disabled and
-is tracked as a separate post-landing authority action; it never parks the code
-or issue.
+landing behind a feature flag — except launch/core surfaces, which ship live or
+stay a draft (canon/OPERATING_SYSTEM.md §1.16). A physical or external action
+ships disabled and is tracked as a separate post-landing authority action; it
+never parks the code or issue.
 
 ## Durable Follow-Up Capture
 

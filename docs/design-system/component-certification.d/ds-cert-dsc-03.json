@@ -1,0 +1,112 @@
+{
+  "gates": {
+    "apps/web/components/features/opportunity-inbox/FounderReviewRecorder.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/opportunity-inbox/HomeSetupComplete.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/opportunity-inbox/OpportunityInboxReportCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/opportunity-inbox/OpportunityInboxTourDateRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/opportunity-inbox/OpportunityInboxTourDateSections.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/ProfileContactDrawerContent.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/profile/ProfilePrimaryCTA.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/MarketingCtaPendingLabel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/molecules/inspector/InfoPopover.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/AccountDashboard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/opportunity-inbox/HomeSetupComplete.tsx": {
+      "permission-denied": "The header has no permission or role gating; the detector matched the word plan in the Plan Your Next Release heading."
+    },
+    "apps/web/components/features/opportunity-inbox/OpportunityInboxReportCard.tsx": {
+      "offline": "The card never fetches; it only calls the handlers it is given. The detector matched the isSubmittingNextStep pending flag."
+    },
+    "apps/web/components/features/opportunity-inbox/OpportunityInboxTourDateRow.tsx": {
+      "offline": "The row never fetches; it only calls the handlers it is given. The detector matched the isBusy pending flag."
+    },
+    "apps/web/components/marketing/MarketingCtaPendingLabel.tsx": {
+      "offline": "The label never fetches; it only reads the link pending status from next/link."
+    },
+    "apps/web/components/organisms/AccountDashboard.tsx": {
+      "empty": "The page is static quick-action cards with no data list; the detector matched the word links in its copy.",
+      "long-content": "All copy is fixed in source; no user-supplied text reaches the cards."
+    }
+  }
+}

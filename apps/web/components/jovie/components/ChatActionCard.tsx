@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { ArrowRight, X } from 'lucide-react';
 import { Icon, type IconName } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
@@ -50,7 +51,7 @@ export function ChatActionCard({
       <div className='system-b-chat-action-card-copy'>
         <h2 className='system-b-chat-action-card-title'>{title}</h2>
         <p className='system-b-chat-action-card-body'>{body}</p>
-        <button
+        <PlainButton
           type='button'
           onClick={onAct}
           className='system-b-chat-action-card-primary'
@@ -61,10 +62,10 @@ export function ChatActionCard({
             className='system-b-chat-action-card-primary-icon'
             strokeWidth={2.5}
           />
-        </button>
+        </PlainButton>
       </div>
 
-      <button
+      <PlainButton
         type='button'
         onClick={onDismiss}
         className='system-b-chat-action-card-dismiss focus-ring'
@@ -74,7 +75,7 @@ export function ChatActionCard({
           className='system-b-chat-action-card-dismiss-icon'
           strokeWidth={2.25}
         />
-      </button>
+      </PlainButton>
     </article>
   );
 }

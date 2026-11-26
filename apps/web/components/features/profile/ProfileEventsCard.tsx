@@ -4,39 +4,26 @@ import { ProfileModeCard } from './ProfileModeCard';
 
 export interface ProfileEventsCardProps {
   readonly accent: ProfileCardAccentAssignment;
-  /** Whether any event dates exist; false renders the truthful empty state. */
+  /** Whether any event dates exist; false hides the section entirely. */
   readonly hasEvents: boolean;
   /** The event list, rendered only when `hasEvents` is true. */
   readonly children?: ReactNode;
-  /** Optional event-alerts opt-in under the empty state. */
+  /** Retained for callers; unused now that empty Events is hidden (JOV-14241). */
   readonly emptyAction?: ReactNode;
 }
 
 /**
- * Events mode card (Pen NdEbB). With no dates it says so plainly and offers
- * only the event-alerts opt-in, in a compact card with no reserved height
- * (walk 2026-11-09: the reserved 17rem read as a large blank gradient); with
- * dates it hosts the event list.
+ * Events mode card (Pen NdEbB). Hidden when there are no upcoming dates
+ * (JOV-14241); with dates it hosts the event list.
  */
 export function ProfileEventsCard({
   accent,
   hasEvents,
   children,
-  emptyAction,
 }: Readonly<ProfileEventsCardProps>) {
+  // JOV-14241: hide Events entirely when empty (nav also drops the tab).
   if (!hasEvents) {
-    return (
-      <ProfileModeCard
-        accent={accent}
-        eyebrow='Events'
-        title='No upcoming events'
-        description='New dates will appear here.'
-        dataTestId='profile-primary-tab-events-empty'
-        className='profile-mode-card--compact'
-      >
-        {emptyAction}
-      </ProfileModeCard>
-    );
+    return null;
   }
 
   return (

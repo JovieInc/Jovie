@@ -81,8 +81,44 @@ describe('SidebarThreadsSection certificate', () => {
     expect(dotFor('Budget notes')).toHaveClass('bg-primary-token/25');
     expect(container.innerHTML).not.toMatch(/(cyan|rose)-\d|bg-white/);
 
-    await user.click(screen.getByRole('button', { name: /Release rollout/ }));
+    expect(
+      screen.getByRole('button', { name: 'Pitch tasks, Running' })
+    ).toHaveAttribute('aria-label', 'Pitch tasks, Running');
+    expect(
+      screen.getByRole('button', { name: 'Release rollout, Error' })
+    ).toHaveAttribute('aria-label', 'Release rollout, Error');
+    expect(
+      screen.getByRole('button', { name: 'Tour poster copy, Unread' })
+    ).toHaveAttribute('aria-label', 'Tour poster copy, Unread');
+    expect(
+      screen.getByRole('button', { name: 'Budget notes' })
+    ).not.toHaveAttribute('aria-label');
+
+    await user.click(
+      screen.getByRole('button', { name: 'Release rollout, Error' })
+    );
     expect(onSelect).toHaveBeenCalledWith('errored');
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps calm rows on the same status-dot + accessible-name contract', async () => {
+    const { container } = render(
+      <SidebarThreadsSection
+        threads={threads}
+        activeThreadId={null}
+        onSelect={vi.fn()}
+        calm
+        collapsed={false}
+      />
+    );
+    expect(dotFor('Pitch tasks')).toHaveClass(
+      'bg-accent/85',
+      'anim-calm-breath'
+    );
+    expect(dotFor('Pitch tasks')).not.toHaveClass('sr-only');
+    expect(
+      screen.getByRole('button', { name: 'Pitch tasks, Running' })
+    ).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 

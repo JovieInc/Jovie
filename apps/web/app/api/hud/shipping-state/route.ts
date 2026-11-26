@@ -3,10 +3,7 @@ import { NextResponse } from 'next/server';
 import { authorizeHud } from '@/lib/auth/hud';
 import { captureError } from '@/lib/error-tracking';
 import { scheduleAfter } from '@/lib/next/schedule-after';
-import {
-  FORBIDDEN_QUERY_KEYS,
-  SHIPPING_STATE_FRESHNESS_MS,
-} from '@/lib/ovie/shipping-state';
+import { FORBIDDEN_QUERY_KEYS } from '@/lib/ovie/shipping-state';
 import {
   hasCachedConfiguredShippingState,
   publishConfiguredShippingState,
@@ -29,6 +26,31 @@ async function measureWithin(ms: number) {
     measuring,
     new Promise<null>(resolve => setTimeout(() => resolve(null), ms)),
   ]);
+}
+
+/** Run one coalesced reconciliation that outlives the response. */
+function keepMeasuring(): void {
+  scheduleAfter(
+    async () => {
+      try {
+        await publishConfiguredShippingState();
+      } catch (error) {
+        logger.error(
+          '[hud/shipping-state] Background reconciliation failed',
+          error
+        );
+        await captureError('HUD shipping-state reconciliation failed', error, {
+          route: '/api/hud/shipping-state',
+          method: 'GET',
+        });
+      }
+    },
+    {
+      // Local packaged dogfood has no Vercel request helper. Start the
+      // reconciliation on the same tick while returning cached state first.
+      fallback: 'inline',
+    }
+  );
 }
 
 function hasForbiddenQuery(request: NextRequest): boolean {
@@ -67,6 +89,10 @@ export async function GET(request: NextRequest) {
     // on the finished measurement.
     if (!hasCachedConfiguredShippingState()) {
       const measured = await measureWithin(INLINE_REFRESH_WAIT_MS);
+      // Outlasted the inline wait: keep the coalesced measurement alive past
+      // the response so the next poll reads the measured projection instead of
+      // the serverless instance freezing it mid-flight.
+      if (!measured) keepMeasuring();
       return NextResponse.json(
         measured ?? readCachedConfiguredShippingState(),
         { headers: NO_STORE_HEADERS }
@@ -75,56 +101,14 @@ export async function GET(request: NextRequest) {
 
     const projection = readCachedConfiguredShippingState();
 
-    // Each serverless instance keeps its own last-known projection and only
-    // reconciles when it is hit, so a poll can land on an instance whose
-    // observation is minutes old (observed 2026-10-25: ages 50-161s, which
-    // painted Shipping "cache is stale" and Product n/a while Home was live).
-    // Past the freshness window, take one coalesced measurement before
-    // answering; the publisher reuses any publication under its max age, so
-    // this costs one read per instance per window, not one per request.
-    const observedAtMs = Date.parse(projection.observationTimestamp ?? '');
-    if (
-      Number.isFinite(observedAtMs) &&
-      Date.now() - observedAtMs > SHIPPING_STATE_FRESHNESS_MS
-    ) {
-      try {
-        const refreshed = await measureWithin(INLINE_REFRESH_WAIT_MS);
-        if (refreshed) {
-          return NextResponse.json(refreshed, { headers: NO_STORE_HEADERS });
-        }
-      } catch (error) {
-        logger.error(
-          '[hud/shipping-state] Inline refresh failed; serving aged projection',
-          error
-        );
-      }
-    }
-
-    scheduleAfter(
-      async () => {
-        try {
-          await publishConfiguredShippingState();
-        } catch (error) {
-          logger.error(
-            '[hud/shipping-state] Background reconciliation failed',
-            error
-          );
-          await captureError(
-            'HUD shipping-state reconciliation failed',
-            error,
-            {
-              route: '/api/hud/shipping-state',
-              method: 'GET',
-            }
-          );
-        }
-      },
-      {
-        // Local packaged dogfood has no Vercel request helper. Start the
-        // reconciliation on the same tick while returning cached state first.
-        fallback: 'inline',
-      }
-    );
+    // Local-first (JOV-8961 / Mac daily-driver): a warm instance always paints
+    // the last-known projection immediately. Reconciliation runs after the
+    // response. Waiting on Linear/GitHub here held the Mac Shipping UI for
+    // up to INLINE_REFRESH_WAIT_MS on every poll past the freshness window
+    // (observed 2026-10-25: ages 50-161s while Home stayed live).
+    // Cold instances still measure inline above; publisher coalescing keeps
+    // background work to one read per instance per window.
+    keepMeasuring();
 
     return NextResponse.json(projection, { headers: NO_STORE_HEADERS });
   } catch (error) {

@@ -21,9 +21,13 @@ function denialLines(warn: { mock: { calls: unknown[][] } }): string[] {
 }
 
 describe('new-account admission denial logging', () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
 
-  it('logs a denial with its reason and the email domain only', async () => {
+  it('logs a denial with its reason and the email domain only when closed', async () => {
+    vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await expect(
       assertNewAccountAdmission({

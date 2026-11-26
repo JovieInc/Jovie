@@ -26,6 +26,21 @@ const cardVariants = cva(
 
 export type CardContentState = 'default' | 'partial' | 'offline';
 
+/**
+ * Why this box is a card. The default is no card: content sits flat on its
+ * surface. A card is allowed only for one of these five intents.
+ * See "Card intent: no extra carding" in .claude/rules/ui.md.
+ */
+export const CARD_INTENTS = [
+  'transient',
+  'movable',
+  'collection',
+  'selectable',
+  'floating',
+] as const;
+
+export type CardIntent = (typeof CARD_INTENTS)[number];
+
 export interface CardProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof cardVariants> {
@@ -40,6 +55,11 @@ export interface CardProps
    * Async/partial content state for data-backed cards.
    */
   readonly contentState?: CardContentState;
+  /**
+   * The reason this box is a card (transient, movable, collection, selectable
+   * or floating). Empty, loading and error states never render a card.
+   */
+  readonly intent?: CardIntent;
 }
 
 const Card = React.forwardRef<HTMLDivElement, CardProps>(
@@ -50,6 +70,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
       asChild = false,
       unstyled = false,
       contentState = 'default',
+      intent,
       'aria-busy': ariaBusy,
       ...props
     },
@@ -66,6 +87,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
           contentState === 'default' ? undefined : contentState
         }
         data-variant={unstyled ? undefined : resolvedVariant}
+        data-card-intent={intent}
         aria-busy={contentState === 'partial' ? true : ariaBusy}
         className={
           unstyled

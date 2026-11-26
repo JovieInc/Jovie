@@ -25,9 +25,9 @@ describe('LogoIcon', () => {
 
   it('uses the muted tone', () => {
     const { container } = render(<LogoIcon variant='muted' />);
-    expect(container.querySelector('span')?.getAttribute('class')).toContain(
-      'text-muted-foreground/50'
-    );
+    const span = container.querySelector('span');
+    expect(span).toHaveClass('text-logo-muted');
+    expect(span).toHaveClass('dark:text-quaternary-token');
   });
 
   it('uses the white tone', () => {

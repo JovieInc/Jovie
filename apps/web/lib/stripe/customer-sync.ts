@@ -43,6 +43,7 @@ export {
   BILLING_FIELDS_STATUS,
   type BillingAuditEventType,
   type BillingFieldsResult,
+  type BillingSkipReason,
   // Customer operations
   ensureStripeCustomer,
   type FetchUserBillingDataOptions,

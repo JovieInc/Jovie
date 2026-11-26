@@ -6,10 +6,7 @@ import { agentClaimPath } from '@/lib/agent-acquisition/claim-handoff';
 import { claimAgentDraft } from '@/lib/agent-acquisition/draft-claim.server';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
-import {
-  allowIfRateLimitBackendDegraded,
-  claimTokenAccessLimiter,
-} from '@/lib/rate-limit';
+import { claimTokenAccessLimiter } from '@/lib/rate-limit';
 import { authHref } from './claim-states';
 
 const DRAFT_ID = /^[0-9a-f-]{36}$/i;
@@ -31,10 +28,8 @@ export async function claimAgentDraftAction(formData: FormData) {
   const { userId } = await getOptionalAuth();
   if (!userId) redirect(authHref(APP_ROUTES.SIGNUP, claimPath));
 
-  const limit = allowIfRateLimitBackendDegraded(
-    await claimTokenAccessLimiter.limit(`agent-claim:${userId}`),
-    { route: '/claim/agent' }
-  );
+  // Fail closed on Redis outage — claim mutations must stay bounded.
+  const limit = await claimTokenAccessLimiter.limit(`agent-claim:${userId}`);
   if (!limit.success) redirect(`${claimPath}&e=retry_later`);
 
   let target: string;

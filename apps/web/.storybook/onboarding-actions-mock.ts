@@ -75,3 +75,12 @@ export async function updateOnboardingProfile(_updates: {
   console.log('[Storybook Mock] updateOnboardingProfile called');
   return { success: true };
 }
+
+export async function recordOnboardingUpgradeOfferDecision(
+  _profileId: string,
+  _decision: 'accepted' | 'dismissed',
+  _plan: string
+): Promise<{ ok: boolean }> {
+  console.log('[Storybook Mock] recordOnboardingUpgradeOfferDecision called');
+  return { ok: true };
+}

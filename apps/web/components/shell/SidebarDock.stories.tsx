@@ -47,20 +47,8 @@ const failedUpdate = updateControl(
   { kind: 'failed', retry: 'check', version: '2' },
   'Update failed'
 );
-const audio = {
-  track: {
-    trackTitle: 'Never Say A Word',
-    artistName: 'Tim White',
-    artworkUrl: null,
-  },
-  isPlaying: true,
-  onPlay: fn(),
-  onDismiss: fn(),
-};
-
 /** Root theme overrides exercise the same tokens as the authenticated shell. */
 function DockPreview(args: SidebarDockProps) {
-  const [hidden, setHidden] = useState(false);
   const [installed, setInstalled] = useState(false);
   return (
     <div
@@ -76,13 +64,6 @@ function DockPreview(args: SidebarDockProps) {
       </nav>
       <SidebarDock
         {...args}
-        audio={
-          hidden
-            ? undefined
-            : args.audio
-              ? { ...args.audio, onDismiss: () => setHidden(true) }
-              : undefined
-        }
         install={
           installed
             ? undefined
@@ -126,11 +107,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Empty: Story = {};
-export const AudioOnly: Story = { args: { audio } };
 export const WhatsNewOnly: Story = { args: { release } };
-export const WhatsNewAndAudio: Story = { args: { release, audio } };
 export const UpdateOnly: Story = { args: { updateControl: update } };
-export const UpdateAndAudio: Story = { args: { updateControl: update, audio } };
 export const UpdateAndWhatsNew: Story = {
   args: { updateControl: update, release },
 };
@@ -138,18 +116,16 @@ export const AllThree: Story = {
   args: {
     updateControl: update,
     release,
-    audio,
   },
 };
 export const WithInstall: Story = {
   args: {
     release,
-    audio,
     install: { onInstall: fn(), onDismiss: fn() },
   },
 };
 export const Collapsed: Story = {
-  args: { updateControl: update, release, audio, collapsed: true },
+  args: { updateControl: update, release, collapsed: true },
 };
 export const CollapsedEmpty: Story = { args: { collapsed: true } };
 export const Downloading: Story = {
@@ -159,7 +135,6 @@ export const Downloading: Story = {
       'Downloading update'
     ),
     release,
-    audio,
   },
 };
 export const Ready: Story = {
@@ -169,7 +144,6 @@ export const Ready: Story = {
       'Restart to update'
     ),
     release,
-    audio,
   },
 };
 export const UpdateError: Story = {
@@ -182,21 +156,6 @@ export const IOSInstall: Story = {
 export const ErrorUpdateFailed: Story = {
   args: {
     updateControl: failedUpdate,
-    audio,
-  },
-};
-/** Audio with only a track title: no artist and no artwork. */
-export const PartialAudio: Story = {
-  args: {
-    release,
-    audio: {
-      ...audio,
-      track: {
-        trackTitle: 'Untitled demo',
-        artistName: null,
-        artworkUrl: null,
-      },
-    },
   },
 };
 export const LongContent: Story = {
@@ -206,29 +165,11 @@ export const LongContent: Story = {
       title:
         'Release pages now show every streaming service, presave countdowns and per-territory analytics',
     },
-    audio: {
-      ...audio,
-      track: {
-        trackTitle:
-          'Midnight Drive Through the Neon City (Extended Club Mix featuring the Late Night Strings)',
-        artistName:
-          'The Long Weekend Collective, Avery Stone and the Northern Lights',
-        artworkUrl: null,
-      },
-    },
   },
 };
 export const Rtl: Story = {
   args: {
     updateControl: update,
-    audio: {
-      ...audio,
-      track: {
-        trackTitle: 'ليالي المدينة الطويلة',
-        artistName: 'فرقة الشرق',
-        artworkUrl: null,
-      },
-    },
   },
   decorators: [
     Story => (
@@ -241,17 +182,8 @@ export const Rtl: Story = {
 
 const light = { themes: { themeOverride: 'light' } };
 export const EmptyLight: Story = { ...Empty, parameters: light };
-export const AudioOnlyLight: Story = { ...AudioOnly, parameters: light };
 export const WhatsNewOnlyLight: Story = { ...WhatsNewOnly, parameters: light };
-export const WhatsNewAndAudioLight: Story = {
-  ...WhatsNewAndAudio,
-  parameters: light,
-};
 export const UpdateOnlyLight: Story = { ...UpdateOnly, parameters: light };
-export const UpdateAndAudioLight: Story = {
-  ...UpdateAndAudio,
-  parameters: light,
-};
 export const UpdateAndWhatsNewLight: Story = {
   ...UpdateAndWhatsNew,
   parameters: light,

@@ -1,10 +1,10 @@
 import { Link as UILink } from '@jovie/ui';
-import Link from 'next/link';
+import NextLink from 'next/link';
 import React from 'react';
 import { cn } from '@/lib/utils';
 
 export interface FooterLinkProps
-  extends Omit<React.ComponentProps<typeof Link>, 'href' | 'className'> {
+  extends Omit<React.ComponentProps<typeof NextLink>, 'href' | 'className'> {
   readonly href: string;
   readonly className?: string;
   readonly tone?: 'light' | 'dark';
@@ -44,7 +44,7 @@ export const FooterLink = React.forwardRef<HTMLAnchorElement, FooterLinkProps>(
     const palette =
       tone === 'light'
         ? 'text-secondary-token hover:text-primary-token hover:bg-surface-1'
-        : 'text-white/70 hover:text-white hover:bg-white/5';
+        : 'text-on-media/70 hover:text-on-media hover:bg-on-media/5';
 
     // Renders through the canonical Link primitive (asChild + variant={null}).
     // The primitive base supplies inline-flex, transition-colors, and the
@@ -61,9 +61,10 @@ export const FooterLink = React.forwardRef<HTMLAnchorElement, FooterLinkProps>(
     );
 
     return (
-      <UILink asChild variant={null} className={linkClassName}>
-        <Link
+      <UILink asChild variant={null}>
+        <NextLink
           ref={ref}
+          className={linkClassName}
           href={href}
           prefetch={prefetch}
           target={resolvedTarget}
@@ -71,7 +72,7 @@ export const FooterLink = React.forwardRef<HTMLAnchorElement, FooterLinkProps>(
           {...props}
         >
           <span className='inline-flex items-center gap-2'>{children}</span>
-        </Link>
+        </NextLink>
       </UILink>
     );
   }

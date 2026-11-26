@@ -122,4 +122,21 @@ describe('CustomerNavMoreMenu', () => {
     expect(source).toContain("@/components/organisms/sidebar'");
     expect(source).not.toContain(`@/components/organisms/${'Sidebar'}'`);
   });
+
+  it('renders the More trigger as a type=button that opens the menu on click', async () => {
+    const user = userEvent.setup();
+    render(
+      <ul>
+        <CustomerNavMoreMenu items={moreItems} isItemActive={() => false} />
+      </ul>
+    );
+
+    const trigger = screen.getByRole('button', { name: 'More options' });
+    expect(trigger).toHaveAttribute('type', 'button');
+
+    await user.click(trigger);
+
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  });
 });

@@ -3,9 +3,14 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const webRoot = process.cwd();
-const sourcePath =
-  'components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form.tsx';
-const sourceFile = resolve(webRoot, sourcePath);
+const sourceDir = 'components/features/dashboard/organisms/onboarding-v2';
+const sourcePaths = [
+  'OnboardingV2Form.tsx',
+  'OnboardingV2Panels.tsx',
+  'OnboardingV2DiscoverySteps.tsx',
+  'OnboardingV2Steps.tsx',
+] as const;
+const sourcePath = `${sourceDir}/OnboardingV2Form.tsx`;
 
 const gradientPattern = ['linear', 'gradient|radial', 'gradient'].join('-');
 const forbiddenVisualPatterns = [
@@ -22,7 +27,9 @@ const forbiddenVisualPatterns = [
 
 describe('OnboardingV2Form System B source contract', () => {
   it('keeps fixed onboarding visuals on named System B primitives', () => {
-    const source = readFileSync(sourceFile, 'utf8');
+    const source = sourcePaths
+      .map(file => readFileSync(resolve(webRoot, sourceDir, file), 'utf8'))
+      .join('\n');
 
     for (const pattern of forbiddenVisualPatterns) {
       expect(source, `${sourcePath} matched ${pattern}`).not.toMatch(pattern);

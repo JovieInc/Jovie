@@ -33,6 +33,7 @@ import {
   openCurrentSummerSession,
   type SummerEveCheckpoint,
   type SummerEveReceipt,
+  type SummerSession,
   type SummerSessionIdentity,
   type SummerToolReceipt,
 } from '@/lib/ovie/summer-session';
@@ -292,11 +293,9 @@ export function resolveOvieDoorGeneration(
   return generation;
 }
 
-export function ovieDoorGenerationKind(
+export const ovieDoorGenerationKind = (
   generation: OvieDoorGeneration
-): OvieDoorGenerationKind {
-  return generation.kind;
-}
+): OvieDoorGenerationKind => generation.kind;
 
 function correlationIdFor(
   receipts: readonly OvieReceipt[],
@@ -314,11 +313,13 @@ export async function* runOvieSummerTurn(input: {
   readonly signal?: AbortSignal;
   readonly clientTurnId?: string | null;
   readonly principalHash?: string;
+  readonly sessionPromise?: Promise<SummerSession>;
 }): AsyncGenerator<SummerTurnEvent> {
   if (input.speaker.id !== 'summer') {
     denyEveAction('summer-answer');
   }
-  const session = await openCurrentSummerSession(input.store);
+  const session = await (input.sessionPromise ??
+    openCurrentSummerSession(input.store));
   const replay = findTurnByClientId(session, input.clientTurnId);
   const binding: SummerTurnBinding = {
     ...eveBindingFromReceipts(input.receipts),

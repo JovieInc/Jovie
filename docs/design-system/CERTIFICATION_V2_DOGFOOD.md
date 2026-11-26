@@ -189,8 +189,10 @@ same receipts. Driver reliability retains
 execution pass rate on known-good builds as a separate regression signal; it
 does not establish customer outcome proof. This adds no queue, storage,
 controller, scheduled execution or certification authority. The server metrics
-adapter still reports unconnected dogfood inputs truthfully; this contract does
-not claim a live receipt store or a live dogfood run.
+adapter reads `jovie:certification:v1:dogfood-receipts` when present (JOV-7200)
+and otherwise reports disconnected dogfood inputs truthfully; a fixture deploy
+binding may graduate to a production `commitSha` + `deploymentId` without a
+second store. This contract still does not claim a live autonomous dogfood run.
 
 When a capability meets the existing exact-deploy reliability rule, preserve
 its established behavior as regression coverage: add the observed invariant or

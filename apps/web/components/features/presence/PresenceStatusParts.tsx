@@ -11,7 +11,7 @@ import type { ConnectionStatus, PresenceSignal } from './types';
  * 44px hit target above the sm breakpoint; mobile keeps the 44px target.
  */
 export const PRESENCE_BUTTON_DESKTOP_DENSITY =
-  'min-h-8 sm:before:min-h-8 sm:before:min-w-0';
+  'min-h-7 sm:before:min-h-7 sm:before:min-w-0';
 
 /**
  * Canonical Presence status vocabulary for every managed identity.

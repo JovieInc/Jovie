@@ -10,6 +10,12 @@ The [stack receipt](../../docs/macos/swift-control-invariants.md) distinguishes
 current owners from planned targets. The [earlier Electron-only ADR](../../docs/MACOS_SWIFT_CONTROL_ADR.md)
 is historical; its rewrite prohibition is superseded.
 
+**Client boundary:** [native / web / Electron policy](../../canon/ENGINEERING.md#native--web--electron-boundary)
+is the authority for when Mac work stays Electron, moves native, or loads web.
+Applied receipt D4 (Electron shipped until cutover; no native Ovie) is in
+[`docs/architecture/native-web-electron-decisions.md`](../../docs/architecture/native-web-electron-decisions.md).
+Register on-demand WebKit bridges per the Mac ADR; do not host daily chat in a webview.
+
 ## Mac app platform
 
 One Ovie (founder decision 2026-10-28, `canon/PRODUCT.md`): web, at `/app/ov` on the shared Jovie/Ovie shell. There is no native Ovie. Do not add a Swift, SwiftUI, AppKit or Electron-only Ovie; the Electron door and the office wall only load that URL (`pnpm run surfaces:check`).

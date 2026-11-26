@@ -132,6 +132,20 @@ export function unknownJsonPropertyRepair(diagnosticLines) {
 }
 
 /** @param {readonly string[]} diagnosticLines */
+export function defaultOptionsPropertyRepair(diagnosticLines) {
+  if (
+    diagnosticLines.some(line =>
+      /error TS2339: Property '.+' does not exist on type '\{ [^']*\?: [^']+ \}'\./.test(
+        line
+      )
+    )
+  ) {
+    return 'TS2339 on an inferred optional-property object: check defaulted options parameters and declare all supported properties with JSDoc. Do not grow the baseline to absorb the error.';
+  }
+  return null;
+}
+
+/** @param {readonly string[]} diagnosticLines */
 function tupleInferenceRepair(diagnosticLines) {
   if (
     diagnosticLines.some(line =>
@@ -438,7 +452,11 @@ export function evaluateTypecheckBaseline({
     for (const { file, code } of newErrors) {
       diagnosticLines.push(...(lines.get(`${file}::${code}`) ?? []));
     }
-    for (const diagnose of [unknownJsonPropertyRepair, tupleInferenceRepair]) {
+    for (const diagnose of [
+      unknownJsonPropertyRepair,
+      defaultOptionsPropertyRepair,
+      tupleInferenceRepair,
+    ]) {
       const repair = diagnose(diagnosticLines);
       if (repair) console.error(repair);
     }

@@ -1,22 +1,31 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { PRODCERT_CLAIM_CANARY_EMAIL } from '@/lib/synthetic/prodcert-identities';
 import {
+  assertCanaryResetSurfaceReady,
+  CanaryResetRateLimitedError,
+  ClaimCanaryNotProvisionedError,
   canaryResetConfigured,
   resetClaimCanary,
 } from './helpers/canary-reset-client';
+import { ensureUserIsFree } from './helpers/ensure-user-is-free';
+import { requireCanaryCheckout } from './helpers/require-canary-checkout';
 import {
   createCheckoutSession,
   createSignedStripeWebhook,
   detachCustomerPaymentMethods,
-  ensureUserIsFree,
   expireRunOwnedTestCheckoutSession,
   getBillingStatus,
-  getStripeContextOrSkip,
+  getRequiredStripeTestContext,
   materializeTestCheckoutCompletion,
   postStripeWebhook,
+  vercelProtectionBypassHeaders,
 } from './helpers/stripe-helpers';
-import { certStep, certStepBlocked } from './utils/prod-cert-steps';
+import {
+  certStep,
+  certStepBlocked,
+  recordCertCapabilities,
+} from './utils/prod-cert-steps';
 import {
   prepareProductionAuthEmailForm,
   waitForProductionDashboardContent,
@@ -42,10 +51,62 @@ import { waitForProductionAuthOtp } from './utils/production-auth-otp';
  *   - every JOV-6920 cone case is recorded as a prod-cert step (cone-*
  *     check ids) and the canary is reset again in teardown.
  *
- * Test mode only: getStripeContextOrSkip fails closed on a live key,
- * another account, or a price that is not the $12 fixture. No live charges,
- * no real artist profile is ever touched.
+ * Test mode only: getRequiredStripeTestContext fails closed on a live key,
+ * another account, or a price that is not the $12 fixture. Missing Stripe
+ * TEST custody records cone-* as blocked (never Playwright-skip soft-green).
+ * No live charges; no real artist profile is ever touched.
  */
+
+recordCertCapabilities({
+  checkout: [
+    'cone-checkout-success-truthful',
+    'cone-checkout-cancel-truthful',
+    'cone-checkout-failure-truthful',
+    'cone-checkout-payment-is-authority',
+    'cone-checkout-entitlement-agrees',
+    'cone-checkout-retry-idempotent',
+  ],
+  onboarding: [
+    'cone-activation-immediate-value',
+    'cone-activation-visible-path',
+    'cone-activation-no-dead-end',
+    'cone-activation-continue-without-rescue',
+  ],
+});
+
+/**
+ * Sign the fixed claim-walk canary up through the real production
+ * email-code flow. Used once per environment, when the reset endpoint
+ * reports the account missing; every later run just resets it.
+ */
+async function provisionClaimCanary(page: Page): Promise<void> {
+  await page.goto(APP_ROUTES.SIGNIN, { waitUntil: 'domcontentloaded' });
+  const { submitButton } = await prepareProductionAuthEmailForm(
+    page,
+    PRODCERT_CLAIM_CANARY_EMAIL
+  );
+  const requestedAtMs = Date.now();
+  await submitButton.click();
+  const codeInput = page
+    .locator('form[data-auth-email-code-step="code"]')
+    .first()
+    .locator(
+      '[data-testid="otp-autofill-input"], input[name="code"], input[autocomplete="one-time-code"], input[inputmode="numeric"]'
+    )
+    .first();
+  await expect(codeInput).toBeVisible({ timeout: 15_000 });
+  const code = await waitForProductionAuthOtp({
+    email: PRODCERT_CLAIM_CANARY_EMAIL,
+    startedAtMs: requestedAtMs,
+  });
+  const signedIn = page.waitForURL(
+    url => !url.pathname.startsWith(APP_ROUTES.SIGNIN),
+    { timeout: 30_000 }
+  );
+  await codeInput.fill(code);
+  await signedIn;
+}
+
 test.describe('Canary claim checkout producer (Stripe test mode)', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
   test.describe.configure({ mode: 'serial' });
@@ -65,26 +126,17 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
   test('reset → claim → test-mode payment → activation → reset', async ({
     page,
   }, testInfo) => {
-    const { stripeClient, priceId } = await getStripeContextOrSkip();
     const origin = requireOrigin(testInfo.project.use.baseURL);
     const tag = runTag();
 
-    // The walk cannot even start without the reset secrets: record the
-    // blocked steps so the cert shows the exact unblock, then fail — the
-    // producer must never be silently absent (a skipped walk is exactly the
-    // false-green the scoreboard exists to prevent).
-    if (!canaryResetConfigured()) {
+    const blockConeWalk = (detail: string) => {
       for (const id of [
         'cone-checkout-success-truthful',
         'cone-checkout-payment-is-authority',
         'cone-checkout-entitlement-agrees',
         'cone-checkout-retry-idempotent',
       ]) {
-        certStepBlocked(
-          'checkout',
-          id,
-          'CRON_SECRET/SYNTHETIC_PASSAGE_KEY are not provided to this run (canary reset unconfigured)'
-        );
+        certStepBlocked('checkout', id, detail);
       }
       for (const id of [
         'cone-activation-immediate-value',
@@ -92,18 +144,77 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
         'cone-activation-no-dead-end',
         'cone-activation-continue-without-rescue',
       ]) {
-        certStepBlocked(
-          'onboarding',
-          id,
-          'CRON_SECRET/SYNTHETIC_PASSAGE_KEY are not provided to this run (canary reset unconfigured)'
-        );
+        certStepBlocked('onboarding', id, detail);
       }
+    };
+
+    // Fail closed — never Playwright-skip. A skipped walk only writes
+    // recordCertCapabilities mapping and looks like a false green on the
+    // scoreboard (postdeploy 44941778256: empty STRIPE_* → 1 skipped).
+    let stripeClient: Awaited<
+      ReturnType<typeof getRequiredStripeTestContext>
+    >['stripeClient'];
+    let priceId: string;
+    try {
+      ({ stripeClient, priceId } = await getRequiredStripeTestContext());
+    } catch (error) {
+      blockConeWalk(
+        `Stripe TEST custody unavailable: ${String(error)} (need Preview – jovie STRIPE_SECRET_KEY/STRIPE_WEBHOOK_SECRET + pinned $12 fixtures)`
+      );
+      throw error;
+    }
+
+    // The walk cannot even start without the reset secrets: record the
+    // blocked steps so the cert shows the exact unblock, then fail — the
+    // producer must never be silently absent (a skipped walk is exactly the
+    // false-green the scoreboard exists to prevent).
+    if (!canaryResetConfigured()) {
+      blockConeWalk(
+        'CRON_SECRET/SYNTHETIC_PASSAGE_KEY are not provided to this run (canary reset unconfigured)'
+      );
       throw new Error(
         'Canary reset secrets (CRON_SECRET/SYNTHETIC_PASSAGE_KEY) are not provided to this run; the JOV-9826 checkout walk cannot run'
       );
     }
 
-    await resetClaimCanary({ request: page.request, origin, runTag: tag });
+    // Fail fast with a named reason when the target surface cannot consume
+    // canary passage tokens (no Redis → fail-closed 401 on every reset —
+    // postdeploy run 45311864925). Still a visible red, never a skip.
+    try {
+      await assertCanaryResetSurfaceReady({ request: page.request, origin });
+    } catch (error) {
+      blockConeWalk(`Canary reset surface preflight failed: ${String(error)}`);
+      throw error;
+    }
+
+    try {
+      await resetClaimCanary({ request: page.request, origin, runTag: tag });
+    } catch (error) {
+      if (error instanceof CanaryResetRateLimitedError) {
+        // Budget, not config: the shared canary-walk passage-grant window is
+        // the cross-run ceiling, and the reset window is PER RUN TAG — a
+        // single walk's retries can never be denied by another run's
+        // consumption (red 45366385483: the prior GLOBAL reset key was
+        // burned by every run and retry, so deploy storms exhausted any
+        // fixed size). Name the condition and fail — the walk never skips,
+        // but the red must say "hourly budget", not an opaque 429 (and
+        // never the opaque 401 the passage-budget denial masqueraded as,
+        // red 45350750159).
+        blockConeWalk(
+          'Canary reset budget exhausted (429): the hourly canary-walk passage-grant budget is shared across all runs and the reset budget is per run tag; retrying cannot help until the window clears'
+        );
+        throw error;
+      }
+      if (!(error instanceof ClaimCanaryNotProvisionedError)) throw error;
+      // First run in this environment: the canary has no account yet.
+      // Create it through the REAL email-code signup (the canary address is
+      // admitted and its code is read from the auth table, exactly like the
+      // per-run new user), then reset it into its pre-claim state. Durable:
+      // no person ever has to sign this account up by hand.
+      await provisionClaimCanary(page);
+      await page.context().clearCookies();
+      await resetClaimCanary({ request: page.request, origin, runTag: tag });
+    }
 
     try {
       // Real production sign-in as the fixed claim-walk canary (fresh OTP).
@@ -135,7 +246,13 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
       await waitForProductionDashboardContent(page);
 
       // Payment authority ordering: BEFORE any payment the canary is free.
-      await ensureUserIsFree(page, stripeClient);
+      // The personaEmail sweep is load-bearing for the canary (JOV-8805
+      // class, red 45369972300): a previous walk whose teardown died — or
+      // whose reset 401/429'd — leaves the subscription active Stripe-side
+      // while the canary reset clears the local rows, and the next checkout
+      // is then answered with the already-subscribed billing-portal session
+      // (`bps_...`) instead of a checkout session.
+      await ensureUserIsFree(page, stripeClient, PRODCERT_CLAIM_CANARY_EMAIL);
       await detachCustomerPaymentMethods(
         stripeClient,
         PRODCERT_CLAIM_CANARY_EMAIL
@@ -146,9 +263,16 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
         'checkout',
         'cone-checkout-launches-owned-context',
         async () => {
-          const start = await page.request.get('/claim/start?new=1', {
-            maxRedirects: 0,
-          });
+          // Use the live page origin (often jov.ie after OTP), not Playwright
+          // baseURL pinned to the protected exact deployment URL.
+          const liveOrigin = new URL(page.url()).origin;
+          const start = await page.request.get(
+            `${liveOrigin}/claim/start?new=1`,
+            {
+              maxRedirects: 0,
+              headers: vercelProtectionBypassHeaders(),
+            }
+          );
           expect(start.status()).toBe(307);
           const cookies = await page.context().cookies();
           expect(cookies.find(c => c.name === 'jv_claim_flow')?.value).toBe(
@@ -161,10 +285,16 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
         }
       );
 
-      const { sessionId } = await createCheckoutSession(page, priceId, {
-        source: 'onboarding',
-        returnTo: '/chat?from=onboarding',
-      });
+      // Both checkout attempts must reject a portal result before using it.
+      const startCanaryCheckout = async () =>
+        requireCanaryCheckout(
+          await createCheckoutSession(page, priceId, {
+            source: 'onboarding',
+            returnTo: '/chat?from=onboarding',
+          }),
+          blockConeWalk
+        );
+      const { sessionId } = await startCanaryCheckout();
 
       const session = await stripeClient.checkout.sessions.retrieve(sessionId);
       expect(session.livemode).toBe(false);
@@ -193,10 +323,7 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
         return 'cancel URL truthful; expired session granted no entitlement';
       });
       // The success walk needs a live session; create a fresh one.
-      const successSession = await createCheckoutSession(page, priceId, {
-        source: 'onboarding',
-        returnTo: '/chat?from=onboarding',
-      });
+      const successSession = await startCanaryCheckout();
 
       // Failure path: a documented attachable-but-declining fixture never
       // grants an entitlement either.
@@ -331,10 +458,12 @@ test.describe('Canary claim checkout producer (Stripe test mode)', () => {
       );
     } finally {
       // The canary returns to its exact pre-claim state: subscription
-      // canceled Stripe-side (with webhook), test payment methods detached,
-      // then the canary-reset endpoint unclaims the reserved handle.
+      // canceled Stripe-side (with the persona orphan sweep so no
+      // provider-only subscription survives the local reset), test payment
+      // methods detached, then the canary-reset endpoint unclaims the
+      // reserved handle.
       try {
-        await ensureUserIsFree(page, stripeClient);
+        await ensureUserIsFree(page, stripeClient, PRODCERT_CLAIM_CANARY_EMAIL);
       } finally {
         try {
           await detachCustomerPaymentMethods(

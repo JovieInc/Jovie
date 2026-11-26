@@ -21,7 +21,8 @@ export type PublicProfileIdentityExclusionReason =
   | 'production_canary'
   | 'qa_auth_fixture'
   | 'screen_cert_fixture'
-  | 'capture_profile_fixture';
+  | 'capture_profile_fixture'
+  | 'crawl_content_fixture';
 
 const EXCLUDED_HANDLES_BY_REASON = {
   // The claim-walk canary's reserved handle (JOV-9826): excluded from every
@@ -47,6 +48,11 @@ const EXCLUDED_HANDLES_BY_REASON = {
   ],
   screen_cert_fixture: ['jovie-screen-fixture'],
   capture_profile_fixture: ['unfazed'],
+  // The product crawl's hidden demo artist: the only owner of a public promo
+  // download, merch card and asset share, created only by its reconciler.
+  // A literal, not an import: this policy ships to the browser, and
+  // crawl-content-fixture.test.ts pins it to the fixture spec's handle.
+  crawl_content_fixture: ['jovie-crawl-fixture'],
   qa_auth_fixture: [
     'authiosprod',
     'authiosstaging',

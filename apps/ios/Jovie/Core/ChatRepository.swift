@@ -2,20 +2,6 @@ import Foundation
 import Observation
 import JovieKit
 
-/// Terminal chat auth: missing token or a 401 after retry. Not a transport outage.
-func isTerminalChatAuthFailure(_ error: Error) -> Bool {
-  if case APIClientError.missingToken = error {
-    return true
-  }
-  if case APIClientError.requestFailed(statusCode: 401) = error {
-    return true
-  }
-  if case MobileChatClientError.requestFailed(statusCode: 401) = error {
-    return true
-  }
-  return false
-}
-
 struct NativeChatIdentity: Equatable, Sendable {
   let userID: String
   let ownership: NativeSessionOwnership?
@@ -34,7 +20,7 @@ final class ChatRepository {
   private(set) var hasMoreOlder = false
   private(set) var isOffline = false
   private(set) var sessionExpired = false
-  private(set) var lastErrorMessage: String?
+  internal(set) var lastErrorMessage: String?
   private var olderCursor: String?
   private var sendGeneration = 0
   private var selectionRevision = 0
@@ -64,7 +50,8 @@ final class ChatRepository {
   /// Better Auth session. `MobileChatView`
   /// unconditionally calls `refreshConversations()` in a `.task` on
   /// appear, so this can't be solved by the call site alone.
-  private var isFixtureSeeded = false
+  // Fixture traffic must never count toward post-Identity customer funnels.
+  var isFixtureSeeded = false
   private var sendTask: Task<Void, Never>?
   private var pendingRetries: Set<RetryKey> = []
 
@@ -324,6 +311,7 @@ final class ChatRepository {
     let clientTurnId = UUID().uuidString
     let clientMessageId = UUID().uuidString
     let context = SendContext()
+    let isRetry = target != nil
     #if DEBUG && os(iOS)
     let captureGeneration = presentationMeasurement?.generation
     #endif
@@ -383,7 +371,9 @@ final class ChatRepository {
           measurementTurnID = clientTurnId
           measurementGeneration = captureGeneration
           #endif
+          let hadPriorUserMessages = timeline.contains { $0.role == .user }
           appendOptimisticTurn(text: text, clientTurnId: clientTurnId)
+          notePostIdentityFirstSendStarted(isRetry: isRetry, hadPriorUserMessages: hadPriorUserMessages)
         }
       }, onEvent: { event in
         await coalescer.ingest(event)
@@ -395,18 +385,19 @@ final class ChatRepository {
       }
       coalescer.flush()
       context.acceptingEvents = false
-      if assistantStatus(clientTurnId: clientTurnId)?.isInFlight == true {
+      // Stream NDJSON can set .failed/.canceled without throwing — still emit outcome.
+      let wasInFlight = assistantStatus(clientTurnId: clientTurnId)?.isInFlight == true
+      if wasInFlight {
         markAssistantFailed(
           clientTurnId: clientTurnId,
           message: "Summer did not confirm a terminal state for this turn."
         )
       }
+      notePostIdentityFirstSendAfterStream(
+        wasInFlight: wasInFlight,
+        status: assistantStatus(clientTurnId: clientTurnId)
+      )
       isOffline = false
-      if assistantStatus(clientTurnId: clientTurnId) != .failed,
-         assistantStatus(clientTurnId: clientTurnId) != .canceled
-      {
-        lastErrorMessage = nil
-      }
       await persistCache(generation: generation, selection: selection)
     } catch {
       // Stop the timer sink before any awaited expiry delivery or cleanup.
@@ -423,12 +414,17 @@ final class ChatRepository {
         // A nil fixture callback never grants managed cancellation persistence.
         if let expected = identity.ownership, context.authorization != .managed(expected) { return }
         markAssistantCanceled(clientTurnId: clientTurnId)
+        notePostIdentityFirstSendCancelled()
         await persistCache(generation: generation, selection: selection, allowingCancellation: true)
       } else {
         context.acceptingEvents = true
         coalescer.flush()
         context.acceptingEvents = false
         applySendFailure(error, clientTurnId: clientTurnId)
+        // 409 keeps the turn in retrying — not a terminal first-send failure.
+        if assistantStatus(clientTurnId: clientTurnId) == .failed || sessionExpired {
+          notePostIdentityFirstSendFailed(error: error)
+        }
         await persistCache(generation: generation, selection: selection)
       }
     }
@@ -446,7 +442,7 @@ final class ChatRepository {
   private func appendOptimisticTurn(text: String, clientTurnId: String) {
     // Stamp once here (not in persistCache) so the cached createdAt stays
     // stable across rewrites and restart pagination uses it as-is.
-    let sentAt = ISO8601DateFormatter().string(from: Date())
+    let sentAt = Date().ISO8601Format()
     timeline.append(
       MobileChatTimelineItem(
         id: "user:\(clientTurnId)",
@@ -487,7 +483,7 @@ final class ChatRepository {
     }
 
     let clientMessageId = "\(idempotencyKey):msg"
-    let sentAt = ISO8601DateFormatter().string(from: Date())
+    let sentAt = Date().ISO8601Format()
     timeline.removeAll { $0.clientTurnId == idempotencyKey }
     timeline.append(
       MobileChatTimelineItem(
@@ -950,7 +946,7 @@ final class ChatRepository {
       // an `olderCursor` from restart-time timestamps and load-earlier would
       // refetch the current window instead of older history. Optimistic rows
       // have no server timestamp yet, so they fall back to now.
-      createdAt: item.createdAt ?? ISO8601DateFormatter().string(from: Date()),
+      createdAt: item.createdAt ?? Date().ISO8601Format(),
       requiresWebHandoff: item.requiresWebHandoff
     )
   }

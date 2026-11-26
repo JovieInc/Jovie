@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { AdminQueryTabsSelect } from '@/components/features/admin/layout/AdminQueryTabsSelect';
 import { AdminSystemMap } from '@/components/features/admin/system-map/AdminSystemMap';
 import { AgentRoster } from '@/components/features/agent-room/AgentRoster';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
@@ -60,11 +61,13 @@ export default async function AdminSystemPage({ searchParams }: Props) {
       description='Who is on the fleet, plus a read-only overview of skills, connectors, tools, and memory — separation of concerns for the platform.'
       testId='admin-system-page'
       viewTestId='admin-system-content'
-      tabs={{
-        param: 'tab',
-        value: activeTab,
-        options: AGENTS_TABS,
-      }}
+      actions={
+        <AdminQueryTabsSelect
+          param='tab'
+          value={activeTab}
+          options={AGENTS_TABS}
+        />
+      }
     >
       {activeTab === 'roster' ? (
         <AgentRoster agents={room.view.agents} />

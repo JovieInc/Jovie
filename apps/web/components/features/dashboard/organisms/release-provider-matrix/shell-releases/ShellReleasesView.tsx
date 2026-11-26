@@ -301,7 +301,7 @@ function ReleasesListContent({
       // and role queries. The Radix context-menu trigger's global
       // aria-haspopup on the row's implicit listitem is legal aria.
       aria-label='Releases'
-      className='py-1.5 space-y-px px-2'
+      className='py-1.5 space-y-px'
     >
       {visibleReleases.map(r => (
         <TableContextMenu

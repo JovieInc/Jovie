@@ -3,15 +3,27 @@ import {
   type CompanyStateReadback,
   readCompanyStateCache,
 } from '@/lib/ovie/company-state.server';
+import { readSummerChartCard } from '@/lib/ovie/summer-chart-cards.server';
+import { extractSummerChartDirectives } from '@/lib/ovie/summer-chart-directives';
 import { ovieSummerTurnId } from '@/lib/ovie/summer-conversation';
 import type { SummerFailureHop } from '@/lib/ovie/summer-failure';
-import { resolveSummerEveCallerOrigin } from '@/lib/ovie/summer-production-pin';
+import {
+  logSummerBridgeEvent,
+  resolveSummerEveCallerOrigin,
+} from '@/lib/ovie/summer-production-pin';
 import { CURRENT_SUMMER_SESSION_ID } from '@/lib/ovie/summer-session';
 import { fetchSummerShadow } from '@/lib/ovie/summer-shadow-client';
 import {
   bindCurrentSummerSpeaker,
   type SummerSpeaker,
 } from '@/lib/ovie/summer-transport';
+import {
+  ADMISSION_RETRY_BASE_MS,
+  admitWithRetry,
+  isCurrentCompanySnapshot,
+  SUMMER_ADMISSION_ATTEMPTS,
+  summerErrorCode,
+} from '@/lib/ovie/summer-turn-admission';
 
 const eveSessionIdSchema = z.string().regex(/^(?:ses_|wrun_)[A-Za-z0-9_-]+$/u);
 const resultSchema = z.object({
@@ -49,8 +61,13 @@ const PENDING_RECOVERY_TEXT =
 const BLOCKING_RECOVERY_TEXT =
   'Summer is still finishing an earlier turn. This message was not sent; wait for that turn to finish, then retry.';
 
-function companyStateContext(readback: CompanyStateReadback | null) {
+function companyStateContext(
+  readback: CompanyStateReadback | null,
+  nowMs: number
+) {
   if (!readback) return null;
+  if (!isCurrentCompanySnapshot(readback.snapshot.generatedAt, nowMs))
+    return null;
   const { sourcePayloads: _payloads, ...snapshot } = readback.snapshot;
   return { ...snapshot, cache: readback.cache };
 }
@@ -167,10 +184,22 @@ function failureHopFor(
     : 'summer_unreachable';
 }
 
+export interface EveSummerSpeakerOptions {
+  /** Admission tries for a first hop that never reached Summer. */
+  readonly admissionAttempts?: number;
+  readonly admissionRetryDelayMs?: number;
+  readonly now?: () => number;
+}
+
 export function createEveSummerSpeaker(
   fetchShadow = fetchSummerShadow,
-  readCompanyState = readCompanyStateCache
+  readCompanyState = readCompanyStateCache,
+  readChartCard = readSummerChartCard,
+  options: EveSummerSpeakerOptions = {}
 ): SummerSpeaker {
+  const attempts = Math.max(1, options.admissionAttempts ?? 1);
+  const retryDelayMs = options.admissionRetryDelayMs ?? ADMISSION_RETRY_BASE_MS;
+  const now = options.now ?? Date.now;
   return {
     id: 'summer',
     runtime: 'eve',
@@ -191,7 +220,7 @@ export function createEveSummerSpeaker(
           (await resolveSummerEveCallerOrigin({ refresh: true })).deploymentId;
         let companyState: ReturnType<typeof companyStateContext> = null;
         try {
-          companyState = companyStateContext(await readCompanyState());
+          companyState = companyStateContext(await readCompanyState(), now());
         } catch {
           // A missing cache is explicit context, never a reason to fan out.
         }
@@ -210,16 +239,25 @@ export function createEveSummerSpeaker(
             ? { canonicalTailRecovery: true }
             : {}),
         });
-        let response = await fetchShadow(prefix, {
-          method: 'POST',
+        let response = await admitWithRetry({
+          eventId,
+          send: () =>
+            fetchShadow(prefix, {
+              method: 'POST',
+              signal: input.signal,
+              body: rawBody,
+            }),
+          verify: async admitted => {
+            deploymentId = await verifiedDeploymentId(
+              admitted,
+              deploymentId,
+              refreshDeploymentId
+            );
+          },
+          attempts,
+          retryDelayMs,
           signal: input.signal,
-          body: rawBody,
         });
-        deploymentId = await verifiedDeploymentId(
-          response,
-          deploymentId,
-          refreshDeploymentId
-        );
         let admission = await body(response, input.signal);
         if (response.status === 409 && admission.code === 'conversation_busy') {
           const blocking = blockingEventSchema.safeParse(
@@ -374,17 +412,41 @@ export function createEveSummerSpeaker(
           yield { type: 'error', state: 'failure', hop: 'summer_turn_failed' };
           return;
         }
-        yield { type: 'text-delta', text: result.responseText };
+        // A chart line (see summer-chart-directives) asks Ovie for an inline chart built
+        // from live, registered sources; the line itself never reaches chat.
+        const reply = extractSummerChartDirectives(result.responseText);
+        if (reply.text) yield { type: 'text-delta', text: reply.text };
+        for (const metric of reply.metrics) {
+          const card = await readChartCard(metric);
+          yield {
+            type: 'tool',
+            tool: 'get_company_metric_chart',
+            ok: true,
+            receiptId: `${result.turnId}:chart:${metric}`,
+            summary: card.title,
+            data: card,
+          };
+        }
       } catch (error) {
-        yield {
-          type: 'error',
-          state: 'unknown',
-          hop: failureHopFor(error, stage),
-        };
+        const hop = failureHopFor(error, stage);
+        // The hop alone hid why 18 founder turns failed (2026-11-22). Name the
+        // underlying cause in the log so every failure points at its repair.
+        logSummerBridgeEvent({
+          event: 'summer_turn_error',
+          eventId,
+          stage,
+          hop,
+          cause: summerErrorCode(error),
+        });
+        yield { type: 'error', state: 'unknown', hop };
       }
     },
   };
 }
 export function bindEveSummerSpeaker(): SummerSpeaker {
-  return bindCurrentSummerSpeaker(createEveSummerSpeaker());
+  return bindCurrentSummerSpeaker(
+    createEveSummerSpeaker(undefined, undefined, undefined, {
+      admissionAttempts: SUMMER_ADMISSION_ATTEMPTS,
+    })
+  );
 }

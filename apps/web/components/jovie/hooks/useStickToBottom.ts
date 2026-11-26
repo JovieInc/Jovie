@@ -12,6 +12,24 @@ import { observeDesktopVisualActivity } from '@/lib/desktop/electron-bridge';
 /** Scroll distance (px) from bottom before considering "scrolled away". */
 export const SCROLL_THRESHOLD = 200;
 
+/**
+ * Pin a chat transcript so the latest content stays in view.
+ *
+ * When an onboarding AuthShell card is present (`data-onboarding-auth-anchor`),
+ * scroll that card to the start of the scrollport so its heading clears
+ * `.system-b-chat-thread-top-fade` (ONB-27). Tall AuthShell cards used to sit
+ * under `scrollTop = scrollHeight`, which left Reserve/Claim h1 inside the
+ * masked band while OAuth below stayed visible.
+ */
+export function pinTranscriptToLatest(container: HTMLElement): void {
+  const authAnchor = container.querySelector('[data-onboarding-auth-anchor]');
+  if (authAnchor instanceof HTMLElement) {
+    authAnchor.scrollIntoView({ block: 'start', behavior: 'auto' });
+    return;
+  }
+  container.scrollTop = container.scrollHeight;
+}
+
 const SERVER_STUCK = () => true;
 
 interface StuckStore {
@@ -154,7 +172,7 @@ export function useStickToBottomController(
         }
       }
 
-      container.scrollTop = container.scrollHeight;
+      pinTranscriptToLatest(container);
       pinnedViewportBottomRef.current =
         container.scrollTop + container.clientHeight;
       if (restoringPinnedRef.current) {

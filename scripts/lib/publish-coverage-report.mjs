@@ -9,6 +9,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { EX_TEMPFAIL, QUOTA_DEFERRED_MARKER } from './github-rate-limit.mjs';
 import { retireGeneratedReports } from './retire-coverage-reports.mjs';
 
 const NIGHTLY = {
@@ -256,13 +257,43 @@ export function publishNightlyReport(options = {}) {
 const SNAPSHOT = 'apps/web/reports/test-coverage-snapshot.json';
 const HEATMAP = 'docs/TEST_COVERAGE_HEATMAP.md';
 
+function errorText(error) {
+  return [error?.stderr, error?.stdout, error?.message]
+    .filter(value => typeof value === 'string')
+    .join('\n');
+}
+
+/** The shared gh adapter sheds with exit 75. That is infrastructure, not a
+ * bad artifact. */
+function isCoverageQuotaDeferred(error) {
+  return (
+    error?.status === EX_TEMPFAIL ||
+    error?.exitCode === EX_TEMPFAIL ||
+    errorText(error).includes(QUOTA_DEFERRED_MARKER)
+  );
+}
+
+class CoverageRestoreDeferredError extends Error {
+  constructor() {
+    super(
+      `${QUOTA_DEFERRED_MARKER}: coverage baseline restore is not a verdict on this change.`
+    );
+    this.name = 'CoverageRestoreDeferredError';
+    this.status = EX_TEMPFAIL;
+  }
+}
+
 /** Restore from GitHub's successful main-run artifacts, never from a PR or a
- * failed audit. The existing upload-artifact step owns publication/retention. */
+ * failed audit. The existing upload-artifact step owns publication/retention.
+ * `onQuota: 'defer'` keeps the committed bootstrap when GitHub sheds the read
+ * (Quality Gap Finder). The default still fails closed so the coverage audit
+ * does not measure drift against a baseline it could not fetch. */
 export function restoreCoverageBaseline({
   cwd = process.cwd(),
   env = process.env,
   baselineFile = join(cwd, SNAPSHOT),
   heatmapFile = join(cwd, HEATMAP),
+  onQuota = 'throw',
   gh = args =>
     execFileSync(
       process.execPath,
@@ -283,10 +314,48 @@ export function restoreCoverageBaseline({
       }
     ).trim(),
 } = {}) {
+  if (onQuota !== 'throw' && onQuota !== 'defer') {
+    throw new Error('Invalid coverage restore quota policy');
+  }
   const repo = env.GITHUB_REPOSITORY;
   if (!/^[\w.-]+\/[\w.-]+$/.test(repo ?? '')) {
     throw new Error('Invalid coverage repository');
   }
+  const readGh = args => {
+    try {
+      return gh(args);
+    } catch (error) {
+      if (!isCoverageQuotaDeferred(error)) throw error;
+      throw new CoverageRestoreDeferredError();
+    }
+  };
+  try {
+    return restoreCoverageBaselineFrom(readGh, {
+      cwd,
+      env,
+      repo,
+      baselineFile,
+      heatmapFile,
+    });
+  } catch (error) {
+    if (!(error instanceof CoverageRestoreDeferredError)) throw error;
+    if (onQuota !== 'defer') throw error;
+    const note = `::warning::${error.message} Committed bootstrap retained.`;
+    console.error(note);
+    if (env.GITHUB_STEP_SUMMARY) {
+      appendFileSync(
+        env.GITHUB_STEP_SUMMARY,
+        'Coverage baseline: deferred on GitHub quota; committed bootstrap retained.\n'
+      );
+    }
+    return { status: 'deferred', baseline: SNAPSHOT };
+  }
+}
+
+function restoreCoverageBaselineFrom(
+  gh,
+  { cwd, env, repo, baselineFile, heatmapFile }
+) {
   const { workflow_runs: runs } = JSON.parse(
     gh([
       'api',

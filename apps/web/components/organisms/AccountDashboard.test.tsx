@@ -32,4 +32,14 @@ describe('AccountDashboard', () => {
     expect(docsLink).toHaveAttribute('target', '_blank');
     expect(docsLink).toHaveAttribute('rel', 'noopener noreferrer');
   });
+
+  it('renders its section titles as h2 headings, not skipped h3/h4 levels', () => {
+    render(<AccountDashboard />);
+
+    expect(screen.queryAllByRole('heading', { level: 3 })).toHaveLength(0);
+    expect(screen.queryAllByRole('heading', { level: 4 })).toHaveLength(0);
+    expect(
+      screen.getAllByRole('heading', { level: 2 }).length
+    ).toBeGreaterThanOrEqual(2);
+  });
 });

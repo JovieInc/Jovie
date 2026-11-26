@@ -1,8 +1,11 @@
 import type { Metadata } from 'next';
 import { OvieShippingStateCard } from '@/components/features/admin/hud/OvieShippingStateCard';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
+import { OVIE_METRIC_ANCHORS } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
+import { ShippingLinearIssues } from './ShippingLinearIssues';
 import { ShippingMatrix } from './ShippingMatrix';
 import { ShippingStatistics } from './ShippingStatistics';
 
@@ -22,7 +25,15 @@ export default async function ShippingPage() {
       testId='ovie-shipping-page'
     >
       <OvieShippingStateCard />
+      <section
+        id={OVIE_METRIC_ANCHORS.shippingVelocity}
+        className='scroll-mt-4 border-y border-subtle'
+        aria-label='Source Merge History'
+      >
+        <ShippingVelocityChart />
+      </section>
       <ShippingMatrix />
+      <ShippingLinearIssues />
       <ShippingStatistics />
     </AdminPage>
   );

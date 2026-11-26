@@ -1,0 +1,62 @@
+name: Crawl content fixture
+
+# Manual-main converge of the product crawl's hidden demo artist
+# (apps/web/lib/synthetic/crawl-content-fixture.json). Tim, 2026-11-22: yes to
+# seeding a hidden demo artist on production so the crawl can check the last
+# three pages (promo download, merch card, asset share). Dry run by default
+# (reads only); apply writes only fixture-owned rows, then loads the three
+# pages on https://jov.ie and fails unless each answers 200. The receipt goes
+# to the run summary.
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Write the fixture rows (false = plan only)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crawl-content-fixture
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: Reconcile crawl content fixture
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-doppler
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Reconcile
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          APPLY: ${{ inputs.apply && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/crawl-content-fixture-receipt.json"
+          args=(--receipt "$receipt")
+          [ "$APPLY" = "true" ] && args+=(--apply)
+          status=0
+          (
+            cd apps/web
+            doppler run --project jovie-web --config prd \
+              --only-secrets=DATABASE_URL \
+              --no-fallback -- env -u DOPPLER_TOKEN \
+                pnpm run crawl-fixture:reconcile "${args[@]}"
+          ) || status=$?
+          if [ -s "$receipt" ]; then
+            {
+              echo '### Crawl content fixture receipt'
+              echo '```json'
+              cat "$receipt"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$status"

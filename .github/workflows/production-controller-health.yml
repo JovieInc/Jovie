@@ -69,6 +69,21 @@ jobs:
               echo current
             fi
           }
+          # JOV-8157: a failed/cancelled controller has no verified marker
+          # because promotion did not succeed. That is a release failure, not
+          # controller_completed_without_marker (run 40673640421, conclusion
+          # failure, promote gate red). Only a successful controller can page
+          # the missing-marker class.
+          controller_terminal_recovery_reason() {
+            case "$1" in
+              failure|cancelled|timed_out|startup_failure|neutral|skipped|stale)
+                echo "controller_terminal_$1"
+                ;;
+              *)
+                echo malformed
+                ;;
+            esac
+          }
           on_exit() {
             local status=$?
             if [ "$status" -ne 0 ]; then
@@ -533,8 +548,7 @@ jobs:
 
               # Self-verify prod before paging: if live build matches current
               # main, deploy path worked and a missing marker is bookkeeping —
-              # not a live outage. Still fail closed when conclusion is not
-              # success (handled below).
+              # not a live outage. A non-success conclusion never reaches here.
               prod_build_id=""
               if prod_json="$(curl --fail --silent --show-error \
                 --connect-timeout 10 --max-time 20 \
@@ -552,8 +566,36 @@ jobs:
                   >> "$GITHUB_OUTPUT"
                 exit 0
               fi
+              incident controller_completed_without_marker
             fi
-            incident controller_completed_without_marker
+            # Non-success has no verified marker because promotion did not
+            # finish. Page the missing-marker class only for success (above).
+            # When a Production Release child job ran, that workflow already
+            # files its own remediation (JOV-8157, run 40644658402). A terminal
+            # run that never started the release stays fail-closed.
+            terminal_reason="$(controller_terminal_recovery_reason "$controller_conclusion")"
+            if [ "$terminal_reason" = "malformed" ]; then
+              incident malformed_controller_conclusion
+            fi
+            release_started=0
+            if controller_jobs="$(bash "$GITHUB_WORKSPACE/.github/scripts/gh-api-hold.sh" api \
+              "repos/$REPOSITORY/actions/runs/$controller_id/attempts/$controller_attempt/jobs?per_page=100")"; then
+              if jq -e '
+                type == "object" and
+                (.jobs | type == "array") and
+                any(.jobs[];
+                  (.name | type == "string" and startswith("Production Release /"))
+                )
+              ' >/dev/null <<<"$controller_jobs"; then
+                release_started=1
+              fi
+            fi
+            if [ "$release_started" = "1" ]; then
+              echo "Controller run $controller_id finished ${controller_conclusion} after Production Release started; release remediation owns that failure."
+              echo "recovery_reason=$terminal_reason" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            incident controller_failed
           fi
 
           # Production starts only after exact staging completion. A live

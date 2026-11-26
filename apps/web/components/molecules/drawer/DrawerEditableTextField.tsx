@@ -1,6 +1,6 @@
 'use client';
 
-import { Input, PlainButton } from '@jovie/ui';
+import { IconButton, Input, PlainButton } from '@jovie/ui';
 import { Check, Copy, ExternalLink } from 'lucide-react';
 import type { ReactNode } from 'react';
 import React, {
@@ -11,7 +11,6 @@ import React, {
   useState,
 } from 'react';
 import { toast } from '@/components/feedback';
-import { DrawerInlineIconButton } from '@/components/molecules/drawer/DrawerInlineIconButton';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 
@@ -68,8 +67,8 @@ export interface DrawerEditableTextFieldProps {
  * ProfileContactHeader, and other TaskView / entity surfaces.
  *
  * Shell handoff rotation 22: React.memo + canonical focus rings on the
- * edit trigger + all action buttons/links (via upgraded delegated
- * DrawerInlineIconButton base) + DS subtle motion only + subtraction
+ * edit trigger + all action buttons/links (via @jovie/ui IconButton
+ * `inline` variant) + DS subtle motion only + subtraction
  * (density + parent grid chrome) + zero layout shift (existing placeholder
  * logic preserved/enhanced).
  */
@@ -204,7 +203,7 @@ export const DrawerEditableTextField = React.memo(
               placeholder={placeholder ?? emptyLabel}
               aria-label={`Edit ${label}`}
               className={cn(
-                'h-8 w-full rounded-lg border-(--app-shell-frame-seam) bg-surface-0 px-2.5 text-app text-primary-token',
+                'h-7 w-full rounded-lg border-(--app-shell-frame-seam) bg-surface-0 px-2.5 text-app text-primary-token',
                 monospace && 'font-mono tracking-wider',
                 inputClassName
               )}
@@ -223,7 +222,7 @@ export const DrawerEditableTextField = React.memo(
                     // text area so editable and static rows share the same
                     // visual grid.
                     'h-auto px-0 py-0 rounded-md hover:bg-surface-0'
-                  : 'h-8 rounded-lg px-2.5 hover:bg-surface-0',
+                  : 'h-7 rounded-lg px-2.5 hover:bg-surface-0',
                 density === 'inline' ? undefined : inputClassName,
                 'border border-transparent bg-transparent shadow-none',
                 !hasValue && 'text-tertiary-token'
@@ -280,20 +279,22 @@ export const DrawerEditableTextField = React.memo(
               : null}
 
             {!isEditing && (copyValue ?? value) ? (
-              <DrawerInlineIconButton
+              <IconButton
+                size='xs'
+                variant='inline'
+                fade='visible'
                 onClick={event => {
                   event.stopPropagation();
                   handleCopyClick();
                 }}
                 aria-label={copyLabel ?? `Copy ${label}`}
-                className='h-6 w-6 min-h-6 min-w-6 text-tertiary-token'
               >
                 {isSuccess ? (
                   <Check className='h-3.5 w-3.5 text-success' />
                 ) : (
-                  <Copy className='h-3.5 w-3.5' />
+                  <Copy className='h-3.5 w-3.5 text-tertiary-token' />
                 )}
-              </DrawerInlineIconButton>
+              </IconButton>
             ) : null}
 
             {isEditing
@@ -315,17 +316,21 @@ export const DrawerEditableTextField = React.memo(
                       {action.icon ?? <ExternalLink className='h-3.5 w-3.5' />}
                     </a>
                   ) : (
-                    <DrawerInlineIconButton
+                    <IconButton
+                      size='xs'
+                      variant='inline'
+                      fade='visible'
                       key={action.id}
                       onClick={event => {
                         event.stopPropagation();
                         action.onClick?.();
                       }}
                       aria-label={action.ariaLabel}
-                      className='h-6 w-6 min-h-6 min-w-6 text-tertiary-token'
                     >
-                      {action.icon ?? <ExternalLink className='h-3.5 w-3.5' />}
-                    </DrawerInlineIconButton>
+                      {action.icon ?? (
+                        <ExternalLink className='h-3.5 w-3.5 text-tertiary-token' />
+                      )}
+                    </IconButton>
                   )
                 )}
           </div>

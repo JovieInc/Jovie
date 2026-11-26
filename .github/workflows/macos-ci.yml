@@ -157,3 +157,31 @@ jobs:
           path: artifacts/desktop-test-results/startup-budget
           if-no-files-found: error
           retention-days: 30
+
+  # JOV-7463: CI-safe charter contract self-test. Rejects over-budget fixtures.
+  # LIVE_CERT stays blocked until Summer/CI runs --mode live on an installed Mac.
+  performance-cert:
+    name: Desktop performance contract (CI-safe)
+    if: ${{ !inputs.mac-child }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.checkout-ref || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Run performance contract self-test
+        run: |
+          mkdir -p artifacts/desktop-test-results/performance-cert
+          pnpm --filter @jovie/desktop run test:performance
+          JOVIE_PERF_CERT_OUT="$GITHUB_WORKSPACE/artifacts/desktop-test-results/performance-cert/ci"
+          pnpm --filter @jovie/desktop run performance:cert --mode contract-check --output "$JOVIE_PERF_CERT_OUT"
+      - name: Upload desktop performance cert receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-performance-cert
+          path: artifacts/desktop-test-results/performance-cert
+          if-no-files-found: error
+          retention-days: 30

@@ -104,7 +104,7 @@ export async function getArtistOfferFunnelReport(input?: {
     FROM acquisition_journeys
     WHERE captured_at >= ${start} AND captured_at < ${end}
       AND consent_revoked_at IS NULL
-      AND ${realJourney}
+      AND ${realJourney()}
   `);
   const totalVisits = Number(
     rowsOf<{ visits: number }>(visitResult)[0]?.visits ?? 0
@@ -118,7 +118,7 @@ export async function getArtistOfferFunnelReport(input?: {
     INNER JOIN acquisition_journey_stages s ON s.acquisition_id = j.id
     WHERE j.captured_at >= ${start} AND j.captured_at < ${end}
       AND j.consent_revoked_at IS NULL
-      AND ${realJourneyJ}
+      AND ${realJourneyJ()}
     GROUP BY j.id, j.captured_at, j.linked_at
     LIMIT ${MAX_TIMELINES}
   `);
@@ -150,7 +150,7 @@ export async function getArtistOfferFunnelReport(input?: {
     FROM acquisition_journeys
     WHERE captured_at >= ${weekStart} AND captured_at < ${end}
       AND consent_revoked_at IS NULL
-      AND ${realJourney}
+      AND ${realJourney()}
   `);
   const visitsLast7d = Number(
     rowsOf<{ visits: number }>(weekResult)[0]?.visits ?? 0
@@ -179,7 +179,7 @@ async function getFunnelDiagnostics(
       FROM acquisition_journeys
       WHERE captured_at >= ${start} AND captured_at < ${end}
         AND consent_revoked_at IS NULL
-        AND ${realJourney}
+        AND ${realJourney()}
     )
     SELECT count(*) FILTER (WHERE path = ANY(string_to_array(${OFFER_LANDING_PATHS.join(',')}, ',')))::int AS offer,
            count(*) FILTER (WHERE NOT (path = ANY(string_to_array(${OFFER_LANDING_PATHS.join(',')}, ','))))::int AS other
@@ -193,7 +193,7 @@ async function getFunnelDiagnostics(
     INNER JOIN acquisition_journeys j ON j.id = s.acquisition_id
     WHERE s.occurred_at >= ${start} AND s.occurred_at < ${end}
       AND j.consent_revoked_at IS NULL
-      AND ${realJourneyJ}
+      AND ${realJourneyJ()}
     GROUP BY s.stage
   `);
   const stageEventsInWindow: Partial<Record<RecordedArtistOfferStage, number>> =

@@ -7,7 +7,9 @@ import {
 } from '@/lib/validation/username-core';
 
 export type AuthShellMode = 'sign-in' | 'sign-up';
-export type AuthShellIntent = 'sign-in' | 'continue' | 'claim';
+export type AuthShellIntent = 'sign-in' | 'continue' | 'claim' | 'waitlist';
+/** Product access bind for sign-up shells (JOV-8052 / ONB-23). */
+export type AuthShellAccessKind = 'claim' | 'waitlist';
 
 export const AUTH_SHELL_HEADINGS = {
   'sign-in': 'Log in to Jovie',
@@ -31,10 +33,17 @@ export function getAuthShellClaimHeading(handle: string): string {
   return `Claim @${handle}`;
 }
 
+export function getAuthShellWaitlistHeading(handle: string): string {
+  return `Reserve @${handle}`;
+}
+
 export function getAuthShellHeading(
   intent: AuthShellIntent,
   handle?: string
 ): string {
+  if (intent === 'waitlist' && handle) {
+    return getAuthShellWaitlistHeading(handle);
+  }
   if (intent === 'claim' && handle) {
     return getAuthShellClaimHeading(handle);
   }
@@ -58,9 +67,12 @@ export function normalizeAuthClaimHandle(
 export function resolveAuthShellIntent(args: {
   readonly mode: AuthShellMode;
   readonly claimHandle?: string;
+  readonly accessKind?: AuthShellAccessKind;
 }): AuthShellIntent {
   if (args.mode === 'sign-in') return 'sign-in';
-  if (args.claimHandle) return 'claim';
+  if (args.claimHandle) {
+    return args.accessKind === 'waitlist' ? 'waitlist' : 'claim';
+  }
   return 'continue';
 }
 

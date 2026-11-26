@@ -1,5 +1,6 @@
 'use client';
 
+import { buttonVariants } from '@jovie/ui';
 import { useSearchParams } from 'next/navigation';
 import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import { providerConfig } from '@/app/app/(shell)/dashboard/releases/config';
@@ -36,25 +37,25 @@ export function DemoReleaseLandingSurface() {
         <div data-testid='demo-showcase-release-landing'>
           <div className='flex min-h-screen items-center justify-center bg-surface-0 px-5 py-10'>
             <div
-              className='w-full max-w-85 rounded-3xl border border-white/8 bg-surface-1 p-5 shadow-[0_32px_100px_rgba(0,0,0,0.45)]'
+              className='w-full max-w-85 rounded-3xl border border-subtle bg-surface-1 p-5 shadow-popover'
               data-testid='demo-release-creator-capture'
             >
-              <div className='rounded-3xl border border-white/8 bg-white/[0.04] p-4'>
-                <p className='text-center text-xs font-semibold text-white/45'>
+              <div className='rounded-3xl border border-subtle bg-surface-2 p-4'>
+                <p className='text-center text-xs font-semibold text-tertiary-token'>
                   Creator Activation
                 </p>
-                <div className='mt-4 rounded-3xl bg-white/[0.05] px-4 py-5 text-center'>
-                  <p className='text-mid font-semibold text-white dark:text-white'>
+                <div className='mt-4 rounded-3xl bg-surface-1 px-4 py-5 text-center'>
+                  <p className='text-mid font-semibold text-primary-token'>
                     {RELEASE.title}
                   </p>
-                  <p className='mt-1 text-xs text-white/58'>
+                  <p className='mt-1 text-xs text-secondary-token'>
                     {ARTIST.displayName}
                   </p>
                 </div>
                 <div className='mt-5 flex justify-center'>
                   <a
                     href={`/${ARTIST.handle}/${RELEASE.slug}/sounds`}
-                    className='inline-flex min-h-12 items-center justify-center rounded-full bg-white dark:bg-surface-1 px-6 py-3 text-mid font-semibold tracking-[-0.02em] text-black dark:text-white'
+                    className={buttonVariants({ size: 'lg' })}
                   >
                     Use this sound
                   </a>

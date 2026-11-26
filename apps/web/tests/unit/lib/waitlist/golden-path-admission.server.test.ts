@@ -74,6 +74,15 @@ describe('golden-path admission server reads', () => {
     expect((await decideGoldenPathAdmissionForArtist(artist)).admit).toBe(
       false
     );
+    expect((await readGoldenPathTurnContext()).verdict).toBe('UNKNOWN');
+  });
+
+  it('preserves BLOCKED verdict from cached report when not eligible', async () => {
+    mocks.readCached.mockResolvedValue({
+      eligible: false,
+      verdict: 'BLOCKED',
+    });
+    expect((await readGoldenPathTurnContext()).verdict).toBe('BLOCKED');
   });
 
   it('pauses admission while open bug reports pile up (support load)', async () => {

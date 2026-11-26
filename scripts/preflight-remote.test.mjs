@@ -34,6 +34,8 @@ test('remote script gates on slots, uses nvmrc, and propagates exit status', () 
     forward: ['--no-coverage'],
     bodyB64: 'aGk=',
   });
+  assert.match(s, /git clone --quiet --filter=blob:none /);
+  assert.doesNotMatch(s, /git clone[^\n]*--(?:depth|shallow|filter=tree)/);
   assert.match(s, /seq 0 \$\(\(4 - 1\)\)/);
   assert.match(s, /nvm use/);
   assert.match(s, /pnpm preflight:changed '--no-coverage'/);

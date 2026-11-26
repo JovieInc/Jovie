@@ -5,6 +5,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  PlainButton,
 } from '@jovie/ui';
 import { Check, ChevronDown, Lock } from 'lucide-react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
@@ -74,7 +75,7 @@ export function TimeRangeSelector<T extends AnalyticsRange>({
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button
+          <PlainButton
             type='button'
             className={cn(
               'inline-flex h-6 items-center gap-1 rounded-full border border-transparent px-1.5 py-0 text-2xs font-normal text-tertiary-token transition-colors duration-subtle hover:bg-surface-0 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30',
@@ -88,7 +89,7 @@ export function TimeRangeSelector<T extends AnalyticsRange>({
               className='text-tertiary-token'
               aria-hidden='true'
             />
-          </button>
+          </PlainButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align='end' className='w-36'>
           {ranges.map(range => {

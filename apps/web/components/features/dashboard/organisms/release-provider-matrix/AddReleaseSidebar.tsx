@@ -5,8 +5,10 @@ import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 // @coverage-via apps/web/tests/components/release-provider-matrix/AddReleaseSidebar.test.tsx
 
 import {
+  Button,
   Input,
   Spinner as LoadingSpinner,
+  PlainButton,
   Select,
   SelectContent,
   SelectItem,
@@ -14,7 +16,7 @@ import {
   SelectValue,
 } from '@jovie/ui';
 import { startOfToday } from 'date-fns';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRelease } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
@@ -23,7 +25,6 @@ import {
   parseDatePickerValue,
 } from '@/components/molecules/DatePicker';
 import {
-  DrawerButton,
   DrawerCardActionBar,
   DrawerFormField,
   DrawerSettingsToggle,
@@ -58,7 +59,20 @@ export interface AddReleaseSidebarProps {
   readonly onArtworkUploaded?: (releaseId: string, artworkUrl: string) => void;
 }
 
-export function AddReleaseSidebar({
+export function AddReleaseSidebar(props: AddReleaseSidebarProps) {
+  // Closing the drawer starts a fresh form session: the keyed child remounts
+  // with empty state, so no effect has to reset fields on the open flag.
+  const [session, setSession] = useState(0);
+  const [wasOpen, setWasOpen] = useState(props.isOpen);
+  if (props.isOpen !== wasOpen) {
+    setWasOpen(props.isOpen);
+    if (!props.isOpen) setSession(current => current + 1);
+  }
+
+  return <AddReleaseSidebarForm key={session} {...props} />;
+}
+
+function AddReleaseSidebarForm({
   isOpen,
   artistName,
   onClose,
@@ -102,11 +116,11 @@ export function AddReleaseSidebar({
     replaceStagedArtworkPreview(null);
   }, [replaceStagedArtworkPreview]);
 
+  // Focus the title when the drawer opens (the field is mounted while closed).
+  const titleInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    if (!isOpen) {
-      resetForm();
-    }
-  }, [isOpen, resetForm]);
+    if (isOpen) titleInputRef.current?.focus();
+  }, [isOpen]);
 
   useEffect(() => {
     return () => {
@@ -236,9 +250,10 @@ export function AddReleaseSidebar({
       hideMinimalHeaderBar
       footerSurface='flat'
       footer={
-        <DrawerButton
-          tone='secondary'
-          className='h-8 w-full justify-center border-white bg-white dark:bg-surface-1 text-black dark:text-white hover:border-white hover:bg-white dark:bg-surface-1 hover:text-black dark:text-white disabled:cursor-not-allowed disabled:border-white disabled:bg-white dark:bg-surface-1 disabled:text-black dark:text-white/55 disabled:opacity-100'
+        <Button
+          variant='primary'
+          size='sm'
+          className='w-full'
           onClick={handleSubmit}
           disabled={isSubmitting || !title.trim()}
         >
@@ -250,7 +265,7 @@ export function AddReleaseSidebar({
           ) : (
             'Create Release'
           )}
-        </DrawerButton>
+        </Button>
       }
       entityHeader={
         <DrawerSurfaceCard
@@ -319,8 +334,7 @@ export function AddReleaseSidebar({
               value={title}
               onChange={event => setTitle(event.target.value)}
               placeholder='My New Release' // ui-casing-allow: default release title placeholder
-              autoFocus
-              className='h-8 rounded-lg border-subtle bg-surface-0 text-xs'
+              ref={titleInputRef}
             />
           </DrawerFormField>
 
@@ -329,10 +343,7 @@ export function AddReleaseSidebar({
               value={releaseType}
               onValueChange={value => setReleaseType(value as ReleaseType)}
             >
-              <SelectTrigger
-                id='release-type'
-                className='h-8 rounded-lg border-subtle bg-surface-0 text-xs'
-              >
+              <SelectTrigger id='release-type'>
                 <SelectValue>{releaseTypeLabel}</SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -373,10 +384,7 @@ export function AddReleaseSidebar({
               selected={genres}
               onChange={setGenres}
               trigger={
-                <button
-                  type='button'
-                  className='flex min-h-8 w-full items-center justify-between gap-2 rounded-lg border border-subtle bg-surface-0 px-3 py-1.5 text-left text-xs text-primary-token transition-[border-color,background-color,color] duration-subtle hover:border-default hover:bg-surface-1'
-                >
+                <PlainButton className='flex min-h-8 w-full items-center justify-between gap-2 rounded-lg bg-surface-1 px-3 py-1.5 text-left text-xs text-primary-token transition-colors duration-subtle hover:bg-surface-2'>
                   <span className='flex min-w-0 flex-1 flex-wrap gap-1.5'>
                     {genres.length > 0 ? (
                       genres.map(genre => (
@@ -396,7 +404,7 @@ export function AddReleaseSidebar({
                     className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
                     aria-hidden='true'
                   />
-                </button>
+                </PlainButton>
               }
             />
           </DrawerFormField>

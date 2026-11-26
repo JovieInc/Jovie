@@ -19,7 +19,7 @@ This directory previously contained 24 duplicate files that were 100% identical 
 - ✅ `atoms/TableCell.tsx`
 - ✅ `atoms/TableEmptyState.tsx`
 - ✅ `atoms/TableHeaderCell.tsx`
-- ✅ `atoms/TableIconButton.tsx`
+- ✅ table row icon actions use `@jovie/ui` `IconButton` (+ `SimpleTooltip`)
 
 **Molecules** (9 files):
 - ✅ `molecules/ContextMenuSubmenu.tsx`

@@ -93,68 +93,9 @@ All contributions to this repository are work product of Jovie Technology Inc. (
 - Follow the established design system
 - Ensure responsive design
 
-### Clerk-Supabase Integration
+### Web authentication
 
-**CRITICAL**: This project uses Clerk's native Supabase integration. Follow these guidelines:
-
-#### ✅ DO Use Native Integration
-
-```typescript
-// Client-side integration
-import { useSession } from '@clerk/nextjs';
-import { createClient } from '@supabase/supabase-js';
-
-function createClerkSupabaseClient() {
-  const { session } = useSession();
-
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_KEY!,
-    {
-      async accessToken() {
-        return session?.getToken() ?? null;
-      },
-    }
-  );
-}
-```
-
-```typescript
-// Server-side integration
-import { auth } from '@clerk/nextjs/server';
-import { createClient } from '@supabase/supabase-js';
-
-export function createServerSupabaseClient() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_KEY!,
-    {
-      async accessToken() {
-        return (await auth()).getToken();
-      },
-    }
-  );
-}
-```
-
-#### ❌ DON'T Use JWT Templates (Deprecated)
-
-```typescript
-// ❌ DO NOT use JWT templates
-const token = await getToken({ template: 'supabase' });
-```
-
-#### RLS Policies
-
-Always use `auth.jwt()` for user identification in RLS policies:
-
-```sql
--- ✅ CORRECT: Use auth.jwt() for RLS
-create policy "User can view own data" on "users"
-for select to authenticated using (
-  auth.jwt()->>'sub' = user_id
-);
-```
+Use the existing Better Auth server session and application-user mapping for authenticated work. See [the web auth architecture](apps/web/lib/auth/README.md) before adding a route or changing session resolution. Client session state is not authorization; enforce ownership and access on the server.
 
 ### Database Operations
 
@@ -165,7 +106,7 @@ for select to authenticated using (
 
 ### Error Handling
 
-- Always handle Supabase errors gracefully
+- Handle database errors without exposing provider internals
 - Provide meaningful error messages to users
 - Log errors appropriately for debugging
 - Use proper loading states
@@ -177,20 +118,18 @@ This project includes comprehensive guidelines for AI coding tools:
 ### For Claude Code (claude.ai/code)
 
 - See [CLAUDE.md](CLAUDE.md) for detailed guidelines
-- Follow the Clerk-Supabase integration patterns
+- Follow the web auth architecture linked above
 - Use the established component structure
 
 ### For Cursor and Other AI Tools
 
 - See [.cursorrules](.cursorrules) for guidelines
-- Follow the native integration approach
+- Reuse the canonical web auth and database modules
 - Maintain security best practices
 
 ### For All AI Tools
 
-- Reference [CLERK_SUPABASE_INTEGRATION.md](CLERK_SUPABASE_INTEGRATION.md) for detailed integration documentation
-- Use the latest patterns from Clerk's official documentation
-- Avoid deprecated approaches (JWT templates, etc.)
+- Reuse server-side auth helpers and verify session and role boundaries in tests.
 
 ## Testing Guidelines
 
@@ -252,7 +191,7 @@ Example:
 ```
 feat: add artist profile customization options
 fix: resolve authentication token refresh issue
-docs: update Clerk-Supabase integration guide
+docs: update the web auth integration guide
 ```
 
 ## Pull Request Guidelines
@@ -286,35 +225,21 @@ Include:
 
 ### Required Environment Variables
 
-```bash
-# Clerk
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_KEY=your-anon-key
-
-# Spotify
-SPOTIFY_CLIENT_ID=your-spotify-client-id
-SPOTIFY_CLIENT_SECRET=your-spotify-client-secret
-```
+For current local variables, use the checked-in [.env.example](.env.example) and [Doppler setup](docs/DOPPLER_SETUP.md). Never commit credentials.
 
 ### Local Development
 
-1. Set up Supabase project
-2. Configure Clerk application
-3. Set up Spotify Developer App
-4. Run database migrations
-5. Start development server
+1. Configure the development environment and database using the [README](README.md).
+2. Run database migrations.
+3. Start the development server and verify the intended auth flow.
 
 ## Troubleshooting
 
 ### Common Issues
 
 1. **Authentication not working**
-   - Check Clerk configuration
-   - Verify Supabase integration setup
+   - Verify the Better Auth configuration and the request origin.
+   - Check whether a real session is available to the server.
    - Test with fresh browser session
 
 2. **Database access denied**

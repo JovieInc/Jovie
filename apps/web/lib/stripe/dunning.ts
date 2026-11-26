@@ -77,6 +77,8 @@ export interface PaymentRecoveryInfo {
   currency: string;
   /** Price ID for the subscription */
   priceId?: string;
+  /** Stripe invoice id for send idempotency on webhook retries */
+  invoiceId?: string;
 }
 
 /**
@@ -247,6 +249,9 @@ export async function sendPaymentRecoveredEmail(
       subject: getPaymentRecoveredSubject(),
       text: getPaymentRecoveredText(templateData),
       html: getPaymentRecoveredHtml(templateData),
+      ...(info.invoiceId
+        ? { idempotencyKey: `payment-recovered:${info.invoiceId}` }
+        : {}),
     });
 
     if (result.status === 'error') {

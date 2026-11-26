@@ -1,0 +1,95 @@
+{
+  "gates": {
+    "apps/web/components/organisms/release-sidebar/TrackSidebar.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/table/molecules/DisplayMenuDropdown.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/CuesPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/EntityPopover.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/LyricsTimeline.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/LyricsView.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/PerformanceCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/ThreadView.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/organisms/release-sidebar/TrackSidebar.tsx": {
+      "loading": "Playback status comes from the useTrackAudioPlayer hook, not a prop, so a story cannot set it. The detector matched `playbackStatus: 'idle' | 'loading' | 'playing'`.",
+      "error": "Errors surface only as toasts from the audio hook, never as rendered markup a story can show. The detector matched `toast.error('Preview unavailable')`.",
+      "offline": "The component makes no network request itself. The detector matched `toast.error('Failed to copy link')`, a clipboard failure toast."
+    },
+    "apps/web/components/shell/EntityPopover.tsx": {
+      "empty": "The popover previews one entity; it owns no collection. The detector matched `className='inline-flex items-center gap-1'`.",
+      "permission-denied": "The popover has no permission or gated state. The detector matched the data field `readonly role?: string;` (a credit role such as producer)."
+    },
+    "apps/web/components/shell/PerformanceCard.tsx": {
+      "permission-denied": "The card has no permission or gated state. The detector matched the ARIA attribute `role='tablist'` on the range selector.",
+      "error": "The card renders caller-supplied series and has no failure path. The detector matched the colour class `: 'text-error'` on a down trend."
+    },
+    "apps/web/components/shell/ThreadView.tsx": {
+      "error": "The view renders passed-in turns and owns no request or failure path. The detector matched the prop forward `onSubmit={onComposerSubmit}`.",
+      "offline": "The view makes no network request itself. The detector matched the prop forward `onSubmit={onComposerSubmit}`."
+    }
+  }
+}

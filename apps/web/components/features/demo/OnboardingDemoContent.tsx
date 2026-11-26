@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { type FormEvent, useCallback, useMemo, useRef, useState } from 'react';
 import { OnboardingExperienceShell } from '@/components/features/onboarding/OnboardingExperienceShell';
 import { OnboardingDspStep } from '@/features/dashboard/organisms/onboarding/OnboardingDspStep';
@@ -54,9 +55,8 @@ function StepSwitcher({
   return (
     <div className='flex items-center gap-1 overflow-x-auto px-1 py-1'>
       {DEMO_ONBOARDING_STEPS.map(step => (
-        <button
+        <PlainButton
           key={step}
-          type='button'
           onClick={() => onStepChange(step)}
           className={cn(
             'min-h-7 shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-subtle',
@@ -66,7 +66,7 @@ function StepSwitcher({
           )}
         >
           {STEP_LABELS[step]}
-        </button>
+        </PlainButton>
       ))}
     </div>
   );
@@ -86,9 +86,8 @@ export function OnboardingDemoContent({
     () => (
       <div className='flex items-center justify-center gap-2 pt-1'>
         {DEMO_ONBOARDING_STEPS.map((step, index) => (
-          <button
+          <PlainButton
             key={step}
-            type='button'
             onClick={() => onStepChange(step)}
             aria-label={`Step ${index + 1}`}
             className={cn(

@@ -227,3 +227,65 @@ export const FeatureRegistry: Story = {};
 export const FeatureRegistryLight: Story = {
   parameters: { themes: { themeOverride: 'light' } },
 };
+
+/** Empty: the registry has no items to review. */
+export const EmptyRegistry: Story = {
+  args: { items: [] },
+};
+
+/** Partial: items with no evidence media and no description yet. */
+export const PartialNoEvidence: Story = {
+  args: {
+    items: [
+      storyItem({
+        id: 'feature.partial',
+        title: 'Newly registered capability',
+        readiness: 'collecting',
+        description: '',
+      }),
+    ],
+  },
+};
+
+/** Long content: a very long title, eyebrow and description stay inside their cells. */
+export const LongContentItem: Story = {
+  args: {
+    items: [
+      storyItem({
+        id: 'feature.long-content',
+        title:
+          'A deliberately very long registry item title that keeps going well past the width of the table column to prove truncation',
+        eyebrow: 'An equally long eyebrow label for the registry grouping',
+        readiness: 'ready',
+        description:
+          'A long description that wraps across many lines so the detail rail has to scroll rather than push the note field and decision buttons out of view. '.repeat(
+            4
+          ),
+        media: evidence,
+      }),
+    ],
+  },
+};
+
+/** Right-to-left: Arabic title and description in an RTL admin page. */
+export const RtlArabicItem: Story = {
+  args: {
+    items: [
+      storyItem({
+        id: 'feature.rtl',
+        title: 'تحرير الروابط الذكية وتخصيصها',
+        readiness: 'ready',
+        description: 'يحرر الفنانون عناوين الروابط الذكية والوجهات من الجدول.',
+      }),
+    ],
+  },
+  decorators: [
+    function RtlDecorator(Story) {
+      return (
+        <div dir='rtl'>
+          <Story />
+        </div>
+      );
+    },
+  ],
+};

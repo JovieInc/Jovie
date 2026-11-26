@@ -263,14 +263,19 @@ describe('executeChatTurn context cost', () => {
       '[chat] model stream aborted',
       expect.objectContaining({ requestId: 'req-1', steps: 0 })
     );
+    onStreamError.mockClear();
     await opts.onFinish({ steps: [], text: '', finishReason: 'stop' });
+    // ASS-95: blank turns soft-recover (persist gate fills draft-hold text);
+    // log + telemetry only — do not abort via onStreamError.
     expect(consoleError).toHaveBeenCalledWith(
-      '[chat] model turn produced no output',
-      expect.objectContaining({ requestId: 'req-1', finishReason: 'stop' })
+      '[chat] model turn produced blank artist-facing text',
+      expect.objectContaining({
+        requestId: 'req-1',
+        finishReason: 'stop',
+        hadTools: false,
+      })
     );
-    expect(onStreamError).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'EmptyChatTurnError' })
-    );
+    expect(onStreamError).not.toHaveBeenCalled();
     consoleError.mockRestore();
   });
 });

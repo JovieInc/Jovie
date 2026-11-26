@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const APP_USER_ID = '55555555-5555-4555-8555-555555555555';
-const { eqMock, cols } = vi.hoisted(() => ({
+const { eqMock, cols, executeMock, selectShapes } = vi.hoisted(() => ({
   eqMock: vi.fn((column: unknown, value: unknown) => ({ column, value })),
+  executeMock: vi.fn(),
+  selectShapes: [] as Record<string, unknown>[],
   cols: (prefix: string) =>
     new Proxy({}, { get: (_target, key) => `${prefix}.${String(key)}` }),
 }));
@@ -20,35 +22,31 @@ vi.mock('@/lib/auth/session', () => ({
   withDbSession: (operation: (appUserId: string) => Promise<unknown>) =>
     operation(APP_USER_ID),
 }));
-vi.mock('@/lib/db/queries/social-links-verification', () => ({
-  getSocialLinksVerificationColumnSupport: vi.fn(async () => false),
-  buildSocialLinksVerificationSelect: () => ({}),
-}));
-vi.mock('@/lib/db', () => ({
-  db: {
-    select: () => ({
-      from: () => ({
-        innerJoin: () => ({
-          leftJoin: () => ({
-            where: () => ({
-              orderBy: () =>
-                Promise.resolve([
-                  {
-                    linkId: 'link-1',
-                    platform: 'spotify',
-                    url: 'https://open.spotify.com/artist/1',
-                    isActive: true,
-                    state: 'active',
-                    version: 1,
-                  },
-                ]),
-            }),
-          }),
-        }),
-      }),
-    }),
-  },
-}));
+vi.mock('@/lib/db', () => {
+  const rows = [
+    {
+      linkId: 'link-1',
+      platform: 'spotify',
+      url: 'https://open.spotify.com/artist/1',
+      isActive: true,
+      state: 'active',
+      version: 1,
+    },
+  ];
+  const where = () => ({ orderBy: () => Promise.resolve(rows) });
+  const from = () => ({
+    innerJoin: () => ({ leftJoin: () => ({ where }) }),
+  });
+  return {
+    db: {
+      execute: executeMock,
+      select: (shape: Record<string, unknown>) => {
+        selectShapes.push(shape);
+        return { from };
+      },
+    },
+  };
+});
 vi.mock('@/lib/db/schema/auth', () => ({ users: cols('users') }));
 vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: cols('creatorProfiles'),
@@ -74,5 +72,20 @@ describe('getProfileSocialLinks app user id', () => {
     ]);
     expect(eqMock).toHaveBeenCalledWith('users.id', APP_USER_ID);
     expect(eqMock).not.toHaveBeenCalledWith('users.clerkId', expect.anything());
+  });
+
+  it('selects verification columns directly, with no schema probe round trip', async () => {
+    const { getProfileSocialLinks } = await import(
+      '@/app/app/(shell)/dashboard/actions/social-links'
+    );
+
+    await getProfileSocialLinks('profile-1');
+
+    expect(executeMock).not.toHaveBeenCalled();
+    expect(selectShapes.at(-1)).toMatchObject({
+      verificationStatus: 'socialLinks.verificationStatus',
+      verificationToken: 'socialLinks.verificationToken',
+      verifiedAt: 'socialLinks.verifiedAt',
+    });
   });
 });

@@ -12,10 +12,10 @@ describe('SidebarNavItem certificate', () => {
     const { container } = render(
       <SidebarNavItem
         collapsed={false}
-        item={{ label: 'Inbox', icon: House, active: true, onActivate }}
+        item={{ label: 'Home', icon: House, active: true, onActivate }}
       />
     );
-    const row = screen.getByRole('button', { name: 'Inbox' });
+    const row = screen.getByRole('button', { name: 'Home' });
     expect(row).toHaveAttribute('data-slot', 'plain-button');
     expect(row).toHaveAttribute('type', 'button');
     expect(row).toHaveAttribute('aria-pressed', 'true');
@@ -33,12 +33,9 @@ describe('SidebarNavItem certificate', () => {
 
   it('keeps its own focus ring rather than the default plain-button ring', () => {
     render(
-      <SidebarNavItem
-        collapsed={false}
-        item={{ label: 'Inbox', icon: House }}
-      />
+      <SidebarNavItem collapsed={false} item={{ label: 'Home', icon: House }} />
     );
-    const row = screen.getByRole('button', { name: 'Inbox' });
+    const row = screen.getByRole('button', { name: 'Home' });
     expect(row).toHaveClass('focus-visible:ring-ring/55');
     expect(row).not.toHaveClass('focus-visible:ring-focus');
   });

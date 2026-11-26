@@ -11,7 +11,6 @@ import {
   test,
 } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
-import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import {
   mintPassageToken,
   PASSAGE_TOKEN_HEADER,
@@ -31,6 +30,11 @@ import { deleteSyntheticChats } from './helpers/synthetic-chat-cleanup';
 import { assertSidebarClickNavigation } from './utils/dashboard-click-navigation';
 import { primeOriginBoundVercelBypass } from './utils/prime-vercel-bypass';
 import { assertChatResponseOk } from './utils/prod-cert-chat-response';
+import { assertProdCertCheckoutEntry } from './utils/prod-cert-checkout-entry';
+import {
+  saveBioAndReadBack,
+  saveLinkAndReadBack,
+} from './utils/prod-cert-outcomes';
 import {
   certStep,
   certStepBlocked,
@@ -82,9 +86,10 @@ recordCertCapabilities({
   'public-profile': [
     'owned-profile-renders-publicly',
     'profile-edit-save-readback',
+    'profile-links-save-readback',
   ],
   chat: ['composer-ready', 'first-reply'],
-  checkout: ['checkout-entry-renders'],
+  checkout: ['checkout-entry-renders', 'fresh-user-checkout-entry'],
 });
 /** Saved signed-in session for the chat cert test (serial same-worker). */
 let signedInStatePath: string | null = null;
@@ -543,6 +548,56 @@ async function signInViaRenderedFlow(
   return 'unknown';
 }
 
+/**
+ * Time to fully loaded first dashboard on the production test account, read
+ * from the probe the shell already runs (first-dashboard-ready/v1). The
+ * sign-in redirect is the hard load being timed. Evidence only: it costs no
+ * extra request and never fails the smoke.
+ */
+async function logFirstDashboardReady(page: Page, source: string) {
+  const sample = await page
+    .waitForFunction(
+      () => globalThis.__jovieFirstDashboardReady ?? null,
+      undefined,
+      {
+        timeout: 10_000,
+        polling: 250,
+      }
+    )
+    .then(handle => handle.jsonValue())
+    .catch(() => null);
+  console.log(
+    `FIRST_DASHBOARD_READY_RECEIPT ${JSON.stringify({
+      source,
+      commit: process.env.EXPECTED_COMMIT_SHA ?? null,
+      sample,
+    })}`
+  );
+}
+
+/**
+ * The sign-in redirect is usually the first request a new deploy serves, so
+ * its sample mostly times a cold instance. Two more hard loads of Home, on the
+ * same session, time the warm path most visits get, so one deploy's receipts
+ * show both and a cut can be told apart from cold-start noise (JOV-14411).
+ * Two plain GET /app requests per run; evidence only, never fails the smoke.
+ */
+const WARM_FIRST_DASHBOARD_SAMPLES = 2;
+
+async function logWarmFirstDashboardReady(page: Page, expectedOrigin: string) {
+  for (let index = 0; index < WARM_FIRST_DASHBOARD_SAMPLES; index += 1) {
+    const loaded = await page
+      .goto(`${expectedOrigin}${APP_ROUTES.DASHBOARD}`, {
+        waitUntil: 'domcontentloaded',
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
+      })
+      .then(() => true)
+      .catch(() => false);
+    if (!loaded) return;
+    await logFirstDashboardReady(page, 'prod-auth-smoke-warm');
+  }
+}
+
 test.describe('Production Auth Smoke @production-smoke', () => {
   // Keep sign-in and authenticated navigation in one browser session. Requesting
   // another Better Auth OTP can invalidate the prior code, so future checks must
@@ -663,6 +718,9 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     telemetry.record('onboarding');
     await telemetry.capture(page, 'onboarding');
 
+    await logFirstDashboardReady(page, 'prod-auth-smoke');
+    await logWarmFirstDashboardReady(page, expectedOrigin);
+
     // Click the sidebar, not page.goto: only a click proves the shell's
     // client-side navigation still moves between dashboard pages.
     await assertSidebarClickNavigation(page, expectedOrigin);
@@ -713,86 +771,31 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       () => `/${claimedUsername} renders publicly`
     );
 
-    // JOV-9625 outcome cert: the artist edit loop — edit the profile, save,
-    // read the change back on the public profile, restore. Exercises the real
-    // PUT /api/dashboard/profile save path and the public readback with the
-    // signed-in canary identity; the bio is restored so the run is idempotent.
+    // JOV-9625 / JOV-14474 outcome certs: perform the artist's edits as the
+    // canary, read the real result back, restore (utils/prod-cert-outcomes.ts).
     await certStep(
       'public-profile',
       'profile-edit-save-readback',
-      async () => {
-        const profileResponse = await page
-          .context()
-          .request.get(`${expectedOrigin}/api/dashboard/profile`);
-        expect(profileResponse.status()).toBe(200);
-        const { profile } = (await profileResponse.json()) as {
-          profile?: { id?: unknown; bio?: string | null; username?: unknown };
-        };
-        // The save route requires the claimed profile's canonical UUID plus
-        // an updates envelope (apps/web/app/api/dashboard/profile/route.ts);
-        // a bare field payload is rejected with 400 before any write.
-        const profileId = typeof profile?.id === 'string' ? profile.id : '';
-        expect(
-          profileId,
-          'Profile edit save requires the claimed profile id'
-        ).toMatch(
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-        );
-        const originalBio = typeof profile?.bio === 'string' ? profile.bio : '';
-        const marker = `prodcert edit-save-readback ${runTag()}`;
-        const save = await page
-          .context()
-          .request.put(`${expectedOrigin}/api/dashboard/profile`, {
-            data: { profileId, updates: { bio: marker } },
-          });
-        expect(save.status(), 'Profile edit save failed').toBe(200);
-        try {
-          // The save path invalidates the public profile's ISR + edge caches
-          // (lib/cache/profile.ts invalidateProfileCache fires revalidatePath,
-          // revalidateTag and the Redis edge purge), but that invalidation is
-          // eventually consistent across the CDN. A single immediate sample
-          // races the propagation window — the readback failed one attempt and
-          // passed the next in run 41155363486 ("Saved bio must read back",
-          // spec :692) and again in 41157880251. Poll the public render with a
-          // bounded window instead of sampling once — the same move
-          // waitForCheckoutEntryContent made for billing text after the
-          // 2026-10-29 05:06Z promotion failed on a single empty sample.
-          const readbackDeadlineMs = Date.now() + 30_000;
-          let publicText = '';
-          for (;;) {
-            const publicPage = await page
-              .context()
-              .request.get(`${expectedOrigin}/${claimedUsername}`);
-            expect(
-              publicPage.status(),
-              `Public profile /${claimedUsername} must render after the save`
-            ).toBe(200);
-            publicText = await publicPage.text();
-            if (
-              publicText.includes(marker) ||
-              Date.now() >= readbackDeadlineMs
-            ) {
-              break;
-            }
-            await page.waitForTimeout(1_000);
-          }
-          expect(
-            publicText,
-            'Saved bio must read back on the public profile'
-          ).toContain(marker);
-          return marker;
-        } finally {
-          // Restore even on a failed readback so the canary profile is not
-          // left carrying the marker between runs.
-          const restore = await page
-            .context()
-            .request.put(`${expectedOrigin}/api/dashboard/profile`, {
-              data: { profileId, updates: { bio: originalBio } },
-            });
-          expect(restore.status(), 'Profile edit restore failed').toBe(200);
-        }
-      },
+      () =>
+        saveBioAndReadBack({
+          request: page.context().request,
+          origin: expectedOrigin,
+          username: claimedUsername,
+          marker: `prodcert edit-save-readback ${runTag()}`,
+          wait: ms => page.waitForTimeout(ms),
+        }),
       () => 'profile edit saved, read back on the public profile, restored'
+    );
+    await certStep(
+      'public-profile',
+      'profile-links-save-readback',
+      () =>
+        saveLinkAndReadBack({
+          request: page.context().request,
+          origin: expectedOrigin,
+          tag: runTag(),
+        }),
+      () => 'link added, read back as stored, removed, own links restored'
     );
     await page.goto(`${expectedOrigin}/${claimedUsername}`, {
       waitUntil: 'domcontentloaded',
@@ -938,56 +941,7 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     await certStep(
       'checkout',
       'checkout-entry-renders',
-      async () => {
-        // JOV-10066: the checkout entry is the real /onboarding/checkout
-        // surface (explicit paid intent, so the organic-offer gates cannot
-        // redirect), not the billing settings page. The step stops before
-        // the Stripe handoff — it asserts the upgrade entry rendered.
-        await page.goto(
-          `${expectedOrigin}/onboarding/checkout?source=intent&plan=pro&interval=month`,
-          {
-            waitUntil: 'domcontentloaded',
-            timeout: SMOKE_TIMEOUTS.NAVIGATION,
-          }
-        );
-        assertExactNavigationUrl(
-          page.url(),
-          expectedOrigin,
-          'Onboarding checkout navigation'
-        );
-        // The receipt labels this surface web.onboarding-checkout, so the cert
-        // must actually LAND on the registered screen: the origin check above
-        // alone would pass a soft redirect to pricing or billing (JOV-9625).
-        expect(
-          new URL(page.url()).pathname,
-          'the checkout cert must land on the registered /onboarding/checkout screen'
-        ).toBe(APP_ROUTES.ONBOARDING_CHECKOUT);
-        await waitForHydration(page);
-        await expect(
-          page.getByRole('heading', { name: /upgrade to/i }).first()
-        ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
-        // The CTA is `Upgrade to ${planMarketing.displayName}`
-        // (OnboardingCheckoutClient); derive the plan name from the registry
-        // instead of pinning old copy ("Pro" became "Artist Presence" and
-        // blocked every production promotion on 2026-10-31, #24015).
-        const upgradeButton = page.getByRole('button', {
-          name: `Upgrade to ${getPlanDisplayName('pro')}`,
-        });
-        await expect(upgradeButton).toBeVisible({
-          timeout: SMOKE_TIMEOUTS.VISIBILITY,
-        });
-        await expect(upgradeButton).toBeEnabled();
-        const checkoutText = (
-          await page.locator('main').first().innerText()
-        ).toLowerCase();
-        expect(checkoutText).not.toMatch(
-          /application error|something went wrong/
-        );
-        expect(checkoutText).toMatch(/pro/);
-        // The paid plan is presented with its per-interval price; the cert
-        // navigates with interval=month, so the monthly price must render.
-        expect(checkoutText).toMatch(/\/mo/);
-      },
+      () => assertProdCertCheckoutEntry(page, expectedOrigin),
       () =>
         'onboarding/checkout entry rendered the upgrade CTA; stopped before payment'
     );
@@ -1479,74 +1433,88 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           ? 'SYNTHETIC_PASSAGE_KEY is not provided to this run'
           : 'EXPECTED_COMMIT_SHA is not provided to this run'
       );
-      return;
-    }
-    const onboardingToken = mintPassageToken(
-      Buffer.from(passageKey, 'base64url'),
-      {
-        sub: email,
-        scp: 'onboarding_chat',
-        run: runTag().slice(0, 64),
-        ttlSeconds: 300,
-      }
-    );
-    recordPlaywrightSensitiveValues([onboardingToken]);
-    await page.route('**/*', async route => {
-      const request = route.request();
-      if (new URL(request.url()).origin !== expectedOrigin) {
-        await route.continue();
-        return;
-      }
-      await route.continue({
-        headers: {
-          ...request.headers(),
-          [PASSAGE_TOKEN_HEADER]: onboardingToken,
-          'x-synthetic-monitoring': 'prod-cert',
-        },
-      });
-    });
-
-    const telemetry = createSurfaceTelemetry(page);
-    await certStep(
-      'onboarding',
-      'fresh-user-onboarding-first-value',
-      async () => {
-        assertExactNavigationUrl(page.url(), expectedOrigin, 'Onboarding chat');
-        const input = page.locator('[aria-label="Chat message input" i]');
-        const sendButton = page.getByRole('button', { name: 'Send message' });
-        await expect(input).toBeVisible({ timeout: 30_000 });
-        await fillControlledInputUntilEnabled(
-          input,
-          sendButton,
-          'Help me set up my artist profile'
-        );
-        const [response] = await Promise.all([
-          page.waitForResponse(
-            candidate =>
-              candidate.request().method() === 'POST' &&
-              new URL(candidate.url()).pathname === '/api/chat',
-            { timeout: 60_000 }
-          ),
-          sendButton.click(),
-        ]);
-        if (response.status() !== 200) {
-          const body = await response.text().catch(() => '');
-          throw new Error(
-            `/api/chat HTTP ${response.status()} ${body.slice(0, 160)}`
-          );
+    } else {
+      const onboardingToken = mintPassageToken(
+        Buffer.from(passageKey, 'base64url'),
+        {
+          sub: email,
+          scp: 'onboarding_chat',
+          run: runTag().slice(0, 64),
+          ttlSeconds: 300,
         }
-        await expect(
-          page.locator("[data-testid='chat-message-reply']").first()
-        ).toBeVisible({ timeout: 60_000 });
-        // The reply element is also where a quota wall renders (the weekly
-        // limit streams its notice as an assistant message); a visible
-        // element alone is a false pass (JOV-9625). Require real content.
-        await assertAssistantReply(page, 'fresh-user onboarding first value');
-        return 'first assistant reply';
-      },
-      () => 'fresh user reached first value: onboarding chat first reply'
+      );
+      recordPlaywrightSensitiveValues([onboardingToken]);
+      await page.route('**/*', async route => {
+        const request = route.request();
+        if (new URL(request.url()).origin !== expectedOrigin) {
+          await route.continue();
+          return;
+        }
+        await route.continue({
+          headers: {
+            ...request.headers(),
+            [PASSAGE_TOKEN_HEADER]: onboardingToken,
+            'x-synthetic-monitoring': 'prod-cert',
+          },
+        });
+      });
+
+      const telemetry = createSurfaceTelemetry(page);
+      await certStep(
+        'onboarding',
+        'fresh-user-onboarding-first-value',
+        async () => {
+          assertExactNavigationUrl(
+            page.url(),
+            expectedOrigin,
+            'Onboarding chat'
+          );
+          const input = page.locator('[aria-label="Chat message input" i]');
+          const sendButton = page.getByRole('button', {
+            name: 'Send message',
+          });
+          await expect(input).toBeVisible({ timeout: 30_000 });
+          await fillControlledInputUntilEnabled(
+            input,
+            sendButton,
+            'Help me set up my artist profile'
+          );
+          const [response] = await Promise.all([
+            page.waitForResponse(
+              candidate =>
+                candidate.request().method() === 'POST' &&
+                new URL(candidate.url()).pathname === '/api/chat',
+              { timeout: 60_000 }
+            ),
+            sendButton.click(),
+          ]);
+          if (response.status() !== 200) {
+            const body = await response.text().catch(() => '');
+            throw new Error(
+              `/api/chat HTTP ${response.status()} ${body.slice(0, 160)}`
+            );
+          }
+          await expect(
+            page.locator("[data-testid='chat-message-reply']").first()
+          ).toBeVisible({ timeout: 60_000 });
+          // The reply element is also where a quota wall renders (the weekly
+          // limit streams its notice as an assistant message); a visible
+          // element alone is a false pass (JOV-9625). Require real content.
+          await assertAssistantReply(page, 'fresh-user onboarding first value');
+          return 'first assistant reply';
+        },
+        () => 'fresh user reached first value: onboarding chat first reply'
+      ).finally(() => page.unrouteAll({ behavior: 'ignoreErrors' }));
+      telemetry.record('onboarding');
+      await telemetry.capture(page, 'onboarding');
+    }
+
+    await certStep(
+      'checkout',
+      'fresh-user-checkout-entry',
+      () => assertProdCertCheckoutEntry(page, expectedOrigin),
+      () =>
+        'fresh synthetic user reached onboarding/checkout upgrade CTA; stopped before payment'
     );
-    telemetry.record('onboarding');
-    await telemetry.capture(page, 'onboarding');
   });
 });

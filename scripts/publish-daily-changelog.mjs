@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { publicationEditorialFindings } from './lib/customer-changelog-editorial.mjs';
 import { collectCustomerCandidates } from './lib/daily-changelog-collector.mjs';
 import { lintDailyDigestStories } from './lib/daily-changelog-copy-gate.mjs';
@@ -247,4 +248,19 @@ if (process.argv.includes('--write') && plan.status === 'publish') {
   if ((await git(['status', '--porcelain'])).trim())
     throw new Error('Publisher requires a clean release checkout');
   writeFileSync('CHANGELOG.md', plan.content);
+  // Pre-push content gate (JOV-13111): the release PR must not open with an
+  // editorial overlay violation. That used to surface only in Source
+  // Validation's disk-read source contracts — minutes into the run, on every
+  // daily-changelog PR (3 sampled failures at 253-317s, 2026-11). Run the
+  // canonical check against the bytes about to be pushed; the PR-stage
+  // source guard stays the fail-closed backstop either way.
+  execFileSync(
+    process.execPath,
+    [
+      fileURLToPath(
+        new URL('./check-customer-changelog-editorial.mjs', import.meta.url)
+      ),
+    ],
+    { stdio: 'inherit' }
+  );
 }

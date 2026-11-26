@@ -1,8 +1,5 @@
 /**
- * Shared Stripe E2E test helpers.
- *
- * Extracted from payment-complete-flow.spec.ts for reuse across billing specs.
- * All functions operate against Stripe test mode with locally-signed webhooks.
+ * Shared Stripe test-mode E2E helpers, with locally signed webhooks.
  */
 
 import type { APIResponse, Page } from '@playwright/test';
@@ -13,13 +10,17 @@ import {
   assertStripeTestAccount,
   getRequiredStripeTestConfig,
 } from '@/lib/stripe/test-price-contract';
+import {
+  isNavigatedHttpPage,
+  vercelProtectionBypassHeaders,
+} from './billing-status';
 
-export interface BillingStatus {
-  isPro: boolean;
-  plan: string;
-  stripeCustomerId: string | null;
-  stripeSubscriptionId: string | null;
-}
+export type { BillingStatus } from './billing-status';
+export {
+  getBillingStatus,
+  parseBillingStatusPayload,
+  vercelProtectionBypassHeaders,
+} from './billing-status';
 
 export interface SignedStripeWebhook {
   eventId: string;
@@ -28,6 +29,7 @@ export interface SignedStripeWebhook {
 }
 
 export interface CheckoutSessionResult {
+  alreadySubscribed?: boolean;
   sessionId: string;
   url: string;
 }
@@ -103,13 +105,6 @@ export async function getRequiredStripeTestContext(): Promise<{
   return { stripeClient, priceId };
 }
 
-/** Fetch current billing status via the app's API. */
-export async function getBillingStatus(page: Page): Promise<BillingStatus> {
-  const response = await page.request.get('/api/billing/status');
-  expect(response.ok()).toBeTruthy();
-  return (await response.json()) as BillingStatus;
-}
-
 /**
  * Manually fire a Stripe webhook to localhost.
  * Webhooks don't auto-fire to dev servers — we construct a signed payload
@@ -164,11 +159,20 @@ export async function postStripeWebhook(
   webhook: SignedStripeWebhook,
   signature = webhook.signature
 ): Promise<APIResponse> {
-  return page.request.post('/api/stripe/webhooks', {
+  // Navigated pages post to their own origin (the public alias after OTP).
+  // An un-navigated synthetic page has none (`about:blank` parses to origin
+  // "null"), so fall back to the relative path, which `page.request` resolves
+  // against the verified test baseURL (JOV-8805).
+  const pageUrl = page.url();
+  const target = isNavigatedHttpPage(pageUrl)
+    ? `${new URL(pageUrl).origin}/api/stripe/webhooks`
+    : '/api/stripe/webhooks';
+  return page.request.post(target, {
     data: webhook.payload,
     headers: {
       'stripe-signature': signature,
       'content-type': 'application/json',
+      ...vercelProtectionBypassHeaders(),
     },
   });
 }
@@ -209,28 +213,6 @@ export async function detachCustomerPaymentMethods(
   return detached;
 }
 
-/** Cancel any active subscription so the user starts on free tier. */
-export async function ensureUserIsFree(page: Page, stripeClient: Stripe) {
-  const status = await getBillingStatus(page);
-  if (!status.isPro || !status.stripeSubscriptionId) return;
-
-  const cancelled = await stripeClient.subscriptions.cancel(
-    status.stripeSubscriptionId
-  );
-  await sendSubscriptionWebhook(
-    page,
-    stripeClient,
-    'customer.subscription.deleted',
-    cancelled
-  );
-
-  await expect
-    .poll(async () => (await getBillingStatus(page)).isPro, {
-      timeout: 30_000,
-    })
-    .toBe(false);
-}
-
 /** Create a Stripe checkout session via the app's API. */
 export async function createCheckoutSession(
   page: Page,
@@ -267,6 +249,7 @@ export async function createCheckoutSession(
   expect(response.body.url).toBeTruthy();
 
   return {
+    alreadySubscribed: response.body.alreadySubscribed === true,
     sessionId: response.body.sessionId as string,
     url: response.body.url as string,
   };

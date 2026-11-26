@@ -76,7 +76,7 @@ function VirtualFixture() {
         getRowId={row => row.id}
         getRowTestId={row => row.id}
         containerClassName='h-72'
-        rowHeight={56}
+        rowMode='dense'
       />
     </div>
   );
@@ -128,32 +128,22 @@ function IdentityFixture({
   grouped?: boolean;
   virtual?: boolean;
 }) {
-  const [canonical, setCanonical] = useState(false);
   return (
-    <div className='space-y-3'>
-      <Button
-        onClick={() => setCanonical(value => !value)}
-        aria-pressed={canonical}
-      >
-        Use two-line rows
-      </Button>
-      <div style={{ height: 400, width: '100%', maxWidth: 720 }}>
-        <UnifiedTable
-          caption='Presence identity geometry fixture'
-          data={data.slice(0, 60)}
-          columns={identityColumns}
-          rowHeight={56}
-          rowMode={canonical ? 'two-line' : undefined}
-          groupingConfig={grouped ? grouping : undefined}
-          enableVirtualization={virtual}
-          enableKeyboardNavigation
-          onRowClick={() => undefined}
-          getRowId={row => row.id}
-          getRowTestId={row => row.id}
-          containerClassName='h-full'
-          minWidth='0'
-        />
-      </div>
+    <div style={{ height: 400, width: '100%', maxWidth: 720 }}>
+      <UnifiedTable
+        caption='Presence identity geometry fixture'
+        data={data.slice(0, 60)}
+        columns={identityColumns}
+        rowMode='dense'
+        groupingConfig={grouped ? grouping : undefined}
+        enableVirtualization={virtual}
+        enableKeyboardNavigation
+        onRowClick={() => undefined}
+        getRowId={row => row.id}
+        getRowTestId={row => row.id}
+        containerClassName='h-full'
+        minWidth='0'
+      />
     </div>
   );
 }

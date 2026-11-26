@@ -21,8 +21,23 @@ export function fakeLinear(state) {
     if (state.failure === 'lookup' && !mutation) throw new Error('offline');
     if (state.failure === 'graphql')
       return new Response(JSON.stringify({ errors: [{ message: 'denied' }] }));
+    if (query.includes('ShippingSloOwnerId'))
+      return reply({
+        issue: state.owner ? { id: state.owner.id } : null,
+      });
     if (query.includes('ShippingSloOwner'))
       return reply({ issue: state.owner });
+    if (query.includes('ShippingSloOpenChildren')) {
+      const rows = state.issues.filter(row => {
+        if (row.archivedAt) return false;
+        const type = row.state?.type ?? 'triage';
+        return ['triage', 'backlog', 'unstarted', 'started'].includes(type);
+      });
+      const children = connection(rows, v.after);
+      if (state.failure === 'incomplete')
+        children.pageInfo = { hasNextPage: true, endCursor: null };
+      return reply({ issue: { children } });
+    }
     if (query.includes('ShippingSloIssues')) {
       const rows = state.issues.filter(
         row => row.title === v.title || row.description.includes(v.marker)

@@ -203,10 +203,10 @@ enum AppRouteManifest {
       source: "Jovie/Features/Chat/MobileChatView.swift",
       userTask: "Talk to Jovie, draft and send messages",
       stateOwner: "AppShellView.selectedTab / ChatRepository",
-      entry: "Drawer surface row, composer, deep link, App Intents; permanent home when enabled",
+      entry: "Drawer surface row, composer, deep link, App Intents; permanent home after first Identity land (JOV-13845)",
       exit: "Drawer surface switch; stays mounted as underlay",
       gate: "chatEnabled (dashboard response loaded)",
-      issue: "JOV-5203",
+      issue: "JOV-13845",
       test: "AppShellChatFirstTests"
     ),
     AppRouteEntry(

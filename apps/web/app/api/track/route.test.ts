@@ -116,6 +116,35 @@ describe('POST /api/track synthetic passage tagging (JOV-9625)', () => {
     });
   });
 
+  it('acks and drops when the durable IP tracking backend is unavailable', async () => {
+    hoisted.ipLimit.mockResolvedValueOnce({
+      success: false,
+      remaining: 0,
+      unavailable: true,
+      backend: 'unavailable',
+    });
+
+    const response = await POST(trackRequest(LISTEN_CLICK));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true, dropped: true });
+    expect(hoisted.insertedValues).toHaveLength(0);
+    expect(hoisted.creatorLimit).not.toHaveBeenCalled();
+  });
+
+  it('acks and drops when the per-creator tracking backend is unavailable', async () => {
+    hoisted.creatorLimit.mockResolvedValueOnce({
+      success: false,
+      remaining: 0,
+      unavailable: true,
+      backend: 'unavailable',
+    });
+
+    const response = await POST(trackRequest(LISTEN_CLICK));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true, dropped: true });
+    expect(hoisted.insertedValues).toHaveLength(0);
+  });
+
   it('tags a passage-granted click synthetic and captures it normally', async () => {
     hoisted.resolvePassage.mockResolvedValue({
       actorId: 'prodcert',

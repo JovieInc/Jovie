@@ -387,16 +387,11 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       approvedVariantBinding(
         'apps/web/components/marketing/MarketingPosterHero.tsx',
         'hero',
-        'centered-phone'
+        'left-phone'
       ),
       // logo-cloud renders only once a brand grants permission for this page
-      // (data/product-truth/logo-permissions.ts, JOV-7795).
-      approvedVariantBinding(
-        'apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSection.tsx',
-        'feature-split',
-        'phone-right',
-        'adaptive'
-      ),
+      // (data/product-truth/logo-permissions.ts, JOV-7795). Mode switcher lives
+      // inside the hero (JOV-14242); no separate adaptive feature-split.
       approvedVariantBinding(
         'apps/web/components/marketing/artist-profile/ArtistProfileOutcomesCarousel.tsx',
         'feature-grid',
@@ -409,43 +404,15 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'fan-capture'
       ),
       approvedVariantBinding(
-        'apps/web/components/marketing/artist-profile/ArtistProfileOpinionatedSection.tsx',
-        'feature-split',
-        'phone-right',
-        'opinionated'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/marketing/artist-profile/ArtistProfileLandingPage.tsx',
-        'feature-split',
-        'phone-left',
-        'annotated-truth'
+        'apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx',
+        'how-it-works',
+        'split-setup'
       ),
       approvedVariantBinding(
         'apps/web/components/marketing/MarketingShippedSitesShowcase.tsx',
         'product-gallery',
         'profile-grid',
         'product-examples'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/marketing/MarketingPlatformSpecBento.tsx',
-        'spec-wall',
-        '5-screenshot-bento'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx',
-        'how-it-works',
-        'split-setup'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx',
-        'product-gallery',
-        'release-rail',
-        'release-cycle'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/marketing/FaqSection.tsx',
-        'faq',
-        'objection-handler'
       ),
       approvedVariantBinding(
         'apps/web/components/site/MarketingTerminalCta.tsx',
@@ -456,12 +423,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     ],
     bindingEvidence: {
       status: 'verified',
-      source: 'JOV-6220 actual source owner and section census 2026-09-29',
+      source: 'JOV-14242 six-section homepage-system artist LP',
       notes:
-        'Source inventory includes every page beat and the shared opt-in. Demo galleries are product examples, not customer adoption. Native design, deployed checks, and real outcomes require separate receipts.',
+        'Six sections: left-phone hero with one mode-morphing mock, outcomes, capture, how-it-works, shipped sites, final CTA. Demo galleries are product examples, not customer adoption.',
     },
     status: 'active',
-    specVersion: '1.0.0',
+    specVersion: '1.1.0',
     url: '/artist-profiles',
     productEvidence: {
       kind: 'framed-screenshot',
@@ -516,13 +483,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       approvedVariantBinding(
         'apps/web/components/marketing/MarketingPosterHero.tsx',
         'hero',
-        'centered-phone'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSection.tsx',
-        'feature-split',
-        'phone-right',
-        'adaptive'
+        'left-phone'
       ),
       approvedVariantBinding(
         'apps/web/components/marketing/artist-profile/ArtistProfileOutcomesCarousel.tsx',
@@ -536,43 +497,15 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'fan-capture'
       ),
       approvedVariantBinding(
-        'apps/web/components/marketing/artist-profile/ArtistProfileOpinionatedSection.tsx',
-        'feature-split',
-        'phone-right',
-        'opinionated'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/marketing/artist-profile/ArtistProfileLandingPage.tsx',
-        'feature-split',
-        'phone-left',
-        'annotated-truth'
+        'apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx',
+        'how-it-works',
+        'split-setup'
       ),
       approvedVariantBinding(
         'apps/web/components/marketing/MarketingShippedSitesShowcase.tsx',
         'product-gallery',
         'profile-grid',
         'product-examples'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/marketing/MarketingPlatformSpecBento.tsx',
-        'spec-wall',
-        '5-screenshot-bento'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx',
-        'how-it-works',
-        'split-setup'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx',
-        'product-gallery',
-        'release-rail',
-        'release-cycle'
-      ),
-      approvedVariantBinding(
-        'apps/web/components/marketing/FaqSection.tsx',
-        'faq',
-        'objection-handler'
       ),
       approvedVariantBinding(
         'apps/web/components/site/MarketingTerminalCta.tsx',
@@ -582,13 +515,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     ],
     bindingEvidence: {
       status: 'verified',
-      source:
-        'route audit 2026-09-26 (JOV-5861); page record 2026-09-30 (JOV-7275)',
+      source: 'JOV-14242 six-section homepage-system artist LP',
       notes:
-        'Family renderer for content/pages/solutions records. The artists record composes the same artist-lp sections as /artist-profiles (zero pixel diff at 390 and 1440). /artists remains the directory. Release-cycle gallery is product evidence, not social proof.',
+        'Family renderer for content/pages/solutions records. Artists composes the same six artist-lp sections as /artist-profiles. /artists remains the directory.',
     },
     status: 'active',
-    specVersion: '1.5.0',
+    specVersion: '1.6.0',
     url: '/solutions/*',
     healthCheck: {
       path: '/solutions/artists',

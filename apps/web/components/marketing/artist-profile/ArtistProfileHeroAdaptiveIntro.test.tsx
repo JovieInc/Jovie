@@ -42,7 +42,7 @@ describe('ArtistProfileHeroAdaptiveIntro', () => {
     grants.fixtures = false;
   });
 
-  it('renders the hero and adaptive section with no trust strip when no logo is granted', async () => {
+  it('renders the left-phone hero with mode morph and no trust strip when no logo is granted', async () => {
     const { container } = render(
       <ArtistProfileHeroAdaptiveIntro
         {...meta.args}
@@ -52,9 +52,13 @@ describe('ArtistProfileHeroAdaptiveIntro', () => {
     expect(
       screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.hero)
     ).toBeInTheDocument();
+    // Mode switcher is nested in hero media (JOV-14242), not a sibling section.
     expect(
       screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.adaptive)
     ).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-marketing-variant="left-phone"]')
+    ).not.toBeNull();
     expect(screen.queryByRole('region', { name: TRUST_LABEL })).toBeNull();
     expect(container.querySelector('.homepage-trust-section')).toBeNull();
     await expectNoA11yViolations(container);

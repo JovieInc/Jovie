@@ -24,10 +24,7 @@ export default function InsightsLoading() {
       </div>
       <div className='space-y-3'>
         {INSIGHT_CARD_KEYS.map(key => (
-          <div
-            key={key}
-            className='h-28 rounded-xl border border-subtle skeleton'
-          />
+          <div key={key} className='h-28 rounded-xl skeleton' />
         ))}
       </div>
     </div>

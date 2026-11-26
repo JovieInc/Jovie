@@ -10,10 +10,10 @@ interface ArtistProfileAdaptiveSectionProps {
 }
 
 /**
- * Canonical feature-split body: the shipped /artist-profiles adaptive section
- * (phone-framed mode switcher, phone-right variant). Mounted exactly once by
- * the route (via ArtistProfileHeroAdaptiveIntro) and by the
- * Marketing/Sections/feature-split story so both render the identical body.
+ * Canonical feature-split body: phone-framed mode switcher (phone-right).
+ * Storybook / Marketing/Sections/feature-split still mounts this owner. The
+ * live /solutions/artists hero embeds ArtistProfileModeSwitcher directly
+ * (JOV-14242) so the page keeps one morphing mock.
  */
 export function ArtistProfileAdaptiveSection({
   adaptive,

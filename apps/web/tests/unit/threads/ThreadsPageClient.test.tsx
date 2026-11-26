@@ -139,18 +139,20 @@ describe('ChatsPageClient', () => {
 
     render(<ThreadsPageClient />);
 
-    expect(screen.getByRole('link', { name: 'Unread answer' })).toHaveClass(
-      'text-primary-token'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Unread answer, Running' })
+    ).toHaveClass('text-primary-token');
     expect(document.querySelector('.anim-calm-breath')).toBeInTheDocument();
 
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search Chats' }), {
       target: { value: 'Pitch' },
     });
 
-    expect(screen.queryByRole('link', { name: 'Unread answer' })).toBeNull();
     expect(
-      screen.getByRole('link', { name: 'Pitch tasks' })
+      screen.queryByRole('link', { name: 'Unread answer, Running' })
+    ).toBeNull();
+    expect(
+      screen.getByRole('link', { name: 'Pitch tasks, Unread' })
     ).toBeInTheDocument();
   });
 
@@ -209,9 +211,14 @@ describe('ChatsPageClient', () => {
 
     render(<ThreadsPageClient />);
 
-    const threadLink = screen.getByRole('link', { name: 'Pitch tasks' });
+    // Empty read-state baselines every row as read after mount.
+    const threadLink = await screen.findByRole('link', {
+      name: 'Pitch tasks',
+    });
     fireEvent.contextMenu(threadLink);
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy Session ID' }));
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Copy Session ID' })
+    );
 
     expect(copySessionId).toHaveBeenCalledWith('thread-newer');
 

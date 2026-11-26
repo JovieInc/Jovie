@@ -313,34 +313,22 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
     status: 'proven',
     referenceRoute: '/artist-profiles', // canonical; /artist-profile is an alias (routeManifest marks alias not second instance)
     audience: 'artist',
-    // Order per codebase-baseline §2.4 (reconciles ARTIST_PROFILE_SECTION_ORDER drift with shipped render).
-    // Note: shipped render merges hero+adaptive and drops standalone trust in FULL_PAGE — manifest test
-    // binds to shipped render order, not aspirational list. trust only renders in !FULL_PAGE short-circuit.
+    // JOV-14242: six homepage-system sections. Mode switcher lives in the hero.
     sectionOrder: [
       'hero',
-      'feature-split', // adaptive (One Profile)
-      'feature-grid', // outcomes (Built for Artists)
+      'feature-grid', // outcomes
       'capture',
-      'feature-split', // reactivation
-      'monetization',
-      'spec-wall',
       'how-it-works',
-      'social-proof',
-      'faq',
+      'product-gallery', // shipped sites
       'cta',
     ],
     arc: [
-      // Creator-economy R9: recognition → identity → aspiration → capability → money-reality → relatability → low-risk action
-      // No problem/agitation beat — illegal for artist audience.
+      // Creator-economy R9: recognition → aspiration → capability → low-risk → relatability → action.
+      // No problem/agitation beat — illegal for artist audience. JOV-14242 six-section cut.
       {
         beat: 'recognition',
-        feeling: 'this is for people like me (my music, my fans)',
+        feeling: 'this is for people like me (my work, my audience)',
         section: 'hero',
-      },
-      {
-        beat: 'identity',
-        feeling: 'that could be MY page',
-        section: 'feature-split',
       },
       {
         beat: 'aspiration',
@@ -349,20 +337,9 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
       },
       {
         beat: 'capability',
-        feeling: 'I can capture every fan',
+        feeling: 'I can capture every listener',
         section: 'capture',
       },
-      {
-        beat: 'capability',
-        feeling: 'I can reactivate them automatically',
-        section: 'feature-split',
-      },
-      {
-        beat: 'money-reality',
-        feeling: 'real people earn from this; here is the take-rate',
-        section: 'monetization',
-      },
-      { beat: 'detail', feeling: 'the specifics matter', section: 'spec-wall' },
       {
         beat: 'low-risk',
         feeling: 'I can be live in 60 seconds',
@@ -370,13 +347,8 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
       },
       {
         beat: 'relatability',
-        feeling: 'even small artists succeed — so can I',
-        section: 'social-proof',
-      },
-      {
-        beat: 'permission',
-        feeling: 'my objections are answered',
-        section: 'faq',
+        feeling: 'real shipped sites already prove this',
+        section: 'product-gallery',
       },
       {
         beat: 'action',
@@ -386,9 +358,9 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
     ],
     hierarchy: {
       oneBigIdea:
-        'Jovie is the one profile that captures every fan and reactivates them automatically — own your fans, keep more earnings',
+        'Jovie is the one profile that captures every listener and keeps them close — own your audience',
       seeFirst: 'hero',
-      second: 'feature-split', // adaptive
+      second: 'feature-grid',
       third: 'capture',
       emphasisBudget: {
         maxDisplayScaleMoments: 1,
@@ -396,7 +368,7 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
         maxHeroWeightProofElements: 1,
       },
       aboveTheFoldContract: {
-        desktop: ['hero'], // hero carries phone-framed profile media (hero-weight proof) + claim CTA
+        desktop: ['hero'], // left-phone hero carries mode-morphing mock + claim CTA
         mobile: ['hero'],
       },
     },
@@ -435,7 +407,7 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
       'cta.headline',
       'cta.primaryCta',
     ],
-    maxContent: { maxSections: 13 },
+    maxContent: { maxSections: 6 },
     chooseWhen:
       'audience=artist AND intent=artist-profile AND conversion=claim-handle OR claim-profile',
     neverUse: [
