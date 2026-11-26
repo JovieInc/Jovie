@@ -152,9 +152,6 @@
     "apps/web/components/features/dashboard/organisms/SettingsUsageStatsSection.tsx": {
       "copy:dead-end-not-available:Usage stats are unavailable in the passive runtime.": 1
     },
-    "apps/web/components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.tsx": {
-      "copy:dead-end-not-available:Telemetry unavailable; crawler reads remain Unknown.": 1
-    },
     "apps/web/components/features/dashboard/organisms/jovie-work-feed/JovieWorkFeed.tsx": {
       "copy:dead-end-not-available:Creator outcomes are unavailable.": 1
     },

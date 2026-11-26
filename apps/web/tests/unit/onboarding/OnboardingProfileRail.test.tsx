@@ -26,6 +26,7 @@ describe('OnboardingProfileRail', () => {
             ],
           },
           artistConfirmed: true,
+          handleConfirmed: false,
           handle: 'testartist',
           socialLinks: ['https://instagram.com/testartist'],
         }}
@@ -83,6 +84,7 @@ describe('OnboardingProfileRail', () => {
             genres: ['progressive house'],
           },
           artistConfirmed: true,
+          handleConfirmed: false,
           handle: null,
           socialLinks: [],
         }}
@@ -118,6 +120,7 @@ describe('OnboardingProfileRail', () => {
             ],
           },
           artistConfirmed: true,
+          handleConfirmed: false,
           handle: 'testartist',
           socialLinks: ['https://evil.test/instagram.com/testartist'],
         }}
@@ -139,6 +142,7 @@ describe('OnboardingProfileRail', () => {
         state={{
           artist: null,
           artistConfirmed: false,
+          handleConfirmed: false,
           handle: 'avery',
           socialLinks: ['https://instagram.com/avery'],
         }}
@@ -158,6 +162,7 @@ describe('OnboardingProfileRail', () => {
         state={{
           artist: null,
           artistConfirmed: false,
+          handleConfirmed: false,
           handle: 'avery',
           socialLinks: [],
         }}
@@ -208,6 +213,7 @@ describe('OnboardingProfileRail', () => {
             },
           },
           artistConfirmed: true,
+          handleConfirmed: false,
           handle: 'unmarked',
           socialLinks: [],
         }}
@@ -247,6 +253,7 @@ describe('OnboardingProfileRail', () => {
         state={{
           artist: null,
           artistConfirmed: false,
+          handleConfirmed: false,
           handle: null,
           socialLinks: [],
         }}

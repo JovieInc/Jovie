@@ -146,7 +146,8 @@ describe('@critical SubscriptionHandler - Errors', () => {
       );
     });
 
-    it('skips fallback when customer is not a string', async () => {
+    it('resolves customer ID from expanded Stripe.Customer objects during fallback', async () => {
+      mockGetUserIdFromStripeCustomer.mockResolvedValueOnce(null);
       const context: WebhookContext = {
         event: {
           id: 'evt_expanded_customer',
@@ -170,7 +171,9 @@ describe('@critical SubscriptionHandler - Errors', () => {
         'Missing user ID in subscription'
       );
 
-      expect(mockGetUserIdFromStripeCustomer).not.toHaveBeenCalled();
+      expect(mockGetUserIdFromStripeCustomer).toHaveBeenCalledWith(
+        'cus_expanded'
+      );
     });
   });
 

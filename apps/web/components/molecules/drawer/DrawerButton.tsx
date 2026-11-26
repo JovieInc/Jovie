@@ -17,8 +17,8 @@ const TONE_CLASSNAMES: Record<DrawerButtonTone, string> = {
 };
 
 const SIZE_CLASSNAMES: Record<DrawerButtonSize, string> = {
-  sm: 'h-8 rounded-full px-2.5 text-xs',
-  icon: 'h-8 w-8 rounded-full px-0 [&_svg]:h-4 [&_svg]:w-4',
+  sm: 'h-7 rounded-full px-2.5 text-xs',
+  icon: 'h-7 w-7 rounded-full px-0 [&_svg]:h-3.5 [&_svg]:w-3.5',
 };
 
 export interface DrawerButtonProps
@@ -32,7 +32,7 @@ export interface DrawerButtonProps
 // #07080a (~3.13:1). Idle secondary text (#a0a5af) already clears 4.5:1;
 // it has to paint immediately. JOV-8068.
 export const DRAWER_BUTTON_CLASSNAME =
-  'border font-caption tracking-tight shadow-none transition-surface duration-subtle focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-ring/20';
+  'border font-caption tracking-tight shadow-none [--press-transition-colors:background-color,border-color] focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-ring/20';
 
 export const DrawerButton = React.forwardRef<
   HTMLButtonElement,

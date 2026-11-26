@@ -204,10 +204,8 @@ export function renderEmailCell({
 export function SelectCell({ row }: CellContext<AudienceMember, unknown>) {
   const { selectedIds } = useAudienceTableVolatileContext();
   const { toggleSelect } = useAudienceTableStableContext();
-  const rowNumber = row.index + 1;
   return (
     <AudienceRowSelectionCell
-      rowNumber={rowNumber}
       isChecked={selectedIds.has(row.original.id)}
       displayName={row.original.displayName}
       onToggle={() => toggleSelect(row.original.id)}
@@ -491,21 +489,21 @@ export function QuickActionsCell({
       <button
         type='button'
         onClick={() => onViewProfile(member)}
-        className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
+        className='inline-flex h-7 w-7 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
         aria-label='View Profile'
         title='View profile'
       >
-        <Eye className='h-4 w-4' />
+        <Eye className='h-3.5 w-3.5' />
       </button>
       {canNotify && (
         <button
           type='button'
           onClick={() => onSendNotification(member)}
-          className='inline-flex h-7 w-7 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
+          className='inline-flex h-7 w-7 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
           aria-label='Send Notification'
           title='Send notification'
         >
-          <Bell className='h-4 w-4' />
+          <Bell className='h-3.5 w-3.5' />
         </button>
       )}
       <AudienceQuickActionsCell

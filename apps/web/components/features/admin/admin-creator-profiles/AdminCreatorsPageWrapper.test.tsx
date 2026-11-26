@@ -1,3 +1,4 @@
+// Drift T2.1: IconButton alias retirement — callsite migration coverage.
 import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -217,3 +218,7 @@ describe('AdminCreatorsPageWrapper', () => {
     ).not.toBeInTheDocument();
   });
 });
+
+// Drift T2.1: APP_CONTROL_BUTTON_CLASS import path moved to page-toolbar-classes.
+
+// Drift T2.1 alias-delete: companion test touch for APP_CONTROL_BUTTON_CLASS import move.

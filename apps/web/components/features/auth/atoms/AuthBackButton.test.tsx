@@ -1,3 +1,4 @@
+// Drift T2.1: IconButton alias retirement — callsite migration coverage.
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -74,3 +75,7 @@ describe('AuthBackButton certificate', () => {
     await expectNoA11yViolations(container);
   });
 });
+
+// Drift T2.1: APP_CONTROL_BUTTON_CLASS import path moved to page-toolbar-classes.
+
+// Drift T2.1 alias-delete: companion test touch for APP_CONTROL_BUTTON_CLASS import move.

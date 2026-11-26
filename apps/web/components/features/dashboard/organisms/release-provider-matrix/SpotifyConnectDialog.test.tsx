@@ -291,6 +291,29 @@ describe('SpotifyConnectDialog', () => {
     expect(input).toHaveValue('tim white');
   }, 15_000);
 
+  it('starts a fresh search session when the dialog is reopened', async () => {
+    const { rerender } = renderDialog();
+    const { input } = await searchFor('tim white');
+    expect(input).toHaveValue('tim white');
+
+    rerender(
+      <SpotifyConnectDialog
+        open={false}
+        onOpenChange={vi.fn()}
+        connected={false}
+      />
+    );
+    rerender(
+      <SpotifyConnectDialog open onOpenChange={vi.fn()} connected={false} />
+    );
+
+    const reopened = screen.getByRole('combobox', {
+      name: 'Search Spotify artists or paste a link',
+    });
+    expect(reopened).toHaveValue('');
+    await waitFor(() => expect(reopened).toHaveFocus());
+  });
+
   it.each(['loading', 'empty', 'error'])(
     'shows recoverable %s search state',
     async state => {
@@ -331,7 +354,7 @@ describe('SpotifyConnectDialog', () => {
 });
 
 describe('SpotifyConnectDialog scale tokens', () => {
-  it('uses the 16px text-base step instead of the text-lg alias', async () => {
+  it('uses no text-lg alias and lets DialogTitle own its type scale', async () => {
     const { readFileSync } = await import('node:fs');
     const { join } = await import('node:path');
     const source = readFileSync(
@@ -340,6 +363,7 @@ describe('SpotifyConnectDialog scale tokens', () => {
     );
 
     expect(source).not.toMatch(/(?<![\w-])text-lg\b/);
-    expect(source).toContain('text-base');
+    expect(source).toContain('<DialogTitle>Connect Spotify</DialogTitle>');
+    expect(source).not.toMatch(/<DialogTitle\s+className=/);
   });
 });

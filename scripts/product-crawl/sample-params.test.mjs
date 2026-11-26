@@ -78,6 +78,34 @@ test('repo samples are the constants the pages check, on public URLs', () => {
     assert.equal(matchRoute(target, routes), route, target);
   }
   assert.ok(repo.reserved.has('listen') && repo.reserved.has('ig'));
+  // The hidden demo artist's three pages come from its fixture JSON, as
+  // fallbacks a real artist's link on a loaded page replaces.
+  const fixture = JSON.parse(
+    io.read('apps/web/lib/synthetic/crawl-content-fixture.json')
+  );
+  const base = `/${fixture.handle}/${fixture.release.slug}`;
+  const fb = r => repo.fallbacks.get(r)?.target;
+  assert.equal(fb('/[username]/[slug]/download'), `${base}/download`);
+  assert.equal(
+    fb('/[username]/merch/[cardId]'),
+    `/${fixture.handle}/merch/${fixture.merchCard.id}`
+  );
+  assert.equal(fb('/a/[handle]/[slug]'), `/a${base}`);
+  for (const r of [
+    '/[username]/[slug]/download',
+    '/[username]/merch/[cardId]',
+    '/a/[handle]/[slug]',
+  ]) {
+    assert.equal(matchRoute(fb(r), routes), r, r);
+    assert.equal(get(r), undefined, r);
+  }
+  // With no loaded page linking them, the fixture fills all three.
+  const bare = pickSamples({ routes, handle: 'tim', hosts, repo });
+  assert.equal(
+    bare.get('/[username]/[slug]/download')?.target,
+    `${base}/download`
+  );
+  assert.equal(bare.get('/a/[handle]/[slug]')?.target, `/a${base}`);
 });
 
 test('a path lands on the most specific route, as Next routes it', () => {

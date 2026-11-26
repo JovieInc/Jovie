@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type { HudMetrics } from '@/types/hud';
@@ -40,8 +39,7 @@ describe('HudCashMrrBand certificate', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('retries degraded financial telemetry by keyboard and stays axe-clean', async () => {
-    const user = userEvent.setup();
+  it('surfaces syncing copy when financial telemetry is degraded', async () => {
     const onRetry = vi.fn();
     const { container } = render(
       <HudCashMrrBand
@@ -51,10 +49,9 @@ describe('HudCashMrrBand certificate', () => {
         onRetry={onRetry}
       />
     );
-    const retry = screen.getByRole('button', { name: /Retry/i });
-    retry.focus();
-    await user.keyboard('{Enter}');
-    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('ovie-ceo-syncing')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Retry/i })).toBeNull();
+    expect(onRetry).not.toHaveBeenCalled();
     await expectNoA11yViolations(container);
   });
 

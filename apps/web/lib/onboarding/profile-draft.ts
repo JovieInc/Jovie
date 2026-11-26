@@ -17,15 +17,18 @@ export type OnboardingRole = z.infer<typeof onboardingRoleSchema>;
 /** Job adapters describe draft content, never entitlements or new products. */
 export const ONBOARDING_ROLE_ADAPTERS = {
   artist: {
-    matches: /\b(artist|musician|singer|band|dj|producer)\b/i,
+    matches:
+      /\b(artist|musician|singer|band|dj|producer|music|songs?|albums?|eps?|singles?|releases?|catalog(?:ue)?|rapper|songwriter|composer|spotify)\b/i,
     source: 'music page',
-    question: 'Should this profile lead with a release, a show, or fan signup?',
+    question:
+      'Should this profile lead with a release, your catalog, a show, or fan signup?',
     sections: ['music', 'releases', 'shows', 'fan signup'],
     sourceRole: (url: URL) =>
       url.hostname === 'open.spotify.com' && /^\/artist\//.test(url.pathname),
   },
   author: {
-    matches: /\b(author|novelist|writer)\b/i,
+    matches:
+      /\b(author|novelist|writer|writing|books?|publications?|newsletters?|essays?|substack)\b/i,
     source: 'book or publication page',
     question: 'Should readers find a book, an event, or your signup first?',
     sections: ['books', 'publications', 'events', 'reader signup'],
@@ -34,7 +37,8 @@ export const ONBOARDING_ROLE_ADAPTERS = {
       /^\/author\//.test(url.pathname),
   },
   creator: {
-    matches: /\b(creator|youtuber|streamer|actor|podcaster)\b/i,
+    matches:
+      /\b(creator|youtuber|streamer|actor|podcaster|content|podcasts?|videos?|channels?)\b/i,
     source: 'channel or featured work',
     question:
       'Should people find featured content, a subscription, or a collaboration contact first?',
@@ -49,7 +53,8 @@ export const ONBOARDING_ROLE_ADAPTERS = {
       /^\/(?:@|channel\/)/.test(url.pathname),
   },
   expert: {
-    matches: /\b(expert|consultant|coach|advisor|speaker)\b/i,
+    matches:
+      /\b(expert|consultant|coach|advisor|speaker|client services|services|consulting|coaching|advisory|speaking)\b/i,
     source: 'services, credentials, or case study page',
     question:
       'Should a potential client review a case study, make an inquiry, or book with you first?',
@@ -57,7 +62,8 @@ export const ONBOARDING_ROLE_ADAPTERS = {
     sourceRole: (_url: URL) => false,
   },
   founder: {
-    matches: /\b(founder|cofounder|co-founder|entrepreneur)\b/i,
+    matches:
+      /\b(founder|cofounder|co-founder|entrepreneur|company|startup|saas|business)\b/i,
     source: 'company or product site',
     question:
       'Should a potential customer see the product launch, customer proof, or a contact link first?',
@@ -168,16 +174,24 @@ export function advanceOnboardingProfileDraft(
   const roleText = text
     .replace(/https?:\/\/\S+/gi, '')
     .replace(/\bnot\s+(?:(?:really\s+)?an?\s+)?\w+/gi, '');
-  const mentioned = onboardingRoleSchema.options.filter(role =>
+  const rawMentioned = onboardingRoleSchema.options.filter(role =>
     ONBOARDING_ROLE_ADAPTERS[role].matches.test(roleText)
   );
+  const explicitRoleShift =
+    /\b(i am|i'm|im|also|first|focus|prioriti[sz]e|priority)\b/i.test(roleText);
+  const mentioned =
+    previous.awaiting === 'outcome' && !explicitRoleShift
+      ? rawMentioned.filter(role => previous.roles.includes(role))
+      : rawMentioned;
   const detected = mentioned.length
     ? mentioned
-    : urls.flatMap(raw =>
-        onboardingRoleSchema.options.filter(role =>
-          ONBOARDING_ROLE_ADAPTERS[role].sourceRole(new URL(raw))
-        )
-      );
+    : previous.awaiting === 'outcome' && !explicitRoleShift
+      ? []
+      : urls.flatMap(raw =>
+          onboardingRoleSchema.options.filter(role =>
+            ONBOARDING_ROLE_ADAPTERS[role].sourceRole(new URL(raw))
+          )
+        );
   draft.roles = [...new Set([...draft.roles, ...detected])].sort();
   if (draft.roles.length === 1) draft.activeRole = draft.roles[0] ?? null;
   else if (
@@ -212,6 +226,11 @@ export function advanceOnboardingProfileDraft(
   ) {
     draft.sourceSkipped = true;
   }
+  const introducesDifferentRole = mentioned.some(
+    role => role !== previous.activeRole
+  );
+  const isPrioritySwitch =
+    /\b(first|focus|prioriti[sz]e|priority|also)\b/i.test(roleText);
   const outcome = /\b(?:i want(?: to)?|my goal is|i need(?: to)?)\s+(.+)/i.exec(
     text
   )?.[1];
@@ -221,7 +240,8 @@ export function advanceOnboardingProfileDraft(
     text.length > 5 &&
     !/^(ok(?:ay)?|yes|no|skip|continue|next)[.!]?$/i.test(text) &&
     !urls.length &&
-    !mentioned.length
+    !introducesDifferentRole &&
+    !isPrioritySwitch
   )
     draft.outcome = text.slice(0, 1000);
   if (draft.activeRole && draft.outcome)

@@ -1,8 +1,9 @@
 'use client';
 
 import { PlainButton } from '@jovie/ui';
-import { ChevronRight, Pause, Play } from 'lucide-react';
+import { ChevronRight, Pause } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
+import { PlayIcon } from '@/components/atoms/PlayIcon';
 import { toast } from '@/components/feedback';
 import { DrawerInlineNote } from '@/components/molecules/drawer';
 import type { ReleaseSidebarTrack } from '@/lib/discography/types';
@@ -303,9 +304,7 @@ function TrackListRow({
   if (isActiveTrack && isTrackPlaying) {
     trackButtonContent = <Pause className='h-3.5 w-3.5' aria-hidden='true' />;
   } else if (isActiveTrack) {
-    trackButtonContent = (
-      <Play className='h-3.5 w-3.5 translate-x-px' aria-hidden='true' />
-    );
+    trackButtonContent = <PlayIcon size={14} aria-hidden='true' />;
   } else {
     trackButtonContent = <span aria-hidden='true'>{trackLabel}</span>;
   }

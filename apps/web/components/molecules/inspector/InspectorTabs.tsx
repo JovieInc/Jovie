@@ -1,7 +1,7 @@
 'use client';
 
 // @coverage-via apps/web/components/molecules/inspector/InspectorRail.test.tsx
-import type { SegmentControlOption } from '@jovie/ui';
+import { PlainButton, type SegmentControlOption } from '@jovie/ui';
 import type { KeyboardEvent, ReactNode } from 'react';
 import {
   TAB_BAR_DRAWER_TRIGGER_ACTIVE_CLASSNAME,
@@ -49,7 +49,7 @@ export function InspectorTabs<T extends string>({
         data-testid='inspector-tabs'
       >
         {options.map(option => (
-          <button
+          <PlainButton
             key={option.value}
             type='button'
             role='tab'
@@ -67,7 +67,7 @@ export function InspectorTabs<T extends string>({
             )}
           >
             {option.label}
-          </button>
+          </PlainButton>
         ))}
       </div>
       {actions ? (

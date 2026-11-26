@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -38,6 +40,7 @@ describe('TaskDataTable certificate', () => {
 
     const table = screen.getByRole('table');
     expect(table).toHaveClass(TASK_DATA_TABLE_CLASSNAME);
+    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
     const first = screen.getByText('Review provider mapping').closest('tr');
     const second = screen.getByText('Confirm release metadata').closest('tr');
     for (const className of TASK_DATA_TABLE_ROW_CLASSNAME.split(' ')) {
@@ -109,5 +112,19 @@ describe('TaskDataTable certificate', () => {
       </TooltipProvider>
     );
     expect(container.querySelectorAll('tbody tr')).toHaveLength(8);
+  });
+});
+
+describe('TaskDataTable seam', () => {
+  it('puts its content on the 12px workspace seam (JOV-12565)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './TaskDataTable.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain(
+      "'h-full overflow-y-auto overflow-x-hidden pb-2 pt-0.5'"
+    );
+    expect(source).not.toContain('px-2.5 pb-2');
   });
 });

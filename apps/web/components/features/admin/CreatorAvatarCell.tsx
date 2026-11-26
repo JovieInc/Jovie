@@ -75,7 +75,7 @@ export function CreatorAvatarCell({
         />
         {isFeatured && (
           <div className='absolute -top-1 -left-1'>
-            <Star className='h-3 w-3 text-yellow-400 dark:text-yellow-300 fill-current' />
+            <Star className='h-3 w-3 text-warning fill-current' />
           </div>
         )}
       </div>

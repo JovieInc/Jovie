@@ -10,14 +10,22 @@ describe('MetaPill', () => {
     expect(screen.getByText('3 subtasks')).toBeInTheDocument();
   });
 
+  it('is a 20px tag like the metadata chips beside it (JOV-12568)', () => {
+    render(<MetaPill>3 subtasks</MetaPill>);
+    const pill = screen.getByText('3 subtasks');
+    expect(pill).toHaveClass('h-5', 'rounded');
+    expect(pill).not.toHaveClass('h-6');
+    expect(pill).not.toHaveClass('rounded-md');
+  });
+
   it('applies amber tone classes', () => {
     render(<MetaPill tone='amber'>Soon</MetaPill>);
-    expect(screen.getByText('Soon').className).toContain('amber-300');
+    expect(screen.getByText('Soon').className).toContain('text-warning-text');
   });
 
   it('applies cyan tone classes', () => {
     render(<MetaPill tone='cyan'>Auto</MetaPill>);
-    expect(screen.getByText('Auto').className).toContain('cyan-300');
+    expect(screen.getByText('Auto').className).toContain('text-accent-text');
   });
 });
 

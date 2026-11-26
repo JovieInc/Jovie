@@ -16,17 +16,6 @@ const meta = {
   args: {
     accent: resolveProfileModeCardAccents({ listenArtworkAccent: 'ultra' })
       .events,
-    hasEvents: false,
-  },
-} satisfies Meta<typeof ProfileEventsCard>;
-
-export default meta;
-type Story = StoryObj<typeof meta>;
-
-export const Empty: Story = {};
-
-export const WithEvents: Story = {
-  args: {
     hasEvents: true,
     children: (
       <p className='text-mid text-(--profile-mode-card-fg)'>
@@ -34,7 +23,20 @@ export const WithEvents: Story = {
       </p>
     ),
   },
+} satisfies Meta<typeof ProfileEventsCard>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+/** Empty Events returns null (JOV-14241); kept as a story for the contract. */
+export const Empty: Story = {
+  args: {
+    hasEvents: false,
+    children: undefined,
+  },
 };
+
+export const WithEvents: Story = {};
 
 const eventRowClassName = 'text-mid text-(--profile-mode-card-fg)';
 

@@ -12,6 +12,19 @@ vi.mock('@jovie/ui', () => ({
   Button: ({ children }: { readonly children: ReactNode }) => (
     <button type='button'>{children}</button>
   ),
+  IconButton: ({
+    children,
+    ariaLabel,
+    'aria-label': ariaLabelProp,
+  }: {
+    readonly children: ReactNode;
+    readonly ariaLabel?: string;
+    readonly 'aria-label'?: string;
+  }) => (
+    <button type='button' aria-label={ariaLabel ?? ariaLabelProp}>
+      {children}
+    </button>
+  ),
   DropdownMenu: ({ children }: { readonly children: ReactNode }) => children,
   DropdownMenuContent: ({ children }: { readonly children: ReactNode }) => (
     <div>{children}</div>
@@ -25,21 +38,6 @@ vi.mock('@jovie/ui', () => ({
     readonly children: ReactNode;
     readonly asChild?: boolean;
   }) => children,
-}));
-
-vi.mock('@/components/atoms/AppIconButton', () => ({
-  AppIconButton: ({
-    children,
-    ariaLabel,
-  }: {
-    readonly children: ReactNode;
-    readonly ariaLabel: string;
-    readonly variant?: string;
-  }) => (
-    <button type='button' aria-label={ariaLabel}>
-      {children}
-    </button>
-  ),
 }));
 
 vi.mock('@/components/atoms/BrandLogo', () => ({

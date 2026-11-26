@@ -32,7 +32,7 @@ export function wipAdmission(branch, execute, cwd, priority = 'default') {
       reason: decision.reason,
       message:
         decision.reason === 'wip-cap'
-          ? `wip-cap: \`${decision.producer}/\` already owns ${decision.used} open PRs (historical cap ${decision.cap}).`
+          ? `wip-cap: ${decision.wipScope === 'session' ? 'this session' : `\`${decision.producer}/\``} already owns ${decision.wipUsed ?? decision.used} open PRs (cap ${decision.wipCap ?? decision.cap}). Finish before starting: land, repair or hand off ${(decision.landFirst ?? []).map(n => `#${n}`).join(' ') || 'them'} first.`
           : `${decision.reason?.startsWith('github-') ? 'github-quota-deferred: ' : ''}${decision.reason}: current capacity defers this admission${decision.retryAt ? ` until ${new Date(decision.retryAt * 1000).toISOString()}` : ''}.`,
     };
   return {
@@ -45,6 +45,23 @@ export function wipAdmission(branch, execute, cwd, priority = 'default') {
           : null
         : `capacity observation unavailable (${(result.stderr || 'no decision').toString().trim().slice(0, 160)}); deferring capacity proof to the bounded API request gate`,
   };
+}
+
+/** The session id agents run under; pr_wip.py reads the same variables. */
+export function agentSession(env = process.env) {
+  const id =
+    env.AGENT_SESSION_ID ||
+    env.CLAUDE_CODE_SESSION_ID ||
+    env.CODEX_SESSION_ID ||
+    '';
+  return /^[A-Za-z0-9_-]{6,128}$/.test(id) ? id : null;
+}
+
+/** Marks a new PR with its session so the per-session WIP cap can count it. */
+export function withSessionMarker(body, env = process.env) {
+  const id = agentSession(env);
+  if (!id || body.includes('<!-- agent-session:')) return body;
+  return `${body.trimEnd()}\n\n<!-- agent-session: ${id} -->\n`;
 }
 
 /**
@@ -70,7 +87,9 @@ export function wipGate(a, branch, { execute, log, record }) {
   const refused = !wip.allowed && !override;
   if (refused)
     log(
-      'Refusing to open: current capacity is unavailable. A WIP override cannot bypass quota or CI.'
+      wip.reason === 'wip-cap'
+        ? 'Refusing to open: this agent is at its WIP cap. Land its open PRs first, or pass --wip-override "<reason>" for an urgent fix.'
+        : 'Refusing to open: current capacity is unavailable. A WIP override cannot bypass quota or CI.'
     );
   return {
     refused,

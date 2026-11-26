@@ -80,18 +80,31 @@ export function inspectArtistProfile(input: {
       )
       .map(value => value.url)
   );
-  const about = document.querySelector('[data-testid="profile-aeo-content"]');
-  const wrongSelfLinks = [...(about?.querySelectorAll('a[href]') ?? [])].filter(
-    a => {
-      if (normalize(a.textContent) !== normalize(artistName)) return false;
-      try {
-        const href = new URL(a.getAttribute('href') ?? '', profileUrl).href;
-        return href !== profileUrl && !releaseUrls.has(href);
-      } catch {
-        return true;
-      }
-    }
+  // About lives in the ProfilePage structured data since #26620 removed the
+  // visible block under the footer; the visible block still counts if present.
+  const aboutBlock = document.querySelector(
+    '[data-testid="profile-aeo-content"]'
   );
+  const profilePage = graphs.find(
+    value => value?.['@id'] === `${profileUrl}#profilepage`
+  );
+  const aboutDescription =
+    typeof profilePage?.description === 'string' &&
+    profilePage.description.trim().length > 0
+      ? profilePage.description
+      : null;
+  const about = aboutBlock ?? aboutDescription;
+  const wrongSelfLinks = [
+    ...(aboutBlock?.querySelectorAll('a[href]') ?? []),
+  ].filter(a => {
+    if (normalize(a.textContent) !== normalize(artistName)) return false;
+    try {
+      const href = new URL(a.getAttribute('href') ?? '', profileUrl).href;
+      return href !== profileUrl && !releaseUrls.has(href);
+    } catch {
+      return true;
+    }
+  });
   const canonical = document
     .querySelector('link[rel="canonical"]')
     ?.getAttribute('href');

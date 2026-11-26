@@ -59,11 +59,13 @@ export function founderFunnelStageFooter(
   isBiggestLeak: boolean
 ): string {
   if (index === 0) return 'Top of funnel';
+  if (index === 1) return 'Account cohort starts here';
   if (stage.dropOff === null) return 'No entrants from previous step';
+  if (stage.dropOff < 0) return 'Stage counts are not nested';
   if (isBiggestLeak) {
-    return `Biggest drop-off · −${stage.dropOff.toLocaleString('en-US')}`;
+    return `Largest count gap · −${stage.dropOff.toLocaleString('en-US')}`;
   }
-  return `−${stage.dropOff.toLocaleString('en-US')} lost`;
+  return `−${stage.dropOff.toLocaleString('en-US')} fewer accounts`;
 }
 
 async function fetchFounderFunnel(
@@ -142,6 +144,17 @@ function FunnelStageTile({
   readonly index: number;
   readonly isBiggestLeak: boolean;
 }>) {
+  const footer = founderFunnelStageFooter(stage, index, isBiggestLeak);
+  // The accessible name starts with the visible text, in visible order
+  // (WCAG 2.5.3 label in name), then adds the drill-down hint.
+  const visibleText = [
+    stage.label,
+    stage.count.toLocaleString('en-US'),
+    footer,
+    stage.identifiable ? null : 'Anonymous · aggregate only',
+  ]
+    .filter(Boolean)
+    .join(' ');
   const content = (
     <>
       <p className='text-2xs font-semibold text-tertiary-token'>
@@ -156,7 +169,7 @@ function FunnelStageTile({
           isBiggestLeak ? 'font-medium text-error' : 'text-tertiary-token'
         )}
       >
-        {founderFunnelStageFooter(stage, index, isBiggestLeak)}
+        {footer}
       </p>
       {!stage.identifiable ? (
         <p className='mt-0.5 text-2xs text-tertiary-token'>
@@ -189,7 +202,7 @@ function FunnelStageTile({
       className={tileClass}
       data-testid={`founder-funnel-stage-${stage.key}`}
       title={stage.description}
-      aria-label={`${stage.count.toLocaleString('en-US')} ${stage.label}; inspect underlying entities`}
+      aria-label={`${visibleText}; inspect underlying entities`}
     >
       {content}
     </Link>
@@ -203,10 +216,21 @@ function FunnelFlow({
   readonly funnel: FounderFunnelData;
   readonly urlSearchParams?: string;
 }>) {
+  const biggestAccountGap = funnel.stages
+    .slice(2)
+    .reduce<FounderFunnelStage | null>(
+      (largest, stage) =>
+        (stage.dropOff ?? 0) > (largest?.dropOff ?? 0) ? stage : largest,
+      null
+    );
   return (
     <ul className='flex items-stretch gap-1 overflow-x-auto'>
       {funnel.stages.map((stage, i) => {
-        const isBiggestLeak = stage.key === funnel.biggestDropOffKey;
+        const isBiggestLeak = i > 1 && stage.key === biggestAccountGap?.key;
+        const comparableStage = i > 1 && (stage.dropOff ?? -1) >= 0;
+        const connectorStage = comparableStage
+          ? stage
+          : { ...stage, conversionRate: null };
         const params = new URLSearchParams(urlSearchParams);
         params.set('funnelStage', stage.key);
         // A pending navigation still displays the previous server cohort.
@@ -221,7 +245,10 @@ function FunnelFlow({
         return (
           <li key={stage.key} className='flex list-none items-center'>
             {i > 0 ? (
-              <StageConnector stage={stage} isBiggestLeak={isBiggestLeak} />
+              <StageConnector
+                stage={connectorStage}
+                isBiggestLeak={isBiggestLeak}
+              />
             ) : null}
             <FunnelStageTile
               stage={displayedStage}
@@ -284,7 +311,7 @@ function observationMessage(
   if (state === 'loading') {
     return 'Loading funnel.';
   }
-  return 'Death-step in onboarding chat to paid.';
+  return 'Customer funnel observed.';
 }
 
 /**
@@ -337,11 +364,11 @@ export function FounderFunnelBand({
   return (
     <ContentSurfaceCard className='overflow-hidden' aria-busy={growth?.pending}>
       <ContentSectionHeader
-        title='Bottleneck'
+        title='Customer Funnel'
         subtitle={
           growth?.pending
             ? 'Updating funnel range…'
-            : 'Death-step in onboarding chat to paid.'
+            : 'Stage counts for the selected window.'
         }
         density='compact'
         className='min-h-0 px-(--app-shell-header-padding-x) py-3'

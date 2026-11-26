@@ -84,28 +84,29 @@ function transformFile(filePath: string, content: string): string | null {
 function transformFrostedButtonProps(buttonTag: string, props: string): string {
   let transformedProps = props;
 
-  // Extract frostedStyle prop
-  const frostedStyleMatch = props.match(/frostedStyle=["'](\w+)["']/);
-  const frostedStyle = frostedStyleMatch ? frostedStyleMatch[1] : 'default';
+  // Prefer tone= (current FrostedButton API); fall back to frostedStyle=.
+  const toneMatch = props.match(/(?:tone|frostedStyle)=["'](\w+)["']/);
+  const tone = toneMatch ? toneMatch[1] : 'solid';
 
   // Extract shape prop
   const shapeMatch = props.match(/shape=["'](\w+)["']/);
   const shape = shapeMatch ? shapeMatch[1] : null;
 
-  // Remove frostedStyle and shape props
+  // Remove tone / frostedStyle and shape props
   transformedProps = transformedProps.replace(
-    /\s*frostedStyle=["']\w+["']/g,
+    /\s*(?:tone|frostedStyle)=["']\w+["']/g,
     ''
   );
   transformedProps = transformedProps.replace(/\s*shape=["']\w+["']/g, '');
 
-  // Map frostedStyle to variant
+  // Map tone to first-class Button glass variant
   const variantMap: Record<string, string> = {
+    solid: 'frosted',
     default: 'frosted',
     ghost: 'frosted-ghost',
     outline: 'frosted-outline',
   };
-  const variant = variantMap[frostedStyle] || 'frosted';
+  const variant = variantMap[tone] || 'frosted';
 
   // Add variant prop
   transformedProps = `variant="${variant}" ${transformedProps}`;

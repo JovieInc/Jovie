@@ -36,6 +36,7 @@ import {
   ANALYTICS_EPOCH,
   type ResolvedWindow,
 } from '@/lib/analytics/time-range';
+import type { DashboardAnalyticsResponse } from '@/types/analytics';
 
 /** Bump when a metric's definition changes meaning (not its label). */
 export const EVIDENCE_RECEIPT_CONTRACT_VERSION =
@@ -131,6 +132,25 @@ export interface EvidenceReceiptSet {
   readonly computed_at: string;
   readonly from_cache: boolean;
   readonly metrics: readonly MetricReceipt[];
+}
+
+type DashboardCount =
+  | 'profile_views'
+  | 'unique_users'
+  | 'subscribers'
+  | 'total_clicks';
+
+/** Legacy responses expose raw counts. A receipt, when present, owns the measurement. */
+export function readMeasuredDashboardCount<K extends DashboardCount>(
+  data: Pick<DashboardAnalyticsResponse, 'evidence' | K> | null | undefined,
+  key: K
+): number | undefined {
+  const receipt = data?.evidence?.metrics.find(metric => metric.metric === key);
+  if (!receipt) return data?.[key];
+  return receipt.availability === 'measured' ||
+    receipt.availability === 'measured_zero'
+    ? receipt.value
+    : undefined;
 }
 
 export interface MetricReceiptInput {

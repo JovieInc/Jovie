@@ -10,59 +10,68 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { SURFACE_IDS } from '../lib/prod-cert.mjs';
 import {
+  BRIEF_DIR,
   designedFrames,
   EXPORT_KEY_FILE,
   exportCacheKey,
   exportGroups,
   exportScript,
   findExport,
+  GOLDEN_PATH_SURFACES,
   MANIFEST,
   PEN_CLI_VERSION,
   runGoldenPathPen,
+  validateGoldenPathManifest,
 } from './pen-golden-path.mjs';
+
+const FIXTURE_SURFACES = ['signup-signin', 'checkout'];
 
 function fixtureRoot() {
   const root = mkdtempSync(join(tmpdir(), 'pen-gp-'));
   mkdirSync(join(root, 'docs/pen-stills/golden-path'), { recursive: true });
-  const frame = (sectionId, penNodeId) => ({
+  mkdirSync(join(root, BRIEF_DIR), { recursive: true });
+  writeFileSync(join(root, BRIEF_DIR, 'request-access.md'), '# Brief\n');
+  const frame = (sectionId, penNodeId, route) => ({
     sectionId,
     penNodeId,
     fileHash: null,
     stillPath: `docs/pen-stills/golden-path/${sectionId.replace('/', '.')}.png`,
     viewport: 1440,
     mode: 'dark',
+    route,
     status: 'active',
   });
   writeFileSync(
     join(root, MANIFEST),
     JSON.stringify({
+      schema: 'pen-still-manifest/v1',
       penFile: { name: 'canonical.lib.pen' },
       frames: [
-        frame('signup-signin/signin', 'oaz9c'),
-        frame('signup-signin/request-access', 'pending-no-design'),
-        frame('checkout/pricing', 'hLRZB'),
+        frame('signup-signin/signin', 'oaz9c', '/signin'),
+        frame('signup-signin/request-access', 'pending-no-design', '/waitlist'),
+        frame('checkout/pricing', 'hLRZB', '/pricing'),
       ],
     })
   );
   return root;
 }
 
-test('the committed Golden Path manifest lists every certified surface', () => {
+test('the committed Golden Path manifest lists every certified surface and passes closed-loop validation', () => {
+  assert.deepEqual([...GOLDEN_PATH_SURFACES], [...SURFACE_IDS]);
   const manifest = JSON.parse(readFileSync(MANIFEST, 'utf8'));
-  const surfaces = new Set(manifest.frames.map(f => f.sectionId.split('/')[0]));
-  for (const surface of [
-    'landing',
-    'signup-signin',
-    'claim',
-    'onboarding',
-    'chat',
-    'public-profile',
-    'smartlink',
-    'checkout',
-  ]) {
-    assert.ok(surfaces.has(surface), `${surface} has no Pen frame row`);
-  }
+  validateGoldenPathManifest(manifest, { surfaceIds: SURFACE_IDS });
+  const smartlink = manifest.frames.find(
+    f => f.sectionId === 'smartlink/release'
+  );
+  assert.equal(smartlink?.route, '/tim/wheels-up');
+  const chat = manifest.frames.find(f => f.sectionId === 'chat/app-chat');
+  assert.equal(chat?.auth, 'required');
+  const onboarding = manifest.frames.find(
+    f => f.sectionId === 'onboarding/start'
+  );
+  assert.equal(onboarding?.viewport, 390);
 });
 
 test('only frames with a real Pen node id are exported', () => {
@@ -86,6 +95,7 @@ test('without the Pen key or file it exports nothing and says why', async () => 
   const result = await runGoldenPathPen({
     out: join(root, 'out'),
     root,
+    surfaceIds: FIXTURE_SURFACES,
     env: {},
     run: () => assert.fail('nothing may run'),
     log: line => lines.push(line),
@@ -110,9 +120,12 @@ test('exports headless, copies stills into place and runs the strict diff', asyn
     return Buffer.from('');
   };
   const lines = [];
+  const statePath = join(root, 'pen-auth.json');
   const result = await runGoldenPathPen({
     out,
     root,
+    surfaceIds: FIXTURE_SURFACES,
+    storageState: statePath,
     env: {
       PEN_CLI_KEY: 'k',
       PEN_GOLDEN_PATH_FILE_URL: 'https://blob.example/x.pen',
@@ -134,6 +147,8 @@ test('exports headless, copies stills into place and runs the strict diff', asyn
     c.includes('scripts/invariants/pen-still-diff.mjs')
   );
   assert.ok(diff?.includes('--strict'), 'the diff runs strict');
+  assert.ok(diff?.includes('--storage-state'), 'storageState is forwarded');
+  assert.ok(diff?.includes(statePath));
   assert.ok(diff?.includes('https://jov.ie'));
   assert.equal(findExport(join(out, 'png'), 'nope'), null);
 });
@@ -163,6 +178,7 @@ test('a frame with its own penFile exports from that file in the archive', async
   await runGoldenPathPen({
     out,
     root,
+    surfaceIds: FIXTURE_SURFACES,
     env: { PEN_CLI_KEY: 'k', PEN_GOLDEN_PATH_FILE_URL: 'https://r2.example/w' },
     run,
     fetchImpl: async () => new Response(new Uint8Array([0x1f, 0x8b, 0])),
@@ -221,6 +237,7 @@ test('the export cache key follows content, exporter and selection, not the URL'
     await runGoldenPathPen({
       out: join(root, `out-${keys.length}`),
       root,
+      surfaceIds: FIXTURE_SURFACES,
       env: penEnv(url),
       run: () => assert.fail('fetch-only runs no exporter'),
       fetchImpl: penSource(body),
@@ -249,6 +266,7 @@ test('a restored export for the same content skips the Pen CLI; new content expo
   const options = body => ({
     out,
     root,
+    surfaceIds: FIXTURE_SURFACES,
     env,
     run: exportingRun(out, calls),
     fetchImpl: penSource(body),
@@ -296,6 +314,7 @@ test('a partial export is never cached', async () => {
   await runGoldenPathPen({
     out,
     root,
+    surfaceIds: FIXTURE_SURFACES,
     env: penEnv('https://blob.example/x.pen'),
     run: (cmd, args) => {
       if (args.includes('interactive'))
@@ -332,6 +351,7 @@ test('a transient browser-install failure is retried before the strict diff runs
   const result = await runGoldenPathPen({
     out,
     root,
+    surfaceIds: FIXTURE_SURFACES,
     env: penEnv('https://blob.example/x.pen'),
     run,
     fetchImpl: penSource('{"v":1}'),
@@ -353,6 +373,7 @@ test('a persistent browser-install failure still fails red', async () => {
       runGoldenPathPen({
         out: join(root, 'out'),
         root,
+        surfaceIds: FIXTURE_SURFACES,
         env: penEnv('https://blob.example/x.pen'),
         run: (cmd, args) => {
           if (args.includes('interactive'))
@@ -370,4 +391,95 @@ test('a persistent browser-install failure still fails red', async () => {
     /apt-get failed/u
   );
   assert.equal(installAttempts.length, 3, 'every attempt is used up first');
+});
+
+test('validateGoldenPathManifest fails closed before export on missing route, unmapped surface, unauth protected route, or missing brief', async () => {
+  const root = fixtureRoot();
+  const base = JSON.parse(readFileSync(join(root, MANIFEST), 'utf8'));
+  const cases = [
+    [
+      {
+        ...base,
+        frames: [
+          { ...base.frames[0], route: undefined },
+          ...base.frames.slice(1),
+        ],
+      },
+      FIXTURE_SURFACES,
+      /must have a concrete route/u,
+    ],
+    [
+      {
+        ...base,
+        frames: [
+          { ...base.frames[0], route: '/[handle]/release' },
+          ...base.frames.slice(1),
+        ],
+      },
+      FIXTURE_SURFACES,
+      /must have a concrete route/u,
+    ],
+    [
+      base,
+      [...FIXTURE_SURFACES, 'smartlink'],
+      /surface "smartlink" has no active Pen frame/u,
+    ],
+    [
+      {
+        ...base,
+        frames: [
+          ...base.frames,
+          {
+            sectionId: 'chat/app-chat',
+            penNodeId: 'hkkdJ',
+            stillPath: 'p.png',
+            viewport: 1440,
+            mode: 'dark',
+            route: '/app/chat',
+            status: 'active',
+          },
+        ],
+      },
+      [...FIXTURE_SURFACES, 'chat'],
+      /protected route "\/app\/chat" must set auth: "required"/u,
+    ],
+    [
+      {
+        ...base,
+        frames: [
+          ...base.frames,
+          {
+            sectionId: 'checkout/no-brief',
+            penNodeId: 'pending-no-design',
+            stillPath: 'p.png',
+            viewport: 1440,
+            mode: 'dark',
+            route: '/pricing-2',
+            status: 'active',
+          },
+        ],
+      },
+      FIXTURE_SURFACES,
+      /pending Pen frame requires brief docs\/design-system\/pen-briefs\/no-brief\.md/u,
+    ],
+  ];
+  for (const [candidate, surfaceIds, pattern] of cases) {
+    assert.throws(
+      () => validateGoldenPathManifest(candidate, { root, surfaceIds }),
+      pattern
+    );
+  }
+  writeFileSync(join(root, MANIFEST), JSON.stringify(cases[0][0]));
+  await assert.rejects(
+    () =>
+      runGoldenPathPen({
+        out: join(root, 'bad-out'),
+        root,
+        surfaceIds: FIXTURE_SURFACES,
+        env: {},
+        run: () => assert.fail('invalid manifest must fail before export'),
+        log: () => {},
+      }),
+    /must have a concrete route/u
+  );
 });

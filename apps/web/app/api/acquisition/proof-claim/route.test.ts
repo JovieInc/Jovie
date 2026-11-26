@@ -87,4 +87,20 @@ describe('POST /api/acquisition/proof-claim', () => {
     expect(response.status).toBe(429);
     expect(mockRecord).not.toHaveBeenCalled();
   });
+
+  it('acks and drops the funnel event when the durable tracking backend is unavailable', async () => {
+    mockLimit.mockResolvedValueOnce({
+      success: false,
+      limit: 100,
+      remaining: 0,
+      reset: new Date(Date.now() + 30_000),
+      unavailable: true,
+      backend: 'unavailable',
+    });
+
+    const response = await POST(buildRequest({ eventType: 'proof_viewed' }));
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ ok: true, dropped: true });
+    expect(mockRecord).not.toHaveBeenCalled();
+  });
 });

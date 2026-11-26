@@ -71,6 +71,12 @@ vi.mock('@jovie/ui', () => ({
     </button>
   ),
   DropdownMenuSeparator: () => <hr />,
+  PlainButton: ({
+    children,
+    ...props
+  }: { children: ReactNode } & Record<string, unknown>) => (
+    <button {...props}>{children}</button>
+  ),
   DropdownMenuTrigger: ({ children }: { children: ReactNode }) => (
     <>{children}</>
   ),

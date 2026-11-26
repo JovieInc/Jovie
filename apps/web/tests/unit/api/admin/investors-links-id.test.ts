@@ -33,6 +33,18 @@ vi.mock('@/lib/db', () => ({
 }));
 
 vi.mock('@/lib/db/schema/investors', () => ({
+  investorStageEnum: {
+    enumValues: [
+      'shared',
+      'viewed',
+      'engaged',
+      'meeting_booked',
+      'committed',
+      'wired',
+      'passed',
+      'declined',
+    ],
+  },
   investorLinks: {
     id: 'investor_links.id',
     label: 'investor_links.label',

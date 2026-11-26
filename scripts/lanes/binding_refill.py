@@ -12,7 +12,12 @@ Ownership (Tim 2026-10-25, one owner per queue): this refill is the ONLY writer 
 Backlog order for both teams. Summer's backlog governor (summer-config summer-backlog-governor.ts, JOV-7073) is an
 observer for JOV: it ranks supply and "delegates every Todo admission to the existing guarded Gem writer", never
 transitioning an issue itself, so it defers to this module by construction. If the governor ever gains a writer it
-must call this module's `select`, not its own ordering.
+must call this module's `select`, not its own ordering. Auto-filers (scripts/lib/linear-issue-intake.mjs and the
+lanes' board, remediation and factory intake) create and reopen in Backlog, so this refill and priority admission
+are the only writers of Backlog -> Todo (2026-11-22: filers writing straight to Todo had grown it to 468).
+
+Refill runs per code sub-lane (`work_lane.code_sub_lane`): each tops up only its own Todo to its own depth, so a
+burst of ready remediation fills the remediation sub-lane and nothing else. Activation fills first.
 
 Pure selection (`select`) is separate from the write (`refill`), which goes through the
 outbox like every other lane write (readback, retry, never overwrites a remote decision).
@@ -32,6 +37,8 @@ import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
 from atomic_state import atomic_write_text  # noqa: E402
 import macos_pool
+import work_lane
+import execution_attempt
 
 READY_LABEL = "agent-ready"  # retired as a requirement (2026-10-29); still produced by some intake, never required
 # Labels that mean a human decision, a human-owned task or a container: never auto-promoted.
@@ -90,8 +97,27 @@ def skip_reason(row: dict, open_ids: set[str], excluded: frozenset[str], red_lin
     return None
 
 
+def execution_skips(state: Path, rows: list[dict]) -> dict[str, str]:
+    """Negative observations from the existing execution mirror, never a dispatch grant.
+
+    A missing observation leaves the canonical execution coordinator fully
+    blocking at claim time. A known terminal is generation-specific: priority,
+    label and timestamp churn cannot release it. Source revisions still take
+    the existing authoritative reentry and execution gates.
+    """
+    try:
+        history = execution_attempt._rows(Path(state) / 'runs' / 'execution-attempts.jsonl')
+        stopped = {item['identityDigest'] for item in history
+                   if item.get('terminalState') in execution_attempt.TERMINAL or item.get('event') == 'completion_fenced'}
+    except (OSError, ValueError, TypeError, AttributeError, RuntimeError, KeyError):
+        return {row['identifier']: 'execution-mirror-unreadable' for row in rows}
+    return {row['identifier']: 'execution-generation-terminal' for row in rows
+            if execution_attempt.identity('linear-work', {'issue': row['identifier'], 'outcome': 'draft-pr'},
+                {'title': row.get('title') or '', 'description': row.get('description') or ''})['identityDigest'] in stopped}
+
+
 def select(rows: list[dict], need: int, excluded=(), red_line=lambda row: False, now: float | None = None,
-           factory_share: float | None = None) -> tuple[list[dict], dict]:
+           factory_share: float | None = None, observed_skips: dict | None = None) -> tuple[list[dict], dict]:
     """The next `need` Backlog rows to promote in `backlog_rank` order (value x confidence / effort
     plus age, factory floor first when the fleet is under it), plus a reason for every Backlog
     row left behind."""
@@ -102,7 +128,7 @@ def select(rows: list[dict], need: int, excluded=(), red_line=lambda row: False,
     for row in rows:
         if row.get("state") != "Backlog":
             continue
-        reason = skip_reason(row, open_ids, excluded, red_line)
+        reason = skip_reason(row, open_ids, excluded, red_line) or (observed_skips or {}).get(row["identifier"])
         if reason:
             skipped[row["identifier"]] = reason
         else:
@@ -133,12 +159,13 @@ def groom_queue(rows: list[dict], now: float, keep: int = GROOM_KEEP) -> list[di
             for row in backlog_rank.order(queue, now)[:keep]]
 
 
-def view(rows: list[dict], now: float) -> dict:
+def view(rows: list[dict], now: float, observed_skips: dict | None = None) -> dict:
     """Backlog health for one team from the mirror: agent-ready count and age p50/p95 in days."""
     open_ids = {row["identifier"] for row in rows}
     ages = []
     for row in rows:
-        if row.get("state") == "Backlog" and skip_reason(row, open_ids, frozenset()) is None:
+        if (row.get("state") == "Backlog" and row["identifier"] not in (observed_skips or {})
+                and skip_reason(row, open_ids, frozenset()) is None):
             created = backlog_rank._epoch(row.get("createdAt"))
             if created:
                 ages.append((now - created) / 86400)
@@ -156,55 +183,74 @@ def refill(lane, host, binding, linear, floor: int = 0, now: float | None = None
     state = Path(host.state)
     mirror = lane.linear_sync.read_mirror(state, binding.key)
     rows = list((mirror.get("issues") or {}).values())
-    todo = lane.linear_sync.todo(state, binding.key)
+    execution_held = execution_skips(state, rows)
+    # The code target counts code only, per sub-lane: non-code lanes (work_lane.py) hold their own depth, so a full
+    # design or data lane never stops code refill, and a full remediation sub-lane never stops product refill.
+    todo = work_lane.code_only(lane.linear_sync.todo(state, binding.key))
     pending = lane.linear_sync._pending_moves(state)  # promotions still in the outbox count as Todo
     depth, goal = len(todo), target(state, floor)  # todo() already counts promotions waiting in the outbox
+    by_sub = work_lane.by_sub_lane(todo)
+    depths = work_lane.sub_lane_depths(goal, by_sub)
+    need = {sub: max(0, depths[sub] - len(by_sub[sub])) for sub in work_lane.SUB_LANES}
     path = state / "refill" / f"{binding.key}.json"
     try:
         previous = json.loads(path.read_text())
     except (OSError, ValueError):
         previous = {}
     receipt = {"at": now, "team": binding.key, "todo": depth, "target": goal, "seats": seats(state),
-               "mirrorSyncedAt": mirror.get("syncedAt"), "promoted": [], "skipped": {}}
-    # Stage timestamps for p50/p95: when the deficit opened and when it closed.
+               "mirrorSyncedAt": mirror.get("syncedAt"), "promoted": [], "skipped": {},
+               "codeSubLanes": {sub: {"todo": len(by_sub[sub]), "target": depths[sub], "promoted": []} for sub in need}}
+    # Stage timestamps for p50/p95: when the deficit opened and when it closed. A sub-lane with no ready
+    # Backlog work cannot close its deficit, so only a short sub-lane with ready supply keeps one open.
     since = previous.get("deficitSince")
-    if depth >= goal:
-        if since:
-            receipt["lastRefillLatencyS"] = round(now - since, 1)
-        receipt["deficitSince"] = None
-        receipt.update(view(rows, now))
+    open_ids, excluded = {row["identifier"] for row in rows}, frozenset(label.lower() for label in binding.excluded)
+    supplied = {work_lane.code_sub_lane(row) for row in rows if row.get("state") == "Backlog" and not work_lane.own_lane(row)
+                and row["identifier"] not in execution_held and skip_reason(row, open_ids, excluded) is None}
+    if since and not any(need[sub] for sub in supplied):
+        receipt["lastRefillLatencyS"] = round(now - since, 1)
+    receipt["deficitSince"] = (since or now) if any(need[sub] for sub in supplied) else None
+    if not any(need.values()):
+        receipt.update(view(rows, now, execution_held))
         _write(path, receipt)
         return receipt
-    receipt["deficitSince"] = since or now
     stale = now - float(mirror.get("syncedAt") or 0) > 900
     if stale:  # a mirror that stopped syncing proves nothing about Backlog; never act on it
         receipt["held"] = "mirror-stale"
         _write(path, receipt)
         return receipt
-    live = [row for row in rows if pending.get(row["id"]) != "Todo"]
+    # Speed wins are admitted by priority admission outside the code target; non-code lanes hold their own.
+    live = [row for row in rows if pending.get(row["id"]) != "Todo" and not work_lane.own_lane(row)]
     # LYB iOS work waits while LYB's running + queued hosted-macOS jobs are at the cap (macos_pool.HOLD_AT):
     # the shared pool is Jovie's merge-group Mac lane too. Fails open without a fresh sample.
     admission = macos_pool.admission(state, now) if binding.key == "LYB" else {"hold": False}
     live, macos_held = macos_pool.partition_ios(live, admission["hold"])
-    picked, skipped = select(live, goal - depth, binding.excluded, lambda row: lane.issue_hits_red_line(_issue(lane, row)),
-                             now, _factory_share(state))
+    picked, skipped = [], {}
+    for sub, members in work_lane.by_sub_lane(live).items():  # activation first: it always keeps a seat
+        chosen, why = select(members, need[sub], binding.excluded, lambda row: lane.issue_hits_red_line(_issue(lane, row)),
+                             now, _factory_share(state), observed_skips=execution_held)
+        chosen = chosen[:need[sub]]
+        picked += chosen
+        skipped.update(why)
+        receipt["codeSubLanes"][sub]["promoted"] = [row["identifier"] for row in chosen]
     skipped.update(macos_held)
+    skipped.update(execution_held)
     if binding.key == "LYB":
         receipt["macosAdmission"] = admission
     outbox = lane.linear_sync.Outboxed(state, linear)
     for row in picked:
+        sub = work_lane.code_sub_lane(row)
         outbox.move(row["id"], "Todo")
-        outbox.comment(row["id"], f"Backlog refill: promoted to Todo ({binding.key} Todo was {depth} of {goal}; "
-                                  f"agent-ready, acceptance criteria present, no open blocker). Why ranked here: "
-                                  f"{backlog_rank.explain(row, now)}.")
+        outbox.comment(row["id"], f"Backlog refill: promoted to Todo ({binding.key} {sub} sub-lane Todo was "
+                                  f"{len(by_sub[sub])} of {depths[sub]}; acceptance criteria present, no open blocker). "
+                                  f"Why ranked here: {backlog_rank.explain(row, now)}.")
         receipt["promoted"].append(row["identifier"])
-        _log(state, {"at": now, "team": binding.key, "id": row["identifier"],
+        _log(state, {"at": now, "team": binding.key, "id": row["identifier"], "subLane": sub,
                      "backlogAgeS": round(now - (backlog_rank._epoch(row.get("createdAt")) or now)),
                      "score": backlog_rank.score(row, now), "factory": backlog_rank.is_factory(row)})
     receipt["skipped"] = dict(sorted(skipped.items())[:100])
-    receipt["short"] = max(0, goal - depth - len(picked))
+    receipt["short"] = max(0, sum(need.values()) - len(picked))
     receipt["groomQueue"] = groom_queue(live, now)
-    receipt.update(view(rows, now))
+    receipt.update(view(rows, now, execution_held))
     # Guard: ready work waited in Backlog while Todo sat under target. Promotion normally closes the
     # deficit within a tick, so a deficit this old means writes are not landing.
     if receipt["deficitSince"] and now - receipt["deficitSince"] > ALARM_AFTER_S and receipt["ready"] > len(picked):

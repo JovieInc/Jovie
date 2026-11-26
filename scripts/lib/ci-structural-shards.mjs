@@ -1,12 +1,14 @@
 /**
- * ci-fast (structural lanes) runs as two matrix legs on separate runners: leg
- * ab runs shards a+b, leg cd runs c+d, and each combines its pair into
- * jovie-lanes-<group>.coverage for the lanes-coverage report job, which merges
- * both and enforces the unchanged per-module floors on the full suite.
+ * ci-fast (structural lanes) runs as four matrix legs on separate runners
+ * (Wave 2): each leg runs one pytest shard a|b|c|d into
+ * jovie-lanes-<group>.coverage; the lanes-coverage report job merges all four
+ * and enforces the unchanged per-module floors on the full suite.
  */
 export const LANES_COVERAGE_GROUP_SHARDS = Object.freeze({
-  ab: Object.freeze(['a', 'b']),
-  cd: Object.freeze(['c', 'd']),
+  a: Object.freeze(['a']),
+  b: Object.freeze(['b']),
+  c: Object.freeze(['c']),
+  d: Object.freeze(['d']),
 });
 export const lanesCoverageGroupCommands = (allShards, run, wrap) =>
   Object.freeze(
@@ -231,12 +233,20 @@ const lanesCoverageShard = ({ id, files, keyword }) =>
 export const lanesCoverageRun = (shards, combinedName) => {
   const background = shards.slice(0, -1);
   const last = shards[shards.length - 1];
-  return `{ ${LANES_RETRY_FUNCTION}${background.map(shard => `${lanesCoverageShard(shard)} & lanes_${shard.id}=$!;`).join(' ')} ${lanesCoverageShard(last)}; lanes_status=$?; ${background.map(shard => `wait "$lanes_${shard.id}"; lanes_shard=$?; [ "$lanes_status" -ne 0 ] || lanes_status=$lanes_shard;`).join(' ')} (exit "$lanes_status"); } && COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/${combinedName}.coverage" python3 -m coverage combine ${shards.map(shard => `"\${RUNNER_TEMP:-/tmp}/jovie-lanes-${shard.id}.coverage"`).join(' ')}`;
+  const runShards = `{ ${LANES_RETRY_FUNCTION}${background.map(shard => `${lanesCoverageShard(shard)} & lanes_${shard.id}=$!;`).join(' ')} ${lanesCoverageShard(last)}; lanes_status=$?; ${background.map(shard => `wait "$lanes_${shard.id}"; lanes_shard=$?; [ "$lanes_status" -ne 0 ] || lanes_status=$lanes_shard;`).join(' ')} (exit "$lanes_status"); }`;
+  // Wave 2 single-shard groups reuse the shard id as the group key
+  // (`a`→`jovie-lanes-a.coverage`). Combining that path onto itself makes
+  // coverage.py exit 1 with "No usable data files" after a green pytest —
+  // the shard file is already the group artifact, so skip combine.
+  if (shards.length === 1 && `jovie-lanes-${shards[0].id}` === combinedName) {
+    return runShards;
+  }
+  return `${runShards} && COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/${combinedName}.coverage" python3 -m coverage combine ${shards.map(shard => `"\${RUNNER_TEMP:-/tmp}/jovie-lanes-${shard.id}.coverage"`).join(' ')}`;
 };
 
 /** Files of the lanes coverage suite (one coverage map, sharded below). */
 export const LANES_PYTEST_FILES = Object.freeze(
-  'scripts/tests/test_factory_signals.py scripts/tests/test_factory_intake.py scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_board_intake.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_cloud_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_conftest_host_isolation.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_public_feed.py scripts/tests/test_health_checks.py scripts/tests/test_main_health.py scripts/tests/test_epics.py scripts/tests/test_fix_red_statement_merge.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_cli.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_families.py scripts/tests/test_model_pools.py scripts/tests/test_model_pool_guard.py scripts/tests/test_model_pool_calls.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_pr_events_repair_evidence.py scripts/tests/test_pr_events_blast_radius.py scripts/tests/test_pr_events_red_repair.py scripts/tests/test_pr_body_markup.py scripts/tests/test_priority_admission.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_reason_publication.py scripts/tests/test_reason_dispatch.py scripts/tests/test_reason_events.py scripts/tests/test_incident_stage_events.py scripts/tests/test_remediation.py scripts/tests/test_repair_order.py scripts/tests/test_repair_win.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py scripts/tests/test_fix_red_coverage_include.py scripts/tests/test_hyperagent_board_bridge.py scripts/tests/test_revert_first.py'.split(
+  'scripts/tests/test_factory_signals.py scripts/tests/test_factory_intake.py scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_board_intake.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_cloud_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_conftest_host_isolation.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_public_feed.py scripts/tests/test_health_checks.py scripts/tests/test_main_health.py scripts/tests/test_epics.py scripts/tests/test_fix_red_statement_merge.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_cli.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_families.py scripts/tests/test_model_pools.py scripts/tests/test_model_pool_guard.py scripts/tests/test_model_pool_calls.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_pr_events_repair_evidence.py scripts/tests/test_pr_events_blast_radius.py scripts/tests/test_pr_events_red_repair.py scripts/tests/test_pr_body_markup.py scripts/tests/test_priority_admission.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_reason_publication.py scripts/tests/test_reason_dispatch.py scripts/tests/test_reason_events.py scripts/tests/test_incident_stage_events.py scripts/tests/test_remediation.py scripts/tests/test_repair_order.py scripts/tests/test_repair_win.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py scripts/tests/test_fix_red_coverage_include.py scripts/tests/test_hyperagent_board_bridge.py scripts/tests/test_revert_first.py scripts/tests/test_intake_linear_relay.py'.split(
     ' '
   )
 );

@@ -47,6 +47,24 @@ describe('AppShellFrame certificate', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('exposes one live landmark while the streamed fallback is still mounted', () => {
+    const { container } = render(
+      <>
+        <AppShellFrame placeholder sidebar={sidebar} main={<p>Loading</p>} />
+        <div hidden>
+          <AppShellFrame sidebar={sidebar} main={<p>Resolved content</p>} />
+        </div>
+      </>
+    );
+    expect(
+      container.querySelectorAll('[data-app-shell-frame="true"]')
+    ).toHaveLength(1);
+    expect(container.querySelectorAll('#main-content')).toHaveLength(1);
+    expect(container.querySelector('#main-content')).toHaveTextContent(
+      'Resolved content'
+    );
+  });
+
   it('pushes the route with an inspector column and stays axe-clean', async () => {
     const { container } = render(
       <AppShellFrame

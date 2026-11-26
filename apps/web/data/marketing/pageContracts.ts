@@ -1,6 +1,7 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { PRODUCT_CLAIM_HREF, PRODUCT_COPY } from '@/data/productCopy';
 import type { PageCopyScope, PageRecordFamily } from './factory/pageRecord';
+import { HOME_MARKETING_HEADER_CTA } from './headerCta';
 
 /**
  * Language scope describes the page's subject, never the visitor's
@@ -40,10 +41,7 @@ const START_CTA = {
 
 // Open signup (2026-11-09): the homepage's one action is the shared
 // claim-profile intent into /start (Tim, 2026-11-12 23:46Z: "Switch it").
-const HOME_CLAIM_CTA = {
-  href: APP_ROUTES.START,
-  label: 'Claim your profile',
-} as const;
+const HOME_CLAIM_CTA = HOME_MARKETING_HEADER_CTA;
 
 const CLAIM_PROFILE_CTA = {
   href: APP_ROUTES.SIGNUP,

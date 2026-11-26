@@ -64,6 +64,18 @@ describe('OV mode routing', () => {
     });
   });
 
+  it('redirects the Fleet address to Operations instead of a blank not-found', async () => {
+    const nextConfigModule = await import('../../../next.config.js');
+    const nextConfig = nextConfigModule.default ?? nextConfigModule;
+    const redirects = (await nextConfig.redirects()) as RouteRule[];
+
+    expect(redirects).toContainEqual({
+      source: '/app/ov/fleet',
+      destination: '/app/ov/operations',
+      permanent: false,
+    });
+  });
+
   it('aliases every OV path to the existing admin implementation tree', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;

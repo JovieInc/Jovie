@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
   DailyBucket,
@@ -39,10 +45,15 @@ function payload(
   };
 }
 
-function renderGrid() {
+function renderGrid(seed?: ShippingVelocityResponse) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
+  if (seed) {
+    queryClient.setQueryData(['hud', 'kpi', 'shipping-velocity', '30d'], seed, {
+      updatedAt: 1,
+    });
+  }
   return render(
     <QueryClientProvider client={queryClient}>
       <HudKpiSubgrid metrics={metrics} />
@@ -85,11 +96,55 @@ describe('HudKpiSubgrid', () => {
     const velocity = screen.getByTestId('hud-kpi-ship-velocity');
     await waitFor(() => expect(velocity).toHaveTextContent('21'));
     expect(velocity).toHaveTextContent('PRs merged, last 7d');
-    expect(velocity).toHaveTextContent('↑ 50.0% vs prior 7d');
+    expect(velocity).toHaveTextContent('Up 50.0% vs prior 7d');
     const mergeTime = screen.getByTestId('hud-kpi-merge-time');
     expect(mergeTime).toHaveTextContent('2.0h');
-    expect(mergeTime).toHaveTextContent('↓ 50.0% vs prior 7d');
+    expect(mergeTime).toHaveTextContent('Down 50.0% vs prior 7d');
     await expectNoA11yViolations(container);
+  });
+
+  it('preserves missing and measured-zero days in both the trend and UTC details', async () => {
+    const days = twoWeeks();
+    days[8] = { ...days[8]!, merged: 0, mergeP50Hours: null };
+    days[9] = { ...days[9]!, mergeP50Hours: 0 };
+    days[10] = { ...days[10]!, mergeP50Hours: 1.2345 };
+    stubFetch(async () => Response.json(payload(days, 'stale')));
+    const { container } = renderGrid();
+
+    const chart = await screen.findByRole('img', {
+      name: /Daily median hours to merge/i,
+    });
+    const path = chart.querySelector('path')?.getAttribute('d');
+    expect(path?.match(/M/g)).toHaveLength(2);
+    fireEvent.click(screen.getByText('Daily Shipping Data · Cached'));
+    expect(
+      screen.getByText(/GitHub.*UTC days.*2026-09-14 12:00 UTC/)
+    ).toBeInTheDocument();
+    const observations = screen.getByRole('list', {
+      name: 'Daily Shipping Observations',
+    });
+    const entries = within(observations).getAllByRole('listitem');
+    expect(entries).toHaveLength(14);
+    expect(entries[8]).toHaveTextContent(
+      '2026-09-09Merged PRs: 0Median merge time: Not measured'
+    );
+    expect(entries[9]).toHaveTextContent(
+      '2026-09-10Merged PRs: 3Median merge time: 0 h'
+    );
+    expect(entries[10]).toHaveTextContent('Median merge time: 1.2345 h');
+    await expectNoA11yViolations(container);
+  });
+
+  it('omits the percentage comparison when the prior week is incomplete', async () => {
+    stubFetch(async () => Response.json(payload(twoWeeks().slice(1))));
+    renderGrid();
+
+    const velocity = screen.getByTestId('hud-kpi-ship-velocity');
+    await waitFor(() => expect(velocity).toHaveTextContent('21'));
+    expect(velocity).toHaveTextContent('— vs prior 7d');
+    expect(screen.getByTestId('hud-kpi-merge-time')).toHaveTextContent(
+      '— vs prior 7d'
+    );
   });
 
   it('shows zero merges for a successful empty observation, axe-clean', async () => {
@@ -103,16 +158,70 @@ describe('HudKpiSubgrid', () => {
     await expectNoA11yViolations(container);
   });
 
+  it.each([
+    [401, 'Sign In', '/signin?redirect_url=%2Fapp%2Fov%2Fops'],
+    [403, 'Open Dashboard', '/app'],
+  ] as const)(
+    'hides cached shipping observations after a %s read and offers the right action',
+    async (status, action, href) => {
+      stubFetch(async () => new Response(null, { status }));
+      renderGrid(payload(twoWeeks()));
+      fireEvent.click(screen.getByText('Daily Shipping Data'));
+
+      expect(await screen.findByRole('link', { name: action })).toHaveAttribute(
+        'href',
+        href
+      );
+      expect(screen.queryByRole('img')).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('list', { name: 'Daily Shipping Observations' })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Retry' })
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId('hud-kpi-ship-velocity')).not.toHaveTextContent(
+        '21'
+      );
+    }
+  );
+
+  it('retries the request and retains an in-place disabled action until the read resolves', async () => {
+    const retry = Promise.withResolvers<Response>();
+    const request = stubFetch(async () =>
+      Response.json(payload([], 'unavailable'))
+    );
+    renderGrid();
+    fireEvent.click(screen.getByText('Daily Shipping Data'));
+    await screen.findByText(/Retry to load the daily observations/);
+    request.mockImplementationOnce(() => retry.promise);
+    const button = screen.getByRole('button', { name: 'Retry' });
+    fireEvent.click(button);
+    await waitFor(() => expect(button).toBeDisabled());
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Loading shipping data.'
+    );
+    expect(request).toHaveBeenCalledTimes(2);
+    retry.resolve(Response.json(payload([], 'empty')));
+    await screen.findByText('GitHub reported no daily observations.');
+    expect(
+      screen.queryByRole('button', { name: 'Retry' })
+    ).not.toBeInTheDocument();
+  });
+
   it('keeps dashes when the source is unavailable or the request fails', async () => {
     const fetchMock = stubFetch(async () =>
       Response.json(payload(twoWeeks(), 'unavailable'))
     );
     const first = renderGrid();
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    await waitFor(() =>
-      expect(screen.getByTestId('hud-kpi-ship-velocity')).toHaveTextContent(
-        '↑ 50.0%'
-      )
+    fireEvent.click(screen.getByText('Daily Shipping Data'));
+    await screen.findByText(/GitHub shipping data is unavailable/);
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('list', { name: 'Daily Shipping Observations' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('hud-kpi-ship-velocity')).not.toHaveTextContent(
+      '50.0%'
     );
     expect(screen.getByTestId('hud-kpi-ship-velocity')).not.toHaveTextContent(
       '21'

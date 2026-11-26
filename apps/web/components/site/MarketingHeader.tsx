@@ -44,16 +44,13 @@ export type MarketingHeaderCta = HeaderNavCta;
 // the same declared order; only the desktop shell adds visual treatment.
 // The Customers flyout renders between the wordmark and these links, so the
 // desktop order is Customers, Product, Pricing (Pen header, 2026-09-26).
-const MARKETING_GLASS_DESKTOP_LINKS: readonly MarketingHeaderNavLink[] = [
-  { href: APP_ROUTES.HOME, label: 'Jovie', treatment: 'wordmark' },
-  ...MARKETING_NAV_LINKS.map((link): MarketingHeaderNavLink => ({ ...link })),
-];
+// LogoLink is the home control. Do not add a separate "Jovie" text nav link
+// beside the mark on inner marketing pages (JOV-14240).
+const MARKETING_GLASS_DESKTOP_LINKS: readonly MarketingHeaderNavLink[] =
+  MARKETING_NAV_LINKS.map((link): MarketingHeaderNavLink => ({ ...link }));
 const MARKETING_GLASS_FLYOUT_MENUS: readonly HeaderFlyoutMenu[] = [
   MARKETING_CUSTOMERS_FLYOUT,
 ];
-// Icon-only pages drop the desktop wordmark; the logo reveals it on hover.
-const MARKETING_GLASS_DESKTOP_LINKS_ICON_ONLY: readonly MarketingHeaderNavLink[] =
-  MARKETING_GLASS_DESKTOP_LINKS.filter(link => link.treatment !== 'wordmark');
 const MARKETING_GLASS_MOBILE_LINKS: readonly MarketingHeaderNavLink[] =
   MARKETING_NAV_LINKS;
 const DEFAULT_MARKETING_CTA: MarketingHeaderCta =
@@ -90,6 +87,7 @@ export interface MarketingHeaderProps
      * says "Jovie").
      */
     readonly brand?: MarketingHeaderBrand;
+    readonly canonicalMarketing?: boolean;
     readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
     readonly logoVariant?: LogoVariant;
     readonly navLinks?: readonly MarketingHeaderNavLink[];
@@ -117,7 +115,6 @@ function resolveNavConfig(
   hasSimpleNav: boolean,
   centerNavDisabled: boolean,
   simpleNavLinks: readonly MarketingHeaderNavLink[],
-  iconOnly: boolean,
   chromeNav?: MarketingHeaderChromeNav
 ): ResolvedNavConfig {
   if (hasSimpleNav) {
@@ -132,18 +129,6 @@ function resolveNavConfig(
   }
   if (chromeNav) {
     const primary = plainLinks(chromeNav.primary);
-    const desktop: readonly MarketingHeaderNavLink[] = [
-      ...(iconOnly
-        ? []
-        : [
-            {
-              href: APP_ROUTES.HOME,
-              label: 'Jovie',
-              treatment: 'wordmark' as const,
-            },
-          ]),
-      ...primary,
-    ];
     return {
       flyoutMenus: [
         {
@@ -152,15 +137,13 @@ function resolveNavConfig(
         },
       ],
       mobileNavLinks: primary,
-      desktopNavLinks: desktop,
+      desktopNavLinks: primary,
     };
   }
   return {
     flyoutMenus: MARKETING_GLASS_FLYOUT_MENUS,
     mobileNavLinks: MARKETING_GLASS_MOBILE_LINKS,
-    desktopNavLinks: iconOnly
-      ? MARKETING_GLASS_DESKTOP_LINKS_ICON_ONLY
-      : MARKETING_GLASS_DESKTOP_LINKS,
+    desktopNavLinks: MARKETING_GLASS_DESKTOP_LINKS,
   };
 }
 
@@ -172,6 +155,7 @@ function plainLinks(
 
 export function MarketingHeader({
   brand,
+  canonicalMarketing = false,
   logoSize = 'xs',
   logoVariant = 'word',
   navLinks,
@@ -194,8 +178,9 @@ export function MarketingHeader({
   const isMinimal = variant === 'minimal';
   const isHomepage = variant === 'homepage';
   const isArtistProfiles =
-    pathname === APP_ROUTES.ARTIST_PROFILES ||
-    pathname === APP_ROUTES.ARTIST_PROFILE_LEGACY;
+    !canonicalMarketing &&
+    (pathname === APP_ROUTES.ARTIST_PROFILES ||
+      pathname === APP_ROUTES.ARTIST_PROFILE_LEGACY);
   const usesHomepageChrome = isHomepage;
   const presentation = isMinimal
     ? 'default'
@@ -233,11 +218,13 @@ export function MarketingHeader({
     hasSimpleNav,
     centerNavDisabled,
     resolvedNavLinks,
-    iconOnly || leftWordmark,
     chromeNav
   );
   const resolvedPrimaryCta =
-    primaryCta ?? resolveMarketingHeaderPrimaryCta(pathname);
+    primaryCta ??
+    (canonicalMarketing
+      ? HOME_MARKETING_HEADER_CTA
+      : resolveMarketingHeaderPrimaryCta(pathname));
   // leftWordmark (the homepage) renders the mark with its reveal wordmark; the
   // homepage stylesheet keeps that wordmark shown beside the 28px mark.
   const resolvedLogoVariant = leftWordmark
@@ -257,6 +244,7 @@ export function MarketingHeader({
       logoMarkSize='marketing'
       logoReveal={resolvedLogoVariant === 'icon'}
       authMode='public-static'
+      marketingPathname={canonicalMarketing ? pathname : undefined}
       hideNav={isMinimal}
       hideDesktopNav={hideCenterNav}
       minimalAuth={isMinimal}

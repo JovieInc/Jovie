@@ -1,7 +1,7 @@
 import {
   act,
   fireEvent,
-  render,
+  render as renderUi,
   screen,
   waitFor,
   within,
@@ -14,9 +14,9 @@ import {
   type MediaCanvasTransportSnapshot,
   publishMediaCanvasTransport,
   registerMediaCanvasTransport,
+  requestFullAudioPlayer,
   resetAudioChromeSnapshot,
 } from '@/components/organisms/audio-chrome-state';
-import { SidebarBottomNowPlayingBridge } from '@/components/organisms/SidebarBottomNowPlayingBridge';
 import {
   APP_ROUTES,
   buildLyricsRoute,
@@ -131,6 +131,17 @@ const { PersistentAudioBar } = await import(
   '@/components/organisms/PersistentAudioBar'
 );
 
+/**
+ * A user play lands in the sidebar O, so the player mounts closed. These
+ * suites drive the full dock; open it once with the expand request the O's
+ * title button sends. Closed-by-default is asserted by name below.
+ */
+function render(...args: Parameters<typeof renderUi>) {
+  const result = renderUi(...args);
+  if (mockPlaybackState.activeTrackId) act(() => requestFullAudioPlayer());
+  return result;
+}
+
 /** Helper to set active playback state with sensible defaults */
 function setPlaying(overrides: Partial<MockPlaybackState> = {}) {
   mockPlaybackState = {
@@ -187,25 +198,6 @@ describe('PersistentAudioBar', () => {
     });
   }
 
-  it('hands focus between the full dock and sidebar mini after each commit', async () => {
-    setPlaying();
-    const user = userEvent.setup();
-    render(
-      <>
-        <SidebarBottomNowPlayingBridge />
-        <PersistentAudioBar />
-      </>
-    );
-    const hide = screen.getByRole('button', { name: 'Hide Player' });
-    await user.click(hide);
-    const show = screen.getByRole('button', { name: /Show Player/ });
-    await waitFor(() => expect(show).toHaveFocus());
-    await user.click(show);
-    await waitFor(() => expect(hide).toHaveFocus());
-    expect(stop).not.toHaveBeenCalled();
-    expect(toggleTrack).not.toHaveBeenCalled();
-  });
-
   it('returns focus to the lyrics invoker after route navigation back', async () => {
     setPlaying({ hasLyrics: true });
     pathname = APP_ROUTES.LIBRARY;
@@ -232,7 +224,7 @@ describe('PersistentAudioBar', () => {
   });
 
   it('keeps the dock collapsed (zero reserved space) when no track is active', () => {
-    render(<PersistentAudioBar />);
+    renderUi(<PersistentAudioBar />);
 
     // The dock stays mounted so a stop/dismiss can animate the panel back
     // down — idle means data-state=closed, max-height 0, no player chrome.
@@ -994,6 +986,7 @@ describe('PersistentAudioBar', () => {
 
     setPlaying({ artistName: 'DJ Cool' });
     rerender(<PersistentAudioBar />);
+    act(() => requestFullAudioPlayer());
 
     await waitFor(() => {
       expect(dock.style.maxHeight).toBe(

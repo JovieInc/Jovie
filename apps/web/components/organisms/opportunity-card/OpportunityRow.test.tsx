@@ -22,6 +22,15 @@ describe('OpportunityRow', () => {
     ).toBeInTheDocument();
   });
 
+  it('fires dismiss with the row id from the dismiss button', () => {
+    const onDismiss = vi.fn();
+    render(<OpportunityRow {...baseProps} onDismiss={onDismiss} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Dismiss Opportunity' })
+    );
+    expect(onDismiss).toHaveBeenCalledWith('row-1');
+  });
+
   it('renders a status dot', () => {
     render(<OpportunityRow {...baseProps} />);
     const dot = document.querySelector('[aria-hidden="true"]');

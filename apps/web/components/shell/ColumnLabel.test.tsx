@@ -39,7 +39,7 @@ describe('ColumnLabel', () => {
     expect(onSort).toHaveBeenCalledWith('title');
   });
 
-  it('paints the active column cyan when sortBy matches', () => {
+  it('paints the active column with the accent tone when sortBy matches', () => {
     render(
       <ColumnLabel<Field>
         field='title'
@@ -50,7 +50,7 @@ describe('ColumnLabel', () => {
         onSort={() => undefined}
       />
     );
-    expect(screen.getByRole('button').className).toContain('cyan-300');
+    expect(screen.getByRole('button').className).toContain('text-accent-text');
   });
 
   it('keeps inactive columns muted', () => {
@@ -64,7 +64,9 @@ describe('ColumnLabel', () => {
         onSort={() => undefined}
       />
     );
-    expect(screen.getByRole('button').className).not.toContain('cyan-300');
+    expect(screen.getByRole('button').className).not.toContain(
+      'text-accent-text'
+    );
   });
 
   it('keeps the indicator muted when sortBy equals defaultField', () => {
@@ -79,6 +81,8 @@ describe('ColumnLabel', () => {
         defaultField='index'
       />
     );
-    expect(screen.getByRole('button').className).not.toContain('cyan-300');
+    expect(screen.getByRole('button').className).not.toContain(
+      'text-accent-text'
+    );
   });
 });

@@ -13,6 +13,7 @@
 
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { GITHUB_API } from '../../packages/api-client/github.ts';
 import {
   ADMISSION_BLOCKING_LABELS,
   MACHINE_BLOCK_LABELS,
@@ -20,6 +21,7 @@ import {
 import {
   classifyAutoReadyPromotion,
   hasControlledProofMarker,
+  UNDRAFT_HOLD_LABELS,
 } from './auto-ready-provenance.mjs';
 import { classifyQueueCheckBlockers } from './pr-check-failures.mjs';
 import { WRITER_PROMOTION_HOLD_LABELS } from './writer-owned-pr-promotion.mjs';
@@ -36,6 +38,8 @@ const MACHINE_BLOCKS = new Set(MACHINE_BLOCK_LABELS);
 export const GREEN_SOURCE_HOLD_LABELS = Object.freeze([
   ...new Set([
     ...WRITER_PROMOTION_HOLD_LABELS,
+    // JOV-13139: outside-review / do-not-ready pins.
+    ...UNDRAFT_HOLD_LABELS,
     ...ADMISSION_BLOCKING_LABELS.filter(label => !MACHINE_BLOCKS.has(label)),
   ]),
 ]);
@@ -51,6 +55,60 @@ function exactSha(value) {
   return typeof value === 'string' && SHA_RE.test(value.toLowerCase())
     ? value.toLowerCase()
     : '';
+}
+
+/** @param {{state?: any, suites?: any, repository?: string, prNumber?: number}} input */
+export function withVerifiedDraftPush({
+  state,
+  suites,
+  repository,
+  prNumber,
+} = {}) {
+  if (state?.parkedDraft !== true) return state;
+  const head = exactSha(state.head);
+  const parkedAt = Date.parse(state.parkedAt ?? '');
+  if (!head || !state.branch || !Number.isFinite(parkedAt)) return state;
+  // A bounded, complete page only. Later CI suites retain the original
+  // before/after pair, so only the earliest matching creation can end a park.
+  const rows = suites?.check_suites;
+  if (
+    !Array.isArray(rows) ||
+    !Number.isInteger(suites.total_count) ||
+    suites.total_count !== rows.length
+  )
+    return state;
+  const repoUrl = `${GITHUB_API}/repos/${repository}`;
+  const matching = rows.filter(
+    row =>
+      row?.head_sha === head &&
+      row.head_branch === state.branch &&
+      row.repository?.full_name === repository &&
+      Array.isArray(row.pull_requests) &&
+      row.pull_requests.some(
+        pr =>
+          pr?.number === Number(prNumber) &&
+          pr.head?.sha === head &&
+          pr.head.ref === state.branch &&
+          pr.head.repo?.url === repoUrl
+      )
+  );
+  if (
+    !matching.length ||
+    matching.some(
+      row =>
+        !exactSha(row.before) ||
+        exactSha(row.before) === head ||
+        row.after !== head ||
+        typeof row.created_at !== 'string' ||
+        !Number.isFinite(Date.parse(row.created_at))
+    )
+  )
+    return state;
+  const pushedAt = Math.min(...matching.map(row => Date.parse(row.created_at)));
+  return {
+    ...state,
+    parkedDraft: !(pushedAt > parkedAt && pushedAt <= Date.now()),
+  };
 }
 
 function labelName(label) {
@@ -100,6 +158,14 @@ export function classifyGreenSourceDraft(input = {}) {
   }
   if (hasGreenSourceHold(input.labels)) {
     return { eligible: false, reason: 'held' };
+  }
+  // JOV-13139: an unresolved must-fix review is a deterministic hold. GitHub's
+  // reviewDecision is structured state, not judgment; a later approving
+  // review (or an opened review resolving the request) clears it.
+  if (
+    String(input.reviewDecision ?? '').toUpperCase() === 'CHANGES_REQUESTED'
+  ) {
+    return { eligible: false, reason: 'review:changes-requested' };
   }
 
   const state = String(input.state ?? 'OPEN').toUpperCase();
@@ -259,7 +325,7 @@ function main(argv) {
     if (out.length > 0) process.stdout.write(`${out.join('\n')}\n`);
     return 0;
   }
-  if (cmd === 'classify') {
+  if (cmd === 'classify' || cmd === 'push-evidence') {
     const raw = readStdin().trim();
     if (!raw) {
       process.stdout.write(
@@ -277,12 +343,12 @@ function main(argv) {
       return 0;
     }
     process.stdout.write(
-      `${JSON.stringify(classifyGreenSourceDraft(parsed))}\n`
+      `${JSON.stringify(cmd === 'push-evidence' ? withVerifiedDraftPush(parsed) : classifyGreenSourceDraft(parsed))}\n`
     );
     return 0;
   }
   console.error(
-    'Usage: auto-ready-green-drafts.mjs <classify|cohort|hold-re|protected>'
+    'Usage: auto-ready-green-drafts.mjs <classify|push-evidence|cohort|hold-re|protected>'
   );
   return 2;
 }

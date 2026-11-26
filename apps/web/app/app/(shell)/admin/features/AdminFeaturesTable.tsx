@@ -368,7 +368,7 @@ export function AdminFeaturesTable({
       <AdminTableShell testId='admin-features-table' toolbar={toolbar}>
         {() => (
           <AdminDataTable
-            rowMode='controls'
+            rowMode='dense'
             data={rows}
             columns={columns}
             enableVirtualization={false}

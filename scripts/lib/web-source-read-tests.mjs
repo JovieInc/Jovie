@@ -125,8 +125,15 @@ export function keyMatches(key, file) {
     return candidates.some(candidate => pattern.test(candidate));
   }
   return candidates.some(candidate => {
-    if (!key.includes('/'))
+    if (!key.includes('/')) {
+      // Bare filenames and route groups match apps/web paths and repo-root
+      // files (package.json, turbo.json). They must not match every nested
+      // basename outside apps/web (e.g. scripts/*/baseline.json), or
+      // swift-arch ratchets falsely select web disk-read tests (JOV-10443).
+      const isRepoRootFile = !file.includes('/');
+      if (!file.startsWith(WEB) && !isRepoRootFile) return false;
       return basename(candidate) === key || candidate.split('/').includes(key);
+    }
     const padded = `/${candidate}`;
     const at = padded.indexOf(`/${key}`);
     if (at === -1) return false;
@@ -178,8 +185,9 @@ export function selectSourceReadTests(changed, options = {}) {
 
 /**
  * test:fast allows 5s locally and 12s in CI. This guard is the publication
- * hook, so it uses the CI budget. A loaded hook timed out production-config
- * reads at 5s.
+ * hook, so it uses a CI-or-heavier budget. A loaded hook timed out
+ * production-config reads at 5s; git-heavy iOS TestFlight selection timed
+ * out at 12s when preflight ran this suite alongside script-contracts.
  * @param {readonly string[]} selected web-relative test paths
  */
 export function sourceReadRunnerArgs(selected) {
@@ -193,7 +201,7 @@ export function sourceReadRunnerArgs(selected) {
     '--maxWorkers=4',
     '--fileParallelism',
     '--retry=1',
-    '--testTimeout=12000',
+    '--testTimeout=30000',
     ...selected,
   ];
 }

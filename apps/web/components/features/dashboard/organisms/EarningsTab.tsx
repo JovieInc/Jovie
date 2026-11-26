@@ -55,7 +55,7 @@ const tipperColumnHelper = createColumnHelper<TipperRow>();
 
 /**
  * Tippers on the shared people table: one PersonCell (name with email as its
- * quiet secondary fact) in the dense 32px row, then right-aligned tabular
+ * quiet secondary fact) in the compact 40px row, then right-aligned tabular
  * amount and date.
  */
 const TIPPER_COLUMNS = [

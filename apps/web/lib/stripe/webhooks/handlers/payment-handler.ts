@@ -1,24 +1,4 @@
-/**
- * Payment/Invoice Handler
- *
- * Handles Stripe invoice webhook events for payment processing:
- * - invoice.payment_succeeded: Subscription payment collected successfully
- * - invoice.payment_failed: Subscription payment failed
- *
- * Processing flow:
- * 1. Extract subscription ID from invoice
- * 2. Retrieve subscription from Stripe API
- * 3. Extract user ID from subscription metadata (with fallback to customer lookup)
- * 4. Update user billing status based on payment result
- * 5. Invalidate billing cache
- *
- * Payment Failure Handling:
- * The handler downgrades users when the subscription enters any failure status:
- * - past_due: Payment is late but subscription is still technically active
- * - unpaid: Multiple payment attempts failed
- * - incomplete: Initial payment failed (new subscription)
- * - incomplete_expired: Initial payment failed and grace period expired
- */
+/** Stripe invoice.payment_succeeded / invoice.payment_failed webhook handler. */
 
 import type Stripe from 'stripe';
 
@@ -40,6 +20,10 @@ import { logger } from '@/lib/utils/logger';
 
 import { BaseSubscriptionHandler } from '../base-handler';
 import {
+  canCompleteIdempotentPostEffects,
+  canRecordInvoiceKeyedCommission,
+} from '../post-activation';
+import {
   isStripeReconciliationRequiredError,
   StripeReconciliationRequiredError,
 } from '../reconciliation';
@@ -54,10 +38,6 @@ import {
   invalidateBillingCache,
 } from '../utils';
 
-/**
- * Subscription statuses that indicate payment failure.
- * When a subscription enters any of these states, we should revoke pro access.
- */
 const FAILURE_STATUSES = [
   'past_due',
   'unpaid',
@@ -67,34 +47,7 @@ const FAILURE_STATUSES = [
 
 type FailureStatus = (typeof FAILURE_STATUSES)[number];
 
-/**
- * Handler for invoice payment events.
- *
- * This handler manages payment lifecycle:
- *
- * **Payment Succeeded**: When a subscription invoice is paid
- * - Confirms/restores pro access for the user
- * - Useful for recovering from past_due states
- *
- * **Payment Failed**: When a subscription invoice payment fails
- * - Logs the failure for monitoring
- * - Downgrades user if subscription enters failure status
- * - Handles multiple failure statuses (past_due, unpaid, incomplete, incomplete_expired)
- *
- * @example
- * ```ts
- * const handler = new PaymentHandler();
- * const result = await handler.handle({
- *   event: stripeEvent,
- *   stripeEventId: 'evt_123',
- *   stripeEventTimestamp: new Date()
- * });
- * ```
- */
 export class PaymentHandler extends BaseSubscriptionHandler {
-  /**
-   * Event types handled by this handler.
-   */
   readonly eventTypes: readonly SupportedEventType[] = [
     'invoice.payment_succeeded',
     'invoice.payment_failed',
@@ -188,6 +141,7 @@ export class PaymentHandler extends BaseSubscriptionHandler {
       amountPaid: invoice.amount_paid,
       currency: invoice.currency,
       priceId,
+      invoiceId: invoice.id,
     }).catch(error => {
       logger.warn('Failed to send payment recovery email', {
         userId,
@@ -263,33 +217,35 @@ export class PaymentHandler extends BaseSubscriptionHandler {
         throw new Error('Billing update omitted canonical app user ID');
       }
 
-      // Durable revenue event emitted from the verified webhook, not the
-      // buyer's return page. `stripe:${stripeEventId}` deduplicates Stripe
-      // retries; a failed write throws so the webhook stays unprocessed and
-      // Stripe redelivers instead of leaving a paid transition unmeasured.
-      const paymentDelivery = await trackServerEvent(
-        invoice.billing_reason === 'subscription_cycle'
-          ? 'subscription_renewed'
-          : 'payment_succeeded',
-        {
-          stripeEventId,
-          billingReason: invoice.billing_reason ?? undefined,
-        },
-        undefined,
-        {
-          eventIdentity: `stripe:${stripeEventId}`,
-          occurredAt: stripeEventTimestamp,
-        }
-      );
-      if (!paymentDelivery.ok) {
-        throw new Error(
-          `Payment analytics delivery failed: ${paymentDelivery.error}`
+      await invalidateBillingCache(result.appUserId);
+
+      if (canCompleteIdempotentPostEffects(result)) {
+        this.sendRecoveryEmailIfNeeded(invoice, subscription, result.appUserId);
+
+        const paymentDelivery = await trackServerEvent(
+          invoice.billing_reason === 'subscription_cycle'
+            ? 'subscription_renewed'
+            : 'payment_succeeded',
+          {
+            stripeEventId,
+            billingReason: invoice.billing_reason ?? undefined,
+          },
+          undefined,
+          {
+            eventIdentity: `stripe:${stripeEventId}`,
+            occurredAt: stripeEventTimestamp,
+          }
         );
+        if (!paymentDelivery.ok) {
+          throw new Error(
+            `Payment analytics delivery failed: ${paymentDelivery.error}`
+          );
+        }
       }
 
-      await invalidateBillingCache(result.appUserId);
-      await this.tryRecordReferralCommission(result.appUserId, invoice);
-      this.sendRecoveryEmailIfNeeded(invoice, subscription, result.appUserId);
+      if (canRecordInvoiceKeyedCommission(result)) {
+        await this.tryRecordReferralCommission(result.appUserId, invoice);
+      }
 
       return result;
     } catch (error) {
@@ -385,13 +341,14 @@ export class PaymentHandler extends BaseSubscriptionHandler {
       };
     }
 
-    // Subscription is in failure status - downgrade the user
     const customerId = getCustomerId(subscription.customer);
     const result = await updateUserBillingStatus({
       clerkUserId: userId,
       isPro: false,
       stripeCustomerId: customerId ?? undefined,
       stripeSubscriptionId: null,
+      expectedSubscriptionId: subscription.id,
+      stripePriceId: null,
       stripeEventId,
       stripeEventTimestamp,
       eventType: 'payment_failed',
@@ -423,8 +380,7 @@ export class PaymentHandler extends BaseSubscriptionHandler {
     }
     await invalidateBillingCache(result.appUserId);
 
-    // Send dunning email (fire-and-forget, don't block webhook response)
-    if (shouldSendDunningEmail(invoice.attempt_count ?? 1)) {
+    if (!result.skipped && shouldSendDunningEmail(invoice.attempt_count ?? 1)) {
       const priceId = subscription.items.data[0]?.price?.id;
       sendPaymentFailedEmail({
         userId: result.appUserId,

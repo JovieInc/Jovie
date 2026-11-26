@@ -380,6 +380,14 @@ export {
   selectCreatorDocumentRevisionSchema,
   selectCreatorDocumentSchema,
 } from './creator-documents';
+// Dashboard views (agent-published shareable views)
+export {
+  type DashboardViewRow,
+  type DashboardViewVersionRow,
+  dashboardViews,
+  dashboardViewVersions,
+  type NewDashboardViewRow,
+} from './dashboard-views';
 export {
   dogfooderBindings,
   dogfooders,

@@ -69,6 +69,7 @@ jobs:
             scripts/lib/source-admission-policy.mjs
             scripts/pr-fleet-rules.mjs
             scripts/lib/wins-ledger.mjs
+            scripts/lib/wins-measure/classify.mjs
             packages/api-client
             scripts/lib/product-lane-classifier.mjs
             scripts/lib/merge-group-member-policy.mjs

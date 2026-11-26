@@ -9,15 +9,10 @@ import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { TableMetaProvider } from '@/contexts/TableMetaContext';
 import { AudiencePanelProvider } from '@/features/dashboard/organisms/AudiencePanelContext';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type { AudienceMember } from '@/types';
 import { DashboardAudienceTableUnified } from './DashboardAudienceTableUnified';
 import { DEFAULT_AUDIENCE_FILTERS } from './types';
-
-// Analytics has its own query contract; this test exercises table/export binding.
-vi.mock(
-  '@/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard',
-  () => ({ AiCrawlerIntelligenceCard: () => null })
-);
 
 function renderWithProviders(ui: ReactElement) {
   const queryClient = new QueryClient({
@@ -94,12 +89,13 @@ describe('DashboardAudienceTableUnified', () => {
       />
     );
 
-    const card = document.querySelector('[data-empty-state-card]');
-    expect(card).not.toBeNull();
-    expect(card).toHaveClass('rounded-md');
-    expect(card).toHaveClass('border-subtle');
-    expect(card).toHaveClass('bg-surface-0');
-    expect(card).toHaveClass('text-left');
+    expect(document.querySelector('[data-empty-state-card]')).toBeNull();
+    const content = document.querySelector(
+      '[data-empty-state-content="workspace"]'
+    );
+    expect(content).not.toBeNull();
+    expect(content).toHaveClass('text-left');
+    expect(content).not.toHaveClass('border-subtle', 'bg-surface-0');
   });
 
   it('renders the empty members view', () => {
@@ -149,7 +145,59 @@ describe('DashboardAudienceTableUnified', () => {
     ).toBeNull();
   });
 
-  it('renders members on the 32px dense people row with a face', () => {
+  it('has no accessibility violations in the empty and populated views', async () => {
+    const props = {
+      mode: 'members',
+      view: 'all',
+      sort: 'lastSeen',
+      direction: 'desc',
+      onSortChange: () => undefined,
+      onViewChange: () => undefined,
+      onFiltersChange: () => undefined,
+      filters: DEFAULT_AUDIENCE_FILTERS,
+      subscriberCount: 0,
+    } as const;
+    const empty = renderWithProviders(
+      <DashboardAudienceTableUnified {...props} rows={[]} total={0} />
+    );
+    await expectNoA11yViolations(empty.container);
+    empty.unmount();
+    const populated = renderWithProviders(
+      <DashboardAudienceTableUnified
+        {...props}
+        rows={[
+          {
+            id: 'm-a11y',
+            type: 'email',
+            displayName: 'ليلى الحسن',
+            locationLabel: '',
+            geoCity: null,
+            geoCountry: null,
+            visits: 1,
+            engagementScore: 50,
+            intentLevel: 'medium',
+            latestActions: [],
+            referrerHistory: [],
+            utmParams: {},
+            email: 'layla@example.com',
+            emailVisibleToArtist: true,
+            phone: null,
+            spotifyConnected: false,
+            purchaseCount: 0,
+            tipAmountTotalCents: 0,
+            tipCount: 0,
+            tags: [],
+            deviceType: null,
+            lastSeenAt: null,
+          },
+        ]}
+        total={1}
+      />
+    );
+    await expectNoA11yViolations(populated.container);
+  });
+
+  it('renders members on the 40px compact people row with a face', () => {
     const member: AudienceMember = {
       id: 'm1',
       type: 'email',

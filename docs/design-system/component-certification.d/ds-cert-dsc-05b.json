@@ -1,0 +1,60 @@
+{
+  "gates": {
+    "apps/web/components/features/release/SmartLinkAudioPreview.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/release-sidebar/ReleaseSidebarSections.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/shell/DspAvatarStack.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/site/MarketingTerminalCta.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/release/SmartLinkAudioPreview.tsx": {
+      "loading": "Loading comes only from the shared useTrackAudioPlayer singleton after a real playback attempt, which a story cannot start without audio; the unit test drives it through a mocked hook and checks the disabled Loading preview button.",
+      "error": "Error appears only after the shared player reports a failed playback; the unit test drives it through a mocked hook and asserts the Unavailable label.",
+      "offline": "The component never fetches; the preview URL is handed to the shared audio element and failures surface through the same error state."
+    },
+    "apps/web/components/organisms/release-sidebar/ReleaseSidebarSections.tsx": {
+      "loading": "The header renders an already-loaded release view model; the loading words matched in the source belong to the preview toggle's aria label and no skeleton or pending data exists here.",
+      "error": "The header has no error branch; failed previews are handled by the shared player, not by this component.",
+      "offline": "The header never fetches; artwork upload and revert callbacks are owned by the caller."
+    },
+    "apps/web/components/shell/DspAvatarStack.tsx": {
+      "offline": "The stack renders caller-supplied DSP status and never fetches; the detector matched the word pending in a status label.",
+      "permission-denied": "The component has no gated or role-based state; the detector matched the word plan or role in doc text and nothing in the render path branches on permissions."
+    },
+    "apps/web/components/site/MarketingTerminalCta.tsx": {
+      "empty": "The CTA renders caller-supplied copy and links and owns no collection; the detector matched the items-center and list-like class words. A missing body is the Partial story.",
+      "permission-denied": "Nothing in the render path branches on role or plan; the detector matched the word plan in copy props."
+    }
+  }
+}

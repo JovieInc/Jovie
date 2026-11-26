@@ -1,5 +1,4 @@
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 
@@ -10,7 +9,7 @@ import { StandaloneProductPage } from '@/components/organisms/StandaloneProductP
 export default function BillingCancelLoading() {
   return (
     <StandaloneProductPage width='sm' centered>
-      <ContentSurfaceCard className='overflow-hidden'>
+      <div className='overflow-hidden'>
         <ContentSectionHeaderSkeleton
           titleWidth='w-44'
           descriptionWidth='w-80'
@@ -45,7 +44,7 @@ export default function BillingCancelLoading() {
             />
           </div>
         </div>
-      </ContentSurfaceCard>
+      </div>
     </StandaloneProductPage>
   );
 }

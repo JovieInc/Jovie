@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { APP_ROUTES } from '@/constants/routes';
+import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import {
   loadAppShellRouteContext,
   requireAppShellDashboardUserId,
@@ -11,7 +12,7 @@ import { loadPresenceRemovalPrincipal } from '../profiles/removal-principal.serv
 export const runtime = 'nodejs';
 
 export const metadata: Metadata = {
-  title: 'Profiles',
+  title: 'Identity',
   description:
     'Manage who you are and how you are represented across public surfaces',
 };
@@ -20,8 +21,8 @@ export default async function PresencePage() {
   const routeContext = await loadAppShellRouteContext({
     route: APP_ROUTES.PRESENCE,
     authFailure: 'notFound',
-    dashboardErrorLogMessage: 'Dashboard data load failed on Profiles page',
-    dashboardErrorMessage: 'Failed to load Profiles. Please refresh the page.',
+    dashboardErrorLogMessage: 'Dashboard data load failed on Identity page',
+    dashboardErrorMessage: 'Failed to load Identity. Please refresh the page.',
   });
   if (!routeContext.ok) return routeContext.error;
 
@@ -45,11 +46,17 @@ export default async function PresencePage() {
   const removalPrincipal = await loadPresenceRemovalPrincipal(
     routeContext.userId
   );
+  const profile = routeContext.dashboardData.selectedProfile;
   return (
     <ProfilesWorkspace
       data={data}
       scope={scope}
       removalPrincipal={removalPrincipal}
+      editableArtist={
+        profile?.id === identityId
+          ? convertDrizzleCreatorProfileToArtist(profile)
+          : undefined
+      }
     />
   );
 }

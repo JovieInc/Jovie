@@ -21,6 +21,7 @@ import {
   normalizeButtonVariantContract,
   resolveButtonPenMaster,
 } from './button-contract';
+import { warnDeprecatedButtonValue } from './button-deprecations';
 import { Spinner } from './spinner';
 
 const BUTTON_VARIANT_CLASSES: Record<ButtonVariant, string> = {
@@ -33,6 +34,13 @@ const BUTTON_VARIANT_CLASSES: Record<ButtonVariant, string> = {
   ghost:
     'border border-transparent bg-transparent text-tertiary-token shadow-none hover:bg-interactive-hover hover:text-primary-token active:bg-interactive-active',
   link: 'h-auto border-0 bg-transparent p-0 text-primary underline-offset-4 shadow-none hover:underline',
+  // Glass family: shared frosted material (IconButton projects through these).
+  frosted:
+    'border border-subtle bg-icon-button-frosted text-primary-token shadow-none backdrop-blur-sm hover:bg-icon-button-frosted-hover',
+  'frosted-ghost':
+    'border border-transparent bg-transparent text-tertiary-token shadow-none backdrop-blur-sm hover:bg-interactive-hover hover:text-primary-token active:bg-interactive-active',
+  'frosted-outline':
+    'border border-subtle bg-transparent text-secondary-token shadow-none backdrop-blur-sm hover:bg-icon-button-frosted hover:text-primary-token',
 };
 
 // 44px minimum hit target for icon buttons below 44px (WCAG 2.5.5 / Apple HIG),
@@ -61,7 +69,7 @@ const BUTTON_SIZE_CLASSES: Record<ButtonSize, string> = {
 };
 
 const buttonVariants = cva(
-  'relative inline-flex items-center justify-center rounded-full text-app [font-weight:var(--font-weight-medium)] tracking-normal transition-[background-color,border-color,color,box-shadow,opacity,transform] duration-subtle ease-subtle motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page aria-disabled:pointer-events-none aria-disabled:opacity-[var(--state-disabled-opacity)] aria-disabled:text-(--color-text-disabled-token)',
+  'relative inline-flex items-center justify-center rounded-full text-app [font-weight:var(--font-weight-medium)] tracking-normal press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page aria-disabled:pointer-events-none aria-disabled:opacity-[var(--state-disabled-opacity)] aria-disabled:text-(--color-text-disabled-token)',
   {
     variants: {
       variant: {
@@ -103,35 +111,13 @@ const DESTRUCTIVE_CLASSES: Record<ButtonVariant, string> = {
   tertiary: 'text-error-text hover:bg-error-subtle hover:text-error-text',
   ghost: 'text-error-text hover:bg-error-subtle hover:text-error-text',
   link: 'text-error-text hover:text-error-text',
+  frosted:
+    'border-error-subtle bg-error-subtle text-error-text hover:bg-error-subtle hover:text-error-text',
+  'frosted-ghost':
+    'text-error-text hover:bg-error-subtle hover:text-error-text',
+  'frosted-outline':
+    'border-error-subtle text-error-text hover:bg-error-subtle hover:text-error-text',
 };
-
-const warnedDeprecatedValues = new Set<string>();
-
-function isProductionEnvironment(): boolean {
-  return (
-    (
-      globalThis as {
-        readonly process?: {
-          readonly env?: { readonly NODE_ENV?: string };
-        };
-      }
-    ).process?.env?.NODE_ENV === 'production'
-  );
-}
-
-function warnDeprecatedButtonValue(
-  kind: 'variant' | 'size',
-  value: string,
-  replacement: string
-): void {
-  if (isProductionEnvironment()) return;
-  const key = `${kind}:${value}`;
-  if (warnedDeprecatedValues.has(key)) return;
-  warnedDeprecatedValues.add(key);
-  console.warn(
-    `[Button] ${kind}="${value}" is deprecated. Use ${kind}="${replacement}" instead.`
-  );
-}
 
 function normalizeButtonVariant({
   variant,
@@ -165,9 +151,9 @@ export interface ButtonProps
   readonly pendingPresentation?: 'spinner' | 'morph';
   readonly actionState?: ButtonActionState;
   readonly stateLabels?: Partial<ButtonStateLabels>;
-  /** Enables subtle tactile compression for actions without another immediate cue. */
+  /** @deprecated No-op. Every Button presses by default through the shared `press` utility. */
   readonly pressFeedback?: boolean;
-  /** @deprecated Prefer leaving pressFeedback unset. */
+  /** Opt-out for non-interactive display: no press. Disabled and busy never press either. */
   readonly static?: boolean;
   readonly destructive?: boolean;
 }
@@ -231,7 +217,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       pendingPresentation = 'spinner',
       actionState = 'idle',
       stateLabels,
-      pressFeedback = false,
+      pressFeedback: _pressFeedback,
       static: isStatic = false,
       destructive = false,
       disabled,
@@ -244,7 +230,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const Comp = asChild ? Slot : 'button';
     const isDisabled = disabled || loading;
-    const hasPressFeedback = pressFeedback && !isStatic && !isDisabled;
+    const hasPressFeedback = !isStatic && !isDisabled;
     const dataState = getDataState(loading, isDisabled);
     const normalizedVariant = normalizeButtonVariant({
       variant,
@@ -307,7 +293,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         normalizedVariant.destructive &&
           DESTRUCTIVE_CLASSES[normalizedVariant.variant],
         className,
-        hasPressFeedback && 'active:scale-press motion-reduce:active:scale-100',
         isDisabled && 'pointer-events-none'
       ),
       'aria-disabled': isDisabled ? true : ariaDisabled,
@@ -383,9 +368,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   }
 );
 Button.displayName = 'Button';
-
-export type { ButtonSize, ButtonVariant };
-export { BUTTON_SIZE_NAMES, BUTTON_VARIANT_NAMES, Button, buttonVariants };
 
 interface ButtonMorphProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -680,3 +662,6 @@ const ButtonMorph = React.forwardRef<HTMLButtonElement, ButtonMorphProps>(
     );
   }
 );
+
+export type { ButtonSize, ButtonVariant };
+export { BUTTON_SIZE_NAMES, BUTTON_VARIANT_NAMES, Button, buttonVariants };

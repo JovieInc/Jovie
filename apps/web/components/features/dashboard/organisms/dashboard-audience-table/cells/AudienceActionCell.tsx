@@ -2,9 +2,9 @@
 
 // @coverage-via apps/web/tests/unit/dashboard/audience-table/AudienceActionCell.test.tsx
 
-import { memo, useCallback } from 'react';
+import { IconButton, SimpleTooltip } from '@jovie/ui';
+import { type MouseEvent, memo, useCallback } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { TableIconButton } from '@/components/organisms/table/atoms/TableIconButton';
 import type { AudienceMember } from '@/types';
 import { useAudienceTableStableContext } from '../AudienceTableContext';
 import {
@@ -22,12 +22,17 @@ export const AudienceActionCell = memo(function AudienceActionCell({
   const { onSendNotification } = useAudienceTableStableContext();
   const canMessage = canMessageAudienceMember(member);
 
-  const handleClick = useCallback(() => {
-    if (!canMessage) {
-      return;
-    }
-    onSendNotification(member);
-  }, [member, onSendNotification, canMessage]);
+  const handleClick = useCallback(
+    (event: MouseEvent) => {
+      // A row action never also activates the row.
+      event.stopPropagation();
+      if (!canMessage) {
+        return;
+      }
+      onSendNotification(member);
+    },
+    [member, onSendNotification, canMessage]
+  );
 
   if (!canMessage) {
     return (
@@ -39,13 +44,17 @@ export const AudienceActionCell = memo(function AudienceActionCell({
 
   return (
     <div className='flex justify-end'>
-      <TableIconButton
-        dense
-        icon={<Icon name='Send' className='h-3.5 w-3.5' aria-hidden />}
-        onClick={handleClick}
-        ariaLabel={`Message ${displayName}`}
-        tooltip='Message'
-      />
+      <SimpleTooltip content='Message'>
+        <IconButton
+          variant='secondary'
+          size='xs'
+          ariaLabel={`Message ${displayName}`}
+          onClick={handleClick}
+        >
+          {/* size=xs owns [&_svg] 12px — dense TableIconButton already did. */}
+          <Icon name='Send' aria-hidden />
+        </IconButton>
+      </SimpleTooltip>
     </div>
   );
 });

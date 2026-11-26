@@ -1,10 +1,15 @@
 import { ImageResponse } from 'next/og';
 import { type NextRequest, NextResponse } from 'next/server';
-import { ProofBriefError } from '@/lib/proof-briefs/contract';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
-  PROOF_BRIEF_CARD_SIZE,
-  ProofBriefCard,
-} from '@/lib/proof-briefs/image';
+  assertProofBriefRenderable,
+  ProofBriefError,
+} from '@/lib/proof-briefs/contract';
+import { ProofBriefCard } from '@/lib/proof-briefs/image';
+import {
+  isProofBriefImageFormat,
+  proofBriefImageLayout,
+} from '@/lib/proof-briefs/image-layout';
 import { resolveCertifiedProofBrief } from '@/lib/proof-briefs/resolve';
 import { loadShareFonts } from '@/lib/share/image-utils';
 
@@ -13,61 +18,68 @@ export const runtime = 'nodejs';
 const briefIdSchema = /^[a-zA-Z0-9_-]{1,64}$/;
 
 export async function GET(req: NextRequest) {
-  const briefId = req.nextUrl.searchParams.get('brief');
-  const revParam = req.nextUrl.searchParams.get('rev');
-
-  if (!briefId || !briefIdSchema.test(briefId)) {
+  const params = req.nextUrl.searchParams;
+  const briefId = params.get('brief');
+  const [format = 'landscape', duplicateFormat] = params.getAll('format');
+  const [revParam, duplicateRevision] = params.getAll('rev');
+  const revision = revParam === undefined ? undefined : Number(revParam);
+  if (
+    !briefId ||
+    !briefIdSchema.test(briefId) ||
+    duplicateRevision !== undefined ||
+    duplicateFormat !== undefined ||
+    !isProofBriefImageFormat(format) ||
+    (revision !== undefined &&
+      (!/^\d+$/.test(revParam) ||
+        !Number.isSafeInteger(revision) ||
+        revision < 1))
+  ) {
     return NextResponse.json(
       { error: 'Invalid brief.' },
-      { status: 400, headers: { 'Cache-Control': 'no-store' } }
+      { status: 400, headers: NO_STORE_HEADERS }
     );
   }
 
-  const revision = revParam != null ? Number.parseInt(revParam, 10) : undefined;
-  const brief = resolveCertifiedProofBrief(
-    briefId,
-    Number.isFinite(revision) ? revision : undefined
-  );
+  const brief = resolveCertifiedProofBrief(briefId, revision);
   if (!brief) {
     return NextResponse.json(
       { error: 'Brief not found.' },
-      { status: 404, headers: { 'Cache-Control': 'no-store' } }
-    );
-  }
-
-  let fonts: Awaited<ReturnType<typeof loadShareFonts>>;
-  try {
-    fonts = await loadShareFonts();
-  } catch {
-    return NextResponse.json(
-      { error: 'Font loading failed' },
-      { status: 500, headers: { 'Cache-Control': 'no-store' } }
+      { status: 404, headers: NO_STORE_HEADERS }
     );
   }
 
   try {
-    return new ImageResponse(<ProofBriefCard brief={brief} />, {
-      ...PROOF_BRIEF_CARD_SIZE,
-      fonts: [
-        {
-          name: 'Satoshi',
-          data: fonts.satoshi,
-          weight: 700,
-          style: 'normal',
-        },
-      ],
-      headers: { 'Cache-Control': 'public, max-age=86400, immutable' },
-    });
+    // ImageResponse renders lazily. Reject an ineligible snapshot before
+    // scheduling image work, then finish rendering before returning a 200.
+    assertProofBriefRenderable(brief, { requirePublic: true });
+    const { size } = proofBriefImageLayout(brief, format);
+    const fonts = await loadShareFonts();
+    const image = new ImageResponse(
+      <ProofBriefCard brief={brief} format={format} />,
+      {
+        ...size,
+        fonts: [
+          {
+            name: 'Satoshi',
+            data: fonts.satoshi,
+            weight: 700,
+            style: 'normal',
+          },
+        ],
+        headers: NO_STORE_HEADERS,
+      }
+    );
+    return new Response(await image.arrayBuffer(), { headers: image.headers });
   } catch (error) {
     const status =
-      error instanceof ProofBriefError && error.code === 'privacy-scope'
-        ? 403
-        : error instanceof ProofBriefError && error.code === 'stale-brief'
-          ? 410
-          : 400;
+      error instanceof ProofBriefError
+        ? { 'privacy-scope': 403, 'stale-brief': 410, 'invalid-brief': 400 }[
+            error.code
+          ]
+        : 500;
     return NextResponse.json(
       { error: 'Brief not renderable.' },
-      { status, headers: { 'Cache-Control': 'no-store' } }
+      { status, headers: NO_STORE_HEADERS }
     );
   }
 }

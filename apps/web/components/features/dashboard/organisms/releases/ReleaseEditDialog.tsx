@@ -91,7 +91,7 @@ export function ReleaseEditDialog({
                     src={release.artworkUrl}
                     alt={`${release.title} artwork`}
                     size={64}
-                    className='border border-subtle bg-surface-0'
+                    className='bg-surface-0'
                   />
                 }
                 title={release.title}
@@ -99,7 +99,7 @@ export function ReleaseEditDialog({
                 badge={
                   <Badge
                     variant='secondary'
-                    className='rounded-md border border-subtle bg-surface-1 px-2 py-0.5 text-2xs text-secondary-token'
+                    className='rounded-md bg-surface-1 px-2 py-0.5 text-2xs text-secondary-token'
                   >
                     {release.releaseDate
                       ? formatReleaseDateShort(release.releaseDate)

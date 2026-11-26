@@ -35,6 +35,36 @@ describe('buildDelightReport', () => {
     expect(metric(slow, 'time_to_wow')?.status).toBe('off_target');
   });
 
+  it('judges time to first dashboard in seconds and skips older inputs', () => {
+    const fast = buildDelightReport({
+      timeToWowSeconds: null,
+      timeToFirstDashboardSeconds: { samples: 40, p50: 1.1, p95: 2.2 },
+      wowReach: null,
+      turnsBeforeWow: null,
+    });
+    expect(metric(fast, 'time_to_first_dashboard')).toMatchObject({
+      unit: 'seconds',
+      samples: 40,
+      status: 'on_target',
+    });
+    const slow = buildDelightReport({
+      timeToWowSeconds: null,
+      timeToFirstDashboardSeconds: { samples: 40, p50: 1.4, p95: 4.8 },
+      wowReach: null,
+      turnsBeforeWow: null,
+    });
+    expect(metric(slow, 'time_to_first_dashboard')?.status).toBe('off_target');
+    const legacy = buildDelightReport({
+      timeToWowSeconds: null,
+      wowReach: null,
+      turnsBeforeWow: null,
+    });
+    expect(metric(legacy, 'time_to_first_dashboard')).toMatchObject({
+      samples: 0,
+      status: 'insufficient_sample',
+    });
+  });
+
   it('reads wow reach as a rate with a lower bound', () => {
     const report = buildDelightReport({
       timeToWowSeconds: null,
@@ -83,6 +113,7 @@ describe('Summer funnel delight', () => {
   it('returns empty inputs instead of throwing when the read fails', async () => {
     await expect(getDelightInput(new Date(0))).resolves.toEqual({
       timeToWowSeconds: null,
+      timeToFirstDashboardSeconds: null,
       wowReach: null,
       turnsBeforeWow: null,
     });

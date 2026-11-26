@@ -53,7 +53,7 @@ describe('AdminDataTable', () => {
     expect(table).toHaveAttribute('data-virtualized', 'true');
     expect(table).toHaveAttribute('data-column-snap', 'false');
     expect(table).toHaveAttribute('data-column-sizing', 'schema');
-    expect(table).toHaveAttribute('data-row-mode', 'compact');
+    expect(table).toHaveAttribute('data-row-mode', 'dense');
     expect(table).toHaveAttribute('data-row-height', '');
     expect(table).toHaveAttribute(
       'data-container-class-name',
@@ -61,7 +61,7 @@ describe('AdminDataTable', () => {
     );
   });
 
-  it('allows callers to extend class names and override table geometry', () => {
+  it('allows callers to extend class names while keeping dense row mode', () => {
     render(
       <AdminDataTable
         className='custom-density'
@@ -70,7 +70,6 @@ describe('AdminDataTable', () => {
         containerClassName='max-h-96'
         enableVirtualization={false}
         minWidth='1120px'
-        rowHeight={40}
       />
     );
 
@@ -83,8 +82,8 @@ describe('AdminDataTable', () => {
     expect(table).toHaveAttribute('data-min-width', '1120px');
     expect(table).toHaveAttribute('data-virtualized', 'false');
     expect(table).toHaveAttribute('data-column-sizing', 'schema');
-    expect(table).toHaveAttribute('data-row-mode', '');
-    expect(table).toHaveAttribute('data-row-height', '40');
+    expect(table).toHaveAttribute('data-row-mode', 'dense');
+    expect(table).toHaveAttribute('data-row-height', '');
     expect(table).toHaveAttribute(
       'data-container-class-name',
       'min-h-0 flex-1 max-h-96'

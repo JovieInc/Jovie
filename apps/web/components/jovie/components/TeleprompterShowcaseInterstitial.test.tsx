@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { TeleprompterShowcaseInterstitial } from './TeleprompterShowcaseInterstitial';
 
 vi.mock('@/lib/teleprompter/analytics', () => ({
@@ -34,6 +35,54 @@ function renderInterstitial(
 }
 
 describe('TeleprompterShowcaseInterstitial', () => {
+  it.each([
+    { state: 'closed', open: false },
+    { state: 'open', open: true },
+  ])('has no axe violations when $state', async ({ open }) => {
+    const { container } = renderInterstitial({ open });
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no axe violations with long content', async () => {
+    const { container } = renderInterstitial({
+      title:
+        'Release Promo — Extended Single Drop With Pre-Save Campaign And Fan Capture Follow-Up',
+      script:
+        'Hey, it is me. My new single drops Friday — tap the link in my bio to pre-save it now. Tell a friend, share the story, and come back Friday night for the premiere livestream.',
+    });
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no axe violations in an RTL overflow frame', async () => {
+    const { container } = render(
+      <div dir='rtl'>
+        <TeleprompterShowcaseInterstitial
+          open
+          onOpenChange={vi.fn()}
+          profileId='profile-1'
+          kind='promo'
+          title='إصدار ترويجي'
+          script='مرحباً، أنا هنا. أغنيتي الجديدة تصدر يوم الجمعة.'
+          showcaseVariant='interstitial'
+          onStartRecording={vi.fn()}
+        />
+      </div>
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('uses PlainButton for the backdrop dismiss control', () => {
+    renderInterstitial();
+    const dismissControls = screen.getAllByRole('button', {
+      name: 'Dismiss Teleprompter Preview',
+    });
+    const backdrop = dismissControls.find(
+      el => el.getAttribute('data-slot') === 'plain-button'
+    );
+    expect(backdrop).toBeTruthy();
+    expect(backdrop?.className).toContain('bg-ink-on-media/55');
+  });
+
   it('renders nothing while closed', () => {
     const { container } = renderInterstitial({ open: false });
     expect(container).toBeEmptyDOMElement();

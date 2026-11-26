@@ -37,7 +37,7 @@ interface Destination {
 const TABS: readonly Destination[] = [
   { label: 'Identity', href: APP_ROUTES.PRESENCE },
   { label: 'Work', href: APP_ROUTES.LIBRARY },
-  { label: 'Inbox', href: APP_ROUTES.DASHBOARD },
+  { label: 'Home', href: APP_ROUTES.DASHBOARD },
 ];
 
 function urlPattern(href: string): RegExp {

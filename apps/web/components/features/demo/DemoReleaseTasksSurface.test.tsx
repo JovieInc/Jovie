@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { DemoReleaseTasksSurface } from './DemoReleaseTasksSurface';
 
 describe('release task demo accuracy', () => {
@@ -51,4 +52,15 @@ describe('release task demo accuracy', () => {
       expect(screen.getByText('2d')).toBeVisible();
     }
   );
+
+  it('uses theme tokens with no forced caps or white overlays, and is axe-clean', async () => {
+    const { container } = render(<DemoReleaseTasksSurface />);
+
+    const eyebrow = screen.getByText('Demo · Apr 2, 2026');
+    expect(eyebrow).not.toHaveClass('uppercase');
+    const tile = screen.getByText('Total tasks').parentElement;
+    expect(tile).toHaveClass('bg-surface-1');
+    expect(container.innerHTML).not.toMatch(/white\/|rgba\(/);
+    await expectNoA11yViolations(container);
+  });
 });

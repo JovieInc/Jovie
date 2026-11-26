@@ -48,8 +48,8 @@ describe('shipping read deadline', () => {
       expect(panel).toHaveAttribute('data-truth', 'unavailable')
     );
     expect(panel).toHaveAttribute('data-connection', 'disconnected');
-    expect(screen.getByText('Shipping-state request timed out')).toBeTruthy();
-    expect(screen.getAllByText(/^Unknown/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/^Unknown/)).toBeNull();
+    expect(screen.getByTestId('hud-delivery-metrics-syncing')).toBeTruthy();
     expect(screen.queryByText('0')).toBeNull();
   });
 
@@ -90,8 +90,8 @@ describe('shipping read deadline', () => {
       expect(panel).toHaveAttribute('data-truth', 'unavailable')
     );
     expect(panel).toHaveAttribute('data-connection', 'disconnected');
-    expect(screen.getByText('Shipping-state request timed out')).toBeTruthy();
-    expect(screen.getAllByText(/^Unknown/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/^Unknown/)).toBeNull();
+    expect(screen.getByTestId('hud-delivery-metrics-syncing')).toBeTruthy();
     expect(screen.queryByText('0')).toBeNull();
   });
 });

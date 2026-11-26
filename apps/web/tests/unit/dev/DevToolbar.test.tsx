@@ -242,14 +242,14 @@ describe('DevToolbar', () => {
   });
 
   describe('UX latency telemetry', () => {
-    it('keeps a fixed six-metric strip for empty and populated samples', async () => {
+    it('keeps a fixed seven-metric strip for empty and populated samples', async () => {
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
       const strip = screen.getByTestId('dev-toolbar-latency');
       expect(strip).toHaveClass('h-12', 'overflow-x-auto');
-      expect(strip.querySelectorAll('[data-metric]')).toHaveLength(6);
-      expect(screen.getAllByText(/P50 — · P95 —/)).toHaveLength(6);
+      expect(strip.querySelectorAll('[data-metric]')).toHaveLength(7);
+      expect(screen.getAllByText(/P50 — · P95 —/)).toHaveLength(7);
 
       recordUxLatency('chat_first_token', 125);
       recordUxLatency('chat_first_token', 300);
@@ -264,7 +264,7 @@ describe('DevToolbar', () => {
         ).toHaveTextContent('P50 950ms · P95 950ms');
       });
       expect(strip).toHaveClass('h-12', 'overflow-x-auto');
-      expect(strip.querySelectorAll('[data-metric]')).toHaveLength(6);
+      expect(strip.querySelectorAll('[data-metric]')).toHaveLength(7);
     });
 
     it('does not render latency chrome while the toolbar is collapsed', () => {

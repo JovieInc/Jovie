@@ -137,6 +137,20 @@ describe('checkout validates billable price before session creation', () => {
     await expect(createCheckoutSession(args)).rejects.toThrow('does not match');
     expect(mocks.create).not.toHaveBeenCalled();
   });
+  it('never creates a session for a price from another Stripe account', async () => {
+    mocks.retrieve.mockRejectedValue(
+      new Error("No such price: 'price_visibility'")
+    );
+    await expect(createCheckoutSession(args)).rejects.toThrow('No such price');
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+  it('never asks Stripe for a session when the price is not a published offer', async () => {
+    await expect(
+      createCheckoutSession({ ...args, priceId: 'price_unverified' })
+    ).rejects.toThrow('not available for new subscriptions');
+    expect(mocks.retrieve).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
   it('never creates a session when Stripe price retrieval fails', async () => {
     mocks.retrieve.mockRejectedValue(new Error('Stripe unavailable'));
     await expect(createCheckoutSession(args)).rejects.toThrow(

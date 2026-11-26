@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, PlainButton } from '@jovie/ui';
 import Image from 'next/image';
 import { useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
@@ -151,17 +151,17 @@ export function DspMatchCard({
       {/* Expandable Confidence Breakdown */}
       {confidenceBreakdown && (
         <div className='mt-3 border-t border-subtle pt-3'>
-          <button
-            type='button'
+          <PlainButton
             onClick={() => setIsExpanded(!isExpanded)}
-            className='flex h-7 w-full items-center justify-between rounded-lg border border-transparent px-2 text-xs text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:border-subtle hover:bg-surface-0 hover:text-secondary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-ring'
+            aria-expanded={isExpanded}
+            className='flex h-7 w-full items-center justify-between rounded-lg px-2 text-xs text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:bg-surface-0 hover:text-secondary-token hover:ring-1 hover:ring-subtle focus-visible:outline-none focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-ring'
           >
             <span>Confidence breakdown</span>
             <Icon
               name={isExpanded ? 'ChevronUp' : 'ChevronDown'}
               className='h-3.5 w-3.5'
             />
-          </button>
+          </PlainButton>
 
           {isExpanded && (
             <div className='mt-2'>
@@ -183,7 +183,7 @@ export function DspMatchCard({
               size='sm'
               onClick={() => onReject(matchId)}
               disabled={isLoading}
-              className='h-7 rounded-lg border border-subtle bg-surface-0 px-2.5 text-2xs font-caption text-secondary-token hover:bg-surface-1 hover:text-primary-token'
+              className='h-7 rounded-lg bg-surface-0 px-2.5 text-2xs font-caption text-secondary-token ring-1 ring-subtle hover:bg-surface-1 hover:text-primary-token'
             >
               {isRejecting ? 'Rejecting...' : 'Reject'}
             </Button>

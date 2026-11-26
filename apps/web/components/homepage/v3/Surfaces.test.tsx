@@ -7,6 +7,15 @@ import { Callout, CommandPaletteCard, ReleasePage } from './Surfaces';
 const PALETTE = HOMEPAGE_PRODUCT_UI.palette;
 
 describe('homepage v3 surfaces', () => {
+  it('exposes the keyboard-shortcut chip as a real kbd with shortcut text (JOV-13065 canary)', () => {
+    const { container } = render(<CommandPaletteCard />);
+    const chip = container.querySelector('kbd.hv3-kbd');
+    expect(chip?.tagName).toBe('KBD');
+    expect(chip?.textContent?.length ?? 0).toBeGreaterThan(0);
+    const linkedRows = container.querySelectorAll('li a, li[data-hv3-row]');
+    expect(linkedRows.length).toBeGreaterThan(0);
+  });
+
   it('shows the command palette at rest with Profile selected', async () => {
     const { container } = render(<CommandPaletteCard />);
     expect(screen.getByText(PALETTE.placeholder)).toBeInTheDocument();

@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DATA_SERIES } from '@/lib/design/metric-tone';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { formatWeekLabel, WeeklyTrendChart } from './WeeklyTrendChart';
 
@@ -41,6 +42,11 @@ describe('WeeklyTrendChart', () => {
     for (const label of ['Scraped', 'Contacted', 'Signups', 'Paid']) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+    const swatches = Array.from(
+      container.querySelectorAll<HTMLElement>('.rounded-full')
+    ).map(el => el.style.backgroundColor);
+    expect(swatches).toEqual([...DATA_SERIES.ordered]);
+    expect(container.innerHTML).not.toContain('hsl(var(--color-');
     await expectNoA11yViolations(container);
   });
 

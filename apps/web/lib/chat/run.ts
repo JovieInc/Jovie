@@ -666,38 +666,11 @@ export async function executeChatTurn(
       },
     }),
     onFinish: async ({ steps, text, finishReason }) => {
-      if (
-        !(typeof text === 'string' && text.trim()) &&
-        steps.every(step => step.toolCalls.length === 0)
-      ) {
-        const emptyOutputError = Object.assign(
-          new Error('Model turn produced no text or tool calls'),
-          { name: 'EmptyChatTurnError' }
-        );
-        // An empty turn is a failure the caller would otherwise persist as a
-        // placeholder reply (JOV-6533); console.error so prod logs show it.
-        console.error('[chat] model turn produced no output', {
-          requestId,
-          mode,
-          selectedModel,
-          finishReason,
-          steps: steps.length,
-          aborted: signal?.aborted ?? false,
-        });
-        langfuseTrace.endError(emptyOutputError);
-        await telemetry?.captureException?.(emptyOutputError, {
-          tags: { feature: 'ai-chat', errorType: 'empty_output' },
-          extra: {
-            userId,
-            messageCount: uiMessages.length,
-            requestId,
-            profileId: resolvedProfileId,
-            conversationId: resolvedConversationId,
-          },
-        });
-        await onStreamError?.(emptyOutputError);
-        return;
-      }
+      // ASS-95: blank artist-facing text soft-recovers at the persist gate
+      // (EMPTY_ASSISTANT_REPLY_FALLBACK). Do not abort; log after tool-step-cap
+      // tags so callers that invoke onFinish without awaiting still see
+      // chat_tool_step_cap_exhausted (run.parity exact-head).
+      const blankArtistText = !(typeof text === 'string' && text.trim());
       let promptLeakBlocked = false;
       if (!blockedForDisclosure && typeof text === 'string') {
         const sanitized = sanitizeAssistantResponse(text);
@@ -744,34 +717,62 @@ export async function executeChatTurn(
       });
 
       if (
-        blockedForDisclosure ||
-        writingPilot ||
-        !isChatToolStepCapExhausted(steps, toolStepLimit)
+        !blockedForDisclosure &&
+        !writingPilot &&
+        isChatToolStepCapExhausted(steps, toolStepLimit)
       ) {
-        return;
+        turnSignals.toolStepCapExhausted = true;
+
+        telemetry?.setTags?.({
+          chat_tool_step_cap_exhausted: 'true',
+        });
+        telemetry?.setExtra?.('chat_tool_step_count', steps.length);
+        telemetry?.setExtra?.('chat_tool_step_limit', toolStepLimit);
+        telemetry?.addBreadcrumb?.({
+          category: 'ai-chat',
+          message: 'chat_tool_step_cap_exhausted',
+          level: 'warning',
+          data: {
+            stepLimit: toolStepLimit,
+            stepCount: steps.length,
+            requestId,
+            conversationId: resolvedConversationId,
+            profileId: resolvedProfileId,
+            plan: userPlan,
+            mode,
+          },
+        });
       }
 
-      turnSignals.toolStepCapExhausted = true;
-
-      telemetry?.setTags?.({
-        chat_tool_step_cap_exhausted: 'true',
-      });
-      telemetry?.setExtra?.('chat_tool_step_count', steps.length);
-      telemetry?.setExtra?.('chat_tool_step_limit', toolStepLimit);
-      telemetry?.addBreadcrumb?.({
-        category: 'ai-chat',
-        message: 'chat_tool_step_cap_exhausted',
-        level: 'warning',
-        data: {
-          stepLimit: toolStepLimit,
-          stepCount: steps.length,
+      if (blankArtistText) {
+        const hadTools = steps.some(step => step.toolCalls.length > 0);
+        console.error('[chat] model turn produced blank artist-facing text', {
           requestId,
-          conversationId: resolvedConversationId,
-          profileId: resolvedProfileId,
-          plan: userPlan,
           mode,
-        },
-      });
+          selectedModel,
+          finishReason,
+          steps: steps.length,
+          hadTools,
+          aborted: signal?.aborted ?? false,
+        });
+        await telemetry?.captureException?.(
+          Object.assign(
+            new Error('Model turn produced blank artist-facing text'),
+            { name: 'EmptyChatTurnError' }
+          ),
+          {
+            tags: { feature: 'ai-chat', errorType: 'empty_output' },
+            extra: {
+              userId,
+              messageCount: uiMessages.length,
+              requestId,
+              profileId: resolvedProfileId,
+              conversationId: resolvedConversationId,
+              hadTools,
+            },
+          }
+        );
+      }
     },
     onAbort: ({ steps }) => {
       console.error('[chat] model stream aborted', {

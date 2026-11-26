@@ -304,6 +304,32 @@ describe('SlashCommandMenu album-art availability', () => {
   });
 });
 
+describe('SlashCommandMenu loading emptyHint', () => {
+  it('shows Searching… while the release entity query is pending', () => {
+    mockUseReleasesQuery.mockReturnValue({ data: [], isLoading: true });
+    render(
+      withProviders(
+        <SlashCommandMenu
+          state={{
+            status: 'entity',
+            kind: 'release',
+            query: '',
+            startIdx: 0,
+            selectedIndex: 0,
+          }}
+          profileId='profile-test'
+          onSelectSkill={vi.fn()}
+          onSelectEntity={vi.fn()}
+          onSetSelected={vi.fn()}
+          onMoveSelected={vi.fn()}
+          onClose={vi.fn()}
+        />
+      )
+    );
+    expect(screen.getByText('Searching…')).toBeInTheDocument();
+  });
+});
+
 describe('SlashCommandMenu combobox required attributes (aria-required-attr)', () => {
   it('always wires aria-controls to a real listbox id, with or without listIdProp', () => {
     const source = readFileSync(

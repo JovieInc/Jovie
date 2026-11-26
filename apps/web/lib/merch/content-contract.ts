@@ -151,6 +151,17 @@ export function getMerchContentReviewBlockers(
 ): string[] {
   const conceptBlockers = getMerchConceptPublicationBlockers(qualityReview);
   if (conceptBlockers.length) return conceptBlockers;
+  return getMerchPersonContentReviewBlockers(qualityReview);
+}
+
+/**
+ * Person-content blockers only. Picking a design for a private draft card
+ * uses this; the concept rights gate still blocks publishing and selling
+ * through getMerchContentReviewBlockers.
+ */
+export function getMerchPersonContentReviewBlockers(
+  qualityReview: Record<string, unknown> | null | undefined
+): string[] {
   if (!requiresMerchContentReview(qualityReview)) return [];
   const review = readMerchContentReview(qualityReview);
   if (!review) return [MERCH_CONTENT_REVIEW_REQUIRED_BLOCKER];

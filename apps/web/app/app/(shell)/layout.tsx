@@ -6,7 +6,6 @@ import { Suspense } from 'react';
 import { OvieRouteUsageBeacon } from '@/components/features/admin/OvieRouteUsageBeacon';
 import { TeleprompterStudioHost } from '@/components/features/teleprompter-studio/TeleprompterStudioHost';
 import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
-import { PersistentAudioBar } from '@/components/organisms/PersistentAudioBar';
 import { NuqsProvider } from '@/components/providers/NuqsProvider';
 import { APP_ROUTES } from '@/constants/routes';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
@@ -15,6 +14,7 @@ import {
   APP_SHELL_MODE_HEADER,
   parseTrustedAppShellMode,
 } from '@/lib/app-shell/mode';
+import { PersistentAudioBarLazy } from '@/lib/app-shell/PersistentAudioBarLazy';
 import { canAccessAppShell } from '@/lib/auth/access-route-redirect';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
@@ -106,7 +106,7 @@ export default async function AppShellLayout({
       );
     }
 
-    const audioPlayer = <PersistentAudioBar />;
+    const audioPlayer = <PersistentAudioBarLazy />;
 
     // Pick the route-specific skeleton main slot.
     const routeMain = resolveShellRouteSkeleton(loadingPathname);

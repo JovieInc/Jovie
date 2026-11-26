@@ -43,7 +43,7 @@
     {
       "id": "combined-integration",
       "name": "Combined Integration",
-      "purpose": "Affected unit, parallel hosted build-plus-layout, Ovie build, Ovie typecheck, and Storybook surface workspaces, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head."
+      "purpose": "Affected unit, parallel hosted build-plus-layout, Ovie build, Ovie typecheck, and Storybook surface workspaces, and model-free semantic evals for GitHub's exact merge-group head. Path-selected Xcode/Mac Fast Unit stays listed as merge-group needs but is forced skip on the queue (hosted macOS pool) and recovered on queue-proven main via ci-apple-post-queue."
     },
     {
       "id": "main-deploy",
@@ -222,7 +222,7 @@
       "mergeGate": true,
       "gateStage": "merge-group",
       "nextLocalCommand": "pnpm run ios:lint && bash apps/ios/scripts/run-unit-tests.sh && bash apps/ios/scripts/check_coverage.sh",
-      "remediation": "Repair the path-selected iOS unit or coverage regression on the exact combined head; the full simulator UI/screenshot regression remains required before TestFlight upload."
+      "remediation": "Queued merge_group forces run_ios=false (hosted macOS pool). Repair path-selected iOS unit/coverage on queue-proven main via ci-apple-post-queue (or unproven-main Path Changes). Full simulator UI/screenshot regression remains required before TestFlight upload."
     },
     {
       "id": "ci-macos",
@@ -231,7 +231,7 @@
       "mergeGate": true,
       "gateStage": "merge-group",
       "nextLocalCommand": "pnpm run macos:test && pnpm run macos:build && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test",
-      "remediation": "Repair the path-selected Electron or MenuMonitor test/package regression on the exact combined head; unrelated Web and iOS lanes remain skipped."
+      "remediation": "Queued merge_group forces run_macos=false (hosted macOS pool). Repair path-selected Electron/MenuMonitor on queue-proven main via ci-apple-post-queue (or unproven-main Path Changes); unrelated Web and iOS lanes remain skipped."
     },
     {
       "id": "ci-cross-product-integration",

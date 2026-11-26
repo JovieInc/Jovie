@@ -40,6 +40,26 @@ describe('WorkspaceSelector certificate', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('shows one workspace as a plain name with no caret or menu', async () => {
+    const { container } = render(
+      <WorkspaceSelector
+        currentWorkspaceId='customer'
+        workspaces={[
+          {
+            id: 'customer',
+            label: 'Jovie',
+            href: '/app',
+            brandVariant: 'jovie',
+          },
+        ]}
+      />
+    );
+    expect(screen.getByText('Jovie')).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(container.querySelector('svg')).toBeNull();
+    await expectNoA11yViolations(container);
+  });
+
   it('renders a long RTL workspace name without violations', async () => {
     const { container } = render(
       <div dir='rtl' lang='ar'>
@@ -51,6 +71,12 @@ describe('WorkspaceSelector certificate', () => {
               label: 'جوفي للتسجيلات والنشر الموسيقي',
               href: '/app',
               brandVariant: 'jovie',
+            },
+            {
+              id: 'ov',
+              label: 'OV',
+              href: '/app/ov',
+              brandVariant: 'ov',
             },
           ]}
         />

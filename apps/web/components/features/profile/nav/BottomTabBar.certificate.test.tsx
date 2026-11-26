@@ -11,7 +11,7 @@ describe('BottomTabBar certificate', () => {
     const { container } = render(
       <BottomTabBar
         activeTab='profile'
-        hasTourDates={false}
+        hasTourDates
         onTabSelect={onTabSelect}
       />
     );
@@ -30,6 +30,19 @@ describe('BottomTabBar certificate', () => {
       'type',
       'button'
     );
+    await expectNoA11yViolations(container);
+  });
+
+  it('hides Events when there are no tour dates (JOV-14241)', async () => {
+    const { container } = render(
+      <BottomTabBar
+        activeTab='profile'
+        hasTourDates={false}
+        onTabSelect={vi.fn()}
+      />
+    );
+    expect(screen.queryByRole('button', { name: 'Events' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'About' })).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 

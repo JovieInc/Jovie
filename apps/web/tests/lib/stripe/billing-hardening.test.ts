@@ -1,10 +1,5 @@
 /**
- * Billing Hardening Tests
- *
- * Tests for:
- * - Event ordering (skip stale events)
- * - Optimistic locking (concurrent update protection)
- * - Audit logging
+ * Billing Hardening Tests — event ordering, optimistic locking, and audit logging.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -279,6 +274,7 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
         success: true,
         appUserId: 'uuid-123',
         skipped: true,
+        skipReason: 'duplicate_event',
         reason: 'Stripe event already applied',
       });
     });

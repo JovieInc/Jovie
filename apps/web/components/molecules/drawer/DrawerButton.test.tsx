@@ -1,4 +1,5 @@
-import { dirname, join } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -89,12 +90,17 @@ describe('DrawerButton', () => {
     expect(button.className).toContain('text-secondary-token');
     expect(button.className).toContain('bg-surface-0');
 
-    expect(button).toHaveClass('transition-surface', 'duration-subtle');
+    // Ink must paint immediately: the shared press narrows its colour
+    // transition to the surface instead of the drawer writing its own.
+    expect(button).toHaveClass('press');
+    expect(button.className).toContain(
+      '[--press-transition-colors:background-color,border-color]'
+    );
     expect(
       button.className
         .split(/\s+/)
         .filter(name => name.startsWith('transition-'))
-    ).toEqual(['transition-surface']);
+    ).toEqual([]);
 
     const shell = '#07080a';
     // Axe reported 3.13 for this ink; the engine measures 3.138.
@@ -115,5 +121,21 @@ describe('DrawerButton', () => {
     expect(idle.status).toBe('pass');
     expect(idle.ratio).toBeGreaterThanOrEqual(4.5);
     expect(idle.ratio).toBeGreaterThan(sampledFailure);
+  });
+});
+
+describe('DrawerButton control heights (JOV-12567)', () => {
+  it('sits on the 28px control and 44px bar contract', () => {
+    const source = readFileSync(
+      resolve(__dirname, './DrawerButton.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain("sm: 'h-7 rounded-full px-2.5 text-xs'");
+    expect(source).toContain(
+      "icon: 'h-7 w-7 rounded-full px-0 [&_svg]:h-3.5 [&_svg]:w-3.5'"
+    );
+    expect(source).not.toContain("sm: 'h-8 ");
+    expect(source).not.toContain("icon: 'h-8 ");
   });
 });

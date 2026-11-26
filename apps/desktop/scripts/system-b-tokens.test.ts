@@ -172,3 +172,43 @@ describe('SYSTEM_B_DESKTOP_TOKENS stays aligned with web System-B canon', () => 
     expect(webBrandTokens).toMatch(/export const BRAND_MARK_CREAM = '#F5F4F0'/);
   });
 });
+
+describe('boot splash is one muted O (ovie-o-presence slice 2)', () => {
+  const mainSource = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'main.ts'),
+    'utf8'
+  );
+  const splash = mainSource.match(
+    /function buildDesktopBootSplashHtml\(\): string \{[\s\S]*?\n\}/
+  )?.[0];
+
+  test('muted opacity is the locked 0.35 and there is no corner mark token', () => {
+    expect(SYSTEM_B_DESKTOP_TOKENS.macCornerMarkOpacity).toBe(0.35);
+    expect(SYSTEM_B_DESKTOP_TOKENS).not.toHaveProperty('macCornerMarkSizePx');
+    expect(SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx).toBeGreaterThanOrEqual(24);
+    expect(SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx).toBeLessThanOrEqual(32);
+  });
+
+  test('settled O uses textSecondary at the muted opacity, never cream or blue', () => {
+    expect(splash).toBeDefined();
+    expect(splash).toContain('SYSTEM_B_DESKTOP_TOKENS.textSecondary');
+    expect(splash).toContain('SYSTEM_B_DESKTOP_TOKENS.macCornerMarkOpacity');
+    expect(splash).toMatch(/\.settled-mark \{.*color: var\(--mac-muted\)/);
+    expect(splash).not.toMatch(
+      /11AFFF|--mac-ion|radial-gradient\(ellipse[^)]*rgba\(17,175,255/i
+    );
+  });
+
+  test('exactly one O mark: no corner mark, one settled mark', () => {
+    expect(splash).not.toContain('corner-mark');
+    expect(splash?.match(/data-splash-settled="o"/g)).toHaveLength(1);
+  });
+
+  test('progress is a 1px grey line and reduced motion stops all animation', () => {
+    expect(splash).toMatch(/\.progress \{.*height: 1px/);
+    expect(splash).toMatch(
+      /prefers-reduced-motion: reduce\) \{[^@]*animation: none/
+    );
+    expect(splash).toMatch(/\.settled-mark \{ opacity: \$\{mutedMarkOpacity\}/);
+  });
+});

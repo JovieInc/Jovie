@@ -44,7 +44,7 @@ describe('shipping reviewer Cloudflare-only routing', () => {
     expect(route).toMatchObject({
       route: 'workers-ai-only',
       fallback: null,
-      models: ['@cf/zai-org/glm-5.3-flash'],
+      models: ['@cf/deepseek-ai/deepseek-v4.1-flash-1017'],
       gatewayKey: null,
     });
     expect(route?.gatewayUsdPerDayMax ?? 0).toBe(0);
@@ -251,7 +251,9 @@ describe('CLI routing evidence', () => {
           : Array(2).fill('jovie-workers-ai.tim-fd8.workers.dev')
       );
       const written = JSON.parse(readFileSync(out, 'utf8'));
-      expect(written.reviewers.model).toBe('@cf/zai-org/glm-5.3-flash');
+      expect(written.reviewers.model).toBe(
+        '@cf/deepseek-ai/deepseek-v4.1-flash-1017'
+      );
       expect(written.reviewers.routing).toMatchObject({
         viaWorkersAi: state === 'served' ? 2 : 0,
         viaGateway: 0,

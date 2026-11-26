@@ -100,7 +100,7 @@ describe('dashboard metadata generation', () => {
     const metadata = await generateMetadata();
 
     // Rendered tab title is "Inbox | Jovie" via the root title template.
-    expect(metadata.title).toBe('Inbox');
+    expect(metadata.title).toBe('Home');
   });
 
   it('uses the visible New Chat title for the chat home route', async () => {

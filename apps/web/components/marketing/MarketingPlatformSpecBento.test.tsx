@@ -25,8 +25,8 @@ describe('MarketingPlatformSpecBento', () => {
       screen.queryByText(/Dark product surfaces, Jovie accents only/i)
     ).toBeNull();
     expect(
-      screen.getByText('Preserved product demonstrations · illustrative data')
-    ).toBeVisible();
+      screen.queryByText('Preserved product demonstrations · illustrative data')
+    ).toBeNull();
     expect(
       screen
         .getByRole('img', { name: /demo of Tim White.*desktop/i })

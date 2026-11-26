@@ -153,7 +153,7 @@ export const DspPresenceTable = memo(function DspPresenceTable({
       hideHeader
       enableVirtualization={false}
       // 24px provider face on one line: the 44px list mode.
-      rowMode='list'
+      rowMode='dense'
       minWidth='720px'
       className='text-xs text-primary-token'
       containerClassName='h-full'

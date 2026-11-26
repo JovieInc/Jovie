@@ -7,6 +7,11 @@ import { env } from '@/lib/env';
 // cannot collapse to 0.0.0 when NEXT_PUBLIC_APP_VERSION is absent at runtime
 // (JOV-3459).
 import releaseInfo from '../../../../version.json';
+import { resolveDeployedAtMs } from './build-deployed-at';
+// Compile-time build stamp. `next build` rewrites this before compilation, so
+// the bundled value is the build start and cannot move on a later request
+// (JOV-8658). Dev and tests keep the committed null.
+import { BUILD_DEPLOYED_AT_MS } from './build-deployed-at.generated';
 
 export interface DeployedBuildInfo {
   readonly buildId: string;
@@ -14,7 +19,8 @@ export interface DeployedBuildInfo {
   readonly commitSha: string | undefined;
   readonly deploymentId: string | undefined;
   readonly environment: string | undefined;
-  readonly deployedAt: string | number;
+  /** Epoch milliseconds, or null when this process has no build stamp. */
+  readonly deployedAt: number | null;
 }
 
 let _cachedBuildId: Promise<string> | undefined;
@@ -73,6 +79,14 @@ export async function getDeployedBuildInfo(): Promise<DeployedBuildInfo> {
     commitSha: resolveCommitSha(),
     deploymentId: env.VERCEL_DEPLOYMENT_ID,
     environment: env.VERCEL_ENV,
-    deployedAt: env.VERCEL_DEPLOYMENT_TIME || Date.now(),
+    // Never the request clock. That fallback makes every probe look like a
+    // fresh deploy, so prod age stays ~0 (JOV-8658).
+    deployedAt: resolveDeployedAtMs({
+      vercelDeploymentTime: env.VERCEL_DEPLOYMENT_TIME,
+      generatedDeployedAt: BUILD_DEPLOYED_AT_MS,
+      // Static access so a next.config `env` override can be inlined. A
+      // dynamic process.env lookup would not be.
+      buildDeployedAt: process.env.JOVIE_BUILD_DEPLOYED_AT,
+    }),
   };
 }

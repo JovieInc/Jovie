@@ -560,7 +560,7 @@ test.describe('public profile browser admission', () => {
   ] as const;
 
   for (const fixture of eventsNavigationCases) {
-    test(`${fixture.id} exposes and activates the Events destination`, async ({
+    test(`${fixture.id} Events destination contract`, async ({
       page,
     }, testInfo) => {
       await installPublicRouteMocks(page);
@@ -588,6 +588,21 @@ test.describe('public profile browser admission', () => {
         name: 'Events',
         exact: true,
       });
+
+      // JOV-14241: empty Events is hidden from nav and panels.
+      if (fixture.events === 'empty') {
+        await expect(eventsButton).toHaveCount(0);
+        await expect(
+          surface.getByTestId('profile-primary-tab-events-empty')
+        ).toHaveCount(0);
+        await captureStill(
+          page,
+          testInfo,
+          `events-navigation-${fixture.id}-hidden.png`
+        );
+        return;
+      }
+
       await expect(eventsButton).toBeVisible();
       await expect(
         navigation.getByRole('button', { name: 'Shows', exact: true })
@@ -679,11 +694,6 @@ test.describe('public profile browser admission', () => {
 
       await expect(page).toHaveURL(/\/unfazed\?mode=tour$/);
       await expect(eventsButton).toHaveAttribute('aria-current', 'page');
-      // Scoped to the owning surface: the armed desktop surface also renders
-      // a primary-tab panel inside the display:none no-morph shell at compact
-      // widths, so page-level locators resolve duplicates.
-      // The desktop surface carries the SAME testid on the pill-nav tab
-      // button and the panel; the panel is the section.
       const selected = surface.locator(
         layout === 'desktop'
           ? 'section[data-testid="profile-primary-tab-tour"]'
@@ -695,21 +705,12 @@ test.describe('public profile browser admission', () => {
           selected.getByRole('heading', { name: 'Events', exact: true })
         ).toBeVisible();
       }
-
-      if (fixture.events === 'populated') {
-        if (layout === 'compact') {
-          await expect(selected.getByTestId('tour-drawer-list')).toBeVisible();
-        }
-        await expect(
-          selected.getByText(getUpcomingFixtureVenue(), { exact: true })
-        ).toBeVisible();
-      } else if (layout === 'compact') {
-        const empty = selected.getByTestId('profile-primary-tab-events-empty');
-        await expect(empty).toBeVisible();
-        await expect(empty).toContainText('No upcoming events');
-      } else {
-        await expect(selected).toContainText('No upcoming shows.');
+      if (layout === 'compact') {
+        await expect(selected.getByTestId('tour-drawer-list')).toBeVisible();
       }
+      await expect(
+        selected.getByText(getUpcomingFixtureVenue(), { exact: true })
+      ).toBeVisible();
 
       await captureStill(
         page,

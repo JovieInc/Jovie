@@ -67,6 +67,17 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+export const IdentityDrawer: Story = {
+  args: { presentation: 'drawer' },
+  decorators: [
+    StoryComponent => (
+      <div className='w-80 max-w-full'>
+        <StoryComponent />
+      </div>
+    ),
+  ],
+};
+
 export const LowQualityAvatar: Story = {
   args: {
     avatarQuality: { status: 'low', width: 96, height: 96 },
@@ -82,4 +93,57 @@ export const NoBioDetails: Story = {
       career_highlights: null,
     },
   },
+};
+
+export const Loading: Story = {
+  args: { artist: { ...artist, name: '', image_url: undefined } },
+};
+
+export const Empty: Story = {
+  args: {
+    artist: {
+      ...artist,
+      name: '',
+      location: null,
+      hometown: null,
+      career_highlights: null,
+    },
+  },
+};
+
+export const Error: Story = {
+  args: { avatarQuality: { status: 'low', width: 64, height: 64 } },
+};
+
+export const Offline: Story = {
+  args: { onRefresh: () => Promise.reject(new TypeError('Offline')) },
+};
+
+export const LongContent: Story = {
+  args: {
+    artist: {
+      ...artist,
+      name: 'An Artist Name That Is Long Enough To Wrap Past The Field Width',
+      career_highlights:
+        'Streaming milestones, press coverage, radio play and playlist history that run on for several lines. '.repeat(
+          12
+        ),
+    },
+  },
+};
+
+function RtlFrame({ children }: { readonly children: React.ReactNode }) {
+  return <div dir='rtl'>{children}</div>;
+}
+
+export const Rtl: Story = {
+  decorators: [
+    function WithRtl(StoryComponent) {
+      return (
+        <RtlFrame>
+          <StoryComponent />
+        </RtlFrame>
+      );
+    },
+  ],
 };

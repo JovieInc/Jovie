@@ -19,7 +19,10 @@ export function getProfileVisitorState({
   authUserId: string | null;
   pendingClaimContext: PendingClaimContext | null;
 }): ProfileVisitorState {
-  if (authUserId && profile.userClerkId === authUserId) {
+  if (
+    authUserId &&
+    (profile.userId === authUserId || profile.userClerkId === authUserId)
+  ) {
     return 'owner';
   }
 

@@ -1,13 +1,14 @@
 import '../../styles/system-b-app.css';
 import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import SettingsLayout from '@/app/app/(shell)/settings/layout';
 import { RailToggleButton } from '@/components/atoms/RailToggleButton';
 import { DashboardHeader } from '@/components/features/dashboard/organisms/DashboardHeader';
 import { SettingsSection } from '@/components/features/dashboard/organisms/SettingsSection';
 import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
 import { useRailPreview } from '@/components/shell/useRailPreview';
+import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { AppShellFrame } from './AppShellFrame';
 import { Sidebar, SidebarProvider } from './sidebar';
 
@@ -112,24 +113,63 @@ export const SettingsHeaderAlignment: Story = {
 
 function InspectorFixture({
   withPreview = false,
+  withContext = false,
 }: {
   readonly withPreview?: boolean;
+  readonly withContext?: boolean;
 }) {
   const [pinned, setPinned] = useState(false);
+  const compact = useBreakpointDown('lg');
+  const [contextArrived, setContextArrived] = useState(false);
+  const occupied = withContext || contextArrived;
+  useEffect(() => {
+    const arrive = () => setContextArrived(true);
+    window.addEventListener('story-chat-context-arrives', arrive);
+    return () =>
+      window.removeEventListener('story-chat-context-arrives', arrive);
+  }, []);
   // Production wiring (PreviewPanelContext + ProfileContactSidebar): hover or
   // focus on the toggle previews the rail as an overlay; a press pins it and
   // the route yields.
   const { isPreview, isFloating, dismissPreview } = useRailPreview({
     side: 'right',
     pinned,
-    enabled: withPreview,
+    enabled: withPreview && !compact,
   });
   const open = pinned || isPreview;
-  const presentation = isFloating ? 'overlay' : 'push';
+  const presentation = isFloating && !occupied ? 'overlay' : 'push';
   const setOpen = (next: boolean | ((value: boolean) => boolean)) => {
     dismissPreview();
     setPinned(value => (typeof next === 'function' ? next(value) : next));
   };
+  const drawer = (
+    <RightDrawer
+      id='story-inspector'
+      data-testid='story-inspector'
+      isOpen={open}
+      width={400}
+      presentation={presentation}
+      ariaLabel='Work details'
+      onKeyDown={event => {
+        if (event.key === 'Escape') setOpen(false);
+      }}
+    >
+      <div className='h-full overflow-auto p-4'>
+        <Button type='button' onClick={() => setOpen(false)}>
+          Close details
+        </Button>
+        <label className='block py-4'>
+          Detail notes
+          <input className='block w-full' defaultValue='Inspector draft' />
+        </label>
+        <p>
+          {presentation === 'push'
+            ? 'The open inspector is a column: the route yields its width.'
+            : 'A transient preview floats over the route below its header.'}
+        </p>
+      </div>
+    </RightDrawer>
+  );
   return (
     <SidebarProvider defaultOpen={false}>
       <AppShellFrame
@@ -169,35 +209,20 @@ function InspectorFixture({
           </div>
         }
         rightPanel={
-          <RightDrawer
-            id='story-inspector'
-            data-testid='story-inspector'
-            isOpen={open}
-            width={400}
-            presentation={presentation}
-            ariaLabel='Work details'
-            onKeyDown={event => {
-              if (event.key === 'Escape') setOpen(false);
-            }}
-          >
-            <div className='h-full overflow-auto p-4'>
-              <Button type='button' onClick={() => setOpen(false)}>
-                Close details
-              </Button>
-              <label className='block py-4'>
-                Detail notes
-                <input
-                  className='block w-full'
-                  defaultValue='Inspector draft'
-                />
-              </label>
-              <p>
-                {presentation === 'push'
-                  ? 'The open inspector is a column: the route yields its width.'
-                  : 'A transient preview floats over the route below its header.'}
-              </p>
+          occupied ? (
+            <div className='system-b-chat-entity-right-panel-shell flex-col'>
+              <div
+                className='system-b-chat-entity-panel-context-divider shrink-0 p-3'
+                data-rail-context-occupied='true'
+                data-testid='story-chat-rail-context'
+              >
+                Release context
+              </div>
+              <div className='min-h-0 flex-1'>{drawer}</div>
             </div>
-          </RightDrawer>
+          ) : (
+            drawer
+          )
         }
       />
     </SidebarProvider>
@@ -213,4 +238,9 @@ export const PushInspector: Story = {
  * pressing it pins the rail and the route yields with the same motion. */
 export const PreviewOverlayInspector: Story = {
   render: () => <InspectorFixture withPreview />,
+};
+
+/** A chat release context already occupies the in-flow rail without a drawer. */
+export const OccupiedContextInspector: Story = {
+  render: () => <InspectorFixture withPreview withContext />,
 };

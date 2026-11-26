@@ -2,14 +2,30 @@ import { APP_ROUTES } from '@/constants/routes';
 import type { PartialAppFlagSnapshot } from '@/lib/flags/contracts';
 
 /** Bump when a shipped label, destination, or availability projection changes. */
-export const PRODUCT_PROJECTION_VERSION = 2;
+export const PRODUCT_PROJECTION_VERSION = 3;
 export const PRODUCT_PROJECTION_LOCALES = ['en'] as const;
+
+/**
+ * Creator shell roots (Drift T0.2). Visible labels only — never previous /
+ * compatibility nouns in chrome.
+ */
+export const CREATOR_ROOT_LABELS = [
+  'Home',
+  'Identity',
+  'Work',
+  'Audience',
+] as const;
 
 export const TOP_LEVEL_PRODUCT_CONCEPTS = ['identity', 'work'] as const;
 
 export type TopLevelProductConcept =
   (typeof TOP_LEVEL_PRODUCT_CONCEPTS)[number];
 
+/**
+ * `previousLabels` is compatibility history for migrations and redirects.
+ * Ban: never render them in UI, breadcrumbs, analytics-facing copy, or
+ * projections — live chrome uses `label` only (Drift T0.2 / T3.2).
+ */
 export const PRODUCT_ONTOLOGY = {
   identity: {
     label: 'Identity',
@@ -61,6 +77,11 @@ export const PRODUCT_ONTOLOGY = {
     readonly capabilities: readonly string[];
   }
 >;
+
+/** Flat set of banned UI nouns from ontology history. */
+export const PRODUCT_ONTOLOGY_PREVIOUS_LABELS = Object.values(
+  PRODUCT_ONTOLOGY
+).flatMap(feature => feature.previousLabels);
 
 /** Display references, never an authorization or tool-capability grant. */
 export function getProductProjection(

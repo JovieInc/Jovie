@@ -77,7 +77,20 @@ describe('buildSystemPrompt', () => {
       '- Neon Reef (single, 1 track; released 2026-08-31, 58 days ago)'
     );
     expect(prompt).toMatch(/Jovie profile .*\/testartist|Jovie profile .*\//);
-    expect(prompt).toContain('End with exactly one next step');
+    expect(prompt).toContain(
+      'End every advice reply with exactly one next move plus the reason'
+    );
+    expect(prompt).toContain('Never invent account stats');
+    expect(prompt).toContain('Draft every outbound artifact');
+    expect(prompt).toContain('Revenue first');
+    expect(prompt).toContain('first content sentence');
+    expect(prompt).toContain(
+      'clarifying question is allowed only when a required tool field is truly missing'
+    );
+    expect(prompt).toContain(
+      'Never invent popularity, streams, peer benchmarks'
+    );
+    expect(prompt).toContain('today Jovie setup step');
     expect(prompt).not.toContain('Never volunteer unrequested suggestions');
     const being = prompt.slice(prompt.indexOf('## Being Useful'));
     expect(being.slice(0, being.indexOf('\n## ', 5))).not.toMatch(/[–—]/);

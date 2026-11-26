@@ -32,7 +32,7 @@ export const HOMEPAGE_LATEST_RELEASE = HOMEPAGE_CATALOG[0];
 /** Visible strings inside the live product UI on the homepage. */
 export const HOMEPAGE_PRODUCT_UI = {
   searchChats: 'Search chats',
-  inbox: 'Inbox',
+  inbox: 'Home',
   releases: 'Releases',
   releaseCount: '18',
   searchCommand: 'Search or run a command',

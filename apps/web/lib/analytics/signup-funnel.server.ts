@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { and, sql as drizzleSql, eq, gte } from 'drizzle-orm';
+import { realJourneyJ } from '@/lib/acquisition/synthetic-traffic';
 import { db } from '@/lib/db';
 import { serverAnalyticsEvents } from '@/lib/db/schema/analytics';
 import { trackServerEvent } from '@/lib/server-analytics';
@@ -335,19 +336,24 @@ function rowsOf<T>(result: unknown): T[] {
 export async function getDelightInput(since: Date): Promise<DelightInput> {
   const empty: DelightInput = {
     timeToWowSeconds: null,
+    timeToFirstDashboardSeconds: null,
     wowReach: null,
     turnsBeforeWow: null,
   };
   try {
-    const [wowResult, turnsResult] = await Promise.all([
+    const [wowResult, turnsResult, firstDashboardResult] = await Promise.all([
       db.execute(drizzleSql`
         WITH journeys AS (
-          SELECT acquisition_id,
-                 min(occurred_at) FILTER (WHERE stage = 'start') AS started_at,
-                 min(occurred_at) FILTER (WHERE stage = 'catalog-preview') AS wow_at
-          FROM acquisition_journey_stages
-          WHERE stage IN ('start', 'catalog-preview') AND occurred_at >= ${since}
-          GROUP BY acquisition_id
+          SELECT s.acquisition_id,
+                 min(s.occurred_at) FILTER (WHERE s.stage = 'start') AS started_at,
+                 min(s.occurred_at) FILTER (WHERE s.stage = 'catalog-preview') AS wow_at
+          FROM acquisition_journey_stages s
+          INNER JOIN acquisition_journeys j ON j.id = s.acquisition_id
+          WHERE s.stage IN ('start', 'catalog-preview')
+            AND s.occurred_at >= ${since}
+            AND j.consent_revoked_at IS NULL
+            AND ${realJourneyJ()}
+          GROUP BY s.acquisition_id
         ), timed AS (
           SELECT extract(epoch FROM wow_at - started_at) AS seconds
           FROM journeys
@@ -362,7 +368,7 @@ export async function getDelightInput(since: Date): Promise<DelightInput> {
       `),
       db.execute(drizzleSql`
         WITH sessions AS (
-          SELECT max((${serverAnalyticsEvents.properties}->>'turn_index')::int) + 1 AS turns
+          SELECT GREATEST(max((${serverAnalyticsEvents.properties}->>'turn_index')::int), 1) AS turns
           FROM ${serverAnalyticsEvents}
           WHERE ${serverAnalyticsEvents.eventName} = 'onboarding_reply'
             AND ${serverAnalyticsEvents.occurredAt} >= ${since}
@@ -373,6 +379,21 @@ export async function getDelightInput(since: Date): Promise<DelightInput> {
                percentile_cont(0.5) WITHIN GROUP (ORDER BY turns) AS p50,
                percentile_cont(0.95) WITHIN GROUP (ORDER BY turns) AS p95
         FROM sessions
+      `),
+      db.execute(drizzleSql`
+        WITH loads AS (
+          SELECT (${serverAnalyticsEvents.properties}->>'duration_ms')::numeric / 1000 AS seconds
+          FROM ${serverAnalyticsEvents}
+          WHERE ${serverAnalyticsEvents.eventName} = 'first_dashboard_ready'
+            AND ${serverAnalyticsEvents.occurredAt} >= ${since}
+            AND ${serverAnalyticsEvents.properties}->>'outcome' = 'reached'
+            AND ${serverAnalyticsEvents.properties}->>'cohort' = 'customer'
+            AND ${serverAnalyticsEvents.properties}->>'duration_ms' ~ '^[0-9]+$'
+        )
+        SELECT count(*)::int AS samples,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY seconds) AS p50,
+               percentile_cont(0.95) WITHIN GROUP (ORDER BY seconds) AS p95
+        FROM loads
       `),
     ]);
     const wow = rowsOf<
@@ -387,6 +408,9 @@ export async function getDelightInput(since: Date): Promise<DelightInput> {
           }
         : null,
       turnsBeforeWow: toDistribution(rowsOf<DistributionRow>(turnsResult)[0]),
+      timeToFirstDashboardSeconds: toDistribution(
+        rowsOf<DistributionRow>(firstDashboardResult)[0]
+      ),
     };
   } catch {
     return empty;

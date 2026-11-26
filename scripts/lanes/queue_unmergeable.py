@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
-"""Dequeue merge-queue entries that sit UNMERGEABLE, comment why, and route the PR to the lanes.
+"""Request the existing hosted drain for parked native queue entries.
 
-2026-10-29: #23519 sat UNMERGEABLE at position 3 for 3 hours and stalled the queue behind it until a
-human dequeued it. An UNMERGEABLE entry cannot merge until its branch changes, so waiting is pure
-loss. After GRACE_S observed UNMERGEABLE the entry is dequeued, a machine-readable comment says why,
-and `lane-fix-conflict` hands it to the conflict lane. Every action is appended to
-queue-unmergeable.jsonl. Reads and writes go through the injected gh runner (the budgeted client)."""
+The hosted writer retains its exact-head stop receipt before dequeuing. A direct
+host dequeue lost that receipt and let unchanged #26212 re-enter twice. Reserve
+one request per head before dispatch; an ambiguous response never earns a retry.
+"""
 from __future__ import annotations
 
+import fcntl
 import json
+import math
 import os
+import subprocess
 import time
 from pathlib import Path
 
 GRACE_S, MAX_PER_TICK, SEEN_FILE, LOG_FILE = 600, 3, "queue-unmergeable.json", "queue-unmergeable.jsonl"
 QUERY = ("query($o:String!,$r:String!){repository(owner:$o,name:$r){mergeQueue(branch:\"main\"){entries(first:50)"
          "{nodes{state position pullRequest{id number headRefOid}}}}}}")
-DEQUEUE = "mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}"
-ROUTE_LABEL = "lane-fix-conflict"
+WORKFLOW = "merge-queue-green-enroll.yml"
 
 
 def _gh(run, *args):
@@ -29,15 +30,29 @@ def _gh(run, *args):
 
 def _write(path: Path, payload: dict) -> None:
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(payload, sort_keys=True))
+    with open(tmp, "w") as handle:
+        handle.write(json.dumps(payload, sort_keys=True, allow_nan=False))
+        handle.flush()
+        os.fsync(handle.fileno())
     os.replace(tmp, path)
 
 
 def sweep(state, run, now: float | None = None, repo: str = "JovieInc/Jovie") -> dict:
-    """One pass. Returns {"seen": [...], "dequeued": [...], "errors": [...]}."""
+    """Serialize the existing observer's request claim, without waiting on another sweep."""
+    state = Path(state)
+    with open(state / (SEEN_FILE + ".lock"), "a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return {"seen": [], "dequeued": [], "requested": [], "errors": ["queue recovery observation in progress"]}
+        return _sweep_locked(state, run, now, repo)
+
+
+def _sweep_locked(state, run, now: float | None, repo: str) -> dict:
+    """One bounded pass; a request acknowledgement is not a dequeue receipt."""
     now, state = time.time() if now is None else now, Path(state)
     owner, name = repo.split("/")
-    out = {"seen": [], "dequeued": [], "errors": []}
+    out = {"seen": [], "dequeued": [], "requested": [], "errors": []}
     try:
         data = json.loads(_gh(run, "api", "graphql", "-f", f"query={QUERY}", "-f", f"o={owner}", "-f", f"r={name}"))
         entries = ((((data.get("data") or {}).get("repository") or {}).get("mergeQueue") or {}).get("entries") or {}).get("nodes") or []
@@ -46,36 +61,49 @@ def sweep(state, run, now: float | None = None, repo: str = "JovieInc/Jovie") ->
         return out
     try:
         first_seen = json.loads((state / SEEN_FILE).read_text())
-    except (OSError, ValueError):
+        if not isinstance(first_seen, dict):
+            raise ValueError("queue recovery state must be an object")
+        for key, value in first_seen.items():
+            value = {"firstSeen": value} if isinstance(value, (int, float)) and not isinstance(value, bool) else value
+            fields = ("firstSeen", "requestedAt") if isinstance(value, dict) and "requestedAt" in value else ("firstSeen",)
+            if not isinstance(value, dict) or any(
+                    not isinstance(value.get(field), (int, float)) or isinstance(value[field], bool)
+                    or not math.isfinite(value[field]) for field in fields):
+                raise ValueError("invalid queue recovery observation")
+            first_seen[key] = value
+    except FileNotFoundError:
         first_seen = {}
-    current = {}
+    except (OSError, ValueError, TypeError) as error:
+        out["errors"].append(f"state: {error}")
+        return out
+    # Keep spent requests even after an entry disappears; reappearance is not a
+    # new generation. A new source head has its own key and its own grace.
+    current = {key: value for key, value in first_seen.items() if "requestedAt" in value}
+    requests = 0
     for entry in entries:
         pr = entry.get("pullRequest") or {}
         if entry.get("state") != "UNMERGEABLE" or not pr.get("number"):
             continue
-        key = f"{pr['number']}@{pr.get('headRefOid')}"
-        current[key] = first_seen.get(key, now)
-        out["seen"].append({"pr": pr["number"], "position": entry.get("position"), "ageS": round(now - current[key])})
-        if now - current[key] < GRACE_S or len(out["dequeued"]) >= MAX_PER_TICK:
+        head = pr.get("headRefOid") or ""
+        if len(head) != 40 or any(c not in "0123456789abcdef" for c in head):
+            out["errors"].append(f"#{pr['number']} missing exact source head")
             continue
+        key = f"{pr['number']}@{pr.get('headRefOid')}"
+        current[key] = first_seen.get(key, {"firstSeen": now})
+        age = now - current[key]["firstSeen"]
+        out["seen"].append({"pr": pr["number"], "position": entry.get("position"), "ageS": round(age)})
+        if age < GRACE_S or "requestedAt" in current[key] or requests >= MAX_PER_TICK:
+            continue
+        current[key]["requestedAt"] = now
+        _write(state / SEEN_FILE, {**first_seen, **current})
+        requests += 1
         try:
-            _gh(run, "api", "graphql", "-f", f"query={DEQUEUE}", "-f", f"id={pr['id']}")
-            marker = json.dumps({"code": "unmergeable", "by": "lanes/queue_unmergeable", "position": entry.get("position")})
-            body = (f"Dequeued from the merge queue: this entry was UNMERGEABLE for {round((now - current[key]) / 60)} min "
-                    f"at position {entry.get('position')} and blocked the entries behind it. It needs a rebase or conflict "
-                    f"fix; `{ROUTE_LABEL}` routes it to the lanes.\n<!-- queue-dequeue {marker} -->")
-            for args in (("api", f"repos/{repo}/issues/{pr['number']}/comments", "-f", f"body={body}"),
-                         ("api", f"repos/{repo}/issues/{pr['number']}/labels", "-f", f"labels[]={ROUTE_LABEL}")):
-                try:
-                    _gh(run, *args)
-                except RuntimeError as error:  # the dequeue stands; a failed comment or label is logged, not retried blind
-                    out["errors"].append(f"#{pr['number']} {args[1].rsplit('/', 1)[-1]}: {error}")
-            out["dequeued"].append(pr["number"])
+            _gh(run, "workflow", "run", WORKFLOW, "--repo", repo, "--ref", "main", "-f", f"pr_number={pr['number']}")
+            out["requested"].append(pr["number"])
             with open(state / LOG_FILE, "a") as log:
                 log.write(json.dumps({"at": now, "pr": pr["number"], "head": pr.get("headRefOid"), "position": entry.get("position"),
-                                      "unmergeableForS": round(now - current[key]), "action": "dequeued+routed"}) + "\n")
-            current.pop(key, None)
-        except RuntimeError as error:
-            out["errors"].append(f"#{pr['number']} dequeue: {error}")
+                                      "unmergeableForS": round(age), "action": "central-dequeue-requested"}) + "\n")
+        except (RuntimeError, OSError, subprocess.SubprocessError) as error:
+            out["errors"].append(f"#{pr['number']} central drain request: {error}; request retained, no blind retry")
     _write(state / SEEN_FILE, current)
     return out

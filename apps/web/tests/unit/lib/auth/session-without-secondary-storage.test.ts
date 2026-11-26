@@ -24,7 +24,7 @@ function createSessionAuth() {
     session: {
       expiresIn: 604800,
       updateAge: 86400,
-      cookieCache: { enabled: true, maxAge: 300 },
+      cookieCache: { enabled: true, maxAge: 120 },
       storeSessionInDatabase: true,
     },
   });
@@ -49,7 +49,7 @@ describe('Better Auth sessions without Redis secondary storage', () => {
     expect(auth.options.session?.storeSessionInDatabase).toBe(true);
     expect(auth.options.session?.cookieCache).toMatchObject({
       enabled: true,
-      maxAge: 300,
+      maxAge: 120,
     });
   });
 

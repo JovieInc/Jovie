@@ -145,12 +145,12 @@ export interface CreatorProfile {
 
 export interface ArtistSettings extends Record<string, unknown> {
   searchable?: boolean;
+  /** TRK-6: advertising pixels off on this public profile. */
+  youngAudience?: boolean;
   exclude_self_from_analytics?: boolean;
   hometown?: string | null;
   heroRoleLabel?: string | null;
-  notifications?: {
-    artistEmailReady?: boolean;
-  };
+  notifications?: { artistEmailReady?: boolean };
 }
 
 // Backwards compatibility - Artist interface mapped from CreatorProfile

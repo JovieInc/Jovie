@@ -34,3 +34,26 @@ export const Loading: Story = {
     refreshIngestStatus: 'loading',
   },
 };
+
+/** Empty: a row that is neither claimed nor verified. */
+export const EmptyUnclaimed: Story = {
+  args: { isClaimed: false, isVerified: false },
+};
+
+/** Error: the parent reports a failed verification and the control stays usable. */
+export const ErrorVerificationFailed: Story = {
+  args: { verificationStatus: 'error', refreshIngestStatus: 'error' },
+};
+
+/** RTL: the action row mirrors in a right-to-left document. */
+export const RtlActions: Story = {
+  decorators: [
+    function RtlDecorator(Story) {
+      return (
+        <div dir='rtl'>
+          <Story />
+        </div>
+      );
+    },
+  ],
+};

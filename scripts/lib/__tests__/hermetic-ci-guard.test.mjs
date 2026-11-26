@@ -17,6 +17,7 @@ import {
   unpinnedIn,
   violations,
 } from '../../hermetic-ci-guard.mjs';
+import { JS_RANDOM_DRAW } from '../quoted-draws.mjs';
 
 const ROOT = new URL('../../../', import.meta.url);
 const SHA = 'a'.repeat(40);
@@ -64,6 +65,29 @@ describe('hermetic-ci-guard', () => {
     expect(
       seedsIn('rng = random.Random(7)\nx = random.choice(items)\n', 'py')
     ).toBe(0);
+    expect(
+      seedsIn("const sample = 'if (Math.random() * 100 > 25) return null;';")
+    ).toBe(0);
+    expect(
+      seedsIn('const sample = "Math.random()";\nconst id = Math.random();')
+    ).toBe(1);
+    expect(seedsIn('const id = `n${Math.random()}`;')).toBe(1);
+    expect(seedsIn('const id = `Math.random()`;')).toBe(0);
+    expect(seedsIn('x = "random.choice(items)"\n', 'py')).toBe(0);
+    expect(seedsIn('x = f"n{random.random()}"\n', 'py')).toBe(1);
+    expect(JS_RANDOM_DRAW).toBe(['Math', '.random()'].join(''));
+    expect(seedsIn(`const id = ${JS_RANDOM_DRAW};`)).toBe(1);
+    expect(seedsIn(`const sample = '${JS_RANDOM_DRAW}';`)).toBe(0);
+    const launchCore = readFileSync(
+      new URL(
+        '../../../apps/web/tests/unit/ci/launch-core-flag-check.test.ts',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    // The trusted-base counter still counts a literal. This file must not have one.
+    expect(launchCore.match(/\bMath\.random\(\s*\)/gu) ?? []).toEqual([]);
+    expect(seedsIn(launchCore)).toBe(0);
   });
 
   it('shared-state: flags a fixed /tmp path and isolation-off switches', () => {

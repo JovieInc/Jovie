@@ -63,14 +63,16 @@ export function capProfileLinkInputs<
 >(links: T[]): T[] {
   const withIndex = links.map((link, index) => ({ link, index }));
   const mode = withIndex.filter(({ link }) => getLinkGroup(link) === 'mode');
-  const social = withIndex.filter(
-    ({ link }) => getLinkGroup(link) === 'social'
-  );
+  // Social, website, earnings and custom links all share the non-mode
+  // slots in payload order. Categories the profile editors offer — a
+  // personal site, a linktree, a venmo handle — must survive the cap,
+  // not be silently discarded by the save (JOV-14551).
+  const nonMode = withIndex.filter(({ link }) => getLinkGroup(link) !== 'mode');
 
   const modeKeep = mode.slice(0, MAX_MODE_LINKS);
-  const socialSlots = Math.max(0, MAX_PROFILE_LINKS - modeKeep.length);
-  const socialKeep = social.slice(0, socialSlots);
+  const nonModeSlots = Math.max(0, MAX_PROFILE_LINKS - modeKeep.length);
+  const nonModeKeep = nonMode.slice(0, nonModeSlots);
 
-  const keep = new Set([...modeKeep, ...socialKeep].map(item => item.index));
+  const keep = new Set([...modeKeep, ...nonModeKeep].map(item => item.index));
   return links.filter((_, index) => keep.has(index));
 }

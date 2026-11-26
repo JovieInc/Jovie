@@ -83,30 +83,23 @@
   --linear-btn-secondary-bg: oklch(94% 0.005 282);
   --linear-btn-secondary-fg: oklch(20% 0.005 282);
   --linear-btn-secondary-hover: oklch(90% 0.005 282);
-  /* Accent button — palette purple */
-  --linear-btn-accent-bg: #8b1eff;
-  --linear-btn-accent-fg: oklch(100% 0 0);
-  --linear-btn-accent-hover: #9a46ff;
+  /* Accent / info / btn-accent / pricing-accent families collapsed
+     (Drift T1.2 unify-ion). Bare accent aliases System B ion; rainbow /
+     btn / pricing defs deleted. Prefer --color-accent* at new callsites. */
+  --linear-accent: var(--color-accent);
+  --linear-accent-gray: var(--color-accent-gray);
+  --linear-info: var(--color-info);
+  --linear-info-subtle: var(--color-info-subtle);
   /* ============================================
-     ACCENT COLORS (mode-independent)
+     STATUS COLORS (mode-independent) — shrink-only;
+     prefer --color-success|warning|error|* from design-system.css
      ============================================ */
-  --linear-accent-gray: #7f7f85;
-  --linear-accent-blue: #2563ff;
-  --linear-accent-purple: #8b1eff;
-  --linear-accent-pink: #d61a7f;
-  --linear-accent-red: #f3122d;
-  --linear-accent-orange: #ff9800;
-  --linear-accent-green: #2f9e44;
-  --linear-accent-teal: #0f9b8e;
   --linear-success: #2f9e44;
   --linear-success-subtle: rgb(47 158 68 / 0.14);
   --linear-warning: #ff9800;
   --linear-warning-subtle: rgb(255 152 0 / 0.15);
   --linear-error: #f3122d;
   --linear-error-subtle: rgb(243 18 45 / 0.14);
-  --linear-info: #2563ff;
-  --linear-info-subtle: rgb(37 99 255 / 0.14);
-  --linear-accent: #8b1eff;
   /* ============================================
      HERO-SPECIFIC TOKENS
      Used by RedesignedHero for theme-aware gradients
@@ -251,10 +244,7 @@
     oklch(18% 0.03 265 / 0.45),
     transparent 65%
   );
-  /* Pricing accent */
-  --linear-pricing-accent: #8b1eff;
-  --linear-pricing-accent-border: rgba(94, 106, 210, 0.4);
-  --linear-pricing-accent-shadow: rgba(94, 106, 210, 0.15);
+  /* Pricing accent family retired (Drift T1.2 unify-ion) — use --color-accent. */
   /* Audience CRM section */
   --linear-crm-glow: radial-gradient(
     ellipse 60% 40% at 50% 100%,

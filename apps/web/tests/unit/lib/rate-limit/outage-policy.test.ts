@@ -35,6 +35,11 @@ describe('RATE_LIMIT_OUTAGE_POLICY', () => {
       'onboarding',
       'adminImpersonate',
       'accountDelete',
+      'handleCheck',
+      'api',
+      'spotifySearchApi',
+      'appleMusicSearch',
+      'wrapLinkAnonymous',
     ] as const) {
       expect(RATE_LIMIT_OUTAGE_POLICY[name]).toMatchObject({
         class: 'mandatory',
@@ -78,7 +83,10 @@ describe('RATE_LIMIT_OUTAGE_POLICY', () => {
 
 describe('REDIS_DATA_CONSUMERS', () => {
   it('separates fail-closed coordination from origin-read caches', () => {
-    expect(REDIS_DATA_CONSUMERS['auth/rate-limit'].class).toBe('advisory');
+    expect(REDIS_DATA_CONSUMERS['auth/rate-limit']).toMatchObject({
+      class: 'mandatory',
+      recovery: expect.stringMatching(/fail closed/i),
+    });
     expect(REDIS_DATA_CONSUMERS['db/cache']).toMatchObject({
       class: 'optional',
       staleBound: expect.stringMatching(/ttl/i),

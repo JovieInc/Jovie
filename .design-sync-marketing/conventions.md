@@ -8,7 +8,7 @@ generic AI template style.
 
 All backgrounds use the Jovie carbon tokens:
 - `bg-(--linear-bg-page)` (`#06070a`) as the page canvas
-- `bg-surface-0` for recessed wells, `bg-surface-1` for cards / elevated panels
+- `bg-surface-0` for recessed wells, `bg-surface-1` for cards that pass the card-intent test below
 - `text-primary-token` / `text-secondary-token` / `text-tertiary-token` for text
 
 Previews render on a dark canvas (`DesignSyncCanvas`) — light-on-dark is the
@@ -71,3 +71,24 @@ composition (layout, spacing, type) is what the agent designs, not the images.
 
 All flags are build-time booleans (no runtime API calls). Safe to read in the
 design-sync preview sandbox.
+
+## Card intent: no extra carding
+
+A card is any box that sets content apart with its own fill, border or shadow. The default is no card: content sits flat on its surface and is grouped by spacing, type and hairline dividers. A card is allowed only when the box says something true about the object inside it. The five allowed intents:
+
+1. `transient`: it appears and goes away (toast, popover, menu, dialog, hover preview, inline notice the user dismisses).
+2. `movable`: the user drags, reorders, pins or dismisses the object (kanban card, sortable row, draggable chip).
+3. `collection`: one of a set of peer objects the user browses or compares (carousel, gallery, grid of releases or artists, pricing tiers, opportunity cards).
+4. `selectable`: the whole box is one target that opens or selects one entity (option card, link card).
+5. `floating`: a live object layered over the page (chat composer, sticky player).
+
+Banned, whatever the reason:
+
+- Empty, loading and error states: always flat, no card, no fill, no border.
+- A card around a page section, settings group, form, single chart, single stat or single table just to give it structure.
+- A card inside a card, or inside a drawer, sheet or dialog body.
+- A card used as a heading or hierarchy device.
+
+The test: if removing the box loses nothing the user can do with, or understand about, the object, the box goes.
+
+Marketing note: a carousel of outcome cards or a grid of pricing tiers is a `collection`; a spec wall, how-it-works step list, FAQ or section callout is not, so it sits flat with spacing and hairline dividers. Empty, loading and error states are flat.

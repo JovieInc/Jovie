@@ -19,7 +19,7 @@ vi.mock('@/components/organisms/table', () => ({
     getRowClassName,
     hideHeader,
     minWidth,
-    rowHeight,
+    rowMode,
     skeletonRows,
     columns,
   }: {
@@ -32,7 +32,7 @@ vi.mock('@/components/organisms/table', () => ({
     ) => string;
     readonly hideHeader?: boolean;
     readonly minWidth?: string;
-    readonly rowHeight?: number;
+    readonly rowMode?: string;
     readonly skeletonRows?: number;
     readonly columns?: ReadonlyArray<{
       readonly meta?: { readonly cellContentClassName?: string };
@@ -44,7 +44,7 @@ vi.mock('@/components/organisms/table', () => ({
       data-hide-header={String(hideHeader)}
       data-min-width={minWidth}
       data-row-class-name={getRowClassName?.({ id: 'task-1' }, 0)}
-      data-row-height={String(rowHeight)}
+      data-row-mode={rowMode ?? ''}
       data-skeleton-rows={String(skeletonRows)}
       data-cell-content-class-name={
         columns?.[0]?.meta?.cellContentClassName ?? ''
@@ -72,7 +72,7 @@ describe('TaskDataTable', () => {
       'data-row-class-name',
       TASK_DATA_TABLE_ROW_CLASSNAME
     );
-    expect(table).toHaveAttribute('data-row-height', '56');
+    expect(table).toHaveAttribute('data-row-mode', 'dense');
     expect(table).toHaveAttribute('data-skeleton-rows', '8');
     expect(table).toHaveAttribute('data-virtualized', 'false');
     expect(TASK_DATA_TABLE_ROW_CLASSNAME).toContain('group/row');
@@ -89,7 +89,7 @@ describe('TaskDataTable', () => {
     );
   });
 
-  it('allows callers to extend task table chrome without losing row defaults', () => {
+  it('allows callers to extend task table chrome without losing dense row mode', () => {
     render(
       <TaskDataTable
         className='custom-density'
@@ -97,7 +97,6 @@ describe('TaskDataTable', () => {
         containerClassName='custom-scroll'
         data={[]}
         getRowClassName={() => 'selected-row'}
-        rowHeight={72}
       />
     );
 
@@ -115,7 +114,7 @@ describe('TaskDataTable', () => {
       'data-row-class-name',
       `${TASK_DATA_TABLE_ROW_CLASSNAME} selected-row`
     );
-    expect(table).toHaveAttribute('data-row-height', '72');
+    expect(table).toHaveAttribute('data-row-mode', 'dense');
   });
 
   it('preserves column-owned multiline content through the task table wrapper', () => {

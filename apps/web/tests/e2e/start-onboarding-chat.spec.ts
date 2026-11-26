@@ -519,46 +519,41 @@ test.describe('canonical /start onboarding chat', () => {
     ).toHaveCount(0);
   });
 
-  test('selected artist preview stays inline on mobile without overflow', async ({
+  test('selected artist preview peeks above the keyboard on mobile without pushing inputs', async ({
     page,
   }, testInfo) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await mockOnboardingChat(page);
     await page.goto('/start', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
-
     await sendComposerMessage(page, 'I am Test Artist');
-
     await expect(page.getByTestId('onboarding-artist-picker')).toBeVisible();
     await page.getByTestId('onboarding-artist-confirm').click();
 
     await expect(page.getByTestId('onboarding-profile-rail')).toBeHidden();
-    const inlineRail = page.getByTestId('onboarding-profile-rail-inline');
-    await expect(inlineRail).toBeVisible();
     await expect(
-      inlineRail.getByTestId('onboarding-profile-bento')
-    ).toBeVisible();
-    await expect(
-      inlineRail.getByTestId('onboarding-phone-preview')
-    ).toBeVisible();
-    await expect(
-      inlineRail.getByTestId('onboarding-profile-compact-surface')
-    ).toBeVisible();
-    await expect(inlineRail.getByText('Manage')).toHaveCount(0);
-
-    const overflow = await page.evaluate(
-      () =>
-        document.documentElement.scrollWidth -
-        document.documentElement.clientWidth
+      page.getByTestId('onboarding-profile-rail-inline')
+    ).toHaveCount(0);
+    const peekStrip = page.getByTestId('onboarding-profile-peek-strip');
+    await expect(peekStrip).toBeVisible();
+    await expect(peekStrip.getByText('Preview')).toBeVisible();
+    const peekBox = await peekStrip.boundingBox();
+    const composerBox = await page.locator(COMPOSER_SURFACE).boundingBox();
+    expect(peekBox && composerBox).toBeTruthy();
+    expect(peekBox!.height).toBeLessThanOrEqual(56);
+    expect(peekBox!.y + peekBox!.height).toBeLessThanOrEqual(
+      composerBox!.y + 1
     );
-    expect(overflow).toBeLessThanOrEqual(0);
-
-    await expect(inlineRail).toHaveScreenshot(
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth
+      )
+    ).toBeLessThanOrEqual(0);
+    await expect(peekStrip).toHaveScreenshot(
       'start-onboarding-profile-mobile.png',
-      {
-        animations: 'disabled',
-        maxDiffPixelRatio: 0.01,
-      }
+      { animations: 'disabled', maxDiffPixelRatio: 0.01 }
     );
     await testInfo.attach('onboarding-demo-mobile-rail-layout', {
       body: await page.screenshot({ fullPage: true }),

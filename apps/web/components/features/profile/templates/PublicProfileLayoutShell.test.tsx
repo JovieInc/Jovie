@@ -29,6 +29,13 @@ const commonProps = {
 };
 
 describe('PublicProfileLayoutShell', () => {
+  it('paints one cover-lit accent line on the stage (JOV-14241)', () => {
+    render(
+      <PublicProfileLayoutShell {...commonProps} isDesktopLayout={false} />
+    );
+    expect(screen.getByTestId('profile-cover-accent-line')).toBeInTheDocument();
+  });
+
   it('owns exactly the desktop surface in desktop layout', () => {
     render(
       <PublicProfileLayoutShell

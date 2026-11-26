@@ -175,7 +175,7 @@ export function companionChecklist(files, read) {
         filename,
         'source file fits company size budget',
         false,
-        `${lines} lines exceeds ${budget}; extract a cohesive module before pushing (scripts/company-guards/size-baseline.json).`
+        `${lines} lines exceeds ${budget} by ${lines - budget}; extract at least ${lines - budget} lines into a cohesive module before pushing (scripts/company-guards/size-baseline.json).`
       );
   }
 

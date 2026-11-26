@@ -1,7 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { mockInvalidateProxyUserStateCache } = vi.hoisted(() => ({
+  mockInvalidateProxyUserStateCache: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/auth/proxy-state', () => ({
+  invalidateProxyUserStateCache: mockInvalidateProxyUserStateCache,
+}));
+
 import {
   approveWaitlistEntryInTx,
   disapproveWaitlistEntryInTx,
+  finalizeWaitlistApproval,
+  finalizeWaitlistDisapproval,
 } from '@/lib/waitlist/approval';
 
 type QueryResult = Array<Record<string, unknown>>;
@@ -71,6 +82,7 @@ describe('approveWaitlistEntryInTx', () => {
       profileId: 'target-profile',
       email: 'creator@example.com',
       fullName: 'Creator',
+      userId: 'user-1',
       clerkId: 'clerk_123',
     });
 
@@ -232,6 +244,7 @@ describe('approveWaitlistEntryInTx', () => {
       profileId: null,
       email: 'creator@example.com',
       fullName: 'Creator',
+      userId: 'user-1',
       clerkId: 'clerk_123',
     });
     expect(updateSet).toHaveBeenCalledTimes(2);
@@ -242,6 +255,44 @@ describe('approveWaitlistEntryInTx', () => {
         activeProfileId: null,
       })
     );
+  });
+
+  it('never downgrades an already active user or clobbers activeProfileId when no held profile exists', async () => {
+    const { tx, updateSet } = createTxMock([
+      [
+        {
+          id: 'entry-1',
+          email: 'creator@example.com',
+          fullName: 'Creator',
+          status: 'new',
+        },
+      ],
+      [
+        {
+          id: 'user-1',
+          clerkId: null,
+          userStatus: 'active',
+          activeProfileId: 'existing-profile',
+        },
+      ],
+      [],
+    ]);
+
+    const result = await approveWaitlistEntryInTx(tx, 'entry-1');
+    expect(result).toMatchObject({
+      outcome: 'approved',
+      userId: 'user-1',
+      clerkId: null,
+    });
+    expect(updateSet).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        userStatus: 'active',
+        activeProfileId: 'existing-profile',
+      })
+    );
+    await finalizeWaitlistApproval(result);
+    expect(mockInvalidateProxyUserStateCache).toHaveBeenCalledWith('user-1');
   });
 
   it('re-approves expired invites so admins can send a fresh invite', async () => {
@@ -266,6 +317,7 @@ describe('approveWaitlistEntryInTx', () => {
       profileId: null,
       email: 'creator@example.com',
       fullName: 'Creator',
+      userId: 'user-1',
       clerkId: 'clerk_123',
     });
     expect(updateSet).toHaveBeenCalledTimes(2);
@@ -302,8 +354,12 @@ describe('disapproveWaitlistEntryInTx', () => {
 
     expect(result).toEqual({
       outcome: 'disapproved',
+      userId: 'user-1',
       clerkId: 'clerk_123',
     });
+    await finalizeWaitlistDisapproval(result);
+    expect(mockInvalidateProxyUserStateCache).toHaveBeenCalledWith('user-1');
+    expect(mockInvalidateProxyUserStateCache).toHaveBeenCalledWith('clerk_123');
     expect(updateSet).toHaveBeenCalledWith(
       expect.objectContaining({
         status: 'waitlisted',
@@ -331,5 +387,42 @@ describe('disapproveWaitlistEntryInTx', () => {
 
     expect(result).toEqual({ outcome: 'terminal', status: 'claimed' });
     expect(updateSet).not.toHaveBeenCalled();
+  });
+
+  it('does not unclaim linked profiles or clear activeProfileId for active users', async () => {
+    const { tx, updateSet } = createTxMock([
+      [
+        {
+          id: 'entry-1',
+          email: 'creator@example.com',
+          status: 'approved',
+        },
+      ],
+      [{ id: 'user-1', clerkId: 'clerk_123', userStatus: 'active' }],
+      [{ id: 'profile-1' }],
+    ]);
+
+    const result = await disapproveWaitlistEntryInTx(tx, 'entry-1');
+
+    expect(result).toMatchObject({
+      outcome: 'disapproved',
+      userId: 'user-1',
+      clerkId: 'clerk_123',
+    });
+    expect(updateSet).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: null,
+        isClaimed: false,
+        isPublic: false,
+      })
+    );
+    expect(updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userStatus: 'active',
+      })
+    );
+    expect(updateSet).not.toHaveBeenCalledWith(
+      expect.objectContaining({ activeProfileId: null })
+    );
   });
 });

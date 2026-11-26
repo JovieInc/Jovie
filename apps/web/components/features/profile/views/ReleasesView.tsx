@@ -2,7 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/profile/ReleasesView.test.tsx
 
-import { useMemo } from 'react';
+import { useMemo, ViewTransition } from 'react';
 import {
   ARTWORK_FIT_CLASSNAME,
   ArtworkFrame,
@@ -10,6 +10,7 @@ import {
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { track } from '@/lib/analytics';
 import { formatReleaseArtistLine } from '@/lib/discography/formatting';
+import { releaseCoverTransitionName } from '@/lib/motion/view-transition-names';
 import type { PublicRelease } from '../releases/types';
 
 const YEAR_HEADER_THRESHOLD = 15;
@@ -161,20 +162,26 @@ export function ReleasesView({
               }
               className='group flex min-h-16 items-center gap-3 border-t border-white/[0.075] px-4 py-2.5 first:border-t-0 transition-colors duration-subtle hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
             >
-              <ArtworkFrame size={44} className='h-11 w-11 bg-white/[0.04]'>
-                {/* Artwork is decorative: the link's accessible name comes from the
+              <ViewTransition
+                name={releaseCoverTransitionName(release.slug)}
+                share='jovie-morph'
+                default='none'
+              >
+                <ArtworkFrame size={44} className='h-11 w-11 bg-white/[0.04]'>
+                  {/* Artwork is decorative: the link's accessible name comes from the
                     visible title + meta text (WCAG 2.5.3 label-in-name). */}
-                <ImageWithFallback
-                  src={release.artworkUrl}
-                  alt=''
-                  fill
-                  sizes='44px'
-                  priority={index === 0}
-                  loading={index === 0 ? undefined : 'lazy'}
-                  className={ARTWORK_FIT_CLASSNAME}
-                  fallbackVariant='release'
-                />
-              </ArtworkFrame>
+                  <ImageWithFallback
+                    src={release.artworkUrl}
+                    alt=''
+                    fill
+                    sizes='44px'
+                    priority={index === 0}
+                    loading={index === 0 ? undefined : 'lazy'}
+                    className={ARTWORK_FIT_CLASSNAME}
+                    fallbackVariant='release'
+                  />
+                </ArtworkFrame>
+              </ViewTransition>
 
               <div className='min-w-0 flex-1 space-y-px'>
                 <div className='flex min-w-0 items-center gap-1.5'>

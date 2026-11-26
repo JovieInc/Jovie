@@ -1,11 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  ChatPageClient,
-  resetWelcomeChatBootstrapState,
-  shouldRetryWelcomeChatBootstrap,
-} from '@/app/app/(shell)/chat/ChatPageClient';
+import { ChatPageClient } from '@/app/app/(shell)/chat/ChatPageClient';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { APP_ROUTES } from '@/constants/routes';
@@ -150,6 +146,7 @@ vi.mock('@/components/jovie/JovieChat', () => ({
 vi.mock('@/lib/hooks/useNotifications', () => ({
   useNotifications: () => ({
     success: mockSuccessNotification,
+    info: vi.fn(),
     error: mockErrorNotification,
   }),
 }));
@@ -659,20 +656,6 @@ describe('ChatPageClient', () => {
       'Chat selectedProfile missing due to dashboard load failure',
       expect.any(Object)
     );
-  });
-
-  it('treats onboarding profile-missing 404s as retryable', () => {
-    expect(shouldRetryWelcomeChatBootstrap(404)).toBe(true);
-  });
-
-  it('resets scheduled bootstrap state during cleanup', () => {
-    const stateRef = { current: 'scheduled' as const };
-    const retryCountRef = { current: 2 };
-
-    resetWelcomeChatBootstrapState(stateRef, retryCountRef);
-
-    expect(stateRef.current).toBe('idle');
-    expect(retryCountRef.current).toBe(0);
   });
 
   it('announces welcome chat bootstrap progress without changing layout', async () => {

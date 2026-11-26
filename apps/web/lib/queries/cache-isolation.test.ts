@@ -36,6 +36,48 @@ describe('JOV-6186 cache isolation', () => {
     });
   });
 
+  it('treats anonymous-ready → first userId as hydrate (ONB-54 / JOV-14959)', () => {
+    // Anonymous /start already hydrated the fence as ready with null userId.
+    // First Email OTP must not bump generation or QueryProvider will remount
+    // and wipe OnboardingSessionBoundary's Keep freeze.
+    applyCacheScope({
+      userId: null,
+      sessionId: null,
+      ready: true,
+    });
+    expect(getCacheGeneration()).toBe(0);
+    expect(getCacheScope()).toMatchObject({
+      userId: null,
+      ready: true,
+    });
+
+    const firstAuth = applyCacheScope({
+      userId: 'user-a',
+      sessionId: 'sess-a',
+    });
+    expect(firstAuth?.reason).toBe('hydrate');
+    expect(firstAuth?.changed).toBe(false);
+    expect(getCacheGeneration()).toBe(0);
+    expect(getCacheScope()).toMatchObject({
+      userId: 'user-a',
+      sessionId: 'sess-a',
+    });
+  });
+
+  it('still fences account A → B after an anonymous-ready first auth', () => {
+    applyCacheScope({ userId: null, sessionId: null, ready: true });
+    applyCacheScope({ userId: 'user-a', sessionId: 'sess-a' });
+    expect(getCacheGeneration()).toBe(0);
+
+    const accountChange = applyCacheScope({
+      userId: 'user-b',
+      sessionId: 'sess-b',
+    });
+    expect(accountChange?.reason).toBe('account-change');
+    expect(accountChange?.changed).toBe(true);
+    expect(getCacheGeneration()).toBe(1);
+  });
+
   it('advances generation on account change and sign-out, not on public-key reuse', () => {
     applyCacheScope({
       userId: 'user-a',

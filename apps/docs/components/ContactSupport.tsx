@@ -15,8 +15,8 @@ export function ContactSupport({
   from,
   query,
 }: {
-  from?: string;
-  query?: string;
+  from?: string | undefined;
+  query?: string | undefined;
 }) {
   const [referrer, setReferrer] = useState('');
   const [pageUrl, setPageUrl] = useState('');

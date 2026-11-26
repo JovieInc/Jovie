@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { MerchPrintfulSnapshot } from '@/lib/db/schema/merch';
 import {
   getMerchContentReviewBlockers,
+  getMerchPersonContentReviewBlockers,
   MERCH_CONTENT_CONTRACT_VERSION,
   MERCH_CONTENT_REVIEW_REQUIRED_BLOCKER,
   MERCH_CONTENT_REVIEWER_VERSION,
@@ -172,5 +173,25 @@ describe('merch person-content evaluation lane', () => {
     }).map(fixture => fixture.id);
 
     expect(escapes).toEqual([]);
+  });
+});
+
+describe('concept gate split', () => {
+  it('blocks publishing but not a draft pick for a concept-reviewed design', () => {
+    const qualityReview = { conceptReview: { status: 'approved' } };
+    expect(getMerchContentReviewBlockers(qualityReview)[0]).toContain(
+      'rights and production-art approval'
+    );
+    expect(getMerchPersonContentReviewBlockers(qualityReview)).toEqual([]);
+  });
+
+  it('still blocks a draft pick when the person review is missing', () => {
+    const qualityReview = {
+      conceptReview: { status: 'approved' },
+      contentContractVersion: MERCH_CONTENT_CONTRACT_VERSION,
+    };
+    expect(getMerchPersonContentReviewBlockers(qualityReview)).toEqual([
+      MERCH_CONTENT_REVIEW_REQUIRED_BLOCKER,
+    ]);
   });
 });

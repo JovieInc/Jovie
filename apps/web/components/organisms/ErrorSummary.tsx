@@ -1,6 +1,7 @@
 'use client';
 
 // @coverage-via apps/web/tests/components/forms.test.tsx
+import { PlainButton } from '@jovie/ui';
 import { useEffect, useId, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -62,13 +63,13 @@ export function ErrorSummary({
           {Object.entries(errors).map(([fieldName, errorMessage]) => (
             <li key={fieldName}>
               {onFocusField ? (
-                <button
+                <PlainButton
                   type='button'
                   className='focus-ring-themed rounded-sm text-left text-error underline underline-offset-2 hover:text-error'
                   onClick={() => onFocusField(fieldName)}
                 >
                   {errorMessage}
-                </button>
+                </PlainButton>
               ) : (
                 <span>{errorMessage}</span>
               )}

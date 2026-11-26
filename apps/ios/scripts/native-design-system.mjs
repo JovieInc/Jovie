@@ -8,7 +8,17 @@ import {
   scanSwiftSource,
   tierOf,
 } from '../../../scripts/invariants/native-spacing-scale.mjs';
+import {
+  projectedActionButton,
+  replaceActionButtonProjection,
+} from './native-design-system-action-button.mjs';
+import {
+  contrastRatio,
+  projectedMotion,
+  replaceMotionProjection,
+} from './native-design-system-motion.mjs';
 
+export { contrastRatio };
 export const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 export const MANIFEST = 'apps/ios/scripts/native-design-system.manifest.json';
 export const START = '  // BEGIN GENERATED NATIVE COLORS';
@@ -122,7 +132,6 @@ export function replaceProjection(source, projection) {
   );
 }
 
-/** Mask Swift comments/strings without changing offsets; nested block comments included. */
 export function maskSwift(source) {
   let result = '';
   let index = 0;
@@ -414,30 +423,6 @@ export function nativeSpacing(source) {
   );
 }
 
-export function contrastRatio(foreground, background, opacity = 1) {
-  const rgb = value =>
-    value
-      .slice(1)
-      .match(/../g)
-      .map(channel => Number.parseInt(channel, 16) / 255);
-  const bg = rgb(background);
-  const fg = rgb(foreground).map(
-    (value, index) => value * opacity + bg[index] * (1 - opacity)
-  );
-  const luminance = channels =>
-    channels.reduce(
-      (sum, channel, index) =>
-        sum +
-        (channel <= 0.04045
-          ? channel / 12.92
-          : ((channel + 0.055) / 1.055) ** 2.4) *
-          [0.2126, 0.7152, 0.0722][index],
-      0
-    );
-  const [low, high] = [luminance(fg), luminance(bg)].sort((a, b) => a - b);
-  return (high + 0.05) / (low + 0.05);
-}
-
 export function checkNativeDesign(root = ROOT, { write = false } = {}) {
   const manifest = JSON.parse(readFileSync(resolve(root, MANIFEST), 'utf8'));
   const palette = JSON.parse(
@@ -446,8 +431,17 @@ export function checkNativeDesign(root = ROOT, { write = false } = {}) {
   const css = readFileSync(resolve(root, manifest.semantics), 'utf8');
   const themePath = resolve(root, manifest.theme);
   const theme = readFileSync(themePath, 'utf8');
-  const projection = projectedColors(manifest, palette, css);
-  const expected = replaceProjection(theme, projection);
+  const contract = readFileSync(
+    resolve(root, manifest.actionButtonContract),
+    'utf8'
+  );
+  const expected = replaceActionButtonProjection(
+    replaceMotionProjection(
+      replaceProjection(theme, projectedColors(manifest, palette, css)),
+      projectedMotion(manifest.motionBindings, css)
+    ),
+    projectedActionButton(manifest.actionButtonBindings, contract)
+  );
   if (write) writeFileSync(themePath, expected);
   const issues = [];
   if (!write && expected !== theme)

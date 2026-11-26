@@ -441,7 +441,7 @@ export async function applyGithubAudit(
     const it: SnapshotItem = {
       kind: action.startsWith('workflows.') ? 'workflow' : 'ruleset',
       id: String(r.workflow_id ?? r.name ?? ''),
-      name: r.name,
+      ...(r.name !== undefined ? { name: r.name } : {}),
       state: action.includes('disable') ? 'disabled_manually' : 'active',
       updated_at: at,
     };
@@ -501,7 +501,7 @@ export async function retain(env: Env, now: Date) {
       contentEncoding: 'gzip',
     },
   });
-  const last = results[results.length - 1].ts;
+  const last = results[results.length - 1]?.ts;
   await env.AUDIT_DB.prepare('DELETE FROM events WHERE ts <= ?1 AND ts < ?2')
     .bind(last, cutoff)
     .run();

@@ -14,7 +14,7 @@ import {
 } from '@/components/features/dashboard/organisms/dashboard-audience-table/cells/NowMsContext';
 import {
   AUDIENCE_STATE_LABELS,
-  AUDIENCE_STATE_STYLES,
+  AUDIENCE_STATE_TONES,
   canMessageAudienceMember,
   getAudienceDisplayName,
   getAudienceDisplayState,
@@ -23,6 +23,7 @@ import {
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/audience';
 import type { AudienceMember } from '@/types';
+import { StatusCell } from '../cells/StatusCell';
 
 export interface AudienceMobileCardProps {
   readonly member: AudienceMember;
@@ -114,14 +115,12 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
           >
             {displayName}
           </TruncatedText>
-          <span
-            className={cn(
-              'inline-flex shrink-0 items-center rounded-md px-1.5 py-0.5 text-2xs font-medium tabular-nums ring-1 ring-inset',
-              AUDIENCE_STATE_STYLES[state]
-            )}
+          <StatusCell
+            tone={AUDIENCE_STATE_TONES[state]}
+            className='shrink-0 text-2xs'
           >
             {AUDIENCE_STATE_LABELS[state]}
-          </span>
+          </StatusCell>
         </div>
 
         <div className='flex items-center justify-between gap-2'>

@@ -105,13 +105,15 @@ describe('table System B style exports', () => {
     expect(source).not.toMatch(/group-(?:hover|focus-visible)\/task-row:bg-/);
   });
 
-  it('keeps reduced motion and the 40px row invariant in the canonical stylesheet', () => {
+  it('keeps reduced motion and the dense 32px row invariant in the canonical stylesheet', () => {
     const designSystemSource = readFileSync(
       join(process.cwd(), 'styles/system-b-app.css'),
       'utf8'
     );
 
-    expect(designSystemSource).toContain('height: 40px;');
+    expect(designSystemSource).toContain(
+      'height: var(--table-row-height, 32px);'
+    );
     expect(designSystemSource).toContain(
       '@media (prefers-reduced-motion: reduce)'
     );

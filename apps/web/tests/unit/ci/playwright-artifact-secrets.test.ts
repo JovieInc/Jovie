@@ -92,12 +92,10 @@ type PolicyWorkflow = {
   readonly jobs?: Record<string, PolicyJob>;
 };
 const safeUploadUses = './.github/actions/upload-safe-playwright-artifact';
-// Commands that make Playwright (or its telemetry normalizers) write the
-// browser-derived files the guard scans before any upload can read them.
+// Playwright/telemetry commands that write browser-derived files the guard scans.
 const playwrightProducer =
   /(?:playwright test|run qa:routes| e2e:|run test:e2e|test:nightly-agent:(?:normalize|publish-status))/;
-// Reviewed producers that run without guard-playwright-artifacts.mjs, keyed
-// `file:job` to one step name or '*' for the whole job.
+// Unguarded producers: `file:job` → step name or '*' for the whole job.
 const unguardedProducerSteps = new Map([
   // Captures publish through the catalog integrity/budget verifier instead.
   ['screenshots.yml:generate', '*'],
@@ -118,7 +116,7 @@ const producerStageExempt = new Set([
 ]);
 // Jobs that must keep the receipt even if their uploads move elsewhere.
 const producerStageRequired = [
-  ...'ci-fast-remaining ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-lighthouse-dashboard-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'
+  ...'ci-fast-remaining-shards ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-lighthouse-dashboard-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-profile-viewport-sweep ci-admin-smoke ci-e2e-tests ci-smoke-required'
     .split(' ')
     .map(job => `ci.yml:${job}`),
   'e2e-full-matrix.yml:e2e-full-matrix',
@@ -133,9 +131,11 @@ const producerStageRequired = [
   'visual-regression.yml:visual-regression',
 ];
 const imageAllowedJobs = new Set([
-  'ci.yml:ci-fast-remaining',
+  'ci.yml:ci-fast-remaining-shards',
   'ci.yml:ci-golden-path',
   'ci.yml:ci-lighthouse-pr',
+  // Failing-width screenshots of the public profile fixture renders.
+  'ci.yml:ci-profile-viewport-sweep',
   'ci.yml:ci-storybook-surfaces',
   'ci.yml:ci-visual-snapshot-homepage',
   'ci.yml:ci-visual-marketing-dom',
@@ -153,7 +153,7 @@ const markdownAllowedJobs = new Set([
   'ci.yml:ci-build-layout',
   'ci.yml:ci-e2e-smoke',
   'ci.yml:ci-e2e-tests',
-  'ci.yml:ci-fast-remaining',
+  'ci.yml:ci-fast-remaining-shards',
   'ci.yml:ci-golden-path',
   'ci.yml:ci-smoke-required',
   'ci.yml:ci-storybook-surfaces',
@@ -261,12 +261,10 @@ function fixture(prefix = 'jovie-artifact-', parent = tmpdir()) {
   generated.push(path);
   return path;
 }
-
 function write(path: string, contents: string | Buffer) {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, contents);
 }
-
 const fileMode = (path: string) => lstatSync(path).mode & 0o777;
 const jobBlock = (source: string, job: string) =>
   source.match(new RegExp(`\\n  ${job}:[\\s\\S]*?(?=\\n  [\\w-]+:|$)`))?.[0] ??
@@ -734,7 +732,7 @@ afterEach(() => {
 });
 
 describe('Playwright artifact secret boundary', () => {
-  it('keeps configs reporter-safe and suppresses default JSON only for producer jobs', async () => {
+  it('keeps configs reporter-safe and always emits JSON flaky status in CI', async () => {
     const actual = readdirSync(webRoot)
       .filter(name =>
         /^playwright(?:\.[\w-]+)*\.config(?:\.[\w-]+)*\.[cm]?[jt]s$/.test(name)
@@ -840,21 +838,20 @@ describe('Playwright artifact secret boundary', () => {
     expect(reporterNames(ci['playwright.config.ts'].reporter)).toContain(
       'json'
     );
+    // Producer-stage lanes still need JSON flaky status for the flakiness
+    // report on green runs (JOV-12621). Only Vercel automation bypass skips it.
     expect(
       reporterNames(
         (await configs(true, true))['playwright.config.ts'].reporter
       )
-    ).not.toContain('json');
+    ).toContain('json');
     await expect(configs(true, false, 'sentinel')).rejects.toThrow(
       'Global Vercel bypass headers are forbidden'
     );
   }, 90_000);
 
   it('keeps fixture Playwright configs from fetching into the enclosing checkout', () => {
-    // Fixtures live under apps/web, inside the real checkout. With CI's
-    // GITHUB_ACTIONS and a pull_request event, Playwright's git-commit-info
-    // plugin runs `git fetch origin <base.sha> --depth=1` from the config dir,
-    // which shallows the checkout under concurrent structural commands.
+    // Fixture configs must disable git-commit-info fetch (CI shallows checkout).
     const source = readFileSync(import.meta.filename, 'utf8');
     const fixtureConfigs = source
       .split(['export default', 'defineConfig({'].join(' '))
@@ -945,7 +942,7 @@ describe('Playwright artifact secret boundary', () => {
     'keeps Storybook base-fetch auth scoped and propagates exit %i',
     fetchExit => {
       const workflow = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
-      const job = jobBlock(workflow, 'ci-fast-remaining');
+      const job = jobBlock(workflow, 'ci-fast-remaining-shards');
       const step = stepBlock(job, 'Decide structural lane');
       expect(step).toContain('GH_TOKEN: ${{ github.token }}');
       const command = step
@@ -1065,9 +1062,7 @@ describe('Playwright artifact secret boundary', () => {
     expect(visualUpload).toContain("public-images: 'true'");
   });
 
-  // JOV-7707: the artifact boundary is enforced as policy over parsed workflow
-  // YAML. New producers, uploads and jobs are held to these rules by default,
-  // so adding one needs no inventory edit; only exemptions are listed.
+  // JOV-7707: policy over parsed YAML; only exemptions are listed.
   it('guards every Playwright producer step outside the reviewed exemptions', () => {
     const violations = workflowJobs().flatMap(({ file, id, job }) =>
       producerSteps(job).flatMap(({ step }) => {
@@ -1324,9 +1319,7 @@ ${fixtureCheckout}
     expect(violations).toEqual([]);
     const reportJob = policyWorkflow('nightly-testing-agent.yml').jobs?.report;
     expect(reportJob?.permissions).toEqual({ contents: 'read' });
-    // Evidence is data: the nightly report ships as a run artifact, never as
-    // a PR (#23906). The report job must not mint a publication token at all,
-    // so no bot credentials can reach it in any order.
+    // Nightly report is a run artifact only (#23906) — no publication token.
     expect(
       reportJob?.steps?.some(step =>
         /create-github-app-token@/.test(step.uses ?? '')
@@ -1521,46 +1514,38 @@ ${fixtureCheckout}
     });
   });
 
-  it.each([
-    [3, true],
-    [0, false],
-  ])(
-    'keeps the chaos sweep exit %i and copies its report when present',
-    (producerExit, writesResults) => {
-      const sweep = policyWorkflow('nightly-tests.yml').jobs?.[
-        'e2e-tests'
-      ]?.steps?.find(step => step.name === 'Run full surface chaos sweep');
-      expect(String(sweep?.run)).toContain(guardScriptName);
-      expect(sweep?.['continue-on-error']).toBe(true);
-      const root = fixture('jovie-chaos-sweep-');
-      const bin = join(root, 'bin');
-      write(
-        join(bin, 'node'),
-        '#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nexec "$@"\n'
-      );
-      write(
-        join(bin, 'pnpm'),
-        `#!/bin/sh\n${writesResults ? 'mkdir -p test-results && echo {} > test-results/nightly-results.json\n' : ''}exit ${producerExit}\n`
-      );
-      spawnSync('chmod', ['+x', join(bin, 'node'), join(bin, 'pnpm')]);
-      mkdirSync(join(root, 'apps/web'), { recursive: true });
-      const result = spawnSync('bash', ['-c', String(sweep?.run)], {
-        cwd: root,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          GITHUB_WORKSPACE: root,
-          PATH: `${bin}:${process.env.PATH ?? ''}`,
-        },
-      });
-      expect(result.status, result.stderr).toBe(producerExit);
-      expect(
-        existsSync(
-          join(root, 'apps/web/test-results/full-surface-chaos-report.json')
-        )
-      ).toBe(writesResults);
-    }
-  );
+  it('keeps advisory chaos continue-on-error and isolated JSON/output paths (JOV-14767)', () => {
+    const e2e = policyWorkflow('nightly-tests.yml').jobs?.['e2e-tests'];
+    const sweep = e2e?.steps?.find(
+      step => step.name === 'Run full surface chaos sweep'
+    );
+    const required = e2e?.steps?.find(
+      step => step.name === 'Run nightly E2E tests'
+    );
+    expect(String(sweep?.run)).toContain(guardScriptName);
+    expect(String(sweep?.run)).toContain(
+      'tests/e2e/nightly/full-surface-chaos.spec.ts'
+    );
+    // Chaos no longer copies over nightly-results.json; it writes its own file.
+    expect(String(sweep?.run)).not.toContain(
+      'cp test-results/nightly-results.json test-results/full-surface-chaos-report.json'
+    );
+    expect(sweep?.['continue-on-error']).toBe(true);
+    expect(String(sweep?.if ?? '')).toContain('always()');
+    expect(sweep?.env).toMatchObject({
+      PLAYWRIGHT_JSON_OUTPUT_FILE:
+        'test-results/full-surface-chaos-report.json',
+      PLAYWRIGHT_OUTPUT_DIR: 'test-results/chaos-playwright-output',
+    });
+    expect(required?.env).toMatchObject({
+      PLAYWRIGHT_JSON_OUTPUT_FILE: 'test-results/nightly-results.json',
+      PLAYWRIGHT_OUTPUT_DIR: 'test-results/required-playwright-output',
+    });
+    const names = (e2e?.steps ?? []).map(step => step.name);
+    expect(names.indexOf('Run nightly E2E tests')).toBeLessThan(
+      names.indexOf('Run full surface chaos sweep')
+    );
+  });
 
   it('requires step-scoped Markdown allowance for every production smoke producer', () => {
     const expected = productionSmokeProducers;
@@ -1574,7 +1559,9 @@ ${fixtureCheckout}
               step =>
                 step.includes(
                   'node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs"'
-                ) && step.includes('tests/e2e/smoke-prod-auth.spec.ts')
+                ) &&
+                (step.includes('tests/e2e/smoke-prod-auth.spec.ts') ||
+                  step.includes('tests/e2e/canary-claim-checkout.spec.ts'))
             )
             .map(step => ({
               file,
@@ -1609,6 +1596,23 @@ ${fixtureCheckout}
       expect(yamlPropertyBlock(source, 'env', 0), item).not.toContain(
         'PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN'
       );
+      // JOV-9826: Stripe TEST custody; paid walk → staging.jov.ie (pk_test-only).
+      if (producer.includes('canary-claim-checkout.spec.ts')) {
+        for (const s of [
+          'STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}',
+          'STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}',
+          'STRIPE_TEST_ACCOUNT_ID=acct_1T1DV0ASl9B9udHv',
+          'STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY=price_1USkjzASl9B9udHvEYkZLYZp',
+          "CANARY_BASE_URL='https://staging.jov.ie'",
+          'EXPECTED_VERCEL_ENVIRONMENT=preview',
+          'pk_test-only',
+        ])
+          expect(producer).toContain(s);
+        expect(producer).not.toContain(
+          'STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY,STRIPE_TEST_ACCOUNT_ID'
+        );
+        expect(job.source).toMatch(/^\s+environment:\s+Preview – jovie\s*$/m);
+      }
     }
   });
 
@@ -2128,17 +2132,14 @@ ${fixtureCheckout}
     const valid = png();
     expect(validPlaywrightPng(valid)).toBe(true);
     expect(validPlaywrightPng(png([], undefined, 6))).toBe(true);
-    // Exact marketing-route failure mode: 2x desktop (1440 CSS @ 2) full-page
-    // at 7_000 CSS px → 2880×14000 RGB = 120_974_000 decoded bytes. The old
-    // 100MB ceiling rejected these as image-policy even with allow-images.
+    // Marketing-route 2x desktop full-page (2880×14000) must pass pixel budget.
     const marketingRouteDesktop = png([], undefined, 2, 2880, 14_000);
     expect((1 + 2880 * 3) * 14_000).toBeGreaterThan(100_000_000);
     expect((1 + 2880 * 3) * 14_000).toBeLessThan(
       MAX_PLAYWRIGHT_PNG_PIXEL_BYTES
     );
     expect(validPlaywrightPng(marketingRouteDesktop)).toBe(true);
-    // Regression for the production /changelog desktop capture that exposed
-    // the previous 400MB ceiling: 2880x58814 RGBA plus one filter byte/row.
+    // /changelog desktop capture must stay under the prior 400MB ceiling.
     expect((1 + 2880 * 4) * 58_814).toBe(677_596_094);
     expect((1 + 2880 * 4) * 58_814).toBeLessThan(
       MAX_PLAYWRIGHT_PNG_PIXEL_BYTES
@@ -2363,11 +2364,7 @@ ${fixtureCheckout}
       chromiumConfig,
       "import{defineConfig}from'@playwright/test';export default defineConfig({captureGitInfo:{commit:false,diff:false},testDir:'.',outputDir:'test-results',reporter:'line',use:{trace:'off',video:'off',screenshot:'off',viewport:{width:1440,height:900},deviceScaleFactor:2}})"
     );
-    // Under runner CPU contention headless Chromium intermittently rejects a
-    // 2880x14000 full-page capture with "Protocol error
-    // (Page.captureScreenshot): Unable to capture screenshot" (merge-queue
-    // structural-web jobs 108805269012 and 108870253303). Retry only that
-    // transient, at most twice; any other error, or a third failure, fails.
+    // Retry captureScreenshot CPU-contention failures ≤2× (MQ structural-web).
     write(
       join(chromiumDir, 'route.spec.ts'),
       "import{test}from'@playwright/test';test('route',async({page},info)=>{await page.setContent('<style>html,body{margin:0}</style><div style=\"height:7000px;background:#111\"></div>');for(let attempt=1;;attempt++){try{await page.screenshot({animations:'disabled',fullPage:true,path:info.outputPath('marketing-route.png'),type:'png'});break}catch(error){if(attempt>=3||!String(error).includes('Unable to capture screenshot'))throw error}}})"
@@ -2645,10 +2642,7 @@ ${fixtureCheckout}
     const counts =
       'blocked 1 unsafe or unverifiable Playwright artifact file(s); categories=credential-text:1; file-classes=json:1';
 
-    // In Actions the counts-only line is duplicated as a step error annotation
-    // so a fresh failing step is diagnosable from check annotations without
-    // admin job-log access (run 39820205877 class). Content is identical to
-    // the stderr line — never paths, file names, or values.
+    // Duplicate counts-only line as Actions annotation (run 39820205877).
     const annotated = runChild(workspace, runner, leakChild, {
       FLAGS_SECRET: 'annotation-sentinel-secret',
     });
@@ -2929,6 +2923,7 @@ ${fixtureCheckout}
       'apps/web/test-results/nightly-agent/skill-delta.json',
       'docs/NIGHTLY_TESTING_AGENT_REPORT.md',
       'apps/web/reports/nightly-agent/last-run.json',
+      'apps/web/reports/nightly-agent/skill-delta.json',
     ];
     const reportContents = Object.fromEntries(
       reportPaths.map((path, index) => [

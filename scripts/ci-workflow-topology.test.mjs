@@ -19,6 +19,8 @@ test('Pen drafts share one editor across runs and retain pending frame jobs', ()
   assert.equal(workflow.jobs.draft.strategy['max-parallel'], 1);
   assert.match(workflow.concurrency.group, /github\.event\.pull_request\.number/);
   assert.match(workflow.concurrency.group, /github\.sha/);
+  // Each PR push plans only its own changes, so it must not replace a queued push.
+  assert.match(workflow.concurrency.group, /github\.event\.pull_request\.head\.sha/);
 });
 
 test('repository workflows satisfy the topology and fan-out contract', () => {

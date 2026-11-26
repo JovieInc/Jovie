@@ -29,6 +29,11 @@ import { isMusicfetchVendorUnavailable } from '@/lib/musicfetch/errors';
 import { captureRevenueSpineFailure } from '@/lib/observability/revenue-spine';
 import { scheduleOnboardingCatalogImport } from '@/lib/onboarding/catalog-import.server';
 import {
+  buildImportedProfileFields,
+  buildOnboardingSettings,
+  type HeldClaimVerification,
+} from '@/lib/onboarding/claim-profile-settings';
+import {
   type ClaimedOnboardingState,
   deriveClaimedOnboardingStateFromMessageRows,
 } from '@/lib/onboarding/claimed-state';
@@ -54,7 +59,6 @@ import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 type CreatorProfile = typeof creatorProfiles.$inferSelect;
 
 const HANDLE_CLAIM_MAX_ATTEMPTS = 5;
-const MAX_IMPORTED_BIO_LENGTH = 2_000;
 
 export interface MaterializeClaimedOnboardingProfileInput {
   readonly userId: string;
@@ -78,10 +82,6 @@ export interface MaterializeClaimedOnboardingProfileResult {
   readonly profileId: string | null;
   readonly handle: string | null;
   readonly status: 'created' | 'updated' | 'skipped';
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function cleanProposedHandle(handle: string | null): string | null {
@@ -118,43 +118,13 @@ function pickInitialProfileHandle(
 async function reserveFallbackProfileHandle(
   state: ClaimedOnboardingState,
   cleanedProposedHandle: string | null,
-  userId: string
+  userId: string,
+  heldArtistName: string | null = null
 ): Promise<string> {
-  // Fail closed: handle reservation success requires verified ownership.
   return reserveOnboardingHandle(
-    state.artist?.name ?? cleanedProposedHandle ?? 'profile',
+    state.artist?.name ?? cleanedProposedHandle ?? heldArtistName ?? 'profile',
     userId
   );
-}
-
-function buildOnboardingSettings(
-  existingSettings: unknown,
-  state: ClaimedOnboardingState,
-  conversationId: string,
-  claimedAt: Date
-): Record<string, unknown> {
-  const base = isRecord(existingSettings) ? existingSettings : {};
-  const onboarding = isRecord(base.onboarding) ? base.onboarding : {};
-
-  return {
-    ...base,
-    onboarding: {
-      ...onboarding,
-      claimedConversationId: conversationId,
-      claimedAt: claimedAt.toISOString(),
-      selectedSpotifyArtistId: state.artist?.id ?? null,
-      selectedSpotifyArtistName: state.artist?.name ?? null,
-      socialLinks: [...state.socialLinks],
-      interviewSignalCount: state.interviewSignals.length,
-      profileDraft: state.profileDraft ?? null,
-    },
-  };
-}
-
-interface HeldClaimVerification {
-  readonly spotifyArtistId: string;
-  readonly artistName: string | null;
-  readonly reach: number;
 }
 
 /**
@@ -188,36 +158,11 @@ async function holdHighReachArtistForVerification(
   };
 }
 
-function hasMaterializableState(state: ClaimedOnboardingState): boolean {
-  return Boolean(state.artist || state.handle);
-}
-
-function cleanImportedBio(bio: string | null | undefined): string | null {
-  const cleaned = bio?.trim().replaceAll(/\s+/g, ' ') ?? '';
-  if (!cleaned) return null;
-  return cleaned.slice(0, MAX_IMPORTED_BIO_LENGTH);
-}
-
-function cleanSpotifyAvatarUrl(
-  imageUrl: string | null | undefined
-): string | null {
-  const cleaned = imageUrl?.trim();
-  if (!cleaned) return null;
-
-  try {
-    const parsed = new URL(cleaned);
-    if (parsed.protocol !== 'https:') return null;
-    if (
-      parsed.hostname === 'i.scdn.co' ||
-      parsed.hostname.endsWith('.scdn.co')
-    ) {
-      return parsed.toString();
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
+function hasMaterializableState(
+  state: ClaimedOnboardingState,
+  verification: HeldClaimVerification | null
+): boolean {
+  return Boolean(state.artist || state.handle || verification);
 }
 
 async function fetchMusicFetchProfile(
@@ -241,36 +186,6 @@ async function fetchMusicFetchProfile(
     );
     return null;
   }
-}
-
-function buildImportedProfileFields({
-  existingProfile,
-  state,
-  musicFetch,
-}: {
-  readonly musicFetch: MusicFetchArtistResult | null;
-  readonly existingProfile: CreatorProfile | null;
-  readonly state: ClaimedOnboardingState;
-}): Record<string, unknown> {
-  if (!state.artist) return {};
-
-  const importedBio = cleanImportedBio(musicFetch?.bio);
-  const importedAvatarUrl =
-    cleanSpotifyAvatarUrl(state.artist.imageUrl) ??
-    cleanSpotifyAvatarUrl(musicFetch?.image?.url);
-
-  return {
-    avatarUrl:
-      existingProfile?.avatarLockedByUser && existingProfile.avatarUrl
-        ? existingProfile.avatarUrl
-        : (importedAvatarUrl ?? existingProfile?.avatarUrl ?? null),
-    ...(importedBio && !existingProfile?.bio ? { bio: importedBio } : {}),
-    spotifyId: state.artist.id,
-    spotifyUrl: state.artist.url,
-    spotifyFollowers: state.artist.followers,
-    spotifyPopularity: state.artist.popularity,
-    genres: [...state.artist.genres],
-  };
 }
 
 interface PersistClaimedProfileInput {
@@ -379,6 +294,7 @@ async function persistClaimedProfileRow({
 async function persistClaimedProfileWithHandleRetry({
   userId,
   state,
+  verification,
   conversationId,
   now,
   musicFetch,
@@ -388,6 +304,7 @@ async function persistClaimedProfileWithHandleRetry({
 }: {
   readonly userId: string;
   readonly state: ClaimedOnboardingState;
+  readonly verification: HeldClaimVerification | null;
   readonly conversationId: string;
   readonly now: Date;
   readonly musicFetch: MusicFetchArtistResult | null;
@@ -402,18 +319,21 @@ async function persistClaimedProfileWithHandleRetry({
   const cleanedProposedHandle = pickInitialProfileHandle(state.handle);
   let handle =
     cleanedProposedHandle ??
-    (await reserveFallbackProfileHandle(state, cleanedProposedHandle, userId));
+    (await reserveFallbackProfileHandle(
+      state,
+      cleanedProposedHandle,
+      userId,
+      verification?.artistName ?? null
+    ));
+  const targetSpotifyId =
+    state.artist?.id ?? verification?.spotifyArtistId ?? null;
 
   for (let attempt = 0; attempt < HANDLE_CLAIM_MAX_ATTEMPTS; attempt++) {
     try {
-      // Serialize this user's materialization even before a profile exists.
-      // Avoid a users row lock: direct claims update profile -> users, and an
-      // inverse users -> profile order would deadlock. External I/O stays out.
       const result = await withDbSessionTx(
         async tx => {
-          // Match direct Spotify claims: identity lock before user/profile rows.
-          if (state.artist)
-            await lockSpotifyProfileIdentity(tx, state.artist.id);
+          if (targetSpotifyId)
+            await lockSpotifyProfileIdentity(tx, targetSpotifyId);
           await tx.execute(
             drizzleSql`SELECT pg_advisory_xact_lock(hashtext('jovie:onboarding-profile-owner'), hashtext(${userId}))`
           );
@@ -430,17 +350,16 @@ async function persistClaimedProfileWithHandleRetry({
               profileOwnerUserId: existingProfile.userId,
             });
           }
-          if (state.artist) {
-            // A stale transcript must not replace an already bound identity.
+          if (targetSpotifyId) {
             if (
               existingProfile?.spotifyId &&
-              existingProfile.spotifyId !== state.artist.id
+              existingProfile.spotifyId !== targetSpotifyId
             ) {
               throw new SpotifyProfileIdentityConflictError();
             }
             await assertSpotifyProfileIdentityAvailable(
               tx,
-              state.artist.id,
+              targetSpotifyId,
               existingProfile?.id ?? null
             );
           }
@@ -449,7 +368,7 @@ async function persistClaimedProfileWithHandleRetry({
               ? state.profileDraft.activeRole === 'artist'
                 ? 'artist'
                 : 'creator'
-              : state.artist
+              : state.artist || verification
                 ? 'artist'
                 : 'creator',
             tx,
@@ -457,12 +376,21 @@ async function persistClaimedProfileWithHandleRetry({
             handle,
             existingProfile,
             displayName:
-              state.artist?.name ?? existingProfile?.displayName ?? handle,
+              state.artist?.name ??
+              (unproven &&
+              verification &&
+              !requiresClaimVerification(verification.reach)
+                ? verification.artistName
+                : null) ??
+              existingProfile?.displayName ??
+              handle,
             settings: buildOnboardingSettings(
               existingProfile?.settings,
               state,
               conversationId,
-              now
+              now,
+              verification,
+              unproven
             ),
             now,
             spotifyFields: buildImportedProfileFields({
@@ -479,7 +407,6 @@ async function persistClaimedProfileWithHandleRetry({
       );
       return { ...result, handle };
     } catch (error) {
-      // Keep the unique constraint as a backstop for writers outside this lock.
       if (isUniqueViolation(error, 'creator_profiles_spotify_id_unique')) {
         throw new SpotifyProfileIdentityConflictError();
       }
@@ -488,11 +415,11 @@ async function persistClaimedProfileWithHandleRetry({
         attempt === HANDLE_CLAIM_MAX_ATTEMPTS - 1
       )
         throw error;
-      // A failed transaction is rolled back before a handle retry starts.
       handle = await reserveFallbackProfileHandle(
         state,
         cleanedProposedHandle,
-        userId
+        userId,
+        verification?.artistName ?? null
       );
     }
   }
@@ -557,10 +484,8 @@ async function materializeProfile({
     deriveClaimedOnboardingStateFromMessageRows(messageRows),
     { forceHold: requestedUnproven }
   );
-  // Proof is about an artist identity. With none to hold, there is nothing
-  // to prove and the page is ordinary (never private with no way out).
   const unproven = requestedUnproven && verification !== null;
-  if (!hasMaterializableState(state)) {
+  if (!hasMaterializableState(state, verification)) {
     return { profileId: null, handle: null, status: 'skipped' };
   }
 
@@ -570,6 +495,7 @@ async function materializeProfile({
     await persistClaimedProfileWithHandleRetry({
       userId: verifiedUserId,
       state,
+      verification,
       conversationId,
       now,
       musicFetch,
@@ -578,10 +504,7 @@ async function materializeProfile({
       waitlistEntryId,
     });
 
-  // JOV-9758: import the matched artist's real catalog (releases, artwork,
-  // release smartlinks, DSP links) for every materialized identity,
-  // including reserved waitlist holds, so the page is never an empty shell.
-  // A held high-reach identity has no artist here and imports on approval.
+  // JOV-9758: import catalog for attached identities; held identities import on approval.
   if (state.artist?.id && profileId) {
     scheduleOnboardingCatalogImport({
       profileId,
@@ -657,9 +580,11 @@ async function materializeProfile({
     }
   }
 
+  const resolvedArtistName =
+    state.artist?.name ?? verification?.artistName ?? null;
   const artistLabel = describeArtistProfileForVisitor({
     ownershipVerified: true,
-    artistName: state.artist?.name ?? null,
+    artistName: resolvedArtistName,
   });
 
   await db.insert(chatAuditLog).values({
@@ -675,8 +600,9 @@ async function materializeProfile({
       status,
       visibility: reserved ? 'reserved' : unproven ? 'unproven' : 'public',
       waitlistEntryId,
-      spotifyArtistId: state.artist?.id ?? null,
-      spotifyArtistName: state.artist?.name ?? null,
+      spotifyArtistId:
+        state.artist?.id ?? verification?.spotifyArtistId ?? null,
+      spotifyArtistName: resolvedArtistName,
       // Neutral, ownership-verified label (never pre-verify "you" language).
       artistProfileLabel: artistLabel,
     },

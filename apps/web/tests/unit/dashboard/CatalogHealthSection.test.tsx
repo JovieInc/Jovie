@@ -317,9 +317,9 @@ describe('CatalogHealthSection', () => {
 
     // Post-triage summary should appear
     await waitFor(() => {
-      expect(
-        screen.getByText(/You flagged 1 track as not yours/)
-      ).toBeInTheDocument();
+      const note = screen.getByText(/You flagged 1 track as not yours/);
+      expect(note).toHaveClass('text-warning-text');
+      expect(note.parentElement).toHaveClass('bg-warning-subtle');
       expect(
         screen.getByText('Report to Spotify for Artists →')
       ).toBeInTheDocument();

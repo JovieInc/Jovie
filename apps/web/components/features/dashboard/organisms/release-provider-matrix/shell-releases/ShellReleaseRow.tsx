@@ -2,15 +2,9 @@
 
 // @coverage-via apps/web/tests/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow.test.tsx
 
+import { PlainButton } from '@jovie/ui';
 import { QueryClientContext } from '@tanstack/react-query';
-import {
-  Clock,
-  ExternalLink,
-  Lock,
-  MoreHorizontal,
-  Pause,
-  Play,
-} from 'lucide-react';
+import { Clock, ExternalLink, Lock, Pause } from 'lucide-react';
 import Link from 'next/link';
 import {
   type ComponentPropsWithoutRef,
@@ -22,6 +16,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { PlayIcon } from '@/components/atoms/PlayIcon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 import { toast } from '@/components/feedback';
@@ -29,6 +24,7 @@ import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useT
 import {
   contextualAction,
   ShellListRowFrame,
+  TableRowOverflowTrigger,
 } from '@/components/organisms/table';
 import { AgentPulse } from '@/components/shell/AgentPulse';
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
@@ -161,8 +157,7 @@ const ArtworkCell = memo(function ArtworkCell({
       />
       {isSyncing ? <AgentPulse className='rounded-sm' /> : null}
       {hasPreview ? (
-        <button
-          type='button'
+        <PlainButton
           onClick={handleTogglePlayback}
           onKeyDown={e => e.stopPropagation()}
           aria-label={
@@ -173,8 +168,8 @@ const ArtworkCell = memo(function ArtworkCell({
           className={cn(
             // Always renders white-on-black scrim in both themes — pair the
             // light/dark utilities so the play glyph stays legible on the
-            // `bg-black/50` overlay (satisfies no-hardcoded-theme-colors).
-            'absolute inset-0 grid place-items-center rounded-sm bg-black/50 text-white dark:text-white transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/55',
+            // `bg-ink-on-media/50` overlay (satisfies no-hardcoded-theme-colors).
+            'absolute inset-0 grid place-items-center rounded-sm bg-ink-on-media/50 text-on-media transition-opacity duration-subtle ease-subtle focus-visible:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring/55',
             isTrackPlaying
               ? 'opacity-100'
               : 'opacity-0 group-hover/row:opacity-100'
@@ -188,14 +183,14 @@ const ArtworkCell = memo(function ArtworkCell({
               aria-hidden='true'
             />
           ) : (
-            <Play
-              className='h-3.5 w-3.5 translate-x-px'
+            <PlayIcon
+              size={14}
               strokeWidth={2.5}
               fill='currentColor'
               aria-hidden='true'
             />
           )}
-        </button>
+        </PlainButton>
       ) : null}
     </div>
   );
@@ -229,12 +224,16 @@ const SmartLinkCell = memo(function SmartLinkCell({
         }
         data-shell-release-smart-link-locked='true'
         data-shell-release-smart-link-lock-reason={smartLinkLockReason}
-        className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token cursor-not-allowed'
+        className='shrink-0 h-7 w-7 rounded-full grid place-items-center text-quaternary-token cursor-not-allowed'
       >
         {isScheduled ? (
-          <Clock className='h-3 w-3' strokeWidth={2.25} aria-hidden='true' />
+          <Clock
+            className='h-3.5 w-3.5'
+            strokeWidth={2.25}
+            aria-hidden='true'
+          />
         ) : (
-          <Lock className='h-3 w-3' strokeWidth={2.25} aria-hidden='true' />
+          <Lock className='h-3.5 w-3.5' strokeWidth={2.25} aria-hidden='true' />
         )}
       </span>
     );
@@ -249,9 +248,9 @@ const SmartLinkCell = memo(function SmartLinkCell({
       onClick={e => e.stopPropagation()}
       title={`Open smart link · ${smartLinkPath}`}
       aria-label={`Open smart link for ${release.title}`}
-      className='shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-colors duration-subtle ease-subtle'
+      className='shrink-0 h-7 w-7 rounded-full grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-colors duration-subtle ease-subtle'
     >
-      <ExternalLink className='h-3 w-3' strokeWidth={2.25} />
+      <ExternalLink className='h-3.5 w-3.5' strokeWidth={2.25} />
     </Link>
   );
 });
@@ -494,15 +493,9 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
             open={actionsOpen}
             onOpenChange={setActionsOpen}
           >
-            <button
-              type='button'
-              onClick={e => e.stopPropagation()}
-              onKeyDown={e => e.stopPropagation()}
-              aria-label={`Release actions for ${release.title}`}
-              className='grid h-7 w-7 shrink-0 place-items-center rounded-md text-quaternary-token transition-[opacity,color,background-color] duration-subtle ease-subtle hover:bg-surface-2/70 hover:text-primary-token'
-            >
-              <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />
-            </button>
+            <TableRowOverflowTrigger
+              ariaLabel={`Release actions for ${release.title}`}
+            />
           </TableActionMenu>
         </div>
       ) : null}

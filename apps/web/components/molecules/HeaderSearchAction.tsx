@@ -1,10 +1,9 @@
 'use client';
 
+import { IconButton, TooltipShortcut } from '@jovie/ui';
 import { Search, X } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { AppSearchField } from '@/components/molecules/AppSearchField';
-import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { cn } from '@/lib/utils';
 
 export interface HeaderSearchActionProps {
@@ -63,14 +62,18 @@ export function HeaderSearchAction({
 
   if (!isOpen && !alwaysOpen) {
     return (
-      <DashboardHeaderActionButton
-        ariaLabel={submitAriaLabel}
-        onClick={() => setIsOpen(true)}
-        icon={submitIcon}
-        iconOnly
-        tooltipLabel={tooltipLabel}
-        className={className}
-      />
+      <TooltipShortcut label={tooltipLabel} side='bottom'>
+        <IconButton
+          type='button'
+          variant='control'
+          size='md'
+          ariaLabel={submitAriaLabel}
+          onClick={() => setIsOpen(true)}
+          className={className}
+        >
+          {submitIcon}
+        </IconButton>
+      </TooltipShortcut>
     );
   }
 
@@ -86,20 +89,27 @@ export function HeaderSearchAction({
         autoFocus={!alwaysOpen}
         showClearButton={false}
         className='w-[min(42vw,208px)] sm:w-[min(30vw,240px)] lg:w-[min(26vw,276px)]'
-        inputClassName={cn('text-app', inputClassName)}
+        inputClassName={inputClassName}
       />
       {alwaysOpen && searchValue.length === 0 ? null : (
-        <AppIconButton
-          type='button'
-          ariaLabel={
-            alwaysOpen ? 'Clear search' : `Close ${tooltipLabel.toLowerCase()}`
-          }
-          tooltipLabel={alwaysOpen ? 'Clear search' : 'Close search'}
-          className='border-transparent bg-transparent text-tertiary-token hover:border-transparent hover:bg-surface-1 hover:text-primary-token'
-          onClick={close}
+        <TooltipShortcut
+          label={alwaysOpen ? 'Clear search' : 'Close search'}
+          side='bottom'
         >
-          <X className='h-4 w-4' />
-        </AppIconButton>
+          <IconButton
+            type='button'
+            variant='control'
+            size='sm'
+            ariaLabel={
+              alwaysOpen
+                ? 'Clear search'
+                : `Close ${tooltipLabel.toLowerCase()}`
+            }
+            onClick={close}
+          >
+            <X className='h-4 w-4' />
+          </IconButton>
+        </TooltipShortcut>
       )}
     </div>
   );

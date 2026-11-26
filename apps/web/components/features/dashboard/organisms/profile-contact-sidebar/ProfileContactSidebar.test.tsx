@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FetchError } from '@/lib/queries/fetch';
 import { queryKeys } from '@/lib/queries/keys';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ProfileContactSidebar } from './ProfileContactSidebar';
 
 type DeferredMutationCall = {
@@ -131,20 +132,6 @@ vi.mock('@/components/feedback', () => ({
     success: mockState.toastSuccess,
     error: mockState.toastError,
   },
-}));
-
-vi.mock('@/components/atoms/AppIconButton', () => ({
-  AppIconButton: ({
-    children,
-    ariaLabel,
-    ...props
-  }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-    ariaLabel: string;
-  }) => (
-    <button type='button' aria-label={ariaLabel} {...props}>
-      {children}
-    </button>
-  ),
 }));
 
 vi.mock(
@@ -322,7 +309,7 @@ vi.mock('@/features/dashboard/organisms/dsp-matches/hooks', () => ({
   }),
 }));
 
-function renderSidebar() {
+function renderSidebar(contextOccupied = false) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -332,7 +319,7 @@ function renderSidebar() {
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <ProfileContactSidebar />
+      <ProfileContactSidebar contextOccupied={contextOccupied} />
     </QueryClientProvider>
   );
 }
@@ -411,6 +398,33 @@ async function rejectRemoveCall(index: number) {
   });
 }
 
+describe('ProfileContactSidebar a11y', () => {
+  beforeEach(() => {
+    mockState.profileCalls.length = 0;
+    mockState.removeCalls.length = 0;
+    mockState.toastSuccess.mockReset();
+    mockState.toastError.mockReset();
+    mockState.routerReplace.mockReset();
+    mockState.useRealProfileMutation = false;
+    mockState.isFloating = false;
+    mockState.selectedProfileId = 'profile-1';
+    mockState.previewReady = true;
+    mockState.searchParams = new URLSearchParams();
+    vi.unstubAllGlobals();
+  });
+
+  it('has no accessibility violations for the skeleton and hydrated rail', async () => {
+    mockState.previewReady = false;
+    const skeleton = renderSidebar();
+    await expectNoA11yViolations(skeleton.container);
+    skeleton.unmount();
+
+    mockState.previewReady = true;
+    const { container } = renderSidebar();
+    await expectNoA11yViolations(container);
+  });
+});
+
 describe('ProfileContactSidebar optimistic mutation sequencing', () => {
   it.each(['/app/profiles', '/app/settings/profile?tab=music'])(
     'preserves the header destination %s',
@@ -470,6 +484,15 @@ describe('ProfileContactSidebar optimistic mutation sequencing', () => {
     expect(screen.getByTestId('profile-contact-sidebar')).toHaveAttribute(
       'data-presentation',
       'overlay'
+    );
+  });
+
+  it('keeps an occupied chat context column in flow while a passive preview closes', () => {
+    mockState.isFloating = true;
+    renderSidebar(true);
+    expect(screen.getByTestId('profile-contact-sidebar')).toHaveAttribute(
+      'data-presentation',
+      'push'
     );
   });
 

@@ -317,7 +317,30 @@ test('loop is wired: workflow runs sync + check on the lanes clock, registry row
   const row = rows.find(r => r.id === 'github:jovie:security-advisory-loop');
   assert.ok(row, 'registry row missing');
   assert.match(row.purpose, /48h/);
+  assert.equal(row.owner, 'summer');
+  assert.equal(row.heartbeat?.escalationOwner, 'summer');
+  assert.match(row.purpose, /Summer-owned|area:security/);
+  assert.match(wf, /Summer owned/);
+  assert.doesNotMatch(wf, /Linear devin lane/);
   assert.ok(row.maxStalenessMinutes > 0);
+});
+
+test('Summer security labels are the intake routing contract', async () => {
+  const { SUMMER_SECURITY_LABELS, resolveSummerSecurityLabelIds } =
+    await import('./security-advisory-intake.mjs');
+  assert.deepEqual(SUMMER_SECURITY_LABELS, [
+    'security',
+    'Bug',
+    'area:security',
+  ]);
+  const ids = await resolveSummerSecurityLabelIds(async name => `${name}-id`);
+  assert.deepEqual(ids, ['security-id', 'Bug-id', 'area:security-id']);
+  await assert.rejects(
+    resolveSummerSecurityLabelIds(async name =>
+      name === 'Bug' ? null : `${name}-id`
+    ),
+    /label "Bug" not found/
+  );
 });
 
 test('recordBlindSource writes a blind receipt instead of reading as zero advisories', async () => {
@@ -357,8 +380,13 @@ test('blind sync persists the repair-card result and rejects failed writes', asy
     now: NOW,
   };
   const calls = [];
+  const labelByName = {
+    security: 'security-label',
+    Bug: 'bug-label',
+    'area:security': 'area-security-label',
+  };
   const dependencies = {
-    resolveLabel: async () => 'devin-label',
+    resolveLabel: async name => labelByName[name] ?? null,
     upsert: async input => {
       calls.push(input);
       return { ok: false, action: 'failed' };
@@ -374,7 +402,11 @@ test('blind sync persists the repair-card result and rejects failed writes', asy
     assert.equal(receipt.actions[0].ok, false);
     assert.equal(calls[0].fingerprint, 'secadv-blind-source');
     assert.equal(calls[0].reopenTerminal, true);
-    assert.deepEqual(calls[0].createLabelIds, ['devin-label']);
+    assert.deepEqual(calls[0].createLabelIds, [
+      'security-label',
+      'bug-label',
+      'area-security-label',
+    ]);
     dependencies.upsert = async () => ({ ok: true, action: 'existing' });
     await recordBlindSource(request, dependencies);
     assert.equal(
@@ -384,7 +416,7 @@ test('blind sync persists the repair-card result and rejects failed writes', asy
     dependencies.resolveLabel = async () => null;
     await assert.rejects(
       recordBlindSource(request, dependencies),
-      /label "devin" not found/
+      /label "security" not found/
     );
     assert.equal(JSON.parse(readFileSync(receiptPath, 'utf8')).blind, true);
   } finally {

@@ -44,7 +44,7 @@ function CollapseFixture() {
 }
 
 describe('Linear-scale density (founder lock 2026-09-25)', () => {
-  it('retains creation and destination order when the shared header owns Inbox', () => {
+  it('retains creation and destination order when the shared header owns Home', () => {
     renderDashboardNav({ renderFn: render, headerOwnsInbox: true });
     const destinations = Array.from(
       document.querySelectorAll('[data-navigation-item-id]')
@@ -74,7 +74,6 @@ describe('DashboardNav route warming', () => {
   });
 
   it('leaves home attention to the brand row and retains destinations', () => {
-    const label = 'Inbox';
     const destinations = () =>
       screen.getAllByRole('link').map(link => ({
         label: link.getAttribute('aria-label') ?? link.textContent?.trim(),
@@ -84,7 +83,8 @@ describe('DashboardNav route warming', () => {
       renderFn: render,
     });
     const attention = document.querySelector('[data-inbox-attention]');
-    expect(attention).toHaveAccessibleName(label);
+    // Qualified so it does not collide with the Home nav row.
+    expect(attention).toHaveAccessibleName('Home — notifications');
     expect(attention).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
     const retained = destinations();
     const attentionIndex = screen
@@ -98,16 +98,18 @@ describe('DashboardNav route warming', () => {
       headerOwnsInbox: true,
     });
     expect(document.querySelector('[data-inbox-attention]')).toBeNull();
-    // The header bell is the Inbox entry, so the rail's Inbox row goes too;
+    // The header bell is the Home entry, so the rail's Home row goes too;
     // every other destination is retained.
     expect(destinations()).toEqual(
       retained.filter(destination => destination.href !== APP_ROUTES.DASHBOARD)
     );
-    expect(screen.queryByRole('link', { name: label })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /^Home$/ })
+    ).not.toBeInTheDocument();
     expect(document.querySelector('[data-sidebar-search-divider]')).toBeNull();
   });
 
-  it('gives New Chat a labeled row on the icon column when the header owns inbox and search', () => {
+  it('gives New Chat a labeled row on the icon column when the header owns Home and search', () => {
     renderDashboardNav({
       renderFn: render,
       headerOwnsInbox: true,
@@ -143,11 +145,14 @@ describe('DashboardNav route warming', () => {
         'false'
       );
     }
-    const homeLinks = screen.getAllByRole('link', { name: 'Inbox' });
-    expect(homeLinks).toHaveLength(2);
+    // Exact "Home" is the nav row only; the rail bell uses a qualified name.
+    const homeLinks = screen.getAllByRole('link', { name: /^Home$/ });
+    expect(homeLinks).toHaveLength(1);
     for (const link of homeLinks) {
       expect(link).toHaveAttribute('data-prefetch', 'false');
     }
+    const attention = document.querySelector('[data-inbox-attention]');
+    expect(attention).toHaveAttribute('data-prefetch', 'false');
     for (const label of ['Library', 'Links', 'Contacts', 'Calendar', 'Tasks']) {
       expect(
         screen.queryByRole('link', { name: label })
@@ -216,7 +221,7 @@ describe('DashboardNav route warming', () => {
     }
   });
 
-  it.each(['inbox', 'chat', 'home'] as const)(
+  it.each(['chat', 'home'] as const)(
     'clears a stalled %s acknowledgment and accepts a retry without replacing the source content',
     itemId => {
       vi.useFakeTimers();
@@ -259,8 +264,8 @@ describe('DashboardNav route warming', () => {
     expect(link).not.toHaveAttribute('aria-busy');
   });
 
-  it('keeps opportunity counts on the Inbox bell and leaves app updates to the shell pill', () => {
-    // The update now lives in the shell's corner pill; the Inbox page shows
+  it('keeps opportunity counts on the Home bell and leaves app updates to the shell pill', () => {
+    // The update now lives in the shell's corner pill; Home shows
     // no update, so the bell must not point there for one.
     runtimeUpdateState.available = true;
     const pending = renderDashboardNav({
@@ -270,9 +275,9 @@ describe('DashboardNav route warming', () => {
       },
     });
     const pendingLink = pending.container.querySelector(
-      '[data-navigation-item-id="inbox"]'
+      '[data-navigation-item-id="home"]'
     );
-    expect(pendingLink).toHaveAccessibleName('Inbox');
+    expect(pendingLink).toHaveAccessibleName('Home — 3 Items Need Attention');
     expect(pendingLink).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
     expect(pendingLink).toHaveAttribute('data-inbox-attention', 'available');
     expect(
@@ -295,21 +300,21 @@ describe('DashboardNav route warming', () => {
       updateOnly.queryByRole('link', { name: /App Update Available/ })
     ).toBeNull();
     const link = updateOnly.container.querySelector(
-      '[data-navigation-item-id="inbox"]'
+      '[data-navigation-item-id="home"]'
     );
-    expect(link).toHaveAccessibleName('Inbox');
+    expect(link).toHaveAccessibleName('Home — all caught up');
     expect(link).toHaveAttribute('data-inbox-attention', 'empty');
     expect(link?.querySelector('[data-inbox-runtime-update]')).toBeNull();
     runtimeUpdateState.available = false;
   });
 
-  it('labels the header bell Inbox without a rollout override', () => {
+  it('labels the rail Home bell with a qualified accessible name', () => {
     const view = renderDashboardNav({
       renderFn: render,
     });
     expect(
-      view.container.querySelector('[data-navigation-item-id="inbox"]')
-    ).toHaveAccessibleName('Inbox');
+      view.container.querySelector('[data-navigation-item-id="home"]')
+    ).toHaveAccessibleName('Home — notifications');
   });
 
   // JOV-6181: the rail's New Chat affordance must never carry the terminal
@@ -359,7 +364,7 @@ describe('DashboardNav route warming', () => {
     );
     expect(secondary).toHaveAttribute('aria-hidden', 'true');
     expect(
-      secondary?.querySelector('[data-navigation-item-id="inbox"]')
+      secondary?.querySelector('[data-navigation-item-id="home"]')
     ).not.toBeNull();
   });
 

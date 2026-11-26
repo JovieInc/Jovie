@@ -1,7 +1,7 @@
 'use client';
 
 // @coverage-via apps/web/tests/components/organisms/release-sidebar/TrackSidebar.test.tsx
-import type { CommonDropdownItem } from '@jovie/ui';
+import { type CommonDropdownItem, PlainButton } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Pause, Play, VolumeX } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SeekBar } from '@/components/atoms/SeekBar';
@@ -427,8 +427,7 @@ export function TrackSidebar({
           <div className='space-y-3 p-2.5'>
             <div className='flex min-h-11 items-center gap-2'>
               {playableUrl ? (
-                <button
-                  type='button'
+                <PlainButton
                   onClick={handleTogglePlayback}
                   aria-label={isPlaying ? 'Pause preview' : 'Play preview'}
                   aria-pressed={isPlaying}
@@ -439,7 +438,7 @@ export function TrackSidebar({
                   ) : (
                     <Play className='h-4 w-4 translate-x-px' />
                   )}
-                </button>
+                </PlainButton>
               ) : (
                 <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-(--app-shell-frame-seam) bg-surface-0 text-quaternary-token'>
                   <VolumeX className='h-4 w-4' />

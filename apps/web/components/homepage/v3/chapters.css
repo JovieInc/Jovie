@@ -120,8 +120,7 @@
  * actions and opens onto the window's top edge, so it reads as light falling
  * on the product, not as a shape behind the copy. The window stands in front
  * of it; below the window it is spill. Everything else falls to black.
- * The wedge is clipped on ::before and blurred here, so its edges are soft
- * (a filter on the clipped element itself would leave them hard).
+ * The wedge is a faint tint (at most .08) with sharp edges: lean light, not fog.
  * Replaces the hero's rings, arc and glow blobs.
  */
 .hv3-keylight {
@@ -131,7 +130,6 @@
   /* container-width-allow: light geometry in the approved 1440 frame, not a page column */
   width: 34rem;
   height: 78rem;
-  filter: blur(1.75rem);
   pointer-events: none;
 }
 
@@ -142,9 +140,9 @@
   background: linear-gradient(
     180deg,
     transparent 15%,
-    color-mix(in srgb, var(--hv3-ion) 4%, transparent) 20%,
-    color-mix(in srgb, var(--hv3-ion) 11%, transparent) 27%,
-    color-mix(in srgb, var(--hv3-ion) 7%, transparent) 55%,
+    color-mix(in srgb, var(--hv3-accent) 3%, transparent) 20%,
+    color-mix(in srgb, var(--hv3-accent) 8%, transparent) 27%,
+    color-mix(in srgb, var(--hv3-accent) 5%, transparent) 55%,
     transparent 80%
   );
   clip-path: polygon(44% 0, 56% 0, 100% 100%, 0 100%);
@@ -158,15 +156,9 @@
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--hv3-ion) 80%, transparent) 55%,
+    color-mix(in srgb, var(--hv3-accent) 80%, transparent) 55%,
     transparent
   );
-}
-
-/* The window's own corner glow answered the old arc; under a top key it
-   would be a second source. */
-.hv3-rig--hero .hv3-app::after {
-  content: none;
 }
 
 /* Top light on the window's surface, falling off down the list. */
@@ -315,10 +307,9 @@
 }
 
 .hv3-stage--profile .hv3-bounce {
-  top: 47.5rem;
+  top: 52.5rem;
   left: -1.375rem;
   width: 43.75rem;
-  height: 10rem;
 }
 
 .hv3-rig--profile {
@@ -356,7 +347,6 @@
   left: 10.875rem;
   /* container-width-allow: stage geometry in the approved 1440 frame, not a page column */
   width: 56.25rem;
-  height: 11.25rem;
 }
 
 /* The catalog spans the first two caption columns and the release page the
