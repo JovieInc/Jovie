@@ -2,7 +2,7 @@
 
 Use the checked-in [Playwright config](../playwright.config.ts) and [auth setup](e2e/auth.setup.ts) as the source of truth. Jovie web uses [Better Auth](../lib/auth/README.md).
 
-- **Local browser and synthetic tests:** use the repository's scoped dev test-auth fixture to establish a real test session. The setup project writes Playwright storage state only after setup succeeds. Never opt a production browser run into local bypass.
+- **Local browser and synthetic tests:** use the repository's scoped dev test-auth fixture to establish a real test session. On success, the setup project saves authenticated Playwright storage state; when prerequisites are missing or a handled setup error occurs, it writes empty state and returns. Never treat that empty state as authenticated, or opt a production browser run into local bypass.
 - **Signed-out checks:** start from an empty browser context. Do not reuse authenticated storage state for sign-in or sign-up rendering.
 - **Deployed release evidence:** use the existing [production auth smoke](e2e/smoke-prod-auth.spec.ts) with its approved synthetic identities. A local fixture pass does not certify email OTP or OAuth on a deployed build.
 
