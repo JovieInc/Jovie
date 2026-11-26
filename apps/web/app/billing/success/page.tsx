@@ -18,7 +18,6 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { CheckoutUnlockCards } from '@/components/organisms/billing/CheckoutUnlockCards';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { APP_ROUTES } from '@/constants/routes';
@@ -29,17 +28,14 @@ import {
   ARTIST_VISIBILITY_ACTIVATION_COPY,
   ARTIST_VISIBILITY_ACTIVATION_STEPS,
   ARTIST_VISIBILITY_SHARE_PROMPT,
-  CHECKOUT_PENDING_COPY,
-  CHECKOUT_RECOVERY_COPY,
   getPaidSuccessPrimaryHref,
   getPaidSuccessPrimaryLabel,
   isArtistVisibilityPlan,
-  type PaidPlanId,
-  resolveCanonicalPlan,
+  resolveCheckoutSuccessCopy,
   resolveCheckoutSuccessView,
-  resolvePaidPlan,
   shouldCelebratePaidSuccess,
 } from './checkout-success-state';
+import { useCheckoutConfirmation } from './use-checkout-confirmation';
 
 const MAX_UNLOCK_TILES = [
   {
@@ -65,42 +61,6 @@ const ARTIST_VISIBILITY_STEP_ICONS = {
   analytics: BarChart3,
   verify: BadgeCheck,
 } as const;
-
-async function fetchValidatedSession(
-  sessionId: string,
-  signal: AbortSignal
-): Promise<{
-  plan: PaidPlanId | null;
-  needsProfile: boolean;
-  proofPending: boolean;
-  shareUrl: string | null;
-}> {
-  const response = await fetch(
-    `/api/billing/checkout-session?session_id=${encodeURIComponent(sessionId)}`,
-    { cache: 'no-store', signal }
-  );
-  if (!response.ok) {
-    return {
-      plan: null,
-      needsProfile: false,
-      proofPending: false,
-      shareUrl: null,
-    };
-  }
-  const body = (await response.json()) as {
-    plan?: string | null;
-    needsProfile?: boolean;
-    proofPending?: boolean;
-    profileShareUrl?: string | null;
-  };
-  return {
-    plan: resolvePaidPlan(body.plan ?? null),
-    needsProfile: body.needsProfile === true,
-    proofPending: body.proofPending === true,
-    shareUrl:
-      typeof body.profileShareUrl === 'string' ? body.profileShareUrl : null,
-  };
-}
 
 function FeatureCard({
   icon: Icon,
@@ -135,33 +95,17 @@ export default function CheckoutSuccessPage() {
   const searchParams = useSearchParams();
   const isOnboardingUpgrade = searchParams.get('source') === 'onboarding';
   const checkoutSessionId = searchParams.get('session_id');
-  const rawPlanIdParam = searchParams.get('plan_id');
   const [requestState, setRequestState] = useState<
     'idle' | 'submitting' | 'success' | 'error'
   >('idle');
-  const {
-    data: billingData,
-    isLoading: isBillingLoading,
-    isFetched: isBillingFetched,
-    error: billingError,
-  } = useBillingStatusQuery();
+  const { data: billingData } = useBillingStatusQuery();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [hasHydrated, setHasHydrated] = useState(false);
-  const [isSessionPlanPending, setIsSessionPlanPending] = useState(
-    Boolean(checkoutSessionId)
-  );
-  const [validatedSessionPlan, setValidatedSessionPlan] =
-    useState<PaidPlanId | null>(null);
-  const [needsProfile, setNeedsProfile] = useState(false);
-  // Private until we confirm it is the artist's: never say "live".
-  const [proofPending, setProofPending] = useState(false);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const isBillingPending =
-    !checkoutSessionId &&
-    isBillingLoading === true &&
-    billingData === undefined &&
-    isBillingFetched !== true &&
-    billingError == null;
+  const {
+    receipt,
+    pending: isSessionPlanPending,
+    retry,
+  } = useCheckoutConfirmation(checkoutSessionId);
   const conversionTrackedRef = useRef(false);
   const onboardingTrackedRef = useRef(false);
   const celebrationTrackedRef = useRef(false);
@@ -170,69 +114,16 @@ export default function CheckoutSuccessPage() {
     setHasHydrated(true);
   }, []);
 
-  useEffect(() => {
-    if (!checkoutSessionId) {
-      setIsSessionPlanPending(false);
-      setValidatedSessionPlan(null);
-      return;
-    }
-
-    const sessionId = checkoutSessionId;
-    const controller = new AbortController();
-    setIsSessionPlanPending(true);
-
-    void fetchValidatedSession(sessionId, controller.signal)
-      .then(session => {
-        if (controller.signal.aborted) return;
-        setValidatedSessionPlan(session.plan);
-        setNeedsProfile(session.needsProfile);
-        setProofPending(session.proofPending);
-        setShareUrl(session.shareUrl);
-      })
-      .catch(error => {
-        if (controller.signal.aborted) return;
-        console.error(
-          '[billing/success] checkout session validation failed',
-          error
-        );
-        setValidatedSessionPlan(null);
-      })
-      .finally(() => {
-        if (controller.signal.aborted) return;
-        setIsSessionPlanPending(false);
-      });
-
-    return () => controller.abort();
-  }, [checkoutSessionId]);
-
   const view = useMemo(
     () =>
       resolveCheckoutSuccessView({
         checkoutSessionId,
         isSessionPlanPending,
-        validatedSessionPlan,
-        billingPlan: billingData?.plan,
-        isBillingPending,
+        validatedSessionPlan: receipt.plan,
+        confirmationStatus: receipt.status,
+        paymentStatus: receipt.paymentStatus,
       }),
-    [
-      billingData?.plan,
-      checkoutSessionId,
-      isBillingPending,
-      isSessionPlanPending,
-      validatedSessionPlan,
-    ]
-  );
-
-  const resolvedPlan = useMemo(
-    () =>
-      view.kind === 'success'
-        ? resolveCanonicalPlan(
-            billingData?.plan,
-            rawPlanIdParam,
-            validatedSessionPlan
-          )
-        : { canonical: null, displayName: null },
-    [billingData?.plan, rawPlanIdParam, validatedSessionPlan, view.kind]
+    [checkoutSessionId, isSessionPlanPending, receipt]
   );
 
   useEffect(() => {
@@ -310,43 +201,32 @@ export default function CheckoutSuccessPage() {
     }
   };
 
-  const paidDisplayName =
-    resolvedPlan.displayName ??
-    (view.kind === 'success' ? view.displayName : null);
+  const needsProfile = receipt.needsProfile;
+  const proofPending = receipt.proofPending;
+  const profileLive = receipt.profileLive;
+  const shareUrl = receipt.shareUrl;
+  const sessionStatus = receipt.sessionStatus;
+  const openCheckoutUrl = receipt.checkoutUrl;
+  const paidDisplayName = view.kind === 'success' ? view.displayName : null;
   const isArtistVisibilitySuccess =
     view.kind === 'success' && isArtistVisibilityPlan(view.plan);
-  let successTitle: string;
-  if (view.kind !== 'success') {
-    successTitle =
-      view.kind === 'pending'
-        ? CHECKOUT_PENDING_COPY.title
-        : CHECKOUT_RECOVERY_COPY.title;
-  } else if (isOnboardingUpgrade && proofPending) {
-    successTitle = 'Your plan is active';
-  } else if (isOnboardingUpgrade) {
-    successTitle = 'Your profile is live and upgraded';
-  } else if (paidDisplayName) {
-    successTitle = `Welcome to ${paidDisplayName}!`;
-  } else {
-    successTitle = CHECKOUT_RECOVERY_COPY.title;
-  }
-
-  let successSubtitle: string;
-  if (view.kind === 'pending') {
-    successSubtitle = CHECKOUT_PENDING_COPY.subtitle;
-  } else if (view.kind === 'recovery') {
-    successSubtitle = CHECKOUT_RECOVERY_COPY.subtitle;
-  } else if (isOnboardingUpgrade && proofPending) {
-    successSubtitle = PROOF_PENDING_TERMS;
-  } else if (isOnboardingUpgrade) {
-    successSubtitle = isArtistVisibilitySuccess
-      ? `You're all set. ${ARTIST_VISIBILITY_ACTIVATION_COPY.status}.`
-      : "You're all set. Here's what you just unlocked.";
-  } else if (isArtistVisibilitySuccess) {
-    successSubtitle = ARTIST_VISIBILITY_ACTIVATION_COPY.next;
-  } else {
-    successSubtitle = "Your plan is active. Here's what you just unlocked.";
-  }
+  const canClaimProfileLive =
+    !proofPending &&
+    !needsProfile &&
+    (checkoutSessionId ? profileLive !== false : profileLive === true);
+  const effectiveShareUrl =
+    proofPending || needsProfile || profileLive === false ? null : shareUrl;
+  const { title: successTitle, subtitle: successSubtitle } =
+    resolveCheckoutSuccessCopy({
+      view,
+      isOnboardingUpgrade,
+      proofPending,
+      canClaimProfileLive,
+      isArtistVisibilitySuccess,
+      paidDisplayName,
+      proofPendingTerms: PROOF_PENDING_TERMS,
+      sessionStatus,
+    });
 
   // The page settles in place: no confetti, no entrance slide and no vertical
   // centering — the card is top-anchored so the pending-to-paid swap grows it
@@ -383,7 +263,9 @@ export default function CheckoutSuccessPage() {
               data-testid='checkout-success-status'
             >
               <CircleCheck className='h-3.5 w-3.5' aria-hidden='true' />
-              Payment confirmed
+              {view.paymentStatus === 'paid'
+                ? 'Payment confirmed'
+                : 'Checkout confirmed — no payment due'}
             </p>
           ) : (
             <div
@@ -415,7 +297,7 @@ export default function CheckoutSuccessPage() {
                 {ARTIST_VISIBILITY_ACTIVATION_COPY.status}
               </p>
               <CheckoutUnlockCards
-                shareUrl={shareUrl}
+                shareUrl={effectiveShareUrl}
                 showFanListExport={!needsProfile}
                 canNativeShare={canNativeShare}
                 onNativeShare={handleNativeShare}
@@ -444,12 +326,30 @@ export default function CheckoutSuccessPage() {
           <div className='flex flex-col items-center gap-3'>
             {view.kind === 'recovery' ? (
               <>
-                <UpgradeButton
-                  className='w-full sm:w-auto [&_button]:w-full'
-                  size='lg'
-                >
-                  Retry checkout
-                </UpgradeButton>
+                {openCheckoutUrl ? (
+                  <Button asChild size='lg'>
+                    <a
+                      href={openCheckoutUrl}
+                      data-testid='checkout-resume-open-session'
+                    >
+                      Complete checkout
+                    </a>
+                  </Button>
+                ) : null}
+                {checkoutSessionId ? (
+                  <Button
+                    type='button'
+                    size='lg'
+                    variant={openCheckoutUrl ? 'secondary' : 'primary'}
+                    onClick={retry}
+                    data-testid='checkout-check-again'
+                  >
+                    Check Again
+                  </Button>
+                ) : null}
+                <Button asChild variant='secondary' size='lg'>
+                  <Link href={APP_ROUTES.BILLING}>View Billing</Link>
+                </Button>
                 <Button asChild variant='secondary' size='lg'>
                   <Link href={APP_ROUTES.SUPPORT}>Contact support</Link>
                 </Button>

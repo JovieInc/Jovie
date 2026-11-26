@@ -111,6 +111,20 @@ CLI, engineering, AI), only approved https social hosts, 3 to 4 columns with 8
 to 16 links, and a resolution smoke test through the shell's resolver. Layout
 and the legal row stay in code.
 
+### Route ownership
+
+The public company homepage and the pages under `app/(marketing)` select the
+same canonical header through `PublicPageShell`. This includes Pricing, Product,
+Support, Artist Profiles, and the Artists customer landing. The shared header
+owns the published navigation, active links, desktop flyout, mobile menu, and
+the approved claim intent into `/start`. The two route layouts own only their
+body and footer presentation. Marketing routes use the full SEO footer.
+
+Public artist and release URLs, auth and app shells, and standalone legal,
+contact, and transactional experiences keep their own chrome. The separate
+`/brand` route is the brand toolkit and retains its embedded brand display
+through `PublicPageShell`.
+
 ### Page specs (`page-spec/<route-slug>`)
 
 A page is an ordered list of certified sections plus meta

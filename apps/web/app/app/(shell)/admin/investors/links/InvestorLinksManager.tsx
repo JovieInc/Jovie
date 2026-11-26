@@ -9,12 +9,10 @@ import {
   Copy,
   Loader2,
   Plus,
-  Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
@@ -23,7 +21,6 @@ import {
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
-import { TableIconButton } from '@/components/organisms/table';
 import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -35,6 +32,7 @@ import {
   InvestorTableHeaderRow,
   InvestorTableRow,
 } from '../_components/InvestorTablePrimitives';
+import { InvestorLinkRowActions } from './InvestorLinkRowActions';
 
 // ---------------------------------------------------------------------------
 // Types (mirrored from schema to avoid server-only import in client component)
@@ -362,69 +360,6 @@ function StatusBadge({ isActive }: { readonly isActive: boolean }) {
 }
 
 // ---------------------------------------------------------------------------
-// Link row actions
-// ---------------------------------------------------------------------------
-
-function LinkActions({
-  link,
-  onToggleActive,
-  onRequestDelete,
-}: {
-  readonly link: InvestorLinkWithCounts;
-  readonly onToggleActive: (id: string, isActive: boolean) => void;
-  readonly onRequestDelete: () => void;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  const shareableUrl = `${BASE_URL}/investor-portal?t=${link.token}`;
-  const actionItems = [
-    {
-      id: link.isActive ? 'deactivate' : 'reactivate',
-      label: link.isActive ? 'Deactivate' : 'Reactivate',
-      icon: link.isActive ? CircleSlash : CheckCircle2,
-      onClick: () => onToggleActive(link.id, !link.isActive),
-    },
-    { id: 'separator', label: '' },
-    {
-      id: 'delete',
-      label: 'Delete',
-      icon: Trash2,
-      variant: 'destructive' as const,
-      onClick: onRequestDelete,
-    },
-  ];
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(shareableUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback for HTTP contexts
-    }
-  };
-
-  return (
-    <div className='flex items-center gap-2'>
-      <TableIconButton
-        ariaLabel='Copy shareable URL'
-        className='text-tertiary-token'
-        icon={
-          copied ? (
-            <Check className='h-3.5 w-3.5 text-success' />
-          ) : (
-            <Copy className='h-3.5 w-3.5' />
-          )
-        }
-        onClick={handleCopy}
-        tooltip='Copy shareable URL'
-      />
-      <TableActionMenu items={actionItems} align='end' />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Main Manager Component
 // ---------------------------------------------------------------------------
 
@@ -596,7 +531,7 @@ export function InvestorLinksManager() {
                   </InvestorTableCell>
                   <InvestorTableCell>
                     <div className='flex justify-end'>
-                      <LinkActions
+                      <InvestorLinkRowActions
                         link={link}
                         onToggleActive={handleToggleActive}
                         onRequestDelete={() => setPendingDeleteLink(link)}

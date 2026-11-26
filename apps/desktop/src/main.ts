@@ -129,6 +129,7 @@ import { installNightlyUpdateLaunchAgent } from './nightly-update-launch-agent';
 import { buildNativeHelpMenu } from './native-help-menu';
 import { DesktopNavigationCoordinator } from './navigation-coordinator';
 import { createStartupMaintenanceGate } from './startup-maintenance';
+import { loadHostedUrlAfterSplash as navigateHostedAfterSplash, primeHostedLaunch } from './hosted-launch-prime';
 import {
   getUrlDisposition as getDesktopUrlDisposition,
   isAllowedExternalUrl as isAllowedDesktopExternalUrl,
@@ -171,6 +172,12 @@ import {
 } from './renderer-recovery';
 import { createRecoveryUnlatchController } from './renderer-recovery-unlatch';
 import {
+  createRecoverAfterWake,
+  DESKTOP_LOAD_FAILURE_DOCUMENT_MARKER,
+  recoverDesktopWindowAfterWake,
+  scheduleWakeRendererRecovery,
+} from './renderer-wake-recovery';
+import {
   createSummerRuntimeBridge,
   type SummerRuntimeBridge,
 } from './summer-runtime-bridge';
@@ -198,8 +205,8 @@ import {
   WINDOW_STATE_SHUTDOWN_FLUSH_MS,
 } from './window-state-store';
 
-// Separate userData for non-production shells so local, staging, and production
-// sessions coexist without sharing cookies or corrupted renderer state.
+// Separate userData for non-production shells: no shared cookies or corrupted
+// renderer state across channels.
 if (APP_ENV === 'staging') {
   app.setPath('userData', path.join(app.getPath('appData'), 'Jovie-Staging'));
 } else if (APP_ENV === 'local') {
@@ -216,10 +223,9 @@ const APP_ENTRY_URL = buildAppUrl('/app/chat');
 const SETTINGS_URL = buildAppUrl('/app/settings');
 const APP_BACKGROUND_COLOR = SYSTEM_B_DESKTOP_TOKENS.backgroundColor;
 const NAVIGATION_ABORTED_ERROR_CODE = -3;
-// A crashed/killed renderer is reloaded up to this many times before the shell
-// gives up and shows the visible load-failure page (Retry) instead of leaving
-// the window black. Reset to 0 only after a confirmed app-booted ping so a
-// renderer that crashes deterministically after load still hits the cap.
+// A crashed/killed renderer reloads up to this many times before the shell
+// shows the visible load-failure page. Reset to 0 only after a confirmed
+// app-booted ping so deterministic post-load crashes still hit the cap.
 const MAX_RENDERER_CRASH_RELOADS = 2;
 const MAX_HOSTED_LOAD_RETRIES = APP_ENV === 'local' ? 3 : 1;
 const HOSTED_LOAD_RETRY_DELAY_MS = APP_ENV === 'local' ? 2_000 : 0;
@@ -405,10 +411,9 @@ let startupMaintenance: ReturnType<typeof createStartupMaintenanceGate> | null =
 let summerRuntimeBridge: SummerRuntimeBridge | null = null;
 let mainLivenessMonitor: MainLivenessMonitor | null = null;
 
-// Observe async rejections in the main process instead of letting Node's
-// default warning be the only trace. The summary is bounded and redacted;
-// observing a rejection never marks the app healthy — the liveness probe
-// below is the only responsiveness verdict.
+// Observe async rejections instead of relying on Node's default warning; the
+// summary is bounded and redacted, and observing never marks the app healthy —
+// the liveness probe below is the only responsiveness verdict.
 process.on('unhandledRejection', reason => {
   console.error('[Jovie Desktop] Unhandled rejection', {
     reason: summarizeUnhandledRejection(reason),
@@ -451,6 +456,7 @@ const rendererBootControllers = new Map<
   {
     readonly markBooted: () => void;
     readonly beginRecoveryUnlatch: () => void;
+    readonly recoverAfterWake: () => void;
     readonly dispose: () => void;
   }
 >();
@@ -463,11 +469,11 @@ function getDesktopAppDisplayName(): string {
 
 app.setName(getDesktopAppDisplayName());
 
-// Refuse to run a packaged shell that was launched with a Chrome DevTools
-// Protocol switch. A packaged .app can be started by ANY local process, so an
-// exposed CDP port lets any process running as the same user read the renderer's
-// cookies (incl. the Clerk session) and inject JS — a full session hijack. Source
-// runs may still opt in via JOVIE_DEV=1 (see scripts/launch-electron.mjs).
+// Refuse to run a packaged shell launched with a Chrome DevTools Protocol
+// switch: a packaged .app can be started by ANY local process, and an exposed
+// CDP port lets it read renderer cookies (incl. the Clerk session) and inject
+// JS — a full session hijack. Source runs may opt in via JOVIE_DEV=1
+// (see scripts/launch-electron.mjs).
 const remoteDebuggingGuard = evaluateRemoteDebuggingGuard({
   isPackaged: app.isPackaged,
   hasRemoteDebuggingPort: app.commandLine.hasSwitch('remote-debugging-port'),
@@ -880,12 +886,10 @@ function findLegacyAuthReturnRouteInArgv(
   return null;
 }
 
-// Chromium's Web Speech recognition backend needs Google API keys that
-// Electron cannot ship, so `webkitSpeechRecognition` exists in the renderer
-// but every start() fails with a 'network' error (electron/electron#46143,
-// #7749). Advertising it as a fallback made the composer mic look live and
-// fail on every press. Report it unavailable so the renderer points at OS
-// dictation instead — macOS dictation types into any focused field here.
+// Chromium's Web Speech backend needs Google API keys Electron cannot ship,
+// so `webkitSpeechRecognition` fails every start() with a 'network' error
+// (electron/electron#46143, #7749). Report it unavailable so the renderer
+// points at OS dictation instead — macOS dictation types into any field.
 function getDesktopDictationStatus(): DesktopDictationStatus {
   return {
     ok: true,
@@ -1481,6 +1485,7 @@ function buildDesktopShellHtml(input: {
   readonly body: string;
   readonly actions?: string;
   readonly identityHtml?: string;
+  readonly mainAttributes?: string;
 }): string {
   return `<!doctype html>
 <html lang="en">
@@ -1506,7 +1511,7 @@ function buildDesktopShellHtml(input: {
     </style>
   </head>
   <body>
-    <main class="shell" role="main">
+    <main class="shell" role="main"${input.mainAttributes ? ` ${input.mainAttributes}` : ''}>
       <svg class="mark" viewBox="0 0 353.68 347.97" aria-hidden="true">
         <path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/>
       </svg>
@@ -1528,6 +1533,7 @@ function buildDesktopLoadFailureUrl(failure: DesktopLoadFailureView): string {
     title: 'Jovie Desktop',
     heading: failure.heading,
     body: failure.body,
+    mainAttributes: DESKTOP_LOAD_FAILURE_DOCUMENT_MARKER,
     actions: `<div class="actions">
         <a class="primary" href="${retryUrl}">Retry</a>
         <a class="secondary" href="${appOrigin}">Open Jovie</a>
@@ -1569,8 +1575,8 @@ async function preloadDesktopBootSplashWordmark(): Promise<void> {
 
 function buildDesktopBootSplashHtml(): string {
   const markCream = SYSTEM_B_DESKTOP_TOKENS.markCream;
-  const cornerMarkPx = SYSTEM_B_DESKTOP_TOKENS.macCornerMarkSizePx;
-  const cornerMarkOpacity = SYSTEM_B_DESKTOP_TOKENS.macCornerMarkOpacity;
+  const mutedMark = SYSTEM_B_DESKTOP_TOKENS.textSecondary;
+  const mutedMarkOpacity = SYSTEM_B_DESKTOP_TOKENS.macCornerMarkOpacity;
   const settledMarkPx = SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx;
   const wordmarkDataUrl = desktopBootSplashWordmarkDataUrl;
   return `<!doctype html>
@@ -1580,41 +1586,37 @@ function buildDesktopBootSplashHtml(): string {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Jovie</title>
     <style>
-      :root { color-scheme: dark; --mac-canvas: ${SYSTEM_B_DESKTOP_TOKENS.macCinematicCanvas}; --mac-ion: #11AFFF; --mac-cream: ${markCream}; }
+      :root { color-scheme: dark; --mac-canvas: ${SYSTEM_B_DESKTOP_TOKENS.macCinematicCanvas}; --mac-cream: ${markCream}; --mac-muted: ${mutedMark}; }
       html, body { margin: 0; width: 100%; min-height: 100%; background: var(--mac-canvas); }
       body { min-height: 100vh; overflow: hidden; color: var(--mac-cream); font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif; }
-      main { position: relative; display: grid; min-height: 100vh; place-items: center; isolation: isolate; background: radial-gradient(ellipse 78% 34% at 52% -8%, rgba(17,175,255,.30), transparent 76%), radial-gradient(ellipse 44% 24% at 88% 4%, rgba(17,175,255,.18), transparent 80%), var(--mac-canvas); }
+      main { position: relative; display: grid; min-height: 100vh; place-items: center; isolation: isolate; background: var(--mac-canvas); }
       main::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 85% 90% at 50% 46%, transparent 55%, rgba(3,4,7,.72)); }
-      .corner-mark { position: absolute; top: min(32px, 1.43vw); right: min(32px, 1.43vw); width: min(${cornerMarkPx}px, 1.786vw); height: min(${cornerMarkPx}px, 1.786vw); opacity: ${cornerMarkOpacity}; color: var(--mac-cream); }
       .lockup-area { position: relative; display: grid; justify-items: center; gap: min(24px, 1.07vw); width: 100%; }
       .lockup { display: flex; width: min(249px, 11.12vw); align-items: center; justify-content: flex-start; gap: min(12px, .536vw); white-space: nowrap; }
       .wordmark { display: block; width: min(104px, 4.64vw); height: auto; flex: none; }
       .fallback-mark { width: min(32px, 1.43vw); height: min(32px, 1.43vw); color: var(--mac-cream); }
       .suffix { font-size: min(38px, 1.7vw); line-height: 1.15; font-weight: 400; letter-spacing: -.8px; }
-      .progress { width: min(120px, 5.36vw); height: 2px; overflow: hidden; background: rgba(255,255,255,.2); }
-      .progress::before { content: ""; display: block; width: min(44px, 1.96vw); height: 2px; background: var(--mac-ion); }
+      /* One grey 1px line, no color. */
+      .progress { width: min(120px, 5.36vw); height: 1px; background: var(--mac-muted); opacity: ${mutedMarkOpacity}; }
       /* splash-b-everywhere-v1: the wordmark appears, then settles down to just the O. Opacity/scale only, so nothing shifts layout. */
       .stage { display: grid; place-items: center; }
       .stage > * { grid-area: 1 / 1; }
-      .settled-mark { width: ${settledMarkPx}px; height: ${settledMarkPx}px; color: var(--mac-cream); opacity: 0; animation: splash-o-settle 360ms ease-out 1100ms forwards; }
+      .settled-mark { width: ${settledMarkPx}px; height: ${settledMarkPx}px; color: var(--mac-muted); opacity: 0; animation: splash-o-settle 360ms ease-out 1100ms forwards; }
       .lockup, .fallback-mark { opacity: 0; animation: splash-wordmark-appear 320ms ease-out forwards, splash-wordmark-settle 360ms ease-in 1100ms forwards; }
       .progress { animation: splash-progress-out 240ms ease-out 1100ms forwards; }
       @keyframes splash-wordmark-appear { from { opacity: 0; } to { opacity: 1; } }
       @keyframes splash-wordmark-settle { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(.4); } }
-      @keyframes splash-o-settle { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
-      @keyframes splash-progress-out { to { opacity: 0; } }
+      @keyframes splash-o-settle { from { opacity: 0; transform: scale(.85); } to { opacity: ${mutedMarkOpacity}; transform: scale(1); } }
+      @keyframes splash-progress-out { from { opacity: ${mutedMarkOpacity}; } to { opacity: 0; } }
       @media (prefers-reduced-motion: reduce) {
         .lockup, .fallback-mark, .settled-mark, .progress { animation: none; }
         .lockup, .fallback-mark, .progress { opacity: 0; }
-        .settled-mark { opacity: 1; }
+        .settled-mark { opacity: ${mutedMarkOpacity}; }
       }
     </style>
   </head>
   <body>
     <main role="main" aria-label="Jovie for Mac is loading" data-desktop-splash="cinematic">
-      <svg class="corner-mark" viewBox="0 0 353.68 347.97" aria-hidden="true">
-        <path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/>
-      </svg>
       <div class="lockup-area" aria-hidden="true">
         <div class="stage">${wordmarkDataUrl ? `<div class="lockup"><img class="wordmark" src="${wordmarkDataUrl}" alt="" /><span class="suffix">for Mac</span></div>` : `<svg class="fallback-mark" viewBox="0 0 353.68 347.97" aria-hidden="true"><path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/></svg>`}<svg class="settled-mark" viewBox="0 0 353.68 347.97" aria-hidden="true" data-splash-settled="o"><path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/></svg></div>
         <div class="progress"></div>
@@ -1626,6 +1628,14 @@ function buildDesktopBootSplashHtml(): string {
 
 function buildDesktopBootSplashUrl(): string {
   return `data:text/html;charset=utf-8,${encodeURIComponent(buildDesktopBootSplashHtml())}`;
+}
+
+function loadHostedUrlAfterSplash(win: BrowserWindow, hostedUrl: string): void {
+  navigateHostedAfterSplash({
+    win, hostedUrl, origin: APP_ORIGIN, entryUrl: APP_ENTRY_URL,
+    splashUrl: buildDesktopBootSplashUrl(),
+    fetch: (url, init) => net.fetch(url, { ...init, credentials: 'omit' }),
+  });
 }
 
 function buildDesktopAboutUrl(): string {
@@ -1701,21 +1711,6 @@ function showDesktopAboutWindow(): void {
     event.preventDefault();
   });
   void aboutWindow.loadURL(buildDesktopAboutUrl());
-}
-
-function loadHostedUrlAfterSplash(win: BrowserWindow, hostedUrl: string): void {
-  const navigateToHosted = (): void => {
-    if (win.isDestroyed()) return;
-    void win.loadURL(hostedUrl);
-  };
-
-  if (win.webContents.getURL().startsWith('data:text/html')) {
-    navigateToHosted();
-    return;
-  }
-
-  win.webContents.once('did-finish-load', navigateToHosted);
-  void win.loadURL(buildDesktopBootSplashUrl());
 }
 
 function showDesktopLoadFailure(
@@ -2175,6 +2170,9 @@ function attachRendererRecovery(
       return;
     }
 
+    // Hard hosted docs must re-prove app-booted (JOV-14765).
+    rendererEverBooted = false;
+
     loadWatchdogTimer = setTimeout(() => {
       loadWatchdogTimer = null;
       expireWatchdog('load', url);
@@ -2209,9 +2207,26 @@ function attachRendererRecovery(
     recoveryUnlatch.stop();
   };
 
+  const recoverAfterWake = createRecoverAfterWake({
+    isDestroyed: () => win.isDestroyed(),
+    getCurrentUrl: () => win.webContents.getURL(),
+    isRendererBooted: () => rendererBooted,
+    isRendererCrashed: () => win.webContents.isCrashed(),
+    appOrigin: APP_ORIGIN,
+    beginUnlatch: () => {
+      recoveryUnlatch.begin();
+      if (win === mainWindow) showWindowNow(win);
+    },
+    reloadHosted: () => {
+      void win.loadURL(lastHostedUrl || APP_ENTRY_URL);
+      if (win === mainWindow) showWindowNow(win);
+    },
+  });
+
   rendererBootControllers.set(webContentsId, {
     markBooted: markRendererBooted,
     beginRecoveryUnlatch: recoveryUnlatch.begin,
+    recoverAfterWake,
     dispose: () => {
       clearAllWatchdogs();
       localHostedLoadRecovery.dispose();
@@ -2860,7 +2875,15 @@ function scheduleDesktopAutoUpdate(): void {
   powerMonitor.on('unlock-screen', checkAfterWake);
 }
 
-/** Restart into a downloaded update only overnight, idle, and with no work at risk. */
+function recoverMainWindowAfterWake(): void {
+  recoverDesktopWindowAfterWake({
+    isAuthHandoffInteractive,
+    getMainWindow: () => mainWindow,
+    getController: id => rendererBootControllers.get(id),
+  });
+}
+
+/** Restart into a downloaded update when idle with no work at risk. */
 const installDownloadedUpdateIfIdle = singleFlight(async () => {
   if (!updateReadyToInstall || nightlyUpdateLaunch) return;
   const workStateSafe = await allWindowWorkStateSafe();
@@ -3663,7 +3686,11 @@ app.whenReady().then(async () => {
     gotSingleInstanceLock &&
     !printBuildIdentityOnStart
   ) {
-    session.defaultSession.preconnect({ url: APP_ORIGIN, numSockets: 2 });
+    primeHostedLaunch({
+      origin: APP_ORIGIN, entryUrl: APP_ENTRY_URL,
+      preconnect: options => session.defaultSession.preconnect(options),
+      fetch: (url, init) => net.fetch(url, { ...init, credentials: 'omit' }),
+    });
   }
   if (!gotSingleInstanceLock && !printBuildIdentityOnStart) return;
 
@@ -3761,6 +3788,7 @@ app.whenReady().then(async () => {
   if (directProfileUrl) showPublicProfilePreview(directProfileUrl);
   pendingLegacyAuthReturnRoute = null;
   scheduleNightlyUpdateLaunchAgent();
+  scheduleWakeRendererRecovery({ powerMonitor, recover: recoverMainWindowAfterWake });
   scheduleDesktopAutoUpdate();
   scheduleHudBuildAutoReload();
 

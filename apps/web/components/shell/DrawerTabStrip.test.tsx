@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { DrawerTabStrip } from './DrawerTabStrip';
 
@@ -90,5 +91,19 @@ describe('JOV-5466 token retire', () => {
     expect(active.className).toContain('ring-(--app-shell-border)');
     expect(active.className).not.toContain('ring-white/10');
     expect(active.className).not.toMatch(/shadow-\[[^\]]*rgba/);
+  });
+});
+
+describe('DrawerTabStrip PlainButton tabs', () => {
+  it('renders type=button tabs that fire onChange on userEvent.click', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <DrawerTabStrip<Tab> tabs={TABS} active='overview' onChange={onChange} />
+    );
+    const tab = screen.getByRole('tab', { name: 'Distribution' });
+    expect(tab).toHaveAttribute('type', 'button');
+    await user.click(tab);
+    expect(onChange).toHaveBeenCalledWith('distribution');
   });
 });

@@ -186,3 +186,13 @@ export function suggestionToAcceptedRow(
     lastObservedAt: null,
   };
 }
+export function describeSuggestionCount(
+  count: number | null,
+  loading: boolean
+): string {
+  if (loading) return 'Checking saved suggestions.';
+  if (count === null)
+    return 'Could not load suggestions. Open review to retry.';
+  if (count === 0) return 'No suggested profiles are waiting for review.';
+  return `${count} suggested ${count === 1 ? 'profile' : 'profiles'} to review.`;
+}

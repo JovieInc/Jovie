@@ -357,4 +357,25 @@ describe('release share metadata (JOV-9626)', () => {
     expect(metadata.openGraph?.title).toContain('Midnight Signal');
     expect(metadata.openGraph?.title).toContain('Tim White');
   });
+
+  it('resolves seeded screen-cert fixture metadata without hitting creator DB lookups', async () => {
+    vi.stubEnv('PUBLIC_NOAUTH_SMOKE', '1');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '0');
+    vi.stubEnv('VERCEL_ENV', '');
+    hoisted.getCreatorByUsername.mockClear();
+    hoisted.getContentBySlug.mockClear();
+
+    const { generateMetadata } = await import('./page');
+    const metadata = await generateMetadata({
+      params: Promise.resolve({
+        username: 'jovie-screen-fixture',
+        slug: 'screen-cert-release',
+      }),
+    });
+
+    expect(hoisted.getCreatorByUsername).not.toHaveBeenCalled();
+    expect(hoisted.getContentBySlug).not.toHaveBeenCalled();
+    expect(metadata.title).toContain('Screen Cert Fixture Release');
+    expect(metadata.title).toContain('Screen Cert Fixture');
+  });
 });

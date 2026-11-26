@@ -59,10 +59,16 @@ vi.mock('@/lib/server-analytics', () => ({
 }));
 vi.mock('@/lib/cache/profile', () => ({ invalidateProfileCache: vi.fn() }));
 vi.mock('@/lib/rate-limit', () => ({
-  allowIfRateLimitBackendDegraded: (r: unknown) => r,
   claimTokenAccessLimiter: { limit: async () => ({ success: true }) },
   createRateLimitHeaders: () => ({}),
   getClientIP: () => '203.0.113.9',
+  rateLimitDenialStatus: (result: { unavailable?: boolean }) =>
+    result.unavailable === true ? 503 : 429,
+  rateLimitDenialMessage: (
+    result: { unavailable?: boolean },
+    exhausted: string,
+    unavailable = 'Temporarily unavailable.'
+  ) => (result.unavailable === true ? unavailable : exhausted),
 }));
 vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
   recordArtistOfferStage: vi.fn(),

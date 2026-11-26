@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { UIMessage } from 'ai';
 import type { ReactNode } from 'react';
@@ -83,7 +83,11 @@ describe('OnboardingShell states', () => {
     const { container } = render(
       <OnboardingShell sessionLabel='cert' onRestart={vi.fn()} />
     );
-    expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+    // JOV-14243: quiet Find You / Claim Your Name / Go Live rail is always on.
+    expect(screen.queryAllByRole('listitem')).toHaveLength(3);
+    expect(
+      screen.getByTestId('onboarding-start-step-rail')
+    ).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
     await expectNoA11yViolations(container);
     await openOptions();
@@ -136,7 +140,12 @@ describe('OnboardingShell states', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'We could not start a new conversation. Try again.'
     );
-    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(
+      within(screen.getByTestId('onboarding-start-step-rail')).getAllByRole(
+        'listitem'
+      )
+    ).toHaveLength(3);
+    expect(screen.getByText('Your progress is saved.')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 
@@ -150,9 +159,7 @@ describe('OnboardingShell states', () => {
         onRestart={vi.fn()}
       />
     );
-    expect(screen.getAllByRole('listitem')[1]).toHaveTextContent(
-      'Your progress is saved.'
-    );
+    expect(screen.getByText('Your progress is saved.')).toBeInTheDocument();
     const draft = screen.getByLabelText('Chat message');
     await user.type(draft, 'Continue');
     expect(draft).toHaveValue('Continue');
@@ -207,7 +214,7 @@ describe('OnboardingShell states', () => {
         />
       </div>
     );
-    expect(screen.getByRole('listitem')).toHaveTextContent('أهلاً');
+    expect(screen.getByText(/أهلاً/)).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 });

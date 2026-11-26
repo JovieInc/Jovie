@@ -3,7 +3,11 @@
 
 from __future__ import annotations
 
+import os
 import re
+import shlex
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -64,9 +68,6 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
             },
             {"Closed", "Cancelled", "Canceled", "Duplicate", "Done"},
         )
-        self.assertIn(
-            "git clone --depth 1 git@github.com:JovieInc/Jovie.git .", workflow
-        )
         self.assertRegex(
             workflow,
             re.compile(r"^\s+command: codex .* app-server$", re.MULTILINE),
@@ -79,6 +80,98 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
             "must not become a global source-merge gate",
             workflow,
         )
+
+    def test_codex_clone_is_blobless_with_complete_ancestry(self) -> None:
+        workflow = WORKFLOW.read_text()
+        hook = re.search(
+            r"^  after_create: \|\n(?P<script>(?:    .+\n)+)",
+            workflow,
+            re.MULTILINE,
+        )
+        self.assertIsNotNone(hook)
+        assert hook is not None
+        self.assertEqual(
+            hook["script"].splitlines(),
+            [
+                "    git clone --filter=blob:none git@github.com:JovieInc/Jovie.git .",
+                "    JOVIE_AGENT_PROFILE=coder ./scripts/setup.sh",
+            ],
+        )
+
+    def test_codex_clone_checks_out_head_and_fetches_historical_blobs_on_demand(self) -> None:
+        # Run the hook's actual clone flags against a local filter-capable origin.
+        # No provider credentials or external network are needed for this probe.
+        command = re.search(
+            r"^    (git clone .+)$", WORKFLOW.read_text(), re.MULTILINE
+        )
+        self.assertIsNotNone(command)
+        assert command is not None
+        env = {
+            key: value
+            for key, value in os.environ.items()
+            if not key.startswith("GIT_")
+        }
+        env.update(
+            {
+                "GIT_CONFIG_GLOBAL": os.devnull,
+                "GIT_CONFIG_NOSYSTEM": "1",
+                "GIT_AUTHOR_NAME": "fixture",
+                "GIT_AUTHOR_EMAIL": "fixture@example.com",
+                "GIT_COMMITTER_NAME": "fixture",
+                "GIT_COMMITTER_EMAIL": "fixture@example.com",
+                "GIT_AUTHOR_DATE": "2026-01-01T00:00:00Z",
+                "GIT_COMMITTER_DATE": "2026-01-01T00:00:00Z",
+            }
+        )
+        with tempfile.TemporaryDirectory(prefix="codex-blobless-") as directory:
+            root = Path(directory)
+            source, work = root / "source", root / "work"
+
+            def git(cwd: Path, *args: str, no_lazy_fetch: bool = False) -> str:
+                return subprocess.check_output(
+                    ["git", *args],
+                    cwd=cwd,
+                    env={
+                        **env,
+                        **({"GIT_NO_LAZY_FETCH": "1"} if no_lazy_fetch else {}),
+                    },
+                    text=True,
+                    stderr=subprocess.PIPE,
+                    timeout=15,
+                ).strip()
+
+            git(root, "init", "--quiet", "--initial-branch=main", str(source))
+            git(source, "config", "uploadpack.allowFilter", "true")
+            (source / "historical.txt").write_text("historical blob")
+            (source / "current.txt").write_text("initial tree")
+            git(source, "add", ".")
+            git(source, "commit", "-qm", "initial")
+            historical_blob = git(source, "rev-parse", "HEAD:historical.txt")
+            git(source, "rm", "-q", "historical.txt")
+            (source / "current.txt").write_text("current tree")
+            git(source, "add", ".")
+            git(source, "commit", "-qm", "head")
+            args = shlex.split(command[1])[1:]
+            args[-2:] = [source.as_uri(), str(work)]
+            git(root, *args)
+            self.assertEqual(
+                git(work, "rev-parse", "HEAD"), git(source, "rev-parse", "HEAD")
+            )
+            self.assertEqual(git(work, "rev-list", "--count", "HEAD"), "2")
+            self.assertEqual(
+                git(work, "rev-parse", "--is-shallow-repository"), "false"
+            )
+            self.assertEqual((work / "current.txt").read_text(), "current tree")
+            self.assertEqual(
+                git(work, "config", "remote.origin.partialclonefilter"), "blob:none"
+            )
+            self.assertEqual(git(work, "config", "remote.origin.promisor"), "true")
+            missing = git(
+                work, "rev-list", "--objects", "--missing=print", "HEAD",
+                no_lazy_fetch=True,
+            )
+            self.assertIn("?" + historical_blob, missing.splitlines())
+            self.assertEqual(git(work, "show", "HEAD^:historical.txt"), "historical blob")
 
     def test_burrito_note_binds_the_supported_team_adapter(self) -> None:
         note = BURRITO_NOTE.read_text()

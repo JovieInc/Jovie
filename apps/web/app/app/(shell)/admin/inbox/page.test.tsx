@@ -5,25 +5,75 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const requireCurrentAdminPageAccess = vi.fn();
 vi.mock('@/lib/admin/page-access', () => ({ requireCurrentAdminPageAccess }));
 vi.mock('@/components/features/admin/hud/OvieInbox', () => ({
-  OvieInbox: ({ caseId }: { readonly caseId?: string }) => (
-    <section data-testid='existing-unified-inbox' data-case-id={caseId} />
+  OvieInbox: ({
+    caseId,
+    showHeading,
+  }: {
+    readonly caseId?: string;
+    readonly showHeading?: boolean;
+  }) => (
+    <section
+      data-testid='existing-unified-inbox'
+      data-case-id={caseId}
+      data-show-heading={showHeading}
+    />
   ),
 }));
+vi.mock(
+  '@/components/features/admin/review-inbox/ReviewInboxPilotWorkbench',
+  () => ({
+    ReviewInboxPilotWorkbench: () => (
+      <section data-testid='review-inbox-pilot-workbench' />
+    ),
+  })
+);
 vi.mock('@/components/features/admin/layout/AdminPage', () => ({
   AdminPage: ({ children }: { readonly children: ReactNode }) => (
     <main>{children}</main>
   ),
 }));
 
-describe('guarded Ovie inbox destination', () => {
+describe('guarded Ovie Operator Inbox destination', () => {
   beforeEach(() => {
     requireCurrentAdminPageAccess.mockReset().mockResolvedValue('founder');
+  });
+
+  it('qualifies the page title as Operator Inbox', async () => {
+    const { metadata } = await import('./page');
+    expect(metadata.title).toBe('Operator Inbox | Ovie');
+  });
+
+  it('renders the pilot workbench when pilot=1', async () => {
+    const { default: InboxPage } = await import('./page');
+    render(await InboxPage({ searchParams: Promise.resolve({ pilot: '1' }) }));
+    expect(
+      screen.getByTestId('review-inbox-pilot-workbench')
+    ).toBeInTheDocument();
+  });
+
+  it('opens the review canvas from the review item case id alone', async () => {
+    const { default: InboxPage } = await import('./page');
+    render(
+      await InboxPage({
+        searchParams: Promise.resolve({ case: 'pilot-synthetic-photo' }),
+      })
+    );
+    expect(
+      screen.getByTestId('review-inbox-pilot-workbench')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('existing-unified-inbox')
+    ).not.toBeInTheDocument();
   });
 
   it('renders the existing inbox after the current admin and privacy guard', async () => {
     const { default: InboxPage } = await import('./page');
     render(await InboxPage({ searchParams: Promise.resolve({}) }));
     expect(requireCurrentAdminPageAccess).toHaveBeenCalledOnce();
+    expect(screen.getByTestId('existing-unified-inbox')).toHaveAttribute(
+      'data-show-heading',
+      'false'
+    );
     expect(screen.getByTestId('existing-unified-inbox')).not.toHaveAttribute(
       'data-case-id'
     );

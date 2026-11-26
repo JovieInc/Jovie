@@ -62,23 +62,37 @@ const LEDGER = {
     kind: 'on-download-failure',
     greenGroupCalls: 0,
   },
-  'ci-fast-remaining/Run actionlint': {
+  'ci-fast-remaining-shards/Run actionlint': {
     kind: 'on-download-failure',
     greenGroupCalls: 0,
   },
-  'ci-fast-remaining/Start base-branch history fetch': {
+  // JOV-12618: lists Source Validation runs only when MG tree == source tree
+  // (~3/10 groups per JOV-13081). Typical green groups pay 0 REST here.
+  'ci-fast-typecheck/Decide typecheck/lint reuse': {
+    kind: 'same-tree-proof',
+    greenGroupCalls: 0,
+  },
+  'ci-fast-remaining-shards/Decide typecheck/lint reuse': {
+    kind: 'same-tree-proof',
+    greenGroupCalls: 0,
+  },
+  'ci-fast-remaining-shards/Start base-branch history fetch': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-remaining/Decide structural lane': {
+  'ci-fast-remaining-shards/Decide structural lane': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-remaining/Run structural ci-fast lane': {
+  'ci-fast-remaining-shards/Run structural ci-fast lane': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
   'ci-profile-admission-browser/Fetch base-branch history': {
+    kind: 'git-auth',
+    greenGroupCalls: 0,
+  },
+  'ci-profile-viewport-sweep/Fetch base-branch history': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
@@ -106,15 +120,15 @@ const LEDGER = {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-structural-lanes/Start base-branch history fetch': {
+  'ci-fast-structural-lanes-shards/Start base-branch history fetch': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-structural-lanes/Decide structural lane': {
+  'ci-fast-structural-lanes-shards/Decide structural lane': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-structural-lanes/Run lanes coverage pytest': {
+  'ci-fast-structural-lanes-shards/Run lanes coverage pytest': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },

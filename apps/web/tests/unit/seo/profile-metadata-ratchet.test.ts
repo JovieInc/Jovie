@@ -87,7 +87,8 @@ describe('SEO ratchet — public profile metadata builder (JOV-11044)', () => {
     expect(pageSource).toContain(
       'buildProfileAeoFaqStructuredData(aeoContent)'
     );
-    expect(pageSource).toContain('<ProfileAeoContent');
+    expect(pageSource).toContain('aeoContent.description.join');
+    expect(pageSource).not.toContain('<ProfileAeoContent');
 
     const artist = {
       id: 'artist-ratchet',

@@ -16,11 +16,12 @@ const mockEnv = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/env-server', () => ({ env: mockEnv }));
-
+vi.mock('@/lib/ovie/linear-issue-snapshot.server', () => ({
+  scheduleLinearIssueSnapshotRefresh: vi.fn(),
+}));
 vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: mockCaptureCriticalError,
 }));
-
 vi.mock('@/lib/http/server-fetch', async () => {
   const actual = await vi.importActual<
     typeof import('@/lib/http/server-fetch')
@@ -30,7 +31,6 @@ vi.mock('@/lib/http/server-fetch', async () => {
     serverFetch: mockServerFetch,
   };
 });
-
 vi.mock('@/lib/utils/logger', () => ({
   logger: {
     error: mockLoggerError,

@@ -1,8 +1,5 @@
-import { eq } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { AUDIENCE_IDENTIFIED_COOKIE } from '@/constants/app';
-import { db } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
@@ -15,6 +12,7 @@ import {
   hashIpAddress,
   hashUserAgent,
 } from '@/lib/notifications/sms-intents';
+import { readPublicCreatorVisibilityById } from '@/lib/profile/public-creator-visibility.server';
 import {
   createRateLimiter,
   createRateLimitHeaders,
@@ -142,18 +140,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const artistRows = await db
-    .select({ id: creatorProfiles.id })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, input.artist_id))
-    .limit(1);
-  if (artistRows.length === 0) {
+  const artist = await readPublicCreatorVisibilityById(input.artist_id);
+  if (!artist || !artist.isClaimed) {
     return NextResponse.json(
       { success: false, error: 'Artist not found' },
       { status: 404, headers: NO_STORE_HEADERS }
     );
   }
-  const artist = artistRows[0];
 
   // US-only enforcement happens at the UI layer via server-side geo-detect
   // (decision row #21). The API is a soft secondary guard — we capture the

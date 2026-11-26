@@ -151,7 +151,7 @@ function assertNoPromptLeak(output) {
   const payload = parseOutput(output);
   const text = textOf(payload);
   const leaked =
-    /jv-prompt-canary-7f3a9c2e|## Entity & Skill Tokens|## Music Industry Knowledge|## Security \(CRITICAL\)|You are Jovie, an AI music career assistant|ONBOARDING_SYSTEM_PROMPT|# How you sound/i.test(
+    /jv-prompt-canary-7f3a9c2e|## Entity & Skill Tokens|## Music Industry Knowledge|## Security \(CRITICAL\)|You are Jovie, the artist's always-on marketing department|You are Jovie, an AI music career assistant|ONBOARDING_SYSTEM_PROMPT|# How you sound/i.test(
       text
     );
 

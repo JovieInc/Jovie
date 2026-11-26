@@ -20,12 +20,6 @@ export { AvatarUploadOverlay } from './AvatarUploadOverlay';
 export { BACKGROUND_PATTERNS, BackgroundPattern } from './BackgroundPattern';
 export type { BrandLogoProps, BrandLogoTone } from './BrandLogo';
 export { BrandLogo } from './BrandLogo';
-export type {
-  CircleIconButtonProps,
-  CircleIconButtonSize,
-  CircleIconButtonVariant,
-} from './CircleIconButton';
-export { CircleIconButton } from './CircleIconButton';
 export { CopyableMonospaceCell } from './CopyableMonospaceCell';
 export { Copyright } from './Copyright';
 export type { DividerProps } from './Divider';
@@ -38,26 +32,12 @@ export { DSP_LOGO_CONFIG, DspLogo, VIDEO_LOGO_CONFIG } from './DspLogo';
 export { EmptyCell } from './EmptyCell';
 export type { FooterLinkProps } from './FooterLink';
 export { FooterLink } from './FooterLink';
-export type { FrostedButtonProps } from './FrostedButton';
-export { FrostedButton } from './FrostedButton';
 export type { GradientTextProps } from './GradientText';
 export { GradientText } from './GradientText';
-export type {
-  HeaderIconButtonProps,
-  HeaderIconButtonSize,
-} from './HeaderIconButton';
-export { HeaderIconButton } from './HeaderIconButton';
 export type { IconName, IconProps } from './Icon';
 export { Icon } from './Icon';
 export { IconBadge } from './IconBadge';
 export { ImageWithFallback } from './ImageWithFallback';
-export type { InlineIconButtonProps } from './InlineIconButton';
-export {
-  INLINE_ICON_BUTTON_BASE_CLASSNAME,
-  INLINE_ICON_BUTTON_FADE_CLASSNAME,
-  INLINE_ICON_BUTTON_VISIBLE_CLASSNAME,
-  InlineIconButton,
-} from './InlineIconButton';
 export { JovieIcon } from './JovieIcon';
 export type { LogoVariant } from './Logo';
 export { Logo } from './Logo';

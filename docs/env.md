@@ -50,7 +50,12 @@ at least 32 characters.
 
 ### `BETTER_AUTH_URL` / `NEXT_PUBLIC_BETTER_AUTH_URL`
 
-Public origin of the auth server (`https://jov.ie` in production).
+Public origin of the auth server. Production allows the `jov.ie` and `www.jov.ie`
+hosts. The staging release runs as a Vercel preview and allows only
+`staging.jov.ie`. It identifies staging by the public app URL or by the
+release's runtime `NEXT_PUBLIC_PROFILE_HOSTNAME`. Other previews allow only their
+exact Vercel deployment or branch hostname. When both auth URLs are set, their
+hostnames must match.
 
 ### `NEXT_PUBLIC_AUTH_MOCK`
 

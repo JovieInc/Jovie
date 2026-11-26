@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockSchedule = vi.hoisted(() => vi.fn());
+const mockSnapshotRefresh = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/env-server', () => ({
   env: { LINEAR_WEBHOOK_SECRET: 'linear-secret', GH_DISPATCH_TOKEN: 'gh' },
@@ -16,6 +17,10 @@ vi.mock('@/lib/webhooks/recent-dispatch', () => ({
 }));
 vi.mock('@/lib/ovie/fleet-room.server', () => ({
   scheduleFleetRoomWebhook: mockSchedule,
+}));
+
+vi.mock('@/lib/ovie/linear-issue-snapshot.server', () => ({
+  scheduleLinearIssueSnapshotRefresh: mockSnapshotRefresh,
 }));
 
 describe('Linear webhook to Ovie fleet room', () => {
@@ -60,5 +65,38 @@ describe('Linear webhook to Ovie fleet room', () => {
     );
     expect(response.status).toBe(401);
     expect(mockSchedule).not.toHaveBeenCalled();
+  });
+
+  it('schedules a Linear issue snapshot refresh for a verified Issue event only', async () => {
+    mockSnapshotRefresh.mockClear();
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const payload = {
+      type: 'Issue',
+      action: 'update',
+      createdAt: '2026-11-11T20:59:00.000Z',
+      data: { id: 'i1', identifier: 'JOV-1', team: { key: 'JOV' } },
+    };
+    const body = JSON.stringify(payload);
+    const signature = createHmac('sha256', 'linear-secret')
+      .update(body)
+      .digest('hex');
+    await POST(
+      new Request('https://example.com/api/webhooks/linear', {
+        method: 'POST',
+        headers: { 'linear-signature': signature },
+        body,
+      }) as never
+    );
+    expect(mockSnapshotRefresh).toHaveBeenCalledWith(payload);
+
+    mockSnapshotRefresh.mockClear();
+    await POST(
+      new Request('https://example.com/api/webhooks/linear', {
+        method: 'POST',
+        headers: { 'linear-signature': 'bad' },
+        body,
+      }) as never
+    );
+    expect(mockSnapshotRefresh).not.toHaveBeenCalled();
   });
 });

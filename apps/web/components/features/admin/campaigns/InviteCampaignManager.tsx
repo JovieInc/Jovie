@@ -358,31 +358,29 @@ export function InviteCampaignManager({
               label='Pending'
               value={stats.campaign.pending}
               subtitle='Awaiting processing'
-              valueClassName='text-warning'
             />
             <CampaignMetric
               label='Sending'
               value={stats.campaign.sending}
               subtitle='In progress right now'
-              valueClassName='text-info'
             />
             <CampaignMetric
               label='Sent'
               value={stats.campaign.sent}
               subtitle='Delivered successfully'
-              valueClassName='text-success'
             />
             <CampaignMetric
               label='Failed'
               value={stats.campaign.failed}
               subtitle='Need follow-up'
-              valueClassName='text-destructive'
+              valueClassName={
+                stats.campaign.failed > 0 ? 'text-error-text' : undefined
+              }
             />
             <CampaignMetric
               label='Claimed'
               value={stats.campaign.claimed}
               subtitle='Profiles converted'
-              valueClassName='text-accent'
             />
           </div>
         )}
@@ -407,25 +405,21 @@ export function InviteCampaignManager({
               label='Jobs Pending'
               value={stats.jobQueue.pending}
               subtitle='Queued workers'
-              valueClassName='text-info'
             />
             <CampaignMetric
               label='Processing'
               value={stats.jobQueue.processing}
               subtitle='Running now'
-              valueClassName='text-info'
             />
             <CampaignMetric
               label='Succeeded'
               value={stats.jobQueue.succeeded}
               subtitle='Completed jobs'
-              valueClassName='text-success'
             />
             <CampaignMetric
               label='Est. Remaining'
               value={`~${stats.jobQueue.estimatedMinutesRemaining} min`}
               subtitle='Until queue clears'
-              valueClassName='text-info'
             />
           </div>
 
@@ -475,19 +469,16 @@ export function InviteCampaignManager({
             label='Unique Click-throughs'
             value={campaignOverview?.engagement.uniqueClicks ?? 0}
             subtitle='Visitors who engaged'
-            valueClassName='text-info'
           />
           <CampaignMetric
             label='Profiles Claimed'
             value={campaignOverview?.conversion.profilesClaimed ?? 0}
             subtitle='Successful conversions'
-            valueClassName='text-success'
           />
           <CampaignMetric
             label='Claim Conversion Rate'
             value={`${(campaignOverview?.conversion.claimRate ?? 0).toFixed(1)}%`}
             subtitle='Invite to claim'
-            valueClassName='text-accent'
           />
         </div>
       </CampaignSection>
@@ -561,13 +552,16 @@ export function InviteCampaignManager({
                 label='With Contact Email'
                 value={preview.sample.withEmails}
                 subtitle='Ready to send'
-                valueClassName='text-success'
               />
               <CampaignMetric
                 label='Missing Email'
                 value={preview.sample.withoutEmails}
                 subtitle='Needs enrichment first'
-                valueClassName='text-warning'
+                valueClassName={
+                  preview.sample.withoutEmails > 0
+                    ? 'text-warning-text'
+                    : undefined
+                }
               />
             </div>
 

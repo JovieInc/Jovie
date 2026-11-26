@@ -11,6 +11,7 @@ import {
   ADMIN_MOBILE_SNAPSHOT_SURFACES,
   ADMIN_PRIMARY_NAV_SURFACES,
   ADMIN_RENDER_SURFACES,
+  getAdminDesktopSnapshotName,
   getAdminSurfaceById,
 } from '../../e2e/utils/admin-surface-manifest';
 
@@ -76,6 +77,27 @@ describe('admin surface inventory', () => {
     expect(getAdminSurfaceById('people-assets').rootTestId).toBe(
       'admin-people-view-assets'
     );
+  });
+
+  it('snapshots each Growth deep link at its own accordion, sharing only identical states', () => {
+    const accordionFor = (id: string) =>
+      getAdminSurfaceById(id).snapshotAccordion;
+    expect(accordionFor('growth')).toBeUndefined();
+    expect(accordionFor('growth-outreach')).toBe('Outreach & Campaigns');
+    expect(accordionFor('growth-ingest')).toBe('Intake & Keywords');
+    for (const surface of ADMIN_RENDER_SURFACES) {
+      if (!surface.snapshotSharedWith) continue;
+      const owner = getAdminSurfaceById(surface.snapshotSharedWith);
+      // A shared baseline is only honest when both render the same state.
+      expect(owner.snapshotSharedWith).toBeUndefined();
+      expect(surface.snapshotAccordion).toBe(owner.snapshotAccordion);
+      expect(getAdminDesktopSnapshotName(surface)).toBe(
+        `${owner.snapshotSlug}-desktop.png`
+      );
+    }
+    expect(
+      getAdminDesktopSnapshotName(getAdminSurfaceById('growth-campaigns'))
+    ).toBe('admin-growth-outreach-desktop.png');
   });
 
   it('keeps surface identifiers, snapshot names and URLs unique', () => {

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ATTACH_ACCOUNT_CTA_LABEL,
-  CONFIRM_HANDLE_CTA_LABEL,
+  HANDLE_ACCEPT_COPY,
+  isHandleConfirmIntent,
   isIncompleteAdvanceMessage,
   isMeaningfulIntakeAnswer,
   isOnboardingWidgetEventType,
@@ -9,6 +10,7 @@ import {
   ONBOARDING_GUARDED_STEPS,
   ONBOARDING_WIDGET_EVENTS,
   parseWidgetEventFromMetadata,
+  WIDGET_COMPLETION_ACTIONS,
   widgetEventDisplayText,
 } from '@/lib/chat/onboarding-script/widget-events';
 
@@ -26,9 +28,10 @@ describe('onboarding widget events', () => {
   });
 
   it('uses Title Case CTAs', () => {
-    expect(CONFIRM_HANDLE_CTA_LABEL).toBe('Confirm Handle');
+    expect(HANDLE_ACCEPT_COPY).toBe('Keep');
     expect(ATTACH_ACCOUNT_CTA_LABEL).toBe('Attach Account');
     expect(NONE_OF_THESE_CTA_LABEL).toBe('None of These');
+    expect(WIDGET_COMPLETION_ACTIONS.SPOTIFY_SKIPPED).toBe('spotify_skipped');
   });
 
   it('parses handle_confirmed metadata', () => {
@@ -69,6 +72,31 @@ describe('onboarding widget events', () => {
     expect(isIncompleteAdvanceMessage('  OK  ')).toBe(true);
     expect(isIncompleteAdvanceMessage('like 300 people')).toBe(false);
     expect(isIncompleteAdvanceMessage('planning a single')).toBe(false);
+  });
+
+  it('recognizes free-text claim/confirm/keep intent for Keep', () => {
+    for (const text of [
+      'claim',
+      'Claim!',
+      'claim it',
+      'claim my profile',
+      'sign me up',
+      'sign up',
+      'confirm',
+      'confirm handle',
+      'keep',
+      'keep it',
+      'keep this draft',
+      'lock it in',
+      'I want to claim my profile',
+    ]) {
+      expect(isHandleConfirmIntent(text)).toBe(true);
+    }
+    expect(isHandleConfirmIntent('ok')).toBe(false);
+    expect(isHandleConfirmIntent('k')).toBe(false);
+    expect(isHandleConfirmIntent('newname')).toBe(false);
+    expect(isHandleConfirmIntent('@newname')).toBe(false);
+    expect(isHandleConfirmIntent('what does a handle do here?')).toBe(false);
   });
 
   it('requires meaningful intake answers', () => {

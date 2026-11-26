@@ -1,3 +1,4 @@
+// Drift T2.1: IconButton alias retirement — callsite migration coverage.
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';

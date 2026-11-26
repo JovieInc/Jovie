@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ChatActionCard } from './ChatActionCard';
 
@@ -93,5 +94,32 @@ describe('ChatActionCard accessible name (JOV-8873)', () => {
     expect(
       screen.getByRole('button', { name: 'Review links' })
     ).not.toHaveAttribute('aria-label');
+  });
+});
+
+describe('ChatActionCard PlainButton actions', () => {
+  it('renders type=button actions that fire their handlers on userEvent.click', async () => {
+    const user = userEvent.setup();
+    const onAct = vi.fn();
+    const onDismiss = vi.fn();
+    render(
+      <ChatActionCard
+        title='Review imported links'
+        body='Three links need confirmation.'
+        actionLabel='Review links'
+        onAct={onAct}
+        onDismiss={onDismiss}
+      />
+    );
+    const primary = screen.getByRole('button', { name: 'Review links' });
+    const dismiss = screen.getByRole('button', {
+      name: 'Dismiss Review imported links',
+    });
+    expect(primary).toHaveAttribute('type', 'button');
+    expect(dismiss).toHaveAttribute('type', 'button');
+    await user.click(primary);
+    await user.click(dismiss);
+    expect(onAct).toHaveBeenCalledOnce();
+    expect(onDismiss).toHaveBeenCalledOnce();
   });
 });

@@ -57,6 +57,7 @@ export {
   BILLING_FIELDS_STATUS,
   type BillingAuditEventType,
   type BillingFieldsResult,
+  type BillingSkipReason,
   type FetchUserBillingDataOptions,
   type FetchUserBillingDataResult,
   type FetchUserBillingDataWithAuthOptions,

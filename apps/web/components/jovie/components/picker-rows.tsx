@@ -12,6 +12,7 @@
  * a row is a row.
  */
 
+import { PlainButton } from '@jovie/ui';
 import {
   Calendar,
   CalendarDays,
@@ -426,7 +427,7 @@ export const PickerRow = memo(function PickerRow({
   rowId,
 }: PickerRowProps) {
   return (
-    <button
+    <PlainButton
       type='button'
       role='option'
       id={rowId}
@@ -444,6 +445,6 @@ export const PickerRow = memo(function PickerRow({
     >
       <RowVisual item={item} />
       <RowBody item={item} />
-    </button>
+    </PlainButton>
   );
 });

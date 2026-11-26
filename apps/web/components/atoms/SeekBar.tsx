@@ -1,5 +1,6 @@
 'use client';
 
+import { HostDrawnInput } from '@jovie/ui';
 import {
   type ChangeEvent,
   type PointerEvent as ReactPointerEvent,
@@ -34,10 +35,6 @@ export function SeekBar({
   }, [currentTime, isScrubbing]);
 
   const displayTime = isScrubbing ? scrubTime : currentTime;
-  const progressPercent =
-    duration > 0
-      ? Math.min(100, Math.max(0, (displayTime / duration) * 100))
-      : 0;
   const isDisabled = disabled || duration <= 0;
 
   const commitSeek = useCallback(
@@ -72,7 +69,7 @@ export function SeekBar({
   }, []);
 
   return (
-    <input
+    <HostDrawnInput
       type='range'
       min={0}
       max={duration > 0 ? duration : 1}
@@ -83,17 +80,9 @@ export function SeekBar({
       onPointerUp={endScrub}
       onPointerCancel={endScrub}
       onBlur={endScrub}
-      aria-label='Seek track'
+      aria-label='Seek Track'
       disabled={isDisabled}
-      className={cn(
-        'seek-range cursor-pointer appearance-none rounded-full accent-(--linear-accent) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) disabled:cursor-default disabled:opacity-50',
-        className
-      )}
-      style={
-        {
-          '--seek-pct': `${progressPercent}%`,
-        } as React.CSSProperties
-      }
+      className={cn('w-full', className)}
     />
   );
 }

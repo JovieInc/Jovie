@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { ChevronDown } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
@@ -74,11 +75,27 @@ export function SidebarSection({
     return <div className={cn('space-y-px', className)}>{children}</div>;
   }
 
+  // A caret promises items behind it. With none, the name is a plain label.
+  if (itemCount <= 0) {
+    return (
+      <div className={className}>
+        <div
+          className={cn(SIDEBAR_ENTRY_ROW_CLASS, 'relative w-full rounded-md')}
+        >
+          <span className='size-(--app-shell-sidebar-icon-size) shrink-0' />
+          <span className='text-app font-caption truncate text-primary-token'>
+            {name}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   const bodyMaxHeight = open ? itemCount * ITEM_HEIGHT + SECTION_PADDING : 0;
 
   return (
     <div className={className}>
-      <button
+      <PlainButton
         type='button'
         onClick={onToggle}
         className={cn(
@@ -98,7 +115,7 @@ export function SidebarSection({
         <span className='text-app font-caption truncate text-primary-token'>
           {name}
         </span>
-      </button>
+      </PlainButton>
       <div
         className='overflow-hidden'
         style={{

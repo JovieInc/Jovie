@@ -1,5 +1,6 @@
 'use client';
 
+import { HostDrawnInput } from '@jovie/ui';
 import { Search } from 'lucide-react';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
@@ -35,18 +36,20 @@ export function CmdKMainPlaneSearchInput({
   const [draft, setDraft] = useState(value);
   const draftRef = useRef(value);
   const lastValueRef = useRef(value);
-  const pendingEchoesRef = useRef<Set<string>>(new Set());
+  // Echoes of keystrokes already applied locally that may arrive late from
+  // the parent value prop after the draft was updated.
+  const inboundEchoesRef = useRef<Set<string>>(new Set());
 
   useLayoutEffect(() => {
     if (value === lastValueRef.current) return;
     lastValueRef.current = value;
-    const pending = pendingEchoesRef.current;
-    if (pending.has(value)) {
+    const echoes = inboundEchoesRef.current;
+    if (echoes.has(value)) {
       // A late echo of something the user already typed.
-      if (value === draftRef.current) pending.clear();
+      if (value === draftRef.current) echoes.clear();
       return;
     }
-    pending.clear();
+    echoes.clear();
     draftRef.current = value;
     setDraft(value);
   }, [value]);
@@ -56,19 +59,19 @@ export function CmdKMainPlaneSearchInput({
   }, [open]);
 
   return (
-    <div className='flex h-full min-w-0 flex-1 items-center gap-2'>
+    <div className='flex h-full min-w-0 flex-1 items-center gap-2 text-sm text-primary-token'>
       <Search
         className='size-4 shrink-0 text-tertiary-token'
         aria-hidden='true'
       />
-      <input
+      <HostDrawnInput
         ref={inputRef}
         id={`${listId}-input`}
         type='search'
         value={draft}
         onChange={event => {
           const next = event.target.value;
-          pendingEchoesRef.current.add(next);
+          inboundEchoesRef.current.add(next);
           draftRef.current = next;
           setDraft(next);
           onQueryChange(next);
@@ -78,7 +81,7 @@ export function CmdKMainPlaneSearchInput({
           onKeyDown(event.nativeEvent);
         }}
         placeholder='Search Jovie or run a command…'
-        className='min-w-0 flex-1 appearance-none bg-transparent text-sm text-primary-token outline-none placeholder:text-tertiary-token focus:outline-none focus-visible:outline-none'
+        className='min-w-0 flex-1 appearance-none'
         aria-label='Command Palette Search'
         role='combobox'
         aria-autocomplete='list'

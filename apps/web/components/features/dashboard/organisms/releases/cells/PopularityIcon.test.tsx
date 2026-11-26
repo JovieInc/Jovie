@@ -1,5 +1,6 @@
 import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { PopularityIcon } from './PopularityIcon';
 
@@ -46,5 +47,23 @@ describe('PopularityIcon', () => {
       }
       unmount();
     }
+  });
+
+  it('renders the popularity control as a type=button PlainButton that takes keyboard focus', async () => {
+    const user = userEvent.setup();
+    render(
+      <TooltipProvider>
+        <PopularityIcon popularity={70} />
+      </TooltipProvider>
+    );
+
+    const control = screen.getByRole('button', {
+      name: 'Popularity 70 out of 100',
+    });
+    expect(control).toHaveAttribute('type', 'button');
+
+    await user.tab();
+
+    expect(control).toHaveFocus();
   });
 });

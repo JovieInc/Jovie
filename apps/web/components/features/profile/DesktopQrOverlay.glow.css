@@ -1,0 +1,10 @@
+/* Scenic hover wash for the open QR card. Colour lives here so the
+   component TSX stays on semantic tokens for chrome. */
+
+.desktop-qr-overlay-glow {
+  background: radial-gradient(
+    80% 60% at 50% 0%,
+    rgba(255, 255, 255, 0.35),
+    transparent 60%
+  );
+}

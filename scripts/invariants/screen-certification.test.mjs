@@ -582,7 +582,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       id: 'web.marketing-support',
       platform: 'web',
       owner: 'marketing-support',
-      sources: [source],
+      sources: [source, source.replace('page.tsx', 'loading.tsx')],
       viewports: ['desktop', 'mobile'],
     });
 

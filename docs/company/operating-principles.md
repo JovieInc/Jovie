@@ -15,7 +15,7 @@ Speed of learning beats quality of plan.
 - **"Done" means merged and observable in production.** Not "feature-complete on branch." Not "tests pass locally." Merged. Live. Watched.
 - **Polish that doesn't change UX or revenue is debt; polish that does is the work.** Don't refactor the demo path on the way out the door. Don't ship the demo path without polish.
 - **The cost of shipping the wrong thing fast is usually lower than the cost of shipping the right thing slow.** The wrong thing teaches us what right is. The right thing shipped six months late teaches us nothing.
-- **Ship under feature flags when the change is risky.** Reversibility unlocks speed. (See Principle 2.)
+- **Ship under feature flags when the change is risky.** Reversibility unlocks speed. (See Principle 2.) Launch/core is excepted: ship live or stay a draft (OS §1.16).
 
 This principle is the operating mode for [`.claude/rules/release.md`](../../.claude/rules/release.md). When the rule and this principle agree, the rule is the implementation; this principle is the why.
 

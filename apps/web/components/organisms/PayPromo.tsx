@@ -6,7 +6,7 @@ export default function PayPromo() {
     <CTASection
       title={
         <>
-          Pay, <span className='text-indigo-400'>instantly.</span>
+          Pay, <span className='text-accent'>instantly.</span>
         </>
       }
       description={

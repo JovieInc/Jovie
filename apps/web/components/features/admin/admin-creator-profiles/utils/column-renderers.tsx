@@ -1,12 +1,11 @@
+import { IconButton } from '@jovie/ui';
 import { Copy, ExternalLink } from 'lucide-react';
-import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { toast } from '@/components/feedback';
 import { AvatarCell, SocialLinksCell } from '@/components/organisms/table';
 import { getProfileUrl } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 import type { CellContext } from '@/lib/tanstack-table';
-
 /**
  * Renders the avatar cell with profile information
  */
@@ -29,11 +28,11 @@ export function renderAvatarCell({
       disableUsernameLink
       usernameActions={
         <span className='flex shrink-0 items-center gap-5'>
-          <InlineIconButton
+          <IconButton
+            fade='parent'
+            variant='inline'
             size='xs'
             aria-label={`Copy link for @${profile.username}`}
-            fadeOnParentHover
-            className='[&_svg]:h-3 [&_svg]:w-3'
             onClick={event => {
               event.stopPropagation();
               copyToClipboard(profileUrl).then(ok => {
@@ -46,19 +45,19 @@ export function renderAvatarCell({
             }}
           >
             <Copy className='h-3 w-3' />
-          </InlineIconButton>
-          <InlineIconButton
+          </IconButton>
+          <IconButton
+            fade='parent'
+            asChild
+            variant='inline'
             size='xs'
-            href={profileUrl}
-            target='_blank'
-            rel='noopener noreferrer'
             aria-label={`Open profile for @${profile.username}`}
-            fadeOnParentHover
-            className='[&_svg]:h-3 [&_svg]:w-3'
             onClick={event => event.stopPropagation()}
           >
-            <ExternalLink className='h-3 w-3' />
-          </InlineIconButton>
+            <a href={profileUrl} target='_blank' rel='noopener noreferrer'>
+              <ExternalLink className='h-3 w-3' />
+            </a>
+          </IconButton>
         </span>
       }
     />

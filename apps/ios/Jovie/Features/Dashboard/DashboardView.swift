@@ -199,6 +199,16 @@ struct DashboardView: View {
           .disabled(response.publicProfileURL == nil)
           .opacity(response.publicProfileURL == nil ? 0.35 : 1)
           .accessibilityIdentifier("dashboard-share-profile-button")
+          .simultaneousGesture(
+            TapGesture().onEnded {
+              guard response.publicProfileURL != nil else { return }
+              // Share sheet open only — not delivery or recipient activation.
+              Observability.addBreadcrumb(
+                .profileSharePresented,
+                context: ["stage": "share_sheet_presented"]
+              )
+            }
+          )
         }
 
         appleWalletControl(response: response)
@@ -305,6 +315,10 @@ struct DashboardView: View {
     guard let value else { return }
     UIPasteboard.general.string = value
     didCopyURL = true
+    Observability.addBreadcrumb(
+      .profileUrlCopied,
+      context: ["stage": "clipboard"]
+    )
 
     Task {
       // Stay "Copied" long enough to be observable: the release-lane UI test

@@ -62,16 +62,20 @@ describe('BottomTabBar — tab rendering', () => {
     );
   });
 
-  it('keeps Events when hasTourDates is false', () => {
+  it('hides Events when hasTourDates is false (JOV-14241)', () => {
     render(<BottomTabBar {...makeProps({ hasTourDates: false })} />);
-    expect(screen.getByRole('button', { name: 'Events' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Events' })).toBeNull();
     expect(screen.getByRole('button', { name: 'About' })).toBeInTheDocument();
   });
 
   it('does not let fan-capture flags invent or hide destinations', () => {
     const { container } = render(
       <BottomTabBar
-        {...makeProps({ showAlerts: false, showAlertsTab: false })}
+        {...makeProps({
+          hasTourDates: true,
+          showAlerts: false,
+          showAlertsTab: false,
+        })}
       />
     );
 
@@ -246,12 +250,12 @@ describe('BottomTabBar — grid layout', () => {
     expect(grid?.getAttribute('style')).toContain('repeat(4,');
   });
 
-  it('has 4 columns when hasTourDates=false', () => {
+  it('has 3 columns when hasTourDates=false (Events hidden)', () => {
     const { container } = render(
       <BottomTabBar {...makeProps({ hasTourDates: false })} />
     );
     const grid = container.querySelector('[style*="grid-template-columns"]');
-    expect(grid?.getAttribute('style')).toContain('repeat(4,');
+    expect(grid?.getAttribute('style')).toContain('repeat(3,');
   });
 
   it('keeps the dock icon-only while each named grid cell remains interactive', () => {

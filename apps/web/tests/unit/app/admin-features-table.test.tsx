@@ -118,7 +118,7 @@ describe('AdminFeaturesTable', () => {
     expect(screen.getByTestId('admin-features-table')).toBeInTheDocument();
     expect(screen.getByRole('table')).toHaveAttribute(
       'data-table-row-mode',
-      'controls'
+      'dense'
     );
     expect(
       screen.getByRole('button', { name: 'Copy flag key spotify_oauth' })

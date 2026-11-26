@@ -132,3 +132,36 @@ test('getCompiledRoutesMtimeMs returns null when compiled routes are missing', (
     rmSync(root, { force: true, recursive: true });
   }
 });
+
+test('ensureDevNextCacheFresh wipes stale Next.js 16 isolated .next/dev cache', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'jovie-dev-cache-isolated-'));
+  const appDir = path.join(root, 'app');
+  const nextDir = path.join(root, '.next');
+  const isolatedRoutesDir = path.join(nextDir, 'dev', 'server', 'app');
+
+  try {
+    mkdirSync(path.join(appDir, '(dynamic)', 'start'), { recursive: true });
+    mkdirSync(isolatedRoutesDir, { recursive: true });
+
+    touch(
+      path.join(isolatedRoutesDir, 'manifest.json'),
+      new Date('2026-06-20T00:00:00Z')
+    );
+    touch(
+      path.join(appDir, '(dynamic)', 'start', 'page.tsx'),
+      new Date('2026-07-03T00:00:00Z')
+    );
+
+    const summary = ensureDevNextCacheFresh({
+      appDir,
+      nextDir,
+      skipStaleCheck: false,
+      forceReset: false,
+    });
+
+    assert.equal(summary.cacheState, 'stale');
+    assert.throws(() => statSync(nextDir), /ENOENT/);
+  } finally {
+    rmSync(root, { force: true, recursive: true });
+  }
+});

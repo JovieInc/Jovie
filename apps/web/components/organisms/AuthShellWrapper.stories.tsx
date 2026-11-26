@@ -46,6 +46,10 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+export const StreamedPlaceholder: Story = {
+  args: { framePlaceholder: true },
+};
+
 export const PreviewPanelOpen: Story = {
   args: {
     previewPanelDefaultOpen: true,

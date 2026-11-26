@@ -82,8 +82,8 @@ export function GoldenPathFunnelPanel({
             Golden Path Conversion
           </h2>
           <p className='mt-1 text-app text-secondary-token'>
-            One consented journey from entry to paid, last 28 days. Time is
-            measured between stages.
+            Consented journeys, last 28 days. Counts include every recorded
+            arrival. Rates and times use journeys with both events in order.
           </p>
         </div>
         {report ? (

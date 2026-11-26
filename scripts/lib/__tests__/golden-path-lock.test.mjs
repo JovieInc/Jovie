@@ -31,6 +31,7 @@ import {
   executeAutofix,
   findFingerprintPrs,
   findOpenAutofixPr,
+  findOwnedAgentRecords,
   findOwnedAgents,
   GOLDEN_PATH_AUTOFIX_MAX_ATTEMPTS,
   GOLDEN_PATH_LOCK_SCHEMA,
@@ -69,21 +70,52 @@ describe('golden-path lock test files', () => {
 });
 
 describe('golden-path lock classifier', () => {
-  it('marks chat, start, waitlist, and homepage CTA paths', () => {
+  it('marks chat, start, waitlist, checkout, claim, and homepage CTA paths', () => {
     const classified = classifyChangedPaths([
       'apps/web/app/api/chat/onboarding-handler.ts',
+      'apps/web/app/(dynamic)/start/page.tsx',
       'apps/web/app/start/page.tsx',
       'apps/web/app/api/waitlist/route.ts',
+      'apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx',
+      'apps/web/app/claim/page.tsx',
+      'apps/web/data/homepageStartCta.ts',
       'apps/web/data/homepageFrontDoorCta.ts',
       'README.md',
     ]);
     expect(classified.touchesGoldenPath).toBe(true);
     expect(classified.matched).toEqual([
       'apps/web/app/api/chat/onboarding-handler.ts',
+      'apps/web/app/(dynamic)/start/page.tsx',
       'apps/web/app/start/page.tsx',
       'apps/web/app/api/waitlist/route.ts',
+      'apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx',
+      'apps/web/app/claim/page.tsx',
+      'apps/web/data/homepageStartCta.ts',
       'apps/web/data/homepageFrontDoorCta.ts',
     ]);
+  });
+
+  it('verifies every live Golden Path surface exists on disk and triggers touchesGoldenPath', () => {
+    const liveGoldenPathFiles = [
+      'apps/web/components/homepage/HomepageEditorial.tsx',
+      'apps/web/data/homepageStartCta.ts',
+      'apps/web/app/(dynamic)/start/page.tsx',
+      'apps/web/components/features/onboarding/OnboardingChat.tsx',
+      'apps/web/components/features/onboarding/ChatProposeCheckoutCard.tsx',
+      'apps/web/app/(auth)/signup/SignUpPageClient.tsx',
+      'apps/web/app/(auth)/signin/SignInPageClient.tsx',
+      'apps/web/app/claim/page.tsx',
+      'apps/web/app/claim/agent/[draftId]/AgentClaimScreen.tsx',
+      'apps/web/app/onboarding/checkout/OnboardingCheckoutClient.tsx',
+      'apps/web/app/[username]/_components/PublicClaimBanner.tsx',
+      'apps/web/app/r/[slug]/ReleaseLandingPage.tsx',
+    ];
+    for (const relPath of liveGoldenPathFiles) {
+      expect(
+        readFileSync(join(REPO_ROOT, relPath), 'utf8').length
+      ).toBeGreaterThan(0);
+      expect(classifyChangedPaths([relPath]).touchesGoldenPath).toBe(true);
+    }
   });
 
   it('still records docs-only diffs without treating them as a skip', () => {
@@ -720,21 +752,26 @@ describe('golden-path Linear-only intake', () => {
       JSON.stringify({
         data: {
           team: {
-            states: { nodes: [{ id: 'todo-state', name: 'Todo' }] },
+            states: {
+              nodes: [
+                { id: 'todo-state', name: 'Todo' },
+                { id: 'backlog-state', name: 'Backlog' },
+              ],
+            },
           },
           issues: { nodes: [] },
         },
       })
     );
 
-  it('creates exactly one canonical Linear record straight into Todo (JOV-5966)', async () => {
+  it('creates exactly one canonical Linear record in Backlog, where admission takes it (JOV-5966)', async () => {
     const fetchImpl = vi.fn(async (_input, init) => {
       const payload = JSON.parse(String(init.body));
       if (payload.query.includes('FindIssueByFingerprint')) {
         return searchEmpty();
       }
       expect(payload.query).toContain('mutation CreateDedupedLinearIssue');
-      expect(payload.variables).toMatchObject({ stateId: 'todo-state' });
+      expect(payload.variables).toMatchObject({ stateId: 'backlog-state' });
       expect(payload.variables.title).toContain('golden-path-lock:prod:test');
       return new Response(
         JSON.stringify({
@@ -1285,6 +1322,13 @@ describe('golden-path autofix dedupe (JOV-6832)', () => {
       },
     ];
     expect(findOwnedAgents(agents, FINGERPRINT)).toEqual(['running']);
+    // Full record lookup matches branch-only Cursor list entries (so 24h launch
+    // accounting sees both RUNNING and FINISHED runs) while findOwnedAgents
+    // excludes FINISHED runs so stale finished agents never block escalation.
+    expect(findOwnedAgentRecords(agents, FINGERPRINT).map(a => a.id)).toEqual([
+      'running',
+      'done',
+    ]);
   });
 
   it('binds Cursor dispatch to a stable boundary phase and stops when that boundary is held', () => {

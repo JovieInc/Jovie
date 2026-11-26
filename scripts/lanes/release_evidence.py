@@ -14,7 +14,7 @@ doctor's Tracker and routed by Summer's detector loop:
 
 Both clear themselves when the condition clears (the next green evidence run; a new production build).
 
-api-budget: github-user-core 48/hr - doctor tick every 5 min: 1 main push CI runs read, 1 main commit read, jobs of new completed runs (about 1 per tick, cached by run id), and 1 job-log read per new failing job once a streak is an incident
+api-budget: github-user-core 48/hr - doctor tick every 5 min: the 1 main push CI runs read and the 1 main commit read go through If-None-Match (JOV-13142: a 304-confirmed read is free, so a quiet main costs ~0 of the fixed reads; the first read after a change pays the 200), jobs of new completed runs (about 1 per tick, cached by run id), and 1 job-log read per new failing job once a streak is an incident
 """
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ from pathlib import Path
 
 import throughput_sentinel as sentinel
 from atomic_state import atomic_write_text
+from pr_events import conditional_page  # JOV-13142: the canonical If-None-Match read (304 = free)
 
 REPO = "JovieInc/Jovie"
 # The CI jobs whose result is release evidence: the Production Controller's journey gate
@@ -156,13 +157,24 @@ def sample(state_dir: Path, now: float, run=None, version=read_version) -> tuple
     if isinstance(cached.get("observedAt"), (int, float)) and 0 <= now - cached["observedAt"] < REFRESH_S:
         return cached, None
     gh = lambda p: sentinel._gh_json(run, p)  # noqa: E731
+    cache = Path(state_dir) / "cache" / "etag"
+
+    def conditional(path):
+        """JOV-13142: the two unconditional per-tick reads (runs list, main head) through
+        If-None-Match; a 304-confirmed read is free. Any miss (no cache, error, malformed
+        reply, pagination) falls back to the plain read, so behavior is never skipped."""
+        body = conditional_page(path, sh=lambda argv, timeout=30:
+                                (run or sentinel._budgeted_gh)(argv[1:], capture_output=True, text=True, timeout=timeout),
+                                cache=cache)
+        return body if body is not None else gh(path)
+
     errors: list[str] = []
     jobs_cache: dict[str, list] = dict(cached.get("jobsCache") or {})
     out = {"observedAt": now, "evidenceReadAt": cached.get("evidenceReadAt"), "firstObservedAt": cached.get("firstObservedAt") or now,
            "streaks": {}, "build": cached.get("build") or {}, "jobsCache": {}}
     try:
-        runs = gh(f"repos/{REPO}/actions/workflows/ci.yml/runs?branch=main&event=push&status=completed"
-                  f"&per_page={RUNS_READ}").get("workflow_runs") or []
+        runs = (conditional(f"repos/{REPO}/actions/workflows/ci.yml/runs?branch=main&event=push&status=completed"
+                            f"&per_page={RUNS_READ}") or {}).get("workflow_runs") or []
 
         attempts = {r["id"]: r.get("run_attempt") or 1 for r in runs}
 
@@ -205,7 +217,7 @@ def sample(state_dir: Path, now: float, run=None, version=read_version) -> tuple
         out["streaks"] = cached.get("streaks") or {}
         out["jobsCache"] = jobs_cache  # keep what was read: a transient error must not force a full refetch
     try:  # separate from the evidence read: a failed main lookup never discards fresh streaks
-        main_sha = (gh(f"repos/{REPO}/commits/main") or {}).get("sha")
+        main_sha = (conditional(f"repos/{REPO}/commits/main") or {}).get("sha")
     except Exception as error:  # noqa: BLE001
         errors.append(f"main head: {type(error).__name__}: {str(error)[:80]}")
         main_sha = (cached.get("build") or {}).get("mainSha")

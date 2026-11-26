@@ -10,6 +10,7 @@ const meta = {
   },
   args: {
     hero: ARTIST_PROFILE_COPY.hero,
+    adaptive: ARTIST_PROFILE_COPY.adaptive,
   },
 } satisfies Meta<typeof ArtistProfileHero>;
 

@@ -7,7 +7,8 @@
  * queues; enqueue sites call it through `kickQueue` so work starts at insert
  * time instead of waiting for the next tick.
  *
- * Auth: verifyCronRequest (trusted host or CRON_SECRET bearer).
+ * Auth: verifyCronRequest (requires CRON_SECRET bearer; trusted host is
+ * additive when requireTrustedOrigin is set, never a substitute).
  */
 import { NextResponse } from 'next/server';
 import { verifyCronRequest } from '@/lib/cron/auth';

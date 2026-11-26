@@ -77,6 +77,7 @@ vi.mock('@/lib/cache/profile', () => ({ invalidateProfileCache: vi.fn() }));
 vi.mock('@/lib/cache/releases', () => ({ invalidateReleaseCaches: vi.fn() }));
 vi.mock('@/lib/claim/claim-verification.server', () => ({
   lookupArtistReach: mocks.reach,
+  scheduleClaimVerificationCard: vi.fn(),
 }));
 vi.mock('@/lib/waitlist/settings', () => ({
   isWaitlistGateEnabled: mocks.gate,

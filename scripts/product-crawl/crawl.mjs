@@ -16,8 +16,7 @@
 // pass (overlay-walk.mjs) hovers, resizes, presses Escape and follows one
 // link on a few pages, looking for overlays left up without their anchor.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { chromium } from 'playwright';
 import { skipSignedIn, uncoveredEntry } from './accepted-uncovered.mjs';
@@ -36,11 +35,17 @@ import {
   fromThirdPartyFrame,
   median,
   PLACEHOLDER,
-  productReady,
-  rankFindings,
   TIMING_SAMPLES,
   timingSuspect,
 } from './ready-gate.mjs';
+import {
+  CRAWL_DEFAULTS,
+  producerScope,
+  receiptAt,
+  SIGNED_IN_TARGET,
+  VIEWPORTS,
+} from './receipt-producer.mjs';
+import { readPublicAdoption } from './receipt-reuse.mjs';
 import {
   COLLECT,
   coverRoute,
@@ -50,7 +55,7 @@ import {
   SIGNED_IN_DISCOVERY,
   strangerDiscovery,
 } from './sample-params.mjs';
-import { inShard, parseShard, summaryLines } from './shard.mjs';
+import { inShard, parseShard, writeCrawlReceipt } from './shard.mjs';
 import { judgeOnQuietReload, wasThrottled } from './throttle.mjs';
 import { createTrafficEvidence } from './traffic-evidence.mjs';
 
@@ -69,11 +74,15 @@ const { values: args } = parseArgs({
     shard: { type: 'string', default: process.env.CRAWL_SHARD || '' },
     'max-intercepted-requests': {
       type: 'string',
-      default: process.env.CRAWL_MAX_INTERCEPTED_REQUESTS || '20000',
+      default:
+        process.env.CRAWL_MAX_INTERCEPTED_REQUESTS ||
+        String(CRAWL_DEFAULTS.maxInterceptedRequests),
     },
     'page-interval-ms': {
       type: 'string',
-      default: process.env.CRAWL_PAGE_INTERVAL_MS || '1000',
+      default:
+        process.env.CRAWL_PAGE_INTERVAL_MS ||
+        String(CRAWL_DEFAULTS.pageIntervalMs),
     },
   },
 });
@@ -84,16 +93,7 @@ const started = Date.now();
 const pastDeadline = () => Date.now() >= DEADLINE;
 const minutes = () => ((Date.now() - started) / 60_000).toFixed(1);
 
-const VIEWPORTS = {
-  desktop: { width: 1440, height: 900 },
-  phone: { width: 390, height: 844 },
-};
 const SIGN_IN = /^\/(sign-?in|sign-?up|login|signin)(\/|$)/;
-// Where a route needs a query to land on its real screen when signed in.
-const SIGNED_IN_TARGET = {
-  '/onboarding/checkout':
-    '/onboarding/checkout?source=intent&plan=pro&interval=month',
-};
 // Sent only to the crawled origin, never to third parties.
 const BYPASS = process.env.PLAYWRIGHT_VERCEL_BYPASS_SECRET || '';
 
@@ -203,6 +203,7 @@ async function visit({ route, target, viewport, identity, fixture, collect }) {
   const row = { route, url: target, identity, viewport };
   if (fixture === 'unclaimed') row.expectClaimBanner = true;
   const t0 = Date.now();
+  row.measuredAt = new Date(t0).toISOString();
   try {
     const res = await page.goto(new URL(target, args.origin).href, {
       waitUntil: 'load',
@@ -271,7 +272,25 @@ const safeVisit = job =>
   });
 
 // Rechecks call safeVisit directly, retaining independent cold contexts.
-const measurements = createColdVisit(safeVisit, args.origin);
+const scope = producerScope(process.cwd(), {
+  origin: args.origin,
+  sha: args.sha,
+  deploymentId: process.env.CRAWL_DEPLOYMENT_ID,
+  handle: args.handle,
+  unclaimedHandle: args['unclaimed-handle'],
+  shard,
+  maxInterceptedRequests: Number(args['max-intercepted-requests']),
+  pageIntervalMs: Number(args['page-interval-ms']),
+});
+const adoption =
+  process.env.GITHUB_JOB === 'product-crawl'
+    ? readPublicAdoption(
+        process.env.CRAWL_PUBLIC_REUSE_B64 || '',
+        scope,
+        inventory.inventory
+      )
+    : null;
+const measurements = createColdVisit(safeVisit, args.origin, { adoption });
 const coldVisit = measurements.visit;
 
 // Real values for dynamic routes (sample-params.mjs): repo constants, the
@@ -456,7 +475,11 @@ const receipt = {
   schema: 'product-crawl/v1',
   origin: args.origin,
   sha: args.sha || null,
-  at: new Date().toISOString(),
+  at: receiptAt(started, pages),
+  producerScope: scope,
+  ...(measurements.adoption()
+    ? { publicAdoption: measurements.adoption() }
+    : {}),
   shard,
   signedIn,
   // A shard owns only its routes; merge-receipts.mjs unions them back.
@@ -471,29 +494,5 @@ const receipt = {
   traffic: traffic.snapshot(),
   pages,
 };
-const verdict = productReady(receipt);
-await mkdir(args.out, { recursive: true });
-await writeFile(
-  join(args.out, 'receipt.json'),
-  JSON.stringify(receipt, null, 1)
-);
-await writeFile(
-  join(args.out, 'verdict.json'),
-  JSON.stringify(verdict, null, 1)
-);
-
-const lines = summaryLines(receipt, verdict);
-await writeFile(join(args.out, 'summary.md'), lines.join('\n'));
-console.log(lines.join('\n'));
-// Every finding, one JSON line each, so the full list survives in the job log.
-for (const f of rankFindings(verdict.findings))
-  console.log(`crawl-finding ${JSON.stringify(f)}`);
-for (const p of pages.filter(x => !x.error && !x.authGated))
-  console.log(
-    `crawl-page ${JSON.stringify({ route: p.route, url: p.url, identity: p.identity, viewport: p.viewport, status: p.status, cls: p.cls, lcpMs: p.lcpMs, longestTaskMs: p.longestTaskMs, loadMs: p.loadMs })}`
-  );
-for (const w of overlayWalks.walks)
-  console.log(
-    `crawl-walk ${JSON.stringify({ route: w.route, url: w.url, identity: w.identity, rail: w.rail, opened: w.opened, steps: w.steps?.length, orphaned: w.steps?.filter(s => s.orphans).length, error: w.error })}`
-  );
-// The crawl reports; ready-gate.mjs decides. Exit 0 so the receipt uploads.
+await writeCrawlReceipt(receipt, args.out);
+// The crawl reports; the gate decides.

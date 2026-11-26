@@ -115,6 +115,10 @@ describe('UnreleasedReleaseHero', () => {
       '/test-artist'
     );
     expect(screen.getByTestId('pre-save-actions')).toBeInTheDocument();
+    // Title/artist remain mounted for route ViewTransition morph (JOV-14244).
+    expect(
+      screen.getByRole('heading', { name: 'Future Release' })
+    ).toBeVisible();
     await expectNoA11yViolations(container);
   });
 

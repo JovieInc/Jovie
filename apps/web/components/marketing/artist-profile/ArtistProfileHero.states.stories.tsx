@@ -9,7 +9,10 @@ const meta = {
   title: 'Marketing/Artist Profile/ArtistProfileHero States',
   component: ArtistProfileHero,
   parameters: { layout: 'fullscreen' },
-  args: { hero: HERO },
+  args: {
+    hero: HERO,
+    adaptive: ARTIST_PROFILE_COPY.adaptive,
+  },
 } satisfies Meta<typeof ArtistProfileHero>;
 
 export default meta;

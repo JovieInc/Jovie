@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SHELL_CAPTION_CLASSNAME } from './shell-caption';
@@ -67,7 +68,7 @@ export function ColumnLabel<F extends string>({
 }: ColumnLabelProps<F>) {
   const active = sortBy === field && field !== defaultField;
   return (
-    <button
+    <PlainButton
       type='button'
       onClick={() => onSort(field)}
       className={cn(
@@ -77,7 +78,7 @@ export function ColumnLabel<F extends string>({
         'shrink-0 inline-flex items-center gap-1',
         align === 'right' && 'flex-row-reverse',
         active
-          ? 'text-cyan-300/90'
+          ? 'text-accent-text/90'
           : 'text-quaternary-token/85 hover:text-secondary-token',
         className
       )}
@@ -100,6 +101,6 @@ export function ColumnLabel<F extends string>({
           <ArrowUpDown className='h-2.5 w-2.5' strokeWidth={2.25} />
         )}
       </span>
-    </button>
+    </PlainButton>
   );
 }

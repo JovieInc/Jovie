@@ -92,6 +92,18 @@ enum MobileChatTranscriptMotion {
 
 }
 
+private struct ChatSurfaceVisibleKey: EnvironmentKey {
+  static let defaultValue = false
+}
+
+extension EnvironmentValues {
+  /// True only when the chat tab is the selected shell surface (not underlay).
+  var chatSurfaceVisible: Bool {
+    get { self[ChatSurfaceVisibleKey.self] }
+    set { self[ChatSurfaceVisibleKey.self] = newValue }
+  }
+}
+
 struct MobileChatView: View {
   @Bindable var repository: ChatRepository
   @Binding var draft: String
@@ -104,6 +116,7 @@ struct MobileChatView: View {
   @State private var isAtBottom = true
   @State private var userEditedSinceSend = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.chatSurfaceVisible) private var chatSurfaceVisible
   #if DEBUG
   @State private var presentationMonitor = ChatPresentationMonitor.fixture()
   #endif
@@ -168,6 +181,17 @@ struct MobileChatView: View {
       #endif
       await repository.refreshConversations()
     }
+    .onChange(of: chatSurfaceVisible) { _, visible in
+      notePostIdentityEmptyHomeIfNeeded(isChatSurfaceVisible: visible)
+    }
+    .onChange(of: repository.timeline.isEmpty) { _, isEmpty in
+      if isEmpty {
+        notePostIdentityEmptyHomeIfNeeded(isChatSurfaceVisible: chatSurfaceVisible)
+      }
+    }
+    .task(id: emptyHomeDwellTaskID) {
+      await observePostIdentityEmptyHomeDwell()
+    }
     #if DEBUG
     .environment(\.chatPresentationMonitor, presentationMonitor)
     .onDisappear { presentationMonitor?.measurement.cancel() }
@@ -175,6 +199,36 @@ struct MobileChatView: View {
     // voiceCaptureTrigger is owned by the shell Talk FAB / App Intents path
     // (JOV-3636). Chat no longer starts capture itself — the shell opens
     // TalkOverlayView when the trigger increments.
+  }
+
+  private var emptyHomeDwellTaskID: String {
+    "\(chatSurfaceVisible):\(repository.timeline.isEmpty):\(repository.identity.userID)"
+  }
+
+  private func notePostIdentityEmptyHomeIfNeeded(isChatSurfaceVisible: Bool) {
+    _ = PostIdentityChatMeasurement.noteEmptyChatHomeSeen(
+      userID: repository.identity.userID,
+      launchMode: LaunchMode.current(),
+      isEmpty: repository.timeline.isEmpty,
+      isChatSurfaceVisible: isChatSurfaceVisible
+    )
+  }
+
+  private func observePostIdentityEmptyHomeDwell() async {
+    notePostIdentityEmptyHomeIfNeeded(isChatSurfaceVisible: chatSurfaceVisible)
+    guard chatSurfaceVisible, repository.timeline.isEmpty else { return }
+    do {
+      try await Task.sleep(for: PostIdentityChatMeasurement.emptyHomeDwellSeconds)
+    } catch {
+      return
+    }
+    guard !Task.isCancelled else { return }
+    _ = PostIdentityChatMeasurement.noteEmptyChatHomeDwell(
+      userID: repository.identity.userID,
+      launchMode: LaunchMode.current(),
+      isEmpty: repository.timeline.isEmpty,
+      isChatSurfaceVisible: chatSurfaceVisible
+    )
   }
 
   @ViewBuilder

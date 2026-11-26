@@ -19,7 +19,7 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
 }));
 
 const CANONICAL_NAV = [
-  ['Inbox', APP_ROUTES.DASHBOARD],
+  ['Home', APP_ROUTES.DASHBOARD],
   ['Identity', APP_ROUTES.PRESENCE],
   ['Work', APP_ROUTES.LIBRARY],
   ['Audience', APP_ROUTES.CONTACTS_AUDIENCE],
@@ -102,10 +102,11 @@ describe('DashboardNav', () => {
       navChildren: <button type='button'>Search</button>,
     });
 
-    const inbox = document.querySelector('[data-navigation-item-id="inbox"]');
+    const inbox = document.querySelector('[data-navigation-item-id="home"]');
     expect(inbox).toBeInstanceOf(HTMLElement);
     if (!(inbox instanceof HTMLElement)) return;
-    expect(inbox).toHaveAccessibleName('Inbox');
+    // Rail bell is first home id; name is qualified so it ≠ nav row "Home".
+    expect(inbox).toHaveAccessibleName('Home — notifications');
     const search = getByRole('button', { name: 'Search' });
     const newChat = getByRole('link', { name: 'New Chat' });
 
@@ -147,8 +148,8 @@ describe('DashboardNav', () => {
     });
 
     expect(
-      document.querySelector('[data-navigation-item-id="inbox"]')
-    ).toHaveAccessibleName('Inbox');
+      document.querySelector('[data-navigation-item-id="home"]')
+    ).toHaveAccessibleName('Home — all caught up');
     expect(getByRole('link', { name: 'New Chat' })).toBeInTheDocument();
   });
 
@@ -161,12 +162,9 @@ describe('DashboardNav', () => {
       },
     });
 
-    expect(
-      document.querySelector('[data-navigation-item-id="home"]')
-    ).toHaveAttribute('aria-current', 'page');
-    expect(
-      document.querySelector('[data-navigation-item-id="inbox"]')
-    ).not.toHaveAttribute('aria-current');
+    const current = document.querySelectorAll('[aria-current="page"]');
+    expect(current).toHaveLength(1);
+    expect(current[0]).toHaveAttribute('data-navigation-item-id', 'home');
   });
 
   it('keeps Inbox visible when availability is unknown', () => {
@@ -178,8 +176,8 @@ describe('DashboardNav', () => {
     });
 
     expect(
-      document.querySelector('[data-navigation-item-id="inbox"]')
-    ).toHaveAccessibleName('Inbox');
+      document.querySelector('[data-navigation-item-id="home"]')
+    ).toHaveAccessibleName('Home — notifications');
   });
 
   it('keeps the exact customer IA invariant for admin users', () => {
@@ -393,13 +391,12 @@ describe('DashboardNav', () => {
     });
 
     fireEvent.click(getByRole('button', { name: 'Chat History' }));
-    expect(getByRole('link', { name: 'Unread answer' })).toHaveClass(
+    expect(getByRole('link', { name: 'Unread answer, Unread' })).toHaveClass(
       'text-primary-token'
     );
-    expect(getByRole('link', { name: 'Running task' })).toHaveAttribute(
-      'href',
-      `${APP_ROUTES.CHAT}/conv-running`
-    );
+    expect(
+      getByRole('link', { name: 'Running task, Running' })
+    ).toHaveAttribute('href', `${APP_ROUTES.CHAT}/conv-running`);
     expect(container.querySelector('.anim-calm-breath')).toBeTruthy();
   });
 

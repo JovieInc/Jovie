@@ -42,6 +42,17 @@ function table(data: CatalogRow[], emptyState?: ReactNode) {
 }
 
 describe('UnifiedTable states', () => {
+  it('defaults to the canonical dense row mode', () => {
+    render(table(RELEASES));
+    expect(screen.getByRole('table')).toHaveAttribute(
+      'data-table-row-mode',
+      'dense'
+    );
+    expect(
+      screen.getByRole('table').style.getPropertyValue('--table-row-height')
+    ).toBe('32px');
+  });
+
   it('opens a row with missing values on click', async () => {
     const user = userEvent.setup();
     const onRowClick = vi.fn();
@@ -125,5 +136,47 @@ describe('UnifiedTable states', () => {
   ])('has no accessibility violations with %s', async (_name, ui) => {
     const { container } = render(ui);
     await expectNoA11yViolations(container);
+  });
+});
+
+describe('UnifiedTable hideWhenEmpty columns', () => {
+  const hideable: ColumnDef<CatalogRow, unknown>[] = [
+    columns[0],
+    { ...columns[1], meta: { hideWhenEmpty: true } },
+  ];
+  const render2 = (data: CatalogRow[]) =>
+    render(
+      <UnifiedTable
+        data={data}
+        columns={hideable}
+        enableVirtualization={false}
+        getRowId={row => row.id}
+        rowMode='dense'
+      />
+    );
+
+  it('hides a flagged column that no row has a value for', () => {
+    render2([{ id: 'a', title: 'Only Title' }]);
+    expect(screen.getByRole('columnheader', { name: 'Title' })).toBeVisible();
+    expect(
+      screen.queryByRole('columnheader', { name: 'Artist' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps the flagged column once any row has a value', () => {
+    render2(RELEASES);
+    expect(screen.getByRole('columnheader', { name: 'Artist' })).toBeVisible();
+  });
+
+  it('keeps every column on an empty table so the empty state reads as a table', () => {
+    render2([]);
+    expect(screen.getByRole('columnheader', { name: 'Artist' })).toBeVisible();
+  });
+
+  it('applies the dense row mode to the table', () => {
+    const { container } = render2(RELEASES);
+    expect(
+      container.querySelectorAll('[data-table-row-mode="dense"]').length
+    ).toBeGreaterThan(0);
   });
 });

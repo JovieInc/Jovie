@@ -36,6 +36,11 @@ import { pathToFileURL } from 'node:url';
 export const VENDOR_ROOT = '.github/actions/vendor';
 export const MANIFEST_SCHEMA = 'jovie-vendored-actions/v1';
 const BUILD_DIRECTIVES = 'remove-build-directives/v1';
+// Repo-size budget (docs/ci/repository-health.md): unminified ncc/webpack
+// bundles cost ~3.4 MB each. Minify keeps names and license comments, so
+// stack traces and attribution survive; upstreamFiles still pins the source.
+const MINIFY = 'minify/v1';
+const PROCESSING = new Set([BUILD_DIRECTIVES, MINIFY]);
 
 /** Remove build-only comments from runtime bundles; preserve licenses and tokens.
  * Parse JavaScript so comment-like strings, regexes and templates stay intact.
@@ -79,6 +84,22 @@ export function stripBuildDirectives(source) {
     .split('\n')
     .map((line, i) => (line === lines[i] ? line : line.trimEnd()))
     .join('\n');
+}
+
+/** Minify an ESM/CJS action bundle with the repo's pinned esbuild (refresh only). */
+export function minifyBundle(source) {
+  // esbuild is pinned via pnpm.overrides and is a direct apps/desktop dep.
+  const esbuild = createRequire(
+    new URL('../apps/desktop/package.json', import.meta.url)
+  )('esbuild');
+  return esbuild.transformSync(source, {
+    minify: true,
+    keepNames: true,
+    legalComments: 'inline',
+    platform: 'node',
+    format: /^\s*import\s|^\s*export\s/m.test(source) ? 'esm' : 'cjs',
+    target: 'node24',
+  }).code;
 }
 
 const sha256 = path =>
@@ -156,7 +177,7 @@ export function checkVendored(repoRoot) {
     } catch (error) {
       problems.push(error.message);
     }
-    if (action.processing && action.processing !== BUILD_DIRECTIVES)
+    if (action.processing && !PROCESSING.has(action.processing))
       problems.push(`${action.dir}: unknown processing ${action.processing}`);
     const base = resolve(repoRoot, VENDOR_ROOT, action.dir);
     for (const [file, hash] of Object.entries(action.files ?? {})) {
@@ -195,7 +216,7 @@ function refresh(repoRoot, dir, shaOverride) {
   const manifest = loadManifest(repoRoot);
   const action = manifest.actions.find(item => item.dir === dir);
   if (!action) throw new Error(`unknown vendored action ${dir}`);
-  if (action.processing && action.processing !== BUILD_DIRECTIVES)
+  if (action.processing && !PROCESSING.has(action.processing))
     throw new Error(`unknown processing ${action.processing}`);
   const pins = workflowPins(repoRoot).get(action.repo);
   if (!shaOverride && pins && pins.size > 1)
@@ -232,6 +253,8 @@ function refresh(repoRoot, dir, shaOverride) {
           target,
           stripBuildDirectives(readFileSync(target, 'utf8'))
         );
+      if (action.processing === MINIFY && file.endsWith('.js'))
+        writeFileSync(target, minifyBundle(readFileSync(target, 'utf8')));
       files[file] = sha256(target);
     }
     for (const consumer of consumers)

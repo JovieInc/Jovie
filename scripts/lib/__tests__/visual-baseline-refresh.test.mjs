@@ -307,9 +307,11 @@ describe('visual baseline refresh (JOV-12638)', () => {
       'profile-visual-audit.spec.ts',
       'chat-visual.spec.ts',
       'electron-titlebar-geometry.spec.ts',
+      'desktop-shell-certification.spec.ts',
       'admin-visual-regression.spec.ts',
       'storybook-elevation.spec.ts',
       'storybook-chat-history-switcher.spec.ts',
+      'storybook-audience-table.spec.ts',
     ]);
     for (const entry of entries) {
       expect(

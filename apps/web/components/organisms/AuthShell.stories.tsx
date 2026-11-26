@@ -82,6 +82,10 @@ export const Dashboard: Story = {
   },
 };
 
+export const StreamedPlaceholder: Story = {
+  args: { ...Dashboard.args, framePlaceholder: true },
+};
+
 export const Operator: Story = {
   args: {
     section: 'ov',

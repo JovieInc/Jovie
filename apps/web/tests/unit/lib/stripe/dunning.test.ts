@@ -40,12 +40,6 @@ vi.mock('@/lib/email/templates/payment-failed', () => ({
   getPaymentFailedText: vi.fn().mockReturnValue('Payment failed text'),
 }));
 
-vi.mock('@/lib/email/templates/payment-recovered', () => ({
-  getPaymentRecoveredHtml: vi.fn().mockReturnValue('<html>recovered</html>'),
-  getPaymentRecoveredSubject: vi.fn().mockReturnValue('Payment recovered'),
-  getPaymentRecoveredText: vi.fn().mockReturnValue('recovered text'),
-}));
-
 vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn(),
 }));

@@ -23,6 +23,8 @@ import {
   shippingStateReadFromHttp,
 } from '@/lib/ovie/shipping-state-client';
 import { REALTIME_CACHE } from '@/lib/queries/cache-strategies';
+import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
+import { linearUpdate, shippedUpdate } from './useOUpdateOptIns';
 
 type OperationalTaskFeed = ShippingCockpitProjection['operationalTasks'];
 type OperationalRequestState = 'idle' | 'error';
@@ -212,6 +214,11 @@ export function useHudShippingStateQuery(kioskToken: string | null) {
           shippingCockpitProjectionIssue(payload) ?? 'unknown'
         );
       }
+      // Seed the Shipping page observers so Home → Shipping does not start a
+      // second /api/hud/shipping-state waterfall for the same receipt.
+      if (parsed) {
+        queryClient.setQueryData(shippingStateQueryOptions.queryKey, parsed);
+      }
       return snapshotFor(
         key,
         next.view,
@@ -234,6 +241,7 @@ export function useHudShippingStateQuery(kioskToken: string | null) {
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
     retry: false,
+    meta: { oUpdate: [shippedUpdate, linearUpdate] },
   });
 
   useEffect(() => {

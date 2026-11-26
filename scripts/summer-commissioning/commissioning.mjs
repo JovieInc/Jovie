@@ -61,7 +61,7 @@ const CLI_ARGUMENTS = new Set([
 ]);
 const REQUIRED_CAPABILITY_IDS = new Set(
   Array.from(
-    { length: 16 },
+    { length: 17 },
     (_, index) => `SUMMER-COMM-${String(index + 1).padStart(3, '0')}`
   )
 );

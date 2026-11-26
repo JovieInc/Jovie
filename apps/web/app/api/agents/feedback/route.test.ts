@@ -7,10 +7,16 @@ const hoisted = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/rate-limit', () => ({
-  allowIfRateLimitBackendDegraded: (result: unknown) => result,
   createRateLimitHeaders: () => ({ 'Retry-After': '60' }),
   getClientIP: () => '203.0.113.10',
   publicClickLimiter: { limit: hoisted.limit },
+  rateLimitDenialStatus: (result: { unavailable?: boolean }) =>
+    result.unavailable === true ? 503 : 429,
+  rateLimitDenialMessage: (
+    result: { unavailable?: boolean },
+    exhausted: string,
+    unavailable = 'Temporarily unavailable.'
+  ) => (result.unavailable === true ? unavailable : exhausted),
 }));
 vi.mock('@/lib/feedback', () => ({ createFeedbackItem: hoisted.create }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
@@ -94,5 +100,19 @@ describe('POST /api/agents/feedback', () => {
     const res = await post(valid);
     expect(res.status).toBe(500);
     expect((await res.json()).error.code).toBe('INTERNAL');
+  });
+
+  it('fails closed with 503 when the rate-limit backend is unavailable', async () => {
+    hoisted.limit.mockResolvedValueOnce({
+      success: false,
+      unavailable: true,
+      limit: 60,
+      remaining: 0,
+      reset: new Date(Date.now() + 60_000),
+    });
+    const res = await post(valid);
+    expect(res.status).toBe(503);
+    expect((await res.json()).error.code).toBe('TEMPORARILY_UNAVAILABLE');
+    expect(hoisted.create).not.toHaveBeenCalled();
   });
 });

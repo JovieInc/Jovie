@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AudioBar } from '../AudioBar';
@@ -188,5 +190,20 @@ describe('AudioBar', () => {
       'h-8',
       'w-8'
     );
+  });
+});
+
+describe('AudioBar transport axis (JOV-12568)', () => {
+  it('puts the transport, track and mode buttons on one 44px band under the waveform', () => {
+    const source = readFileSync(resolve(__dirname, '../AudioBar.tsx'), 'utf8');
+
+    expect(source).toContain("'flex h-11 items-center gap-1.5'");
+    expect(source).toContain("'flex h-11 items-center gap-1 justify-self-end'");
+    expect(source).toContain("gap-3 items-end px-2'");
+    expect(source).toContain("'flex min-w-0 flex-col items-center'");
+    expect(source).toContain("<div className='pt-1.5'>");
+    expect(source).not.toContain('gap-3 items-center px-2 py-1.5');
+    expect(source).not.toContain("'pt-1.5 pb-1.5'");
+    expect(source).not.toContain('justify-center min-h-11');
   });
 });

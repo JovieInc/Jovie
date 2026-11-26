@@ -393,6 +393,27 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Ask Jovie to plan your next release...')).toBeNull();
   });
 
+  it('renders composerDock above the composer on Home and nothing without it', () => {
+    const withDock = renderWithQueryClient(
+      <JovieChat
+        profileId='profile-1'
+        chatMode='ov'
+        composerDock={() => <div data-testid='dock-fixture'>Ask</div>}
+      />
+    );
+    const fixture = withDock.getByTestId('dock-fixture');
+    expect(
+      fixture.compareDocumentPosition(withDock.getByTestId('chat-input')) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    withDock.unmount();
+
+    const without = renderWithQueryClient(
+      <JovieChat profileId='profile-1' chatMode='ov' />
+    );
+    expect(without.queryByTestId('dock-fixture')).toBeNull();
+  });
+
   it('renders a supplied Home canvas full-bleed above the docked composer', () => {
     const { getByTestId, queryByText } = renderWithQueryClient(
       <JovieChat

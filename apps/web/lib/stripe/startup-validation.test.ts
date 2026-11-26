@@ -114,6 +114,24 @@ describe('Artist Visibility billing startup contract', () => {
     }
   );
 
+  it('never swaps in another Stripe price when the key and price modes disagree', async () => {
+    // A key prefix says test or live, not which account owns a price, so a
+    // mismatch stays as configured and checkout's Stripe price check rejects it.
+    vi.stubEnv('STRIPE_SECRET_KEY', 'sk_live_fixture');
+    vi.stubEnv(
+      'STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY',
+      'price_1USkjzASl9B9udHvEYkZLYZp'
+    );
+    const { getStripePriceIds } = await import('./price-ids');
+    const { getActivePriceIds } = await import('./config');
+
+    expect(getStripePriceIds().artistVisibilityProMonthly).toBe(
+      'price_1USkjzASl9B9udHvEYkZLYZp'
+    );
+    expect(getActivePriceIds()).toEqual(['price_1USkjzASl9B9udHvEYkZLYZp']);
+    expect(getActivePriceIds()).not.toContain('price_1USkk3AAI1NrDqJSrdoP9BdJ');
+  });
+
   it('still reports missing Stripe credentials when the offer price is configured', async () => {
     vi.stubEnv('STRIPE_SECRET_KEY', undefined);
     vi.stubEnv('STRIPE_WEBHOOK_SECRET', undefined);

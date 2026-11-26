@@ -26,6 +26,8 @@ export const APP_ROUTES = {
   LEGACY_DASHBOARD_LIBRARY: '/app/dashboard/library',
   DASHBOARD_LIBRARY: '/app/library',
   CHATS: '/app/chats',
+  /** Saved dashboard views (shared views saved by the user). */
+  DASHBOARDS: '/app/dashboards',
   /** Legacy chat list path. Keep for old bookmarks; use CHATS for navigation. */
   THREADS: '/app/threads',
   /** Legacy release workspace route. Keep for old bookmarks and nested task aliases; use RELEASES for navigation. */
@@ -281,6 +283,11 @@ export const APP_ROUTES = {
 } as const;
 
 export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];
+
+export const OVIE_METRIC_ANCHORS = {
+  shippingVelocity: 'shipping-velocity',
+  companyNow: 'company-now',
+} as const;
 
 /**
  * Where public CTAs send a new, anonymous visitor. There is one flow, not a

@@ -47,6 +47,23 @@ SLOT_MAX_AGE_S = 3 * 24 * 3600
 # the concurrent-install reflink race and cost no data blocks.
 INSTALL = ["pnpm", "install", "--frozen-lockfile", "--prefer-offline", "--package-import-method=hardlink"]
 WARM = ["pnpm", "--filter", "@jovie/web", "run", "typecheck"]
+
+def install_git_hooks(worktree: Path, log=None) -> None:
+    """Arm the tracked pre-push hook in a new worktree and fail if it is not installed.
+
+    `pnpm install` may run Husky, which rewrites core.hooksPath to the untracked
+    `.husky/_` wrappers. Fresh worktrees also inherit the shared Git config without
+    those wrappers. The installer points Git at the tracked hooks and verifies them.
+    """
+    worktree = Path(worktree)
+    script = worktree / "scripts/hooks/configure-git-hooks.sh"
+    if not script.is_file():
+        raise RuntimeError(
+            f"git hook installer missing: {script}. A worktree without "
+            "scripts/hooks/configure-git-hooks.sh cannot arm the pre-push size guard."
+        )
+    run(["bash", str(script)], cwd=worktree, log=log, timeout=60)
+
 READY = ".ready"
 PRESERVED_REPAIR = ".jovie-preserved-repair.json"  # disk_guard's marker; never recycle those
 # Build output that would otherwise ride along into the next agent's checkout. Installed
@@ -224,6 +241,7 @@ def take(repo: Path, dest: Path, branch: str | None, base: str = "origin/main", 
                         raise RuntimeError(f"pool slot {slot.name} was dirty")
                     checkout = ["git", "checkout", "-q"] + (["-b", branch] if branch else ["--detach"]) + [base]
                     run(checkout, cwd=dest, log=log, timeout=300)
+                    install_git_hooks(dest, log=log)
                     return "pool"
                 except (subprocess.SubprocessError, OSError, RuntimeError) as error:
                     if log is not None:
@@ -235,6 +253,11 @@ def take(repo: Path, dest: Path, branch: str | None, base: str = "origin/main", 
     # let the caller install into, and hand an agent, a directory that is not there.
     if getattr(result, "returncode", 0):
         raise subprocess.CalledProcessError(result.returncode, args, getattr(result, "stdout", ""))
+    try:
+        install_git_hooks(dest, log=log)
+    except (subprocess.SubprocessError, OSError, RuntimeError):
+        remove_worktree(repo, dest, log)
+        raise
     return "fresh"
 
 
@@ -323,6 +346,7 @@ def fill(repo: Path, size: int = POOL_SIZE, base: str = "origin/main", warm: boo
             try:
                 run(["git", "worktree", "add", "-q", "--detach", str(slot), base], cwd=repo, log=log, timeout=600)
                 run(INSTALL, cwd=slot, log=log)
+                install_git_hooks(slot, log=log)
                 if warm:
                     # A warm tsbuildinfo turns the first web typecheck from ~2 min into ~30s.
                     # tsc writes it even when main has type errors, so a red check is fine.
@@ -450,6 +474,8 @@ def guarded_main(argv: list[str] | None = None) -> int:
     source = take(repo, args.dest, args.branch, args.base, log=sys.stdout)
     if not args.no_install:
         run(INSTALL, cwd=args.dest, log=sys.stdout, env=node_env(args.dest))
+    # Husky may have rewritten hooksPath during install; re-arm and verify.
+    install_git_hooks(args.dest, log=sys.stdout)
     if not args.no_refill:
         refill_in_background(repo)
     print(f"worktree-new: {args.dest} ready from {source} in {time.monotonic() - started:.0f}s")

@@ -156,10 +156,11 @@ const defaultDependencies: CompanyStateProducerDependencies = {
   redis: getRedis(),
 };
 
-export async function refreshCompanyStateCache(
-  now = new Date(),
-  dependencies: CompanyStateProducerDependencies = defaultDependencies,
-  options: { readonly includeExecution?: boolean } = {}
+/** Reads every producer source and builds the snapshot without publishing it. */
+async function collectCompanyState(
+  now: Date,
+  dependencies: CompanyStateProducerDependencies,
+  options: { readonly includeExecution?: boolean }
 ): Promise<CompanyStateSnapshot> {
   const [
     eligibility,
@@ -192,7 +193,7 @@ export async function refreshCompanyStateCache(
       })
     )
     .digest('hex');
-  const snapshot = buildCompanyState({
+  return buildCompanyState({
     now,
     revision,
     acquisitionEligibility: eligibility,
@@ -204,6 +205,77 @@ export async function refreshCompanyStateCache(
     linearObservedAt: linearIssues ? now.toISOString() : null,
     previous: previous?.snapshot,
   });
+}
+
+export async function refreshCompanyStateCache(
+  now = new Date(),
+  dependencies: CompanyStateProducerDependencies = defaultDependencies,
+  options: { readonly includeExecution?: boolean } = {}
+): Promise<CompanyStateSnapshot> {
+  const snapshot = await collectCompanyState(now, dependencies, options);
   await publishCompanyState(snapshot, dependencies.redis);
   return snapshot;
+}
+
+export interface LiveCompanyBlocker {
+  readonly blocker: CompanyBlocker | null;
+  readonly generatedAt: string;
+  readonly source: 'live';
+}
+
+/** How long one live read serves Home before it is taken again. */
+export const LIVE_COMPANY_BLOCKER_TTL_MS = 5 * 60_000;
+/** A live read that takes longer than this is reported as unavailable. */
+export const LIVE_COMPANY_BLOCKER_TIMEOUT_MS = 10_000;
+
+let liveBlockerMemo: {
+  readonly at: number;
+  readonly value: Promise<LiveCompanyBlocker>;
+} | null = null;
+
+/**
+ * Home's fallback when no snapshot is cached (a deployment where the producer
+ * cron has not published, or Redis is absent). It reads the same sources the
+ * cron reads and names the same blocker, but never publishes: the cron stays
+ * the only writer. One read is shared per instance for a few minutes so a
+ * polling Home does not multiply upstream calls.
+ */
+export function readLiveCompanyBlocker(
+  now = new Date(),
+  dependencies: CompanyStateProducerDependencies = defaultDependencies
+): Promise<LiveCompanyBlocker> {
+  if (
+    liveBlockerMemo &&
+    now.getTime() - liveBlockerMemo.at < LIVE_COMPANY_BLOCKER_TTL_MS
+  ) {
+    return liveBlockerMemo.value;
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error('company_state_live_timeout')),
+      LIVE_COMPANY_BLOCKER_TIMEOUT_MS
+    );
+  });
+  const value = Promise.race([
+    collectCompanyState(now, dependencies, { includeExecution: false }),
+    timeout,
+  ])
+    .then(snapshot => ({
+      blocker: companyBlocker(snapshot, now),
+      generatedAt: snapshot.generatedAt,
+      source: 'live' as const,
+    }))
+    .finally(() => clearTimeout(timer));
+  const memo = { at: now.getTime(), value };
+  liveBlockerMemo = memo;
+  value.catch(() => {
+    if (liveBlockerMemo === memo) liveBlockerMemo = null;
+  });
+  return value;
+}
+
+/** Test seam: forget the shared live read. */
+export function resetLiveCompanyBlockerForTests(): void {
+  liveBlockerMemo = null;
 }

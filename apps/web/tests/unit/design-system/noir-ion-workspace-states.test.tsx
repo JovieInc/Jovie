@@ -88,11 +88,28 @@ describe('Noir Ion D — workspace state surfaces (JOV-4648)', () => {
     expect(shellBlock).toContain(
       '--color-focus-ring: rgba(17, 175, 255, 0.72)'
     );
-    expect(shellBlock).toContain('--color-bg-elevated: #1b1d22');
-    expect(shellBlock).toContain('--color-bg-tooltip: #24272d');
-    expect(shellBlock).toContain('--color-skeleton-base: #1b1d22');
-    expect(shellBlock).toContain('--app-shell-content-surface: #101114');
-    expect(shellBlock).toContain('--color-bg-surface-1: #14161a');
+    expect(shellBlock).toContain(
+      '--color-bg-elevated: var(--noir-ion-elevated)'
+    );
+    expect(shellBlock).toContain(
+      '--color-bg-tooltip: var(--noir-ion-floating)'
+    );
+    expect(shellBlock).toContain(
+      '--color-skeleton-base: var(--noir-ion-elevated)'
+    );
+    expect(shellBlock).toContain(
+      '--app-shell-content-surface: var(--noir-ion-card)'
+    );
+    expect(shellBlock).toContain('--color-bg-surface-0: var(--noir-ion-shell)');
+    expect(shellBlock).toContain('--color-bg-surface-1: var(--noir-ion-card)');
+    expect(shellBlock).toContain(
+      '--color-bg-surface-2: var(--noir-ion-elevated)'
+    );
+    expect(shellBlock).toContain(
+      '--color-bg-surface-3: var(--noir-ion-floating)'
+    );
+    // No parallel carbon surface hex ladder inside the shell frame.
+    expect(shellBlock).not.toMatch(/#101114|#0b0c0f|#14161a|#1b1d22|#24272d/i);
     expect(shellBlock).toContain(
       '--color-bg-hover: rgba(255, 255, 255, 0.055)'
     );
@@ -105,7 +122,8 @@ describe('Noir Ion D — workspace state surfaces (JOV-4648)', () => {
     // Shrink-only: shell block must not introduce new --linear-* call sites.
     expect(shellBlock).not.toMatch(/--linear-[a-z0-9-]+/);
 
-    // Global/public surfaces must not hardcode the same Noir anchors at :root.
+    // Global/public surfaces must not hardcode the same workspace-state
+    // hover/selected anchors at :root.
     const rootBlocks = DESIGN_SYSTEM_CSS.match(
       /:root(?:\.dark)?\s*\{[\s\S]*?\n\}/g
     );
@@ -114,17 +132,15 @@ describe('Noir Ion D — workspace state surfaces (JOV-4648)', () => {
       expect(block).not.toContain(
         '--color-row-selected: rgba(255, 255, 255, 0.085)'
       );
-      expect(block).not.toContain('--color-bg-elevated: #1b1d22');
-      expect(block).not.toContain('--color-bg-tooltip: #24272d');
     }
   });
 
   it('preserves table density and keyboard focus geometry', () => {
     expect(DESIGN_SYSTEM_CSS).toContain(
-      ':where(.system-b-table-row-height) {\n  height: 40px;'
+      ':where(.system-b-table-row-height) {\n  height: var(--table-row-height, 32px);'
     );
-    expect(layoutStability.rowHeight).toBe('40px');
-    expect(layoutStability.skeletonRowHeight).toBe('40px');
+    expect(layoutStability.rowHeight).toBe('32px');
+    expect(layoutStability.skeletonRowHeight).toBe('32px');
     expect(rowState.hover).toBe('system-b-table-row-hover');
     expect(rowState.selected).toBe('system-b-table-row-selected');
     expect(rowState.focusVisible).toBe('system-b-table-row-focus-visible');

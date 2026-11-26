@@ -67,3 +67,56 @@ export const DegradedNoSeries: Story = {
     },
   },
 };
+
+/** Empty: no facts and no series, only the title and state. */
+export const EmptyNoFacts: Story = {
+  args: {
+    card: { ...shippingCard, facts: [], series: null },
+  },
+};
+
+/** Long content: long labels and values truncate inside the grid. */
+export const LongContentTruncated: Story = {
+  args: {
+    card: {
+      ...shippingCard,
+      title:
+        'Shipping lanes across every repository, environment and deploy target',
+      facts: [
+        {
+          label: 'Merge queue depth across all protected branches',
+          value: 'Three pull requests waiting on required checks',
+        },
+        { label: 'Running tasks', value: '2' },
+      ],
+      series: {
+        label: 'Live counts by lane',
+        points: [
+          { label: 'Queued behind a very long lane name', value: 3 },
+          { label: 'Running', value: 2 },
+        ],
+      },
+    },
+  },
+};
+
+/** Rtl: the card mirrors in a right-to-left layout. */
+export const RtlCard: Story = {
+  args: {
+    card: {
+      ...shippingCard,
+      title: 'مسارات الشحن',
+      facts: [{ label: 'قائمة الدمج', value: '3' }],
+      series: null,
+    },
+  },
+  decorators: [
+    function RtlFrame(Story) {
+      return (
+        <div dir='rtl' className='w-full max-w-3xl'>
+          <Story />
+        </div>
+      );
+    },
+  ],
+};

@@ -18,7 +18,7 @@ requires the ordinary native resource route; source checks are not visual proof.
 | 1 | Settings | High | **Lowered in this PR** | Founder-named system surface. Was a custom `ScrollView` of solid `surface0` wells, all-caps section titles, a private press style, force-unwrapped URLs, and an unused Liquid Glass atom. |
 | 2 | Native palette and semantic roles | High | Source repaired in JOV-5331; native proof pending | Existing JovieTheme projects all five ZiaWI elevations/six accents and product CSS text/CTA/border roles. No independent expected-hex list. |
 | 3 | Motion comment vs code | Medium | Open | `DrawerRowRevealModifier` and `StatTileRevealModifier` comments say opacity-only and still apply offset. Reduce Motion already zeros the offset. |
-| 4 | Press scale token | Medium | Open | iOS `JovieMotion.pressScale` is `0.96`. Web `--scale-press` is `0.98`. `docs/design-system/state-matrix.md` still documents `active:scale-[0.96]`. One owner needed. |
+| 4 | Press scale token | Medium | **Closed** | Native `JovieMotion.pressScale` projects web `--scale-press` (`0.98`) via `native-design-system` `motionBindings`; `state-matrix.md` documents `active:scale-press`. |
 | 5 | System-surface glass adoption | Medium | Open after Settings | `jovieSurface` / `glassEffect` now has a Settings consumer. Dashboard, audience, library, and onboarding grouped cards still use solid fills. Do not spray glass onto Chat/Calendar. |
 | 6 | Feature-local button styles | Medium | Open | `ComposerSlashRowButtonStyle` (Chat, locked) and `MobileChatMerchActionButtonStyle` still sit beside `JoviePressFeedbackButtonStyle`. Library no longer has a private card style. |
 | 7 | Feature-local raw paint | Low | Remaining debt, growth blocked | 27 exact statement identities / 33 matches remain outside this slice. The new source gate forbids new identities/counts and baseline growth against Git base. These are debt, not image exceptions or full certification. |
@@ -47,7 +47,7 @@ Eval:
 
 1. **Token hex family** — align `JovieColor` to Noir Ion anchors and extend the existing `themeTokensMatchSystemBCanon` guard. Touches every native screen; keep it to the token file plus the style-guard test.
 2. **Motion comment family** — drop offset under the existing Reduce Motion branch *and* make the comments match, or drop offset entirely if decorative movement is rejected.
-3. **Press-scale family** — pick one canonical `--scale-press` value and update iOS, web CSS, and `state-matrix.md` together.
+3. **Press-scale family** — done: web `--scale-press` (`0.98`) projects into `JovieMotion.pressScale`; state-matrix uses `active:scale-press`.
 4. **Glass adoption family** — one non-locked grouped-card surface at a time (Dashboard QR plate stays white on purpose).
 5. **Local button-style family** — merch actions only. Chat slash rows stay locked.
 
@@ -65,7 +65,7 @@ Eval:
 
 The only raw-paint exemption is the exact path/owner/statement/count-bound `JovieColor.qrSurface` white substrate for encoded black modules. Image foreground projects canonical strong ink. Legacy Chat/camera/art paint remains debt: new identities/counts and floor growth against immutable Git base fail, including multiline constructors, aliases and shorthand.
 
-Direct nested rounded modifier anatomy must use named tokens with outer = inner + inset; pills, circles, unrelated siblings and square QR content are excluded. This is a bounded source scanner, not arbitrary Swift AST inference. JOV-5865 spacing scanning is reused: conservative iOS debt drops 12→11, strict inventory stays 20, Mac stays 4. The pill has a 28-point visual minimum and 44-point hit container; Dynamic Type grows content and press opacity preserves the hit area. Locked Chat controls remain 32 points.
+Direct nested rounded modifier anatomy must use named tokens with outer = inner + inset; pills, circles, unrelated siblings and square QR content are excluded. This is a bounded source scanner, not arbitrary Swift AST inference. JOV-5865 spacing scanning is reused: conservative iOS debt drops 12→11, strict inventory stays 20, Mac stays 4. ActionButton is KEEP 28/44 (`JovieActionButtonMetrics`); Dynamic Type grows content and press opacity preserves the hit area. Locked Chat controls remain 32.
 
 Primary/secondary/tertiary text must clear 4.5:1 on all five dark elevations; minimum is tertiary/floating **6.06:1**. Canonical red/floating is **3.95:1** and ultra/floating **3.55:1**, unsuitable for normal text; entity labels use semantic ink while indicators retain accents. Neutral CTA inverse ink also clears 4.5:1. These calculations do not certify composited native appearance.
 

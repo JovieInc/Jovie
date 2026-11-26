@@ -101,7 +101,7 @@ test.describe('Homepage', () => {
     for (const href of await startLinks.evaluateAll(links =>
       links.map(link => link.getAttribute('href'))
     )) {
-      expect(href).toBe('/start');
+      expect(href).toBe(getClaimProfileIntent().href);
     }
     await expect(page.locator('#homepage-claim-handle')).toHaveCount(0);
     await expect(page.locator('main')).not.toContainText(/\$\d/);
@@ -177,19 +177,18 @@ test.describe('Homepage', () => {
     const viewport = page.viewportSize();
     test.skip(
       (viewport?.width ?? 0) < 1024,
-      'The Customers flyout is a desktop navigation affordance'
+      'The Customers item is a desktop navigation affordance'
     );
-    const trigger = header.getByRole('button', { name: /Customers/ });
-    await trigger.hover();
-    const flyout = page.locator('#marketing-header-flyout-customers');
-    await expect(flyout).toBeVisible();
-    await expect(flyout.getByRole('link', { name: 'Artists' })).toHaveAttribute(
-      'href',
-      '/solutions/artists'
+    // One audience page so far: a plain link, never a caret over one item.
+    await expect(header.getByRole('button', { name: /Customers/ })).toHaveCount(
+      0
     );
-    await expect(flyout.getByRole('link')).toHaveCount(1);
-    await page.keyboard.press('Escape');
-    await expect(flyout).toHaveCount(0);
+    await expect(
+      header.getByRole('link', { name: 'Customers' })
+    ).toHaveAttribute('href', '/solutions/artists');
+    await expect(
+      page.locator('#marketing-header-flyout-customers')
+    ).toHaveCount(0);
   });
 
   test('canonical header has only the Customers flyout', async ({ page }) => {

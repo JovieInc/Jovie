@@ -129,3 +129,11 @@ the founder to decide whether unknown agent work should be saved or discarded.
 ## Registry authority and mutation proof
 
 Registry status is singular and machine-recomputed: `metadataStatus` on each registry root is the only authoritative status field, and visible ledger rows are generated, never hand-written. Audit any ledger export with [`scripts/agent/pen-registry-audit.mjs`](../../scripts/agent/PEN_REGISTRY_LEDGER.md) before and after registry mutations; it fails closed on visible/metadata contradiction, duplicate authoritative records, unentitled SAFE, silently retained stale proof, and denominator drift.
+
+## Data-backed ship path (not Pen-through-CI)
+
+Do not put `.pen` blobs in the merge queue. Ship with live persist (mtime) +
+lease save + registry identity map + a small code sync PR; optional prod/Pen
+parity probe after land. CI checks contracts/ratchets only — see
+[`docs/design-system/DATA_BACKED_SHIP_PATH.md`](../../docs/design-system/DATA_BACKED_SHIP_PATH.md)
+and `pnpm design:pen-ship:check`.

@@ -32,9 +32,9 @@ describe('GradientText', () => {
       const { container } = render(<GradientText>Primary</GradientText>);
       const element = container.querySelector('span');
 
-      expect(element).toHaveClass('from-blue-600');
-      expect(element).toHaveClass('via-purple-600');
-      expect(element).toHaveClass('to-cyan-600');
+      expect(element).toHaveClass('from-accent-blue');
+      expect(element).toHaveClass('via-accent-purple');
+      expect(element).toHaveClass('to-accent-teal');
     });
 
     it('renders secondary variant', () => {
@@ -43,8 +43,8 @@ describe('GradientText', () => {
       );
       const element = container.querySelector('span');
 
-      expect(element).toHaveClass('from-gray-600');
-      expect(element).toHaveClass('to-gray-800');
+      expect(element).toHaveClass('from-secondary-token');
+      expect(element).toHaveClass('to-primary-token');
     });
 
     it('renders success variant', () => {
@@ -53,8 +53,8 @@ describe('GradientText', () => {
       );
       const element = container.querySelector('span');
 
-      expect(element).toHaveClass('from-green-600');
-      expect(element).toHaveClass('to-emerald-600');
+      expect(element).toHaveClass('from-accent-green');
+      expect(element).toHaveClass('to-accent-teal');
     });
 
     it('renders warning variant', () => {
@@ -63,8 +63,8 @@ describe('GradientText', () => {
       );
       const element = container.querySelector('span');
 
-      expect(element).toHaveClass('from-yellow-600');
-      expect(element).toHaveClass('to-orange-600');
+      expect(element).toHaveClass('from-accent-orange');
+      expect(element).toHaveClass('to-accent-pink');
     });
 
     it('renders purple-cyan variant', () => {
@@ -73,8 +73,8 @@ describe('GradientText', () => {
       );
       const element = container.querySelector('span');
 
-      expect(element).toHaveClass('from-purple-600');
-      expect(element).toHaveClass('to-cyan-600');
+      expect(element).toHaveClass('from-accent-purple');
+      expect(element).toHaveClass('to-accent-teal');
     });
   });
 
@@ -124,15 +124,14 @@ describe('GradientText', () => {
       expect(element).toHaveClass('text-transparent');
     });
 
-    it('includes dark mode variant classes', () => {
+    it('uses theme-adaptive token stops with no per-theme overrides', () => {
       const { container } = render(
         <GradientText variant='primary'>Text</GradientText>
       );
       const element = container.querySelector('span');
 
-      expect(element).toHaveClass('dark:from-blue-400');
-      expect(element).toHaveClass('dark:via-purple-400');
-      expect(element).toHaveClass('dark:to-cyan-400');
+      expect(element).toHaveClass('from-accent-blue');
+      expect(element?.className).not.toMatch(/dark:/);
     });
   });
 
@@ -164,7 +163,7 @@ describe('GradientText', () => {
       );
 
       const element = screen.getByRole('heading', { level: 3 });
-      expect(element).toHaveClass('from-green-600');
+      expect(element).toHaveClass('from-accent-green');
       expect(element).toHaveClass('text-xl');
       expect(element).toHaveClass('font-bold');
     });

@@ -1,6 +1,11 @@
 /**
  * Merch image-gen quality spike (throwaway).
  *
+ * Aliased → product lane `merch-graphic`
+ * (`apps/web/lib/merch/graphic-engine.ts`). Inventory:
+ * `docs/design-system/MEDIA_GENERATION.md` (JOV-13852). Do not extend this
+ * spike into a parallel owner.
+ *
  * Proves whether we can hit Tim's quality bar (the GPT-image "PANADA / RIDE THE
  * WAVES" vintage band tee) by generating the same kind of print graphic across
  * all three gateway image models. Run, then eyeball the outputs vs the reference.

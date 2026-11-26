@@ -49,7 +49,7 @@ export const HUD_SECTION_TEST_IDS = {
 } as const satisfies Record<HudSectionId, string>;
 
 export const HUD_SECTION_LABELS = {
-  'action-required': 'Inbox',
+  'action-required': 'Home',
   'cash-mrr': 'Company Now',
   bottleneck: 'Bottleneck',
   shipper: 'Delivery',

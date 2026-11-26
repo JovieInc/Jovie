@@ -10,6 +10,7 @@ const mockLoggerError = vi.hoisted(() => vi.fn());
 const mockCreateLiveReaders = vi.hoisted(() => vi.fn());
 const mockDefaultLiveIo = vi.hoisted(() => vi.fn());
 const mockFetch = vi.hoisted(() => vi.fn());
+const mockScheduleAfter = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/hud', () => ({
   authorizeHud: mockAuthorizeHud,
@@ -40,6 +41,10 @@ vi.mock('@/lib/ovie/shipping-state/live', async importOriginal => {
   };
 });
 
+vi.mock('@/lib/next/schedule-after', () => ({
+  scheduleAfter: mockScheduleAfter,
+}));
+
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
 }));
@@ -60,6 +65,10 @@ describe('GET /api/hud/shipping-state', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    mockScheduleAfter.mockImplementation((task: () => unknown) => {
+      void task();
+      return true;
+    });
     mockCreateLiveReaders.mockReturnValue({});
     mockDefaultLiveIo.mockReturnValue({ fetch: mockFetch });
     mockHasCached.mockReturnValue(true);
@@ -104,7 +113,7 @@ describe('GET /api/hud/shipping-state', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('measures inline when the cached observation is past the freshness cutoff', async () => {
+  it('serves the aged projection immediately and reconciles in the background when past freshness', async () => {
     mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
     mockReadCached.mockReturnValue({
       schema: 'ovie.shipping-state.v1',
@@ -112,19 +121,19 @@ describe('GET /api/hud/shipping-state', () => {
       publishing: true,
       observationTimestamp: new Date(Date.now() - 120_000).toISOString(),
     });
-    mockPublish.mockResolvedValue({
-      schema: 'ovie.shipping-state.v1',
-      state: 'fresh',
-    });
+    // Background reconcile starts but must not delay the cached response.
+    mockPublish.mockReturnValue(new Promise(() => {}));
     const { GET } = await import('@/app/api/hud/shipping-state/route');
     const response = await GET(
       new NextRequest('http://localhost/api/hud/shipping-state')
     );
-    await expect(response.json()).resolves.toMatchObject({ state: 'fresh' });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ state: 'stale' });
+    expect(mockScheduleAfter).toHaveBeenCalledTimes(1);
     expect(mockPublish).toHaveBeenCalledTimes(1);
   });
 
-  it('serves the aged projection when the inline measurement fails', async () => {
+  it('still serves the aged projection when background reconciliation later fails', async () => {
     mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
     mockReadCached.mockReturnValue({
       schema: 'ovie.shipping-state.v1',
@@ -139,6 +148,8 @@ describe('GET /api/hud/shipping-state', () => {
     );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ state: 'stale' });
+    expect(mockScheduleAfter).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(mockCaptureError).toHaveBeenCalled());
   });
 
   it('returns the local projection without waiting for reconciliation', async () => {
@@ -178,6 +189,25 @@ describe('GET /api/hud/shipping-state', () => {
     });
     expect(mockPublish).toHaveBeenCalledTimes(1);
     expect(mockReadCached).not.toHaveBeenCalled();
+  });
+
+  it('keeps the cold measurement alive past the response when it outlasts the inline wait', async () => {
+    vi.useFakeTimers();
+    try {
+      mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
+      mockHasCached.mockReturnValue(false);
+      mockPublish.mockReturnValue(new Promise(() => {}));
+      const { GET } = await import('@/app/api/hud/shipping-state/route');
+      const pending = GET(
+        new NextRequest('http://localhost/api/hud/shipping-state')
+      );
+      await vi.advanceTimersByTimeAsync(2_300);
+      const response = await pending;
+      expect(response.status).toBe(200);
+      expect(mockScheduleAfter).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('returns 500 when the cold-instance measurement throws', async () => {

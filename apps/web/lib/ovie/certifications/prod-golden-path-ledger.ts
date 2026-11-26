@@ -10,17 +10,22 @@ import {
   mutateCertificationRecord,
 } from '@/lib/agent-os/certification-cas';
 import type { CertificationPacketFile } from './packet-files.server';
+import {
+  isFutureDated,
+  isProdGoldenPathLastPassed,
+  isProdGoldenPathPassRef,
+  isSurfaceCertifiedOn,
+  ledgerServedSha,
+  nextLastPassed,
+  type ProdGoldenPathLastPassed,
+  type ProdGoldenPathPassRef,
+} from './prod-golden-path-carry';
 import type { OvieCertificationDomainId } from './types';
 
 /**
- * Production golden-path certification ledger (JOV-9625).
- *
- * After every production promotion the post-deploy probes run the golden path
- * against https://jov.ie and post one SHA-bound receipt per surface. This
- * ledger keeps the latest receipt per surface and projects each into a
- * certification packet (runtime_dogfood tier) so the existing Ovie inventory
- * (`/api/ovie/certifications`, `/app/admin/certifications`) shows per-surface
- * production state. A missing ledger is disconnected evidence, never a zero.
+ * Production golden-path certification ledger (JOV-9625): stores the latest
+ * SHA-bound post-deploy receipt per surface and projects runtime_dogfood
+ * packets into `/api/ovie/certifications`. A missing ledger is never a zero.
  */
 
 export const PROD_GOLDEN_PATH_RECEIPT_SCHEMA =
@@ -118,11 +123,15 @@ export interface ProdGoldenPathReceipt {
   readonly networkErrorCount?: number | null;
   readonly screenshot?: ProdGoldenPathScreenshot | null;
   readonly adminInventoryReadback?: ProdGoldenPathAdminReadback | null;
+  /** JOV-14402: a carried pass names the run that exercised the step. */
+  readonly carriedFrom?: ProdGoldenPathPassRef | null;
 }
 
 export interface ProdGoldenPathSurfaceRecord {
   readonly latest: ProdGoldenPathReceipt;
   readonly lastPassedSha: string | null;
+  /** JOV-14402; absent on records written before it (prod-golden-path-carry). */
+  readonly lastPassed?: ProdGoldenPathLastPassed | null;
   readonly history: readonly {
     readonly sha: string;
     readonly status: ProdGoldenPathStatus;
@@ -206,7 +215,15 @@ export function isProdGoldenPathReceipt(
   ) {
     return false;
   }
-  return true;
+  // A carried receipt is a pass for this SHA that names an earlier one.
+  const from = value.carriedFrom;
+  return (
+    from === undefined ||
+    from === null ||
+    (value.status === 'passed' &&
+      isProdGoldenPathPassRef(from) &&
+      from.sha !== value.sha)
+  );
 }
 
 function emptyLedger(updatedAt: string): ProdGoldenPathLedger {
@@ -244,7 +261,12 @@ export function parseProdGoldenPathLedger(raw: unknown): ProdGoldenPathLedger {
     if (
       !isRecord(record) ||
       !isProdGoldenPathReceipt(record.latest) ||
-      record.latest.surface !== id
+      record.latest.surface !== id ||
+      !(
+        record.lastPassed === undefined ||
+        record.lastPassed === null ||
+        isProdGoldenPathLastPassed(record.lastPassed)
+      )
     ) {
       throw new ProdGoldenPathPersistenceError(
         `Production golden-path record ${id} is invalid.`
@@ -265,31 +287,18 @@ export async function readProdGoldenPathLedger(
 }
 
 /**
- * A surface is certified while its latest production receipt passed within
- * this window. Post-deploy probes certify after every promotion, so a day
- * without a passing receipt means the certification is no longer current.
- */
-export const PROD_GOLDEN_PATH_CERTIFICATION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-const CLOCK_SKEW_MS = 5 * 60 * 1000;
-
-/**
- * Surfaces with a current production certification, in launch order. The
- * production alias perf gate blocks only on these (Tim 2026-10-31): the
- * blocking set grows as surfaces certify, and a missing ledger certifies
- * nothing, so it can never block.
+ * Surfaces certified on the release the ledger speaks for, in launch order
+ * (JOV-14402: a certification belongs to its release and never ages out).
+ * The production alias perf gate blocks only on these (Tim 2026-10-31); a
+ * missing ledger certifies nothing, so it can never block.
  */
 export function certifiedProdGoldenPathSurfaces(
-  ledger: ProdGoldenPathLedger | null,
-  now: number = Date.now(),
-  maxAgeMs: number = PROD_GOLDEN_PATH_CERTIFICATION_MAX_AGE_MS
+  ledger: ProdGoldenPathLedger | null
 ): ProdGoldenPathSurfaceId[] {
-  if (!ledger) return [];
-  return PROD_GOLDEN_PATH_SURFACE_IDS.filter(id => {
-    const latest = ledger.surfaces[id]?.latest;
-    if (!latest || latest.status !== 'passed') return false;
-    const endedAt = Date.parse(latest.endedAt);
-    return endedAt <= now + CLOCK_SKEW_MS && now - endedAt <= maxAgeMs;
-  });
+  const servedSha = ledgerServedSha(ledger);
+  return PROD_GOLDEN_PATH_SURFACE_IDS.filter(id =>
+    isSurfaceCertifiedOn(ledger?.surfaces[id], servedSha)
+  );
 }
 
 export type ProdGoldenPathRecordResult = {
@@ -308,14 +317,17 @@ export async function recordProdGoldenPathRun(input: {
   readonly receipts: readonly ProdGoldenPathReceipt[];
   readonly recordedAt?: string;
 }): Promise<ProdGoldenPathRecordResult> {
+  const recordedAt = input.recordedAt ?? new Date().toISOString();
   for (const receipt of input.receipts) {
-    if (!isProdGoldenPathReceipt(receipt)) {
+    if (
+      !isProdGoldenPathReceipt(receipt) ||
+      isFutureDated(receipt.endedAt, recordedAt)
+    ) {
       throw new ProdGoldenPathPersistenceError(
         `Golden-path receipt for ${String((receipt as { surface?: unknown })?.surface)} is invalid.`
       );
     }
   }
-  const recordedAt = input.recordedAt ?? new Date().toISOString();
   return mutateCertificationRecord<
     ProdGoldenPathLedger,
     ProdGoldenPathRecordResult
@@ -352,6 +364,7 @@ export async function recordProdGoldenPathRun(input: {
             receipt.status === 'passed'
               ? receipt.sha
               : (existing?.lastPassedSha ?? null),
+          lastPassed: nextLastPassed(existing, receipt),
           history: [
             ...(existing?.history ?? []),
             {
@@ -383,37 +396,30 @@ const EVIDENCE_STATUS = {
   'passed' | 'failed' | 'blocked'
 >;
 
-/** Freshness window for a passed receipt, aligned with certificationVerdict. */
-export const PROD_GOLDEN_PATH_FRESHNESS_MS = 24 * 60 * 60 * 1000;
-
 /**
  * Per-surface runtime lifecycle state of the golden-path projection
- * (JOV-9625 outcome rework). `certified` = passed on the served build inside
- * the freshness window; `expired` = last pass is older than the window;
+ * (JOV-9625; JOV-14402 made it release-bound). `certified` = the surface's
+ * pass belongs to the release the ledger speaks for; `expired` = its last
+ * pass is for an older release, superseded with no receipt for this one;
  * `missing` = no receipt ever recorded; a failed/blocked receipt keeps its
- * own status and carries no lifecycle state.
+ * own status and carries no lifecycle state. Nothing ages out with time.
  */
 export type ProdGoldenPathRuntimeState = 'certified' | 'expired' | 'missing';
 
 function runtimeState(
-  receipt: ProdGoldenPathReceipt | undefined,
-  nowMs: number
+  record: ProdGoldenPathSurfaceRecord | undefined,
+  servedSha: string | null
 ): ProdGoldenPathRuntimeState | undefined {
-  if (!receipt) return 'missing';
-  // A failed/blocked receipt was exercised on production: it keeps its own
-  // status and carries no lifecycle state, so it is never conflated with a
-  // surface that has no receipt at all (JOV-9625 review rework).
-  if (receipt.status !== 'passed') return undefined;
-  if (nowMs - Date.parse(receipt.endedAt) > PROD_GOLDEN_PATH_FRESHNESS_MS) {
-    return 'expired';
-  }
-  return 'certified';
+  if (!record) return 'missing';
+  // Failed/blocked receipts keep their own status and carry no lifecycle state.
+  if (record.latest.status !== 'passed') return undefined;
+  return isSurfaceCertifiedOn(record, servedSha) ? 'certified' : 'expired';
 }
 
 function summarize(
   receipt: ProdGoldenPathReceipt | undefined,
   state: ProdGoldenPathRuntimeState | undefined,
-  nowMs: number
+  servedSha: string | null
 ): string {
   if (!receipt) {
     return 'state=missing; No production receipt recorded for this surface.';
@@ -423,8 +429,6 @@ function summarize(
     typeof receipt.networkErrorCount === 'number'
       ? `; consoleErrors=${receipt.consoleErrorCount ?? 'n/a'}; networkErrors=${receipt.networkErrorCount ?? 'n/a'}`
       : '';
-  // Blocked and failed receipts carry no `state=` marker: their own status
-  // is the verdict, and `missing` is reserved for never-recorded surfaces.
   if (receipt.status === 'blocked') {
     return `Not exercised on production: ${receipt.blocker}${evidenceCounts}`;
   }
@@ -436,36 +440,31 @@ function summarize(
     );
   }
   if (state === 'expired') {
-    const ageHours = (
-      (nowMs - Date.parse(receipt.endedAt)) /
-      3_600_000
-    ).toFixed(1);
-    return `state=expired; Last production pass on ${receipt.sha.slice(0, 8)} is ${ageHours}h old (freshness window 24h)${evidenceCounts}`;
+    return `state=expired; Last production pass on ${receipt.sha.slice(0, 8)} is for an older release than ${servedSha?.slice(0, 8) ?? 'the served build'}${evidenceCounts}`;
+  }
+  if (receipt.carriedFrom) {
+    return `state=certified; carried forward from ${receipt.carriedFrom.sha.slice(0, 8)}: this release touches none of the step's files, routes or deps${evidenceCounts}`;
   }
   return `state=certified; ${receipt.checks.length} production checks passed as ${receipt.identity}${evidenceCounts}`;
 }
 
 /**
- * Project each stored surface into the packet-file shape the Ovie inventory
- * already renders. The evidence is runtime_dogfood bound to the deployed SHA.
- * Every surface emits a row — a surface with no receipt projects the
- * explicit `missing` state instead of vanishing — and each row carries the
- * runtime lifecycle state (`certified` / `expired` / `missing`) plus the
- * receipt's per-surface browser evidence (screenshot frame, console and
- * network error counts) so the inventory preserves what the run measured.
+ * Project each surface into Ovie inventory `runtime_dogfood` packets bound to
+ * the deployed SHA (`certified` / `expired` / `missing` + browser telemetry).
  */
 export function prodGoldenPathPacketFiles(
   ledger: ProdGoldenPathLedger,
   options: { readonly nowMs?: number } = {}
 ): CertificationPacketFile[] {
   const nowMs = options.nowMs ?? Date.now();
+  const servedSha = ledgerServedSha(ledger);
   const files: CertificationPacketFile[] = [];
   for (const id of PROD_GOLDEN_PATH_SURFACE_IDS) {
     const record = ledger.surfaces[id];
     const receipt = record?.latest;
-    const state = runtimeState(receipt, nowMs);
+    const state = runtimeState(record, servedSha);
     const meta = PROD_GOLDEN_PATH_SURFACES[id];
-    const summary = summarize(receipt, state, nowMs);
+    const summary = summarize(receipt, state, servedSha);
     const visualProof: CertificationEvidenceReceipt[] = [];
     if (receipt?.screenshot) {
       visualProof.push({
@@ -508,8 +507,8 @@ export function prodGoldenPathPacketFiles(
             ? {
                 id: `prod-golden-path:${id}:${receipt.sha.slice(0, 8)}`,
                 tier: 'runtime_dogfood',
-                // An expired pass is pending recertification, not a pass:
-                // the freshness window gates the runtime_dogfood tier.
+                // A pass for an older release is pending recertification,
+                // not a pass for the served one.
                 status:
                   state === 'expired'
                     ? 'pending'

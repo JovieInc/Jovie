@@ -1,7 +1,7 @@
 // @coverage-via apps/web/tests/components/release-provider-matrix/TrackRow.test.tsx
 'use client';
 
-import { Badge } from '@jovie/ui';
+import { Badge, PlainButton } from '@jovie/ui';
 import { Pause, Play, VolumeX } from 'lucide-react';
 import { memo, useCallback, useMemo } from 'react';
 import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
@@ -131,10 +131,10 @@ export const TrackRow = memo(function TrackRow({
   );
 
   const playbackButton = canPlay ? (
-    <button
+    <PlainButton
       type='button'
       onClick={handleTogglePlayback}
-      className='focus-ring-transparent-offset flex h-7 w-7 items-center justify-center rounded-full border border-transparent text-secondary-token transition-colors duration-subtle hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
+      className='focus-ring-transparent-offset relative flex h-7 w-7 items-center before:absolute before:left-1/2 before:top-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 justify-center rounded-full border border-transparent text-secondary-token transition-colors duration-subtle hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
       aria-label={isPlaying ? `Pause ${track.title}` : `Play ${track.title}`}
     >
       {isPlaying ? (
@@ -142,7 +142,7 @@ export const TrackRow = memo(function TrackRow({
       ) : (
         <Play className='h-3.5 w-3.5' />
       )}
-    </button>
+    </PlainButton>
   ) : (
     <span className='system-b-track-row-preview-unavailable flex h-7 w-7 items-center justify-center rounded-full text-secondary-token/80'>
       <VolumeX className='h-3.5 w-3.5' aria-label='No Preview Available' />
@@ -192,14 +192,14 @@ export const TrackRow = memo(function TrackRow({
           <div className='flex items-start justify-between gap-3'>
             <div className='min-w-0'>
               {onClick ? (
-                <button
+                <PlainButton
                   type='button'
                   onClick={onClick}
                   aria-label={`Open details for ${trackLabel}. ${track.title}`}
                   className='focus-ring-transparent-offset min-w-0 rounded-lg text-left'
                 >
                   {titleRow}
-                </button>
+                </PlainButton>
               ) : (
                 titleRow
               )}

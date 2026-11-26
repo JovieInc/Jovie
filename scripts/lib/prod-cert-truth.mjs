@@ -247,6 +247,53 @@ export async function loadPenInputs(env = process.env) {
 }
 
 /**
+ * Bind a manifest frame to its pen-still-diff receipt row by exact identity
+ * (JOV-11623): section + mode + viewport, then penNodeId and route when the
+ * producer emitted them. Incomplete or ambiguous rows stay unresolved so a
+ * wrong-node PASS cannot certify by order.
+ * @param {any} frame
+ * @param {any} receipt
+ * @returns {{ row: any | null, reason?: string }}
+ */
+export function receiptRowForPenFrame(frame, receipt) {
+  const candidates = (receipt?.frames ?? []).filter(
+    r =>
+      r &&
+      r.sectionId === frame.sectionId &&
+      r.mode === frame.mode &&
+      r.viewport === frame.viewport
+  );
+  if (candidates.length === 0) return { row: null, reason: 'missing' };
+
+  const withIdentity = candidates.filter(r => {
+    if (r.penNodeId != null && r.penNodeId !== frame.penNodeId) return false;
+    if (
+      r.route != null &&
+      frame.route != null &&
+      String(r.route) !== String(frame.route)
+    ) {
+      return false;
+    }
+    return true;
+  });
+  if (withIdentity.length === 0) {
+    return { row: null, reason: 'identity-mismatch' };
+  }
+  if (withIdentity.length > 1) {
+    return { row: null, reason: 'ambiguous-identity' };
+  }
+  const row = withIdentity[0];
+  // Producer always emits penNodeId via frameId(); a section-only row is incomplete.
+  if (row.penNodeId == null || row.penNodeId === '') {
+    return { row: null, reason: 'incomplete-identity' };
+  }
+  if (frame.route != null && (row.route == null || row.route === '')) {
+    return { row: null, reason: 'incomplete-identity' };
+  }
+  return { row };
+}
+
+/**
  * Design-first checks for one surface. A screen with no Pen frame fails, and
  * so does a frame whose still was never exported. With every still exported,
  * `pen.matches-production` follows the pen-still-diff receipt for those
@@ -309,13 +356,12 @@ export function penDesignChecks(surface, deps = {}) {
   }
   if (undesigned.length) return checks;
   const verdicts = designed.map(f => {
-    const row = (receipt?.frames ?? []).find(
-      r =>
-        r.sectionId === f.sectionId &&
-        r.mode === f.mode &&
-        r.viewport === f.viewport
-    );
-    return { f, verdict: row?.verdict ?? 'missing', reason: row?.reason };
+    const { row, reason } = receiptRowForPenFrame(f, receipt);
+    return {
+      f,
+      verdict: row?.verdict ?? 'missing',
+      reason: row?.reason ?? reason,
+    };
   });
   const failed = verdicts.filter(v => v.verdict === 'fail');
   const pending = verdicts.filter(
@@ -328,7 +374,7 @@ export function penDesignChecks(surface, deps = {}) {
       failed.length
         ? `production differs from Pen: ${failed.map(v => `${screen(v.f)}${v.reason ? ` ${v.reason}` : ''}`).join(', ')}`
         : pending.length
-          ? `no Pen comparison yet for ${pending.map(v => screen(v.f)).join(', ')}`
+          ? `no Pen comparison yet for ${pending.map(v => `${screen(v.f)}${v.reason ? ` (${v.reason})` : ''}`).join(', ')}`
           : `production matches Pen for ${designed.map(screen).join(', ')}`
     )
   );

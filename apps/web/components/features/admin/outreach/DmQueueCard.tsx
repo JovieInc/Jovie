@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Textarea } from '@jovie/ui';
 import { Check, Copy, ExternalLink, Loader2, User } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from '@/components/feedback';
@@ -84,11 +84,12 @@ export function DmQueueCard({ lead, onMarkedSent }: DmQueueCardProps) {
       </div>
 
       {lead.dmCopy && (
-        <textarea
+        <Textarea
           readOnly
+          aria-label='Direct Message Copy'
           value={lead.dmCopy}
           rows={4}
-          className='w-full resize-none rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-xs text-secondary-token'
+          resizable={false}
         />
       )}
 

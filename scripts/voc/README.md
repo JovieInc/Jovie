@@ -40,8 +40,51 @@ frequency is a series. Options: `--category <id>`, `--sources
 appstore,hn,exa,trustpilot`, `--days <n>`.
 
 Weekly: `.github/workflows/voc-mine.yml` (Mondays) runs the same collector and
-uploads the anonymized `items.jsonl` and summary as an artifact. It skips until
-the `VOC_TARGETS_JSON` and `EXA_API_KEY` repository secrets exist.
+uploads the anonymized `items.jsonl` and summary as an artifact. It skips only
+when the `VOC_TARGETS_JSON` repository secret is empty. Set `EXA_API_KEY` too:
+without it the job still runs (App Store + HN), but Exa search and Trustpilot
+return empty arrays.
+
+## Secrets unlock (Tim / ops)
+
+Do **not** paste keys into chat or commit real product names. Set values in the
+GitHub Actions secrets UI and Doppler dashboard only.
+
+| Name | Where | Why |
+|---|---|---|
+| `VOC_TARGETS_JSON` | **GitHub repository secret** (Settings → Secrets → Actions) | Workflow reads `secrets.VOC_TARGETS_JSON` directly; empty → job skips. Not part of Production env sync. |
+| `EXA_API_KEY` | **GitHub repository secret** (same) **and** Doppler `jovie-web` (`dev` / ops lane) | Exa + Trustpilot in CI/local; missing key does **not** skip the workflow — those sources just yield nothing. Also used by `packages/research`. |
+
+Canonical private targets live in gbrain `ops/voc/targets`. For CI, copy that
+`json voc-targets` block into the repository secret as:
+
+```json
+{
+  "targets": [
+    {
+      "id": "lib-01",
+      "category": "link-in-bio",
+      "name": "REDACTED_PRODUCT",
+      "aliases": ["redacted", "redacted.app"],
+      "appStoreId": "0000000000",
+      "trustpilot": "redacted.example",
+      "queries": [
+        "REDACTED_PRODUCT complaints review problems",
+        "is REDACTED_PRODUCT worth paying for? cancelled subscription"
+      ]
+    }
+  ]
+}
+```
+
+Fields: `id`, `category`, `name`, `aliases` (required for HN); optional
+`appStoreId`, `trustpilot`, `queries`. Verify with Actions → VOC Mine → Run
+workflow; expect artifact `voc-items-<run_id>`.
+
+Related research keys (Doppler, not this workflow): `FIRECRAWL_API_KEY`,
+`SCRAPECREATORS_API_KEY`, `BRAVE_API_KEY`. `OPENROUTER_API_KEY` is already in
+Doppler for last30days synthesis. last30days also needs a global skill install
+at `~/.claude/skills/last30days/`.
 
 ## Synthesis and consumers
 

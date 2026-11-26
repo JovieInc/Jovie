@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Bounded GitHub transport for the postdeploy probe admission ledger. */
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   appendFileSync,
   chmodSync,
@@ -98,7 +99,7 @@ export function createGitHubTransport({
         throw new TransportFailure('Malformed GitHub JSON');
       }
     },
-    getLedger(repository, artifactId) {
+    getLedger(repository, artifactId, crawlDigest = '') {
       const root = mkdtempSync(join(temporaryRoot, 'postdeploy-probe-ledger-'));
       chmodSync(root, 0o700);
       const archive = join(root, 'artifact.zip');
@@ -110,6 +111,14 @@ export function createGitHubTransport({
         );
         if (statSync(archive).size > MAX_ZIP_BYTES)
           throw new TransportFailure('ZIP exceeds bound');
+        if (
+          crawlDigest &&
+          (!/^sha256:[a-f0-9]{64}$/u.test(crawlDigest) ||
+            `sha256:${createHash('sha256').update(readFileSync(archive)).digest('hex')}` !==
+              crawlDigest)
+        )
+          throw new TransportFailure('Crawl artifact digest mismatch');
+        const member = crawlDigest ? 'receipt.json' : 'ledger.json';
         const listing = execute('unzip', ['-Z1', archive], {
           encoding: 'utf8',
           timeout: 5_000,
@@ -118,10 +127,19 @@ export function createGitHubTransport({
         if (
           listing.error ||
           listing.status !== 0 ||
-          String(listing.stdout ?? '').trim() !== 'ledger.json'
+          String(listing.stdout ?? '')
+            .trim()
+            .split('\n')
+            .sort()
+            .join(',') !==
+            (crawlDigest ? 'receipt.json,verdict.json' : 'ledger.json')
         )
-          throw new TransportFailure('Artifact must contain only ledger.json');
-        const extracted = execute('unzip', ['-p', archive, 'ledger.json'], {
+          throw new TransportFailure(
+            crawlDigest
+              ? 'Artifact members do not match the canonical crawl receipt'
+              : 'Artifact must contain only ledger.json'
+          );
+        const extracted = execute('unzip', ['-p', archive, member], {
           encoding: 'utf8',
           timeout: 5_000,
           maxBuffer: MAX_JSON_BYTES + 1,
@@ -143,13 +161,17 @@ export function createGitHubTransport({
         rmSync(root, { recursive: true, force: true });
       }
     },
+    getCrawlReceipt(repository, artifactId, digest) {
+      if (!digest) throw new TransportFailure('Missing crawl artifact digest');
+      return this.getLedger(repository, artifactId, digest);
+    },
   };
 }
 
 /** Discover immutable per-run capsules from a complete exact-name namespace. */
 export function collectProbeHistory(
   context,
-  transport = createGitHubTransport()
+  /** @type {Pick<ReturnType<typeof createGitHubTransport>, 'getJson'|'getLedger'>} */ transport = createGitHubTransport()
 ) {
   try {
     if (evaluateProbeAdmission(context, null).reason === 'context-malformed')
@@ -266,7 +288,7 @@ export function executeProbeAdmission(
   mode,
   context,
   outDir,
-  transport = createGitHubTransport()
+  /** @type {Pick<ReturnType<typeof createGitHubTransport>, 'getJson'|'getLedger'>} */ transport = createGitHubTransport()
 ) {
   mkdirSync(outDir, { recursive: true, mode: 0o700 });
   chmodSync(outDir, 0o700);

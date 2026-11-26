@@ -45,6 +45,20 @@
       "scan": "plan-prices"
     },
     {
+      "id": "api-usage-pricing-proposal",
+      "title": "API free-to-start usage pricing proposal",
+      "owner": {
+        "kind": "file",
+        "ref": "apps/web/lib/config/api-usage-pricing-proposal.ts",
+        "note": "JOV-4875 proposal only. Paid activation is disabled and exact amounts are not stored here. Subscription prices stay in plan-prices.ts. Account ledgers and live cache leases stay with JOV-4073, JOV-4075, JOV-7831, and JOV-8746."
+      },
+      "derived": [
+        "docs/company/PRICING-STRATEGY.md",
+        "docs/product/api-agentic-self-serve.md",
+        "docs/FEATURE_REGISTRY.md"
+      ]
+    },
+    {
       "id": "stripe-price-ids",
       "title": "Stripe price ids",
       "owner": {

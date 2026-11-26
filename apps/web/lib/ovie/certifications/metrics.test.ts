@@ -1,113 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import {
-  buildDogfoodReceipt,
-  type DogfoodReceipt,
-} from '@/lib/agent-os/dogfood-receipt';
+import type { DogfoodReceipt } from '@/lib/agent-os/dogfood-receipt';
 import { expectedExposure } from '../../../../../packages/release-channel-contracts/test-fixtures/dogfood-exposure';
+import { CERTIFICATION_METRICS_CONTRACT } from './metrics';
 import {
-  CERTIFICATION_METRICS_CONTRACT,
-  type CertificationMetricsInput,
-  computeCertificationMetrics,
-  type MetricsSubject,
-} from './metrics';
-
-const NOW = '2026-09-29T12:00:00.000Z';
-const WINDOW_START = '2026-09-01T12:00:00.000Z'; // 28 days
-const SHA = 'a'.repeat(40);
-const DEPLOY = { commitSha: SHA, deploymentId: 'dep-1' };
-
-function subject(overrides: Partial<MetricsSubject> = {}): MetricsSubject {
-  return {
-    id: 'sub-1',
-    product: 'jov',
-    riskClass: 'product',
-    requiredMissions: [],
-    deploy: null,
-    confidenceTier: null,
-    machineCertifiedAt: null,
-    fullyRolledOutAt: null,
-    promotedSilently: false,
-    killedAfterPromotion: false,
-    founderFlaggedAfterPromotion: false,
-    founderBlocking: [],
-    killSwitches: [],
-    escalationRungResolved: null,
-    hasCanary: false,
-    ...overrides,
-  };
-}
-
-function receipt(overrides: Partial<DogfoodReceipt> = {}): DogfoodReceipt {
-  const input = {
-    subjectId: 'sub-1',
-    product: 'jov',
-    kind: 'ui_agent',
-    driver: 'playwright',
-    missionId: 'm-1',
-    actor: 'summer',
-    environment: 'production',
-    deploymentId: DEPLOY.deploymentId,
-    commitSha: DEPLOY.commitSha,
-    flagCohort: 'dogfood',
-    startedAt: '2026-09-28T10:00:00.000Z',
-    completedAt: '2026-09-28T10:05:00.000Z',
-    outcome: 'passed',
-    ...overrides,
-  } as const;
-  return buildDogfoodReceipt({
-    ...input,
-    evidenceRefs: ['artifact:result-state'],
-    missionObservation: {
-      purpose: 'capability',
-      method: 'goal_driven',
-      missionRevision: 1,
-      goalCompletion: 'completed',
-      correctness: 'correct',
-      resultingState: 'The intended result persists after a fresh read.',
-      checks: [
-        {
-          criterion: 'saved result',
-          status: 'passed',
-          evidenceRefs: ['artifact:result-state'],
-        },
-      ],
-      friction: { assessment: 'acceptable', details: [] },
-      recovery: { retries: 0, details: [] },
-      durationMs: Date.parse(input.completedAt) - Date.parse(input.startedAt),
-      resources: {
-        status: 'not_applicable',
-        reason: 'No metered service used.',
-      },
-    },
-    ...('missionObservation' in overrides
-      ? { missionObservation: overrides.missionObservation }
-      : {}),
-  });
-}
-
-function input(overrides: Partial<CertificationMetricsInput> = {}) {
-  return computeCertificationMetrics({
-    generatedAt: NOW,
-    windowStart: WINDOW_START,
-    subjects: [],
-    defects: [],
-    founderCards: [],
-    judgeReceipts: [],
-    decisions: [],
-    signalReports: [],
-    roster: [],
-    receipts: [],
-    knownGoodDeploymentIds: [],
-    qualityReceipts: null,
-    ...overrides,
-  });
-}
+  METRICS_TEST_DEPLOY as DEPLOY,
+  metricsTestInput as input,
+  metricsTestReceipt as receipt,
+  metricsTestSubject as subject,
+} from './metrics.test-helpers';
 
 describe('computeCertificationMetrics', () => {
   it('reports the contract and every lane with null metrics on empty input', () => {
     const result = input();
     expect(result.contract).toBe(CERTIFICATION_METRICS_CONTRACT);
     expect(result.qualityScoreboard.source.status).toBe('disconnected');
+    expect(result.dogfoodFeed.status).toBe('disconnected');
+    expect(result.dogfoodFeed.receiptCount).toBe(0);
     expect(Object.keys(result.lanes).sort()).toEqual(['jov', 'lyb', 'ovie']);
     const jov = result.lanes.jov;
     expect(jov.founderBlockingMinutes).toBe(0);

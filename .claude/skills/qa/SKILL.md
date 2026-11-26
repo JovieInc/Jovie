@@ -43,3 +43,21 @@ once certified a chat reply that was a quota wall (JOV-9625). Every spec:
   `scripts/lib/outcome-verifier.mjs`;
 - is shown red first: run it against the broken state, or a known-bad sample
   (`acceptedNegativeControls(check)` returns `[]`), before trusting its green.
+
+## Feature maps + skip-reporting
+
+When QA covers a product journey that has a feature map (entry points, success /
+cancel / error / empty / persistence), load that map first and report every
+path as **covered**, **failed**, or **skipped** with an explicit reason.
+
+Claim → checkout → recovery: [`docs/testing/claim-checkout-feature-map.md`](../../../docs/testing/claim-checkout-feature-map.md).
+Do not invent coverage for skip-listed paths. Current skip-report rows:
+
+| Skip | Why |
+|------|-----|
+| Screenshot-only “looks like checkout” | No URL / session / entitlement assertion |
+| RLS policy matrix without Neon `DATABASE_URL` | MG Neon cert owns DB evidence; local skip is honest |
+| Live Stripe network in unit tests | Mocked gateway only |
+
+In the QA write-up, list skipped paths in a **Skip report** section (path →
+reason). A silent omit is not a skip.

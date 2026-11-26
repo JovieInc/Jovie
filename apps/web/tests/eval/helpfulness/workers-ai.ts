@@ -7,11 +7,15 @@
  * It hosts the production chat model (zai glm-5.3), so the subject is the
  * same model artists talk to.
  *
- * Env: CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN (Workers AI scope). On
- * a host with `wrangler login`, the runner fills the token from
- * `wrangler auth token`.
+ * Auth (either path; relay preferred on Cursor agent VMs / CI):
+ *   - Relay: WORKERS_AI_TOKEN (+ optional WORKERS_AI_BASE_URL). Hits the
+ *     jovie-workers-ai OpenAI-compatible relay; no CLOUDFLARE_ACCOUNT_ID.
+ *   - Direct: CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN (or wrangler OAuth).
  */
 
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createApiClient } from '../../../../../packages/api-client/client.ts';
 import { hashCredential } from '../../../../../packages/api-client/store.ts';
 
@@ -21,8 +25,73 @@ export const WORKERS_AI_SUBJECT_MODEL = '@cf/zai-org/glm-5.3';
  * traffic on this account and its per-minute limit is shared.
  */
 export const WORKERS_AI_CHEAP_JUDGE = '@cf/openai/gpt-oss-120b';
+/**
+ * One-shot fallback when the live jovie-workers-ai relay rejects gpt-oss
+ * (`model not allowed`) before ASS-17 deploy rolls the allowlist. Must stay
+ * off glm-5.3 / glm-5.3-flash (Summer share + answerer ≠ judge).
+ */
+export const WORKERS_AI_CHEAP_JUDGE_FALLBACK =
+  '@cf/deepseek-ai/deepseek-v4.1-flash-1017';
 /** Calibrated 2026-10-28: MAE 9.7 vs reference grades (kimi-k2.6 timed out, gpt-oss-120b MAE 18.4). */
 export const WORKERS_AI_STRONG_JUDGE = '@cf/deepseek-ai/deepseek-v4-pro-0813';
+
+/**
+ * Live relay HTTP 400 body: `{"error":{"message":"model not allowed",...}}`.
+ * Also matches allowlist phrasing from older/relay variants.
+ */
+export function isWorkersAiModelAllowlistError(error: unknown): boolean {
+  const text = error instanceof Error ? error.message : String(error);
+  if (!/\bHTTP 400\b/.test(text)) return false;
+  return /model not allowed|not (?:on |in )?the allowlist|allowlist/i.test(
+    text
+  );
+}
+
+/**
+ * When primary is the cheap judge and the error is an allowlist miss, return
+ * the one-shot fallback model; otherwise null (caller rethrows).
+ */
+export function cheapJudgeFallbackModel(
+  primary: string,
+  error: unknown
+): string | null {
+  if (primary !== WORKERS_AI_CHEAP_JUDGE) return null;
+  if (!isWorkersAiModelAllowlistError(error)) return null;
+  return WORKERS_AI_CHEAP_JUDGE_FALLBACK;
+}
+
+/**
+ * Run `fn(primary)`; on a cheap-judge allowlist miss, retry once with
+ * {@link WORKERS_AI_CHEAP_JUDGE_FALLBACK}. Other models/errors pass through.
+ */
+export async function withCheapJudgeFallback<T>(
+  primary: string,
+  fn: (model: string) => Promise<T>,
+  onFallback?: (fallback: string, error: unknown) => void
+): Promise<T> {
+  try {
+    return await fn(primary);
+  } catch (error) {
+    const fallback = cheapJudgeFallbackModel(primary, error);
+    if (!fallback) throw error;
+    onFallback?.(fallback, error);
+    return await fn(fallback);
+  }
+}
+
+const ROUTING = JSON.parse(
+  readFileSync(
+    join(
+      dirname(fileURLToPath(import.meta.url)),
+      '../../../lib/ai/routing.json'
+    ),
+    'utf8'
+  )
+) as { providers: { 'workers-ai': { relayBaseUrl: string } } };
+
+/** Same relay as production (`apps/web/lib/ai/workers-ai.ts`). */
+export const WORKERS_AI_RELAY_BASE_URL: string =
+  ROUTING.providers['workers-ai'].relayBaseUrl;
 
 export interface WaiMessage {
   readonly role: 'system' | 'user' | 'assistant' | 'tool';
@@ -51,11 +120,19 @@ export interface WaiResult {
   readonly usage: { readonly input: number; readonly output: number };
 }
 
-export interface WorkersAiConfig {
-  readonly accountId: string;
-  /** Current bearer. Called per request so short-lived OAuth tokens refresh. */
-  readonly token: () => string;
-}
+export type WorkersAiConfig =
+  | {
+      readonly mode: 'relay';
+      /** OpenAI-compatible base ending in `/v1` (no trailing slash). */
+      readonly baseUrl: string;
+      /** Current bearer. Called per request so short-lived tokens refresh. */
+      readonly token: () => string;
+    }
+  | {
+      readonly mode: 'direct';
+      readonly accountId: string;
+      readonly token: () => string;
+    };
 
 /**
  * Minimum gap between calls to one model. Workers AI rate limits per model
@@ -63,6 +140,13 @@ export interface WorkersAiConfig {
  * (glm-5.3-flash), so the eval paces itself well under the limit.
  */
 export const WORKERS_AI_MIN_INTERVAL_MS = 5_000;
+
+export function chatCompletionsUrl(config: WorkersAiConfig): string {
+  if (config.mode === 'relay') {
+    return `${config.baseUrl.replace(/\/+$/u, '')}/chat/completions`;
+  }
+  return `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/ai/v1/chat/completions`;
+}
 
 export function workersAiChat(config: WorkersAiConfig) {
   const nextSlot = new Map<string, number>();
@@ -75,12 +159,16 @@ export function workersAiChat(config: WorkersAiConfig) {
   // One ledger bucket per model: Workers AI rate limits per model, so a 429
   // on one model must not open the breaker for the others.
   const clients = new Map<string, ReturnType<typeof createApiClient>>();
+  const credentialRoot =
+    config.mode === 'relay'
+      ? hashCredential('cloudflare', `relay:${config.baseUrl}`)
+      : hashCredential('cloudflare', config.accountId);
   const clientFor = (model: string) => {
     let client = clients.get(model);
     if (!client) {
       client = createApiClient({
         provider: 'cloudflare',
-        credential: `${hashCredential('cloudflare', config.accountId)}:${model}`,
+        credential: `${credentialRoot}:${model}`,
         authorize: headers => {
           headers.set('authorization', `Bearer ${config.token()}`);
         },
@@ -89,7 +177,7 @@ export function workersAiChat(config: WorkersAiConfig) {
     }
     return client;
   };
-  const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/ai/v1/chat/completions`;
+  const url = chatCompletionsUrl(config);
 
   return async function chat(input: {
     readonly model: string;

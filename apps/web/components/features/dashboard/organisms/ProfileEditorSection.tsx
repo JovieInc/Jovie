@@ -7,7 +7,7 @@
 
 'use client';
 
-import { Input } from '@jovie/ui';
+import { Input, PlainButton } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -27,7 +27,7 @@ interface ProfileIdentityFieldRowProps {
   readonly emptyLabel: string;
   readonly ariaLabel: string;
   readonly onEdit: () => void;
-  readonly input: ReactNode;
+  readonly children: ReactNode;
   readonly tone?: 'primary' | 'secondary';
   readonly controlsId: string;
   readonly className?: string;
@@ -40,7 +40,7 @@ function ProfileIdentityFieldRow({
   emptyLabel,
   ariaLabel,
   onEdit,
-  input,
+  children,
   tone = 'secondary',
   controlsId,
   className,
@@ -56,9 +56,9 @@ function ProfileIdentityFieldRow({
         {label}
       </p>
       {editing ? (
-        input
+        children
       ) : (
-        <button
+        <PlainButton
           type='button'
           className={cn(
             'w-full rounded-md border border-transparent px-3 py-2.5 text-center transition-[background-color,border-color,color] duration-subtle hover:border-subtle hover:bg-surface-1 focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-ring/20 active:bg-surface-2',
@@ -69,10 +69,10 @@ function ProfileIdentityFieldRow({
           onClick={onEdit}
           aria-label={ariaLabel}
           aria-pressed={editing}
-          aria-controls={controlsId}
+          aria-controls={editing ? controlsId : undefined}
         >
           {value || emptyLabel}
-        </button>
+        </PlainButton>
       )}
     </div>
   );
@@ -194,20 +194,19 @@ export function ProfileEditorSection({
             onEdit={() => setEditingField('displayName')}
             controlsId='profile-display-name'
             tone='primary'
-            input={
-              <Input
-                ref={displayNameInputRef as React.RefObject<HTMLInputElement>}
-                id='profile-display-name'
-                type='text'
-                aria-label='Display Name'
-                value={profileDisplayName}
-                onChange={e => onDisplayNameChange(e.target.value)}
-                onKeyDown={e => onInputKeyDown(e, 'displayName')}
-                onBlur={onInputBlur}
-                className='min-h-12 rounded-md border-default bg-surface-0 text-center text-mid font-semibold tracking-tighter text-primary-token'
-              />
-            }
-          />
+          >
+            <Input
+              ref={displayNameInputRef as React.RefObject<HTMLInputElement>}
+              id='profile-display-name'
+              type='text'
+              aria-label='Display Name'
+              value={profileDisplayName}
+              onChange={e => onDisplayNameChange(e.target.value)}
+              onKeyDown={e => onInputKeyDown(e, 'displayName')}
+              onBlur={onInputBlur}
+              className='min-h-12 rounded-md border-default bg-surface-0 text-center text-mid font-semibold tracking-tighter text-primary-token'
+            />
+          </ProfileIdentityFieldRow>
           <ProfileIdentityFieldRow
             label='Username'
             editing={editingField === 'username'}
@@ -216,22 +215,21 @@ export function ProfileEditorSection({
             ariaLabel='Edit username'
             onEdit={() => setEditingField('username')}
             controlsId='profile-username'
-            input={
-              <Input
-                ref={usernameInputRef as React.RefObject<HTMLInputElement>}
-                id='profile-username'
-                type='text'
-                aria-label='Username'
-                data-1p-ignore
-                autoComplete='off'
-                value={profileUsername}
-                onChange={e => onUsernameChange(e.target.value)}
-                onKeyDown={e => onInputKeyDown(e, 'username')}
-                onBlur={onInputBlur}
-                className='min-h-11 rounded-md border-default bg-surface-0 text-center text-app font-caption tracking-tight text-primary-token'
-              />
-            }
-          />
+          >
+            <Input
+              ref={usernameInputRef as React.RefObject<HTMLInputElement>}
+              id='profile-username'
+              type='text'
+              aria-label='Username'
+              data-1p-ignore
+              autoComplete='off'
+              value={profileUsername}
+              onChange={e => onUsernameChange(e.target.value)}
+              onKeyDown={e => onInputKeyDown(e, 'username')}
+              onBlur={onInputBlur}
+              className='min-h-11 rounded-md border-default bg-surface-0 text-center text-app font-caption tracking-tight text-primary-token'
+            />
+          </ProfileIdentityFieldRow>
         </ContentSurfaceCard>
       </div>
     </div>

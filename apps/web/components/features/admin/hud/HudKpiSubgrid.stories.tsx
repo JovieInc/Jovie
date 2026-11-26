@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
+import { expect, userEvent, within } from 'storybook/test';
 import type {
   DailyBucket,
   ShippingVelocityResponse,
@@ -160,4 +161,43 @@ function renderRtl(args: { readonly metrics: HudMetrics }) {
 export const RtlTiles: Story = {
   beforeEach: stubVelocity(answerWith(measured)),
   render: renderRtl,
+};
+
+const sparse = velocity(
+  buckets(1).map((day, index) => {
+    if (index === 12) return { ...day, merged: 0, mergeP50Hours: null };
+    if (index === 13) return { ...day, mergeP50Hours: 0 };
+    return day;
+  }),
+  'stale'
+);
+
+export const MissingAndMeasuredZero: Story = {
+  beforeEach: stubVelocity(answerWith(sparse)),
+  render: args => <KpiStory metrics={args.metrics} seed={sparse} />,
+};
+
+export const PermissionDenied: Story = {
+  beforeEach: stubVelocity(async () => new Response(null, { status: 403 })),
+  render: renderUnseeded,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByText('Daily Shipping Data'));
+    await expect(
+      await canvas.findByRole('link', { name: 'Open Dashboard' })
+    ).toBeVisible();
+  },
+};
+
+export const ErrorReadingVelocity: Story = {
+  beforeEach: stubVelocity(async () => new Response(null, { status: 503 })),
+  render: renderUnseeded,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByText('Daily Shipping Data'));
+    await expect(
+      await canvas.findByText(/Retry to load the daily observations/)
+    ).toBeVisible();
+    await expect(canvas.getByRole('button', { name: 'Retry' })).toBeEnabled();
+  },
 };

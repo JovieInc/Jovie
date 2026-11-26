@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { SuggestedPrompts } from './SuggestedPrompts';
 
@@ -42,5 +43,18 @@ describe('SuggestedPrompts', () => {
     expect(
       screen.getByRole('button', { name: 'Plan a Release' })
     ).toBeInTheDocument();
+  });
+});
+
+describe('SuggestedPrompts PlainButton chips', () => {
+  it('renders type=button chips that call onSelect on userEvent.click', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    render(<SuggestedPrompts onSelect={onSelect} />);
+    const chip = screen.getByRole('button', { name: 'Plan a Release' });
+    expect(chip).toHaveAttribute('type', 'button');
+    await user.click(chip);
+    expect(onSelect).toHaveBeenCalledOnce();
+    expect(onSelect).toHaveBeenCalledWith(expect.any(String));
   });
 });

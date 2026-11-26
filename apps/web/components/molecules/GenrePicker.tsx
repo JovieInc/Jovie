@@ -1,9 +1,17 @@
 'use client';
 
-import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
+import {
+  HostDrawnInput,
+  PlainButton,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@jovie/ui';
 import { Check, Search } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GENRE_TAXONOMY } from '@/constants/genres';
+import { cn } from '@/lib/utils';
+import './GenrePicker.search.css';
 
 interface GenreOptionProps {
   readonly genre: string;
@@ -21,20 +29,22 @@ const GenreOption = memo(function GenreOption({
   }, [onToggle, genre]);
 
   return (
-    <button
+    <PlainButton
       type='button'
       onClick={handleClick}
-      className={`w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-app transition-colors ${
+      className={cn(
+        'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-app transition-colors',
         isSelected
-          ? 'bg-interactive-hover text-primary-token font-medium'
+          ? 'bg-interactive-hover font-medium text-primary-token'
           : 'text-secondary-token hover:bg-interactive-hover hover:text-primary-token'
-      }`}
-    >
-      {isSelected && (
-        <Check className='w-3.5 h-3.5 shrink-0 text-primary-token' />
       )}
+      data-testid='genre-picker-option'
+    >
+      {isSelected ? (
+        <Check className='h-3.5 w-3.5 shrink-0 text-primary-token' />
+      ) : null}
       <span className='flex-1 text-left capitalize'>{genre}</span>
-    </button>
+    </PlainButton>
   );
 });
 
@@ -86,10 +96,8 @@ export function GenrePicker({
     (genre: string) => {
       const normalized = genre.toLowerCase();
       if (selectedSet.has(normalized)) {
-        // Remove
         onChange(selected.filter(g => g.toLowerCase() !== normalized));
       } else if (!atCap) {
-        // Add
         onChange([...selected, genre]);
       }
     },
@@ -104,44 +112,40 @@ export function GenrePicker({
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-      <PopoverContent align='start' sideOffset={4} className='w-56 p-0'>
-        {/* Search input */}
-        <div className='flex items-center gap-2 border-b border-subtle px-3 py-2'>
+      <PopoverContent align='start' sideOffset={4} size='bare' className='w-56'>
+        <div className='genre-picker-search flex items-center gap-2 border-b border-subtle px-3 py-2'>
           <Search className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
-          <input
+          <HostDrawnInput
             ref={searchRef}
             type='text'
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder='Search genres...'
-            className='flex-1 bg-transparent text-app text-primary-token placeholder:text-tertiary-token outline-none'
+            aria-label='Search Genres'
+            className='min-w-0 flex-1'
           />
         </div>
 
-        {/* Cap indicator */}
-        {atCap && (
-          <div className='px-3 py-1.5 border-b border-subtle'>
+        {atCap ? (
+          <div className='border-b border-subtle px-3 py-1.5'>
             <p className='text-2xs text-tertiary-token'>
               Maximum {maxGenres} genres reached
             </p>
           </div>
-        )}
+        ) : null}
 
         <div className='max-h-64 overflow-y-auto p-1.5'>
           {sortedGenres.length > 0 ? (
-            sortedGenres.map(genre => {
-              const isSelected = selectedSet.has(genre);
-              return (
-                <GenreOption
-                  key={genre}
-                  genre={genre}
-                  isSelected={isSelected}
-                  onToggle={handleToggle}
-                />
-              );
-            })
+            sortedGenres.map(genre => (
+              <GenreOption
+                key={genre}
+                genre={genre}
+                isSelected={selectedSet.has(genre)}
+                onToggle={handleToggle}
+              />
+            ))
           ) : (
-            <p className='px-2.5 py-3 text-app text-tertiary-token text-center'>
+            <p className='px-2.5 py-3 text-center text-app text-tertiary-token'>
               No matching genres
             </p>
           )}

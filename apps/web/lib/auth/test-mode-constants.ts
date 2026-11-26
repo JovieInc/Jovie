@@ -5,6 +5,13 @@ export const TEST_MODE_COOKIE = '__e2e_test_mode';
 export const TEST_USER_ID_COOKIE = '__e2e_test_user_id';
 export const TEST_PERSONA_COOKIE = '__e2e_test_persona';
 
+/** Session id prefix for resolveRequestAuth test-auth bypass. */
+export const TEST_AUTH_BYPASS_SESSION_PREFIX = 'sess_test_bypass_';
+
+export function testAuthBypassSessionId(dbUserId: string): string {
+  return `${TEST_AUTH_BYPASS_SESSION_PREFIX}${dbUserId}`;
+}
+
 // Precomputed by getDeterministicDevTestAuthPersonaUserId('creator'). Keep the
 // browser-reachable test-mode module free of Node's crypto implementation.
 export const DEFAULT_TEST_CREATOR_USER_ID =

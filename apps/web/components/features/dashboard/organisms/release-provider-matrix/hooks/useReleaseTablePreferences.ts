@@ -5,11 +5,11 @@ import type { ColumnVisibility, Density } from '@/components/organisms/table';
 
 const STORAGE_KEY = 'jovie:releases-table-preferences';
 
-/** Row heights for each density level */
+/** Row heights for each density level — frozen to dense 32px (DRI-21). */
 export const DENSITY_ROW_HEIGHTS: Record<Density, number> = {
-  compact: 36,
-  normal: 44,
-  comfortable: 56,
+  compact: 32,
+  normal: 32,
+  comfortable: 32,
 } as const;
 
 /** Column IDs that can be toggled */

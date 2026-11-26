@@ -21,6 +21,29 @@ vi.mock('@/hooks/useIsAuthenticated', () => ({
 }));
 
 describe('MobileNav', () => {
+  it('focuses the first marketing destination and identifies the current page', async () => {
+    const user = userEvent.setup();
+    render(
+      <MobileNav
+        groups={[
+          {
+            id: 'customers',
+            label: 'Customers',
+            links: [{ href: '/about', label: 'About' }],
+          },
+        ]}
+        navLinks={[{ href: '/pricing', label: 'Pricing' }]}
+      />
+    );
+    const toggle = screen.getByRole('button', { name: 'Open menu' });
+    await user.click(toggle);
+    const customer = screen.getByRole('link', { name: 'Customers' });
+    expect(customer).toHaveFocus();
+    expect(customer).toHaveAttribute('aria-current', 'page');
+    await user.keyboard('{Escape}');
+    expect(toggle).toHaveFocus();
+  });
+
   afterEach(() => {
     authState.signedIn = false;
     document.body.style.removeProperty('overflow');

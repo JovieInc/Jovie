@@ -8,6 +8,7 @@ const mockWithDbSession = vi.hoisted(() => vi.fn());
 const mockWithDbSessionTx = vi.hoisted(() => vi.fn());
 const mockDeleteBlobs = vi.hoisted(() => vi.fn());
 const mockCheckAccountDeleteRateLimit = vi.hoisted(() => vi.fn());
+const mockCheckAccountExportRateLimit = vi.hoisted(() => vi.fn());
 const mockWriteFlagOverride = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockDbUpdate = vi.hoisted(() => vi.fn());
@@ -67,6 +68,7 @@ vi.mock('@/lib/auth/session', () => ({
 
 vi.mock('@/lib/rate-limit', () => ({
   checkAccountDeleteRateLimit: mockCheckAccountDeleteRateLimit,
+  checkAccountExportRateLimit: mockCheckAccountExportRateLimit,
   createRateLimitHeaders: vi.fn(() => ({})),
 }));
 
@@ -108,6 +110,7 @@ vi.mock('@/lib/db', () => ({
 }));
 
 import { POST as deleteAccount } from '@/app/api/account/delete/route';
+import { GET as exportAccount } from '@/app/api/account/export/route';
 import { POST as rollbackFlag } from '@/app/api/admin/feature-flags/rollback/route';
 import { POST as writeFlag } from '@/app/api/admin/feature-flags/route';
 import { POST as unwaitlist } from '@/app/api/dev/unwaitlist/route';
@@ -208,6 +211,19 @@ describe('revoked session with a still-valid cookie', () => {
     expect(mockDeleteBlobs).not.toHaveBeenCalled();
     expect(mockDbUpdate).not.toHaveBeenCalled();
     expect(mockDbDelete).not.toHaveBeenCalled();
+  });
+
+  it('denies account export before rate limit or data read', async () => {
+    const response = await exportAccount();
+
+    expect(response.status).toBe(401);
+    expect(
+      mockGetSession.mock.calls.every(call =>
+        sessionReadDisabledCookieCache(call)
+      )
+    ).toBe(true);
+    expect(mockCheckAccountExportRateLimit).not.toHaveBeenCalled();
+    expect(mockWithDbSessionTx).not.toHaveBeenCalled();
   });
 
   it('denies a feature-flag write before the override is stored', async () => {

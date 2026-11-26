@@ -55,12 +55,32 @@ export function getEveShadowOrigin(): string {
   return SUMMER_PRODUCTION.productionOrigin;
 }
 
+/**
+ * Founder chat paths Summer also accepts from Jovie staging (staging.jov.ie is
+ * the jovie preview build of exact main; summer-config admits its
+ * `environment:preview` OIDC subject on these routes only). Every other
+ * Summer path stays production-only.
+ */
+const STAGING_FOUNDER_CHAT_PREFIXES = [
+  '/ovie/v1/summer-shadow/conversation/',
+  '/ovie/v1/summer-shadow/sessions/',
+  '/ovie/v1/summer-chat/',
+] as const;
+
+function callerAllowed(path: string): boolean {
+  const environment = process.env.VERCEL_ENV;
+  if (environment === 'production') return true;
+  return (
+    environment === 'preview' &&
+    STAGING_FOUNDER_CHAT_PREFIXES.some(prefix => path.startsWith(prefix))
+  );
+}
+
 export async function fetchSummerShadow(
   path: string,
   init: RequestInit = {}
 ): Promise<Response> {
-  if (process.env.VERCEL_ENV !== 'production')
-    throw new Error('production_origin_required');
+  if (!callerAllowed(path)) throw new Error('production_origin_required');
   if (
     !path.startsWith('/ovie/v1/summer-shadow/') &&
     !path.startsWith('/ovie/v1/summer-chat/') &&

@@ -5,6 +5,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  IconButton,
 } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { Archive, Check, Copy, Ellipsis } from 'lucide-react';
@@ -13,6 +14,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChatEntityPanelProvider } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { ChatEntityRightPanelHost } from '@/app/app/(shell)/chat/ChatEntityRightPanelHost';
 import { JovieChat } from '@/app/app/(shell)/chat/DeferredJovieChat';
+import {
+  getWelcomeChatBootstrapAnnouncement,
+  resetWelcomeChatBootstrapState,
+  shouldRetryWelcomeChatBootstrap,
+  WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS,
+  type WelcomeChatBootstrapState,
+} from '@/app/app/(shell)/chat/welcome-chat-bootstrap';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
@@ -20,7 +28,6 @@ import {
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { ChatHistorySwitcher } from '@/components/jovie/ChatHistorySwitcher';
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
@@ -44,6 +51,7 @@ import {
   ONBOARDING_PREVIEW_SNAPSHOT_KEY,
   ONBOARDING_WELCOME_REPLY_KEY,
 } from '@/lib/onboarding/session-keys';
+import { useOnboardingCheckoutReturn } from '@/lib/onboarding/use-onboarding-checkout-return';
 import { mergePreviewPanelHydration } from '@/lib/profile/preview-panel-optimistic';
 import {
   queryKeys,
@@ -59,50 +67,10 @@ interface ChatPageClientProps {
   readonly isFirstSession?: boolean;
 }
 
-const WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS = [1500, 3000, 5000] as const;
-
-type WelcomeChatBootstrapState =
-  | 'idle'
-  | 'pending'
-  | 'scheduled'
-  | 'done'
-  | 'failed';
-
-export function shouldRetryWelcomeChatBootstrap(
-  status: number | null
-): boolean {
-  return (
-    status === null ||
-    status === 404 ||
-    status === 500 ||
-    status === 502 ||
-    status === 503 ||
-    status === 504
-  );
-}
-
-export function resetWelcomeChatBootstrapState(
-  stateRef: { current: WelcomeChatBootstrapState },
-  retryCountRef: { current: number }
-): void {
-  stateRef.current = 'idle';
-  retryCountRef.current = 0;
-}
-
-function getWelcomeChatBootstrapAnnouncement(
-  state: WelcomeChatBootstrapState
-): string {
-  switch (state) {
-    case 'pending':
-      return 'Starting your onboarding chat.';
-    case 'scheduled':
-      return 'Still setting up your onboarding chat. Retrying now.';
-    case 'failed':
-      return '';
-    default:
-      return '';
-  }
-}
+export {
+  resetWelcomeChatBootstrapState,
+  shouldRetryWelcomeChatBootstrap,
+} from '@/app/app/(shell)/chat/welcome-chat-bootstrap';
 
 function WelcomeChatBootstrapAnnouncer({
   state,
@@ -138,7 +106,6 @@ export function ChatProfileFallback({
   dashboardLoadError,
   isProfileSetupRace,
   canAutoRetry,
-  autoRetryCount,
   onRetry,
 }: ChatProfileFallbackProps) {
   if (needsOnboarding && !dashboardLoadError) {
@@ -300,6 +267,10 @@ export function ChatPageClient({
   // @artist mentions can open the same rail used in setup/onboarding.
   const shouldHydratePreviewData = enablePreviewPanel && Boolean(activeProfile);
 
+  // Stripe onboarding return lands here with upgrade=success|cancel. Acknowledge
+  // once and strip checkout residue so pay ≠ skip at first useful result.
+  useOnboardingCheckoutReturn(APP_ROUTES.CHAT);
+
   useEffect(() => {
     return () => {
       setPreviewData(null);
@@ -422,12 +393,14 @@ export function ChatPageClient({
       <div className='flex items-center gap-1'>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <AppIconButton
+            <IconButton
+              variant='control'
               ariaLabel='Thread options'
               className={DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS}
+              size='sm'
             >
               <Ellipsis aria-hidden='true' className='size-4' />
-            </AppIconButton>
+            </IconButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align='end'>
             <DropdownMenuItem onClick={handleCopyConversationId}>

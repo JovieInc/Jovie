@@ -1,3 +1,4 @@
+// Drift T2.1: IconButton alias retirement — callsite migration coverage.
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ShareLinkButton } from '@/components/features/share/ShareLinkButton';

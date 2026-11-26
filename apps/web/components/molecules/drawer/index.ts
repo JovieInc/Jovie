@@ -56,10 +56,6 @@ export {
   type DrawerFormGridRowProps,
 } from './DrawerFormGridRow';
 export {
-  DrawerInlineIconButton,
-  type DrawerInlineIconButtonProps,
-} from './DrawerInlineIconButton';
-export {
   DrawerInlineNote,
   type DrawerInlineNoteProps,
 } from './DrawerInlineNote';

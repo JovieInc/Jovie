@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
 import { toast } from '@/components/feedback';
 import {
@@ -75,11 +76,7 @@ export class ErrorBoundary extends Component<Props, State> {
       // Default fallback UI
       return (
         <div className='flex flex-col items-center justify-center min-h-50 p-6 text-center'>
-          <div
-            className='w-full max-w-md rounded-2xl border border-subtle bg-surface-1 p-6 shadow-sm'
-            role='alert'
-            aria-live='polite'
-          >
+          <div className='w-full max-w-md p-6' role='alert' aria-live='polite'>
             <div className='space-y-4'>
               <div className='flex justify-center'>
                 <div className='text-destructive'>
@@ -111,13 +108,13 @@ export class ErrorBoundary extends Component<Props, State> {
               </div>
 
               <div className='flex justify-center'>
-                <button
+                <PlainButton
                   type='button'
                   onClick={() => globalThis.location.reload()}
                   className='btn btn-md btn-primary btn-press'
                 >
                   Reload page
-                </button>
+                </PlainButton>
               </div>
             </div>
           </div>

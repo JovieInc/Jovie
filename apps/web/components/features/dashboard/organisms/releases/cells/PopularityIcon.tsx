@@ -2,7 +2,12 @@
 
 // @coverage-via apps/web/components/features/dashboard/organisms/releases/cells/PopularityIcon.test.tsx
 
-import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import {
+  PlainButton,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@jovie/ui';
 import { memo } from 'react';
 
 interface PopularityIconProps {
@@ -63,7 +68,7 @@ export const PopularityIcon = memo(function PopularityIcon({
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
+        <PlainButton
           type='button'
           className='inline-flex items-end gap-[1.5px] rounded-sm opacity-80 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
           aria-label={`Popularity ${displayPopularity} out of 100`}
@@ -83,7 +88,7 @@ export const PopularityIcon = memo(function PopularityIcon({
             className={`w-[2.5px] rounded-sm ${filledBars >= 3 ? activeColor : inactiveColor}`}
             style={{ height: '12px' }}
           />
-        </button>
+        </PlainButton>
       </TooltipTrigger>
       <TooltipContent side='top'>
         <span className='font-caption'>{displayPopularity}</span>

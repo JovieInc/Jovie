@@ -37,6 +37,11 @@ export interface HomeCanvasState {
   /** A turn is being submitted or streamed. */
   readonly isStreaming: boolean;
   readonly onOpenTranscript: () => void;
+  /**
+   * Composer carries intent (typing, picker, chips). Story First melts the
+   * board while the docked composer stays (Tim 2026-11-21).
+   */
+  readonly composerHasIntent?: boolean;
 }
 
 /** The subset of a chat message a canvas reads; parts are untyped tool data. */
@@ -95,6 +100,12 @@ export interface JovieChatProps {
    * request (founder decision 2026-10-20, Q3).
    */
   readonly homeCanvasMode?: 'empty-state' | 'living';
+  /**
+   * Optional card pinned directly above the composer in both the Home and the
+   * thread layouts (Ovie: Summer's pending ask). Return `null` from the
+   * rendered element to show nothing. Absent: the layout is unchanged.
+   */
+  readonly composerDock?: () => ReactNode;
   /** Whether profile setup is complete, used to suppress setup quick actions. */
   readonly isProfileComplete?: boolean;
   /**

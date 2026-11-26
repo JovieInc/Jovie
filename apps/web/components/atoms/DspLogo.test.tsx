@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
-import { DSP_LOGO_CONFIG, DspLogo } from './DspLogo';
+import { DSP_LOGO_CONFIG, DspLogo, DspServiceIcon } from './DspLogo';
 
 describe('DspLogo', () => {
   it('renders a muted System B platform logo with tokenized brand color', async () => {
@@ -48,5 +48,30 @@ describe('DspLogo', () => {
   it('renders nothing for an unmapped provider', () => {
     const { container } = render(<DspLogo provider='amazon' />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('DspServiceIcon', () => {
+  it('renders DSP_LOGO_CONFIG path with System B brand class and skips unknowns', () => {
+    const { container, rerender } = render(
+      <DspServiceIcon provider='spotify' />
+    );
+    const svg = container.querySelector('svg[data-dsp-icon="spotify"]');
+    expect(svg?.querySelector('path')).toHaveAttribute(
+      'd',
+      DSP_LOGO_CONFIG.spotify.iconPath
+    );
+    expect(svg).toHaveClass('system-b-dsp-service-icon');
+    expect(svg).toHaveAttribute('data-dsp-icon', 'spotify');
+    rerender(<DspServiceIcon provider='not-a-dsp' />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('keeps a single style={} in DspLogo.tsx (System B inline-style ratchet)', () => {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const source = readFileSync(resolve(__dirname, 'DspLogo.tsx'), 'utf8');
+    const styleHits = source.match(/style=\{/g) ?? [];
+    expect(styleHits).toHaveLength(1);
   });
 });

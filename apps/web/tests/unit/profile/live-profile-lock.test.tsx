@@ -234,9 +234,13 @@ describe('live public profile lock', () => {
         .getByTestId('public-profile-layout-shell')
         .querySelector('.public-profile-layout-compact-slot') as HTMLElement
     );
-    for (const label of ['Home', 'Music', 'Events', 'About', 'Menu']) {
+    // JOV-14241: empty Events is omitted from the dock.
+    for (const label of ['Home', 'Music', 'About', 'Menu']) {
       expect(compact.getByRole('button', { name: label })).toBeInTheDocument();
     }
+    expect(
+      compact.queryByRole('button', { name: 'Events' })
+    ).not.toBeInTheDocument();
 
     // Credits live in the overflow menu, not as a raw control in the shell.
     fireEvent.click(compact.getByRole('button', { name: 'Menu' }));
@@ -308,10 +312,18 @@ describe('live public profile lock', () => {
         'desktop'
       );
       expect(screen.getAllByText('Get updates').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Events').length).toBeGreaterThan(0);
+      // JOV-14241: empty Events card and nav stay hidden.
+      expect(screen.queryByText('Events')).not.toBeInTheDocument();
       expect(screen.getAllByText('About').length).toBeGreaterThan(0);
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Release credits' }));
+    // Desktop credits open from the Menu popover, once (no duplicate pill).
+    expect(
+      screen.queryByRole('button', { name: 'Release credits' })
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Release credits' })
+    );
     expect(
       await screen.findByRole('heading', { name: 'Credits' })
     ).toBeInTheDocument();

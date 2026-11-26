@@ -2,7 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/library/LibraryCatalogWaveformCell.test.tsx
 
-import { StatusGlyph, type StatusGlyphState } from '@jovie/ui';
+import { StatusGlyph } from '@jovie/ui';
 import { memo, useMemo } from 'react';
 import { LibraryMediaThumbnail } from '@/app/app/(shell)/library/LibraryMediaThumbnail';
 import {
@@ -11,6 +11,12 @@ import {
   type LibraryReleaseAsset,
 } from '@/app/app/(shell)/library/library-data';
 import { libraryWaveformPeaks } from '@/app/app/(shell)/library/library-waveform-peaks';
+import {
+  formatLibraryStatus,
+  formatReleaseStatus,
+  type LibraryStatusGlyphSpec,
+  resolveLibraryStatusGlyph,
+} from '@/components/features/library/resolve-library-status-glyph';
 import { alignment } from '@/components/organisms/table/table.styles';
 import {
   type DspAvatarItem,
@@ -19,6 +25,13 @@ import {
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
+
+export {
+  formatLibraryStatus,
+  formatReleaseStatus,
+  type LibraryStatusGlyphSpec,
+  resolveLibraryStatusGlyph,
+};
 
 // ---------------------------------------------------------------------------
 // Dense Tracks-catalog columns for the Library Table view mode (JOV-4846).
@@ -58,58 +71,6 @@ export function formatLibraryItemType(asset: LibraryReleaseAsset): string {
   if (asset.catalogType === 'social') return 'Social';
   if (asset.itemKind === 'video') return 'Video';
   return formatReleaseType(asset.releaseType);
-}
-
-export function formatReleaseStatus(
-  status: LibraryReleaseAsset['status']
-): string {
-  return capitalizeFirst(status);
-}
-
-export function formatLibraryStatus(asset: LibraryReleaseAsset): string {
-  return asset.itemStatusLabel ?? formatReleaseStatus(asset.status);
-}
-
-export interface LibraryStatusGlyphSpec {
-  readonly state: StatusGlyphState;
-  /** One phrase for both axes; the tooltip and accessible name. */
-  readonly label: string;
-}
-
-/**
- * Folds release status and approval into one Linear-style glyph so a tile
- * never shows two stacked "Draft" words (#10384 / JOV-3333). Progress reads
- * left to right: empty ring (draft), half (scheduled), check (out). Review is
- * the one approval state that needs attention, so it owns the glyph; any
- * other approval state only qualifies the label.
- */
-export function resolveLibraryStatusGlyph(
-  asset: LibraryReleaseAsset
-): LibraryStatusGlyphSpec {
-  if (
-    asset.lifecycleStatus === 'archived' ||
-    asset.approvalStatus === 'archived'
-  ) {
-    return { state: 'canceled', label: 'Archived' };
-  }
-  const status = formatLibraryStatus(asset);
-  if (asset.approvalStatus === 'needs_review') {
-    return { state: 'in_review', label: `${status} · Needs review` };
-  }
-  const state: StatusGlyphState =
-    asset.status === 'released'
-      ? 'done'
-      : asset.status === 'scheduled'
-        ? 'in_progress'
-        : 'todo';
-  if (asset.approvalStatus === 'approved') {
-    return { state, label: `${status} · Approved` };
-  }
-  // An unapproved draft has nothing to approve yet; say it once.
-  return {
-    state,
-    label: asset.status === 'draft' ? status : `${status} · Not approved`,
-  };
 }
 
 /** The one status mark for tile, row, table and inspector. */
@@ -439,21 +400,18 @@ export const LIBRARY_CATALOG_TABLE_COLUMNS = [
   libraryCatalogColumnHelper.display({
     id: 'type',
     header: 'Type',
+    // Not fluid-cell: Title absorbs spare width; Type stays readable (JOV-7752).
     cell: ({ row }) => (
       <span
         title={formatLibraryItemType(row.original)}
-        className='system-b-library-meta-text system-b-library-fluid-cell block truncate text-tertiary-token'
+        className='system-b-library-meta-text block truncate whitespace-nowrap text-tertiary-token'
       >
         {formatLibraryItemType(row.original)}
       </span>
     ),
-    size: 120,
+    size: 112,
     minSize: 96,
-    meta: {
-      className: 'pl-2 pr-3',
-      priority: 6,
-      minWidth: 120,
-    },
+    meta: { className: 'pl-2 pr-3', priority: 6, minWidth: 112 },
   }),
   libraryCatalogColumnHelper.display({
     id: 'bpm',

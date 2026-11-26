@@ -2,7 +2,7 @@
 
 Owner: JOV-4875 / existing agent-native API workstream. Status: proposal only.
 Evidence checked: October 20, 2026, source base `68b1c4a7c31`.
-Pricing authority: the private API pricing proposal schema (JOV-4875) in `JovieInc/Ops` at `jovie-private/docs/company/PRICING-STRATEGY.md`; public summary in [PRICING-STRATEGY.md](../company/PRICING-STRATEGY.md).
+Pricing authority: the executable public proposal in `apps/web/lib/config/api-usage-pricing-proposal.ts`, indexed by [PRICING-STRATEGY.md](../company/PRICING-STRATEGY.md#api-pricing-schema-proposal-jov-4875). Unapproved numeric strategy stays in the private `JovieInc/Ops` pricing document and is not copied here.
 
 ## Outcome, scope, and evidence
 
@@ -198,7 +198,7 @@ surfaces; inspect their mounted UI and Pen/interaction owners before that work.
 
 | Stage / existing owner | Required proof |
 |---|---|
-| Documentation / JOV-4875 | Canonical API pricing fields, registry proposal, this brief, local links/parity/policy checks; no live billing edits |
+| Documentation / JOV-4875 | Executable proposal schema (`admitApiWork` / `settleApiWork`), registry proposal, this brief, local links/parity/policy checks; no live billing edits |
 | Account and shadow usage / JOV-4073, JOV-4075 | Provider signup/list/revoke/cancellation/recovery; cross-tenant and operator-token denial; durable rate limits; same-account multi-key quota; zero charges |
 | Resource reuse / JOV-4075 | Concurrent identical misses invoke upstream once; crash/lease expiry and invalidation races cannot publish stale results; tenant isolation; source expiry and upstream failure never yield stale merchant/product truth |
 | Paid activation / JOV-4875 gates | Tim's exact-amount receipt, responsibility matrix, delegated-grant denial/revocation, metering before charge, concurrent cap boundary, provider duplicate/out-of-order delivery, refunds/disputes, reconciliation after crashes/outages |

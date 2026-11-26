@@ -2,7 +2,11 @@
 
 // @coverage-via apps/web/tests/unit/DrawerHeaderActions.test.tsx
 
-import { type CommonDropdownItem, IconButton } from '@jovie/ui';
+import {
+  ACTION_OVERFLOW_MAX_PRIMARY,
+  type CommonDropdownItem,
+  IconButton,
+} from '@jovie/ui';
 import type { LucideIcon } from 'lucide-react';
 import { MoreVertical, X } from 'lucide-react';
 import Link from 'next/link';
@@ -37,7 +41,8 @@ export interface DrawerHeaderAction {
 }
 
 export interface DrawerHeaderActionsProps {
-  readonly primaryActions: DrawerHeaderAction[]; // Max 2, shown inline
+  /** Inline primaries — capped by shared `ACTION_OVERFLOW_MAX_PRIMARY`. */
+  readonly primaryActions: DrawerHeaderAction[];
   readonly overflowActions?: DrawerHeaderAction[]; // Rest in ellipsis menu
   readonly menuItems?: readonly CommonDropdownItem[]; // Shared menu items, usually from contextMenuItems
   readonly onClose?: () => void;
@@ -47,8 +52,9 @@ export interface DrawerHeaderActionsProps {
 }
 
 /**
- * Drawer header actions component
- * Shows top 2 priority actions inline, collapses rest into ellipsis menu
+ * Drawer header actions component.
+ * Uses the shared action-ranking capacity (`ACTION_OVERFLOW_MAX_PRIMARY`) so
+ * drawer headers and table row action bars collapse at the same threshold.
  */
 export function DrawerHeaderActions({
   primaryActions,
@@ -59,8 +65,7 @@ export function DrawerHeaderActions({
   searchPlaceholder,
   searchMode = 'root',
 }: DrawerHeaderActionsProps) {
-  // Ensure max 2 primary actions
-  const displayActions = primaryActions.slice(0, 2);
+  const displayActions = primaryActions.slice(0, ACTION_OVERFLOW_MAX_PRIMARY);
 
   // Convert overflow actions to menu items with defensive filtering
   const baseMenuItems: TableActionMenuItem[] = overflowActions

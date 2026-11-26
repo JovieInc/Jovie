@@ -38,7 +38,18 @@ export function ciFastTrustedBaseCandidates(env = process.env) {
     }
   };
 
-  if (event === 'pull_request' || event === 'merge_group') {
+  if (event === 'merge_group') {
+    // Prefer the merge-group parent (TURBO_SCM_BASE = merge_group.base_sha).
+    // origin/main would attribute earlier queue entries' registry growth to
+    // later ones (SYM-3 / JOV-12617). When the parent SHA is set, never list
+    // origin/<base> as a silent fallback — a missing local commit must fail
+    // closed. Fall back to origin/<base> only when TURBO_SCM_BASE is unset.
+    if (typeof turbo === 'string' && turbo.trim()) {
+      push(turbo);
+    } else {
+      push(originBase);
+    }
+  } else if (event === 'pull_request') {
     push(originBase);
     push(turbo);
   } else {

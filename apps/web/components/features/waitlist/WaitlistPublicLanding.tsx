@@ -36,6 +36,7 @@ export function WaitlistPublicLanding({
     <AuthenticatedAuthEntryGuard>
       <AuthLayout
         formTitle='Continue to Jovie'
+        chrome='splash-b'
         showFormTitle={false}
         showFooterPrompt={signupClosed}
         footerPrompt='Already have an account?'
@@ -45,7 +46,7 @@ export function WaitlistPublicLanding({
       >
         <AuthRoutePrefetch href={APP_ROUTES.SIGNIN} />
         {signupClosed ? (
-          <WaitlistRoleForm qualify title='Request an invite' />
+          <WaitlistRoleForm qualify title='Join the waitlist' />
         ) : (
           <AuthShell
             mode='sign-up'

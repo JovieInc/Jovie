@@ -53,6 +53,11 @@ export interface TrackingTokenPayload {
   email: string;
   /** Provider message ID (optional) */
   messageId?: string;
+  /**
+   * Destination URL for click tracking.
+   * When present, the HMAC binds this URL so callers cannot swap `u`.
+   */
+  clickUrl?: string;
 }
 
 /**
@@ -72,6 +77,7 @@ export function generateTrackingToken(
     r: payload.referenceId,
     e: payload.email.toLowerCase().trim(),
     m: payload.messageId,
+    ...(payload.clickUrl ? { u: payload.clickUrl } : {}),
   });
 
   const dataBase64 = Buffer.from(data).toString('base64url');
@@ -120,9 +126,45 @@ export function verifyTrackingToken(
       referenceId: data.r,
       email: data.e,
       messageId: data.m,
+      clickUrl: typeof data.u === 'string' ? data.u : undefined,
     };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Timing-safe equality for UTF-8 strings (e.g. bound click destinations).
+ */
+export function safeEqualString(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a, 'utf8');
+  const bBuf = Buffer.from(b, 'utf8');
+  if (aBuf.length !== bBuf.length) return false;
+  return timingSafeEqual(aBuf, bBuf);
+}
+
+/**
+ * First-party hosts used in historical email click destinations
+ * (claim-invite / recovery). Used only as a legacy unbound-token fallback —
+ * never as a substitute for HMAC binding of arbitrary destinations.
+ */
+const FIRST_PARTY_CLICK_HOST_SUFFIXES = ['jov.ie', 'meetjovie.com'] as const;
+
+/**
+ * True when `url` is http(s) to a Jovie product host.
+ * Rejects lookalikes like `jov.ie.evil.com`.
+ */
+export function isFirstPartyClickDestination(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+    const host = parsed.hostname.toLowerCase();
+    if (host === 'localhost' || host === '127.0.0.1') return true;
+    return FIRST_PARTY_CLICK_HOST_SUFFIXES.some(
+      suffix => host === suffix || host.endsWith(`.${suffix}`)
+    );
+  } catch {
+    return false;
   }
 }
 
@@ -139,13 +181,17 @@ export function buildOpenTrackingUrl(
 
 /**
  * Build a click tracking URL that wraps the original URL.
+ * The destination is HMAC-bound into the tracking token.
  */
 export function buildClickTrackingUrl(
   payload: TrackingTokenPayload,
   targetUrl: string,
   linkId?: string
 ): string | null {
-  const token = generateTrackingToken(payload);
+  const token = generateTrackingToken({
+    ...payload,
+    clickUrl: targetUrl,
+  });
   if (!token) return null;
 
   const params = new URLSearchParams({

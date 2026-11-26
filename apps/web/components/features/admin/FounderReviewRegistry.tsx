@@ -1,7 +1,6 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/components/admin/FounderReviewRegistry.test.tsx
-import { Button } from '@jovie/ui';
+import { Button, PlainButton, Textarea } from '@jovie/ui';
 import {
   Check,
   CheckCircle2,
@@ -438,7 +437,7 @@ export function FounderReviewRegistry({
         data-testid='founder-review-detail-rail'
         footer={
           <div className='space-y-2'>
-            <label className='block'>
+            <label htmlFor='founder-review-note' className='block'>
               <span className='mb-1.5 block text-2xs font-medium text-primary-token'>
                 Founder note{' '}
                 <span className='text-tertiary-token'>
@@ -447,17 +446,19 @@ export function FounderReviewRegistry({
                     : '(required for Needs Work)'}
                 </span>
               </span>
-              <textarea
+              <Textarea
+                id='founder-review-note'
                 value={note}
                 onChange={event => setNote(event.target.value)}
                 rows={2}
+                textareaSize='sm'
+                resizable={false}
                 disabled={!canDecide}
                 placeholder={
                   canDecide
                     ? 'What should stay true or change?'
                     : 'Available when the review packet is ready.'
                 }
-                className='w-full resize-none rounded-lg border border-(--app-shell-border) bg-surface-1 px-3 py-2 text-xs text-primary-token outline-none placeholder:text-tertiary-token focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60'
               />
             </label>
             <div className='flex flex-wrap items-center justify-end gap-2'>
@@ -513,26 +514,24 @@ export function FounderReviewRegistry({
           <div data-testid='founder-review-evidence-media'>
             {selected.media.length > 0 ? (
               <>
-                <button
-                  type='button'
+                <PlainButton
                   onClick={() => setViewerIndex(0)}
                   aria-label={`Open ${media?.alt ?? selected.title}`}
                   className='relative block aspect-video w-full overflow-hidden rounded-lg border border-(--app-shell-border) bg-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
                 >
                   {media ? <MediaThumb item={media} fit='contain' /> : null}
-                </button>
+                </PlainButton>
                 {selected.media.length > 1 ? (
                   <div className='mt-2 grid grid-cols-4 gap-1.5'>
                     {selected.media.map((item, i) => (
-                      <button
+                      <PlainButton
                         key={item.src}
-                        type='button'
                         onClick={() => setViewerIndex(i)}
                         aria-label={`Open ${item.alt}`}
                         className='relative aspect-video overflow-hidden rounded-md border border-(--app-shell-border) bg-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
                       >
                         <MediaThumb item={item} />
-                      </button>
+                      </PlainButton>
                     ))}
                   </div>
                 ) : null}

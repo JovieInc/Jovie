@@ -230,7 +230,7 @@ describe('ProfileDrawerShell', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it('anchors embedded drawers flush to the phone shell instead of floating them', () => {
+  it('floats embedded drawers as a capped card above the shell edge', () => {
     const onOpenChange = vi.fn();
     render(
       <ProfileDrawerShell
@@ -244,9 +244,14 @@ describe('ProfileDrawerShell', () => {
       </ProfileDrawerShell>
     );
 
-    const dialog = screen.getByTestId('embedded-drawer');
-    expect(dialog.className).toContain('inset-x-0');
-    expect(dialog.className).toContain('bottom-0');
+    // Embedded is the 768-1179px presentation. An edge-to-edge sheet there
+    // filled ~90% of the frame (Tim, jov.ie/tim); it is a detached card
+    // capped at popover width instead.
+    const lane = screen.getByTestId('embedded-drawer').parentElement;
+    expect(lane).toHaveAttribute('data-sheet-container');
+    expect(lane?.className).toContain('inset-x-3 bottom-3');
+    expect(lane?.className).toContain('max-w-96');
+    expect(screen.getByTestId('embedded-drawer')).toHaveClass('w-full');
     const backdrop = screen.getByRole('button', {
       name: 'Close Drawer Overlay',
     });

@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, SimpleTooltip } from '@jovie/ui';
+import { Button, PlainButton, SimpleTooltip } from '@jovie/ui';
 import { ArrowUp, Loader2, Mic, MicOff, Plus } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useCallback, useRef } from 'react';
@@ -89,7 +89,7 @@ export function ComposerSendButton({
           !isInteractive && 'cursor-not-allowed'
         )}
       >
-        <button
+        <PlainButton
           type='button'
           onMouseDown={onMouseDown}
           onClick={
@@ -121,7 +121,7 @@ export function ComposerSendButton({
               {icon}
             </motion.span>
           </AnimatePresence>
-        </button>
+        </PlainButton>
       </span>
     </SimpleTooltip>
   );

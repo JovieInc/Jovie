@@ -22,6 +22,16 @@ Preserve the approved homepage headline and visual composition. COMPANY_IDENTITY
 | Connected services | Connections | Spotify, Apple Music, LinkedIn, and other supported service names |
 | Actions | View profile, Edit profile, Share profile | Listen, Get tickets, Visit website, Get in touch, with real destinations |
 
+### Profile representation isomorphism (Drift W1 / C2)
+
+Visitor tabs, editor tabs, and creator Identity/Work capabilities describe one
+Profile object. Map specialist nouns onto the shared job facets in
+[`docs/design-system/shell-ia.md`](../design-system/shell-ia.md#c2--profile-representation-isomorphism)
+(Home/overview → Identity; Music/Events → Work; About/Social → Identity; Earn →
+Money contextual + Payments settings). Do not invent peer taxonomies
+(Earn↔Events, Social↔Home) without a mapping row or a merge. This contract
+does not reshuffle public tabs.
+
 Contacts, subscribers, followers, fans, leads, and customers retain distinct meanings. Neither copy nor a role switch creates consent, commercial intent, payment evidence, or ownership. Avoid claims of owning people. Name the permissioned relationship or list instead.
 
 Keep existing API fields, CLI commands, identifiers, schema types, artist names, third-party product names, quotations, and historical editorial content accurate. Changing a shared label does not authorize data migrations or a mechanical artist-to-creator replacement.

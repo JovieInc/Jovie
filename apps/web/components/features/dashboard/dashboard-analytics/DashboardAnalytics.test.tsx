@@ -1,6 +1,8 @@
 import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { DashboardAnalytics } from './DashboardAnalytics';
 
 const state = vi.hoisted(() => ({
@@ -117,5 +119,57 @@ describe('DashboardAnalytics metric consumer states', () => {
       screen.getByText('No operating system data yet')
     ).toBeInTheDocument();
     expect(screen.getByTestId('stat-profile-views')).not.toHaveTextContent('—');
+  });
+
+  it('opens the metric definition from the keyboard and stays axe-clean', async () => {
+    const user = userEvent.setup();
+    state.data = { profile_views: 100, unique_users: 50, subscribers: 5 };
+    const { container } = renderAnalytics();
+    await expectNoA11yViolations(container);
+    await user.tab();
+    const help = screen.getByRole('button', { name: 'About Profile Views' });
+    help.focus();
+    expect(help).toHaveFocus();
+    expect(help).toHaveAttribute('data-slot', 'plain-button');
+    await user.keyboard('{Enter}');
+    expect(screen.getAllByText(/./).length).toBeGreaterThan(0);
+  });
+
+  it('stays axe-clean while loading, after an error and with an empty window', async () => {
+    state.loading = true;
+    const loading = renderAnalytics();
+    await expectNoA11yViolations(loading.container);
+    loading.unmount();
+    state.loading = false;
+    state.error = 'Analytics unavailable';
+    const failed = renderAnalytics();
+    expect(screen.getByText('Analytics unavailable')).toBeInTheDocument();
+    await expectNoA11yViolations(failed.container);
+    failed.unmount();
+    state.error = null;
+    state.data = { profile_views: 0, unique_users: 0, subscribers: 0 };
+    const empty = renderAnalytics();
+    await expectNoA11yViolations(empty.container);
+  });
+
+  it('renders long and right-to-left list labels axe-clean', async () => {
+    state.data = {
+      profile_views: 100,
+      unique_users: 50,
+      subscribers: 5,
+      top_cities: [
+        { city: 'القاهرة', count: 9 },
+        {
+          city: 'Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch',
+          count: 3,
+        },
+      ],
+    };
+    const { container } = renderAnalytics();
+    expect(screen.getByText('القاهرة')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Top Cities', level: 2 })
+    ).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 });

@@ -7,41 +7,20 @@ import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { MeasuredValue } from '@/components/molecules/MeasuredValue';
 import { computeRatePercent } from '@/lib/analytics/metrics';
-import { redactFilesystemPaths } from '@/lib/ovie/home/operator-copy';
+import {
+  hasKnownMetricText,
+  OVIE_METRICS_SYNCING_NOTICE,
+  shippingTruthHeaderLabel,
+} from '@/lib/ovie/metrics-presentation';
 import type {
-  CapacityHorizonLease,
   CountMeasurement,
   DeliveryLanes,
 } from '@/lib/ovie/shipping-state';
 import type {
-  ShippingFlag,
   ShippingMeaningView,
   ShippingStateView,
 } from '@/lib/ovie/shipping-state-client';
 import { useHudShippingStateQuery } from './useHudShippingStateQuery';
-
-const TRUTH_LABEL: Record<ShippingStateView['truth'], string> = {
-  fresh: 'Fresh',
-  stale: 'Connected Stale',
-  disconnected: 'Disconnected',
-  unavailable: 'Unavailable',
-  unauthorized: 'Unauthorized',
-  degraded: 'Degraded',
-  unknown: 'Unknown',
-  failure: 'Error',
-  recovery: 'Recovery',
-};
-
-const FLAG_LABEL: Record<ShippingFlag, string> = {
-  replay: 'Replay ignored',
-  duplicate: 'Duplicate ignored',
-  contradictory: 'Contradictory sequence ignored',
-  sequenceGap: 'Sequence gap',
-  partial: 'Partial source',
-  unsupportedSchema: 'Unsupported schema',
-  cacheExpired: 'Cache expired',
-  clockUncertain: 'Clock uncertain',
-};
 
 type Delivery = ShippingStateView['delivery'];
 
@@ -71,7 +50,7 @@ function MetricValue({
 }: Readonly<{
   readonly view: ShippingStateView;
   readonly sourceId: string;
-  readonly text: string | null;
+  readonly text: string;
   readonly stale?: boolean;
   readonly nowMs: number;
 }>) {
@@ -81,19 +60,6 @@ function MetricValue({
     : Number.NaN;
   const ageMs = Number.isFinite(lastAt) ? Math.max(0, nowMs - lastAt) : null;
   const source = SOURCE_LABEL[sourceId] ?? sourceId;
-  if (text === null) {
-    let reason = 'syncing';
-    if (evidence) reason = evidence.code ?? evidence.state;
-    else if (view.sources) reason = 'not reported';
-    return (
-      <MeasuredValue
-        state='unknown'
-        source={source}
-        reason={reason}
-        ageMs={ageMs}
-      />
-    );
-  }
   const isStale =
     stale || (evidence ? STALE_STATES.has(evidence.state) : false);
   return (
@@ -122,8 +88,13 @@ function formatLanes(lanes: Delivery['lanes']): string | null {
 
 function formatRepoSplit(byRepo: Delivery['merges']['byRepo']): string | null {
   const parts = [byRepo.Jovie, byRepo.LogYourBody, byRepo['summer-config']];
-  if (parts.every(part => part.value === null)) return null;
-  return parts.map(part => formatCount(part) ?? 'unknown').join(' / ');
+  const values: string[] = [];
+  for (const part of parts) {
+    const text = formatCount(part);
+    if (text === null) return null;
+    values.push(text);
+  }
+  return values.join(' / ');
 }
 
 function formatWeek(merges: Delivery['merges']): string | null {
@@ -170,105 +141,6 @@ function formatLybDeploy(health: DeliveryLanes['deployHealth']): string | null {
 
 const SUMMER_LABEL = { up: 'Up', down: 'Down', degraded: 'Degraded' } as const;
 
-function formatAge(seconds: number | null): string | null {
-  if (seconds === null) return null;
-  if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  return `${Math.floor(seconds / 3600)}h ago`;
-}
-
-function formatDuration(seconds: number | null): string {
-  if (seconds === null) return 'source gap';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
-}
-
-function CapacityLeaseRow({ row }: { readonly row: CapacityHorizonLease }) {
-  const work = row.route?.selectedJob ?? 'selection source gap';
-  const reason = row.route?.reason ?? row.forecast.bottleneck ?? 'no blocker';
-  const href = row.route?.selectedJob
-    ? `https://linear.app/jovie/issue/${row.route.selectedJob}`
-    : null;
-  return (
-    <div className='border-t border-subtle py-2 first:border-t-0'>
-      <p className='text-2xs font-medium text-primary-token'>
-        {row.alias} · {row.available ? 'usable' : 'inaccessible'} ·{' '}
-        {row.subscriptionStatus} · {row.usableRemaining ?? '?'}% ·{' '}
-        {row.bankedCount ?? '?'} banked · {row.event.label}{' '}
-        {formatDuration(row.event.countdownSeconds)} · {row.mode}
-      </p>
-      <p className='mt-0.5 text-2xs text-secondary-token'>
-        drain p50 {row.forecast.completionP50At ?? 'source gap'} @{' '}
-        {row.forecast.sustainablePercentPerHour ?? '?'}%/h · unused{' '}
-        {row.forecast.projectedUnused ?? '?'}% · coverage{' '}
-        {row.forecast.qualifiedWork.length} · {row.concurrency ?? '?'}{' '}
-        concurrency ·{' '}
-        {row.compatibility.cli
-          ? row.compatibility.cli.split(/[\\/]/).at(-1)
-          : '?'}
-        +{row.compatibility.harness ?? '?'} · {row.freshness.status}
-      </p>
-      {/* axe nested-interactive (WCAG 4.1.2): <summary> is itself a native
-          toggle control, so the Linear link must sit outside it rather than
-          nested inside — it's a sibling here instead, and the disclosure
-          only wraps the plain-text reason. A <div> wrapper (not <p>) because
-          <details> is block content a <p> cannot validly contain. */}
-      <div className='mt-0.5 text-2xs text-tertiary-token'>
-        {href ? (
-          <a
-            className='text-accent-blue hover:underline'
-            href={href}
-            target='_blank'
-            rel='noreferrer'
-          >
-            {work}
-          </a>
-        ) : (
-          work
-        )}{' '}
-        ·{' '}
-        <details className='inline'>
-          {/* list-none (via `inline`) drops the default disclosure
-              triangle, so a text marker replaces it as the toggle
-              affordance. */}
-          <summary className='inline cursor-pointer list-none' title={reason}>
-            <span aria-hidden='true'>▸</span> {reason}
-          </summary>
-          <p>
-            alternatives{' '}
-            {row.route?.alternativesConsidered.join(', ') || 'none recorded'} ·
-            replan {row.route?.replanConditions.join(', ') || 'source gap'} ·
-            gaps {row.route?.sourceGaps.join(', ') || 'none'}
-          </p>
-        </details>
-      </div>
-    </div>
-  );
-}
-
-function lanesLine(lanes: Delivery['lanes']): string {
-  const landing = formatAge(lanes.lastLandingAgeSeconds.value);
-  return [
-    ...lanes.lanes.map(lane => `${lane.name} ${lane.running}/${lane.slots}`),
-    lanes.pool.value === null ? null : `pool ${lanes.pool.value}`,
-    landing ? `last landing ${landing}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-}
-
-function truthLabel(view: ShippingStateView): string {
-  return view.truth === 'stale' && view.connection !== 'connected'
-    ? TRUTH_LABEL.disconnected
-    : TRUTH_LABEL[view.truth];
-}
-
-function compactMetaValue(value: string | null): string | null {
-  if (!value) return null;
-  if (value.length <= 28) return value;
-  return `${value.slice(0, 14)}...${value.slice(-10)}`;
-}
-
 function useOvieShippingStateQuery(kioskToken: string | null) {
   const query = useHudShippingStateQuery(kioskToken);
   const refetch = query.refetch;
@@ -299,25 +171,19 @@ function useOvieShippingStateQuery(kioskToken: string | null) {
 
 function ShippingStateBody({
   view,
-}: Readonly<{ readonly view: ShippingStateView }>) {
-  const age =
+  isPending,
+}: Readonly<{
+  readonly view: ShippingStateView;
+  readonly isPending: boolean;
+}>) {
+  const freshness =
     view.ageMs === null
       ? null
-      : view.ageMs < 1000
-        ? 'Just now'
-        : `${Math.floor(view.ageMs / 1000)}s ago`;
-  const fullSourceLine = [view.sourceIdentity, view.revision, age]
-    .filter(Boolean)
-    .join(' / ');
-  const sourceLine = [
-    compactMetaValue(view.sourceIdentity),
-    compactMetaValue(view.revision),
-    age,
-  ]
-    .filter(Boolean)
-    .join(' / ');
-  const flagLine = [...view.flags].map(flag => FLAG_LABEL[flag]).join(' · ');
-  const stateDetail = [view.lastError, flagLine].filter(Boolean).join(' · ');
+      : view.ageMs < 60_000
+        ? 'Updated just now'
+        : view.ageMs < 3_600_000
+          ? `Updated ${Math.floor(view.ageMs / 60_000)}m ago`
+          : `Updated ${Math.floor(view.ageMs / 3_600_000)}h ago`;
   const { delivery } = view;
   const rows: readonly (readonly [string, string, string | null, boolean?])[] =
     [
@@ -372,86 +238,51 @@ function ShippingStateBody({
       ],
     ];
   const nowMs = Date.now();
-  const lanesDetail = lanesLine(delivery.lanes);
+  const measuredRows = rows.filter(
+    (row): row is readonly [string, string, string, boolean?] =>
+      hasKnownMetricText(row[2])
+  );
+  const syncingNotice =
+    isPending || view.truth === 'unknown' || measuredRows.length < rows.length;
 
   return (
-    <>
-      <div
-        className='grid gap-2 sm:grid-cols-2'
-        data-testid='hud-delivery-metrics'
-      >
-        {rows.map(([label, sourceId, text, stale]) => (
-          <ContentMetricRow
-            key={label}
-            label={label}
-            value={
-              <MetricValue
-                view={view}
-                sourceId={sourceId}
-                text={text}
-                stale={stale}
-                nowMs={nowMs}
-              />
-            }
-          />
-        ))}
-      </div>
-      <p
-        className='min-h-4 truncate text-2xs leading-4 text-secondary-token'
-        title={lanesDetail || undefined}
-      >
-        {lanesDetail || 'Lanes feed not measured'}
-      </p>
-      {delivery.lanes.capacity ? (
-        <div
-          className='rounded-lg border border-subtle px-3'
-          data-testid='capacity-horizon'
+    <div className='space-y-3' data-testid='hud-shipping-state-body'>
+      {syncingNotice ? (
+        <p
+          className='text-2xs text-tertiary-token'
+          data-testid='hud-delivery-metrics-syncing'
         >
-          <div className='flex items-center justify-between py-2 text-2xs text-secondary-token'>
-            <span>Capacity horizon</span>
-            <span>
-              {delivery.lanes.capacity.incidents.length} incident · show-only
-            </span>
-          </div>
-          <p className='border-t border-subtle py-2 text-2xs text-secondary-token'>
-            {delivery.lanes.capacity.outcomes.useful} useful ·{' '}
-            {delivery.lanes.capacity.outcomes.certified} certified ·{' '}
-            {delivery.lanes.capacity.outcomes.duplicate} duplicate ·{' '}
-            {delivery.lanes.capacity.outcomes.retry} retry ·{' '}
-            {delivery.lanes.capacity.outcomes.failed} failed ·{' '}
-            {delivery.lanes.capacity.outcomes.unknown} unknown
-          </p>
-          {delivery.lanes.capacity.leases.map(row => (
-            <CapacityLeaseRow key={row.leaseId} row={row} />
-          ))}
-          <p className='border-t border-subtle py-2 text-2xs text-tertiary-token'>
-            Top blocker: {delivery.lanes.capacity.topBlocker ?? 'none'}
-          </p>
-        </div>
-      ) : (
-        <p className='min-h-4 text-2xs leading-4 text-tertiary-token'>
-          Capacity source gap
+          {OVIE_METRICS_SYNCING_NOTICE}
         </p>
-      )}
-      <p className='min-h-4 truncate text-2xs leading-4 text-secondary-token'>
-        {delivery.lanes.alerts.map(redactFilesystemPaths).join(' · ')}
-      </p>
-      <p
-        className='min-h-4 break-words text-2xs leading-4 text-tertiary-token'
-        title={fullSourceLine || undefined}
-      >
-        {sourceLine || 'No successful source yet'}
-      </p>
-      <p
-        className='min-h-5 truncate text-app leading-5 text-secondary-token'
-        data-testid='hud-shipping-state-detail'
-        title={stateDetail || undefined}
-      >
-        {view.lastError ? <span>{view.lastError}</span> : null}
-        {view.lastError && flagLine ? ' · ' : null}
-        {flagLine ? <span>{flagLine}</span> : null}
-      </p>
-    </>
+      ) : null}
+      {measuredRows.length > 0 ? (
+        <div
+          className='grid gap-3 sm:grid-cols-2'
+          data-testid='hud-delivery-metrics'
+        >
+          {measuredRows.map(([label, sourceId, text, stale]) => (
+            <ContentMetricRow
+              key={label}
+              label={label}
+              value={
+                <MetricValue
+                  view={view}
+                  sourceId={sourceId}
+                  text={text}
+                  stale={stale}
+                  nowMs={nowMs}
+                />
+              }
+            />
+          ))}
+        </div>
+      ) : null}
+      {freshness ? (
+        <p className='text-2xs text-tertiary-token' data-testid='hud-freshness'>
+          {freshness}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -490,11 +321,14 @@ export function OvieShippingStateCard({
               Delivery
             </p>
           </div>
-          <span className='text-2xs font-medium text-secondary-token'>
-            {isPending ? 'Unknown' : truthLabel(view)}
+          <span
+            className='text-2xs font-medium tabular-nums text-secondary-token'
+            data-testid='hud-shipping-truth'
+          >
+            {shippingTruthHeaderLabel(view, isPending)}
           </span>
         </div>
-        <ShippingStateBody view={view} />
+        <ShippingStateBody view={view} isPending={isPending} />
       </div>
     </ContentSurfaceCard>
   );

@@ -355,15 +355,14 @@ test('route navigation keeps the shell attached and inspects rendered materials 
         document.documentElement.classList.toggle('dark', value === 'dark'),
       theme
     );
-    // [sidebar entry, page heading, pathname]. The Identity destination is
-    // titled `Profiles` since #20953. `/app` has no rail row any more: the
-    // header bell (named Inbox) is its entry, and header + tab title say
-    // Inbox to match (Tim 2026-11-14).
+    // [sidebar entry, page heading, pathname]. Identity chrome says Identity
+    // (Drift T0.2 bans previousLabels). `/app` has no rail row: the header
+    // bell (named Home) is its entry, and header + tab title say Home.
     for (const [entry, heading, pathname] of [
       ['New Chat', 'New Chat', '/app/chat'],
-      ['Identity', 'Profiles', '/app/presence'],
+      ['Identity', 'Identity', '/app/presence'],
       ['Work', 'Work', '/app/library'],
-      ['bell', 'Inbox', '/app'],
+      ['bell', 'Home', '/app'],
     ] as const) {
       await (entry === 'bell'
         ? page.locator('[data-sidebar-header-actions] [data-inbox-attention]')
@@ -374,7 +373,7 @@ test('route navigation keeps the shell attached and inspects rendered materials 
       await page.waitForURL(url => url.pathname === pathname);
       await expectAtMostOneSelectedNavRow(page, pathname);
       if (pathname === '/app') {
-        await expect(page).toHaveTitle(/^Inbox \| /);
+        await expect(page).toHaveTitle(/^Home \| /);
       }
       await expect(
         page.getByRole('heading', { name: heading, exact: true }).first()

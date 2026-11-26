@@ -26,10 +26,10 @@ import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
-  createRateLimitHeaders,
   trackingClicksLimiter,
   trackingIpClicksLimiter,
 } from '@/lib/rate-limit';
+import { trackingLimiterResponse } from '@/lib/rate-limit/tracking-outage';
 import { resolveSyntheticPassageToken } from '@/lib/synthetic/passage-token.server';
 import {
   classifySyntheticClick,
@@ -327,21 +327,19 @@ function resolveTrackSourceLabel(
 
 export async function POST(request: NextRequest) {
   try {
-    // Rate limiting: Check IP-based rate limit for track events
+    // Rate limiting: Check IP-based rate limit for track events.
+    // Tracking is optionalDrop: durable Redis when healthy; on outage drop the
+    // beacon (ack without write) instead of 429/memory fallback (SEC-04).
     const ipAddress = extractClientIP(request.headers);
     const rateLimitResult = await trackingIpClicksLimiter.limit(ipAddress);
-
-    if (!rateLimitResult.success) {
-      return NextResponse.json(
-        { error: 'Too many tracking requests. Please try again later.' },
-        {
-          status: 429,
-          headers: {
-            ...NO_STORE_HEADERS,
-            ...createRateLimitHeaders(rateLimitResult),
-          },
-        }
-      );
+    const ipDenied = trackingLimiterResponse(rateLimitResult, {
+      dropBody: { success: true, dropped: true },
+      throttleBody: {
+        error: 'Too many tracking requests. Please try again later.',
+      },
+    });
+    if (ipDenied) {
+      return ipDenied;
     }
 
     let body: unknown;
@@ -433,17 +431,15 @@ export async function POST(request: NextRequest) {
     // stays under trackingIpClicksLimiter, so also meter by profile identity.
     // Matches the /api/audience/click creator limit (same limiter/prefix).
     const creatorRateLimit = await trackingClicksLimiter.limit(profile.id);
-    if (!creatorRateLimit.success) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded', reason: 'Creator rate limit exceeded' },
-        {
-          status: 429,
-          headers: {
-            ...NO_STORE_HEADERS,
-            ...createRateLimitHeaders(creatorRateLimit),
-          },
-        }
-      );
+    const creatorDenied = trackingLimiterResponse(creatorRateLimit, {
+      dropBody: { success: true, dropped: true },
+      throttleBody: {
+        error: 'Rate limit exceeded',
+        reason: 'Creator rate limit exceeded',
+      },
+    });
+    if (creatorDenied) {
+      return creatorDenied;
     }
 
     // JOV-9625: a short-lived, single-use canary passage token (scope

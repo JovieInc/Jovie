@@ -2,7 +2,14 @@
 
 // @coverage-via apps/web/components/features/dashboard/organisms/releases/cells/AvailabilityCell.test.tsx
 
-import { Input, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
+import {
+  IconButton,
+  Input,
+  PlainButton,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@jovie/ui';
 import {
   type FormEvent,
   memo,
@@ -15,10 +22,7 @@ import {
 import { Icon } from '@/components/atoms/Icon';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { CompactLinkRail } from '@/components/molecules/CompactLinkRail';
-import {
-  DrawerButton,
-  DrawerInlineIconButton,
-} from '@/components/molecules/drawer';
+import { DrawerButton } from '@/components/molecules/drawer';
 import { PROVIDER_DOMAINS } from '@/lib/discography/provider-domains';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
@@ -98,6 +102,11 @@ export const AvailabilityCell = memo(function AvailabilityCell({
     });
     return linked.slice(0, 4);
   }, [allProviders, providerMap]);
+
+  // Move focus into the inline URL field when it appears.
+  useEffect(() => {
+    if (addingProvider) inputRef.current?.focus();
+  }, [addingProvider]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -202,8 +211,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type='button'
+        <PlainButton
           aria-haspopup='listbox'
           aria-expanded={open}
           className='inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-subtle bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] px-1.5 py-1 text-xs font-normal tracking-tight text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:border-(--color-accent) focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--color-accent)'
@@ -241,11 +249,12 @@ export const AvailabilityCell = memo(function AvailabilityCell({
             className='h-3 w-3 text-tertiary-token'
             aria-hidden='true'
           />
-        </button>
+        </PlainButton>
       </PopoverTrigger>
 
       <PopoverContent
         align='end'
+        aria-label='Platform Availability'
         className='w-80 rounded-xl border border-subtle bg-surface-1 p-0 shadow-popover'
       >
         <div className='border-b border-subtle px-3 py-2'>
@@ -311,7 +320,12 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                   if (provider?.url) {
                     return (
                       <div className='flex min-w-35 items-center justify-end gap-1'>
-                        <DrawerInlineIconButton
+                        <IconButton
+                          // sm = 14px [&_svg] — matches prior h-3.5 glyphs (xs is 12px).
+                          size='sm'
+                          // ghost owns hover:text-primary-token (inline does not).
+                          variant='ghost'
+                          fade='visible'
                           aria-label={`Open ${config.label} in new tab`}
                           onClick={() =>
                             globalThis.open(
@@ -320,32 +334,29 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                               'noopener,noreferrer'
                             )
                           }
-                          className='rounded-full p-1 text-tertiary-token hover:bg-surface-1 hover:text-primary-token'
                         >
-                          <Icon
-                            name='ExternalLink'
-                            className='h-3.5 w-3.5'
-                            aria-hidden='true'
-                          />
-                        </DrawerInlineIconButton>
-                        <DrawerInlineIconButton
+                          <Icon name='ExternalLink' aria-hidden='true' />
+                        </IconButton>
+                        <IconButton
+                          size='sm'
+                          variant='ghost'
+                          fade='visible'
                           aria-label={
                             isCopied
                               ? `Copied ${config.label} link`
                               : `Copy ${config.label} link`
                           }
                           onClick={createCopyHandler(providerKey, testId)}
-                          className={cn(
-                            'rounded-full p-1.5 text-tertiary-token transition-[background-color,color] duration-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-ring',
-                            isCopied && 'text-success'
-                          )}
                         >
                           <Icon
                             name={isCopied ? 'Check' : 'Copy'}
-                            className='h-3.5 w-3.5'
+                            className={cn(
+                              // Success state only — otherwise inherit ghost hover.
+                              isCopied && 'text-success'
+                            )}
                             aria-hidden='true'
                           />
-                        </DrawerInlineIconButton>
+                        </IconButton>
                       </div>
                     );
                   }
@@ -367,8 +378,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                             setValidationError('');
                           }}
                           disabled={isAddingUrl}
-                          className='h-8 w-38 rounded-full border-subtle bg-surface-1 text-xs'
-                          autoFocus
+                          className='h-8 w-38 rounded-full bg-surface-1 text-xs'
                         />
                         <DrawerButton
                           type='submit'

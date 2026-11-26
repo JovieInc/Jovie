@@ -1,0 +1,100 @@
+{
+  "gates": {
+    "apps/web/components/jovie/components/ChatLinkRemovalCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/jovie/components/ChatMerchActionCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/jovie/components/EntityChipPopover.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/jovie/components/FeedbackForm.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/marketing/artist-profile/ArtistProfileMonetizationSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/AvatarUpload.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/organisms/billing/GrowthAccessRequestModal.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/jovie/components/ChatLinkRemovalCard.tsx": {
+      "empty": "The card renders one link from its platform and url props; it owns no collection that could be empty.",
+      "offline": "The card never fetches on render; a failed removal while offline surfaces through the same mutation error state shown by ErrorRemovalFails."
+    },
+    "apps/web/components/jovie/components/ChatMerchActionCard.tsx": {
+      "empty": "The card renders one merch action from its props; it owns no collection that could be empty.",
+      "offline": "The card never fetches on render; a failed confirm while offline surfaces through the same mutation error state shown by ErrorConfirmFails.",
+      "loading": "The confirming state lasts only between the confirm press and the server response, driven by the mutation, so a story cannot hold it on screen."
+    },
+    "apps/web/components/jovie/components/EntityChipPopover.tsx": {
+      "loading": "The pending state lasts one tick: useProjectedSourceFact awaits a dynamic import of a local module and no network request, so a story cannot hold it on screen.",
+      "offline": "The popover never fetches; it only reads props and a local dynamic import, so connectivity changes nothing it renders."
+    },
+    "apps/web/components/jovie/components/FeedbackForm.tsx": {
+      "loading": "The pending state exists only between Submit and the server response, driven by the mutation, and cannot be held on screen by a story.",
+      "offline": "The form never fetches on render; an offline submit fails into the same error message shown by ErrorSubmitFails."
+    },
+    "apps/web/components/marketing/artist-profile/ArtistProfileMonetizationSection.tsx": {
+      "empty": "The section renders a fixed four-card earning loop from required copy; it owns no collection that could be empty."
+    },
+    "apps/web/components/organisms/AvatarUpload.tsx": {
+      "loading": "The uploading label shows only while the avatar mutation is in flight, and a story has no prop or fast path that holds it on screen.",
+      "offline": "The form never fetches on render; an offline upload fails into the same alert shown by ErrorInvalidFileType.",
+      "partial": "The form renders one avatar and one button from required props; nothing loads in parts, and the no-photo variant is EmptyNoPhoto.",
+      "permission-denied": "The component reads no session or permission; the upload is available to whoever mounts it."
+    },
+    "apps/web/components/organisms/billing/GrowthAccessRequestModal.tsx": {
+      "loading": "The submitting state lasts only while the mutation is in flight, and a story has no prop that holds it; GrowthAccessRequestModal.test.tsx renders the pending state through the mutation mock.",
+      "error": "The form has no error face: a failed request leaves the dialog open and re-enables Submit, so nothing distinct could be shown.",
+      "offline": "The dialog never fetches on render; an offline submit is a failed request, which leaves the form open as described for error."
+    }
+  }
+}

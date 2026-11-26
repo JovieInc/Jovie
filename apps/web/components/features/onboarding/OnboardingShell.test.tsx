@@ -314,7 +314,7 @@ describe('OnboardingShell status', () => {
     ).toBeVisible();
   });
 
-  it('renders the claim-error status with the error token, not raw red-* (JOV-6773)', () => {
+  it('renders claim-error with error token (JOV-6773; ONB-36 handoff publishes same status)', () => {
     render(<OnboardingShell sessionLabel='pending' />);
 
     const alert = screen.getByRole('alert');
@@ -333,6 +333,10 @@ describe('OnboardingShell status', () => {
       .getByTestId('onboarding-sign-in-header')
       .closest('[data-onboarding-session]');
     expect(session).toHaveClass('flex', 'flex-col', 'min-h-0', 'flex-1');
+    // JOV-7771: the column is the room query the step rail yields to.
+    expect(session).toHaveClass('system-b-onboarding-session');
+    const rail = screen.getByTestId('onboarding-start-step-rail');
+    expect(session).toContainElement(rail);
   });
 
   it('uses the canonical compact icon button and keeps its accessible name without an icon', () => {
@@ -396,6 +400,7 @@ describe('OnboardingShell status', () => {
     builderState.current = {
       artist: null,
       artistConfirmed: false,
+      handleConfirmed: false,
       handle: 'avery',
       socialLinks: ['https://instagram.com/avery'],
     };
@@ -468,13 +473,8 @@ describe('OnboardingShell status', () => {
     expect(claimState.enabled).toBe(true);
   });
 
-  // Golden-path cert 2026-10-31 pm (walk-m1..m3): the OTP form hard-navigates
-  // to /start while a claim POST from the pre-navigation page is in flight.
-  // The server commits ownership, the response is lost, and the reloaded page
-  // restores an owned transcript that already ends in the waitlist decision.
-  // That restore must claim on mount (the server's idempotent alreadyClaimed
-  // recovery returns the receipt), or the visitor waits on "Saving your
-  // request…" forever.
+  // Reloading after OTP handoff restores an owned transcript ending in a
+  // terminal decision; claim on mount so idempotent recovery returns the receipt.
   it.each(['waitlist', 'instant_access'] as const)(
     'claims on mount when a restored owned transcript already ends in a %s decision',
     kind => {
@@ -491,6 +491,12 @@ describe('OnboardingShell status', () => {
       expect(claimState.enabled).toBe(true);
     }
   );
+
+  it('keeps claim disabled while signed out even after conversation activity', () => {
+    render(<OnboardingShell sessionLabel='anonymous' />);
+    act(() => chatProps.current?.onConversationActivity());
+    expect(claimState.enabled).toBe(false);
+  });
 
   it('keeps a restored owned transcript without a terminal decision quiet until a genuine turn', () => {
     render(

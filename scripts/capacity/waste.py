@@ -195,18 +195,7 @@ def col_storage() -> dict:
     return {"staleCheckouts": len(stale), "staleCheckoutGiB": kib / 2**20}
 
 
-def col_debt() -> dict:
-    files = sh(["git", "ls-files", "*.ts", "*.tsx", "*.mjs", "*.py"], 30, REPO)
-    if files is None:
-        return {}
-    big = 0
-    for f in files.splitlines():
-        try:
-            with open(REPO / f, "rb") as h:
-                big += sum(1 for _ in h) > 1500
-        except OSError:
-            pass
-    return {"oversizedFiles": big}
+from waste_debt import CERT_SCREENS, col_debt  # size-500: debt collectors live in waste_debt.py
 
 
 def read_feed(name: str, key: str) -> float | None:

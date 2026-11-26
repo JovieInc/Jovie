@@ -442,16 +442,6 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         status: 'active',
       },
       {
-        id: 'centered-handle-claim',
-        layout: 'centered',
-        media: 'phone',
-        alignment: 'centered',
-        chooseWhen:
-          'audience=artist AND conversion=claim-handle AND recipe=artist-lp (Linktree-style claim bar) — checked FIRST (more specific than centered-phone)',
-        exemplar: { route: '/artist-profiles', section: 'hero' },
-        status: 'active',
-      },
-      {
         id: 'centered-phone',
         layout: 'centered',
         media: 'phone',
@@ -459,6 +449,17 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         chooseWhen:
           'audience=artist AND recipe=artist-lp AND assetClass=product-screenshot tier≥1 (fallback when not claim-handle)',
         exemplar: { route: '/artist-profiles', section: 'hero' },
+        status: 'active',
+      },
+      {
+        id: 'left-phone',
+        layout: 'split',
+        media: 'phone',
+        mediaPosition: 'right',
+        alignment: 'left',
+        chooseWhen:
+          'JOV-14242 homepage-system left-aligned hero with one mode-morphing phone',
+        exemplar: { route: '/solutions/artists', section: 'hero' },
         status: 'active',
       },
       {
@@ -1160,7 +1161,6 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     ],
     status: 'approved',
   },
-
   // ── pricing ──────────────────────────────────────────────────────────────────
   {
     id: 'pricing',
@@ -1271,7 +1271,6 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     ],
     status: 'approved',
   },
-
   // ── comparison ──────────────────────────────────────────────────────────────
   {
     id: 'comparison',
@@ -1352,7 +1351,6 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     ],
     status: 'approved',
   },
-
   // ── faq ────────────────────────────────────────────────────────────────────
   {
     id: 'faq',
@@ -1432,7 +1430,6 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     ],
     status: 'approved',
   },
-
   // ── cta ────────────────────────────────────────────────────────────────────
   {
     id: 'cta',
@@ -1561,7 +1558,6 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     ],
     status: 'approved',
   },
-
   {
     id: 'product-gallery',
     label: 'Product Gallery',
@@ -1625,7 +1621,6 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     ],
     status: 'approved',
   },
-
   // ── spec-wall (Jovie delta) ────────────────────────────────────────────────
   {
     id: 'spec-wall',
@@ -1709,7 +1704,6 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     ],
     status: 'approved',
   },
-
   // ── capture (Jovie delta) ───────────────────────────────────────────────────
   {
     id: 'capture',
@@ -1797,7 +1791,6 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     ],
     status: 'approved',
   },
-
   // ── monetization (Jovie delta) ─────────────────────────────────────────────
   {
     id: 'monetization',
@@ -1881,7 +1874,6 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     ],
     status: 'approved',
   },
-
   // ── ownership (Jovie delta) ─────────────────────────────────────────────────
   {
     id: 'ownership',
@@ -1946,7 +1938,6 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     ],
     status: 'approved',
   },
-
   // ── content-prose ───────────────────────────────────────────────────────────
   {
     id: 'content-prose',
@@ -2014,7 +2005,6 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
     ],
     status: 'approved',
   },
-
   // ── blog-feed ───────────────────────────────────────────────────────────────
   {
     id: 'blog-feed',

@@ -1,6 +1,6 @@
+import { IconButton } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { AvatarCell } from './AvatarCell';
 
 describe('AvatarCell', () => {
@@ -68,13 +68,14 @@ describe('AvatarCell', () => {
         avatarUrl={null}
         disableUsernameLink
         usernameActions={
-          <InlineIconButton
+          <IconButton
+            variant='inline'
             size='xs'
             aria-label='Copy artist'
             onClick={onClick}
           >
             <svg aria-hidden='true' />
-          </InlineIconButton>
+          </IconButton>
         }
       />
     );
@@ -98,5 +99,22 @@ describe('AvatarCell link affordance (JOV-8873)', () => {
     expect(screen.getByRole('link', { name: '@artist' })).toHaveClass(
       'underline'
     );
+  });
+});
+
+describe('AvatarCell featured star token', () => {
+  it('colors the featured star with the warning token, not a yellow palette class', () => {
+    const { container } = render(
+      <AvatarCell
+        profileId='creator'
+        username='artist'
+        displayName='An Artist'
+        avatarUrl={null}
+        isFeatured
+      />
+    );
+    const star = screen.getByLabelText('Featured');
+    expect(star).toHaveClass('text-warning');
+    expect(container.innerHTML).not.toMatch(/yellow-/);
   });
 });

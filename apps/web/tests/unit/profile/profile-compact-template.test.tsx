@@ -961,7 +961,7 @@ describe('ProfileCompactTemplate', () => {
   it('does not bleed the content scroll region on non-music modes', async () => {
     render(
       <ProfileCompactTemplate
-        mode='tour'
+        mode='about'
         artist={mockArtist}
         socialLinks={[]}
         contacts={[]}
@@ -1055,7 +1055,7 @@ describe('ProfileCompactTemplate', () => {
     }
   });
 
-  it('renders the compact bottom navigation with four primary icon tabs', async () => {
+  it('renders the compact bottom navigation without empty Events', async () => {
     render(
       <ProfileCompactTemplate
         mode='profile'
@@ -1066,11 +1066,14 @@ describe('ProfileCompactTemplate', () => {
     );
 
     const bottomNav = screen.getByTestId('profile-bottom-nav');
-    for (const label of ['Home', 'Music', 'Events', 'About']) {
+    for (const label of ['Home', 'Music', 'About']) {
       expect(
         within(bottomNav).getByRole('button', { name: label })
       ).toBeInTheDocument();
     }
+    expect(
+      within(bottomNav).queryByRole('button', { name: 'Events' })
+    ).toBeNull();
     expect(
       within(bottomNav).queryByRole('button', { name: 'Alerts' })
     ).toBeNull();
@@ -1444,9 +1447,8 @@ describe('ProfileCompactTemplate', () => {
     pushStateSpy.mockRestore();
   });
 
-  it('keeps Home canonical after an Events deep link, remount, and browser history in Strict Mode', async () => {
+  it('rewrites an empty Events deep link to Home in Strict Mode (JOV-14241)', async () => {
     window.history.replaceState(null, '', '/test-artist?mode=tour&source=qr');
-    const pushStateSpy = vi.spyOn(window.history, 'pushState');
     const profile = (
       <React.StrictMode>
         <ProfileCompactTemplate
@@ -1457,46 +1459,31 @@ describe('ProfileCompactTemplate', () => {
         />
       </React.StrictMode>
     );
-    const expectMode = (label: string, mode: string, search: string) => {
-      expect(window.location.search).toBe(search);
+
+    const view = render(profile);
+    await waitFor(() => {
+      expect(window.location.search).toBe('?source=qr');
       expect(screen.getByTestId('profile-compact-surface')).toHaveAttribute(
         'data-mode',
-        mode
+        'profile'
       );
       expect(
         within(screen.getByTestId('profile-bottom-nav')).getByRole('button', {
-          name: label,
-        })
-      ).toHaveAttribute('aria-current', 'page');
-    };
-
-    try {
-      const view = render(profile);
-      await waitFor(() => expectMode('Events', 'tour', '?mode=tour&source=qr'));
-      expect(pushStateSpy).not.toHaveBeenCalled();
-
-      fireEvent.click(
-        within(screen.getByTestId('profile-bottom-nav')).getByRole('button', {
           name: 'Home',
         })
+      ).toHaveAttribute('aria-current', 'page');
+    });
+
+    view.unmount();
+    window.history.replaceState(null, '', '/test-artist?mode=tour&source=qr');
+    render(profile);
+    await waitFor(() => {
+      expect(window.location.search).toBe('?source=qr');
+      expect(screen.getByTestId('profile-compact-surface')).toHaveAttribute(
+        'data-mode',
+        'profile'
       );
-      await waitFor(() => expectMode('Home', 'profile', '?source=qr'));
-      expect(pushStateSpy).toHaveBeenCalledTimes(1);
-
-      // Recreate the component from the canonical URL, as a reload would.
-      view.unmount();
-      render(profile);
-      await waitFor(() => expectMode('Home', 'profile', '?source=qr'));
-      expect(pushStateSpy).toHaveBeenCalledTimes(1);
-
-      act(() => window.history.back());
-      await waitFor(() => expectMode('Events', 'tour', '?mode=tour&source=qr'));
-      act(() => window.history.forward());
-      await waitFor(() => expectMode('Home', 'profile', '?source=qr'));
-      expect(pushStateSpy).toHaveBeenCalledTimes(1);
-    } finally {
-      pushStateSpy.mockRestore();
-    }
+    });
   });
 
   it('does not push a source-less URL before the source param hydrates', async () => {
@@ -1914,8 +1901,6 @@ describe('ProfileCompactTemplate', () => {
     beforeEach(() => {
       vi.stubEnv('NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE', '');
       mockViewport('desktop');
-      // Keep the real drawer's Escape/focus lifecycle; only its heavy body
-      // is omitted from this history and claim-banner regression.
       mockProfileUnifiedDrawer.mockImplementation(
         (props: React.ComponentProps<typeof ProfileDrawerShell>) => (
           <ProfileDrawerShell {...props} title='Menu'>
@@ -1994,12 +1979,12 @@ describe('ProfileCompactTemplate', () => {
         });
 
         const nav = () => within(screen.getByTestId('profile-bottom-nav'));
-        fireEvent.click(nav().getByRole('button', { name: 'Events' }));
-        await waitFor(() => expectMode('tour'));
+        fireEvent.click(nav().getByRole('button', { name: 'Music' }));
+        await waitFor(() => expectMode('listen'));
         fireEvent.click(nav().getByRole('button', { name: 'Home' }));
         await waitFor(() => expectMode('profile'));
         act(() => window.history.back());
-        await waitFor(() => expectMode('tour'));
+        await waitFor(() => expectMode('listen'));
         act(() => window.history.forward());
         await waitFor(() => expectMode('profile'));
       }
@@ -2019,11 +2004,11 @@ describe('ProfileCompactTemplate', () => {
         );
         fireEvent.click(
           within(screen.getByTestId('profile-bottom-nav')).getByRole('button', {
-            name: 'Events',
+            name: 'Music',
           })
         );
         await waitFor(() => {
-          expect(window.location.search).toBe('?mode=tour&source=qr');
+          expect(window.location.search).toBe('?mode=listen&source=qr');
           expect(screen.getByTestId('claim-banner-cta')).toHaveAttribute(
             'href',
             '/test-artist/claim?next=auth'

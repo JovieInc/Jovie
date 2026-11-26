@@ -349,7 +349,9 @@ export function buildArtistOfferFunnelReport(input: {
 
 export interface GoldenPathStageSummary {
   readonly stage: GoldenPathStage;
+  /** All observed arrivals at this stage, including journeys with missing earlier events. */
   readonly journeys: number;
+  /** Share of the previous stage's journeys that reached this stage in order. */
   readonly conversionFromPrevious: number | null;
   readonly conversionFromVisit: number | null;
   readonly fromPreviousSeconds: DurationSummary;
@@ -406,7 +408,10 @@ function buildGoldenPathCohort(
       stage,
       journeys,
       conversionFromPrevious: previous
-        ? ratio(journeys, reachedCount(previous))
+        ? ratio(
+            previous === 'visit' ? journeys : fromPrevious.length,
+            reachedCount(previous)
+          )
         : null,
       conversionFromVisit: stage === 'visit' ? null : ratio(journeys, entered),
       fromPreviousSeconds: summarize(fromPrevious),

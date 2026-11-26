@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ChatMerchActionCard } from './ChatMerchActionCard';
 
 const mutateMock = vi.fn();
@@ -109,5 +110,59 @@ describe('ChatMerchActionCard destructive contrast (JOV-8873)', () => {
     expect(destructive?.className).toContain(
       'text-(--color-btn-destructive-fg)'
     );
+  });
+});
+
+describe('ChatMerchActionCard states', () => {
+  const props = {
+    profileId: 'profile-1',
+    merchCardId: 'card-1',
+    action: 'archive' as const,
+    title: 'Tour Tee',
+    currentStatus: 'live',
+    retailPrice: '$25.00',
+  };
+
+  it('renders plain-button actions with the consequence and stays axe-clean', async () => {
+    const { container } = render(<ChatMerchActionCard {...props} />);
+    const confirm = screen.getByRole('button', { name: 'Archive' });
+    expect(confirm).toHaveAttribute('data-slot', 'plain-button');
+    expect(screen.getByText(/Removes this item/)).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('shows the success label after the mutation succeeds', async () => {
+    mutateMock.mockImplementationOnce(
+      (_vars: unknown, opts: { onSuccess?: () => void }) => opts.onSuccess?.()
+    );
+    const user = userEvent.setup();
+    const { container } = render(<ChatMerchActionCard {...props} />);
+    await user.click(screen.getByRole('button', { name: 'Archive' }));
+    expect(screen.getByText('Merch archived')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('shows an error and re-enables the action when the mutation fails', async () => {
+    mutateMock.mockImplementationOnce(
+      (_vars: unknown, opts: { onError?: () => void }) => opts.onError?.()
+    );
+    const user = userEvent.setup();
+    const { container } = render(<ChatMerchActionCard {...props} />);
+    await user.click(screen.getByRole('button', { name: 'Archive' }));
+    expect(
+      screen.getByText('Unable to apply merch action. Please try again.')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Archive' })).toBeEnabled();
+    await expectNoA11yViolations(container);
+  });
+
+  it('dismisses and restores through Undo', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<ChatMerchActionCard {...props} />);
+    await user.click(screen.getByRole('button', { name: 'Cancel Action' }));
+    expect(screen.getByText('Cancelled')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+    await user.click(screen.getByTestId('chat-merch-dismiss-undo'));
+    expect(screen.getByRole('button', { name: 'Archive' })).toBeInTheDocument();
   });
 });

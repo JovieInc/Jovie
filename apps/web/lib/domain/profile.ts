@@ -139,7 +139,8 @@ export async function applyProfileUpdate(input: {
       clerkUserId: appUserId,
       privacyChanged:
         parsedUpdates.isPublic !== undefined ||
-        parsedUpdates.settings?.searchable !== undefined,
+        parsedUpdates.settings?.searchable !== undefined ||
+        parsedUpdates.settings?.youngAudience !== undefined,
     }),
   ]);
 

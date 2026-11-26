@@ -1,7 +1,8 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, useReducedMotion } from 'motion/react';
+import * as m from 'motion/react-m';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   type RefObject,
@@ -9,6 +10,7 @@ import {
   useId,
 } from 'react';
 import { OpportunityRow } from '@/components/organisms/opportunity-card/OpportunityRow';
+import { LazyDomMaxMotion } from '@/lib/animation/LazyMotionFeatures';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { cn } from '@/lib/utils';
 import { isShellShortcutSuppressed } from '@/lib/utils/keyboard';
@@ -141,94 +143,96 @@ export function OpportunityCardStack({
           </ul>
         ))}
 
-        <AnimatePresence mode='popLayout'>
-          <motion.div
-            key={topCard.id}
-            className='relative z-10'
-            drag={reducedMotion || isBusy ? false : 'x'}
-            onPointerDownCapture={event => {
-              if (
-                event.target instanceof HTMLElement &&
-                event.target.closest('button, a, input, textarea, select')
-              )
-                event.stopPropagation();
-            }}
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.85}
-            onDragEnd={(_event, info) => {
-              if (isBusy) return;
-              if (info.offset.x > COMMIT_OFFSET_PX) {
-                onAccept(topCard.id);
-              } else if (info.offset.x < -COMMIT_OFFSET_PX) {
-                onReject(topCard.id);
+        <LazyDomMaxMotion>
+          <AnimatePresence mode='popLayout'>
+            <m.div
+              key={topCard.id}
+              className='relative z-10'
+              drag={reducedMotion || isBusy ? false : 'x'}
+              onPointerDownCapture={event => {
+                if (
+                  event.target instanceof HTMLElement &&
+                  event.target.closest('button, a, input, textarea, select')
+                )
+                  event.stopPropagation();
+              }}
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.85}
+              onDragEnd={(_event, info) => {
+                if (isBusy) return;
+                if (info.offset.x > COMMIT_OFFSET_PX) {
+                  onAccept(topCard.id);
+                } else if (info.offset.x < -COMMIT_OFFSET_PX) {
+                  onReject(topCard.id);
+                }
+              }}
+              initial={
+                reducedMotion
+                  ? { opacity: 0 }
+                  : { opacity: 0, transform: 'translateY(8px) scale(0.98)' }
               }
-            }}
-            initial={
-              reducedMotion
-                ? { opacity: 0 }
-                : { opacity: 0, transform: 'translateY(8px) scale(0.98)' }
-            }
-            animate={{ opacity: 1, transform: 'translateY(0) scale(1)' }}
-            exit={
-              reducedMotion
-                ? { opacity: 0 }
-                : { opacity: 0, transform: 'translateX(0) scale(0.96)' }
-            }
-            transition={{
-              duration: reducedMotion ? 0.15 : 0.22,
-              ease: 'easeOut',
-            }}
-            style={{ touchAction: 'pan-y' }}
-          >
-            {topCard.category === 'youtube_thumbnail' &&
-            topCard.youtubeThumbnail ? (
-              <OpportunityInboxYoutubeThumbnailCard
-                card={topCard}
-                onApprove={onAccept}
-                onReject={onReject}
-                isBusy={isBusy}
-              />
-            ) : topCard.category === 'social_reply' && topCard.socialReply ? (
-              <OpportunityInboxSocialReplyCard
-                card={topCard}
-                onApprove={onAccept}
-                onDismiss={onReject}
-                onRevise={onRevise ?? (() => undefined)}
-                isApproving={pendingActionId === topCard.id}
-                isDismissing={pendingActionId === topCard.id}
-                isRevising={pendingReviseId === topCard.id}
-              />
-            ) : topCard.category === 'report' && topCard.report ? (
-              <OpportunityInboxReportCard
-                card={topCard}
-                onNextStep={onNextStep ?? onAccept}
-                onDismiss={onReject}
-                isSubmittingNextStep={pendingNextStepId === topCard.id}
-                isDismissing={pendingActionId === topCard.id}
-              />
-            ) : (
-              <ul className='m-0 list-none p-0'>
-                <OpportunityRow
-                  id={topCard.id}
-                  state='new'
-                  title={topCard.title}
-                  metadata={topCard.why}
-                  hideDot={false}
-                  primaryActionLabel={topCard.primaryActionLabel}
-                  onPrimaryAction={id => {
-                    // Primary pill accepts; open is Enter/tap via stack focus.
-                    onAccept(id);
-                  }}
-                  onDismiss={id => {
-                    onReject(id);
-                  }}
+              animate={{ opacity: 1, transform: 'translateY(0) scale(1)' }}
+              exit={
+                reducedMotion
+                  ? { opacity: 0 }
+                  : { opacity: 0, transform: 'translateX(0) scale(0.96)' }
+              }
+              transition={{
+                duration: reducedMotion ? 0.15 : 0.22,
+                ease: 'easeOut',
+              }}
+              style={{ touchAction: 'pan-y' }}
+            >
+              {topCard.category === 'youtube_thumbnail' &&
+              topCard.youtubeThumbnail ? (
+                <OpportunityInboxYoutubeThumbnailCard
+                  card={topCard}
+                  onApprove={onAccept}
+                  onReject={onReject}
                   isBusy={isBusy}
-                  dataTestId={`opportunity-stack-top-${topCard.id}`}
                 />
-              </ul>
-            )}
-          </motion.div>
-        </AnimatePresence>
+              ) : topCard.category === 'social_reply' && topCard.socialReply ? (
+                <OpportunityInboxSocialReplyCard
+                  card={topCard}
+                  onApprove={onAccept}
+                  onDismiss={onReject}
+                  onRevise={onRevise ?? (() => undefined)}
+                  isApproving={pendingActionId === topCard.id}
+                  isDismissing={pendingActionId === topCard.id}
+                  isRevising={pendingReviseId === topCard.id}
+                />
+              ) : topCard.category === 'report' && topCard.report ? (
+                <OpportunityInboxReportCard
+                  card={topCard}
+                  onNextStep={onNextStep ?? onAccept}
+                  onDismiss={onReject}
+                  isSubmittingNextStep={pendingNextStepId === topCard.id}
+                  isDismissing={pendingActionId === topCard.id}
+                />
+              ) : (
+                <ul className='m-0 list-none p-0'>
+                  <OpportunityRow
+                    id={topCard.id}
+                    state='new'
+                    title={topCard.title}
+                    metadata={topCard.why}
+                    hideDot={false}
+                    primaryActionLabel={topCard.primaryActionLabel}
+                    onPrimaryAction={id => {
+                      // Primary pill accepts; open is Enter/tap via stack focus.
+                      onAccept(id);
+                    }}
+                    onDismiss={id => {
+                      onReject(id);
+                    }}
+                    isBusy={isBusy}
+                    dataTestId={`opportunity-stack-top-${topCard.id}`}
+                  />
+                </ul>
+              )}
+            </m.div>
+          </AnimatePresence>
+        </LazyDomMaxMotion>
       </div>
 
       <p id={instructionsId} className='mt-3 text-2xs text-quaternary-token'>

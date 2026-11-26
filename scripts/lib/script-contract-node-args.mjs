@@ -11,11 +11,16 @@ const PREFLIGHT_COVERAGE_ARGS = [
 ];
 
 /** Keep unrelated scanners outside V8 instrumentation; run every selection once.
+ * Catalog entries may be space-joined (same pattern as SCRIPT_CONTRACT_VITEST_TESTS);
+ * flatten before spawn so `node --test` never receives a nonexistent path with a space.
  * @param {readonly string[]} tests @returns {string[][]}
  */
 export function scriptContractNodeArgs(tests) {
-  const focused = tests.filter(test => PREFLIGHT_COVERAGE_TESTS.includes(test));
-  const plain = tests.filter(test => !PREFLIGHT_COVERAGE_TESTS.includes(test));
+  const flat = tests.flatMap(test =>
+    String(test).split(/\s+/u).filter(Boolean)
+  );
+  const focused = flat.filter(test => PREFLIGHT_COVERAGE_TESTS.includes(test));
+  const plain = flat.filter(test => !PREFLIGHT_COVERAGE_TESTS.includes(test));
   const batches = [];
   if (focused.length) batches.push([...PREFLIGHT_COVERAGE_ARGS, ...focused]);
   if (plain.length) batches.push(['--test', ...plain]);

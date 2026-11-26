@@ -73,3 +73,24 @@ describe('intent subtitle tokens', () => {
     expect(source).toContain('font-caption text-secondary-token');
   });
 });
+
+describe('audience row icon buttons (JOV-12568)', () => {
+  it('draws icon-only row buttons as circles with 14px glyphs', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../../components/features/dashboard/organisms/dashboard-audience-table/utils/column-renderers.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain(
+      "'inline-flex h-7 w-7 items-center justify-center rounded-full text-tertiary-token"
+    );
+    expect(source).toContain("<Eye className='h-3.5 w-3.5' />");
+    expect(source).toContain("<Bell className='h-3.5 w-3.5' />");
+    expect(source).not.toContain(
+      'h-7 w-7 items-center justify-center rounded-md'
+    );
+  });
+});

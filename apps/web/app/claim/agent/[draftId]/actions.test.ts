@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const h = vi.hoisted(() => ({
   userId: 'user_1' as string | null,
-  limit: { success: true },
+  limit: { success: true } as {
+    success: boolean;
+    unavailable?: boolean;
+  },
   claim: vi.fn(),
   capture: vi.fn(),
 }));
@@ -29,7 +32,6 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 vi.mock('@/lib/rate-limit', () => ({
   claimTokenAccessLimiter: { limit: async () => h.limit },
-  allowIfRateLimitBackendDegraded: (r: unknown) => r,
 }));
 
 import { claimAgentDraftAction } from './actions';
@@ -81,6 +83,12 @@ describe('claimAgentDraftAction', () => {
   it('returns retry_later when rate limited', async () => {
     h.limit = { success: false };
     expect(await run(form())).toMatch(/&e=retry_later$/);
+  });
+
+  it('fails closed with retry_later when the rate-limit backend is unavailable', async () => {
+    h.limit = { success: false, unavailable: true };
+    expect(await run(form())).toMatch(/&e=retry_later$/);
+    expect(h.claim).not.toHaveBeenCalled();
   });
 
   it('treats a bad digest as draft_changed without claiming', async () => {
