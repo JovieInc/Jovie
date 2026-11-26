@@ -276,6 +276,19 @@ describe('isRedisConfigured (JOV-6743)', () => {
     mockEnv.NODE_ENV = 'test';
     mockEnv.VERCEL_ENV = 'preview';
     mockEnv.REDIS_URL = undefined;
+    // JOV-9826: a preview WITH its own non-production Upstash credentials is
+    // now configured (selectRedisStore selects them); memory — and therefore
+    // "not configured" — requires the preview to hold no Upstash credentials.
+    mockEnv.UPSTASH_REDIS_REST_URL = undefined;
     expect(isRedisConfigured()).toBe(false);
+  });
+
+  it('is true when a Vercel preview holds its own non-production Upstash instance (JOV-9826)', () => {
+    mockEnv.NODE_ENV = 'test';
+    mockEnv.VERCEL_ENV = 'preview';
+    mockEnv.UPSTASH_REDIS_REST_URL = 'https://example.upstash.io';
+    mockEnv.UPSTASH_REDIS_REST_TOKEN = 'token';
+    mockEnv.REDIS_URL = undefined;
+    expect(isRedisConfigured()).toBe(true);
   });
 });

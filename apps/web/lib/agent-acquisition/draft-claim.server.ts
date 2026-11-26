@@ -7,6 +7,7 @@ import { invalidateProfileCache } from '@/lib/cache/profile';
 import { requiresClaimVerification } from '@/lib/claim/claim-verification';
 import { lookupArtistReach } from '@/lib/claim/claim-verification.server';
 import { claimPrebuiltProfileForUser } from '@/lib/claim/finalize';
+import { prepareSelfServeClaimProof } from '@/lib/claim/self-serve-claim-proof.server';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
 import { agentVisibilityDrafts } from '@/lib/db/schema/agent-drafts';
@@ -30,66 +31,27 @@ import {
   isAgentDraftId,
 } from './claim-handoff';
 import {
+  type AgentClaimPreview,
+  type AgentClaimView,
+  buildAgentClaimAttribution,
+  isStaleAgentReservation,
+  toAgentClaimPreview,
+} from './draft-claim-view';
+import {
   materializeAgentDraftRelease,
   trustedImageUrl,
 } from './draft-materialize.server';
 import {
-  AGENT_CLAIM_RESERVATION_STALE_MS,
   releaseAgentDraft,
   reserveAgentDraft,
 } from './draft-reservation.server';
 import type { AgentDraftRow } from './draft-store';
 import { goldenPathHandleFromPreview } from './golden-path';
 
-/**
- * Person-side completion of an agent-created draft (JOV-9760).
- *
- * This module does not verify ownership itself. It routes every case into
- * the claim system that already exists:
- * - artist identity: exact Spotify artist ID, the same proof the onboarding
- *   direct claim accepts (`connectOnboardingSpotifyArtist`);
- * - high or unknown reach: `lookupArtistReach` + `requiresClaimVerification`;
- *   the person goes to the existing `/claim/start` verification path and
- *   nothing is linked (unknown reach fails closed here, as /claim/start does);
- * - waitlist: the onboarding gate (`markWaitlistSignedUpInTx`) applies;
- * - an existing Jovie profile for the artist: the existing
- *   `/{handle}/claim` direct-profile flow;
- * - ownership transfer: `claimPrebuiltProfileForUser` (lib/claim/finalize.ts)
- *   with the Spotify identity lock and uniqueness backstop.
- *
- * Claiming never publishes: the profile stays private and the release is a
- * draft until the owner publishes from the dashboard.
- */
+export type { AgentClaimPreview, AgentClaimView };
+
 export const AGENT_ACQUISITION_SETTINGS_KEY = 'agentAcquisition' as const;
 export const AGENT_DRAFT_CLAIM_SOURCE = 'agent_draft_handoff' as const;
-
-export interface AgentClaimPreview {
-  readonly artistName: string;
-  readonly provider: string;
-  readonly sourceUrl: string;
-  readonly imageUrl: string | null;
-  readonly bio: string | null;
-  readonly release: {
-    readonly title: string | null;
-    readonly artistName: string | null;
-    readonly releaseDate: string | null;
-    readonly artworkUrl: string | null;
-    readonly links: Readonly<Record<string, string>>;
-  } | null;
-  readonly expiresAt: string;
-  /** Bound into the claim form; the claim refuses a changed draft. */
-  readonly digest: string;
-}
-
-export type AgentClaimView =
-  | { readonly state: 'invalid' }
-  | { readonly state: 'expired' }
-  | {
-      readonly state: 'claimed';
-      readonly ownedByViewer: boolean;
-      readonly handle: string | null;
-    }
-  | { readonly state: 'ready'; readonly preview: AgentClaimPreview };
 
 export type AgentClaimResult =
   | { readonly status: 'claimed'; readonly handle: string }
@@ -139,37 +101,6 @@ async function findClaimedProfileForDraft(
   return profile ?? null;
 }
 
-function toPreview(row: AgentDraftRow): AgentClaimPreview {
-  const { launch, ...artist } = row.preview;
-  const release = launch?.result.release;
-  return {
-    artistName: artist.display_name,
-    provider: artist.provider,
-    sourceUrl: artist.source_url,
-    imageUrl: trustedImageUrl(artist.image_url),
-    bio: artist.bio,
-    release: release
-      ? {
-          title: release.title,
-          artistName: release.artist_name,
-          releaseDate: release.release_date,
-          artworkUrl: trustedImageUrl(release.artwork_url),
-          links: launch.result.smart_link.links,
-        }
-      : null,
-    expiresAt: row.expiresAt.toISOString(),
-    digest: agentDraftPreviewDigest(row.preview),
-  };
-}
-
-function isStaleReservation(row: AgentDraftRow, now = Date.now()): boolean {
-  return Boolean(
-    row.claimedAt &&
-      now - row.claimedAt.getTime() > AGENT_CLAIM_RESERVATION_STALE_MS &&
-      row.expiresAt.getTime() > now
-  );
-}
-
 /** Read-only page state. Never discloses a draft without a valid handoff. */
 export async function loadAgentClaimView(
   draftId: string,
@@ -181,9 +112,8 @@ export async function loadAgentClaimView(
   if (check === 'invalid' || !row) return { state: 'invalid' };
   if (check === 'claimed') {
     const profile = await findClaimedProfileForDraft(db, row.id);
-    // An abandoned reservation (no profile, stale, unexpired) can be claimed.
-    if (!profile && isStaleReservation(row))
-      return { state: 'ready', preview: toPreview(row) };
+    if (!profile && isStaleAgentReservation(row))
+      return { state: 'ready', preview: toAgentClaimPreview(row) };
     const ownedByViewer = Boolean(
       viewerUserId && profile?.userId === viewerUserId
     );
@@ -194,22 +124,7 @@ export async function loadAgentClaimView(
     };
   }
   if (check === 'expired') return { state: 'expired' };
-  return { state: 'ready', preview: toPreview(row) };
-}
-
-function attribution(row: AgentDraftRow, now: Date) {
-  const { acquisition } = row;
-  return {
-    schema: 'jovie-agent-acquisition/v1',
-    draft_id: row.id,
-    artist_id: row.artistId,
-    agent_source: acquisition.agent_source ?? null,
-    client: acquisition.client ?? null,
-    installation_id: acquisition.installation_id ?? null,
-    session_or_run_id: acquisition.session_or_run_id ?? null,
-    intent: acquisition.intent ?? null,
-    claimed_at: now.toISOString(),
-  };
+  return { state: 'ready', preview: toAgentClaimPreview(row) };
 }
 
 async function chooseHandle(
@@ -252,17 +167,19 @@ class ClaimStateError extends Error {
 
 /**
  * Profile side of the claim, inside the session-scoped (RLS) transaction.
- * The draft row is deliberately not touched here: `agent_visibility_drafts`
- * is reachable only outside a session (owner-bridge policy), so it is
- * reserved by `reserveAgentDraft` before this runs and released if it fails.
- * The Spotify identity lock and unique index remain the backstop.
+ * `agent_visibility_drafts` is reserved before this runs and released on failure.
  */
 async function claimInTransaction(
   tx: DbOrTransaction,
   userId: string,
   row: AgentDraftRow,
-  spotifyId: string
-): Promise<{ handle: string; profileId: string }> {
+  spotifyId: string,
+  followers: number
+): Promise<{
+  handle: string;
+  profileId: string;
+  scheduleReview: () => void;
+}> {
   const [owned] = await tx
     .select({ handle: creatorProfiles.usernameNormalized })
     .from(creatorProfiles)
@@ -284,14 +201,15 @@ async function claimInTransaction(
     row.id,
     goldenPathHandleFromPreview(row.preview)
   );
+  const baseSettings: Record<string, unknown> = {
+    [AGENT_ACQUISITION_SETTINGS_KEY]: buildAgentClaimAttribution(row, now),
+  };
   const [created] = await tx
     .insert(creatorProfiles)
     .values({
       creatorType: 'artist',
       username: handle,
       usernameNormalized: handle,
-      // RLS: an authenticated insert must name the session user; the row
-      // stays an unclaimed reservation until claimPrebuiltProfileForUser.
       userId,
       displayName: artist.display_name,
       bio: artist.bio,
@@ -299,7 +217,7 @@ async function claimInTransaction(
       isPublic: false,
       isClaimed: false,
       ingestionSourcePlatform: 'agent_draft',
-      settings: { [AGENT_ACQUISITION_SETTINGS_KEY]: attribution(row, now) },
+      settings: baseSettings,
       theme: {},
       ingestionStatus: 'idle',
     })
@@ -307,18 +225,28 @@ async function claimInTransaction(
   if (!created)
     throw new Error('Agent draft claim profile insert returned no row');
 
-  // Same lock + exact-ID recheck every Spotify attach takes.
+  const claimProof = prepareSelfServeClaimProof({
+    profile: { id: created.id, handle, isAdmin: false, spotifyId: null },
+    settings: baseSettings,
+    spotifyArtistId: spotifyId,
+    artistName: artist.display_name || null,
+    directClaim: true,
+    followers,
+    source: AGENT_DRAFT_CLAIM_SOURCE,
+    now,
+  });
+
   await assertSpotifyProfileIdentityAvailable(tx, spotifyId, created.id);
   await tx
     .update(creatorProfiles)
     .set({
       spotifyId,
       spotifyUrl: `https://open.spotify.com/artist/${spotifyId}`,
+      settings: claimProof.apply(baseSettings),
       updatedAt: now,
     })
     .where(eq(creatorProfiles.id, created.id));
 
-  // Same waitlist gate onboarding applies before a signup completes.
   try {
     await markWaitlistSignedUpInTx(tx, userId);
   } catch (error) {
@@ -358,7 +286,12 @@ async function claimInTransaction(
       { eventIdentity: `activation_achieved:${created.id}` }
     )
   );
-  return { handle, profileId: created.id };
+  await claimProof.recordCreated(tx);
+  return {
+    handle,
+    profileId: created.id,
+    scheduleReview: claimProof.scheduleReview,
+  };
 }
 
 /**
@@ -390,7 +323,7 @@ export async function claimAgentDraft(
   // Claimed with no profile: an in-flight claim, or an abandoned one that may
   // be taken over once stale (and only while the draft is unexpired).
   const staleClaimedAt =
-    check === 'claimed' && isStaleReservation(row) ? row.claimedAt : null;
+    check === 'claimed' && isStaleAgentReservation(row) ? row.claimedAt : null;
   if (check === 'claimed' && !staleClaimedAt)
     return { status: 'already_claimed' };
   if (agentDraftPreviewDigest(row.preview) !== reviewedDigest)
@@ -414,12 +347,18 @@ export async function claimAgentDraft(
     return { status: 'artist_taken' };
   const own = existing.find(profile => profile.userId === userId);
   if (own?.isClaimed) return { status: 'has_profile', handle: own.handle };
-  const unclaimed = existing.find(profile => !profile.isClaimed);
+  const unclaimed = existing.find(
+    profile => !profile.isClaimed && profile.userId === null
+  );
   if (unclaimed)
     return { status: 'existing_profile', handle: unclaimed.handle };
+  if (
+    existing.some(
+      profile => profile.userId !== null && profile.userId !== userId
+    )
+  )
+    return { status: 'artist_taken' };
 
-  // Unknown reach fails closed: it cannot prove the artist is below the
-  // self-serve threshold, so it goes to the existing verification path.
   const { followers } = await lookupArtistReach(spotifyId);
   if (followers === null || requiresClaimVerification(followers))
     return { status: 'verification_required', spotifyId };
@@ -442,20 +381,22 @@ export async function claimAgentDraft(
       : { status: 'draft_changed' };
   }
 
-  let claimed: { handle: string; profileId: string };
+  let claimed: {
+    handle: string;
+    profileId: string;
+    scheduleReview: () => void;
+  };
   try {
     claimed = await withDbSessionTx(async (tx, sessionUserId) => {
       if (sessionUserId !== userId) throw new Error('Session mismatch');
-      return claimInTransaction(tx, userId, row, spotifyId);
+      return claimInTransaction(tx, userId, row, spotifyId, followers);
     });
   } catch (error) {
-    // The transaction may have committed even though the call threw (lost
-    // acknowledgement). Never release a reservation that backs a profile.
+    // Lost acknowledgement: never release a reservation backing a committed profile.
     let committed: Awaited<ReturnType<typeof findClaimedProfileForDraft>>;
     try {
       committed = await findClaimedProfileForDraft(db, row.id);
     } catch {
-      // Unknown outcome: keep the reservation; it becomes stale-reclaimable.
       throw error;
     }
     if (committed?.userId === userId) {
@@ -480,6 +421,8 @@ export async function claimAgentDraft(
     if (error instanceof ClaimStateError) return error.result;
     throw error;
   }
+
+  claimed.scheduleReview();
 
   await Promise.allSettled([
     invalidateProfileCache(claimed.handle),

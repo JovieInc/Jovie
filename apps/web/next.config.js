@@ -9,6 +9,9 @@ const { version: APP_VERSION } = require('../../version.json');
 const {
   legacyProfileAliasRedirects,
 } = require('./lib/routing/legacy-profile-alias-redirects');
+const {
+  writeBuildDeployedAt,
+} = require('./scripts/write-build-deployed-at.cjs');
 const isVercelPreview = process.env.VERCEL_ENV === 'preview';
 const screenshotCatalogTraceIncludes = [
   'screenshot-catalog/current/**/*',
@@ -503,6 +506,8 @@ const nextConfig = {
       },
       // Keep legacy Needs You links opening the canonical Inbox.
       { source: '/app/ov/needs-you', destination: '/app/ov/inbox' },
+      // Fleet lives at Operations; /app/ov/fleet has no route of its own.
+      { source: '/app/ov/fleet', destination: '/app/ov/operations' },
       { source: '/app/admin/needs-you', destination: '/app/ov/inbox' },
       {
         source: '/app/admin/:path*',
@@ -849,15 +854,29 @@ module.exports = exposeBaseStaticConfigForTooling(
 // The Sentry runtime SDK (sentry.server.config.ts) works independently.
 const { withSentryConfig } = require('@sentry/nextjs/config');
 
-module.exports = exposeBaseStaticConfigForTooling(
-  shouldUseSentryPlugin
-    ? withSentryConfig(module.exports, {
-        org: 'jovie',
-        project: 'jovie-web',
-        silent: !process.env.CI,
-        widenClientFileUpload: true,
-        sourcemaps: { deleteSourcemapsAfterUpload: true },
-        tunnelRoute: '/monitoring',
-      })
-    : module.exports
+function withBuildDeployedAtStamp(config) {
+  const wrapped = (phase, context) => {
+    // Once, before compilation. Server startup reloads this file under
+    // phase-production-server and must not mint a new stamp (JOV-8658).
+    if (phase === 'phase-production-build') {
+      writeBuildDeployedAt();
+    }
+    return typeof config === 'function' ? config(phase, context) : config;
+  };
+  return exposeBaseStaticConfigForTooling(wrapped);
+}
+
+module.exports = withBuildDeployedAtStamp(
+  exposeBaseStaticConfigForTooling(
+    shouldUseSentryPlugin
+      ? withSentryConfig(module.exports, {
+          org: 'jovie',
+          project: 'jovie-web',
+          silent: !process.env.CI,
+          widenClientFileUpload: true,
+          sourcemaps: { deleteSourcemapsAfterUpload: true },
+          tunnelRoute: '/monitoring',
+        })
+      : module.exports
+  )
 );

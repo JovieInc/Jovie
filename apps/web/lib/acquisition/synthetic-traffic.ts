@@ -1,3 +1,4 @@
+import type { SQL } from 'drizzle-orm';
 import { sql as drizzleSql } from 'drizzle-orm';
 
 /**
@@ -27,14 +28,27 @@ export function isSyntheticTraffic(headers: {
 export const SYNTHETIC_FIXTURE_LANDING =
   '^/(dualipa|testartist|nonexistent-artist)(/|\\?|$)';
 
+/**
+ * SQL fragments are built lazily so importing this module (or anything that
+ * re-exports it, like signup-funnel.server) does not evaluate `sql` at load
+ * time. Partial `vi.mock('drizzle-orm')` suites that omit `sql` would otherwise
+ * crash on every import that transitively pulls this file.
+ */
+let realJourneyFragment: SQL | undefined;
+let realJourneyJFragment: SQL | undefined;
+
 /** SQL predicate for single-table queries on acquisition_journeys. */
-export const realJourney = drizzleSql`(
+export function realJourney(): SQL {
+  return (realJourneyFragment ??= drizzleSql`(
   COALESCE(first_touch ->> 'synthetic', '') <> 'true'
   AND COALESCE(first_touch ->> 'landingPath', '') !~ ${SYNTHETIC_FIXTURE_LANDING}
-)`;
+)`);
+}
 
 /** Same predicate for a query that aliases acquisition_journeys as j. */
-export const realJourneyJ = drizzleSql`(
+export function realJourneyJ(): SQL {
+  return (realJourneyJFragment ??= drizzleSql`(
   COALESCE(j.first_touch ->> 'synthetic', '') <> 'true'
   AND COALESCE(j.first_touch ->> 'landingPath', '') !~ ${SYNTHETIC_FIXTURE_LANDING}
-)`;
+)`);
+}

@@ -21,7 +21,10 @@ export interface OviePageSpec {
   readonly subnav: OvieSubnav;
   /** Required for `route-views`: which view group the page belongs to. */
   readonly views?: AdminViewGroupId;
-  /** A `route-views` page may also filter its own data with query tabs. */
+  /**
+   * A route-views page may also filter its own data. Agents passes that
+   * filter as `actions`, not `tabs=`, so the shared shell does not import it.
+   */
   readonly tabs?: boolean;
 }
 

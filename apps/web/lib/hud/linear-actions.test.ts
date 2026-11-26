@@ -32,7 +32,7 @@ describe('fetchTimActionIssues', () => {
     expect(typeof result.fetchedAt).toBe('string');
   });
 
-  it('keeps triage, unstarted, and started issues and drops the rest', async () => {
+  it('keeps backlog, triage, unstarted, and started issues and drops the rest', async () => {
     env.LINEAR_API_KEY = 'lin_api_test';
     const node = (
       id: string,
@@ -64,6 +64,7 @@ describe('fetchTimActionIssues', () => {
                 node('triage-1', 'triage', 1, '2026-01-03T00:00:00.000Z'),
                 node('canceled-1', 'canceled', 1, '2026-01-02T00:00:00.000Z'),
                 node('unstarted-1', 'unstarted', 2, '2026-01-02T00:00:00.000Z'),
+                node('backlog-1', 'backlog', 3, '2026-01-05T00:00:00.000Z'),
               ],
             },
           },
@@ -78,11 +79,13 @@ describe('fetchTimActionIssues', () => {
         'triage',
         'unstarted',
         'started',
+        'backlog',
       ]);
       expect(result.issues.map(issue => issue.id)).toEqual([
         'triage-1',
         'unstarted-1',
         'started-1',
+        'backlog-1',
       ]);
     } finally {
       env.LINEAR_API_KEY = undefined;

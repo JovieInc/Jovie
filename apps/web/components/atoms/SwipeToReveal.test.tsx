@@ -43,6 +43,7 @@ describe('SwipeToReveal gestures', () => {
     const user = userEvent.setup();
     const onOpen = vi.fn();
     const onDelete = vi.fn();
+    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
     render(
       <SwipeToReveal
         forceEnabled
@@ -53,11 +54,17 @@ describe('SwipeToReveal gestures', () => {
       </SwipeToReveal>
     );
     expect(screen.queryByRole('button', { name: 'Delete link' })).toBeNull();
-    swipe(screen.getByText('Spotify'), -60);
+    const row = screen.getByText('Spotify');
+    swipe(row, -60);
     expect(onOpen).toHaveBeenCalledOnce();
+    // Close schedules a hide linger; reopening cancels it via module-scope helper
+    // so frontend-rules does not see clearTimeout inside the isOpen effect body.
+    swipe(row, 70);
+    swipe(row, -60);
+    expect(clearTimeoutSpy).toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Delete link' }));
     expect(onDelete).toHaveBeenCalledOnce();
-    expect(onOpen).toHaveBeenCalledOnce();
+    expect(onOpen).toHaveBeenCalledTimes(2);
   });
 
   it.each([

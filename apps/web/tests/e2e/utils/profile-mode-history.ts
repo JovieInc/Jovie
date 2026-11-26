@@ -6,12 +6,23 @@ import { PROFILE_DESKTOP_SURFACE_SHIPPED } from './profile-desktop-surface';
  *  Layout-aware (JOV-11623): at desktop widths the canonical desktop surface
  *  (Pen frame D9kdx) owns the presentation — the same URL/data-mode/aria-current
  *  contract is asserted through its pill navigation instead of the bottom nav.
+ *
+ *  JOV-14241: Events is a destination only when the profile has upcoming
+ *  events. The caller states which case its profile is in, because reading it
+ *  off the page would let a missing Events tab certify itself. When Events is
+ *  hidden, `mode=tour` must land on Home with no Events control, and the
+ *  deep-link/refresh/history sequence runs from Music instead.
  */
+export type ProfileEventsDestination = 'offered' | 'hidden';
+
 export async function certifyProfileModeHistory(
   page: Page,
   testInfo: TestInfo,
-  handle: string
+  handle: string,
+  { events = 'offered' }: { events?: ProfileEventsDestination } = {}
 ) {
+  const [entryMode, entryLabel] =
+    events === 'offered' ? ['tour', 'Events'] : ['listen', 'Music'];
   const source = 'jov-6572';
   const href = (mode: string) =>
     `/${handle}?${mode === 'profile' ? '' : `mode=${mode}&`}source=${source}`;
@@ -32,7 +43,7 @@ export async function certifyProfileModeHistory(
     ).toHaveAttribute('data-interactive-ready', 'true');
   };
   const observations: unknown[] = [];
-  let stage = 'direct-events';
+  let stage = `direct-${entryMode}`;
   const capture = async (name: string) => {
     const path = testInfo.outputPath(name);
     await page.screenshot({ path, animations: 'disabled', timeout: 10_000 });
@@ -90,15 +101,30 @@ export async function certifyProfileModeHistory(
     await observe(stage);
   };
   try {
+    if (events === 'hidden') {
+      stage = 'direct-tour-hidden';
+      expect(
+        (
+          await page.goto(href('tour'), { waitUntil: 'domcontentloaded' })
+        )?.status()
+      ).toBe(200);
+      await ready();
+      await aligned('profile', 'Home');
+      await expect(
+        nav.getByRole('button', { name: 'Events', exact: true })
+      ).toHaveCount(0);
+      await capture('direct-tour-hidden.png');
+      stage = `direct-${entryMode}`;
+    }
     expect(
       (
-        await page.goto(href('tour'), { waitUntil: 'domcontentloaded' })
+        await page.goto(href(entryMode), { waitUntil: 'domcontentloaded' })
       )?.status()
     ).toBe(200);
     await ready();
-    await aligned('tour', 'Events');
+    await aligned(entryMode, entryLabel);
     const navBox = await nav.boundingBox();
-    await capture('direct-events.png');
+    await capture(`direct-${entryMode}.png`);
     stage = 'home';
     await nav.getByRole('button', { name: 'Home', exact: true }).click({
       noWaitAfter: true,
@@ -131,19 +157,20 @@ export async function certifyProfileModeHistory(
     await ready();
     await aligned('profile', 'Home');
     const historyLength = await page.evaluate(() => history.length);
-    stage = 'back-events';
+    stage = `back-${entryMode}`;
     await page.goBack({ waitUntil: 'domcontentloaded', timeout: 15_000 });
-    await aligned('tour', 'Events');
+    await aligned(entryMode, entryLabel);
     stage = 'forward-home';
     await page.goForward({ waitUntil: 'domcontentloaded', timeout: 15_000 });
     await aligned('profile', 'Home');
     expect(await page.evaluate(() => history.length)).toBe(historyLength);
-    for (const [mode, label] of [
+    const nearby: [string, string][] = [
       ['listen', 'Music'],
       ['about', 'About'],
-      ['tour', 'Events'],
+      ...(events === 'offered' ? [['tour', 'Events'] as [string, string]] : []),
       ['profile', 'Home'],
-    ]) {
+    ];
+    for (const [mode, label] of nearby) {
       stage = `nearby-${mode}`;
       const control = nav.getByRole('button', { name: label, exact: true });
       await control.focus();

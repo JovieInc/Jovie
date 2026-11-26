@@ -43,6 +43,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from disk_guard import LOW_PCT as DISK_LOW_PCT, ensure_sbin_on_path  # noqa: E402  (sibling module of the release)
 import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 import lifecycle  # noqa: E402
+from sweep_hold_ledger import HoldLedger, SWEEP_LAUNCH, SWEEP_REPORT, started_at  # noqa: E402
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
 from atomic_state import atomic_write_text  # noqa: E402
@@ -136,7 +137,7 @@ def linked_worktrees(repo: Path, run) -> list[tuple[Path, str | None]]:
     result = run(["git", "-C", str(repo), "worktree", "list", "--porcelain"],
                  capture_output=True, text=True, timeout=60)
     if result.returncode != 0:
-        return []
+        raise subprocess.CalledProcessError(result.returncode, "git worktree list")
     entries = []
     for block in result.stdout.strip().split("\n\n")[1:]:
         fields = dict(line.split(" ", 1) if " " in line else (line, "") for line in block.splitlines())
@@ -431,20 +432,22 @@ def decide(path: Path, branch: str | None, info: dict, now: float, closed: set[s
 
 
 def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: dict, *, run, now: float,
-           closed: set[str], idle_s: float, preserved_ttl_s: float, prefix: str, date: str) -> None:
+           closed: set[str], idle_s: float, preserved_ttl_s: float, prefix: str, date: str) -> bool:
+    """Return True only when this visit proved the prior snapshot hold can clear."""
     if busy(path, live) or (path / ".sweep-keep").exists():
         report["kept"] += 1
-        return
+        return False
     info = inspect(path, run)
     if info is None:
         report["kept"] += 1
-        return
+        return False
+    needs_backup = bool(info["dirty"] or info["unpushed"] != "0")
     reason = decide(path, branch, info, now, closed, idle_s=idle_s, preserved_ttl_s=preserved_ttl_s)
     if reason is None:
         report["kept"] += 1
         strip_kept(path, info, now, report)
-        return
-    if info["dirty"] or info["unpushed"] != "0":
+        return not needs_backup
+    if needs_backup:
         try:
             saved = backup(path, info, run, prefix, date)
         except SnapshotHeld as held:
@@ -455,11 +458,11 @@ def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: 
             report.setdefault("secretHeld", []).append({"name": held.name, "path": str(path),
                                                         "reason": held.reason})
             strip_kept(path, info, now, report)
-            return
+            return False
         if not saved:
             strip_build_dirs(path)
             report["stripped"].append(str(path))
-            return
+            return False
         report["backups"].append(saved)
     removed, error = git_housekeeping.remove_linked_worktree(
         lambda args: git(repo, run, *args, timeout=900), path)
@@ -467,6 +470,7 @@ def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: 
         report["removed"].append({"path": str(path), "reason": reason})
     else:
         report["errors"].append(f"remove:{path}:{error[:120]}")
+    return True
 
 
 def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecycle.run,
@@ -479,7 +483,8 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
     date = date or datetime.fromtimestamp(now, timezone.utc).strftime("%Y%m%d")
     closed = closed or {}
     report = {"at": datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-              "removed": [], "backups": [], "stripped": [], "kept": 0, "errors": []}
+              "removed": [], "backups": [], "stripped": [], "kept": 0, "errors": [], "secretHeld": []}
+    ledger = HoldLedger(state, repositories_present=bool(repos))
     def yield_to_drain():
         if state is not None and lifecycle.draining(state):
             report["drained"] = True
@@ -494,11 +499,11 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
         return False
 
     if yield_to_drain():
-        return report
+        return ledger.finish(report)
     live = live_paths(run)
     if live is None:
         report["errors"].append("process-state-unavailable")
-        return report
+        return ledger.finish(report)
     # Fairness cursor: least recently visited checkout first, across every repository. Without it a
     # spent budget restarted at the first repository each interval, so the second (~/Jovie, whose
     # worktrees are ~/wt: 334 GiB on root, 2026-11-02) was never reached.
@@ -518,13 +523,14 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
             # A retirement is one unit: finish its preservation/removal before
             # yielding, retaining the inherited lifecycle lease throughout.
             if yield_to_drain():
-                return report
+                return ledger.finish(report)
             if not path.exists() or not in_scope(path, roots, never):
                 continue
             visits[str(path)] = now
             try:
-                retire(repo, path, branch, live, report, run=run, now=now, closed=closed.get(repo, set()),
-                       idle_s=idle_s, preserved_ttl_s=preserved_ttl_s, prefix=prefix, date=date)
+                ledger.visited(path, retire(repo, path, branch, live, report, run=run, now=now,
+                               closed=closed.get(repo, set()), idle_s=idle_s, preserved_ttl_s=preserved_ttl_s,
+                               prefix=prefix, date=date))
             except (OSError, subprocess.SubprocessError) as error:
                 # One slow or broken checkout (e.g. `git add` timing out under load) must not end
                 # the sweep; it stays in place and is retried next interval.
@@ -534,12 +540,12 @@ def sweep(repos: list[Path], roots: list[Path], never: list[Path], *, run=lifecy
         _write_visits(visits_path, visits, {str(path) for _, path, _ in queue})
     for repo in repos:
         if yield_to_drain():
-            return report
+            return ledger.finish(report)
         try:
             git(repo, run, "worktree", "prune", timeout=120)
         except (OSError, subprocess.SubprocessError):
             pass
-    return report
+    return ledger.finish(report)
 
 
 VISITS_FILE = "worktree-sweep-visits.json"
@@ -590,16 +596,13 @@ def maybe_spawn(state: Path, repo: Path, free_pct: float | None, *, now: float |
         alarm_strip(state, repo, json.loads((state / "disk-headroom.json").read_text()), now=now)
     except (OSError, ValueError, AttributeError):
         pass
-    stamp = state / "worktree-sweep.json"
-    try:
-        last = json.loads(stamp.read_text()).get("startedAt", 0)
-    except (OSError, ValueError, AttributeError):
-        last = 0
+    # Cadence is separate from evidence: a launch does not supersede a completed sweep.
+    last = started_at(state)
     interval = LOW_INTERVAL_S if free_pct is not None and free_pct <= DISK_LOW_PCT else INTERVAL_S
     if now - last < interval:
         return "not-due"
     state.mkdir(parents=True, exist_ok=True)
-    atomic_write_text(stamp, json.dumps({"startedAt": now}))
+    atomic_write_text(state / SWEEP_LAUNCH, json.dumps({"startedAt": now}))
     subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "--state", str(state), "--repo", str(repo)],
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      start_new_session=True, **lifecycle.spawn_kwargs())
@@ -865,6 +868,7 @@ def guarded_main(args) -> int:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             return 0  # disk_guard or an earlier sweep owns cleanup
+        started = started_at(args.state) or time.time()
         repos = default_repos(home, args.repo)
         closed = {}
         for repo in repos:
@@ -887,12 +891,7 @@ def guarded_main(args) -> int:
             now = time.time()
             publish_headroom(args.state, headroom(volumes(home, args.state)), now)
             report["dailyReport"] = daily_report(home, args.state, now)
-    stamp = args.state / "worktree-sweep.json"
-    try:
-        started = json.loads(stamp.read_text()).get("startedAt")
-    except (OSError, ValueError, AttributeError):
-        started = None
-    atomic_write_text(stamp, json.dumps({"startedAt": started or time.time(), **report}, indent=1))
+        atomic_write_text(args.state / SWEEP_REPORT, json.dumps({"startedAt": started, **report}, indent=1))
     return 0
 
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { type TouchEvent as ReactTouchEvent, useCallback, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import type { OpportunityRowProps, OpportunityRowState } from './types';
@@ -184,7 +185,7 @@ export function OpportunityRow({
             )}
           >
             {/* Ghost accent ring pill — 2px border, no fill */}
-            <button
+            <PlainButton
               type='button'
               className={cn(
                 'inline-flex items-center justify-center',
@@ -218,12 +219,12 @@ export function OpportunityRow({
               ) : (
                 '→'
               )}
-            </button>
+            </PlainButton>
 
             {/* Dismiss button — faint x, secondary to the primary.
                 Hidden on persistent-action states (accepted/planned). */}
             {!persistentAction ? (
-              <button
+              <PlainButton
                 type='button'
                 className={cn(
                   'inline-flex items-center justify-center',
@@ -240,7 +241,7 @@ export function OpportunityRow({
                 aria-label='Dismiss Opportunity'
               >
                 &times;
-              </button>
+              </PlainButton>
             ) : null}
           </div>
         ) : null}

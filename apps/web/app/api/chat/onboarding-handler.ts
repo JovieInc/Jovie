@@ -736,10 +736,7 @@ export async function tryHandleAnonymousOnboardingChat(
   });
   const tools = buildOnboardingTools(onboardingState);
 
-  // JOV-7134: the artist picker carries the real Spotify id only in message
-  // metadata, which never reaches the model. Confirm the pick here from that
-  // id, show the model the result as a completed tool call, and stream the
-  // same tool part to the client (profile rail) and persistence.
+  // JOV-7134: confirm real Spotify id from message metadata before streaming.
   const serverArtistConfirmation = await confirmSelectedArtist(
     uiMessages,
     onboardingState
@@ -763,7 +760,8 @@ export async function tryHandleAnonymousOnboardingChat(
     onboardingState.spotifyArtistId
   );
   onboardingState.profileDraft = profileDraft;
-  onboardingState.publicProfileUrl = profileDraft.selectedSource?.url ?? null;
+  onboardingState.publicProfileUrl =
+    profileDraft.selectedSource?.url ?? onboardingState.publicProfileUrl;
   const draftToolCallId = randomUUID();
   const draftOutput = {
     action: 'profile_draft_recorded',
@@ -876,7 +874,8 @@ export async function tryHandleAnonymousOnboardingChat(
       messages: serverToolHistory,
     });
     fallbackState.profileDraft = profileDraft;
-    fallbackState.publicProfileUrl = profileDraft.selectedSource?.url ?? null;
+    fallbackState.publicProfileUrl =
+      profileDraft.selectedSource?.url ?? fallbackState.publicProfileUrl;
     const turn: FallbackTurn = await decideFallbackTurn({
       uiMessages,
       state: fallbackState,

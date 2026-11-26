@@ -11,7 +11,7 @@ import {
   useAudiencePanel,
 } from './AudiencePanelContext';
 
-const PANELS = ['contact', 'analytics', 'ai-crawlers'] as const;
+const PANELS = ['contact', 'analytics'] as const;
 
 function PanelButtons() {
   const { mode, toggle, open, close } = useAudiencePanel();
@@ -87,8 +87,8 @@ describe('AudiencePanelContext certificate', () => {
 
     await user.click(screen.getByRole('button', { name: 'analytics' }));
     expect(onModeChange).toHaveBeenLastCalledWith(null);
-    await user.click(screen.getByRole('button', { name: 'ai-crawlers' }));
-    expect(onModeChange).toHaveBeenLastCalledWith('ai-crawlers');
+    await user.click(screen.getByRole('button', { name: 'contact' }));
+    expect(onModeChange).toHaveBeenLastCalledWith('contact');
     await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(onModeChange).toHaveBeenLastCalledWith(null);
     await expectNoA11yViolations(container);

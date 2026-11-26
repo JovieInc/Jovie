@@ -6,7 +6,10 @@ import type {
   ProfilesWorkspaceData,
   ProfileWorkspaceSurfaceRow,
 } from '@/app/app/(shell)/profiles/data';
-import { ProfilesWorkspace } from '@/app/app/(shell)/profiles/ProfilesWorkspace';
+import {
+  connectionSuggestionsQueryKey,
+  ProfilesWorkspace,
+} from '@/app/app/(shell)/profiles/ProfilesWorkspace';
 import { AppShellRightRail } from '@/components/shell/AppShellRightRail';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import {
@@ -167,7 +170,12 @@ function FixturePanel() {
 function PublicSourcesFixture({
   pinnedProfile = false,
   pendingIdentityReview = false,
-}: Readonly<{ pinnedProfile?: boolean; pendingIdentityReview?: boolean }>) {
+  suggestionCount = 0,
+}: Readonly<{
+  pinnedProfile?: boolean;
+  pendingIdentityReview?: boolean;
+  suggestionCount?: number;
+}>) {
   const baseData = pendingIdentityReview ? pendingReviewData : data;
   const fixtureData = pinnedProfile
     ? {
@@ -190,6 +198,18 @@ function PublicSourcesFixture({
     const cache = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
+    cache.setQueryData(
+      connectionSuggestionsQueryKey(fixtureData.profileId, scope),
+      Array.from({ length: suggestionCount }, (_, index) => ({
+        id: `identity-fixture-${index}`,
+        type: 'social_link',
+        platform: 'youtube',
+        platformLabel: 'YouTube',
+        title: `@identity-fixture-${index}`,
+        externalUrl: `https://www.youtube.com/@identity-fixture-${index}`,
+        confidence: 0.9,
+      }))
+    );
     sources.forEach((source, index) => {
       const identity: SourceIdentity = {
         status: source.status,
@@ -239,7 +259,27 @@ function PublicSourcesFixture({
               keyboard-focus a row to inspect avatar emphasis.
             </div>
             <div className='relative flex h-160 min-w-0 overflow-hidden border border-subtle bg-surface-0'>
-              <ProfilesWorkspace data={fixtureData} scope={scope} />
+              <ProfilesWorkspace
+                data={fixtureData}
+                scope={scope}
+                editableArtist={
+                  pinnedProfile
+                    ? {
+                        id: fixtureData.profileId,
+                        owner_user_id: scope.actorId,
+                        handle: fixtureData.artist.username,
+                        name: fixtureData.artist.name,
+                        tagline: 'Artist and producer.',
+                        spotify_id: '',
+                        published: true,
+                        is_verified: false,
+                        is_featured: false,
+                        marketing_opt_out: false,
+                        created_at: observedAt,
+                      }
+                    : undefined
+                }
+              />
               <FixturePanel />
             </div>
           </section>
@@ -265,4 +305,11 @@ export const PendingIdentitiesWithoutSuggestions: Story = {
 };
 export const CombinedIdentityActionsAndReview: Story = {
   args: { pinnedProfile: true, pendingIdentityReview: true },
+};
+export const ManySuggestedProfiles: Story = {
+  args: {
+    pinnedProfile: true,
+    pendingIdentityReview: true,
+    suggestionCount: 24,
+  },
 };

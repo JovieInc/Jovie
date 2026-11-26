@@ -3,38 +3,13 @@ import '@/styles/system-b-app.css';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
-import type { OvieInbox } from '@/lib/ovie/inbox';
-import { INTERACTION_CASE_CONTRACT } from '@/lib/ovie/interaction-case';
+import { emptyDeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import { OvieHomeCanvas } from './OvieHomeCanvas';
-
-const INBOX: OvieInbox = {
-  issues: [],
-  cases: [
-    {
-      contract: INTERACTION_CASE_CONTRACT,
-      id: 'summer:vercel-concurrency',
-      kind: 'spend',
-      source: { system: 'summer', id: 'vercel-concurrency', revision: null },
-      title: 'Vercel on-demand concurrency for Jovie',
-      recommendation: 'About $6 a month, at most $44. Recommended.',
-      owner: null,
-      state: 'needs_you',
-      priority: 1,
-      createdAt: '2026-10-20T18:00:00.000Z',
-      nextAction: null,
-      waitingUntil: null,
-      confidence: null,
-      evidence: [],
-      body: 'Gives production and staging builds their own lane so preview floods cannot stall production.',
-      decisionTarget: { kind: 'summer', id: 'vercel-concurrency' },
-    },
-  ],
-};
+import { COMPANY_RESPONSES, snapshot } from './OvieHomeCanvas.test-fixtures';
 
 /**
- * Network-free shell: the inbox answers from a fixture and shipping state is
- * unavailable, so the story shows real asks beside the reserved shipping
- * frames. Populated shipping visuals live in the HomeLoop organism stories.
+ * Network-free Story First shell: company + blocker answer from fixtures;
+ * shipping comes from the HUD query mock path when unavailable.
  */
 function StoryShell({ children }: { readonly children: ReactElement }) {
   const client = new QueryClient({
@@ -42,17 +17,44 @@ function StoryShell({ children }: { readonly children: ReactElement }) {
   });
   return (
     <QueryClientProvider client={client}>
-      <div className='bg-base p-4 text-primary-token'>{children}</div>
+      <div className='min-h-dvh bg-base p-6 text-primary-token'>{children}</div>
     </QueryClientProvider>
   );
 }
 
-function stubHomeFetch() {
+function stubHomeFetch(overrides: Record<string, unknown> = {}) {
+  const responses = { ...COMPANY_RESPONSES, ...overrides };
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
     const url = typeof input === 'string' ? input : input.toString();
-    if (url.includes('/api/ovie/inbox'))
-      return new Response(JSON.stringify(INBOX), { status: 200 });
+    for (const [path, body] of Object.entries(responses)) {
+      if (
+        url.includes(path) ||
+        url.endsWith(path) ||
+        url.includes(path.replace(/^\//, ''))
+      )
+        return new Response(JSON.stringify(body), { status: 200 });
+    }
+    if (url.includes('/api/hud/metrics'))
+      return new Response(JSON.stringify(responses['/api/hud/metrics']), {
+        status: 200,
+      });
+    if (url.includes('/api/admin/hud/founder-funnel'))
+      return new Response(
+        JSON.stringify(responses['/api/admin/hud/founder-funnel?range=7d']),
+        { status: 200 }
+      );
+    if (url.includes('/api/ovie/certifications'))
+      return new Response(
+        JSON.stringify(responses['/api/ovie/certifications']),
+        {
+          status: 200,
+        }
+      );
+    if (url.includes('/api/ovie/home/blocker'))
+      return new Response(JSON.stringify(responses['/api/ovie/home/blocker']), {
+        status: 200,
+      });
     if (url.includes('/api/hud/shipping-state'))
       return new Response('{}', { status: 503 });
     return realFetch(input, init);
@@ -64,7 +66,7 @@ function stubHomeFetch() {
 
 const meta = {
   title: 'Features/Admin/Hud/OvieHomeCanvas',
-  beforeEach: stubHomeFetch,
+  beforeEach: () => stubHomeFetch(),
   component: OvieHomeCanvas,
   parameters: { layout: 'fullscreen' },
   decorators: [
@@ -79,4 +81,54 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const AsksWithShippingUnavailable: Story = {};
+export const StoryFirstFlat: Story = {};
+
+export const StoryFirstFlatBottleneck: Story = {
+  beforeEach: () =>
+    stubHomeFetch({
+      '/api/ovie/home/blocker': {
+        generatedAt: '2026-11-21T00:00:00.000Z',
+        blocker: {
+          schema: 'jovie.company-blocker/v1',
+          id: 'certification:checkout_payment_entitlement',
+          kind: 'certification',
+          step: 'checkout_payment_entitlement',
+          tone: 'bad',
+          text: 'Checkout fails certification, so nobody can pay yet',
+          detailsHref: '/app/ov/certifications',
+          since: '2026-11-18T00:00:00.000Z',
+          nextAction: 'Certify payment path',
+          observedAt: '2026-11-21T00:00:00.000Z',
+        },
+      },
+    }),
+};
+
+export const StoryFirstFlatMelt: Story = {
+  args: {
+    chat: {
+      messages: [
+        {
+          id: 'u1',
+          role: 'user',
+          parts: [{ type: 'text', text: 'Why is checkout blocking revenue?' }],
+        },
+      ],
+      isStreaming: false,
+      composerHasIntent: true,
+      onOpenTranscript: () => undefined,
+    },
+  },
+};
+
+/** Kept for Chromatic identity; shipping feed empty so glance stays quiet. */
+export const QuietShipping: Story = {
+  loaders: [
+    async () => {
+      // Ensure empty delivery shape is referenced for story authors.
+      void emptyDeliverySummary();
+      void snapshot();
+      return {};
+    },
+  ],
+};

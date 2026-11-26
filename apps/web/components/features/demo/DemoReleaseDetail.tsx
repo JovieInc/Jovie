@@ -1,9 +1,9 @@
 'use client';
 
+import { CompositeField, HostDrawnTextarea, IconButton } from '@jovie/ui';
 import { MessageSquare, Paperclip, SendHorizontal, X } from 'lucide-react';
 import {
   DrawerButton,
-  DrawerInlineIconButton,
   DrawerPropertyRow,
   DrawerSectionHeading,
   DrawerSurfaceCard,
@@ -37,13 +37,14 @@ export function DemoReleaseDetail({
         <div className='min-w-0 flex-1 text-app font-medium tracking-tight text-secondary-token'>
           REL-{release.id.slice(0, 4).toUpperCase()}
         </div>
-        <DrawerInlineIconButton
+        <IconButton
+          size='md'
+          variant='inline'
           onClick={onClose}
-          className='size-7 rounded-full'
           aria-label='Close Detail Panel'
         >
           <X className='size-4' />
-        </DrawerInlineIconButton>
+        </IconButton>
       </div>
 
       {/* Scrollable content */}
@@ -188,29 +189,33 @@ export function DemoReleaseDetail({
               <label htmlFor='release-comment' className='sr-only'>
                 Add comment
               </label>
-              <textarea
-                id='release-comment'
-                rows={3}
-                readOnly
-                value='Leave a short update for your team. Demo comments stay local to this preview.'
-                className='w-full resize-none bg-transparent text-xs leading-[1.45] text-secondary-token outline-none placeholder:text-tertiary-token'
-              />
+              <div className='text-xs leading-[1.45] text-secondary-token'>
+                <CompositeField shape='md' size='md' surface='none'>
+                  <HostDrawnTextarea
+                    id='release-comment'
+                    rows={3}
+                    readOnly
+                    value='Leave a short update for your team. Demo comments stay local to this preview.'
+                    className='w-full resize-none'
+                  />
+                </CompositeField>
+              </div>
               <div className='mt-2 flex items-center justify-between border-t border-subtle/65 pt-2'>
                 <div className='inline-flex items-center gap-1.5 text-2xs text-tertiary-token'>
                   <MessageSquare className='size-3.5' aria-hidden />
                   <span>Private team note</span>
                 </div>
                 <div className='flex items-center gap-1.5'>
-                  <DrawerInlineIconButton
-                    className='size-7 rounded-full text-tertiary-token'
+                  <IconButton
+                    size='md'
+                    variant='inline'
                     aria-label='Attach File'
                   >
                     <Paperclip className='size-3.5' />
-                  </DrawerInlineIconButton>
+                  </IconButton>
                   <DrawerButton
                     size='icon'
                     tone='secondary'
-                    className='h-7 w-7 rounded-full'
                     aria-label='Send Comment'
                     onClick={() =>
                       runDemoAction({
@@ -242,7 +247,6 @@ export function DemoReleaseDetail({
         <div className='mt-8 grid grid-cols-2 gap-2 border-t border-(--app-shell-frame-seam) pt-3'>
           <DrawerButton
             tone='secondary'
-            className='justify-center bg-transparent text-tertiary-token'
             onClick={() =>
               runDemoAction({
                 loadingMessage: 'Syncing providers',
@@ -254,7 +258,6 @@ export function DemoReleaseDetail({
           </DrawerButton>
           <DrawerButton
             tone='secondary'
-            className='justify-center bg-transparent text-tertiary-token'
             onClick={() =>
               runDemoAction({
                 loadingMessage: 'Publishing release',

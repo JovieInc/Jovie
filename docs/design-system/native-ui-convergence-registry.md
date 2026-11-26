@@ -76,7 +76,7 @@ create SwiftUI types or authorize a duplicate implementation.
 | Text | `JovieColor` plus `JovieFont`, `JovieTheme.swift:L10-L12,L56-L75` | Inter body/interface and Satoshi display roles, `tokens.ts:L229-L272` | System menu font plus monospaced status output, `MenuMonitorApp.swift` | iOS is Inter-first; macOS is an operator surface and is not a product typography parity target. No serif is introduced. |
 | Spacing/radius | `JovieSpacing` 4/8/12/16/24/32 and `JovieRadius` 6/8/12/16/pill, `JovieTheme.swift:L78-L93` | spacing/radius tokens, `tokens.ts:L162-L177,L203-L224` | System menu layout | Semantic overlap exists, but values are independently owned. |
 | Motion | `JovieMotion`, including reduce-motion consumers, `JovieTheme.swift:L95-L122` | duration/easing/transition tokens, `tokens.ts:L288-L317` | No custom motion contract | iOS ports web motion names but still owns Swift values. |
-| Controls | `JoviePillButtonStyle` and `JovieIconButtonStyle`, `JovieTheme.swift:L182-L222` | shared UI `Button`/link primitives and state matrix | Native `Button` rows, `MenuMonitorApp.swift` | iOS has 44-point icon frames; the canonical 32-visible-inside-44-target rule is an acceptance constraint for handoff, not proof that every existing icon has been measured. |
+| Controls | `JoviePillButtonStyle` / `JovieActionButtonMetrics` (KEEP 28/44) / `JovieIconButtonStyle`, `JovieTheme.swift` | shared UI `Button`/link primitives and state matrix | Native `Button` rows, `MenuMonitorApp.swift` | KEEP projected; Chat face stays 32. |
 | Entity accents | `EntityAccent`, `JovieTheme.swift:L26-L53` | web CSS entity accent mapping referenced by the iOS source and mobile token contract | Not applicable | `verified-contract` for chat entity semantics; no macOS equivalent. |
 | Elevation | Drawer is recessed base; `shellContent` is raised during drawer presentation, `AppShellLeftDrawer.swift:L38-L43` and `AppShellView.swift:L325-L394` | Shell/page/sidebar share the canvas; main content is one raised plane, `AppShellFrame.tsx:L60-L106`; audio tray is a semantic sibling, `L145-L152` | Menu-bar surface only | Handoff invariant: page and sidebar share elevation, main content is one level above, and additional levels are semantic only (QR plate, sheet, overlay). |
 
@@ -255,13 +255,10 @@ merch, composer, and filled/icon geometry variants retain distinct semantics.
    “opacity-only (no offset)” at `AppShellLeftDrawer.swift:L150-L153` but applies
    `.offset(x: ... -8)` at `L159-L163`. `StatTileRevealModifier` repeats the
    same comment/code mismatch at `AudienceHighlightsView.swift:L250-L263`.
-2. **Press token mismatch and stale inventory.** iOS names
-   `JovieMotion.pressScale` the canonical `--scale-press` at
-   `JovieTheme.swift:L120-L122` and sets it to `0.96`. The current web CSS token
-   is `0.98` at `apps/web/styles/design-system.css:L2021-L2024`, while the
-   historical state matrix still documents `active:scale-[0.96]` at
-   `docs/design-system/state-matrix.md:L42`. Keep the token under one owner
-   when a migration is authorized; do not silently alter locked Chat/Calendar.
+2. **Press token (resolved).** `JovieMotion.pressScale` projects web
+   `--scale-press` (`0.98`) via `native-design-system` `motionBindings`;
+   `state-matrix.md` documents `active:scale-press`. Do not silently alter
+   locked Chat/Calendar press behavior.
 3. **Local token ownership.** iOS hard-codes its `Color(hex:)` values in
    `JovieTheme.swift:L4-L24`; web resolves CSS variables in `tokens.ts:L17-L30`.
    The semantic names overlap, but no cross-platform generated token contract

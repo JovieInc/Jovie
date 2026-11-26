@@ -93,4 +93,4 @@ gh pr edit <PR_NUMBER> --add-label "hold"
 ```
 
 Use `hold` only for a concrete machine-verifiable incident. Taste is steered
-before PR creation or certified after landing behind a feature flag.
+before PR creation or certified after landing behind a feature flag. Launch/core surfaces are excepted: ship live or stay a draft (canon/OPERATING_SYSTEM.md §1.16).

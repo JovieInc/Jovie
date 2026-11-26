@@ -32,6 +32,8 @@ export interface PublicPageShellProps {
   /** Set false when the route owns its final CTA (the homepage). */
   readonly footerShowCta?: boolean;
   readonly footerVariant?: 'auto' | 'expanded' | 'minimal';
+  /** Shared header contract for the public marketing route groups. */
+  readonly canonicalMarketingHeader?: boolean;
   readonly headerVariant?: MarketingHeaderVariant;
   /** Overrides the per-page header brand config (icon-only vs lockup). */
   readonly headerBrand?: MarketingHeaderBrand;
@@ -69,6 +71,7 @@ export function PublicPageShell({
   footerDecoration,
   footerShowCta,
   footerVariant,
+  canonicalMarketingHeader = false,
   headerBrand,
   headerCta,
   headerHidePrimaryCta = false,
@@ -92,6 +95,7 @@ export function PublicPageShell({
     >
       {skipToContent ? <SkipToContent /> : null}
       <MarketingHeader
+        canonicalMarketing={canonicalMarketingHeader}
         brand={headerBrand}
         chromeNav={chrome?.nav}
         logoSize={logoSize}

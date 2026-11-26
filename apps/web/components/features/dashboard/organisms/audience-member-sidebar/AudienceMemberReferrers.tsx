@@ -6,6 +6,7 @@
  * Renders source history from structured actions, UTM, and referrers.
  */
 
+import { PlainButton } from '@jovie/ui';
 import {
   Copy,
   Download,
@@ -203,9 +204,9 @@ function SourceActionButton({
   readonly children: ReactNode;
 }) {
   return (
-    <button
+    <PlainButton
       type='button'
-      className='inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
+      className='relative before:absolute before:left-1/2 before:top-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
       title={label}
       aria-label={label}
       onClick={event => {
@@ -214,7 +215,7 @@ function SourceActionButton({
       }}
     >
       {children}
-    </button>
+    </PlainButton>
   );
 }
 

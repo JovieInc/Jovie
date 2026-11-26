@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { LyricsTimeline } from './LyricsTimeline';
 
 const lines = [
@@ -95,5 +97,56 @@ describe('Ion accent polish (glm/lyrics-player)', () => {
     expect(playhead).not.toBeNull();
     expect(playhead?.className).toContain('bg-accent');
     expect(playhead?.className).toContain('ring-accent/20');
+  });
+
+  it('seeks to the clicked position and stays axe-clean', async () => {
+    const user = userEvent.setup();
+    const onSeek = vi.fn();
+    const { container } = render(
+      <LyricsTimeline
+        durationSec={200}
+        currentTimeSec={10}
+        lines={lines}
+        activeIndex={0}
+        onSeek={onSeek}
+      />
+    );
+    const bar = screen.getByRole('button', { name: 'Lyric Timeline' });
+    expect(bar).toHaveAttribute('type', 'button');
+    vi.spyOn(bar, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      width: 100,
+      right: 100,
+      top: 0,
+      bottom: 10,
+      height: 10,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    await user.pointer({
+      keys: '[MouseLeft]',
+      target: bar,
+      coords: { clientX: 50 },
+    });
+    expect(onSeek).toHaveBeenCalledWith(100);
+    await expectNoA11yViolations(container);
+  });
+
+  it('ignores clicks when the duration is unknown, axe-clean', async () => {
+    const user = userEvent.setup();
+    const onSeek = vi.fn();
+    const { container } = render(
+      <LyricsTimeline
+        durationSec={0}
+        currentTimeSec={0}
+        lines={[]}
+        activeIndex={-1}
+        onSeek={onSeek}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: 'Lyric Timeline' }));
+    expect(onSeek).not.toHaveBeenCalled();
+    await expectNoA11yViolations(container);
   });
 });

@@ -66,4 +66,35 @@ describe('AudienceFanCell certificate', () => {
     expect(screen.getByText('سارة المعجبة')).toBeInTheDocument();
     await expectNoA11yViolations(rtl.container);
   });
+
+  it('falls back to the location descriptor when there is no contact chip', () => {
+    render(
+      <AudienceFanCell
+        member={{ ...member, email: null, geoCity: 'Los Angeles' }}
+      />
+    );
+    expect(screen.getByText('Los Angeles')).toBeInTheDocument();
+  });
+
+  it('prefers the contact chip over the descriptor', () => {
+    render(<AudienceFanCell member={{ ...member, geoCity: 'Los Angeles' }} />);
+    expect(screen.getByText('sasha.fan@example.com')).toBeInTheDocument();
+    expect(screen.queryByText('Los Angeles')).not.toBeInTheDocument();
+  });
+
+  it('gives an anonymous visitor a descriptor but no contact chip', () => {
+    render(
+      <AudienceFanCell
+        member={{
+          ...member,
+          displayName: null,
+          email: null,
+          geoCity: 'Berlin',
+          geoCountry: 'DE',
+        }}
+      />
+    );
+    expect(screen.getByText('Anonymous visitor')).toBeInTheDocument();
+    expect(screen.getByText('Berlin, DE')).toBeInTheDocument();
+  });
 });

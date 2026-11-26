@@ -49,7 +49,9 @@ const sheetVariants = cva(
           'data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top',
         ].join(' '),
         bottom: [
-          'inset-x-0 bottom-0 max-h-sheet-viewport border-t',
+          // Top radius is part of the bottom-sheet surface (call sites must not
+          // restyle rounded-* on SheetContent to get this).
+          'inset-x-0 bottom-0 max-h-sheet-viewport rounded-t-2xl border-t',
           'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
         ].join(' '),
         left: [

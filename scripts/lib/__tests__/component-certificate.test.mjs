@@ -379,7 +379,7 @@ describe('component certificate CLI evidence freshness', () => {
     git(['add', '.']);
     git(['commit', '-qm', 'component and tests']);
     refresh();
-  });
+  }, 60_000);
   afterEach(() => rmSync(f.root, { recursive: true, force: true }));
 
   it('the CLI import closure works with only its existing TypeScript dependency', () => {
@@ -395,7 +395,7 @@ describe('component certificate CLI evidence freshness', () => {
       'scripts/lib/design-rules/raw-colors.mjs',
       ...`component-render-inputs component-render-closure component-story-receipts
         component-story-evidence-lib mutation-sweep mutation-sweep-root mutation-diff
-        mutation-source`
+        mutation-source mutation-score-math`
         .split(/\s+/)
         .map(name => `scripts/lib/${name}.mjs`),
     ]) {

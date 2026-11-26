@@ -215,7 +215,7 @@ enum MobileChatContentParser {
   ) -> String? {
     switch dialect {
     case .toolCall:
-      return firstCapture(in: block, pattern: "<name>\\s*([^<]+?)\\s*</name>")
+      return firstCapture(in: block, pattern: #"<name>\s*([^<]+?)\s*</name>"#)
         .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         .flatMap { $0.isEmpty ? nil : $0 }
     case .functionCalls:
@@ -321,16 +321,9 @@ enum MobileChatContentParser {
     var merchResults: [MerchResult] = []
     var videoProposals: [String: MobileChatVideoProposalPayload] = [:]
     let fallbackToolName = extractMostRecentToolName(from: content)
-    let patterns = [
-      "<tool_result>([\\s\\S]*?)</tool_result>",
-      "<function_result>([\\s\\S]*?)</function_result>",
-    ]
+    let resultRegexes = [toolResultRegex, functionResultRegex].compactMap { $0 }
 
-    for pattern in patterns {
-      guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
-        continue
-      }
-
+    for regex in resultRegexes {
       let range = NSRange(content.startIndex..., in: content)
       regex.enumerateMatches(in: content, range: range) { match, _, _ in
         guard
@@ -342,9 +335,9 @@ enum MobileChatContentParser {
 
         let block = String(content[blockRange])
         let toolName =
-          firstCapture(in: block, pattern: "<name>\\s*([^<]+?)\\s*</name>")
-            ?? firstCapture(in: block, pattern: "\"toolName\"\\s*:\\s*\"([^\"]+)\"")
-            ?? firstCapture(in: block, pattern: "\"name\"\\s*:\\s*\"([^\"]+)\"")
+          firstCapture(in: block, pattern: #"<name>\s*([^<]+?)\s*</name>"#)
+            ?? firstCapture(in: block, pattern: #""toolName"\s*:\s*"([^"]+)""#)
+            ?? firstCapture(in: block, pattern: #""name"\s*:\s*"([^"]+)""#)
             ?? fallbackToolName
 
         guard let toolName else { return }
@@ -401,8 +394,8 @@ enum MobileChatContentParser {
   private static func extractMostRecentToolName(from content: String) -> String? {
     var latest: (index: String.Index, name: String)?
 
-    let toolCallPattern = "<tool_call>[\\s\\S]*?<name>\\s*([^<]+?)\\s*</name>[\\s\\S]*?</tool_call>"
-    if let regex = try? NSRegularExpression(pattern: toolCallPattern, options: [.caseInsensitive]) {
+    func consider(regex: NSRegularExpression?) {
+      guard let regex else { return }
       let range = NSRange(content.startIndex..., in: content)
       regex.enumerateMatches(in: content, range: range) { match, _, _ in
         guard
@@ -426,37 +419,14 @@ enum MobileChatContentParser {
       }
     }
 
-    let functionCallsPattern =
-      "<function_calls>[\\s\\S]*?<invoke[^>]*name=[\"']([^\"']+)[\"'][\\s\\S]*?</function_calls>"
-    if let regex = try? NSRegularExpression(pattern: functionCallsPattern, options: [.caseInsensitive]) {
-      let range = NSRange(content.startIndex..., in: content)
-      regex.enumerateMatches(in: content, range: range) { match, _, _ in
-        guard
-          let match,
-          let openRange = Range(match.range, in: content),
-          let nameRange = Range(match.range(at: 1), in: content)
-        else {
-          return
-        }
-
-        let name = String(content[nameRange]).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty else { return }
-
-        if let current = latest {
-          if openRange.lowerBound > current.index {
-            latest = (openRange.lowerBound, name)
-          }
-        } else {
-          latest = (openRange.lowerBound, name)
-        }
-      }
-    }
+    consider(regex: toolCallNameRegex)
+    consider(regex: functionCallsNameRegex)
 
     return latest?.name
   }
 
   private static func resolveResultState(from block: String) -> MobileChatToolCallState {
-    if let explicitState = firstCapture(in: block, pattern: "<state>\\s*([^<]+?)\\s*</state>") {
+    if let explicitState = firstCapture(in: block, pattern: #"<state>\s*([^<]+?)\s*</state>"#) {
       let normalized = explicitState.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
       if normalized.contains("fail") || normalized.contains("denied") || normalized.contains("error") {
         return .failed
@@ -498,7 +468,7 @@ enum MobileChatContentParser {
     isComplete: Bool,
     resultState: MobileChatToolCallState?
   ) -> MobileChatToolCallCardModel? {
-    guard let toolName = firstCapture(in: block, pattern: "<name>\\s*([^<]+?)\\s*</name>") else {
+    guard let toolName = firstCapture(in: block, pattern: #"<name>\s*([^<]+?)\s*</name>"#) else {
       return nil
     }
 
@@ -536,8 +506,8 @@ enum MobileChatContentParser {
 
   private static func extractInvokeToolName(from block: String) -> String? {
     let patterns = [
-      "<invoke[^>]*name=\"([^\"]+)\"",
-      "<invoke[^>]*name='([^']+)'",
+      #"<invoke[^>]*name="([^"]+)""#,
+      #"<invoke[^>]*name='([^']+)'"#,
     ]
 
     for pattern in patterns {
@@ -554,16 +524,9 @@ enum MobileChatContentParser {
 
   private static func parseInvokeParameters(from block: String) -> [String: String] {
     var values: [String: String] = [:]
-    let patterns = [
-      "<parameter[^>]*name=\"([^\"]+)\"[^>]*>([\\s\\S]*?)</parameter>",
-      "<parameter[^>]*name='([^']+)'[^>]*>([\\s\\S]*?)</parameter>",
-    ]
+    let regexes = [parameterDoubleQuoteRegex, parameterSingleQuoteRegex].compactMap { $0 }
 
-    for pattern in patterns {
-      guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
-        continue
-      }
-
+    for regex in regexes {
       let range = NSRange(block.startIndex..., in: block)
       regex.enumerateMatches(in: block, range: range) { match, _, _ in
         guard
@@ -606,15 +569,14 @@ enum MobileChatContentParser {
     guard
       let parametersBlock = firstCapture(
         in: block,
-        pattern: "<parameters>([\\s\\S]*?)</parameters>"
+        pattern: #"<parameters>([\s\S]*?)</parameters>"#
       )
     else {
       return [:]
     }
 
     var values: [String: String] = [:]
-    let elementPattern = "<([A-Za-z0-9_]+)>\\s*([\\s\\S]*?)\\s*</\\1>"
-    guard let regex = try? NSRegularExpression(pattern: elementPattern) else {
+    guard let regex = parameterElementRegex else {
       return values
     }
 
@@ -686,7 +648,7 @@ enum MobileChatContentParser {
 
   static func firstCapture(in text: String, pattern: String) -> String? {
     guard
-      let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+      let regex = captureRegexByPattern[pattern],
       let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
       let range = Range(match.range(at: 1), in: text)
     else {

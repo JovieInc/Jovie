@@ -7,6 +7,7 @@ describe('ContentMetricDelta certificate', () => {
   it('speaks the label instead of the bare figure when one is given', async () => {
     const { container } = render(
       <ContentMetricDelta
+        polarity='higher-is-better'
         direction='up'
         value='+12.5%'
         aria-label='Up 12.5% from last week'
@@ -15,7 +16,7 @@ describe('ContentMetricDelta certificate', () => {
     );
 
     const delta = screen.getByTestId('delta');
-    expect(delta).toHaveClass('text-success');
+    expect(delta).toHaveClass('text-success-text');
     expect(screen.getByText('Up 12.5% from last week')).toHaveClass('sr-only');
     expect(screen.getByText('+12.5%')).toHaveAttribute('aria-hidden', 'true');
     await expectNoA11yViolations(container);
@@ -24,13 +25,23 @@ describe('ContentMetricDelta certificate', () => {
   it('shows a flat zero change and a partial falling value', async () => {
     const { container } = render(
       <div>
-        <ContentMetricDelta direction='flat' value='0%' data-testid='flat' />
-        <ContentMetricDelta direction='down' value='-4.1%' data-testid='down' />
+        <ContentMetricDelta
+          polarity='higher-is-better'
+          direction='flat'
+          value='0%'
+          data-testid='flat'
+        />
+        <ContentMetricDelta
+          polarity='higher-is-better'
+          direction='down'
+          value='-4.1%'
+          data-testid='down'
+        />
       </div>
     );
 
     expect(screen.getByTestId('flat')).toHaveClass('text-tertiary-token');
-    expect(screen.getByTestId('down')).toHaveClass('text-error');
+    expect(screen.getByTestId('down')).toHaveClass('text-error-text');
     expect(screen.getByText('-4.1%')).not.toHaveAttribute('aria-hidden');
     expect(container.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(
       2
@@ -42,12 +53,14 @@ describe('ContentMetricDelta certificate', () => {
     const { container } = render(
       <div>
         <ContentMetricDelta
+          polarity='higher-is-better'
           direction='up'
           value='+1,284 listeners vs. the previous 28 days'
           className='w-40'
         />
         <div dir='rtl' lang='ar'>
           <ContentMetricDelta
+            polarity='higher-is-better'
             direction='up'
             value='+12.5%'
             aria-label='ارتفاع بنسبة 12.5٪'

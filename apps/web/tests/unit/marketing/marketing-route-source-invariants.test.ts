@@ -265,10 +265,11 @@ describe('marketing route source invariants (manifest-driven)', () => {
     for (const file of [
       'components/features/auth/AuthLayout.tsx',
       'components/features/auth/AuthBrandPanel.tsx',
-      'components/atoms/AppIconButton.tsx',
     ]) {
       expect(files).toContain(file);
     }
+    // Drift T2.1: AuthLayout uses @jovie/ui IconButton directly (no AppIconButton).
+    expect(files).not.toContain('components/atoms/AppIconButton.tsx');
   });
 
   it('detects each rule on a known-bad sample', () => {

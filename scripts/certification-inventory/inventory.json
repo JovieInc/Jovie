@@ -1,9 +1,9 @@
 {
   "schema": "jovie.certification-inventory/v1",
-  "inventoryVersion": "2026-09-30.1",
+  "inventoryVersion": "2026-11-23.1",
   "issue": "JOV-7328",
   "certificationContract": "jovie.certification/v1",
-  "asOf": "2026-09-30T00:00:00Z",
+  "asOf": "2026-11-23T22:00:00Z",
   "notes": "Bootstrap certification debt denominator. Nothing is removed for being old, hard, optional, or uninstrumented; statuses are source-truthful classifications, not certificates.",
   "objects": [
     {
@@ -284,6 +284,25 @@
       "uiRequired": true,
       "expectedEvidence": ["end-to-end publish outcome receipt"],
       "issues": ["JOV-7328"]
+    },
+    {
+      "id": "capability:tech-debt-closed-loop",
+      "title": "Summer tech-debt closed loop",
+      "layer": "capability",
+      "status": "never-evaluated",
+      "owner": "summer",
+      "prerequisites": [],
+      "journeys": ["journey:tech-debt-closed-loop"],
+      "surfaces": ["ops", "automation"],
+      "risk": "high",
+      "uiRequired": false,
+      "expectedEvidence": [
+        "waste-latest.json tech-debt digest freshness within gem:waste-loop maxStalenessMinutes",
+        "\u22651 autonomous remediated debt class with shrink-only or durable guard (cert-screens.debt first)",
+        "factory-fp recovery dedupe receipt (re-signal \u2192 exists, no duplicate Linear/PR)",
+        "summer commissioning probe summer.debt.closed-loop attested runtime receipt (SUMMER-COMM-017)"
+      ],
+      "issues": ["JOV-14725", "JOV-5853"]
     }
   ]
 }

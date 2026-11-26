@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og';
 import { type NextRequest, NextResponse } from 'next/server';
 import { profileCardLayout } from '@/lib/profile/profile-card-layout';
+import { isCreatorRowPubliclyVisible } from '@/lib/profile/public-creator-visibility.server';
 import { getProfileWithLinks } from '@/lib/services/profile';
 
 export const runtime = 'nodejs';
@@ -54,8 +55,19 @@ export async function GET(
     return fallbackCard(normalizedUsername, size);
   }
 
-  if (!profileResult) {
-    return fallbackCard(normalizedUsername, size);
+  if (
+    !profileResult ||
+    !isCreatorRowPubliclyVisible({
+      handle: normalizedUsername,
+      isPublic: profileResult.isPublic,
+      ownerEmail: profileResult.userEmail,
+      settings: profileResult.settings,
+    })
+  ) {
+    return new NextResponse('Not Found', {
+      status: 404,
+      headers: { 'Cache-Control': 'no-store' },
+    });
   }
 
   const artistName = profileResult.displayName || username;

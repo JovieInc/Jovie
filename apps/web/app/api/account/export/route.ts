@@ -25,7 +25,7 @@ export const runtime = 'nodejs';
  * the same transaction handle after transaction-local RLS setup.
  */
 export async function GET() {
-  const { userId } = await getCachedAuth();
+  const { userId } = await getCachedAuth({ session: 'fresh' });
   if (!userId) {
     return NextResponse.json(
       { error: 'Unauthorized' },

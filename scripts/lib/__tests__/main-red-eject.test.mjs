@@ -319,6 +319,7 @@ describe('app-installation rate-limit guard (2026-10-31 5 h queue stall)', () =>
     );
     expect(wf).toContain('GH_FALLBACK_TOKEN: ${{ github.token }}');
     expect(wf).toMatch(/pull-requests: write/);
+    expect(wf).toMatch(/statuses: write/);
     expect(wf).toMatch(/if: \$\{\{ failure\(\) \}\}[\s\S]*alert-failure/);
   });
 });

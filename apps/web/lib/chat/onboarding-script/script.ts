@@ -106,11 +106,22 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
     'v6',
     '{name} is the match, with {followers} Spotify followers. Lock in the handle below.'
   ),
+  // Handle-by-default: match fills the handle; Keep is the only required action.
+  line(
+    'confirm_artist',
+    'v7',
+    'Found {name} on Spotify: {followers} followers. Keep the handle below when it looks right.'
+  ),
 
   line(
     'confirm_artist_no_data',
     'v4',
     'Locked the match. Spotify is slow to send the counts, so we keep moving without them. Confirm the handle below.'
+  ),
+  line(
+    'confirm_artist_no_data',
+    'v5',
+    'Locked the match. Spotify is slow to send the counts, so we keep moving without them. Keep the handle below when it looks right.'
   ),
 
   line(
@@ -118,10 +129,13 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
     'v3',
     'Checking @{handle} now. This is the public link for the profile.'
   ),
+  line(
+    'handle',
+    'v4',
+    '@{handle} is ready from the match. Keep it, or Change Handle.'
+  ),
 
-  // Shown with the social-link card right after the handle is confirmed:
-  // one ask per turn, and it matches the card (2026-10-31 walk: the audience
-  // question rode on top of an "attach an account" card).
+  // Legacy mid-flight social card (deferred after Keep for new sessions).
   line(
     'attach_social',
     'v1',

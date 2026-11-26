@@ -1,0 +1,45 @@
+{
+  "schema": "jovie-smooth-baseline/v1",
+  "surfaceId": "onboarding-start",
+  "label": "/start onboarding",
+  "platform": "desktop",
+  "routeId": "onboarding",
+  "resolvedPath": "/start",
+  "measuredAt": "2026-11-21T07:39:56.464Z",
+  "baseUrl": "https://jovie-aksqwggav-jovie.vercel.app",
+  "runs": 3,
+  "cpuThrottleRate": 1,
+  "viewport": {
+    "width": 1512,
+    "height": 944
+  },
+  "targets": {
+    "cls": 0.02,
+    "lcpMs": 2000,
+    "inpMs": 150,
+    "fullPageReloads": 0,
+    "duplicateFetches": 0,
+    "flickerEvents": 0,
+    "hydrationWarnings": 0
+  },
+  "median": {
+    "cls": 0,
+    "lcpMs": 412,
+    "inpMs": 2,
+    "fcpMs": 309,
+    "ttfbMs": 100,
+    "fullPageReloads": 0,
+    "duplicateFetches": 0,
+    "flickerEvents": 0,
+    "hydrationWarnings": 0
+  },
+  "flags": {
+    "clsPass": true,
+    "lcpPass": true,
+    "inpPass": true,
+    "reloadPass": true,
+    "dupFetchPass": true,
+    "flickerPass": true,
+    "hydrationPass": true
+  }
+}

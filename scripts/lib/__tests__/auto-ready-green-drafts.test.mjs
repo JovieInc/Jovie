@@ -20,7 +20,10 @@ import {
   buildWriterProofReceipt,
   renderWriterProofReceipt,
 } from '../writer-owned-pr-promotion.mjs';
-import { createGreenSourceController } from './fixtures/green-source-controller.mjs';
+import {
+  createGreenSourceController,
+  greenPushReceiptCases,
+} from './fixtures/green-source-controller.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 const fleetScript = readFileSync(
@@ -676,39 +679,20 @@ describe('green-source shell controller (fake gh)', () => {
     expect(result.calls.some(call => call.startsWith('pr ready'))).toBe(false);
   });
 
-  it('leaves a draft parked after its last push, and undrafts it after a new push', () => {
-    const converted = {
-      __typename: 'ConvertToDraftEvent',
-      createdAt: '2026-10-13T02:00:00Z',
-    };
-    const commit = at => ({
-      __typename: 'PullRequestCommit',
-      commit: { committedDate: at },
-    });
-    const parked = runController(
-      [
-        listed({
-          number: 21429,
-          timeline: [commit('2026-10-13T01:00:00Z'), converted],
-        }),
-      ],
-      { TARGET_PR: '21429', TARGET_HEAD: head, MISSED_COHORT: '0' }
-    );
-    expect(parked.status).toBe(0);
-    expect(parked.stdout).toContain('green-source parked-draft');
-    expect(parked.stdout).not.toContain('would mark #21429 ready');
-    const pushed = runController(
-      [
-        listed({
-          number: 21429,
-          timeline: [converted, commit('2026-10-13T03:00:00Z')],
-        }),
-      ],
-      { TARGET_PR: '21429', TARGET_HEAD: head, MISSED_COHORT: '0' }
-    );
-    expect(pushed.status).toBe(0);
-    expect(pushed.stdout).toContain('would mark #21429 ready');
-  });
+  it.each(greenPushReceiptCases({ head, other, listed }))(
+    'uses native push evidence for $name',
+    ({ pr, eligible }) => {
+      const result = runController([pr], {
+        TARGET_PR: '21429',
+        TARGET_HEAD: head,
+        MISSED_COHORT: '0',
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout.includes('would mark #21429 ready')).toBe(eligible);
+      if (!eligible)
+        expect(result.stdout).toContain('green-source parked-draft');
+    }
+  );
 
   it('an event for a ready PR costs one API read and never lists every PR', () => {
     const result = runController([listed({ number: 21261, isDraft: false })], {

@@ -69,9 +69,13 @@ beforeAll(async () => {
   holder.db = database;
 }, 120_000);
 
-afterAll(async () => client?.close());
+afterAll(async () => {
+  vi.unstubAllEnvs();
+  await client?.close();
+});
 
 beforeEach(async () => {
+  vi.stubEnv('FEATURE_PUBLIC_SIGNUP_CLOSED', 'true');
   await client.exec(
     'TRUNCATE ba_sessions, ba_accounts, ba_verifications, ba_users, waitlist_entries, users CASCADE'
   );

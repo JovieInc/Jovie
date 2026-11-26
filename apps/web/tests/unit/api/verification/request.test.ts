@@ -7,6 +7,7 @@ const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockNotifyVerificationRequest = vi.hoisted(() => vi.fn());
 const mockCheckVerificationRequestRateLimit = vi.hoisted(() => vi.fn());
 const mockCreateRateLimitHeaders = vi.hoisted(() => vi.fn(() => ({})));
+const mockEntitlements = vi.hoisted(() => vi.fn());
 
 const mockLimit = vi.hoisted(() => vi.fn());
 const mockWhere = vi.hoisted(() => vi.fn(() => ({ limit: mockLimit })));
@@ -15,6 +16,10 @@ const mockSelect = vi.hoisted(() => vi.fn(() => ({ from: mockFrom })));
 
 vi.mock('@/lib/auth/session', () => ({
   withDbSession: mockWithDbSession,
+}));
+
+vi.mock('@/lib/entitlements/server', () => ({
+  getCurrentUserEntitlements: mockEntitlements,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -29,7 +34,6 @@ vi.mock('@/lib/db/schema/auth', () => ({
     clerkId: 'clerkId',
     name: 'name',
     email: 'email',
-    isPro: 'isPro',
     deletedAt: 'deletedAt',
   },
 }));
@@ -41,12 +45,6 @@ vi.mock('@/lib/db/schema/profiles', () => ({
     usernameNormalized: 'usernameNormalized',
     isVerified: 'isVerified',
   },
-}));
-
-vi.mock('drizzle-orm', () => ({
-  and: vi.fn(() => 'and-condition'),
-  eq: vi.fn(() => 'eq-condition'),
-  isNull: vi.fn(() => 'null-condition'),
 }));
 
 vi.mock('@/lib/verification/notifications', () => ({
@@ -76,6 +74,7 @@ describe('POST /api/verification/request', () => {
       async (callback: (clerkUserId: string) => Promise<NextResponse>) =>
         callback('clerk_123')
     );
+    mockEntitlements.mockResolvedValue({ canBeVerified: true, isPro: true });
     mockLimit
       .mockResolvedValueOnce([
         {
@@ -83,7 +82,6 @@ describe('POST /api/verification/request', () => {
           clerkId: 'clerk_123',
           name: 'Alex Artist',
           email: 'alex@example.com',
-          isPro: true,
         },
       ])
       .mockResolvedValueOnce([
@@ -105,7 +103,21 @@ describe('POST /api/verification/request', () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true });
+    expect(mockEntitlements).toHaveBeenCalledOnce();
     expect(mockCaptureError).not.toHaveBeenCalled();
+  });
+
+  it('rejects when canBeVerified is false', async () => {
+    mockEntitlements.mockResolvedValueOnce({
+      canBeVerified: false,
+      isPro: false,
+    });
+
+    const response = await POST();
+
+    expect(response.status).toBe(403);
+    expect(mockNotifyVerificationRequest).not.toHaveBeenCalled();
+    expect(mockSelect).not.toHaveBeenCalled();
   });
 
   it('fails visibly when notification is skipped', async () => {

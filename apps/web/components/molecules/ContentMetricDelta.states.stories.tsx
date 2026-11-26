@@ -10,6 +10,7 @@ const meta = {
   },
   args: {
     direction: 'up',
+    polarity: 'higher-is-better',
     value: '+12.5%',
   },
 } satisfies Meta<typeof ContentMetricDelta>;

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 
 import { updateCreatorAvatarAsAdmin } from '@/app/app/(shell)/admin/actions';
 import { captureCriticalError } from '@/lib/error-tracking';
@@ -8,10 +9,11 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-interface AdminAvatarPayload {
-  profileId?: string;
-  avatarUrl?: string;
-}
+/** Schema for the admin avatar-update request body. */
+const adminAvatarSchema = z.object({
+  profileId: z.string().min(1),
+  avatarUrl: z.string().min(1),
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,21 +35,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = (await request
-      .json()
-      .catch(() => null)) as AdminAvatarPayload | null;
-
-    if (!body?.profileId || !body?.avatarUrl) {
+    const body: unknown = await request.json().catch(() => null);
+    const parsed = adminAvatarSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
         { error: 'profileId and avatarUrl are required' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
-    await updateCreatorAvatarAsAdmin(body.profileId, body.avatarUrl);
+    await updateCreatorAvatarAsAdmin(
+      parsed.data.profileId,
+      parsed.data.avatarUrl
+    );
 
     return NextResponse.json(
-      { avatarUrl: body.avatarUrl },
+      { avatarUrl: parsed.data.avatarUrl },
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {

@@ -1,6 +1,7 @@
 'use client';
 
 import { Activity } from 'lucide-react';
+import { FunnelTracker } from '@/components/molecules/FunnelTracker';
 import { computeRatePercent } from '@/lib/analytics/metrics';
 import type { SummerOpsCard } from '@/lib/ovie/ops-card';
 import { cn } from '@/lib/utils';
@@ -26,6 +27,11 @@ function formatObservedAt(observedAt: string | null): string | null {
     hour: 'numeric',
     minute: '2-digit',
   });
+}
+
+function formatKindLabel(kind: string): string {
+  const label = kind.replaceAll('-', ' ');
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function seriesMax(card: SummerOpsCard): number {
@@ -63,8 +69,8 @@ export function ChatOpsDataCard({ card, summary }: ChatOpsDataCardProps) {
               <Activity className='h-3.5 w-3.5' strokeWidth={2} />
             </div>
             <div className='min-w-0'>
-              <p className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
-                {card.kind.replaceAll('-', ' ')}
+              <p className='text-2xs font-medium tracking-wide text-tertiary-token'>
+                {formatKindLabel(card.kind)}
               </p>
               <p className='mt-0.5 text-sm font-semibold leading-5 text-primary-token'>
                 {card.title}
@@ -87,6 +93,12 @@ export function ChatOpsDataCard({ card, summary }: ChatOpsDataCardProps) {
           <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
             {summary ?? card.summary}
           </p>
+        ) : null}
+
+        {card.funnel ? (
+          <div className='mt-3'>
+            <FunnelTracker view={card.funnel} hideTitle />
+          </div>
         ) : null}
 
         {card.facts.length > 0 ? (

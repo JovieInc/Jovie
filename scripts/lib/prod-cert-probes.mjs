@@ -228,17 +228,32 @@ export const EXPECTED_BROWSER_CHECKS = Object.freeze({
     'start-chat-first-reply',
     'golden-path-preview-has-release',
   ],
-  onboarding: ['dashboard-first-value', 'fresh-user-onboarding-first-value'],
+  onboarding: [
+    'dashboard-first-value',
+    'fresh-user-onboarding-first-value',
+    'cone-activation-immediate-value',
+    'cone-activation-visible-path',
+    'cone-activation-no-dead-end',
+    'cone-activation-continue-without-rescue',
+  ],
   chat: ['composer-ready', 'first-reply'],
   'public-profile': [
     'owned-profile-renders-publicly',
     'profile-edit-save-readback',
+    'profile-links-save-readback',
   ],
   smartlink: ['click-analytics-capture'],
-  // fresh-user-checkout-entry: an account that signed up through the public
-  // path reaches checkout. Blocked until the browser run walks it (truthful
-  // certification, 2026-11-08); the seeded canary alone proves nothing.
-  checkout: ['checkout-entry-renders', 'fresh-user-checkout-entry'],
+  // fresh-user-checkout-entry blocked until walked; cone-checkout-*=JOV-9826 TEST.
+  checkout: [
+    'checkout-entry-renders',
+    'fresh-user-checkout-entry',
+    'cone-checkout-success-truthful',
+    'cone-checkout-cancel-truthful',
+    'cone-checkout-failure-truthful',
+    'cone-checkout-payment-is-authority',
+    'cone-checkout-entitlement-agrees',
+    'cone-checkout-retry-idempotent',
+  ],
 });
 
 export function missingBrowserChecks({
@@ -248,6 +263,7 @@ export function missingBrowserChecks({
   now,
   capabilities = null,
   producerSourceSha = null,
+  servedSha = null,
 }) {
   const expected = EXPECTED_BROWSER_CHECKS[surface] ?? [];
   const at = now();
@@ -257,6 +273,9 @@ export function missingBrowserChecks({
       : capabilities
         ? new Set(capabilities)
         : null;
+  const sameBuild = Boolean(
+    servedSha && producerSourceSha && servedSha === producerSourceSha
+  );
   return expected
     .filter(id => !present.some(c => c.id === id))
     .map(id => ({
@@ -266,11 +285,13 @@ export function missingBrowserChecks({
       endedAt: at,
       summary:
         declared && !declared.has(id)
-          ? `served build predates browser check ${id} (its auth smoke does not implement it${
-              producerSourceSha
-                ? `; producer checkout ${producerSourceSha.slice(0, 8)}`
-                : ''
-            }); certifies once production is promoted past it`
+          ? sameBuild
+            ? `auth smoke at ${servedSha.slice(0, 8)} does not declare browser check ${id} (missing producer implementation, not deploy skew)`
+            : `served build predates browser check ${id} (its auth smoke does not implement it${
+                producerSourceSha
+                  ? `; producer checkout ${producerSourceSha.slice(0, 8)}`
+                  : ''
+              }); certifies once production is promoted past it`
           : authStatus === 'not-configured'
             ? 'sanctioned production identity (E2E_PROD_USER_EMAIL + DATABASE_URL in Doppler jovie-web/prd) is not configured for this run'
             : `browser step did not run (auth smoke ${authStatus || 'unknown'})`,

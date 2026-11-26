@@ -46,7 +46,7 @@ git worktree add /tmp/jovie-worktrees/jov-<ISSUE_NUMBER> -b tim/jov-<ISSUE_NUMBE
 
 ```bash
 cd /tmp/jovie-worktrees/jov-<ISSUE_NUMBER>
-pnpm install  # ~20s with pnpm's content-addressable store (hard-links)
+pnpm install --offline --frozen-lockfile  # ~20s warm store; --prefer-offline if cold
 ```
 
 Turbo cache is shared automatically — no configuration needed.
@@ -92,7 +92,7 @@ Your branch is: tim/jov-<NUMBER>-<slug>
 1. ALL file operations MUST use /tmp/jovie-worktrees/jov-<NUMBER> as the base path
 2. ALL bash commands MUST cd to /tmp/jovie-worktrees/jov-<NUMBER> first
 3. NEVER cd to or modify the main repo at /Users/timwhite/Documents/GitHub/TBF/Jovie
-4. Run `pnpm install` before starting work (one-time, ~20s)
+4. Run `pnpm install --offline --frozen-lockfile` before starting work (one-time, ~20s; `--prefer-offline` if the store is cold)
 5. After implementation, run: pnpm run typecheck && pnpm run biome:check && pnpm run test
 6. Commit with conventional commit format: fix|feat|refactor: description (JOV-<NUMBER>)
 7. Push and create PR: git push -u origin <branch> && gh pr create
@@ -151,7 +151,7 @@ git worktree add /tmp/jovie-worktrees/jov-XXX -b tim/jov-XXX-slug origin/main
 ```bash
 cd /tmp/jovie-worktrees/jov-XXX
 rm -rf node_modules apps/web/node_modules packages/ui/node_modules
-pnpm install
+pnpm install --offline --frozen-lockfile   # --prefer-offline --frozen-lockfile if the store is cold
 ```
 
 ### Agent's typecheck/lint fails

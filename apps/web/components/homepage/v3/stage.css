@@ -21,10 +21,12 @@
   --hv3-b1: var(--color-border-subtle);
   --hv3-b2: var(--color-border-default);
   --hv3-b3: var(--color-border-strong);
-  --hv3-ion: var(--color-accent);
+  /* The section's one accent, from the ZiaWI pack (ion, ultra, pulse).
+     Light only: hairlines, rings and small points. */
+  --hv3-accent: var(--color-accent);
   --hv3-selected: var(--color-bg-selected);
-  --hv3-ion-glow: color-mix(in srgb, var(--hv3-ion) 20%, transparent);
-  --hv3-ion-faint: color-mix(in srgb, var(--hv3-ion) 8%, transparent);
+  --hv3-accent-glow: color-mix(in srgb, var(--hv3-accent) 12%, transparent);
+  --hv3-accent-faint: color-mix(in srgb, var(--hv3-accent) 6%, transparent);
   --hv3-shade: var(--color-bg-base);
   --hv3-light: var(--color-text-primary-token);
   --hv3-display: var(--font-display);
@@ -60,6 +62,44 @@
   line-height: normal;
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
+}
+
+/* One accent per section (and per Orbit), in pack order. */
+.hv3[data-accent="ion"],
+.hv3-orbit[data-accent="ion"] {
+  --hv3-accent: var(--color-accent);
+}
+
+.hv3[data-accent="ultra"],
+.hv3-orbit[data-accent="ultra"] {
+  --hv3-accent: var(--color-accent-purple);
+}
+
+.hv3[data-accent="pulse"],
+.hv3-orbit[data-accent="pulse"] {
+  --hv3-accent: var(--color-accent-pink);
+}
+
+/* Sections that share one component file take their accent here, keyed by
+   section, so each stays one pack accent (hero and claim are ion, the
+   default). Profile pulse, releases ultra, specs pulse. */
+.hv3[data-pen-section="profile"] {
+  --hv3-accent: var(--color-accent-pink);
+}
+
+.hv3[data-pen-section="releases"] {
+  --hv3-accent: var(--color-accent-purple);
+}
+
+/* Neutral: the light is grey, for the footer. */
+.hv3[data-accent="neutral"],
+.hv3-orbit[data-accent="neutral"] {
+  --hv3-accent: var(--color-text-secondary-token);
+}
+
+.hv3-orbit {
+  --hv3-accent-glow: color-mix(in srgb, var(--hv3-accent) 12%, transparent);
+  --hv3-accent-faint: color-mix(in srgb, var(--hv3-accent) 6%, transparent);
 }
 
 .hv3 :where(h1, h2, h3, h4, h5, p, dl, dd, ol, ul, figure) {
@@ -136,7 +176,7 @@
 }
 
 .hv3-orbit stop {
-  stop-color: var(--hv3-ion);
+  stop-color: var(--hv3-accent);
 }
 
 .hv3-orbit__ring {
@@ -155,13 +195,11 @@
   fill: none;
   opacity: 0.7;
   stroke-linecap: round;
-  stroke-width: 1.5;
+  stroke-width: 1;
 }
 
-.hv3-orbit__bloom {
-  fill: none;
-  opacity: 0.45;
-  stroke-width: 8;
+.hv3-orbit__point {
+  fill: var(--hv3-accent);
 }
 
 .hv3-orbit__sweep {
@@ -179,11 +217,6 @@
   stroke-width: 1;
 }
 
-/* Key light, emitted from the lit arc (drawn in the SVG). */
-.hv3-orbit__light {
-  filter: blur(0.625rem);
-}
-
 /* ── Stage and camera ─────────────────────────────────────────────── */
 
 .hv3-stage {
@@ -197,11 +230,16 @@
   -webkit-font-smoothing: subpixel-antialiased;
 }
 
+/* The floor light is one hairline under the stage, not a wash. */
 .hv3-bounce {
   position: absolute;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, var(--hv3-ion-glow), transparent);
-  filter: blur(2.5rem);
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--hv3-accent) 45%, transparent) 50%,
+    transparent
+  );
   pointer-events: none;
 }
 
@@ -297,10 +335,9 @@
   flex: none;
   width: 0.5625rem;
   height: 0.5625rem;
-  border: 1px solid var(--hv3-ion);
+  border: 1px solid var(--hv3-accent);
   border-radius: 50%;
   background: var(--hv3-canvas);
-  box-shadow: 0 0 0.75rem var(--hv3-ion-glow);
 }
 
 .hv3-callout__leader {
@@ -334,7 +371,7 @@
 
 .hv3-connector path {
   fill: none;
-  stroke: var(--hv3-ion);
+  stroke: var(--hv3-accent);
   stroke-dasharray: 2 4;
   stroke-opacity: 0.6;
   stroke-width: 1;
@@ -342,7 +379,7 @@
 
 .hv3-connector circle {
   fill: var(--hv3-canvas);
-  stroke: var(--hv3-ion);
+  stroke: var(--hv3-accent);
 }
 
 /* ── Motion (off under reduced motion; transforms and opacity only) ── */

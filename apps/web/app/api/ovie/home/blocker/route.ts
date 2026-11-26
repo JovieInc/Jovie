@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { readCompanyStateCache } from '@/lib/ovie/company-state.server';
+import {
+  readCompanyStateCache,
+  readLiveCompanyBlocker,
+} from '@/lib/ovie/company-state.server';
 import { authorizeSummerControl } from '@/lib/ovie/control';
 import { resolveOviePrincipal } from '@/lib/ovie/mcp/principal';
 
@@ -11,8 +14,10 @@ const headers = { 'Cache-Control': 'private, no-store' } as const;
  * The revenue blocker Ovie Home leads with, read from the cached company
  * snapshot (zero third-party calls). Summer's brief reads the same field from
  * `/api/internal/ovie/summer-company/state`, so both name the same blocker.
- * `blocker: null` with a snapshot means nothing is blocking revenue; a missing
- * snapshot is a 503 so Home never shows "clear" on no data.
+ * `blocker: null` with a snapshot means nothing is blocking revenue. With no
+ * cached snapshot, Home reads the same sources live (never publishing) so it
+ * still leads with the revenue blocker; only a failed live read is a 503, so
+ * Home never shows "clear" on no data.
  */
 export async function GET(request: Request): Promise<NextResponse> {
   let principal;
@@ -35,10 +40,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   try {
     const readback = await readCompanyStateCache({ track: false });
     if (!readback) {
-      return NextResponse.json(
-        { error: 'company_state_not_cached' },
-        { status: 503, headers }
-      );
+      return NextResponse.json(await readLiveCompanyBlocker(), { headers });
     }
     return NextResponse.json(
       {

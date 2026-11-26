@@ -10,6 +10,11 @@ export const BUTTON_VARIANT_NAMES = [
   'tertiary',
   'ghost',
   'link',
+  // Glass material family (Drift T2.3): owned by Button so IconButton /
+  // native chat surfaces project through one vocabulary — no twin component.
+  'frosted',
+  'frosted-ghost',
+  'frosted-outline',
 ] as const;
 
 export const BUTTON_SIZE_NAMES = [
@@ -115,9 +120,9 @@ export type ButtonVariant = (typeof BUTTON_VARIANT_NAMES)[number];
 export type ButtonSize = (typeof BUTTON_SIZE_NAMES)[number];
 
 /**
- * ActionButton / product CTA lock (Tim KEEP 2026-09-10 ~1:26 PT).
- * Visible pill is 28px. Mobile tap target is 44px wrapping that pill.
- * Not 32-in-44 and not density-32 on every size.
+ * ActionButton CTA lock (Tim KEEP 2026-09-10; native sync-28). Visible
+ * 28px / hit 44px. Native metrics project via `actionButtonBindings`;
+ * Chat composer stays locked 32pt.
  */
 export const ACTION_BUTTON_VISIBLE_HEIGHT_PX = 28;
 export const ACTION_BUTTON_MOBILE_HIT_TARGET_PX = 44;
@@ -137,13 +142,33 @@ export interface ButtonStateLabels {
 /** Semantic CTAs share the canonical 28px control with a 44px mobile hit. */
 export const CTA_BUTTON_SIZE = 'marketing' as const satisfies ButtonSize;
 
+/**
+ * Named ActionButton geometry preset for product chrome (toolbar / header).
+ * `PageToolbarActionButton` and `DashboardHeaderActionButton` consume this —
+ * do not fork visible height to 32 (`h-8`) on web.
+ *
+ * `iconButtonSize` is the IconButton size whose face matches
+ * `ACTION_BUTTON_VISIBLE_HEIGHT_PX` (`sm` → 28px / `icon-sm`).
+ */
+export const ACTION_BUTTON_PRESET = {
+  size: CTA_BUTTON_SIZE,
+  iconButtonSize: 'sm',
+  visibleHeightPx: ACTION_BUTTON_VISIBLE_HEIGHT_PX,
+  mobileHitTargetPx: ACTION_BUTTON_MOBILE_HIT_TARGET_PX,
+  labelWeight: ACTION_BUTTON_LABEL_WEIGHT,
+  radiusPx: ACTION_BUTTON_RADIUS_PX,
+} as const;
+
+/**
+ * Tailwind face lock for workspace ActionButton chrome (28px = `h-7`).
+ * Consumers may add paint/hover; must not override height to `h-8`.
+ */
+export const ACTION_BUTTON_FACE_CLASSNAME = 'h-7';
+
 export type DeprecatedButtonVariant =
   | 'accent'
   | 'outline'
   | 'destructive'
-  | 'frosted'
-  | 'frosted-ghost'
-  | 'frosted-outline'
   | 'whitePill';
 export type DeprecatedButtonSize = 'default' | 'xl' | 'hero';
 export type ButtonVariantInput = ButtonVariant | DeprecatedButtonVariant | null;
@@ -156,9 +181,6 @@ const DEPRECATED_VARIANT_ALIASES: Record<
   accent: 'primary',
   outline: 'secondary',
   destructive: 'primary',
-  frosted: 'secondary',
-  'frosted-ghost': 'ghost',
-  'frosted-outline': 'secondary',
   whitePill: 'primary',
 };
 

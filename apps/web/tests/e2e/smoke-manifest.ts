@@ -38,6 +38,8 @@ export const DESKTOP_SMOKE_SPECS = [
   'chat-performance-ratchet.spec.ts',
   'chat-cold-load-profile.spec.ts',
   'library-cold-load-profile.spec.ts',
+  // Warn-only receipt for time to fully loaded first dashboard.
+  'first-dashboard-ready.spec.ts',
 ] as const;
 
 export const MOBILE_SMOKE_SPECS = [

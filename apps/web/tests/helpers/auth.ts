@@ -238,7 +238,7 @@ export async function setTestAuthBypassSession(
   persona: DevTestAuthPersona | null,
   overrideUserId?: string | null,
   options?: { readonly email?: string }
-): Promise<void> {
+): Promise<{ userId: string; email: string | null }> {
   const configuredBaseUrl = process.env.BASE_URL?.trim();
   const baseUrl =
     configuredBaseUrl && configuredBaseUrl !== '/'
@@ -284,14 +284,25 @@ export async function setTestAuthBypassSession(
   const body = (await response.json().catch(() => null)) as {
     success?: boolean;
     userId?: string | null;
+    email?: string | null;
   } | null;
 
-  if (!response.ok() || body?.success !== true || !body.userId) {
+  if (
+    !response.ok() ||
+    body?.success !== true ||
+    typeof body.userId !== 'string' ||
+    !body.userId ||
+    (options?.email !== undefined && body.email !== options.email)
+  ) {
     throw new TestAuthError(
       `Better Auth test session provisioning failed (${response.status()}).`,
       'CLERK_SETUP_FAILED'
     );
   }
+  return {
+    userId: body.userId,
+    email: typeof body.email === 'string' ? body.email : null,
+  };
 }
 
 /** Refill a controlled field until React hydration retains it and enables submit. */
@@ -486,7 +497,7 @@ export async function prepareBetterAuthEmailOtp(
 export async function waitForAuthenticatedHealth(
   page: Page,
   expectedUserId?: string | null,
-  options: { readonly timeout?: number } = {}
+  options: { readonly timeout?: number; readonly cookieOnly?: boolean } = {}
 ): Promise<void> {
   const timeout = options.timeout ?? 90_000;
   const configuredBaseUrl = process.env.BASE_URL?.trim();
@@ -495,10 +506,12 @@ export async function waitForAuthenticatedHealth(
       ? configuredBaseUrl.replace(/\/$/, '')
       : 'http://localhost:3100';
   const sessionUrl = `${baseUrl}/api/dev/test-auth/session`;
-  const headers = {
-    [TEST_MODE_HEADER]: TEST_AUTH_BYPASS_MODE,
-    ...(expectedUserId ? { [TEST_USER_ID_HEADER]: expectedUserId } : {}),
-  };
+  const headers = options.cookieOnly
+    ? {}
+    : {
+        [TEST_MODE_HEADER]: TEST_AUTH_BYPASS_MODE,
+        ...(expectedUserId ? { [TEST_USER_ID_HEADER]: expectedUserId } : {}),
+      };
 
   await expect
     .poll(

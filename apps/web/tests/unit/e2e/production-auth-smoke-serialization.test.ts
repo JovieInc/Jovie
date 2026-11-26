@@ -6,6 +6,11 @@ const PRODUCTION_AUTH_SMOKE_PATH = path.resolve(
   __dirname,
   '../../e2e/smoke-prod-auth.spec.ts'
 );
+// The edit-readback step's save calls live in its outcome helper.
+const PROD_CERT_OUTCOMES_PATH = path.resolve(
+  __dirname,
+  '../../e2e/utils/prod-cert-outcomes.ts'
+);
 
 describe('production auth smoke session contract', () => {
   it('uses one rendered sign-in for dashboard and tab assertions', () => {
@@ -56,7 +61,10 @@ describe('production auth smoke session contract', () => {
   });
 
   it('sends the profile save route contract for the edit-readback step', () => {
-    const source = fs.readFileSync(PRODUCTION_AUTH_SMOKE_PATH, 'utf8');
+    expect(fs.readFileSync(PRODUCTION_AUTH_SMOKE_PATH, 'utf8')).toContain(
+      'saveBioAndReadBack('
+    );
+    const source = fs.readFileSync(PROD_CERT_OUTCOMES_PATH, 'utf8');
 
     // PUT /api/dashboard/profile requires { profileId, updates } and rejects
     // a bare field payload 400 before any write (2026-10-30 promote freeze:

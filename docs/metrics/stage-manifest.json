@@ -140,7 +140,7 @@
           "id": "worker-start",
           "meaning": "lane worker process started on the issue",
           "producer": "lanes",
-          "status": "spec",
+          "status": "pushed",
           "source": "lanes-stage-feed",
           "owner": "lanes worker"
         },
@@ -162,7 +162,7 @@
           "id": "gate-seat",
           "meaning": "lane gate waiting for a host gate seat (admission deferrals exit as abandoned)",
           "producer": "lanes",
-          "status": "spec",
+          "status": "pushed",
           "source": "lanes-stage-feed",
           "owner": "lanes worker"
         },
@@ -170,7 +170,7 @@
           "id": "gate",
           "meaning": "lane gate run on the exact head (seat acquired to verdict)",
           "producer": "lanes",
-          "status": "spec",
+          "status": "pushed",
           "source": "lanes-stage-feed",
           "owner": "lanes worker"
         },
@@ -206,7 +206,7 @@
           "id": "outcome-receipt",
           "meaning": "independent issue span: outcome receipt owed (lifecycle comment) to receipt recorded by the outcome lane; entityId is the JOV issue",
           "producer": "lanes",
-          "status": "spec",
+          "status": "pushed",
           "source": "lanes-stage-feed",
           "owner": "lanes worker"
         },
@@ -249,7 +249,7 @@
           "id": "repair-start",
           "meaning": "fix-red lane run started",
           "producer": "lanes",
-          "status": "spec",
+          "status": "pushed",
           "source": "lanes-stage-feed",
           "owner": "lanes worker"
         },

@@ -18,7 +18,7 @@ test.skip(
 );
 
 // Canonical destinations are available to ordinary creators without rollout overrides.
-const CANONICAL_LABELS = ['Inbox', 'Identity', 'Work', 'Audience'] as const;
+const CANONICAL_LABELS = ['Home', 'Identity', 'Work', 'Audience'] as const;
 
 const CANONICAL_HREFS = [
   APP_ROUTES.DASHBOARD,

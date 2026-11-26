@@ -295,6 +295,7 @@ export const APP_SCREEN_SOURCES = [
   'apps/web/app/app/(shell)/dashboard/tasks/page.tsx',
   'apps/web/app/app/(shell)/dashboard/tipping/page.tsx',
   'apps/web/app/app/(shell)/dashboard/tour-dates/page.tsx',
+  'apps/web/app/app/(shell)/dashboards/page.tsx',
   'apps/web/app/app/(shell)/earnings/page.tsx',
   'apps/web/app/app/(shell)/feature-flags/page.tsx',
   'apps/web/app/app/(shell)/insights/page.tsx',

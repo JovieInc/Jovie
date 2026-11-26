@@ -11,7 +11,7 @@ import React, {
   useState,
 } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { TABLE_MIN_WIDTHS, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
+import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import {
   type ColumnDef,
   type ColumnPinningState,
@@ -45,11 +45,13 @@ import {
 import {
   cn,
   iconColors,
-  TABLE_ROW_MODES,
+  resolveTableRowHeightPx,
+  TABLE_CANONICAL_ROW_MODE,
   type TableRowMode,
   tableRowModeStyle,
   zIndex,
 } from '../table.styles';
+import { useEffectiveColumnVisibility } from '../utils/empty-columns';
 import { useTableGrouping } from '../utils/useTableGrouping';
 import { UnifiedTableHeader } from './UnifiedTableHeader';
 import { useTableKeyboardNav } from './useTableKeyboardNav';
@@ -107,12 +109,9 @@ export interface UnifiedTableProps<TData extends RowData> {
    */
   readonly enableVirtualization?: boolean;
 
-  /**
-   * Estimated row height for virtualization
-   * @default 40
-   */
+  /** Legacy px when `rowMode` omitted; prefer dense mode. */
   readonly rowHeight?: number;
-  /** Fixed geometry for content, loading rows, and virtualization. */
+  /** Fixed geometry; defaults to dense 32px (DRI-21). */
   readonly rowMode?: TableRowMode;
 
   /**
@@ -460,8 +459,8 @@ function UnifiedTableContent<TData extends RowData>({
   sorting,
   onSortingChange,
   enableVirtualization,
-  rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
-  rowMode,
+  rowHeight,
+  rowMode = TABLE_CANONICAL_ROW_MODE,
   overscan = 5,
   renderRow,
   getRowId,
@@ -508,9 +507,7 @@ function UnifiedTableContent<TData extends RowData>({
   // Cell identity follows the table option. The provider disables layout
   // animation for reduced motion without remounting cells after hydration.
   const snapColumns = columnSnap;
-  const resolvedRowHeight = rowMode
-    ? TABLE_ROW_MODES[rowMode].rowHeight
-    : rowHeight;
+  const resolvedRowHeight = resolveTableRowHeightPx(rowMode, rowHeight);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [rowRefs] = useState(() => new Map<number, HTMLTableRowElement>());
   const [scrollRoot, setScrollRoot] = useState<HTMLDivElement | null>(null);
@@ -538,20 +535,13 @@ function UnifiedTableContent<TData extends RowData>({
     prioritySpecs,
     hasColumnPriority ? scrollRoot : null
   );
-  const effectiveColumnVisibility = useMemo(() => {
-    if (!hasColumnPriority) return columnVisibility;
-    if (columnVisibility == null && autoLayout.hiddenIds.length === 0) {
-      return autoLayout.visibility;
-    }
-    const merged: VisibilityState = { ...(columnVisibility ?? {}) };
-    for (const id of autoLayout.hiddenIds) merged[id] = false;
-    return merged;
-  }, [
-    autoLayout.hiddenIds,
-    autoLayout.visibility,
+  const effectiveColumnVisibility = useEffectiveColumnVisibility({
+    columns,
+    data,
     columnVisibility,
+    autoLayout,
     hasColumnPriority,
-  ]);
+  });
   const columnCompacts = useMemo(() => {
     const primaryColumn = columns.find(column => column.meta?.primary === true);
     const primaryId = primaryColumn

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
@@ -128,5 +130,18 @@ describe('EntitySidebarShell', () => {
     );
     fireEvent.keyDown(screen.getByTestId('right-drawer'), { key: 'Escape' });
     expect(onClose).toHaveBeenCalledOnce();
+  });
+});
+
+describe('EntitySidebarShell control heights (JOV-12567)', () => {
+  it('sits on the 28px control and 44px bar contract', () => {
+    const source = readFileSync(
+      resolve(__dirname, './EntitySidebarShell.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain("'min-h-(--app-shell-header-height)',");
+    expect(source).toContain("isMinimalHeader && 'px-3'");
+    expect(source).not.toContain('min-h-9 px-2.5 py-1');
   });
 });

@@ -1,8 +1,15 @@
 /**
- * Alpha-knockout spike (throwaway). Proves recraft-v3 transparent output drops
- * cleanly onto a garment color (Tim: "alpha'd clean so it can be dropped onto
- * objects for the comp and product printing"). gpt-image was the original
- * subject; openai/* is banned on the gateway (JOV-7119).
+ * Alpha-knockout spike (throwaway).
+ *
+ * Aliased → product lane `merch-graphic`
+ * (`apps/web/lib/merch/graphic-engine.ts`). Inventory:
+ * `docs/design-system/MEDIA_GENERATION.md` (JOV-13852). Do not extend this
+ * spike into a parallel owner.
+ *
+ * Proves recraft-v3 transparent output drops cleanly onto a garment color
+ * (Tim: "alpha'd clean so it can be dropped onto objects for the comp and
+ * product printing"). gpt-image was the original subject; openai/* is banned
+ * on the gateway (JOV-7119).
  *
  *   doppler run --project jovie-web --config dev -- \
  *     pnpm --filter @jovie/web exec tsx scripts/merch-alpha-spike.ts

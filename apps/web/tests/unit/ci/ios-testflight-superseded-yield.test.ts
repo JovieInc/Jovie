@@ -34,17 +34,8 @@ const { resolveRealGh, runWithRealGh } = realGhHarness as unknown as {
 // production proof and reached the lease admit, which rejected the absent
 // marker and reddened main for a generation that never became verified.
 //
-// This committed suite pins the loud-authority invariants that hold on the
-// shipped workflow today: a finalized-but-markerless generation and an
-// unknown finalize conclusion must both keep routing into the lease (which
-// fails loudly), never into a silent yield. The incident pin itself — the
-// superseded generation must yield as a visible no-op — is only true once
-// the workflow half (carried in PR #25842's body, routed separately) adds
-// the finalize-skipped yield, so it ships in that same routed change
-// instead of reddenning this PR against the unpatched workflow.
-//
-// The companion suite (ios-testflight-authorization.test.ts) is size-pinned
-// at 1698 lines, so these cases live here and leave that file untouched.
+// Explicitly skipped finalization and marker publication signal a deliberate
+// yield. Incomplete or contradictory step evidence still routes to the lease.
 
 type Step = {
   id?: string;
@@ -53,6 +44,7 @@ type Step = {
   run?: string;
   uses?: string;
   conclusion?: string;
+  status?: string;
   env?: Record<string, string>;
   with?: Record<string, unknown>;
 };
@@ -86,6 +78,7 @@ if (!gh && process.env.CI) {
 
 const REPO = 'JovieInc/Jovie';
 const RELEASE = 'a'.repeat(40);
+const NEWER = 'b'.repeat(40);
 const CONTROLLER_WORKFLOW_ID = 101;
 const CONTROLLER_RUN = 5000;
 const roots: string[] = [];
@@ -101,10 +94,10 @@ function tempRoot(prefix: string) {
   return root;
 }
 
-const verifiedJob = (steps: Step[]) => ({
+const verifiedJob = (steps: Step[], transport = RELEASE) => ({
   id: 1,
   name: 'Production Verified',
-  head_sha: RELEASE,
+  head_sha: transport,
   status: 'completed',
   conclusion: 'success',
   steps,
@@ -125,7 +118,7 @@ const finalizedSteps: Step[] = [
   },
 ];
 
-function routes(controllerJobs: unknown[]) {
+function routes(controllerJobs: unknown[], transport: string) {
   const base = `repos/${REPO}/`;
   const table = new Map<string, unknown>([
     [
@@ -142,7 +135,7 @@ function routes(controllerJobs: unknown[]) {
         id: CONTROLLER_RUN,
         run_attempt: 1,
         workflow_id: CONTROLLER_WORKFLOW_ID,
-        head_sha: RELEASE,
+        head_sha: transport,
         head_branch: 'main',
         head_repository: { full_name: REPO },
         event: 'workflow_run',
@@ -156,7 +149,11 @@ function routes(controllerJobs: unknown[]) {
       `actions/runs/${CONTROLLER_RUN}/attempts/1/jobs?per_page=100`,
       { jobs: controllerJobs },
     ],
-    ['commits/main', { sha: RELEASE }],
+    ['commits/main', { sha: transport }],
+    [
+      `compare/${RELEASE}...${NEWER}`,
+      { status: 'ahead', merge_base_commit: { sha: RELEASE } },
+    ],
     [
       `actions/artifacts?name=production-generation-verified-${RELEASE}&per_page=100`,
       { artifacts: [] },
@@ -195,7 +192,7 @@ const readOutputs = (path: string) =>
       ])
   ) as Record<string, string>;
 
-async function authorize(controllerJobs: unknown[]) {
+async function authorize(controllerJobs: unknown[], transport = RELEASE) {
   const root = tempRoot('jovie-testflight-superseded-');
   const output = join(root, 'output');
   writeFileSync(output, '');
@@ -223,7 +220,7 @@ async function authorize(controllerJobs: unknown[]) {
       TRIGGER_RUN_EVENT: 'workflow_run',
       TRIGGER_RUN_PATH: '.github/workflows/production-controller.yml',
       TRIGGER_HEAD_BRANCH: 'main',
-      TRIGGER_HEAD_SHA: RELEASE,
+      TRIGGER_HEAD_SHA: transport,
       TRIGGER_HEAD_REPOSITORY: REPO,
       TRIGGER_RUN_STATUS: 'completed',
       TRIGGER_RUN_CONCLUSION: 'success',
@@ -234,7 +231,7 @@ async function authorize(controllerJobs: unknown[]) {
       ),
       RUNNER_TEMP: root,
     },
-    route: routes(controllerJobs),
+    route: routes(controllerJobs, transport),
   });
   return { ...result, outputs: readOutputs(output) };
 }
@@ -242,10 +239,48 @@ async function authorize(controllerJobs: unknown[]) {
 describe.skipIf(!gh)(
   'superseded-before-marker TestFlight yield (real gh)',
   () => {
+    it('stands down when the successful controller job skipped finalization and marker publication', async () => {
+      const result = await authorize(
+        [
+          verifiedJob(
+            [
+              {
+                name: 'Finalize exact current release generation',
+                status: 'completed',
+                conclusion: 'skipped',
+              },
+              {
+                name: 'Preserve exact verified-generation marker',
+                status: 'completed',
+                conclusion: 'skipped',
+              },
+            ],
+            NEWER
+          ),
+        ],
+        NEWER
+      );
+      expect(result.code, result.stderr).toBe(0);
+      expect(result.outputs.authorized).toBe('false');
+      expect(result.stdout).toContain('skipped marker publication');
+      expect(result.requests).not.toContain(
+        `GET repos/${REPO}/actions/artifacts?name=testflight-upload-verified&per_page=100`
+      );
+    });
+
     it('keeps the lease as the loud authority when finalization ran but no marker exists', async () => {
       // A finalized generation that somehow carries no marker is not a yield:
       // authorize still routes it to the pin step, whose lease fails loudly.
-      const result = await authorize([verifiedJob(finalizedSteps)]);
+      const result = await authorize([
+        verifiedJob([
+          ...finalizedSteps,
+          {
+            name: 'Preserve exact verified-generation marker',
+            status: 'completed',
+            conclusion: 'skipped',
+          },
+        ]),
+      ]);
       expect(result.code, result.stderr).toBe(0);
       expect(result.outputs.authorized).toBe('true');
       expect(result.outputs.release_sha).toBe(RELEASE);

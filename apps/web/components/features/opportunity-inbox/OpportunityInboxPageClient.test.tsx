@@ -377,7 +377,7 @@ describe('OpportunityInboxPageClient', () => {
         }}
       />
     );
-    expect(screen.getByRole('toolbar', { name: 'Inbox View' })).toBeVisible();
+    expect(screen.getByRole('toolbar', { name: 'Home View' })).toBeVisible();
     expect(screen.getByText('Your Inbox Is Clear')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Start A Chat' })).toBeVisible();
     expect(
@@ -441,7 +441,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.getByTestId('opportunity-inbox-content')).toHaveClass(
       'system-b-opportunity-inbox-page'
     );
-    expect(screen.getByRole('toolbar', { name: 'Inbox View' })).toHaveClass(
+    expect(screen.getByRole('toolbar', { name: 'Home View' })).toHaveClass(
       'justify-center'
     );
   });
@@ -970,6 +970,8 @@ describe('OpportunityInboxPageClient', () => {
                 deltaPercent: 5.4,
                 deltaDisplay: '+5.4%',
                 direction: 'up' as const,
+                polarity: 'higher-is-better' as const,
+                sentiment: 'positive' as const,
                 series: [120, 132],
                 items: [],
                 experimentId: 'exp-42',
@@ -1024,6 +1026,8 @@ describe('OpportunityInboxPageClient', () => {
                 deltaPercent: 5.4,
                 deltaDisplay: '+5.4%',
                 direction: 'up' as const,
+                polarity: 'higher-is-better' as const,
+                sentiment: 'positive' as const,
                 series: [120, 132],
                 items: [],
                 experimentId: 'exp-42',

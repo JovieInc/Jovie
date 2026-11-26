@@ -1606,6 +1606,35 @@ const CREATOR_SHELL_ROUTES = [
     seedProfile: 'active-user',
   },
   {
+    // Cold Settings destination for Smooth CWV baselines. `/app/settings`
+    // itself only redirects; measure the account page the redirect lands on.
+    id: 'creator-settings',
+    group: 'creator-shell',
+    surface: 'creator-app',
+    path: APP_ROUTES.SETTINGS_ACCOUNT,
+    requiresAuth: true,
+    warmupStrategy: 'authenticated-route',
+    measureMode: 'page-load',
+    readySelectors: {
+      content: [
+        '[data-testid="account-settings-section"]',
+        '[data-testid="settings-shell-content"]',
+      ],
+      loading: ['[data-testid="settings-route-skeleton"]'],
+    },
+    timings: [
+      { metric: 'first-contentful-paint', budget: 1800 },
+      { metric: 'largest-contentful-paint', budget: 3000 },
+      { metric: 'cumulative-layout-shift', budget: 0.02 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1600 },
+      { metric: 'skeleton-to-content', budget: 1000 },
+    ],
+    resourceSizes: ACCOUNT_BILLING_RESOURCE_BUDGETS,
+    priority: 15,
+    seedProfile: 'active-user',
+  },
+  {
     id: 'creator-calendar-cold',
     group: 'creator-shell',
     surface: 'creator-app',

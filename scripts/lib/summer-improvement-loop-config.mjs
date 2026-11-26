@@ -76,6 +76,9 @@ export const REQUIRED_PROMPT_GUARDRAILS = [
   'regression test',
   'no-op',
   'receipt',
+  '## Win',
+  'summer-verify',
+  'wins-ledger',
   'Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>',
 ];
 const SECRET_PATTERNS = [

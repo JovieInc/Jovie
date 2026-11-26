@@ -92,7 +92,7 @@ function fakeMcp(scenario: Scenario = {}) {
       });
     }
     if (params?.name === 'release.prepare_launch')
-      return args.release_url
+      return args.release_url || args.release_metadata
         ? tool({ status: scenario.prepStatus ?? 'launch_draft_ready' })
         : tool({
             status: 'error',
@@ -114,6 +114,7 @@ const base = {
   releaseUrl: 'https://open.spotify.com/track/x',
   run: 'cert-test',
   now: () => new Date('2026-01-01T00:00:00Z'),
+  env: {},
 };
 const statusOf = (checks: { check: string; status: string }[], name: string) =>
   checks.find(c => c.check === name)?.status;
@@ -141,6 +142,9 @@ describe('runCert', () => {
     expect(statusOf(receipt.checks, 'run-owned fixtures cleaned up')).toBe(
       'SKIP'
     );
+    expect(
+      receipt.checks.find(c => c.check === 'claim outcome persisted')?.detail
+    ).toMatchObject({ gate: 'claim-walk-secrets' });
     expect(receipt.at).toBe('2026-01-01T00:00:00.000Z');
     expect(receipt.toolsListHash).toMatch(/^[0-9a-f]{64}$/);
     const search = seen.find(s => s.name === 'artist.search_or_import');
@@ -150,6 +154,33 @@ describe('runCert', () => {
     expect(
       receipt.latency['artist.search_or_import']?.count
     ).toBeGreaterThanOrEqual(3);
+  });
+
+  it('injects the claim walk when claim-walk env is present', async () => {
+    const draftId = '9efebd98-39b7-4a77-8965-04b5aafad9ad';
+    const handoff = 'b'.repeat(43);
+    const claimUrl = `https://jov.ie/claim/agent/${draftId}?h=${handoff}`;
+    const { fetchImpl } = fakeMcp({ claimUrl, titles: true });
+    const { receipt, exitCode } = await runCert({
+      ...base,
+      fetchImpl,
+      env: {
+        CRON_SECRET: 'cron-secret-at-least-16',
+        SYNTHETIC_PASSAGE_KEY: 'c'.repeat(43),
+        DATABASE_URL: 'postgres://example',
+      },
+      walk: async () => ({
+        claimPersisted: true,
+        fixturesCleaned: true,
+        detail: { gate: 'test-walk' },
+      }),
+    });
+    expect(exitCode).toBe(0);
+    expect(receipt.ok).toBe(true);
+    expect(statusOf(receipt.checks, 'claim outcome persisted')).toBe('PASS');
+    expect(statusOf(receipt.checks, 'run-owned fixtures cleaned up')).toBe(
+      'PASS'
+    );
   });
 
   it.each([

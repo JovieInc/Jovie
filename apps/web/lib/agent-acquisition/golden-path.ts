@@ -139,7 +139,9 @@ export function presentGoldenPathQualification(input: {
     status: 'queued',
     reason: input.reason,
     message: GOLDEN_PATH_WAITLIST_COPY,
-    requiresVerification: false,
+    requiresVerification:
+      input.reason === 'hold_high_profile_needs_verification' ||
+      input.reason === 'hold_reach_unknown',
   };
 }
 

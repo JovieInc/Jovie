@@ -1,6 +1,9 @@
+import { Button } from '@jovie/ui';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { AdminReadUnavailable } from '@/components/features/admin/AdminReadUnavailable';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { APP_ROUTES } from '@/constants/routes';
 import { getAdminCosts, getCostsLastRefreshedAt } from '@/lib/admin/costs';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { captureError } from '@/lib/error-tracking';
@@ -59,6 +62,11 @@ export default async function AdminCostsPage() {
       title='Costs'
       description='Manual 30-day line-item view of company infra + AI spend. Lagging data only (v1).'
       testId='admin-costs-page'
+      actions={
+        <Button variant='secondary' size='sm' asChild>
+          <Link href={APP_ROUTES.ADMIN_CAPACITY}>View capacity</Link>
+        </Button>
+      }
     >
       {costsResult.status === 'rejected' ? (
         <AdminReadUnavailable message='Manual cost records could not be read. Spend is unknown, not zero.' />

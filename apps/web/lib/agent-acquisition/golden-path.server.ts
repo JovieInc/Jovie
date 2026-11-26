@@ -137,12 +137,12 @@ export async function claimHandle(input: unknown) {
   );
 
   // High-reach artists go to the existing verification path; unknown reach
-  // (non-Spotify drafts) fails closed into it too, as /claim/start does.
+  // (non-Spotify drafts or failed lookup) fails closed into it too.
   const spotifyId = spotifyIdOf(row);
   const reach = spotifyId ? await lookupArtistReach(spotifyId) : null;
-  const requiresVerification = requiresClaimVerification(
-    reach?.followers ?? null
-  );
+  const followerCount = reach?.followers ?? null;
+  const requiresVerification =
+    followerCount === null || requiresClaimVerification(followerCount);
 
   const recorded = availability.available
     ? await updateGoldenPathState(parsed.data, current => ({
@@ -166,9 +166,11 @@ export async function claimHandle(input: unknown) {
     // The person, not the agent, claims: reservation completes when they
     // sign in through the claim page. Nothing is public until they publish.
     claim_url: claimUrlFor(row),
-    next_action: requiresVerification
-      ? ('send_user_claim_url_verification' as const)
-      : ('send_user_claim_url' as const),
+    next_action: !availability.available
+      ? ('claim_handle' as const)
+      : requiresVerification
+        ? ('send_user_claim_url_verification' as const)
+        : ('send_user_claim_url' as const),
     retryable: false,
   };
 }
@@ -323,7 +325,7 @@ export async function buildProfile(input: unknown) {
         }
       : null,
     value_enabled: isValueBeforePaywallEnabled(),
-    next_action: 'get_qualification' as const,
+    next_action: 'publish_profile' as const,
     retryable: false,
   };
 }
@@ -341,22 +343,23 @@ export async function publishProfile(input: unknown) {
   const now = new Date();
   // Every other tool only reads unclaimed drafts; publish must also answer
   // once the draft IS claimed, so look up both states by id + capability hash.
-  const [row] = capability
-    ? await db
-        .select()
-        .from(agentVisibilityDrafts)
-        .where(
-          and(
-            eq(agentVisibilityDrafts.id, capability.draft_id),
-            eq(
-              agentVisibilityDrafts.capabilityHash,
-              draftTokenHash(parsed.data.draft_token)
-            ),
-            gt(agentVisibilityDrafts.expiresAt, now)
+  const [row] =
+    capability && capability.draft_id === parsed.data.draft_id
+      ? await db
+          .select()
+          .from(agentVisibilityDrafts)
+          .where(
+            and(
+              eq(agentVisibilityDrafts.id, capability.draft_id),
+              eq(
+                agentVisibilityDrafts.capabilityHash,
+                draftTokenHash(parsed.data.draft_token)
+              ),
+              gt(agentVisibilityDrafts.expiresAt, now)
+            )
           )
-        )
-        .limit(1)
-    : [];
+          .limit(1)
+      : [];
   if (!row) return unavailable();
 
   // Claiming never publishes (draft-claim.server). The person publishes from

@@ -3,7 +3,7 @@
 Version: 1.2
 Status: Constitution (highest authority)
 Owner: Tim White
-Last updated: 2026-10-20
+Last updated: 2026-11-19
 
 This document is the highest-level operating philosophy for Jovie.
 
@@ -148,13 +148,32 @@ Pre-launch, working and shipped beats polished and stalled. Apply without being 
 4. **Correctness gates still block:** signup, auth and billing actually working; security; secrets; data integrity.
 5. **Process is a cost.** A CI job, check, controller or gate that doesn't catch real defects gets deleted. A slow or polling one gets refactored to run fast and on events. Deleting is preferred to adding.
 
+### No flags on launch/core (contract v2 §1.16, EVENT 2026-11-19, Tim)
+
+No feature flags on launch or core work until real people have completed golden
+tasks. Launch/core = signup, onboarding, the golden path, public profiles,
+pricing/billing/checkout, the homepage and launch surfaces, and anything a
+launch depends on. Until Linear records at least one completed golden task by a
+real external person (paid or free; not Tim, the team, test accounts or agents;
+finished end to end, not just started), launch/core changes ship live: no
+default-off, percentage or allowlist flags, and no merged-but-dark code. If a
+change is not safe to ship live, it does not merge; it stays a draft until it
+is. Any runtime toggle that hides launch/core behavior counts as a flag,
+whatever it is named. Not covered: incident kill switches Tim explicitly
+ordered (e.g. the open-signup kill switch), which default ON and exist only to
+roll back, never to hide unshipped work. Existing launch/core flags get
+inventoried into Linear and removed (shipped on or deleted) through normal
+autonomous landing. Non-core internal tooling may still use flags. For
+launch/core work this rule overrides every "default-off flag" line elsewhere in
+this constitution and every canon, rule, or skill below it.
+
 ### Nothing waits on a human (EVENT 2026-10-28, Tim)
 
 > "There shouldn't be any reason that anything gets held by a human. Holds for humans are only for taste gates, and even then they should still ship behind a flag, with any modifications going in a follow-up. Waiting for anything on a human is too slow." "I should have one place to approve and certify things, and that's Ovie: one inbox I can swipe on."
 
 1. **No human hold exists.** `tim-hold`, `tim:hold`, `hold:tim`, `do-not-merge`, `needs-human`, `needs-human-decision`, `human-review-required` and `no-auto` are retired. They block no admission, repair, merge or queue path, and the Legacy Human Hold Scrub deletes any that is applied. The remaining stop labels (`hold`, `gated`, `incident`, `queue-deferred`) are machine holds: a receipt names an owner and a machine-checkable release (`jovie-hold/v1`).
-2. **Taste ships behind a flag** (or the default ships). Tim's feedback is a follow-up PR that arrives through one Ovie inbox card (swipe or tap), never a wait before landing.
-3. **Reserved decisions** (new spend, credentials, legal, outbound to real people, live price changes) become one non-blocking Ovie card with a default and a deadline (`docs/operations/DECISION_DEFAULT_CONTRACT.md`). The change ships disabled behind its flag; the card never blocks unrelated work. Spend and outbound defaults are "no action".
+2. **Taste ships behind a flag** (or the default ships). Tim's feedback is a follow-up PR that arrives through one Ovie inbox card (swipe or tap), never a wait before landing. On launch/core surfaces the flag path is unavailable: taste ships live or the change stays a draft (§1.16 above).
+3. **Reserved decisions** (new spend, credentials, legal, outbound to real people, live price changes) become one non-blocking Ovie card with a default and a deadline (`docs/operations/DECISION_DEFAULT_CONTRACT.md`). The change ships disabled behind its flag (launch/core: ships live or stays a draft, §1.16 above); the card never blocks unrelated work. Spend and outbound defaults are "no action".
 4. **Machines stay fully blocking:** CI, Migration Guard, security and secret scans, boundary tests, correctness and an LLM review gate. Review is a machine gate, not a label or a CODEOWNERS approval from a person.
 5. **Lanes park nothing for a human.** A remediation `needs-human-decision` is a `decisionAsk` row (`escalation.json`, `jovie.lanes-decision-ask/v1`) with `blocking: false`, a default and a `decideBy`; the PR continues through the ordinary machine ladder.
 
@@ -273,6 +292,7 @@ When operating-principles or a `.claude/rules/*` file gives concrete implementat
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-11-19 | Contract v2 §1.16: no flags, dark merges or default-off toggles on launch/core until Linear records a completed golden task by a real external person. | Tim White |
 | 2026-10-20 | Law 2 hard rule: new pipelines and features must emit stage timestamps and a metric to be done. | Tim White |
 | 2026-08-17 | Point at `FLEET.md` as the closed-loop / default-alive operating contract. | Tim White interview |
 | 2026-08-13 | Added phase-dependent capital policy: survival before selectivity, fast-path clean SAFEs, and no investor-theater requirement. | Tim White |

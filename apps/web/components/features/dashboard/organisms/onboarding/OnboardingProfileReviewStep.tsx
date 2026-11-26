@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, CompositeField, HostDrawnInput, PlainButton } from '@jovie/ui';
 import { AlertCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EnrichedProfileData } from '@/app/onboarding/actions/enrich-profile';
@@ -14,7 +14,6 @@ import { track } from '@/lib/analytics';
 import { AUTH_CLASSES, AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import type { AvatarQuality } from '@/lib/profile/avatar-quality';
 import { useUserAvatarMutation } from '@/lib/queries/useUserAvatarMutation';
-import { cn } from '@/lib/utils';
 import {
   canProceedFromProfileReview,
   validateDisplayName as validateDisplayNameGuard,
@@ -356,7 +355,7 @@ export function OnboardingProfileReviewStep({
               <div className='flex flex-col items-center gap-4'>
                 {/* Uploadable Avatar */}
                 <div className='flex flex-col items-center gap-2'>
-                  <div className='rounded-full p-1 ring-1 ring-black/5 dark:ring-white/6 shadow-sm'>
+                  <div className='rounded-full p-1 ring-1 ring-subtle shadow-sm'>
                     <AvatarUploadable
                       src={avatarUrl}
                       alt={editableDisplayName}
@@ -374,9 +373,9 @@ export function OnboardingProfileReviewStep({
                     </p>
                   )}
                   {avatarQuality?.status === 'low' ? (
-                    <div className='mt-2 flex max-w-80 items-start gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-left text-xs text-secondary-token'>
+                    <div className='mt-2 flex max-w-80 items-start gap-2 rounded-lg bg-warning-subtle px-3 py-2 text-left text-xs text-secondary-token'>
                       <AlertCircle
-                        className='mt-0.5 h-4 w-4 shrink-0 text-amber-600'
+                        className='mt-0.5 h-4 w-4 shrink-0 text-warning-text'
                         aria-hidden='true'
                       />
                       <p>
@@ -393,26 +392,22 @@ export function OnboardingProfileReviewStep({
                 <div className='text-center w-full'>
                   {isEditingName ? (
                     <div className='flex w-full flex-col items-center gap-1.5'>
-                      <div
-                        className={cn(
-                          AUTH_SURFACE.fieldShell,
-                          'mx-auto max-w-70 justify-center px-3 py-2.5'
-                        )}
-                      >
-                        <input
-                          ref={nameInputRef}
-                          type='text'
-                          value={editableDisplayName}
-                          onChange={e => setEditableDisplayName(e.target.value)}
-                          onBlur={handleNameBlur}
-                          onKeyDown={handleNameKeyDown}
-                          maxLength={50}
-                          className={cn(
-                            AUTH_SURFACE.fieldInput,
-                            'text-center text-mid font-semibold'
-                          )}
-                          aria-label='Edit Display Name'
-                        />
+                      <div className='mx-auto w-full max-w-70 text-center text-mid font-semibold'>
+                        <CompositeField shape='pill' size='md' surface='field'>
+                          <HostDrawnInput
+                            ref={nameInputRef}
+                            type='text'
+                            value={editableDisplayName}
+                            onChange={e =>
+                              setEditableDisplayName(e.target.value)
+                            }
+                            onBlur={handleNameBlur}
+                            onKeyDown={handleNameKeyDown}
+                            maxLength={50}
+                            className='min-w-0 flex-1 text-center'
+                            aria-label='Edit Display Name'
+                          />
+                        </CompositeField>
                       </div>
                       {nameError && (
                         <p className='text-2xs text-error'>{nameError}</p>
@@ -420,8 +415,7 @@ export function OnboardingProfileReviewStep({
                     </div>
                   ) : (
                     <div className='flex flex-col items-center gap-2'>
-                      <button
-                        type='button'
+                      <PlainButton
                         onClick={startEditingName}
                         className='group cursor-pointer focus-ring-themed rounded-md'
                       >
@@ -429,14 +423,13 @@ export function OnboardingProfileReviewStep({
                         <span className='text-base font-semibold text-primary-token transition-colors group-hover:text-accent'>
                           {editableDisplayName}
                         </span>
-                      </button>
-                      <button
-                        type='button'
+                      </PlainButton>
+                      <PlainButton
                         onClick={startEditingName}
                         className={AUTH_SURFACE.inlineAction}
                       >
                         Edit name
-                      </button>
+                      </PlainButton>
                     </div>
                   )}
                   <div className='mt-2'>

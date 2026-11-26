@@ -69,7 +69,8 @@ describe('OperatorListsNav', () => {
       screen.getByRole('link', { name: 'Favorites' })
     );
     expect(screen.getByRole('button', { name: 'New List' })).toHaveClass(
-      'h-(--app-shell-sidebar-row-height)'
+      'h-(--app-shell-sidebar-row-height)',
+      'text-left'
     );
     expect(collab).toHaveClass('h-(--app-shell-sidebar-row-height)');
     expect(screen.getByLabelText('12 creators')).toHaveTextContent('12');
@@ -98,6 +99,14 @@ describe('OperatorListsNav', () => {
     expect(
       screen.getByRole('button', { name: 'New List' })
     ).toBeInTheDocument();
+  });
+
+  it('focuses the new list input once the New List button opens it', () => {
+    renderNav();
+    fireEvent.click(screen.getByRole('button', { name: 'New List' }));
+    expect(
+      screen.getByRole('textbox', { name: 'New List Name' })
+    ).toHaveFocus();
   });
 
   it('expands a collapsed rail before entering a new list name', () => {

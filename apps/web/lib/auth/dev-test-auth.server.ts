@@ -4,6 +4,7 @@ import { makeSignature } from 'better-auth/crypto';
 import { eq, or } from 'drizzle-orm';
 import { cookies, headers } from 'next/headers';
 import { cache } from 'react';
+import { seedAdminMfaStepUpBestEffort } from '@/lib/admin/mfa-seed';
 import { auth } from '@/lib/auth/better-auth';
 import {
   DEFAULT_DEV_TEST_AUTH_EMAILS,
@@ -33,9 +34,6 @@ import {
   isExplicitDevelopmentEnvironment,
   isLocalDevelopmentAutomationHostname,
 } from '@/lib/security/development-only';
-// Pre-existing cycle through proxy-state and admin roles. Seeding a release
-// does not add a new edge; the changed-file lint now sees the old import.
-// eslint-disable-next-line import/no-cycle -- existing bypass seed cycle
 import {
   DEFAULT_TEST_AVATAR_URL,
   ensureBetterAuthTestUser,
@@ -52,6 +50,90 @@ import { logger } from '@/lib/utils/logger';
 
 const DEV_TEST_AUTH_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 12;
 
+export async function buildBetterAuthSessionCookieDescriptor(
+  actor: DevTestAuthActor,
+  secure: boolean
+) {
+  const ctx = await auth.$context;
+  const session = await ctx.internalAdapter.createSession(
+    actor.clerkUserId,
+    false
+  );
+  if (!session?.token) {
+    throw new Error(
+      'Better Auth performance session creation returned no token'
+    );
+  }
+
+  if (actor.isAdmin && typeof session.id === 'string' && session.id) {
+    await seedAdminMfaStepUpBestEffort('session', session.id);
+  }
+
+  const signature = await makeSignature(session.token, ctx.secret);
+  const attributes = ctx.authCookies.sessionToken.attributes;
+  const configuredSameSite =
+    typeof attributes.sameSite === 'string'
+      ? attributes.sameSite.toLowerCase()
+      : 'lax';
+  const sameSite: 'lax' | 'strict' | 'none' =
+    configuredSameSite === 'strict' || configuredSameSite === 'none'
+      ? configuredSameSite
+      : 'lax';
+
+  return {
+    name: ctx.authCookies.sessionToken.name,
+    value: `${session.token}.${signature}`,
+    httpOnly: attributes.httpOnly ?? true,
+    maxAge: ctx.sessionConfig.expiresIn,
+    path: attributes.path ?? '/',
+    sameSite,
+    secure: secure || (attributes.secure ?? false),
+  };
+}
+
+export function buildDevTestAuthCookieDescriptors(
+  actor: DevTestAuthActor,
+  secure: boolean
+) {
+  const baseCookie = {
+    httpOnly: true,
+    maxAge: DEV_TEST_AUTH_COOKIE_MAX_AGE_SECONDS,
+    path: '/',
+    sameSite: 'lax' as const,
+    secure,
+  };
+
+  return [
+    {
+      name: TEST_MODE_COOKIE,
+      value: TEST_AUTH_BYPASS_MODE,
+      ...baseCookie,
+    },
+    {
+      name: TEST_USER_ID_COOKIE,
+      value: actor.clerkUserId,
+      ...baseCookie,
+    },
+    {
+      name: TEST_PERSONA_COOKIE,
+      value: actor.persona,
+      ...baseCookie,
+    },
+  ];
+}
+
+export const DEV_TEST_AUTH_COOKIE_NAMES = [
+  TEST_MODE_COOKIE,
+  TEST_USER_ID_COOKIE,
+  TEST_PERSONA_COOKIE,
+] as const;
+export function sanitizeDevTestAuthRedirectPath(
+  value: string | null | undefined
+): string | null {
+  if (!value) return '/app';
+  if (!value.startsWith('/') || value.startsWith('//')) return null;
+  return value;
+}
 const DEFAULT_CREATOR_EMAIL = DEFAULT_DEV_TEST_AUTH_EMAILS.creator;
 const DEFAULT_CREATOR_USERNAME = 'browse-test-user';
 const DEFAULT_CREATOR_FULL_NAME = 'Browse Test User';
@@ -74,19 +156,16 @@ const DEFAULT_ADMIN_FULL_NAME = 'Browse Admin';
 const DEFAULT_ADMIN_BIO =
   'Stable admin profile for local perf checks and admin-shell QA.';
 const DEFAULT_ADMIN_VENMO = 'browse-admin-user';
-
 interface DevTestAuthAvailability {
   readonly enabled: boolean;
   readonly trustedHost: boolean;
   readonly reason: string | null;
 }
-
 interface DevTestAuthSession extends DevTestAuthActor {
   readonly dbUserId: string;
 }
 
 export type DevTestAuthFixture = 'profiles-final-row';
-
 const PROFILES_FINAL_ROW_FIXTURE_LINKS = [
   ['instagram', 'https://instagram.com/browse-ready-user'],
   ['tiktok', 'https://tiktok.com/@browse-ready-user'],
@@ -99,7 +178,6 @@ const PROFILES_FINAL_ROW_FIXTURE_LINKS = [
   ['twitter', 'https://twitter.com/browse-ready-user'],
   ['spotify', DEFAULT_READY_CREATOR_SPOTIFY_URL],
 ] as const;
-
 interface PersonaSeedConfig {
   readonly persona: DevTestAuthPersona;
   readonly email: string;
@@ -408,6 +486,9 @@ export async function ensureExistingDevTestAuthActor(
     email: actor.email,
     fullName: actor.fullName,
   });
+  if (actor.isAdmin) {
+    await seedAdminMfaStepUpBestEffort('bypass', actor.dbUserId);
+  }
   return actor;
 }
 
@@ -685,6 +766,12 @@ async function ensureDevTestAuthActorForBetterAuthUser(
     fullName: config.fullName,
   });
 
+  if (config.isAdmin) {
+    // Match resolveRequestAuth's sess_test_bypass_<dbUserId> so requireAdmin
+    // and entitlements see a live passkey step-up without weakening prod MFA.
+    await seedAdminMfaStepUpBestEffort('bypass', dbUserId);
+  }
+
   return {
     persona,
     clerkUserId: betterAuthUserId, // field name preserved for shape compat; carries BA user id
@@ -751,92 +838,4 @@ async function mintBetterAuthSessionForDevTestActor(params: {
 
   const ctx = await auth.$context;
   await ctx.internalAdapter.createSession(betterAuthUserId, false);
-}
-
-export async function buildBetterAuthSessionCookieDescriptor(
-  actor: DevTestAuthActor,
-  secure: boolean
-) {
-  const ctx = await auth.$context;
-  const session = await ctx.internalAdapter.createSession(
-    actor.clerkUserId,
-    false
-  );
-  if (!session?.token) {
-    throw new Error(
-      'Better Auth performance session creation returned no token'
-    );
-  }
-
-  const signature = await makeSignature(session.token, ctx.secret);
-  const attributes = ctx.authCookies.sessionToken.attributes;
-  const configuredSameSite =
-    typeof attributes.sameSite === 'string'
-      ? attributes.sameSite.toLowerCase()
-      : 'lax';
-  const sameSite: 'lax' | 'strict' | 'none' =
-    configuredSameSite === 'strict' || configuredSameSite === 'none'
-      ? configuredSameSite
-      : 'lax';
-
-  return {
-    name: ctx.authCookies.sessionToken.name,
-    value: `${session.token}.${signature}`,
-    httpOnly: attributes.httpOnly ?? true,
-    maxAge: ctx.sessionConfig.expiresIn,
-    path: attributes.path ?? '/',
-    sameSite,
-    secure: secure || (attributes.secure ?? false),
-  };
-}
-
-export function buildDevTestAuthCookieDescriptors(
-  actor: DevTestAuthActor,
-  secure: boolean
-) {
-  const baseCookie = {
-    httpOnly: true,
-    maxAge: DEV_TEST_AUTH_COOKIE_MAX_AGE_SECONDS,
-    path: '/',
-    sameSite: 'lax' as const,
-    secure,
-  };
-
-  return [
-    {
-      name: TEST_MODE_COOKIE,
-      value: TEST_AUTH_BYPASS_MODE,
-      ...baseCookie,
-    },
-    {
-      name: TEST_USER_ID_COOKIE,
-      value: actor.clerkUserId,
-      ...baseCookie,
-    },
-    {
-      name: TEST_PERSONA_COOKIE,
-      value: actor.persona,
-      ...baseCookie,
-    },
-  ];
-}
-
-export const DEV_TEST_AUTH_COOKIE_NAMES = [
-  TEST_MODE_COOKIE,
-  TEST_USER_ID_COOKIE,
-  TEST_PERSONA_COOKIE,
-] as const;
-
-export function sanitizeDevTestAuthRedirectPath(
-  value: string | null | undefined
-): string | null {
-  if (!value) {
-    return '/app';
-  }
-
-  if (!value.startsWith('/') || value.startsWith('//')) {
-    return null;
-  }
-
-  return value;
 }

@@ -1,13 +1,17 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ComponentProps, useEffect, useState } from 'react';
+import { useOUpdates } from '@/components/organisms/o-presence/useOUpdates';
 import {
   SidebarDock,
-  type SidebarDockStatus,
   type SidebarDockUpdateControl,
 } from '@/components/shell/SidebarDock';
+import { SidebarOPresence } from '@/components/shell/SidebarOPresence';
+import { usePublishSidebarDockStatus } from '@/components/shell/sidebar-dock-status';
+import { APP_ROUTES } from '@/constants/routes';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
+import type { BrandVariant } from '@/lib/brand/tokens';
 import type { DesktopUpdateControlState } from '@/lib/desktop/desktop-update-control-state';
 import { useDesktopUpdateState } from '@/lib/desktop/useDesktopUpdateState';
 import {
@@ -17,11 +21,16 @@ import {
   type WhatsNewEntry,
   type WhatsNewUserState,
 } from '@/lib/whats-new';
+import { requestFullAudioPlayer } from './audio-chrome-state';
 import {
-  requestFullAudioPlayer,
-  useAudioChromeSnapshot,
-} from './audio-chrome-state';
-import { useTrackAudioPlayer } from './release-sidebar/useTrackAudioPlayer';
+  OPresenceProvider,
+  useOPresence,
+} from './o-presence/OPresenceProvider';
+import {
+  selectNowPlaying,
+  useTrackAudioActions,
+  useTrackAudioSnapshot,
+} from './release-sidebar/useTrackAudioSnapshot';
 
 // Desktop-only: keep the control (and the morph button it
 // pulls in) out of every browser tab's shell chunk. The dock card reserves
@@ -46,21 +55,41 @@ const UPDATE_CONTROL_NOTICE: Record<
   offline: 'Update paused, no connection',
 };
 
-/** Adapt the existing updater, changelog projection, audio player and PWA hook. */
-export function SidebarDockBridge({
+/**
+ * Footer only: the dock cards and the O. It adapts the existing updater,
+ * changelog projection, audio player and PWA hook, and publishes the icon-rail
+ * status to the identity row through context, so nothing above the footer
+ * re-renders with it.
+ */
+export function SidebarDockBridge(
+  props: ComponentProps<typeof SidebarDockBridgeInner>
+) {
+  return (
+    <OPresenceProvider>
+      <SidebarDockBridgeInner {...props} />
+    </OPresenceProvider>
+  );
+}
+
+function SidebarDockBridgeInner({
   userId,
   collapsed,
-  children,
   fetchImpl = fetch,
   userState,
+  oHref = APP_ROUTES.CHAT,
+  variant = 'jovie',
 }: {
   readonly fetchImpl?: typeof fetch;
   readonly userId: string;
   readonly userState?: WhatsNewUserState;
   readonly collapsed: boolean;
-  readonly children: (status: SidebarDockStatus | undefined) => ReactNode;
+  /** Where the O leads: the main chat page of the current workspace. */
+  readonly oHref?: string;
+  readonly variant?: BrandVariant;
 }) {
+  const publishStatus = usePublishSidebarDockStatus();
   const updateControl = useDesktopUpdateState();
+  const { update: oUpdate, clear: clearOUpdate } = useOUpdates();
   const updateControlKind = updateControl.state.kind;
   const dockUpdateControl: SidebarDockUpdateControl =
     updateControlKind === 'hidden'
@@ -79,8 +108,9 @@ export function SidebarDockBridge({
           ),
         };
   const pwa = usePWAInstall();
-  const audioChrome = useAudioChromeSnapshot();
-  const { playbackState, stop, toggleTrack } = useTrackAudioPlayer();
+  const { state: oState, nowPlaying } = useOPresence();
+  const { activeTrackId, trackTitle } = useTrackAudioSnapshot(selectNowPlaying);
+  const { toggleTrack } = useTrackAudioActions();
   const [release, setRelease] = useState<WhatsNewEntry | null>(null);
 
   useEffect(() => {
@@ -99,56 +129,59 @@ export function SidebarDockBridge({
     return () => controller.abort();
   }, [userId, fetchImpl]);
 
-  const activeTrack = playbackState.activeTrackId && playbackState.trackTitle;
+  const updating =
+    updateControlKind === 'checking' || updateControlKind === 'downloading';
   return (
-    <SidebarDock
-      userId={userId}
-      collapsed={collapsed}
-      updateControl={dockUpdateControl}
-      release={
-        release && userState && isWhatsNewActionComplete(release, userState)
-          ? null
-          : release
-      }
-      audio={
-        activeTrack
-          ? {
-              track: {
-                trackTitle: playbackState.trackTitle,
-                artistName: playbackState.artistName,
-                artworkUrl: playbackState.artworkUrl,
-              },
-              isPlaying: playbackState.isPlaying,
-              reserved:
-                audioChrome.fullPlayerVisible &&
-                audioChrome.activeTrackId === playbackState.activeTrackId,
-              onPlay: () => {
-                if (playbackState.activeTrackId && playbackState.trackTitle)
-                  void toggleTrack({
-                    id: playbackState.activeTrackId,
-                    title: playbackState.trackTitle,
-                  }).catch(() => {});
-              },
-              onDismiss: stop,
-              onExpand: requestFullAudioPlayer,
-            }
-          : undefined
-      }
-      install={
-        pwa.canPrompt && !pwa.isInstalled
-          ? {
-              isIOS: pwa.isIOS,
-              onInstall: pwa.isIOS
-                ? pwa.dismiss
-                : () => {
-                    void pwa.install();
-                  },
-              onDismiss: pwa.dismiss,
-            }
-          : undefined
-      }
-    >
-      {children}
-    </SidebarDock>
+    <>
+      <SidebarDock
+        userId={userId}
+        collapsed={collapsed}
+        updateControl={dockUpdateControl}
+        release={
+          release && userState && isWhatsNewActionComplete(release, userState)
+            ? null
+            : release
+        }
+        install={
+          pwa.canPrompt && !pwa.isInstalled
+            ? {
+                isIOS: pwa.isIOS,
+                onInstall: pwa.isIOS
+                  ? pwa.dismiss
+                  : () => {
+                      void pwa.install();
+                    },
+                onDismiss: pwa.dismiss,
+              }
+            : undefined
+        }
+        onStatusChange={publishStatus}
+      />
+      <SidebarOPresence
+        updating={updating}
+        variant={variant}
+        href={oHref}
+        inert={oState.sidebarInert}
+        player={
+          nowPlaying
+            ? {
+                title: nowPlaying.title,
+                artist: nowPlaying.artist,
+                isPlaying: nowPlaying.isPlaying,
+                onToggle: () => {
+                  if (activeTrackId && trackTitle)
+                    void toggleTrack({
+                      id: activeTrackId,
+                      title: trackTitle,
+                    }).catch(() => {});
+                },
+                onExpand: requestFullAudioPlayer,
+              }
+            : undefined
+        }
+        update={oUpdate}
+        onUpdateDone={clearOUpdate}
+      />
+    </>
   );
 }

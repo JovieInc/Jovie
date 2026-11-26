@@ -1,0 +1,94 @@
+name: 'Pull Git LFS files'
+description: 'Replaces Git LFS pointers under one path with their files, from a cache keyed by the pointers'
+
+# Visual-test baselines are stored in Git LFS (.gitattributes), and actions/checkout
+# leaves them as pointers. Jobs that compare or regenerate baselines call this
+# action (setup-playwright does it for every browser-test job). A cache hit
+# restores the objects with no LFS download, so Git LFS bandwidth is spent only
+# when the pointers change.
+inputs:
+  include:
+    description: 'Git LFS include pattern, relative to the repository root'
+    required: true
+  cache:
+    description: "'true' restores and saves the object cache; 'restore' only restores it (jobs that run PR-controlled code); 'false' uses none"
+    required: false
+    default: 'true'
+outputs:
+  pulled:
+    description: "'true' when every pointer under include was replaced by its file"
+    value: ${{ steps.pull.outputs.pulled || 'false' }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: List Git LFS pointers
+      id: pointers
+      shell: bash
+      env:
+        LFS_INCLUDE: ${{ inputs.include }}
+      run: |
+        set -euo pipefail
+        if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+          echo "::warning::No git checkout here; files under $LFS_INCLUDE stay Git LFS pointers."
+          echo "count=0" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        if ! command -v git-lfs >/dev/null 2>&1; then
+          echo "::warning::git-lfs is not installed on this runner; files under $LFS_INCLUDE stay Git LFS pointers."
+          echo "count=0" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        # Keep the smudge filter off, so later git commands in the job never
+        # download LFS files on their own; only the pull below fetches them.
+        git lfs install --local --skip-smudge --skip-repo >/dev/null
+        listing="$(git lfs ls-files --long --include "$LFS_INCLUDE" | sed -E 's/^([0-9a-f]{64}) [*-] /\1 /' | LC_ALL=C sort)"
+        count="$(printf '%s' "$listing" | grep -c . || true)"
+        echo "count=$count" >> "$GITHUB_OUTPUT"
+        echo "key=${RUNNER_OS}-lfs-$(printf '%s\n' "$LFS_INCLUDE" "$listing" | sha256sum | cut -c1-40)" >> "$GITHUB_OUTPUT"
+        echo "$count Git LFS files under $LFS_INCLUDE"
+
+    - name: Restore Git LFS objects
+      id: lfs-cache
+      if: steps.pointers.outputs.count != '0' && inputs.cache != 'false'
+      uses: ./.github/actions/vendor/actions-cache/restore # actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 v6.1.0 (vendored, JOV-8754)
+      with:
+        path: .git/lfs/objects
+        key: ${{ steps.pointers.outputs.key }}
+
+    # The checkout token reads this repository's LFS objects; it is passed only
+    # to this command, never persisted in the git config.
+    - name: Pull Git LFS files
+      id: pull
+      if: steps.pointers.outputs.count != '0'
+      shell: bash
+      env:
+        LFS_INCLUDE: ${{ inputs.include }}
+        LFS_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        # A checkout that persisted its credentials already sends them; a
+        # second Authorization header would make GitHub refuse the request.
+        if git config --get-all http.https://github.com/.extraheader >/dev/null 2>&1; then
+          GIT_TERMINAL_PROMPT=0 git lfs pull --include "$LFS_INCLUDE"
+        else
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$LFS_TOKEN" | base64 | tr -d '\n')"
+          GIT_TERMINAL_PROMPT=0 git -c "http.https://github.com/.extraheader=$AUTH_HEADER" \
+            lfs pull --include "$LFS_INCLUDE"
+          unset AUTH_HEADER
+        fi
+        unset LFS_TOKEN
+        missing="$(git lfs ls-files --long --include "$LFS_INCLUDE" | grep -E '^[0-9a-f]{64} - ' || true)"
+        if [[ -n "$missing" ]]; then
+          echo "::error::Git LFS left pointers under $LFS_INCLUDE in place:"
+          echo "$missing"
+          exit 1
+        fi
+        echo "pulled=true" >> "$GITHUB_OUTPUT"
+
+    - name: Save Git LFS objects
+      if: steps.pointers.outputs.count != '0' && steps.lfs-cache.outputs.cache-hit != 'true' && inputs.cache == 'true' && runner.environment == 'github-hosted'
+      uses: ./.github/actions/vendor/actions-cache/save # actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 v6.1.0 (vendored, JOV-8754)
+      with:
+        path: .git/lfs/objects
+        key: ${{ steps.pointers.outputs.key }}

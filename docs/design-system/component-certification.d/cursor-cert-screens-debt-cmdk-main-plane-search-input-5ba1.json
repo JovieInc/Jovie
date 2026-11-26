@@ -1,0 +1,18 @@
+{
+  "waivers": {
+    "apps/web/components/organisms/CmdKMainPlaneSearchInput.tsx": {
+      "permission-denied": "The field is a public command-palette combobox with no role or plan gate. The detector matched role='combobox' on the search control."
+    }
+  },
+  "gates": {
+    "apps/web/components/organisms/CmdKMainPlaneSearchInput.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  }
+}

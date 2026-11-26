@@ -495,7 +495,7 @@ function ChatRailContextCards({
 
   return (
     <div className='shrink-0 px-2 py-2' data-testid='chat-rail-context-cards'>
-      <div className='space-y-1'>
+      <div className='space-y-1' data-rail-context-occupied='true'>
         {targets.map(target =>
           target.kind === 'profile' ? (
             <ChatProfileContextCard
@@ -1175,7 +1175,7 @@ export function ChatEntityRightPanelHost({
           data-testid='chat-profile-preview-rail'
           data-shell-profile-only={contextCards ? undefined : 'true'}
         >
-          <ProfileContactSidebar />
+          <ProfileContactSidebar contextOccupied={Boolean(contextCards)} />
         </div>
       </ErrorBoundary>
     ) : null;

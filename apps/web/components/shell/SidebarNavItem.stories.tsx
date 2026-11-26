@@ -21,14 +21,14 @@ type Story = StoryObj<typeof SidebarNavItem>;
 export const Active: Story = {
   args: {
     collapsed: false,
-    item: { label: 'Inbox', icon: House, active: true },
+    item: { label: 'Home', icon: House, active: true },
   },
 };
 
 export const ActiveCollapsed: Story = {
   args: {
     collapsed: true,
-    item: { label: 'Inbox', icon: House, active: true },
+    item: { label: 'Home', icon: House, active: true },
   },
 };
 

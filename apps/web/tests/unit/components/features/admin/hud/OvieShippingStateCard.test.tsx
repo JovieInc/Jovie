@@ -198,6 +198,21 @@ const projection = {
   lastError: null,
   state: 'fresh',
   publishing: true,
+  latencyMs: 12,
+  retrying: { state: 'measured-zero', value: 0 },
+  terminalFailures: { state: 'measured-zero', value: 0 },
+  capacityAvailable: { state: 'measured-nonzero', value: 1 },
+  operationalTasks: {
+    canonicalSource: 'linear',
+    cacheMode: 'local-reconciled',
+    syncState: 'fresh',
+    sourceId: 'lane-pull-requests',
+    observedAt: new Date(NOW).toISOString(),
+    lastSyncedAt: new Date(NOW).toISOString(),
+    freshnessDeadline: new Date(NOW + 8_000).toISOString(),
+    tasks: [],
+    deltas: [],
+  },
   sources: {
     'lane-pull-requests': {
       counts: { running: { state: 'measured-zero', value: 0 } },
@@ -253,23 +268,6 @@ function cockpitWithTask(title: string) {
   };
 }
 
-const LABELS = [
-  'Lanes Running',
-  'Merge Queue',
-  'Merged Today',
-  'In Flight',
-  'Jovie / LYB / Summer',
-  'Merged 7d',
-  'Certified HEAD',
-  'Staging',
-  'Production',
-  'Behind Main',
-  'Merge to Prod',
-  'LYB Deploy',
-  'CI Green',
-  'Summer',
-] as const;
-
 function metricValue(label: string): string | null {
   const row = screen.getByText(label).closest('div')?.parentElement;
   return row?.lastElementChild?.textContent ?? null;
@@ -296,10 +294,6 @@ describe('OvieShippingStateCard', () => {
     expect(
       screen.getByTestId('hud-shipper-status-geometry').className
     ).toContain('min-h-40');
-    for (const label of LABELS) {
-      expect(screen.getByText(label)).toBeTruthy();
-    }
-
     await waitFor(() => {
       expect(panel()).toHaveAttribute('data-truth', 'fresh');
     });
@@ -316,20 +310,12 @@ describe('OvieShippingStateCard', () => {
     expect(metricValue('Staging')).toBe('26.9.16 a1b2c3d');
     expect(metricValue('Production')).toBe('26.9.15 ee7401f');
     expect(metricValue('Behind Main')).toBe('54');
-    expect(metricValue('Merge to Prod')).toMatch(/^Unknown/);
-    expect(metricValue('LYB Deploy')).toMatch(/^Unknown/);
+    expect(screen.queryByText('Merge to Prod')).toBeNull();
+    expect(screen.queryByText('LYB Deploy')).toBeNull();
     expect(metricValue('CI Green')).toBe('Yes');
     expect(metricValue('Summer')).toBe('Up');
-    expect(
-      screen.getByText(
-        'devin 4/4 · codex 3/3 · hyperagent 0/2 · pool 186 · last landing 1m ago'
-      )
-    ).toBeTruthy();
-    expect(screen.getByText('61 harness-failed runs in 24h')).toBeTruthy();
-    expect(screen.getByText('Capacity source gap')).toBeTruthy();
-    for (const label of LABELS) {
-      expect(screen.getByText(label)).toBeTruthy();
-    }
+    expect(screen.queryByText('Lanes feed not measured')).toBeNull();
+    expect(screen.queryByTestId('capacity-horizon')).toBeNull();
   });
 
   it('shows LogYourBody production as failing with the commits it is behind main', async () => {
@@ -382,7 +368,7 @@ describe('OvieShippingStateCard', () => {
     });
   });
 
-  it('fails soft per metric: a missing source reads Unknown with its source, never a bare n/a', async () => {
+  it('omits unmeasured tiles during a partial read and names syncing once', async () => {
     fetchMock.mockResolvedValue(
       jsonResponse(200, {
         ...projection,
@@ -420,26 +406,18 @@ describe('OvieShippingStateCard', () => {
     await waitFor(() => {
       expect(panel()).toHaveAttribute('data-truth', 'degraded');
     });
-    expect(metricValue('Merged Today')).toMatch(/^Unknown/);
-    // The unknown names its source, so the operator knows where to look.
-    expect(metricValue('Merged Today')).toMatch(/^Unknown\s*GitHub/);
+    expect(screen.queryByText('Merged Today')).toBeNull();
     expect(
       screen
         .getByTestId('hud-delivery-metrics')
         .querySelectorAll('[data-measured="unknown"]').length
-    ).toBeGreaterThan(0);
-    expect(screen.getByTestId('hud-delivery-metrics')).not.toHaveTextContent(
-      /\bn\/a\b/
-    );
-    expect(metricValue('Jovie / LYB / Summer')).toMatch(/^Unknown/);
-    expect(metricValue('Merged 7d')).toMatch(/^Unknown/);
-    expect(metricValue('Summer')).toMatch(/^Unknown/);
+    ).toBe(0);
+    expect(screen.getByTestId('hud-delivery-metrics-syncing')).toBeTruthy();
     expect(metricValue('Lanes Running')).toMatch(
       /^7\/9\s*(stale|\d+[smhd] old)$/
     );
     expect(metricValue('Merge Queue')).toBe('2');
     expect(metricValue('Behind Main')).toBe('54');
-    expect(screen.getByText('GitHub GraphQL returned 502')).toBeTruthy();
   });
 
   it('does not render zero for unauthorized before any successful measurement', async () => {
@@ -458,8 +436,8 @@ describe('OvieShippingStateCard', () => {
       );
     });
     expect(screen.queryByText('0')).toBeNull();
-    expect(metricValue('Merged Today')).toMatch(/^Unknown/);
-    expect(metricValue('Lanes Running')).toMatch(/^Unknown/);
+    expect(screen.queryByText('Merged Today')).toBeNull();
+    expect(screen.getByTestId('hud-delivery-metrics-syncing')).toBeTruthy();
   });
 
   it('ages a connected projection to stale at its deadline without another read', async () => {
@@ -494,7 +472,9 @@ describe('OvieShippingStateCard', () => {
     );
     expect(panel()).toHaveAttribute('data-connection', 'connected');
     expect(panel()).toHaveAttribute('data-flags', 'cacheExpired');
-    expect(screen.getByText('Cache expired')).toBeTruthy();
+    expect(screen.getByTestId('hud-shipping-truth')).toHaveTextContent(
+      'Connected Stale'
+    );
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -541,20 +521,20 @@ describe('OvieShippingStateCard', () => {
     await waitFor(() =>
       expect(panel()).toHaveAttribute('data-flags', 'duplicate')
     );
-    expect(screen.getByText('Duplicate ignored')).toBeTruthy();
+    expect(panel()).toHaveAttribute('data-flags', 'duplicate');
 
     await client.refetchQueries({ queryKey: ['hud', 'shipping-state', null] });
     await waitFor(() =>
       expect(panel()).toHaveAttribute('data-flags', 'replay')
     );
-    expect(screen.getByText('Replay ignored')).toBeTruthy();
+    expect(panel()).toHaveAttribute('data-flags', 'replay');
     expect(panel()).toHaveAttribute('data-revision', 'rev-4');
 
     await client.refetchQueries({ queryKey: ['hud', 'shipping-state', null] });
     await waitFor(() =>
       expect(panel()).toHaveAttribute('data-flags', 'sequenceGap')
     );
-    expect(screen.getByText('Sequence gap')).toBeTruthy();
+    expect(panel()).toHaveAttribute('data-flags', 'sequenceGap');
     expect(panel()).toHaveAttribute('data-revision', 'rev-6');
 
     await client.refetchQueries({ queryKey: ['hud', 'shipping-state', null] });
@@ -562,7 +542,7 @@ describe('OvieShippingStateCard', () => {
       expect(panel()).toHaveAttribute('data-truth', 'degraded');
       expect(panel()).toHaveAttribute('data-flags', 'contradictory');
     });
-    expect(screen.getByText('Contradictory sequence ignored')).toBeTruthy();
+    expect(panel()).toHaveAttribute('data-flags', 'contradictory');
     expect(panel()).toHaveAttribute('data-revision', 'rev-6');
   });
 
@@ -576,13 +556,9 @@ describe('OvieShippingStateCard', () => {
       </QueryClientProvider>
     );
 
-    expect(
-      await screen.findByText('Unsupported shipping-state schema')
-    ).toBeTruthy();
     const panel = screen.getByTestId('hud-shipper-status-panel');
-    expect(panel).toHaveAttribute('data-truth', 'unknown');
-    expect(panel).toHaveAttribute('data-flags', 'unsupportedSchema');
-    expect(screen.getByText('Unsupported schema')).toBeTruthy();
+    await waitFor(() => expect(panel).toHaveAttribute('data-truth', 'unknown'));
+    expect(screen.getByTestId('hud-delivery-metrics-syncing')).toBeTruthy();
   });
 
   it('does not refetch for the initial pageshow event', async () => {
@@ -889,75 +865,21 @@ describe('OvieShippingStateCard', () => {
     });
   });
 
-  it('keeps the capacity-lease Linear link out of the reason disclosure toggle', async () => {
-    // Regression for a WCAG 4.1.2 "nested-interactive" axe violation: an <a>
-    // rendered inside a <summary> (itself a native toggle). The Linear link
-    // and the reason disclosure must be siblings, not nested.
+  it('does not render operator-only capacity horizon chrome on the founder card', async () => {
     fetchMock.mockResolvedValue(jsonResponse(200, projectionWithCapacityLease));
-    const { container } = render(
+    render(
       <QueryClientProvider client={createQueryClient()}>
         <OvieShippingStateCard />
       </QueryClientProvider>
     );
 
-    const link = await screen.findByRole('link', { name: 'JOV-1234' });
-    expect(link).toHaveAttribute(
-      'href',
-      'https://linear.app/jovie/issue/JOV-1234'
+    await waitFor(() =>
+      expect(screen.getByTestId('hud-shipper-status-panel')).toHaveAttribute(
+        'data-truth',
+        'fresh'
+      )
     );
-
-    const summary = container.querySelector('summary');
-    expect(summary).not.toBeNull();
-    expect(summary?.querySelector('a')).toBeNull();
-    expect(link.closest('summary')).toBeNull();
-
-    // <details> is flow/block content a <p> cannot validly contain.
-    expect(summary?.closest('details')?.closest('p')).toBeNull();
-
-    // The decorative marker replacing the list-none disclosure triangle
-    // stays out of the accessible name.
-    const marker = summary?.querySelector('[aria-hidden="true"]');
-    expect(marker).not.toBeNull();
-    expect(marker?.getAttribute('aria-hidden')).toBe('true');
-    expect(summary?.textContent).toContain(
-      'least-recently-used available compatible lease'
-    );
-  });
-
-  it('never renders filesystem paths from the capacity feed or lanes alerts', async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse(200, {
-        ...projectionWithCapacityLease,
-        delivery: {
-          ...deliveryWithCapacityLease,
-          lanes: {
-            ...deliveryWithCapacityLease.lanes,
-            alerts: ['runner missing at /home/timwhite/.lanes/bin/runner'],
-            capacity: {
-              ...deliveryWithCapacityLease.lanes.capacity,
-              leases: [
-                {
-                  ...capacityLease,
-                  compatibility: {
-                    ...capacityLease.compatibility,
-                    cli: '/home/timwhite/.npm-global/bin/codex',
-                    harness: 'symphony',
-                  },
-                },
-              ],
-            },
-          },
-        },
-      })
-    );
-    const { container } = render(
-      <QueryClientProvider client={createQueryClient()}>
-        <OvieShippingStateCard />
-      </QueryClientProvider>
-    );
-    await screen.findByRole('link', { name: 'JOV-1234' });
-    expect(container.textContent).toContain('codex+symphony');
-    expect(container.textContent).toContain('runner missing at runner');
-    expect(container.textContent).not.toMatch(/\/home\/|npm-global/);
+    expect(screen.queryByTestId('capacity-horizon')).toBeNull();
+    expect(screen.queryByRole('link', { name: 'JOV-1234' })).toBeNull();
   });
 });

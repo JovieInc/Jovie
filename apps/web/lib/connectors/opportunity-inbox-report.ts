@@ -1,3 +1,8 @@
+import {
+  deltaSentiment,
+  directionOf,
+  parsePolarity,
+} from '@/lib/design/metric-tone';
 import type { OpportunityInboxReportData } from './opportunity-inbox-types';
 
 /**
@@ -128,15 +133,18 @@ export function parseReportMeasurement(
     return null;
   }
 
-  let direction: 'up' | 'down' | 'flat' = 'flat';
-  if (deltaPercent > 0) direction = 'up';
-  else if (deltaPercent < 0) direction = 'down';
+  const direction = directionOf(deltaPercent);
+  const polarity = parsePolarity(
+    measurement.polarity ?? measurement.higherIsBetter
+  );
 
   return {
     metricLabel,
     deltaPercent,
     deltaDisplay: formatReportDelta(deltaPercent),
     direction,
+    polarity,
+    sentiment: deltaSentiment(direction, polarity),
     series: parseSeries(measurement.series),
     items: parseBreakdownItems(measurement.items),
     experimentId: asNonEmptyString(record.experimentId),

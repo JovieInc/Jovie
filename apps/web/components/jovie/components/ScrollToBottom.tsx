@@ -4,6 +4,7 @@
 
 import './ScrollToBottom.css';
 
+import { PlainButton } from '@jovie/ui';
 import { ArrowDown } from 'lucide-react';
 import { useSyncExternalStore } from 'react';
 
@@ -40,7 +41,7 @@ export function ScrollToBottom({ visible, onClick }: ScrollToBottomProps) {
   if (!visible) return null;
 
   return (
-    <button
+    <PlainButton
       type='button'
       onClick={onClick}
       className='system-b-scroll-to-bottom'
@@ -49,6 +50,6 @@ export function ScrollToBottom({ visible, onClick }: ScrollToBottomProps) {
       <span className='system-b-scroll-to-bottom-icon'>
         <ArrowDown className='h-3 w-3' />
       </span>
-    </button>
+    </PlainButton>
   );
 }

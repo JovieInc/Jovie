@@ -5,7 +5,7 @@
 
 name: Pen draft pictures to Linear
 
-# After a Pen draft run on main (JOV-12577): render each drafted frame alone
+# After a Pen draft run on a PR or main (JOV-12577): render each drafted frame alone
 # from its <frame>.pen (the draft's own png is the whole canvas, too small to
 # read), and put that picture inline on the Linear issue `Pen draft for approval: <frame>`, labelled
 # `tim-action-required`, so it appears in the Ovie inbox. One issue
@@ -18,7 +18,6 @@ on:
   workflow_run:
     workflows: [Pen draft missing frames]
     types: [completed]
-    branches: [main]
   workflow_dispatch:
     inputs:
       run_id:
@@ -41,8 +40,11 @@ env:
 jobs:
   plan:
     name: Plan Pen frame pictures
-    # PR drafts stay on the PR; a fork branch named main gets nothing.
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event != 'pull_request' && github.event.workflow_run.head_repository.full_name == github.repository) }}
+    # A brief is drafted once, on its own PR, so its pictures are published
+    # from the PR run; a queue merge draws nothing again. Only this
+    # repository's own branches: a fork's run gets nothing. Checkout takes
+    # the default branch, so the publish scripts are main's.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.head_repository.full_name == github.repository }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -182,3 +184,30 @@ jobs:
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
         run: node scripts/design/pen-draft-publish.mjs --dir "$RUNNER_TEMP/pen-drafts" --run-id "$RUN_ID"
+
+  # Nothing fails without a repair or a success (JOV-14467): a red main run opens or updates this
+  # workflow's repair issue and the next green resolves it.
+  report-outcome:
+    name: Report outcome
+    needs: [plan, render, publish]
+    if: ${{ always() && github.ref == 'refs/heads/main' && github.event_name != 'workflow_dispatch' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            .github/actions
+            .nvmrc
+            packages/api-client
+            scripts/lib
+            scripts/remediation-signal-intake.mjs
+      - uses: ./.github/actions/report-outcome
+        with:
+          results: ${{ toJSON(needs) }}
+          linear-api-key: ${{ secrets.LINEAR_API_KEY }}
+          intake-disabled: ${{ vars.REMEDIATION_INTAKE_DISABLED }}

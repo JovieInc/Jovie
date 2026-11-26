@@ -204,8 +204,9 @@ export function sitemapPaths(xml, hosts) {
  */
 export function repoSamples({ read, list, exists, handle }) {
   const samples = new Map();
-  const put = (route, target, source) =>
-    target && samples.set(route, { target, source });
+  const fallbacks = new Map();
+  const put = (route, target, source, into = samples) =>
+    target && into.set(route, { target, source });
   const grab = (file, re) => read(file)?.match(re)?.[1] ?? null;
   const quoted = s => [...(s ?? '').matchAll(/'([^']+)'/g)].map(m => m[1]);
 
@@ -270,10 +271,43 @@ export function repoSamples({ read, list, exists, handle }) {
     alias && `/${handle}/${alias}`,
     `${cfg} profileModeAliasRewrites`
   );
+  // The hidden demo artist that owns the only public promo download, merch
+  // card and asset share (lib/synthetic/crawl-content-fixture.json, seeded on
+  // production by crawl-content-fixture.yml). Same JSON the reconciler reads.
+  // Fallbacks only: a real artist's link found on a loaded page wins.
+  const fixtureFile = `${WEB}/lib/synthetic/crawl-content-fixture.json`;
+  let fixture = null;
+  try {
+    fixture = JSON.parse(read(fixtureFile) ?? 'null');
+  } catch {
+    fixture = null;
+  }
+  if (fixture?.handle && fixture.release?.slug && fixture.merchCard?.id) {
+    const { handle: h, release, merchCard } = fixture;
+    put(
+      '/[username]/[slug]/download',
+      `/${h}/${release.slug}/download`,
+      fixtureFile,
+      fallbacks
+    );
+    put(
+      '/[username]/merch/[cardId]',
+      `/${h}/merch/${merchCard.id}`,
+      fixtureFile,
+      fallbacks
+    );
+    put(
+      '/a/[handle]/[slug]',
+      `/a/${h}/${release.slug}`,
+      fixtureFile,
+      fallbacks
+    );
+  }
+
   // Second segments the rewrites send elsewhere, never to /[username]/[slug].
   const social = grab(cfg, /:platform\(([a-z|]+)\)/)?.split('|') ?? [];
   const reserved = new Set([...aliases, ...social, 's']);
-  return { samples, reserved };
+  return { samples, fallbacks, reserved };
 }
 
 // A playlist's own page; the index and the genre and mood hubs carry the
@@ -389,6 +423,9 @@ export function pickSamples({
     });
   // Repo constants win: they are the exact values the page checks.
   for (const [route, s] of repo.samples) samples.set(route, s);
+  // Fixture pages fill only what no loaded page did.
+  for (const [route, s] of repo.fallbacks ?? new Map())
+    if (!samples.has(route)) samples.set(route, s);
   return samples;
 }
 

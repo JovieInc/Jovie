@@ -94,4 +94,21 @@ describe('claimed onboarding state', () => {
       { currentTool: { name: 'Linktree' } },
     ]);
   });
+
+  it('does not overwrite an available handle with a subsequent unavailable check_handle', () => {
+    const state = deriveClaimedOnboardingStateFromToolEvents([
+      event('checkHandle', {
+        action: 'check_handle',
+        handle: '@luna',
+        available: true,
+      }),
+      event('checkHandle', {
+        action: 'check_handle',
+        handle: '@takenname',
+        available: false,
+      }),
+    ]);
+
+    expect(state.handle).toBe('luna');
+  });
 });

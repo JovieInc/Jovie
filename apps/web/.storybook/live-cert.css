@@ -18,6 +18,7 @@
 @source "../../../packages/ui/atoms/switch.stories.tsx";
 @source "../../../packages/ui/atoms/badge.tsx";
 @source "../../../packages/ui/atoms/button.tsx";
+@source "../../../packages/ui/atoms/button-styles.ts";
 @source "../../../packages/ui/atoms/card.tsx";
 @source "../../../packages/ui/atoms/inline-offline.tsx";
 @source "../../../packages/ui/atoms/label.tsx";

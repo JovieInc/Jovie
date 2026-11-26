@@ -8,6 +8,7 @@ import {
 } from 'node:fs';
 import { dirname } from 'node:path';
 import { failedOnLinearRateLimit } from './lib/linear-retry.mjs';
+import { noteRecurrence } from './lib/remediation-recurrence.mjs';
 import {
   applyRemediationDecisionWithRetry,
   decideAuthSmokeSignal,
@@ -122,10 +123,24 @@ const result = await applyRemediationDecisionWithRetry(gated, {
   detail: gated.detail || env.REMEDIATION_DETAIL,
   apiKey: env.LINEAR_API_KEY,
 });
+const recurrence =
+  gated.action === 'red'
+    ? await noteRecurrence(result, {
+        fingerprint: gated.fingerprint || env.REMEDIATION_FINGERPRINT,
+        runUrl: env.REMEDIATION_RUN_URL,
+        apiKey: env.LINEAR_API_KEY,
+      })
+    : { ok: true, action: 'none' };
+if (!recurrence.ok) {
+  console.warn(
+    `::warning title=Recurrence not recorded::${gated.fingerprint || env.REMEDIATION_FINGERPRINT} reopened but the recurrence comment failed (${recurrence.reason}).`
+  );
+}
 console.log(
   JSON.stringify({
     ...result,
     ...(gated.reason ? { reason: gated.reason } : {}),
+    ...(recurrence.action === 'none' ? {} : { recurrence }),
     previous: previous || null,
   })
 );

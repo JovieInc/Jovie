@@ -93,6 +93,8 @@ describe('DemoTimWhiteProfileSurface', () => {
         // Preview frame (JOV-6946).
         presentation: 'full-public',
         artist: expect.objectContaining({
+          // JOV-14240: ICP mock derives the live public handle, not timwhite.
+          handle: TIM_WHITE_PROFILE.publicProfileHandle,
           spotify_id: TIM_WHITE_PROFILE.spotifyArtistId,
           name: TIM_WHITE_PROFILE.name,
           image_url: TIM_WHITE_PROFILE.avatarSrc,

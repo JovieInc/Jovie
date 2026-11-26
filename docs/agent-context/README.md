@@ -71,7 +71,7 @@ Never sacrifice necessary context just to meet a token count.
 
 ## Checkpoint before compaction or handoff
 
-For portable task evidence use the [GBrain workspace protocol](MEMORY.md).
+For portable task evidence use the GBrain workspace protocol (archived off-tree).
 
 Preserve exact user requests/corrections, approvals and their scope, declined
 choices, current branch/worktree/SHA, owned dirty paths, completed work, failures,

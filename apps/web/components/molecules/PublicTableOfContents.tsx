@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { TocEntry } from '@/types/docs';
@@ -101,20 +102,20 @@ export function PublicTableOfContents({
           const isActive = activeId === entry.id;
 
           return (
-            <button
+            <PlainButton
               key={entry.id}
-              type='button'
               onClick={() => handleJump(entry.id)}
               onKeyDown={event => handleKeyDown(event, index)}
               aria-current={isActive ? 'location' : undefined}
               className={cn(
-                'public-doc-nav-item',
+                // .public-doc-nav-item draws its own focus ring in globals.css.
+                'public-doc-nav-item focus-visible:outline-none',
                 entry.level > 2 && 'public-doc-nav-item-nested',
                 isActive && 'public-doc-nav-item-active'
               )}
             >
               {entry.title}
-            </button>
+            </PlainButton>
           );
         })}
       </div>

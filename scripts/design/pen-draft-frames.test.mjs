@@ -167,3 +167,19 @@ test('a render that failed, or drew more than the frame, fails the frame', async
   // Nothing was uploaded, so Linear was never asked for anything.
   assert.deepEqual(network.ops(), []);
 });
+
+test('a drafter change draws one canary brief, never every brief', async () => {
+  const { planFrames, CANARY_FRAME } = await import('./pen-draft.mjs');
+  const briefs = ['claim', CANARY_FRAME, 'homepage'].map(frame => ({
+    frame,
+    file: `${frame}.md`,
+  }));
+  const drafter = 'scripts/design/pen-draft.mjs';
+  const brief = 'docs/design-system/pen-briefs/homepage.md';
+  assert.deepEqual(planFrames({ briefs, changed: [drafter] }), [CANARY_FRAME]);
+  assert.deepEqual(planFrames({ briefs, changed: [drafter, brief] }), [
+    'homepage',
+  ]);
+  // A queue merge passes an empty list: its PR already drafted it.
+  assert.deepEqual(planFrames({ briefs, changed: [] }), []);
+});

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { Header } from '@/lib/tanstack-table';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { TableHeaderCell } from './TableHeaderCell';
 
 type Row = { title: string };
@@ -181,5 +182,30 @@ describe('TableHeaderCell (molecule)', () => {
   it('keeps column heading cells bounded to one line', () => {
     const { container } = renderCell();
     expect(container.querySelector('th')).toHaveClass('whitespace-nowrap');
+  });
+
+  it('gives an unlabeled column an accessible name', () => {
+    const header = mockHeader('');
+    header.column.id = 'select';
+    renderCell({ header, canSort: false });
+    const cell = screen.getByRole('columnheader');
+    expect(cell).toHaveTextContent('select');
+    expect(cell.querySelector('.sr-only')).not.toBeNull();
+  });
+
+  it('names a placeholder header cell with hidden text', () => {
+    const header = mockHeader('actions', { placeholder: true });
+    header.column.id = 'actions';
+    renderCell({ header, canSort: false });
+    expect(screen.getByRole('columnheader')).toHaveTextContent('actions');
+  });
+
+  it('keeps sortable and plain headers axe-clean', async () => {
+    const sortable = renderCell({ sortDirection: 'asc' });
+    await expectNoA11yViolations(sortable.container);
+    sortable.unmount();
+
+    const plain = renderCell({ canSort: false });
+    await expectNoA11yViolations(plain.container);
   });
 });

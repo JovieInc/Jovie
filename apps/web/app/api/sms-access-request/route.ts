@@ -13,6 +13,7 @@ import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { notifySlackSmsAccessRequest } from '@/lib/notifications/providers/slack';
@@ -23,13 +24,22 @@ export async function POST() {
   if (error) return error;
 
   try {
+    const entitlements = await getCurrentUserEntitlements();
+    if (!entitlements.isPro) {
+      return NextResponse.json(
+        {
+          error: `SMS notifications require the ${getPlanDisplayName('pro')} plan`,
+        },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
     // Look up user and their active creator profile
     const [user] = await db
       .select({
         id: users.id,
         name: users.name,
         email: users.email,
-        isPro: users.isPro,
       })
       .from(users)
       .where(eq(users.id, userId))
@@ -39,15 +49,6 @@ export async function POST() {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    if (!user.isPro) {
-      return NextResponse.json(
-        {
-          error: `SMS notifications require the ${getPlanDisplayName('pro')} plan`,
-        },
-        { status: 403, headers: NO_STORE_HEADERS }
       );
     }
 

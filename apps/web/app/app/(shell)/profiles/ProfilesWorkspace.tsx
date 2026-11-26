@@ -17,7 +17,6 @@ import {
   CircleX,
   ExternalLink,
   Globe2,
-  MoreHorizontal,
   Orbit,
   Plus,
   RefreshCw,
@@ -75,13 +74,15 @@ import {
   convertToCommonDropdownItems,
   PageToolbar,
   TableEmptyState,
+  TableRowOverflowTrigger,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useFounderDoor } from '@/contexts/FounderDoorContext';
+import { SettingsProfileSection } from '@/features/dashboard/organisms/settings-profile-section';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { openChatWithDraft } from '@/lib/chat/open-chat-with-prompt';
-import { fixChatHref, fixForRow } from '@/lib/presence-loop/adapter';
+import { fixForRow } from '@/lib/presence-loop/adapter';
 import type { SourceIdentity } from '@/lib/profile-surfaces/presence-identity';
 import {
   getPresenceEntityName,
@@ -105,6 +106,7 @@ import {
 import { getCacheScope } from '@/lib/queries/cache-isolation';
 import { type ColumnDef, createColumnHelper } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
+import type { Artist } from '@/types/db';
 import type { ConnectionIntakeCandidate } from './AddConnectionRail';
 import { buildConnectionActions, kindLabel } from './connection-actions';
 import { connectionChatDraft } from './connection-chat-context';
@@ -132,6 +134,7 @@ import type {
   ProfileWorkspaceRow,
   ProfileWorkspaceSurfaceRow,
 } from './data';
+import { IdentityConfirmationSection } from './IdentityConfirmationSection';
 import { PresenceIdentityPhoto } from './PresenceIdentityPhoto';
 import { PresenceLockAffordance } from './PresenceLockAffordance';
 import { usePresenceRemoval } from './usePresenceRemoval';
@@ -158,7 +161,7 @@ const SUGGESTED_CONNECTION_SKELETON_IDS = [
   'suggested-connection-loading-3',
 ] as const;
 
-function connectionSuggestionsQueryKey(
+export function connectionSuggestionsQueryKey(
   profileId: string,
   scope: PresenceWorkspaceScope
 ) {
@@ -447,6 +450,9 @@ function ConnectionRail({
   sourceLoading = false,
   onRetrySource,
   contextMenuItems,
+  editableArtist,
+  onFix,
+  onProfileRefresh,
 }: Readonly<{
   data: ProfilesWorkspaceData;
   row: ProfileWorkspaceRow | null;
@@ -459,6 +465,9 @@ function ConnectionRail({
   sourceLoading?: boolean;
   onRetrySource?: () => void;
   contextMenuItems: CommonDropdownItem[];
+  editableArtist?: Artist;
+  onFix?: () => void;
+  onProfileRefresh: () => void;
 }>) {
   const inspector = row
     ? derivePresenceInspector(row, data.providerAvailable)
@@ -543,6 +552,19 @@ function ConnectionRail({
           className='space-y-3 px-3 py-3'
           data-testid='profiles-rail-content'
         >
+          {editableArtist ? (
+            <SettingsProfileSection
+              key={editableArtist.id}
+              artist={editableArtist}
+              presentation='drawer'
+              onRefresh={onProfileRefresh}
+            />
+          ) : null}
+          {onFix ? (
+            <Button className='w-full' size='sm' onClick={onFix}>
+              Fix With Jovie
+            </Button>
+          ) : null}
           {inspector.sections.map(section => {
             switch (section.key) {
               case 'observation_summary':
@@ -738,96 +760,6 @@ function ConnectionRail({
         </div>
       ) : null}
     </EntitySidebarShell>
-  );
-}
-
-const IDENTITY_SOURCE_LABELS: Readonly<Record<string, string>> = {
-  creator_profile: 'Jovie profile',
-  dsp_match: 'DSP match',
-  identity_link: 'public identity link',
-  social_link: 'linked social profile',
-};
-
-function IdentityConfirmationSection({
-  row,
-  onDecision,
-}: Readonly<{
-  row: ProfileWorkspaceSurfaceRow;
-  onDecision: (surfaceId: string, decision: IdentityDecision) => Promise<void>;
-}>) {
-  const [pendingDecision, setPendingDecision] =
-    useState<IdentityDecision | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const evidence = row.identityEvidence ?? {
-    sourceCount: 0,
-    sourceTypes: [],
-    confidence: null,
-  };
-  const sourceSummary = evidence.sourceTypes
-    .map(
-      sourceType =>
-        IDENTITY_SOURCE_LABELS[sourceType] ?? sourceType.replaceAll('_', ' ')
-    )
-    .join(', ');
-  const confidence =
-    evidence.confidence === null
-      ? null
-      : `${Math.round(evidence.confidence * 100)}% match`;
-  const evidenceSummary =
-    evidence.sourceCount === 0
-      ? 'No live source claim is currently available.'
-      : [
-          `${evidence.sourceCount} live ${evidence.sourceCount === 1 ? 'source' : 'sources'}`,
-          sourceSummary,
-          confidence,
-        ]
-          .filter(Boolean)
-          .join(' · ');
-
-  const decide = async (decision: IdentityDecision) => {
-    setPendingDecision(decision);
-    setError(null);
-    try {
-      await onDecision(row.id, decision);
-    } catch {
-      setError('Could not save your answer. Try again.');
-    } finally {
-      setPendingDecision(null);
-    }
-  };
-
-  return (
-    <DrawerSection title='Identity Check' sectionKind='details'>
-      <div className='space-y-3 px-1'>
-        <div className='space-y-1'>
-          <p className='text-sm font-medium text-primary-token'>Is this you?</p>
-          <p className='text-xs text-tertiary-token'>{evidenceSummary}</p>
-        </div>
-        <div className='grid grid-cols-3 gap-2'>
-          {(['yes', 'no', 'unsure'] as const).map(decision => (
-            <Button
-              key={decision}
-              type='button'
-              size='sm'
-              variant={decision === 'yes' ? 'primary' : 'secondary'}
-              loading={pendingDecision === decision}
-              disabled={pendingDecision !== null}
-              className={PRESENCE_BUTTON_DESKTOP_DENSITY}
-              onClick={() => void decide(decision)}
-            >
-              {decision === 'yes' ? 'Yes' : decision === 'no' ? 'No' : 'Unsure'}
-            </Button>
-          ))}
-        </div>
-        <p
-          className='min-h-4 text-xs text-error'
-          role={error ? 'alert' : 'status'}
-          aria-live='polite'
-        >
-          {error}
-        </p>
-      </div>
-    </DrawerSection>
   );
 }
 
@@ -1137,10 +1069,12 @@ export function ProfilesWorkspace({
   data,
   scope,
   removalPrincipal,
+  editableArtist,
 }: Readonly<{
   data: ProfilesWorkspaceData | null;
   scope: PresenceWorkspaceScope;
   removalPrincipal?: PresenceRemovalPrincipal | null;
+  editableArtist?: Artist;
 }>) {
   return (
     <PresenceWorkspaceBoundary scope={scope}>
@@ -1149,6 +1083,7 @@ export function ProfilesWorkspace({
         data={data}
         scope={scope}
         removalPrincipal={removalPrincipal}
+        editableArtist={editableArtist}
       />
     </PresenceWorkspaceBoundary>
   );
@@ -1158,10 +1093,12 @@ function ProfilesWorkspaceContent({
   data,
   scope,
   removalPrincipal,
+  editableArtist,
 }: Readonly<{
   data: ProfilesWorkspaceData | null;
   scope: PresenceWorkspaceScope;
   removalPrincipal?: PresenceRemovalPrincipal | null;
+  editableArtist?: Artist;
 }>) {
   const sourceIdentityQueries = useQueries({
     combine: combineSourceIdentityQueries,
@@ -1263,6 +1200,9 @@ function ProfilesWorkspaceContent({
     () => selectPresenceReviewRows(rows).filter(row => row.kind !== 'jovie'),
     [rows]
   );
+  const savedProfileCount = rows.filter(
+    row => !row.id.startsWith('preview:')
+  ).length;
   const handleReviewIdentities = useCallback(() => {
     const reviewRow =
       identityReviewRows.find(row => row.id === selected?.id) ??
@@ -1276,6 +1216,17 @@ function ProfilesWorkspaceContent({
   const suggestionActionRefs = useRef(new Map<string, HTMLButtonElement>());
   const suggestedRegionRef = useRef<HTMLDivElement>(null);
   const pendingSuggestionFocusTargetRef = useRef<string | null>(null);
+  const openSuggestedReview = useCallback(() => {
+    if (suggestedRegionRef.current) {
+      suggestedRegionRef.current.focus();
+    } else {
+      pendingSuggestionFocusTargetRef.current = SUGGESTED_QUEUE_FOCUS_TARGET;
+    }
+    setShowSuggestions(true);
+    setSelected(null);
+    setPendingCandidate(null);
+    setIsAddConnectionOpen(false);
+  }, [setSelected]);
   const {
     request: requestRemoval,
     registerTrigger: registerRemovalTrigger,
@@ -1289,7 +1240,8 @@ function ProfilesWorkspaceContent({
     removalPrincipal
   );
   const router = useRouter();
-  const { chatMode: founderChatMode } = useFounderDoor();
+  const { chatMode: founderChatMode, toggle: toggleFounderDoor } =
+    useFounderDoor();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const profileId = data?.profileId ?? null;
@@ -1330,12 +1282,9 @@ function ProfilesWorkspaceContent({
   useEffect(() => {
     if (searchParams.get('add') !== 'service') return;
 
-    setSelected(null);
-    setPendingCandidate(null);
-    setIsAddConnectionOpen(false);
-    setShowSuggestions(true);
+    openSuggestedReview();
     router.replace(APP_ROUTES.PRESENCE);
-  }, [router, searchParams, setSelected]);
+  }, [openSuggestedReview, router, searchParams]);
   useEffect(() => {
     const target = pendingSuggestionFocusTargetRef.current;
     if (!target) return;
@@ -1348,7 +1297,7 @@ function ProfilesWorkspaceContent({
 
     element.focus();
     pendingSuggestionFocusTargetRef.current = null;
-  }, [visibleSuggestionFocusTargets]);
+  }, [showSuggestions, visibleSuggestionFocusTargets]);
   const registerSuggestionActionRef = useCallback(
     (suggestionId: string, action: SuggestionAction) =>
       (node: HTMLButtonElement | null) => {
@@ -1458,6 +1407,35 @@ function ProfilesWorkspaceContent({
     setPendingCandidate(null);
     setIsAddConnectionOpen(true);
   }, [setSelected]);
+  const editJovieProfile = useCallback(
+    (row: ProfileWorkspaceRow) => {
+      if (editableArtist?.id === data?.profileId && editableArtist) {
+        setIsAddConnectionOpen(false);
+        setPendingCandidate(null);
+        setSelected(row);
+      } else {
+        router.push(APP_ROUTES.SETTINGS_PROFILE);
+      }
+    },
+    [data?.profileId, editableArtist, router, setSelected]
+  );
+  const fixExternalProfile = useCallback(
+    (row: ProfileWorkspaceRow) => {
+      const task =
+        fixForRow(row, 'personal')?.agentTask ??
+        'Check what can be corrected on this public profile and draft the changes for my approval.';
+      if (
+        !data ||
+        getCacheScope().profileId !== data.profileId ||
+        !openChatWithDraft(`${connectionChatDraft(row, data)} ${task}`, router)
+      ) {
+        toast.error('Could not open Jovie. Reopen the profile and try again.');
+        return;
+      }
+      if (founderChatMode === 'ov') toggleFounderDoor();
+    },
+    [data, founderChatMode, router, toggleFounderDoor]
+  );
   const getContextMenuItems = useCallback(
     (row: ProfileWorkspaceRow): ContextMenuItemType[] => {
       if (row.id.startsWith('preview:')) return [];
@@ -1466,7 +1444,7 @@ function ProfilesWorkspaceContent({
         onRemoveLink: connection => {
           requestRemoval(connection);
         },
-        onEditProfile: () => router.push(APP_ROUTES.SETTINGS_PROFILE),
+        onEditProfile: editJovieProfile,
         onAskJovie: connection => {
           if (founderChatMode === 'ov') {
             toast.error('Switch to Jovie, then ask about this item again.');
@@ -1490,12 +1468,10 @@ function ProfilesWorkspaceContent({
           }
           router.push(connection.url);
         },
-        onFix: fixForRow(row, 'personal')
-          ? connection => {
-              const fix = fixForRow(connection, 'personal');
-              if (fix) router.push(fixChatHref(fix));
-            }
-          : undefined,
+        onFix:
+          row.rowType === 'surface' && row.kind !== 'jovie'
+            ? fixExternalProfile
+            : undefined,
         onPrimaryAction: connection => {
           const action = getConnectionPrimaryAction(connection);
           if (action === 'review' && connection.rowType === 'surface') {
@@ -1512,7 +1488,15 @@ function ProfilesWorkspaceContent({
         },
       });
     },
-    [data, router, setSelected, founderChatMode, requestRemoval]
+    [
+      data,
+      editJovieProfile,
+      fixExternalProfile,
+      router,
+      setSelected,
+      founderChatMode,
+      requestRemoval,
+    ]
   );
   // A column whose every cell is a dash is noise; show it once any row
   // has something to say.
@@ -1527,6 +1511,8 @@ function ProfilesWorkspaceContent({
       row.rowType !== 'connector' &&
       formatProfileRankChange(row.rank, row.previousRank) !== '—'
   );
+  const artistName = data?.artist.name;
+  const providerAvailable = data?.providerAvailable ?? false;
   const columns = useMemo(
     () => [
       columnHelper.accessor('label', {
@@ -1547,7 +1533,7 @@ function ProfilesWorkspaceContent({
               ) : (
                 <PresenceIdentityPhoto
                   subject={row}
-                  artistName={data?.artist.name ?? row.label}
+                  artistName={artistName ?? row.label}
                   size='sm'
                   className={styles.profilePhoto}
                 />
@@ -1561,14 +1547,11 @@ function ProfilesWorkspaceContent({
                 <div className='truncate text-sm font-medium text-primary-token max-sm:w-full'>
                   {row.rowType === 'connector'
                     ? row.label
-                    : getPresenceRowTitle(row, data?.artist.name ?? '')}
+                    : getPresenceRowTitle(row, artistName ?? '')}
                 </div>
                 <ConnectionSecondaryIdentity row={row} />
                 <div className={styles.mobileStatus}>
-                  <StatusCell
-                    row={row}
-                    providerAvailable={data?.providerAvailable ?? false}
-                  />
+                  <StatusCell row={row} providerAvailable={providerAvailable} />
                 </div>
               </div>
             </div>
@@ -1583,7 +1566,7 @@ function ProfilesWorkspaceContent({
         cell: context => <TypeCell row={context.row.original} />,
       }),
       columnHelper.accessor(
-        row => getConnectionStatus(row, data?.providerAvailable).label,
+        row => getConnectionStatus(row, providerAvailable).label,
         {
           id: 'status',
           header: 'Status',
@@ -1592,7 +1575,7 @@ function ProfilesWorkspaceContent({
           cell: context => (
             <StatusCell
               row={context.row.original}
-              providerAvailable={data?.providerAvailable ?? false}
+              providerAvailable={providerAvailable}
             />
           ),
         }
@@ -1685,23 +1668,17 @@ function ProfilesWorkspaceContent({
                   onKeyDown={event => event.stopPropagation()}
                   onClick={event => {
                     event.stopPropagation();
-                    router.push(APP_ROUTES.SETTINGS_PROFILE);
+                    editJovieProfile(row);
                   }}
                 >
                   Edit
                 </Button>
               ) : null}
               <TableActionMenu items={actionItems} align='end' trigger='custom'>
-                <button
-                  type='button'
-                  aria-label={`Actions for ${row.label}`}
+                <TableRowOverflowTrigger
                   ref={node => registerRemovalTrigger(row.id, node)}
-                  onClick={event => event.stopPropagation()}
-                  onKeyDown={event => event.stopPropagation()}
-                  className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-colors duration-fast hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/50 sm:h-8 sm:w-8'
-                >
-                  <MoreHorizontal className='h-4 w-4' aria-hidden />
-                </button>
+                  ariaLabel={`Actions for ${row.label}`}
+                />
               </TableActionMenu>
             </div>
           );
@@ -1709,12 +1686,12 @@ function ProfilesWorkspaceContent({
       }),
     ],
     [
-      data?.artist.name,
-      data?.providerAvailable,
+      artistName,
+      providerAvailable,
+      editJovieProfile,
       getContextMenuItems,
       hasRank,
       hasRankChange,
-      router,
       selected?.id,
       registerRemovalTrigger,
     ]
@@ -1732,7 +1709,7 @@ function ProfilesWorkspaceContent({
   const selectedSourceIdentity = selectedSourceQuery?.data;
   const selectedSourceLoading = selectedSourceQuery?.isFetching ?? false;
   const refetchSelectedSource = selectedSourceQuery?.refetch;
-  const suggestedCount = connectionSuggestions.length;
+  const suggestedCount = connectionSuggestionsQuery.data?.length ?? null;
   const suggestionsLoading = connectionSuggestionsQuery.isLoading;
   const rightPanel = useMemo(() => {
     if (!data) return null;
@@ -1756,12 +1733,7 @@ function ProfilesWorkspaceContent({
             setShowSuggestions(false);
             setIsAddConnectionOpen(false);
           }}
-          onReviewSuggestions={() => {
-            setShowSuggestions(true);
-            setSelected(null);
-            setPendingCandidate(null);
-            setIsAddConnectionOpen(false);
-          }}
+          onReviewSuggestions={openSuggestedReview}
         />
       );
     }
@@ -1774,6 +1746,17 @@ function ProfilesWorkspaceContent({
         onIdentityDecision={handleIdentityDecision}
         sourceIdentity={selectedSourceIdentity}
         sourceLoading={selectedSourceLoading}
+        editableArtist={
+          selected.kind === 'jovie' && editableArtist?.id === data.profileId
+            ? editableArtist
+            : undefined
+        }
+        onFix={
+          selected.rowType === 'surface' && selected.kind !== 'jovie'
+            ? () => fixExternalProfile(selected)
+            : undefined
+        }
+        onProfileRefresh={router.refresh}
         onRetrySource={() => {
           void refetchSelectedSource?.();
         }}
@@ -1784,10 +1767,14 @@ function ProfilesWorkspaceContent({
     );
   }, [
     data,
+    editableArtist,
+    fixExternalProfile,
     getContextMenuItems,
     handleIdentityDecision,
     isAddConnectionOpen,
+    openSuggestedReview,
     refetchSelectedSource,
+    router.refresh,
     selected,
     selectedSourceIdentity,
     selectedSourceLoading,
@@ -1826,9 +1813,6 @@ function ProfilesWorkspaceContent({
       contentPadding='none'
       data-testid='profiles-workspace'
       surfaceMode='table'
-      // JOV-8964: the workspace reads as one centered content column on wide
-      // (ultrawide) windows instead of a full-bleed table.
-      maxWidth='wide'
       toolbar={
         <PageToolbar
           data-testid='connections-workspace-toolbar'
@@ -1837,7 +1821,9 @@ function ProfilesWorkspaceContent({
           endClassName='max-w-full flex-wrap max-sm:ml-0 max-sm:justify-start'
           start={
             <span className='text-app tabular-nums text-secondary-token'>
-              {rows.length === 1 ? '1 profile' : `${rows.length} profiles`}
+              {savedProfileCount === 1
+                ? '1 profile'
+                : `${savedProfileCount} profiles`}
             </span>
           }
           end={
@@ -1854,13 +1840,16 @@ function ProfilesWorkspaceContent({
               <Button
                 variant='ghost'
                 size='sm'
+                className='min-w-40'
                 aria-expanded={showSuggestions}
                 aria-controls='profile-suggestions'
                 onClick={() => setShowSuggestions(value => !value)}
               >
                 {showSuggestions
                   ? 'Close Suggestions'
-                  : `Review Suggestions (${connectionSuggestions.length})`}
+                  : suggestedCount === null
+                    ? 'Review Suggestions'
+                    : `Review Suggestions (${suggestedCount})`}
               </Button>
               {/* JOV-8964: moved out of the floating shell-header slot into
                   the page toolbar where the table it targets lives. */}
@@ -1877,8 +1866,12 @@ function ProfilesWorkspaceContent({
       }
     >
       {removalDialog}
-      {showSuggestions ? (
-        <div id='profile-suggestions'>
+      <div
+        id='profile-suggestions'
+        hidden={!showSuggestions}
+        className='max-h-1/2 shrink-0 overflow-y-auto overscroll-contain'
+      >
+        {showSuggestions ? (
           <SuggestedConnectionsReview
             groups={suggestedGroups}
             isLoading={connectionSuggestionsQuery.isLoading}
@@ -1891,8 +1884,8 @@ function ProfilesWorkspaceContent({
             registerActionRef={registerSuggestionActionRef}
             regionRef={suggestedRegionRef}
           />
-        </div>
-      ) : null}
+        ) : null}
+      </div>
       <UnifiedTable
         data={rows}
         columns={columns as ColumnDef<ProfileWorkspaceRow, unknown>[]}
@@ -1909,7 +1902,7 @@ function ProfilesWorkspaceContent({
           }
         }}
         getContextMenuItems={getContextMenuItems}
-        rowMode='list'
+        rowMode='dense'
         containerClassName={cn('min-h-0 flex-1', styles.identityContainer)}
         minWidth='0'
         className={styles.table}

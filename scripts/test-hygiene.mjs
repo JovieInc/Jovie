@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // Test-hygiene ratchet: fails when a test file gains a slop pattern that mutation
-// testing can't see (scripts/lib/test-hygiene.mjs lists them). Existing findings
-// are counted per file and rule in scripts/test-quality/test-hygiene-baseline.json;
-// counts may only go down. Focused tests are never allowed.
+// testing can't see (scripts/lib/test-hygiene.mjs lists them, plus the landmine
+// rules in scripts/lib/test-hygiene-landmines.mjs). Existing findings are counted
+// per file and rule in scripts/test-quality/test-hygiene-baseline.json and
+// test-hygiene-landmines.ratchet.json; counts may only go down. Focused tests and
+// a test mocking its own unit under test are never allowed.
 //
 //   node scripts/test-hygiene.mjs              # check every tracked test file
 //   node scripts/test-hygiene.mjs --tighten    # lower the baseline after a cleanup
@@ -22,6 +24,13 @@ import {
   scanTestFile,
   TEST_FILE_GLOBS,
 } from './lib/test-hygiene.mjs';
+import {
+  LANDMINE_RULES,
+  loadRatchet,
+  tightenRatchet,
+} from './lib/test-hygiene-landmines.mjs';
+
+const ALL_RULES = { ...RULES, ...LANDMINE_RULES };
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE = join(
@@ -76,17 +85,21 @@ if (values.report) {
 } else if (values.tighten) {
   baseline.counts = lowerBaseline(baseline.counts, current);
   writeFileSync(BASELINE, `${JSON.stringify(baseline, null, 2)}\n`);
+  tightenRatchet(repoRoot, current);
   console.log(
     'test-hygiene: baseline lowered to current counts (never raised).'
   );
 } else {
-  const failures = compareToBaseline(baseline.counts, current);
+  const failures = compareToBaseline(
+    { ...baseline.counts, ...loadRatchet(repoRoot) },
+    current
+  );
   if (failures.length === 0) {
     console.log(`test-hygiene: ${files.length} test files, no new findings.`);
   } else {
     for (const f of failures) {
       console.error(
-        `${f.file}: ${f.rule} ${f.count} (allowed ${f.allowed}): ${RULES[f.rule]}`
+        `${f.file}: ${f.rule} ${f.count} (allowed ${f.allowed}): ${ALL_RULES[f.rule]}`
       );
       for (const hit of (findingsByFile[f.file] ?? []).filter(
         h => h.rule === f.rule

@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, PlainButton } from '@jovie/ui';
 import {
   AlertCircle,
   Check,
@@ -168,7 +168,7 @@ export function VerificationModal({
 
             {/* DNS provider help */}
             <ContentSurfaceCard className='overflow-hidden bg-surface-0 p-0'>
-              <button
+              <PlainButton
                 type='button'
                 onClick={() => setShowProviders(prev => !prev)}
                 className='flex w-full items-center justify-between px-3 py-2.5 text-app font-caption text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
@@ -181,7 +181,7 @@ export function VerificationModal({
                 ) : (
                   <ChevronDown className='h-3.5 w-3.5' />
                 )}
-              </button>
+              </PlainButton>
               {showProviders && (
                 <div
                   className='space-y-1.5 border-t border-subtle px-3 py-2.5'

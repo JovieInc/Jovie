@@ -28,6 +28,10 @@ export function DashboardFeedbackModal({
   const [feedback, setFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  // Stable callback ref: focuses the message field once, when it mounts.
+  const focusOnMount = useCallback((node: HTMLTextAreaElement | null) => {
+    node?.focus();
+  }, []);
 
   const handleSubmit = useCallback(async () => {
     if (!feedback.trim() || isSubmitting) return;
@@ -81,10 +85,8 @@ export function DashboardFeedbackModal({
           <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success-subtle text-success'>
             <CheckCircle2 className='h-6 w-6' aria-hidden='true' />
           </div>
-          <DialogTitle className='mt-4 text-balance text-base font-semibold text-primary-token'>
-            Feedback Sent
-          </DialogTitle>
-          <DialogDescription className='mt-2 text-app text-secondary-token'>
+          <DialogTitle className='mt-4 text-base'>Feedback Sent</DialogTitle>
+          <DialogDescription className='mt-2'>
             Thanks for telling us.
           </DialogDescription>
         </div>
@@ -92,8 +94,8 @@ export function DashboardFeedbackModal({
         <>
           <div className='flex items-start justify-between gap-4'>
             <div>
-              <DialogTitle className='text-balance'>Send Feedback</DialogTitle>
-              <DialogDescription className='mt-1 text-app text-secondary-token'>
+              <DialogTitle>Send Feedback</DialogTitle>
+              <DialogDescription className='mt-1'>
                 Tell us where the experience feels delightful, where it falls
                 short, or what you&apos;d love us to build next.
               </DialogDescription>
@@ -118,12 +120,12 @@ export function DashboardFeedbackModal({
               helpText={`Press ${GLYPH_CMD} + Enter to send instantly`}
             >
               <Textarea
+                ref={focusOnMount}
                 value={feedback}
                 onChange={event => setFeedback(event.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="What's working? What's not? What should we build next?"
                 rows={5}
-                autoFocus
                 className='bg-surface-1 border-subtle text-primary-token placeholder:text-secondary-token'
               />
             </FormField>
@@ -143,7 +145,6 @@ export function DashboardFeedbackModal({
               onClick={handleSubmit}
               disabled={!feedback.trim() || isSubmitting}
               loading={isSubmitting}
-              className='font-caption'
             >
               Send Feedback
             </Button>

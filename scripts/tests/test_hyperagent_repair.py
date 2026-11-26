@@ -303,6 +303,30 @@ class HyperagentRepairTest(unittest.TestCase):
         self.assertIn("timed out", receipt["remoteError"])
         self.assertIn("endedAt", self.attempts()["58"])
 
+    def test_verify_poll_backs_off_under_the_user_token_floor(self):
+        # JOV-13097: the verify poll beat every 2 min for up to 90 min (~45
+        # pr-view + required-check pairs per repair) and pushed the gem
+        # user-token core bucket past the 80% floor. It must back off
+        # 2 -> 4 -> 8 -> 15 min (cap), bounded by the remaining deadline —
+        # with no verdict change: pending checks still time out.
+        base_sleep = self.world.sleep
+        sleeps = []
+        def recording_sleep(seconds):
+            sleeps.append(seconds)
+            base_sleep(seconds)
+        self.world.sleep = recording_sleep
+        self.world.add_pr(4101, state="BLOCKED", head_message="Merge origin/main\n\nHyperagent-Repair: attempt1")
+        self.world.checks[4101] = [{"name": "CI / unit", "bucket": "pending", "link": ""}]
+        deps = self.deps(check_wait=90 * 60)
+        verdict, head = repair.verify(deps, 4101, sha(0), "attempt1", {})
+        self.assertEqual(verdict, "checks-timeout")
+        self.assertEqual(sha(4101), head)
+        self.assertEqual(sleeps, [120, 240, 480, 900, 900, 900, 900, 900, 60])
+        self.assertLessEqual(max(sleeps), 15 * 60)
+        self.assertEqual(sum(sleeps), 90 * 60)  # never sleeps past the deadline
+        pr_views = [c for c in self.world.calls if c[0] == "gh" and c[1][:2] == ["pr", "view"]]
+        self.assertEqual(len(pr_views), 11)  # 1 pre-loop + 10 polls vs ~47 at the old flat beat
+
     def test_lane_turn_reports_capped_so_the_issue_path_stops_too(self):
         stamp = datetime.fromtimestamp(NOW, timezone.utc)
         (self.bridge / f"runs-{stamp:%Y-%m-%d}.txt").write_text("24")

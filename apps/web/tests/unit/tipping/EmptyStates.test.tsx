@@ -5,6 +5,7 @@ import {
   TippingEmptyState,
   TippingMetricsSkeleton,
 } from '@/components/features/pay/EmptyStates';
+import { expectFlatState } from '@/tests/utils/flat-state';
 
 vi.mock('next/image', () => ({
   default: ({
@@ -54,11 +55,7 @@ describe('TippingEmptyState', () => {
     );
 
     expect(container.firstChild).toHaveClass('custom-class');
-    expect(container.firstChild).toHaveClass(
-      'bg-on-media/60',
-      'dark:bg-on-media/5',
-      'shadow-ink-on-media/5'
-    );
+    expectFlatState(container);
   });
 
   it('composes the canonical EmptyState molecule', () => {

@@ -9,8 +9,6 @@ import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { TableMetaProvider } from '@/contexts/TableMetaContext';
 import { AudiencePanelProvider } from '@/features/dashboard/organisms/AudiencePanelContext';
-import { queryKeys } from '@/lib/queries/keys';
-import type { AiCrawlerAnalyticsResponse } from '@/types/ai-crawler-analytics';
 
 /**
  * Shared Storybook fixtures for the heavier `features/dashboard` organisms
@@ -78,17 +76,6 @@ export const DEFAULT_DASHBOARD_DATA: DashboardData = {
   },
 } as DashboardData;
 
-/** Measured zero-state AI crawler analytics ("Waiting for first AI crawl"). */
-export const DASHBOARD_FIXTURE_AI_CRAWLERS: AiCrawlerAnalyticsResponse = {
-  totalRequests: 0,
-  weeklyRequests: 0,
-  crawlers: [],
-  dailyTrend: [],
-  syncedAt: '2026-09-01T12:00:00.000Z',
-  isPro: true,
-  isTeaser: false,
-};
-
 /** Fresh QueryClient tuned for stories: no retries, no background refetch.
  * Seeds dashboard queries that shell surfaces read on mount so stories render
  * without a network. */
@@ -103,10 +90,6 @@ export function createDashboardQueryClient(): QueryClient {
       mutations: { retry: false },
     },
   });
-  client.setQueryData(
-    queryKeys.dashboard.aiCrawlers(),
-    DASHBOARD_FIXTURE_AI_CRAWLERS
-  );
   return client;
 }
 

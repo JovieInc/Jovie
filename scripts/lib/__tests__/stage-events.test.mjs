@@ -44,6 +44,28 @@ describe('stage manifest', () => {
     expect(checkStageManifest({ repoRoot: REPO_ROOT })).toEqual([]);
   });
 
+  // Law 2 / RSI win #7: live lanes-stage-feed emitters must stay pushed so
+  // shipping gate/worker/outcome/repair p95 cannot silently revert to unmeasured.
+  it('keeps shipping-critical lanes stages pushed (live lanes-stage-feed)', () => {
+    const required = [
+      ['shipping', 'worker-start'],
+      ['shipping', 'gate-seat'],
+      ['shipping', 'gate'],
+      ['shipping', 'outcome-receipt'],
+      ['remediation', 'repair-start'],
+    ];
+    for (const [entityType, stageId] of required) {
+      const stage = MANIFEST.entities[entityType].stages.find(
+        row => row.id === stageId
+      );
+      expect(stage, `${entityType}:${stageId}`).toMatchObject({
+        status: 'pushed',
+        source: 'lanes-stage-feed',
+        producer: 'lanes',
+      });
+    }
+  });
+
   it('rejects unregistered sources, owner-less spec stages and unordered pairs', () => {
     const broken = clone(MANIFEST);
     broken.entities.shipping.stages[0].source = 'nowhere';

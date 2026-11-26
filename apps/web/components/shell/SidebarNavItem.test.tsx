@@ -162,10 +162,10 @@ describe('SidebarNavItem design-system button', () => {
     render(
       <SidebarNavItem
         collapsed={false}
-        item={{ label: 'Inbox', icon: TestIcon }}
+        item={{ label: 'Home', icon: TestIcon }}
       />
     );
-    const row = screen.getByRole('button', { name: 'Inbox' });
+    const row = screen.getByRole('button', { name: 'Home' });
     expect(row).toHaveAttribute('data-slot', 'plain-button');
     expect(row).toHaveClass('focus-visible:ring-ring/55');
     expect(row).not.toHaveClass('focus-visible:ring-focus');

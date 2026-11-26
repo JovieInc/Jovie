@@ -113,7 +113,7 @@ export function AudioBar({
   readonly className?: string;
 }) {
   const transportButtons = (
-    <div className='flex items-center gap-1.5 justify-self-center'>
+    <div className='flex h-11 items-center gap-1.5'>
       {onShuffle && (
         <IconBtn
           label='Shuffle'
@@ -167,7 +167,7 @@ export function AudioBar({
   const rightCluster = (
     <div
       data-testid='audio-bar-mode-buttons'
-      className='flex items-center gap-1 justify-self-end'
+      className='flex h-11 items-center gap-1 justify-self-end'
     >
       {track.hasLyrics && onOpenLyrics && (
         <IconBtn
@@ -222,13 +222,14 @@ export function AudioBar({
         // Visibility is owned by shell parents (e.g. PersistentAudioBar surfaces).
         // Avoid nested `hidden lg:*` here — when Tailwind is active in CI/jsdom,
         // it leaves sibling now-playing chrome visible while hiding transport controls.
-        // Single-row dock: parent may own the left now-playing column (JOV-3511).
-        'group/bar shrink-0 grid grid-cols-[minmax(240px,_1fr)_auto] gap-3 items-center px-2 py-1.5',
+        // Bottom band is the 44px transport axis; the waveform drawer opens
+        // above it. Parent may own the left now-playing column (JOV-3511).
+        'group/bar shrink-0 grid grid-cols-[minmax(240px,_1fr)_auto] gap-3 items-end px-2',
         className
       )}
     >
       {/* Center column: waveform drawer above (collapsible), transport below. */}
-      <div className='flex flex-col items-center justify-center min-h-11 min-w-0'>
+      <div className='flex min-w-0 flex-col items-center'>
         <div
           aria-hidden={!waveformOn}
           inert={!waveformOn || undefined}
@@ -240,7 +241,7 @@ export function AudioBar({
             transition: `max-height var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing)`,
           }}
         >
-          <div className='pt-1.5 pb-1.5'>
+          <div className='pt-1.5'>
             <ScrubGradient
               currentTime={currentTime}
               duration={duration}

@@ -99,6 +99,27 @@ test('canonical registry validates and keeps COMM-006 fail-closed', () => {
   assert.deepEqual(canonicalRegistry.trustedAttestationKeyFingerprints, []);
 });
 
+test('canonical registry registers Summer tech-debt closed loop as COMM-017', () => {
+  const canonicalRegistry = validateRegistry(
+    loadRegistry(canonicalRegistryPath)
+  );
+  assert.equal(canonicalRegistry.capabilities.length, 17);
+  const debt = canonicalRegistry.capabilities.find(
+    item => item.id === 'SUMMER-COMM-017'
+  );
+  assert.equal(debt.capability, 'Tech-debt closed loop');
+  assert.equal(debt.implementationState, 'in_flight');
+  assert.equal(debt.status, 'blocked');
+  assert.equal(debt.critical, true);
+  assert.equal(debt.probe.id, 'summer.debt.closed-loop');
+  assert.equal(debt.probe.requiresRuntimeReceipt, true);
+  assert.equal(
+    debt.probe.expectedState,
+    'waste_digest_fresh_and_autonomous_debt_class_remediated_with_factory_fp_dedupe'
+  );
+  assert.match(debt.ownerRemediation.owner, /Summer tech-debt closed loop/u);
+});
+
 test('direct commissioning rejects a noncanonical false-green registry', async t => {
   const repositoryRoot = await fixtureDirectory();
   t.after(() => rm(repositoryRoot, { recursive: true, force: true }));

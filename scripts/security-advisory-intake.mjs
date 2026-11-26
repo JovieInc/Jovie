@@ -1,8 +1,10 @@
 #!/usr/bin/env node
-// Security-advisory loop: Dependabot alert -> owned Linear issue (devin lane)
-// with a severity SLA -> closed only when the alert is fixed on main AND a
-// Production deploy landed after the fix. `--check` is the ratchet: a critical,
-// high or medium advisory past its SLA with no active exception fails the run.
+// Security-advisory loop: Dependabot alert -> Summer-owned Linear issue
+// (labels: security, Bug, area:security) with a severity SLA -> closed only
+// when the alert is fixed on main AND a Production deploy landed after the
+// fix. `--check` is the ratchet: a critical, high or medium advisory past its
+// SLA with no active exception fails the run. Gem's 4h lanes clock is a
+// backstop only; Summer owns intake outcomes.
 //
 //   node scripts/security-advisory-intake.mjs [--check] [--dry-run]
 //
@@ -27,11 +29,17 @@ import {
   withLinearRetry,
 } from './lib/linear-retry.mjs';
 import {
+  resolveSummerSecurityLabelIds,
+  SUMMER_SECURITY_LABELS,
+} from './lib/security-advisory-labels.mjs';
+import {
   issueDescription,
   issueTitle,
   LINEAR_PRIORITY,
   planAdvisories,
 } from './lib/security-advisory-policy.mjs';
+
+export { resolveSummerSecurityLabelIds, SUMMER_SECURITY_LABELS };
 
 export const MAX_UPSERTS_PER_RUN = 60;
 
@@ -222,19 +230,21 @@ export async function recordBlindSource(
       throw new Error(
         'LINEAR_API_KEY is required to report a blind advisory source'
       );
-    const devin = await resolveLabel('devin', process.env.LINEAR_API_KEY);
-    if (!devin) throw new Error('Linear label "devin" not found');
+    const labelIds = await resolveSummerSecurityLabelIds(
+      resolveLabel,
+      process.env.LINEAR_API_KEY
+    );
     const r = await upsert({
       fingerprint: BLIND_FINGERPRINT,
       title: `Grant Dependabot alerts read to the Jovie Bot app [${BLIND_FINGERPRINT}]`,
       description:
         'The Security Advisory Loop cannot read Dependabot alerts: the Jovie Bot GitHub App installation lacks "Dependabot alerts: read" (create-github-app-token 422). ' +
-        'Grant it in the app settings and accept the installation update; the next loop run (clock every 4h or push) then reads alerts and files owned work. ' +
+        'Grant it in the app settings and accept the installation update; the next loop run (Gem 4h clock backstop or dependency push) then reads alerts and files Summer-owned work. ' +
         'Until then advisories are unobserved. Needs Tim (Ovie card): app permission changes are an owner action.',
       priority: 2,
       createStateName: 'Todo',
       reopenTerminal: true,
-      createLabelIds: devin ? [devin] : [],
+      createLabelIds: labelIds,
     });
     receipt.actions.push({
       fingerprint: BLIND_FINGERPRINT,
@@ -255,9 +265,9 @@ export async function recordBlindSource(
 /**
  * Run the planned closes against the scanned candidates. Fail-closed by
  * construction: any close failure marks the result not ok, and the caller
- * exits 1 unless EVERY failure is the shared Linear quota (which defers, exit
- * 75). Rate-limited closes stop the loop; the remaining groups are deferred
- * with ok:false so incomplete Linear work is never green.
+ * exits 1 unless EVERY failure is the shared Linear quota (which defers,
+ * non-fatal — the next run resumes it). Rate-limited closes stop the loop;
+ * remaining groups defer with ok:false, recorded in the receipt.
  */
 /**
  * @typedef {Object} AdvisoryCloseResult
@@ -378,8 +388,10 @@ async function main() {
   if (!check && !dryRun) {
     if (!process.env.LINEAR_API_KEY)
       throw new Error('LINEAR_API_KEY is required');
-    const devin = await resolveLabelId('devin', process.env.LINEAR_API_KEY);
-    if (!devin) throw new Error('Linear label "devin" not found');
+    const labelIds = await resolveSummerSecurityLabelIds(
+      resolveLabelId,
+      process.env.LINEAR_API_KEY
+    );
     for (const g of plan.upserts.slice(0, MAX_UPSERTS_PER_RUN)) {
       const r = await withLinearRetry(
         () =>
@@ -390,7 +402,7 @@ async function main() {
             priority: LINEAR_PRIORITY[g.severity],
             createStateName: 'Todo',
             reopenTerminal: true,
-            createLabelIds: [devin],
+            createLabelIds: labelIds,
           }),
         { fingerprint: g.fingerprint, op: 'upsert' }
       );
@@ -446,8 +458,8 @@ async function main() {
   );
   console.log(JSON.stringify({ ...receipt, actions: receipt.actions.length }));
   // Classify Linear failures once: quota-only failures re-attempt on the next
-  // loop run (defer, exit 75); any hard failure keeps exit 1. Upsert failures
-  // already logged and exited 1 above; scan/close failures log here.
+  // loop run and are non-fatal (it resumes them; a red main here would only
+  // file a repair issue the next green resolves). GitHub quota still exits 75.
   const failures = receipt.actions.filter(a => !a.ok);
   if (failures.length > 0) {
     if (failures.every(isLinearRateLimitedAction)) {
@@ -455,7 +467,7 @@ async function main() {
         console.warn(
           `::warning title=Linear quota deferred::${failures.length} Linear action(s) deferred on the workspace budget; the next loop run (4h clock or dependency push) resumes them.`
         );
-        process.exitCode = 75;
+        process.exitCode = 0;
       }
     } else {
       for (const a of failures) if (a.op !== 'upsert') logFailedLinearAction(a);

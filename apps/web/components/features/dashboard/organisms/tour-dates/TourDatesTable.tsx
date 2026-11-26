@@ -167,16 +167,16 @@ const PROVIDER_CONFIG: Record<
 > = {
   bandsintown: {
     label: 'Bandsintown',
-    className: 'text-teal-600 dark:text-teal-400',
+    className: 'text-accent-teal',
   },
   songkick: {
     label: 'Songkick',
-    className: 'text-pink-600 dark:text-pink-400',
+    className: 'text-accent-pink',
   },
   manual: { label: 'Manual', className: 'text-tertiary-token' },
   admin_import: {
     label: 'Admin Import',
-    className: 'text-amber-600 dark:text-amber-400',
+    className: 'text-warning-text',
   },
 };
 
@@ -201,6 +201,7 @@ const ActionsHeader = memo(function ActionsHeader({
 }) {
   return (
     <div className='flex items-center justify-end gap-2'>
+      <span className='sr-only'>Actions</span>
       {onSync && (
         <Button
           onClick={event => {
@@ -210,7 +211,7 @@ const ActionsHeader = memo(function ActionsHeader({
           disabled={isSyncing}
           variant='ghost'
           size='sm'
-          className='h-8 gap-1 rounded-md px-2.5 text-app text-secondary-token hover:bg-surface-0 hover:text-primary-token'
+          className='h-7 gap-1 rounded-full px-2.5 text-app text-secondary-token hover:bg-surface-0 hover:text-primary-token'
         >
           <Icon
             name='RefreshCw'
@@ -368,9 +369,8 @@ export function TourDatesTable({
         isPastDate(row.startDate, nowMs) ? 'opacity-60' : ''
       }
       enableVirtualization={tourDates.length >= 20}
-      // Date and start time stack in two lines; the two-line mode gives
-      // them a 48px content budget instead of clipping the time at 32px.
-      rowMode='two-line'
+      // Dense 32px only (DRI-21); stacked date/time truncates in-cell.
+      rowMode='dense'
       className='text-app'
       caption='Tour dates'
       emptyState={

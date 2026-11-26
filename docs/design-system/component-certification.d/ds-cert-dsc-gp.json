@@ -1,0 +1,168 @@
+{
+  "gates": {
+    "apps/web/components/features/dashboard/organisms/onboarding-v2/OnboardingV2Form.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/onboarding/OnboardingProfileReviewStep.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/OnboardingDemoContent.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/AiDemo.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/HeroSpotifySearch.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/HomeTrustSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/MarketingRenderSurface.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/ProductScreenshotFrame.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/claim-handle/ClaimHandleForm.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/onboarding/OnboardingMessageRecoveryRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/onboarding/OnboardingProfilePeekStrip.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/onboarding/OnboardingStartStepRail.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/onboarding/OnboardingToolArtifacts.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/waitlist/WaitlistIntakeChat.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/homepage/HomepageNameSearch.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/onboarding/OnboardingInterviewModal.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/dashboard/organisms/onboarding/OnboardingProfileReviewStep.tsx": {
+      "offline": "Saving and avatar upload go through server actions and mutation hooks that surface their own failures; the step renders no distinct offline layout."
+    },
+    "apps/web/components/features/demo/OnboardingDemoContent.tsx": {
+      "empty": "The demo flow renders fixed fixture data with no fetch, user input beyond a local handle, or failure path, so this state cannot occur.",
+      "error": "The demo flow renders fixed fixture data with no fetch, user input beyond a local handle, or failure path, so this state cannot occur.",
+      "offline": "The demo flow renders fixed fixture data with no fetch, user input beyond a local handle, or failure path, so this state cannot occur.",
+      "long-content": "The demo flow renders fixed fixture data with no fetch, user input beyond a local handle, or failure path, so this state cannot occur."
+    },
+    "apps/web/components/features/home/MarketingRenderSurface.tsx": {
+      "empty": "Each surface id always renders a populated showcase crop; there is no empty data state to show."
+    },
+    "apps/web/components/features/home/claim-handle/ClaimHandleForm.tsx": {
+      "permission-denied": "The form never gates on permission: signed-out visitors are sent to signup on submit and signed-in users go straight to onboarding, so there is no denied UI."
+    },
+    "apps/web/components/onboarding/OnboardingInterviewModal.tsx": {
+      "permission-denied": "The modal opens only for an already authenticated onboarding session (initialRequested comes from the app route); it has no denied UI."
+    }
+  }
+}

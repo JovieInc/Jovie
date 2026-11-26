@@ -10,6 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { PlayIcon } from '@/components/atoms/PlayIcon';
 import { SeekBar } from '@/components/atoms/SeekBar';
 import {
   mediaCanvasTransport,
@@ -357,11 +358,7 @@ function CanvasTransportBar() {
         {transport.isPlaying ? (
           <Pause className='size-4' aria-hidden='true' fill='currentColor' />
         ) : (
-          <Play
-            className='size-4 translate-x-px'
-            aria-hidden='true'
-            fill='currentColor'
-          />
+          <PlayIcon size={16} aria-hidden='true' fill='currentColor' />
         )}
       </button>
       <button

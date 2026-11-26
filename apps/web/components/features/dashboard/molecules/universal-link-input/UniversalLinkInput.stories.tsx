@@ -46,3 +46,31 @@ export const ChatDisabled: Story = {
     chatEnabled: false,
   },
 };
+
+export const Empty: Story = {
+  args: { placeholder: 'Paste any link or ask Jovie anything...' },
+};
+
+export const LongContent: Story = {
+  args: {
+    prefillUrl: `https://example.com/${'a-very-long-path-segment/'.repeat(10)}`,
+    onPrefillConsumed: () => {},
+  },
+};
+
+export const Offline: Story = {
+  args: { disabled: true, prefillUrl: 'https://example.com' },
+};
+
+export const RtlOverflow: Story = {
+  decorators: [
+    function Rtl(Story) {
+      return (
+        <div dir='rtl'>
+          <Story />
+        </div>
+      );
+    },
+  ],
+  args: { prefillUrl: 'https://example.com/رابط-طويل-جدا-جدا-جدا' },
+};

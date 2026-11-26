@@ -39,3 +39,12 @@ describe('AssigneeChip', () => {
     expect(screen.getByTestId('avatar')).toBeInTheDocument();
   });
 });
+
+describe('AssigneeChip accent token', () => {
+  it('tints the brand mark with the accent token, not a cyan palette class', () => {
+    const { container } = render(<AssigneeChip kind='jovie' />);
+    expect(container.querySelector('svg')).toBeInTheDocument();
+    expect(container.innerHTML).not.toContain('cyan-');
+    expect(container.querySelector('.text-accent')).not.toBeNull();
+  });
+});

@@ -29,8 +29,8 @@ function HelpNavLink({
       {item.route ? (
         <Link
           href={item.route}
-          onClick={onNavigate}
           className='help-nav-link'
+          {...(onNavigate && { onClick: onNavigate })}
           data-active={active || undefined}
           aria-current={active ? 'page' : undefined}
         >
@@ -51,7 +51,7 @@ function HelpNavLink({
               key={child.key}
               item={child}
               pathname={pathname}
-              onNavigate={onNavigate}
+              {...(onNavigate && { onNavigate })}
             />
           ))}
         </ul>
@@ -79,7 +79,7 @@ export function HelpNav({
           key={item.key}
           item={item}
           pathname={pathname}
-          onNavigate={onNavigate}
+          {...(onNavigate && { onNavigate })}
         />
       ))}
     </ul>

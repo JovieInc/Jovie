@@ -2,8 +2,9 @@
 'use client';
 
 import { Button } from '@jovie/ui/atoms/button';
-import { BadgeCheck, Link2, Search } from 'lucide-react';
-import Image from 'next/image';
+import { CompositeField } from '@jovie/ui/atoms/composite-field';
+import { HostDrawnInput } from '@jovie/ui/atoms/host-drawn-field';
+import { Search } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   type KeyboardEvent,
@@ -16,38 +17,12 @@ import {
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
-import { presentUnmanagedListing } from '@/lib/profile/artist-status-presentation';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
-import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
 import { cn } from '@/lib/utils';
-import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import { artistSearchQuerySchema } from '@/lib/validation/schemas/spotify';
+import { HeroSpotifyResults } from './HeroSpotifyResults';
+import { isSpotifyUrl } from './hero-spotify-search-utils';
 import { InputAuraFrame } from './InputAuraFrame';
-
-const LOADING_SKELETON_KEYS = ['skeleton-1', 'skeleton-2', 'skeleton-3'];
-
-function formatFollowers(count: number | undefined): string {
-  if (!count) return '';
-  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M followers`;
-  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K followers`;
-  return `${count} followers`;
-}
-
-/**
- * Detect if a string looks like a Spotify URL.
- */
-function isSpotifyUrl(value: string): boolean {
-  const trimmed = value.trim();
-  const normalized = trimmed.startsWith('open.spotify.com/')
-    ? `https://${trimmed}`
-    : trimmed.startsWith('spotify.com/')
-      ? `https://open.${trimmed}`
-      : trimmed;
-  return (
-    normalized.startsWith('https://open.spotify.com/') &&
-    extractSpotifyArtistId(normalized) !== null
-  );
-}
 
 interface HeroSpotifySearchSubmitAnalytics {
   readonly eventName: string;
@@ -140,8 +115,8 @@ export function HeroSpotifySearch({
     }
   }, [activeIndex, results.length]);
 
-  const handleNavigateToStart = useCallback(
-    (spotifyUrl: string, artistName?: string) => {
+  const navigateToStart = useCallback(
+    (params: URLSearchParams, analytics: Record<string, unknown>) => {
       if (isNavigatingRef.current) return;
       isNavigatingRef.current = true;
       setIsNavigating(true);
@@ -151,9 +126,16 @@ export function HeroSpotifySearch({
       if (submitAnalytics) {
         track(submitAnalytics.eventName, {
           ...submitAnalytics.properties,
-          hasArtistName: Boolean(artistName),
+          ...analytics,
         });
       }
+      router.push(`${APP_ROUTES.START}?${params.toString()}`);
+    },
+    [clear, router, submitAnalytics]
+  );
+
+  const handleNavigateToStart = useCallback(
+    (spotifyUrl: string, artistName?: string) => {
       const params = new URLSearchParams();
       params.set('spotify_url', spotifyUrl);
       if (artistName) {
@@ -165,9 +147,9 @@ export function HeroSpotifySearch({
           ? `hey, I'm ${artistName}. show me my Spotify.`
           : `show me this Spotify artist: ${spotifyUrl}`
       );
-      router.push(`${APP_ROUTES.START}?${params.toString()}`);
+      navigateToStart(params, { hasArtistName: Boolean(artistName) });
     },
-    [clear, router, submitAnalytics]
+    [navigateToStart]
   );
 
   /**
@@ -178,24 +160,11 @@ export function HeroSpotifySearch({
    */
   const handleNavigateToStartPrompt = useCallback(
     (query: string) => {
-      if (isNavigatingRef.current) return;
-      isNavigatingRef.current = true;
-      setIsNavigating(true);
-      clear();
-      setShowResults(false);
-      setActiveIndex(-1);
-      if (submitAnalytics) {
-        track(submitAnalytics.eventName, {
-          ...submitAnalytics.properties,
-          hasArtistName: true,
-          freeText: true,
-        });
-      }
       const params = new URLSearchParams();
       params.set('starter_prompt', `hey, I'm ${query}. show me my Spotify.`);
-      router.push(`${APP_ROUTES.START}?${params.toString()}`);
+      navigateToStart(params, { hasArtistName: true, freeText: true });
     },
-    [clear, router, submitAnalytics]
+    [navigateToStart]
   );
 
   const handleSearchInputChange = useCallback(
@@ -385,44 +354,21 @@ export function HeroSpotifySearch({
         'homepage-name-search__field relative flex w-full items-center',
         shouldShowDropdown && 'homepage-name-search__field--open'
       )
-    : cn(
-        'relative w-full flex items-center gap-3 rounded-xl border px-4 py-3 min-h-12 bg-surface-0',
-        'transition-colors duration-subtle ease-subtle',
-        shouldShowDropdown
-          ? 'border-focus ring-2 ring-focus/20'
-          : 'border-strong hover:border-focus'
-      );
+    : 'w-full text-sm text-primary-token';
 
-  const submitControl = isEditorial ? (
+  const submitControl = (
     <Button
       type='submit'
-      size='marketing'
+      size={isEditorial ? 'marketing' : 'sm'}
       variant='primary'
-      loading={isLoading && Boolean(trimmedQuery)}
+      loading={isEditorial ? isLoading && Boolean(trimmedQuery) : isLoading}
+      disabled={isEditorial ? undefined : claimButtonDisabled}
       onClick={handleClaimArtist}
-      className='homepage-name-search__submit shrink-0'
+      className={cn('shrink-0', isEditorial && 'homepage-name-search__submit')}
       data-testid={submitTestId}
     >
       {submitLabel}
     </Button>
-  ) : (
-    <button
-      type='submit'
-      disabled={claimButtonDisabled}
-      onClick={handleClaimArtist}
-      data-testid={submitTestId}
-      className={cn(
-        'shrink-0 inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-xs font-semibold transition-colors focus-ring-themed',
-        claimButtonDisabled
-          ? 'bg-btn-primary/50 text-btn-primary-foreground/60 cursor-not-allowed'
-          : 'bg-btn-primary text-btn-primary-foreground'
-      )}
-    >
-      {isLoading && (
-        <div className='w-3 h-3 border-[1.5px] border-current border-t-transparent rounded-full animate-spin motion-reduce:animate-none' />
-      )}
-      {submitLabel}
-    </button>
   );
 
   return (
@@ -450,289 +396,96 @@ export function HeroSpotifySearch({
             handleClaimArtist();
           }}
         >
-          {isEditorial ? (
-            <Search
-              aria-hidden='true'
-              className='homepage-name-search__icon size-4 shrink-0 text-tertiary-token'
-            />
-          ) : (
-            <div className='flex items-center justify-center size-6 rounded-full shrink-0 bg-brand-spotify-subtle'>
-              <SocialIcon
-                platform='spotify'
-                className='w-3.5 h-3.5 text-brand-spotify'
+          {/* Editorial: the stylesheet owns the pill and the input's own inset
+              focus ring (JOV-6946), so the shell box is dropped. */}
+          <CompositeField
+            shape={isEditorial ? 'pill' : 'md'}
+            size='md'
+            surface={isEditorial ? 'none' : 'field'}
+            className={isEditorial ? 'contents' : undefined}
+          >
+            {isEditorial ? (
+              <Search
+                aria-hidden='true'
+                className='homepage-name-search__icon size-4 shrink-0 text-tertiary-token'
               />
-            </div>
-          )}
-          <input
-            ref={inputRef}
-            id={inputId}
-            name='artist_name'
-            type='text'
-            value={searchQuery}
-            onChange={handleSearchInputChange}
-            onKeyDown={handleKeyDown}
-            onFocus={() => {
-              if (
-                searchQuery.trim().length >= 1 &&
-                !isSpotifyUrl(searchQuery)
-              ) {
-                setShowResults(true);
-              }
-            }}
-            onBlur={e => {
-              // Keep dropdown open if focus moves to another element inside the container
-              if (containerRef.current?.contains(e.relatedTarget as Node))
-                return;
-              setShowResults(false);
-              setActiveIndex(-1);
-            }}
-            placeholder={placeholder}
-            autoCapitalize='none'
-            autoCorrect='off'
-            autoComplete='off'
-            className={cn(
-              'min-w-0 flex-1 bg-transparent text-primary-token focus-visible:outline-none',
-              // The editorial pill owns focus (JOV-6946): no square ring
-              // inside pill geometry. The default field keeps its own ring.
-              !isEditorial &&
-                'focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page',
-              isEditorial ? 'homepage-name-search__input' : 'text-sm'
+            ) : (
+              <div className='flex items-center justify-center size-6 rounded-full shrink-0 bg-brand-spotify-subtle'>
+                <SocialIcon
+                  platform='spotify'
+                  className='w-3.5 h-3.5 text-brand-spotify'
+                />
+              </div>
             )}
-            role='combobox'
-            aria-invalid={isInvalidQuery || undefined}
-            aria-describedby={
-              isInvalidQuery && shouldShowDropdown
-                ? `${resultsId}-validation`
-                : undefined
-            }
-            aria-expanded={shouldShowDropdown}
-            aria-controls={resultsId}
-            aria-activedescendant={
-              activeIndex >= 0
-                ? `${resultsId}-result-${activeIndex}`
-                : undefined
-            }
-          />
-          {showClaimButton ? (
-            submitControl
-          ) : (
-            <Search className='w-4 h-4 shrink-0 text-tertiary-token' />
-          )}
+            <HostDrawnInput
+              ref={inputRef}
+              id={inputId}
+              name='artist_name'
+              type='text'
+              value={searchQuery}
+              onChange={handleSearchInputChange}
+              onKeyDown={handleKeyDown}
+              onFocus={() => {
+                if (
+                  searchQuery.trim().length >= 1 &&
+                  !isSpotifyUrl(searchQuery)
+                ) {
+                  setShowResults(true);
+                }
+              }}
+              onBlur={e => {
+                // Keep dropdown open if focus moves to another element inside the container
+                if (containerRef.current?.contains(e.relatedTarget as Node))
+                  return;
+                setShowResults(false);
+                setActiveIndex(-1);
+              }}
+              placeholder={placeholder}
+              autoCapitalize='none'
+              autoCorrect='off'
+              autoComplete='off'
+              className='min-w-0 flex-1'
+              role='combobox'
+              aria-invalid={isInvalidQuery || undefined}
+              aria-describedby={
+                isInvalidQuery && shouldShowDropdown
+                  ? `${resultsId}-validation`
+                  : undefined
+              }
+              aria-expanded={shouldShowDropdown}
+              aria-controls={resultsId}
+              aria-activedescendant={
+                activeIndex >= 0
+                  ? `${resultsId}-result-${activeIndex}`
+                  : undefined
+              }
+            />
+            {showClaimButton ? (
+              submitControl
+            ) : (
+              <Search className='w-4 h-4 shrink-0 text-tertiary-token' />
+            )}
+          </CompositeField>
         </form>
 
         {/* Dropdown results — inside InputAuraFrame so group-focus-within stays active while interacting */}
         {shouldShowDropdown && (
-          <div
-            className={cn(
-              'absolute top-full left-0 z-50 w-full mt-2 rounded-xl border border-default overflow-hidden bg-surface-0 shadow-lg',
-              isEditorial && 'homepage-name-search__results text-left'
-            )}
-          >
-            <select
-              id={resultsId}
-              className='sr-only'
-              disabled={isLoading}
-              size={Math.min(totalItems, 6)}
-              aria-label='Spotify Artist Results'
-              value={
-                activeIndex === pasteUrlIndex
-                  ? '__paste__'
-                  : (results[activeIndex]?.id ?? '')
-              }
-              onChange={event => {
-                if (event.target.value === '__paste__') {
-                  handlePasteUrlClick();
-                  return;
-                }
-                const selectedArtist = results.find(
-                  artist => artist.id === event.target.value
-                );
-                if (selectedArtist) {
-                  handleArtistSelect(selectedArtist);
-                }
-              }}
-            >
-              <option value='' disabled>
-                Select an artist
-              </option>
-              {results.map((artist, index) => (
-                <option
-                  key={artist.id}
-                  id={`${resultsId}-result-${index}`}
-                  value={artist.id}
-                >
-                  {artist.name}
-                  {artist.followers
-                    ? ` — ${formatFollowers(artist.followers)}`
-                    : ''}
-                </option>
-              ))}
-              <option
-                id={`${resultsId}-result-${pasteUrlIndex}`}
-                value='__paste__'
-              >
-                Paste a Spotify URL instead
-              </option>
-            </select>
-
-            {isInvalidQuery && (
-              <p
-                id={`${resultsId}-validation`}
-                role='status'
-                className='p-4 text-sm text-secondary-token'
-              >
-                Enter an artist name or paste a Spotify artist link.
-              </p>
-            )}
-
-            {/* Loading skeleton */}
-            {state === 'loading' && results.length === 0 && (
-              <div className='p-3 space-y-2'>
-                {LOADING_SKELETON_KEYS.map(key => (
-                  <div
-                    key={key}
-                    className='flex items-center gap-3 animate-pulse'
-                  >
-                    <div className='w-10 h-10 rounded-full bg-surface-1' />
-                    <div className='flex-1 space-y-1'>
-                      <div className='h-4 w-32 rounded bg-surface-1' />
-                      <div className='h-3 w-20 rounded bg-surface-1' />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Empty state */}
-            {!isInvalidQuery && state === 'empty' && (
-              <div className='p-4 text-center'>
-                <p className='text-sm text-secondary-token'>No artists found</p>
-              </div>
-            )}
-
-            {/* Error state */}
-            {!isInvalidQuery && state === 'error' && (
-              <div className='p-4 text-center'>
-                <p role='alert' className='text-sm text-error'>
-                  Search failed.
-                </p>
-                <Button
-                  type='button'
-                  size='sm'
-                  variant='tertiary'
-                  className='mt-2'
-                  onClick={handleRetry}
-                >
-                  Try Again
-                </Button>
-              </div>
-            )}
-
-            {/* Artist results */}
-            {results.length > 0 && (
-              <div
-                ref={resultsListRef}
-                className='max-h-64 overflow-y-auto'
-                aria-hidden='true'
-              >
-                {results.map((artist, index) => (
-                  <button
-                    key={artist.id}
-                    type='button'
-                    disabled={isLoading}
-                    tabIndex={0}
-                    className={cn(
-                      'flex items-center gap-3 p-3 cursor-pointer transition-colors border-0 bg-transparent w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10 dark:focus-visible:ring-white/20 focus-visible:ring-inset',
-                      index === activeIndex && 'bg-surface-1'
-                    )}
-                    onClick={() => handleArtistSelect(artist)}
-                    onKeyDown={event =>
-                      handleActivationKeyDown(event, () =>
-                        handleArtistSelect(artist)
-                      )
-                    }
-                    onMouseEnter={() => setActiveIndex(index)}
-                  >
-                    <div className='w-10 h-10 rounded-full overflow-hidden shrink-0 relative bg-surface-1'>
-                      {artist.imageUrl ? (
-                        <Image
-                          src={artist.imageUrl}
-                          alt={artist.name}
-                          fill
-                          sizes='40px'
-                          className='object-cover'
-                          unoptimized
-                        />
-                      ) : (
-                        <div className='w-full h-full flex items-center justify-center'>
-                          <SocialIcon
-                            platform='spotify'
-                            className='w-5 h-5 text-tertiary-token'
-                          />
-                        </div>
-                      )}
-                    </div>
-                    <div className='flex-1 min-w-0'>
-                      <div className='font-medium truncate text-sm text-primary-token'>
-                        {artist.name}
-                      </div>
-                      {artist.followers ? (
-                        <div className='text-xs text-tertiary-token'>
-                          {formatFollowers(artist.followers)}
-                        </div>
-                      ) : null}
-                    </div>
-                    {artist.isClaimed && (
-                      <span
-                        className='shrink-0 rounded-full bg-brand-spotify-subtle px-2 py-0.5 text-3xs font-semibold text-brand-spotify'
-                        data-testid='listing-badge'
-                      >
-                        {presentUnmanagedListing().label}
-                      </span>
-                    )}
-                    {artist.verified && (
-                      <div
-                        className='shrink-0 text-brand-spotify'
-                        data-testid='verified-badge'
-                      >
-                        <BadgeCheck className='h-4 w-4' aria-hidden='true' />
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* "Paste URL" option */}
-            <button
-              type='button'
-              tabIndex={0}
-              className={cn(
-                'flex items-center gap-3 p-3 cursor-pointer transition-colors bg-transparent w-full text-left border-t border-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10 dark:focus-visible:ring-white/20 focus-visible:ring-inset',
-                activeIndex === pasteUrlIndex && 'bg-surface-1'
-              )}
-              onClick={handlePasteUrlClick}
-              onKeyDown={event =>
-                handleActivationKeyDown(event, () => handlePasteUrlClick())
-              }
-              onMouseEnter={() => setActiveIndex(pasteUrlIndex)}
-            >
-              <div className='w-10 h-10 rounded-full flex items-center justify-center bg-surface-1'>
-                <Link2
-                  className='h-5 w-5 text-tertiary-token'
-                  aria-hidden='true'
-                />
-              </div>
-              <div className='flex-1'>
-                <div className='font-medium text-sm text-primary-token'>
-                  Paste a Spotify URL instead
-                </div>
-                <div className='text-xs text-tertiary-token'>
-                  open.spotify.com/artist/...
-                </div>
-              </div>
-            </button>
-          </div>
+          <HeroSpotifyResults
+            resultsId={resultsId}
+            isEditorial={isEditorial}
+            results={results}
+            state={state}
+            isLoading={isLoading}
+            isInvalidQuery={isInvalidQuery}
+            activeIndex={activeIndex}
+            pasteUrlIndex={pasteUrlIndex}
+            totalItems={totalItems}
+            resultsListRef={resultsListRef}
+            onActiveIndexChange={setActiveIndex}
+            onSelectArtist={handleArtistSelect}
+            onPasteUrl={handlePasteUrlClick}
+            onRetry={handleRetry}
+          />
         )}
       </InputAuraFrame>
     </div>

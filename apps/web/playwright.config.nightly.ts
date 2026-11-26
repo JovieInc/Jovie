@@ -14,6 +14,14 @@ if (!managedWebServerUrl.port) {
   managedWebServerUrl.port = '3100';
 }
 const managedWebServerPort = managedWebServerUrl.port;
+// Required vs advisory chaos must not share one wiped outputDir/JSON path
+// (Astra 6.2 / JOV-14767): the second Playwright run empties outputDir and
+// would otherwise erase the first run's evidence from the workspace.
+const nightlyJsonOutputFile =
+  process.env.PLAYWRIGHT_JSON_OUTPUT_FILE ||
+  'test-results/nightly-results.json';
+const nightlyOutputDir =
+  process.env.PLAYWRIGHT_OUTPUT_DIR || 'test-results/playwright-output';
 
 /**
  * Nightly E2E Test Configuration
@@ -38,14 +46,15 @@ export default defineConfig({
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
   workers: isCI ? 4 : undefined,
+  // Keep blob/failure artifacts off the shared JSON report path so a second
+  // suite (required ↔ chaos) cannot wipe the first suite's reporter file.
+  outputDir: nightlyOutputDir,
   reporter: isCI
     ? [
         ['line'],
         ...(vercelAutomation.active
           ? []
-          : ([
-              ['json', { outputFile: 'test-results/nightly-results.json' }],
-            ] as const)),
+          : ([['json', { outputFile: nightlyJsonOutputFile }]] as const)),
       ]
     : 'html',
 

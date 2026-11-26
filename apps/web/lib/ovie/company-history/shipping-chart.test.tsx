@@ -121,7 +121,7 @@ describe('ShippingChart', () => {
       ])
     ) as Record<MergedPrScope, ReturnType<typeof summarizeWindow>>;
     const tree = ShippingChart({ windows: partial, observedAt: null });
-    expect(JSON.stringify(tree)).toContain('Some days are still loading');
+    expect(JSON.stringify(tree)).toContain('– Not measured');
     if (process.env.COMPANY_CHART_PREVIEW_DIR) {
       writeFileSync(
         join(process.env.COMPANY_CHART_PREVIEW_DIR, 'shipping-30d.png'),

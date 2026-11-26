@@ -63,6 +63,7 @@ import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
 import { companyHistoryCronJob } from '@/lib/ovie/company-history/configured.server';
 import { refreshCompanyStateCache } from '@/lib/ovie/company-state.server';
 import { fleetRoomCronJob } from '@/lib/ovie/fleet-room.server';
+import { linearIssueSnapshotCronJob } from '@/lib/ovie/linear-issue-snapshot.server';
 import { applySummerCardDefaults } from '@/lib/ovie/summer-cards.server';
 import { proofStatsCronJob } from '@/lib/proof-stats/cron.server';
 import {
@@ -216,6 +217,10 @@ export async function GET(request: Request) {
   // Hourly Ovie backstops: company history and the fleet room (webhook-first).
   results.companyHistory = await companyHistoryCronJob(minute, runSubJob);
   results.fleetRoom = await fleetRoomCronJob(minute, runSubJob);
+  results.linearIssueSnapshot = await runSubJob(
+    'linearIssues',
+    linearIssueSnapshotCronJob
+  ); // webhook backstop
 
   // Default-plus-deadline contract: an overdue founder ask records its
   // declared default (approve or reject) so nothing waits on Tim forever.
@@ -261,11 +266,12 @@ export async function GET(request: Request) {
   // 6. Lead discovery + qualification + auto-approve — every invocation (15 min)
   results.leadDiscovery = await runSubJob('leadDiscovery', async () => {
     // Fetch settings (upsert default if missing).
-    // COST GATE (JOV-1901): `leadPipelineSettings.enabled` is DB-backed and
-    // defaults to false (see makeDefaultSettings() in /api/admin/leads/settings).
-    // When enabled=true, SerpAPI is called every 15 min → 96 calls/day.
-    // DO NOT flip this flag without documenting expected SerpAPI cost in the
-    // enabling PR. Keep disabled while GTM is paused.
+    // COST GATE (JOV-1901, JOV-12539): `enabled` defaults to false.
+    // Discovery spends at most `daily_query_budget` SerpAPI searches a day
+    // (10 per run). At SEARCH_QUERY_COST_USD.serpapi ($0.015), the approved
+    // sample budget of 100 is at most $1.50/day. Auto-ingest stays off.
+    // A larger budget goes back to Tim. Outreach still sends nothing:
+    // Instantly is default-off and audience delivery is hard-denied.
     let [settings] = await db
       .select()
       .from(leadPipelineSettings)

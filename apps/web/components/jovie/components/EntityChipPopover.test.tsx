@@ -1,7 +1,8 @@
-import { screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { fastRender } from '@/tests/utils/fast-render';
 import { EntityChip } from './EntityChip';
 import { EntityChipPopover } from './EntityChipPopover';
@@ -42,6 +43,29 @@ function renderPopover(children?: ReactNode) {
   );
 }
 
+function renderAdjacentPopovers() {
+  return fastRender(
+    <>
+      {['Sober', 'Midnight Drive'].map((label, index) => {
+        const id = `rel_${index}`;
+        return (
+          <EntityChipPopover
+            key={id}
+            kind='release'
+            id={id}
+            label={label}
+            entity={{ kind: 'release', id, label }}
+          >
+            <span>{label}</span>
+          </EntityChipPopover>
+        );
+      })}
+      <button type='button'>Continue editing</button>
+      <textarea aria-label='Chat draft' />
+    </>
+  );
+}
+
 describe('EntityChipPopover', () => {
   it('discloses on keyboard focus without moving focus into the card', async () => {
     renderPopover();
@@ -53,6 +77,120 @@ describe('EntityChipPopover', () => {
   });
   beforeEach(() => {
     mockEntityPanelState.entityPanel = null;
+  });
+
+  function enterNeighborAndSettle(neighbor: HTMLElement) {
+    // Only the hover delay is virtual. User-event and the Radix focus lifecycle
+    // run on their normal clock before and after this pointer movement.
+    vi.useFakeTimers();
+    try {
+      fireEvent.pointerOver(neighbor, { pointerType: 'mouse' });
+      act(() => vi.advanceTimersByTime(300));
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+
+  it('keeps the keyboard-open inspection when the pointer passes a neighbor', async () => {
+    const user = userEvent.setup();
+    renderAdjacentPopovers();
+    const first = screen.getByRole('button', { name: /Release: Sober/ });
+    const second = screen.getByRole('button', {
+      name: /Release: Midnight Drive/,
+    });
+
+    await user.tab();
+    expect(first).toHaveFocus();
+    expect(first).toHaveAttribute('aria-expanded', 'true');
+
+    enterNeighborAndSettle(second);
+
+    expect(first).toHaveFocus();
+    expect(first).toHaveAttribute('aria-expanded', 'true');
+    expect(second).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByRole('dialog', { name: 'Sober' })).toBeVisible();
+  });
+
+  it('dismisses a passive hover with Escape without taking unrelated focus', async () => {
+    const user = userEvent.setup();
+    renderAdjacentPopovers();
+    const trigger = screen.getByRole('button', { name: /Release: Sober/ });
+    const outside = screen.getByRole('button', { name: 'Continue editing' });
+    await user.click(outside);
+    await user.hover(trigger);
+    expect(await screen.findByRole('dialog', { name: 'Sober' })).toBeVisible();
+    expect(outside).toHaveFocus();
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => {
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      expect(outside).toHaveFocus();
+    });
+  });
+
+  it('promotes a hover inspection on click until deliberately dismissed', async () => {
+    const user = userEvent.setup();
+    renderAdjacentPopovers();
+    const first = screen.getByRole('button', { name: /Release: Sober/ });
+    const second = screen.getByRole('button', {
+      name: /Release: Midnight Drive/,
+    });
+
+    await user.hover(first);
+    expect(await screen.findByRole('dialog', { name: 'Sober' })).toBeVisible();
+
+    await user.click(first);
+    enterNeighborAndSettle(second);
+
+    expect(first).toHaveAttribute('aria-expanded', 'true');
+    expect(second).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(screen.getByRole('button', { name: 'Continue editing' }));
+    expect(first).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('returns focus to the trigger when Escape closes a focused preview action', async () => {
+    const user = userEvent.setup();
+    mockEntityPanelState.entityPanel = { open: vi.fn() };
+    renderPopover();
+    const trigger = screen.getByRole('button', { name: /Release: Sober/ });
+
+    await user.tab();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('button', { name: 'Open Release' })).toHaveFocus();
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => {
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      expect(trigger).toHaveFocus();
+    });
+  });
+
+  it('preserves a newly focused draft during deferred Escape restoration', async () => {
+    const user = userEvent.setup();
+    mockEntityPanelState.entityPanel = { open: vi.fn() };
+    renderAdjacentPopovers();
+    const trigger = screen.getByRole('button', { name: /Release: Sober/ });
+    const draft = screen.getByRole('textbox', { name: 'Chat draft' });
+    await user.tab();
+    await user.keyboard('{Enter}');
+    const action = screen.getByRole('button', { name: 'Open Release' });
+    expect(action).toHaveFocus();
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.keyDown(action, { key: 'Escape' });
+      act(() => draft.focus());
+      expect(draft).toHaveFocus();
+
+      // Radix emits its real close autofocus callback on a timer after it
+      // unmounts the focus scope. A real focus change may land first.
+      act(() => vi.runOnlyPendingTimers());
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      expect(draft).toHaveFocus();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('exposes the trigger with proper aria semantics', () => {
@@ -270,5 +408,55 @@ describe('EntityChipPopover', () => {
       screen.getByRole('heading', { name: 'Unavailable reference' })
     ).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Open/i })).toBeNull();
+  });
+});
+
+describe('EntityChipPopover states', () => {
+  it('renders the trigger as a plain button and stays axe-clean', async () => {
+    const { container } = renderPopover();
+    const trigger = screen.getByTestId('entity-chip-popover-trigger');
+    expect(trigger).toHaveAttribute('data-slot', 'plain-button');
+    expect(trigger).toHaveAttribute('type', 'button');
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps an unavailable reference axe-clean and discloses it on click', async () => {
+    const { container } = fastRender(
+      <EntityChipPopover kind='release' id='rel_missing' label='Gone'>
+        <EntityChip
+          data={{ kind: 'release', id: 'rel_missing', label: 'Gone' }}
+          variant='transcript'
+        />
+      </EntityChipPopover>
+    );
+    await userEvent
+      .setup()
+      .click(screen.getByTestId('entity-chip-popover-trigger'));
+    expect(screen.getByTestId('entity-chip-popover-trigger')).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('keeps a very long label inside the trigger name', async () => {
+    const label = 'A very long release title '.repeat(12).trim();
+    const { container } = fastRender(
+      <EntityChipPopover
+        kind='release'
+        id='rel_1'
+        label={label}
+        entity={{ kind: 'release', id: 'rel_1', label }}
+      >
+        <EntityChip
+          data={{ kind: 'release', id: 'rel_1', label }}
+          variant='transcript'
+        />
+      </EntityChipPopover>
+    );
+    expect(screen.getByTestId('entity-chip-popover-trigger')).toHaveTextContent(
+      label
+    );
+    await expectNoA11yViolations(container);
   });
 });

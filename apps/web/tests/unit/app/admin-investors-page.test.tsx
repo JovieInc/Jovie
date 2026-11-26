@@ -85,7 +85,7 @@ describe('admin investor pipeline page', () => {
     ).not.toBeNull();
   });
 
-  it('loads on the same two-line row mode the loaded rows use', async () => {
+  it('loads on the same dense row mode the loaded rows use', async () => {
     const page = (await InvestorPipelinePage()) as ReactElement<{
       children: ReactNode;
     }>;
@@ -97,7 +97,7 @@ describe('admin investor pipeline page', () => {
     const { container } = render(tableBoundary?.props.fallback);
 
     expect(
-      container.querySelector('[data-table-row-mode="two-line"]')
+      container.querySelector('[data-table-row-mode="dense"]')
     ).not.toBeNull();
   });
 

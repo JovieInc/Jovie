@@ -27,7 +27,8 @@ export function HelpThemeToggle() {
     ? (theme as (typeof THEME_ORDER)[number])
     : 'system';
   const next =
-    THEME_ORDER[(THEME_ORDER.indexOf(current) + 1) % THEME_ORDER.length];
+    THEME_ORDER[(THEME_ORDER.indexOf(current) + 1) % THEME_ORDER.length] ??
+    current;
 
   return (
     <button
