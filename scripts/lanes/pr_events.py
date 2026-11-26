@@ -1386,8 +1386,9 @@ def backlog_targets(prs: list[dict], disabled: set[str], kinds=("conflict", "gre
 
 
 def list_open(sh=run, *, enrich_conflicted_drafts: bool = False) -> list[dict]:
-    return list_open_prs(REPO, lambda args: red_repair.gh_read(args, None if sh is run else sh),
-                         red_repair.writer_active, LANE_BRANCH.match,
+    def read(args):
+        return red_repair.gh_read(args, None if sh is run else sh, timeout=180, execute=lifecycle.run)
+    return list_open_prs(REPO, read, red_repair.writer_active, LANE_BRANCH.match,
                          BACKLOG_PROTECTED_LABELS, AGENT_DRAFT_S,
                          enrich_conflicted_drafts=enrich_conflicted_drafts)
 

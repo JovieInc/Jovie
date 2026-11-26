@@ -112,6 +112,25 @@ class QueryTest(unittest.TestCase):
                 result = events.list_open(sh, enrich_conflicted_drafts=True)
                 self.assertEqual("createdAt" in result[0], expected)
 
+    def test_inventory_uses_the_lifecycle_runner_with_its_time_bound(self):
+        from apiclient.gh import run_gh
+        from types import SimpleNamespace
+        seen = []
+
+        def budgeted(args, *, run, priority, env):
+            self.assertEqual(priority, "repair")
+            code, stdout, stderr = run(args, {})
+            return {"code": code, "stdout": stdout, "stderr": stderr}
+
+        def execute(args, **kwargs):
+            seen.append((args[:3], kwargs["timeout"]))
+            return SimpleNamespace(returncode=0, stdout="[]", stderr="")
+
+        with patch("apiclient.gh.run_gh", autospec=run_gh, side_effect=budgeted), \
+             patch.object(events.lifecycle, "run", side_effect=execute):
+            self.assertEqual(events.list_open(), [])
+        self.assertEqual(seen, [(["gh", "pr", "list"], 180)])
+
     def test_unavailable_inventory_and_evidence(self):
         for response in ((1, ""), (0, "not JSON"), (0, "{}")):
             with self.subTest(response=response):

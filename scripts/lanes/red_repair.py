@@ -92,17 +92,19 @@ def writer_active(committed_at, now: float) -> bool:
     return committed is not None and 0 <= now - committed < ACTIVE_COMMIT_S
 
 
-def gh_read(args: list[str], sh=None):
+def gh_read(args: list[str], sh=None, *, timeout=None, execute=None):
     """A read through the shared client layer (budget, breaker, backoff) on the relay's read
     token when one was minted. An injected shell (tests, the lane host's `sh`) sees gh argv."""
     if sh is not None:
-        return sh([GH_BIN, *args])
+        return sh([GH_BIN, *args], **({"timeout": timeout} if timeout is not None else {}))
     scripts = str(HERE.parent)
     if scripts not in sys.path:
         sys.path.insert(0, scripts)
-    from apiclient.gh import run_gh
+    from apiclient.gh import default_run, run_gh
+    from functools import partial
     token = os.environ.get("GH_READ_TOKEN")
-    done = run_gh(list(args), priority="repair", env={**os.environ, "GH_TOKEN": token} if token else None)
+    runner = partial(default_run, timeout=timeout, execute=execute)
+    done = run_gh(list(args), priority="repair", env={**os.environ, "GH_TOKEN": token} if token else None, run=runner)
     return subprocess.CompletedProcess(args, done["code"], done["stdout"], done["stderr"])
 
 
