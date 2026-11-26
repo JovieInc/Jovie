@@ -1,7 +1,8 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { Maximize2, Mic2, Play } from 'lucide-react';
+import { Maximize2, Mic2 } from 'lucide-react';
+import { PlayIcon } from '@/components/atoms/PlayIcon';
 import { cn } from '@/lib/utils';
 import { ThreadCardIconBtn } from './ThreadCardIconBtn';
 
@@ -69,11 +70,7 @@ export function ThreadVideoCard({
             )}
           >
             <span data-interactive={onPlay ? 'true' : 'false'}>
-              <Play
-                className='h-4 w-4 translate-x-px'
-                strokeWidth={2.5}
-                fill='currentColor'
-              />
+              <PlayIcon size={16} strokeWidth={2.5} fill='currentColor' />
             </span>
           </Button>
         </span>

@@ -38,6 +38,15 @@ declare module '@tanstack/react-table' {
      * room to breathe.
      */
     readonly minWidth?: number;
+    /**
+     * Hide the column while no loaded row has a value for it, so a table never
+     * shows a column that is empty on every row. Uses `hasValue` when given,
+     * otherwise the column's accessor value (non-null, non-empty). Tables with
+     * zero rows keep their columns for the empty state.
+     */
+    readonly hideWhenEmpty?: boolean;
+    /** Row-level "has something to show" test for `hideWhenEmpty`. */
+    readonly hasValue?: (row: TData) => boolean;
     /** Receives compact forms from columns hidden by the priority layout. */
     readonly primary?: boolean;
     /** Folded into the primary cell when this column is hidden. */

@@ -1,10 +1,14 @@
 import { PlainButton } from '@jovie/ui';
 import { Bell, Check } from 'lucide-react';
 import Link from 'next/link';
-import type { MouseEvent } from 'react';
+import { type MouseEvent, ViewTransition } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { EntityHeaderThumbnail } from '@/components/molecules/drawer/EntityHeader';
 import { HOSTNAME } from '@/constants/domains';
+import {
+  artistAvatarTransitionName,
+  artistTitleTransitionName,
+} from '@/lib/motion/view-transition-names';
 import { cn } from '@/lib/utils';
 import {
   publicLinkAriaLabel,
@@ -96,34 +100,46 @@ export function ProfileIdentityHeader({
       className={cn('flex flex-col items-center text-center', className)}
       data-testid='profile-identity-header'
     >
-      <EntityHeaderThumbnail
-        variant='person'
-        name={name}
-        alt=''
-        src={imageUrl}
-        size={80}
-        priority={imagePriority}
-        // 80px on phones; the desktop composition shows it at 160px, so ask
-        // for a >= 320px source (2x) there. Phones keep the 80px request.
-        sizes='(min-width: 1024px) 320px, 80px'
-        verified={isVerified}
-        className='h-20 w-20'
-        data-testid='profile-identity-portrait'
-      />
-
-      <Heading
-        className='mt-1.5 min-w-0 max-w-full'
-        data-testid={headingTestId}
+      <ViewTransition
+        name={artistAvatarTransitionName(handle)}
+        share='jovie-morph'
+        default='none'
       >
-        <Link
-          href={profileHref}
-          prefetch={false}
-          className='flex min-h-11 min-w-0 items-center justify-center rounded-md text-2xl font-normal leading-8 tracking-tight text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
-          data-testid='profile-identity-link'
+        <EntityHeaderThumbnail
+          variant='person'
+          name={name}
+          alt=''
+          src={imageUrl}
+          size={80}
+          priority={imagePriority}
+          // 80px on phones; the desktop composition shows it at 160px, so ask
+          // for a >= 320px source (2x) there. Phones keep the 80px request.
+          sizes='(min-width: 1024px) 320px, 80px'
+          verified={isVerified}
+          className='h-20 w-20'
+          data-testid='profile-identity-portrait'
+        />
+      </ViewTransition>
+
+      <ViewTransition
+        name={artistTitleTransitionName(handle)}
+        share='jovie-morph'
+        default='none'
+      >
+        <Heading
+          className='mt-1.5 min-w-0 max-w-full'
+          data-testid={headingTestId}
         >
-          <span className='min-w-0 truncate'>{name}</span>
-        </Link>
-      </Heading>
+          <Link
+            href={profileHref}
+            prefetch={false}
+            className='flex min-h-11 min-w-0 items-center justify-center rounded-md text-2xl font-normal leading-8 tracking-tight text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
+            data-testid='profile-identity-link'
+          >
+            <span className='min-w-0 truncate'>{name}</span>
+          </Link>
+        </Heading>
+      </ViewTransition>
       <p
         className='max-w-full truncate text-sm leading-5 text-tertiary-token'
         data-testid='profile-identity-handle'

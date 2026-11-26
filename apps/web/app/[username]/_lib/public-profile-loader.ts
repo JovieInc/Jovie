@@ -15,10 +15,14 @@ import { users } from '@/lib/db/schema/auth';
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import { creatorPixels } from '@/lib/db/schema/pixels';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { resolveEffectivePlan } from '@/lib/entitlements/creator-plan';
 import { checkBoolean } from '@/lib/entitlements/registry';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { mergeProfileTheme } from '@/lib/profile/profile-theme';
-import { isPublicProfilePublished } from '@/lib/profile/public-profile-access';
+import {
+  isPublicProfilePublished,
+  isYoungAudienceProfile,
+} from '@/lib/profile/public-profile-access';
 import { shouldHideTestProfileFromDirectUrl } from '@/lib/profile/test-profile-policy';
 import { getProfileWithLinks as getCreatorProfileWithLinks } from '@/lib/services/profile';
 import { isDspPlatform } from '@/lib/services/social-links/types';
@@ -246,10 +250,12 @@ const fetchProfileAndLinks = async (
 
     const contacts: DbCreatorContact[] = result.contacts ?? [];
     const latestRelease = result.latestRelease ?? null;
-    const creatorMetaPixelId = await getCreatorMetaPixelId(
-      result.id,
-      result.userPlan ?? null
-    );
+    const creatorMetaPixelId = isYoungAudienceProfile(result.settings)
+      ? null
+      : await getCreatorMetaPixelId(
+          result.id,
+          normalizeCreatorPixelPlan(result.userPlan, result.userTrialEndsAt)
+        );
 
     return {
       profile,
@@ -298,6 +304,7 @@ interface PublicationAuthority {
   readonly userIsPro: boolean | null;
   readonly userClerkId: string | null;
   readonly userPlan: string | null;
+  readonly userTrialEndsAt?: Date | null;
 }
 
 /**
@@ -319,6 +326,7 @@ async function readPublicationAuthority(
           userIsPro: users.isPro,
           userClerkId: users.clerkId,
           userPlan: users.plan,
+          userTrialEndsAt: users.trialEndsAt,
         })
         .from(creatorProfiles)
         .leftJoin(users, eq(users.id, creatorProfiles.userId))
@@ -382,6 +390,25 @@ async function readCachedProfileBody(
  * invalidateProfileCache. They come from the fresh authority row, never from
  * the cached body, so a just-upgraded artist sees Pro behavior immediately.
  */
+function normalizeCreatorPixelPlan(
+  plan: string | null | undefined,
+  trialEndsAt?: Date | string | null
+): string | null {
+  if (!plan) return null;
+  const parsedTrialEndsAt =
+    trialEndsAt instanceof Date
+      ? trialEndsAt
+      : typeof trialEndsAt === 'string'
+        ? new Date(trialEndsAt)
+        : null;
+  return resolveEffectivePlan(
+    plan,
+    parsedTrialEndsAt && !Number.isNaN(parsedTrialEndsAt.getTime())
+      ? parsedTrialEndsAt
+      : null
+  );
+}
+
 async function withFreshEntitlements(
   body: PublicProfileLoaderResult,
   authority: PublicationAuthority
@@ -395,10 +422,15 @@ async function withFreshEntitlements(
     creatorIsPro: Boolean(authority.userIsPro),
     creatorClerkId:
       typeof authority.userClerkId === 'string' ? authority.userClerkId : null,
-    creatorMetaPixelId: await getCreatorMetaPixelId(
-      authority.id,
-      authority.userPlan ?? null
-    ),
+    creatorMetaPixelId: isYoungAudienceProfile(body.profile?.settings)
+      ? null
+      : await getCreatorMetaPixelId(
+          authority.id,
+          normalizeCreatorPixelPlan(
+            authority.userPlan,
+            authority.userTrialEndsAt
+          )
+        ),
   };
 }
 

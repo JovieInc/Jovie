@@ -3,7 +3,6 @@
 import { Button, LoadingSkeleton } from '@jovie/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
 import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 import {
   SHIPPING_STATE_REFETCH_MS,
@@ -174,12 +173,6 @@ export function ShippingStatistics() {
             'Current bottleneck: UNKNOWN — these point-in-time counts do not establish a throughput limiter.'
           )}
         </div>
-      </section>
-      <section
-        className='border-y border-subtle'
-        aria-label='Source Merge History'
-      >
-        <ShippingVelocityChart />
       </section>
       <section
         aria-labelledby='shipping-runtime-title'

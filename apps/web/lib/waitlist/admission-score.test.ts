@@ -87,6 +87,33 @@ describe('scoreAdmissionCandidate', () => {
     expect(fresh.unmeasured).toEqual([]);
   });
 
+  it('credits intent for older-catalog artists reporting no_active_release on par with between_releases', () => {
+    const olderCatalog = scoreAdmissionCandidate(
+      {
+        ...base,
+        followers: 600,
+        catalogReleases: 5,
+        latestReleaseAt: '2023-06-01T00:00:00.000Z',
+        releaseStage: 'no_active_release',
+        chatTurns: 3,
+      },
+      now
+    );
+    const zeroCatalog = scoreAdmissionCandidate(
+      {
+        ...base,
+        followers: 600,
+        catalogReleases: 0,
+        latestReleaseAt: null,
+        releaseStage: 'no_active_release',
+        chatTurns: 3,
+      },
+      now
+    );
+    expect(olderCatalog.components.intent).toBe(12);
+    expect(zeroCatalog.components.intent).toBe(8);
+  });
+
   it('is versioned and carries every input', () => {
     const score = scoreAdmissionCandidate(base, now);
     expect(score.version).toBe('admission-score/v1');

@@ -21,6 +21,7 @@ import {
   type RequestSessionRead,
 } from '@/lib/auth/request-session';
 import { checkUserStatus } from '@/lib/auth/status-checker';
+import { testAuthBypassSessionId } from '@/lib/auth/test-mode-constants';
 import { captureRevenueSpineFailure } from '@/lib/observability/revenue-spine';
 import { attachSentryContext } from '@/lib/sentry/set-user-context';
 
@@ -191,7 +192,7 @@ async function resolveRequestAuth(mode: SessionRead): Promise<AuthResult> {
   if (bypassSession) {
     const baseResult: AuthResult = {
       userId: bypassSession.dbUserId,
-      sessionId: `sess_test_bypass_${bypassSession.dbUserId}`,
+      sessionId: testAuthBypassSessionId(bypassSession.dbUserId),
       orgId: null,
     };
     const result = await resolveEffectiveAuth(baseResult);

@@ -47,16 +47,6 @@ const control = (
   ...overrides,
 });
 const update = control();
-const audio = {
-  track: {
-    trackTitle: 'Never Say A Word',
-    artistName: 'Tim White',
-    artworkUrl: null,
-  },
-  isPlaying: true,
-  onPlay: vi.fn(),
-  onDismiss: vi.fn(),
-};
 const install = { onInstall: vi.fn(), onDismiss: vi.fn() };
 const cards = (container: HTMLElement) =>
   [...container.querySelectorAll('[data-dock-card]')].map(card =>
@@ -70,22 +60,20 @@ beforeEach(() => {
 });
 
 describe('SidebarDock', () => {
-  it.each(Array.from({ length: 8 }, (_, mask) => mask))(
+  it.each(Array.from({ length: 4 }, (_, mask) => mask))(
     'keeps fixed order for combination %i',
     async mask => {
       const { container } = render(
         <SidebarDock
           userId='one'
-          updateControl={mask & 4 ? update : undefined}
-          release={mask & 2 ? release : null}
-          audio={mask & 1 ? audio : undefined}
+          updateControl={mask & 2 ? update : undefined}
+          release={mask & 1 ? release : null}
         />
       );
       expect(cards(container)).toEqual(
         [
-          mask & 4 ? 'update' : null,
-          !(mask & 4) && mask & 2 ? 'whats-new' : null,
-          mask & 1 ? 'now-playing' : null,
+          mask & 2 ? 'update' : null,
+          !(mask & 2) && mask & 1 ? 'whats-new' : null,
         ].filter(Boolean)
       );
       await expectNoA11yViolations(container);
@@ -98,11 +86,10 @@ describe('SidebarDock', () => {
         userId='one'
         updateControl={update}
         release={release}
-        audio={audio}
         install={install}
       />
     );
-    expect(cards(container)).toEqual(['update', 'now-playing']);
+    expect(cards(container)).toEqual(['update']);
     await expectNoA11yViolations(container);
     // The update has no dismiss: it leaves only when the updater is done.
     rerender(
@@ -110,15 +97,12 @@ describe('SidebarDock', () => {
         userId='one'
         updateControl={control({ visible: false, label: null, node: null })}
         release={release}
-        audio={audio}
         install={install}
       />
     );
-    expect(cards(container)).toEqual(['whats-new', 'now-playing']);
+    expect(cards(container)).toEqual(['whats-new']);
     fireEvent.click(screen.getByRole('button', { name: "Dismiss what's new" }));
-    expect(cards(container)).toEqual(['now-playing', 'install']);
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss Player' }));
-    expect(audio.onDismiss).toHaveBeenCalledOnce();
+    expect(cards(container)).toEqual(['install']);
     fireEvent.click(screen.getByRole('button', { name: 'Install' }));
     expect(install.onInstall).toHaveBeenCalledOnce();
     await expectNoA11yViolations(container);
@@ -254,68 +238,23 @@ describe('SidebarDock', () => {
     });
   });
 
-  it('shows audio with only a track title', async () => {
-    const onPlay = vi.fn();
-    const { container } = render(
-      <SidebarDock
-        userId='one'
-        audio={{
-          ...audio,
-          onPlay,
-          track: {
-            trackTitle: 'Untitled demo',
-            artistName: null,
-            artworkUrl: null,
-          },
-        }}
-      />
-    );
-    expect(cards(container)).toEqual(['now-playing']);
-    expect(screen.getByText('Untitled demo')).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Pause' }));
-    expect(onPlay).toHaveBeenCalledOnce();
-    await expectNoA11yViolations(container);
-  });
-
-  it('keeps long release and track titles reachable', async () => {
+  it('keeps long release titles reachable', async () => {
     const title =
       'Release pages now show every streaming service, presave countdowns and per-territory analytics';
-    const trackTitle =
-      'Midnight Drive Through the Neon City (Extended Club Mix featuring the Late Night Strings)';
     const { container } = render(
-      <SidebarDock
-        userId='one'
-        release={{ ...release, title }}
-        audio={{
-          ...audio,
-          track: { ...audio.track, trackTitle },
-        }}
-      />
+      <SidebarDock userId='one' release={{ ...release, title }} />
     );
-    expect(cards(container)).toEqual(['whats-new', 'now-playing']);
+    expect(cards(container)).toEqual(['whats-new']);
     expect(screen.getByText(title)).toHaveClass('truncate');
-    expect(screen.getByText(trackTitle)).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });
 
   it('keeps the update control reachable in a right-to-left sidebar', async () => {
     const { container } = render(
       <div dir='rtl' lang='ar'>
-        <SidebarDock
-          userId='one'
-          updateControl={update}
-          audio={{
-            ...audio,
-            track: {
-              trackTitle: 'ليالي المدينة الطويلة',
-              artistName: 'فرقة الشرق',
-              artworkUrl: null,
-            },
-          }}
-        />
+        <SidebarDock userId='one' updateControl={update} />
       </div>
     );
-    expect(screen.getByText('ليالي المدينة الطويلة')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Slotted control' })
     ).toBeVisible();
@@ -329,7 +268,6 @@ describe('SidebarDock', () => {
         collapsed
         updateControl={update}
         release={release}
-        audio={audio}
         install={install}
       >
         {status => (
@@ -344,9 +282,9 @@ describe('SidebarDock', () => {
       [...container.querySelectorAll('[data-dock-badge]')].map(node =>
         node.getAttribute('data-dock-badge')
       )
-    ).toEqual(['update', 'whats-new', 'audio', 'install']);
+    ).toEqual(['update', 'whats-new', 'install']);
     expect(screen.getByRole('button')).toHaveAccessibleName(
-      "Update available · What's new: Your latest releases · Playing: Never Say A Word · Install Jovie"
+      "Update available · What's new: Your latest releases · Install Jovie"
     );
     rerender(
       <SidebarDock userId='one' collapsed>
@@ -426,16 +364,6 @@ describe('SidebarDock', () => {
     });
   });
 
-  it('reserves the audio slot without a duplicate transport while the full player is visible', () => {
-    const { container } = render(
-      <SidebarDock userId='one' audio={{ ...audio, reserved: true }} />
-    );
-    expect(
-      container.querySelector('[data-dock-card="now-playing"]')
-    ).toHaveAttribute('inert');
-    expect(screen.queryByRole('button', { name: 'Pause' })).toBeNull();
-  });
-
   it('returns keyboard focus after dismissing a card', async () => {
     render(
       <div>
@@ -472,15 +400,28 @@ describe('SidebarDock', () => {
   });
   it('measures card positions only when the card stack changes', () => {
     const measure = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
-    const { rerender } = render(<SidebarDock userId='one' audio={audio} />);
+    const { rerender } = render(<SidebarDock userId='one' release={release} />);
     const mounted = measure.mock.calls.length;
     expect(mounted).toBeGreaterThan(0);
-    rerender(
-      <SidebarDock userId='one' audio={{ ...audio, isPlaying: false }} />
-    );
+    rerender(<SidebarDock userId='one' release={{ ...release }} />);
     expect(measure.mock.calls.length).toBe(mounted);
-    rerender(<SidebarDock userId='one' audio={audio} updateControl={update} />);
+    rerender(
+      <SidebarDock userId='one' release={release} updateControl={update} />
+    );
     expect(measure.mock.calls.length).toBeGreaterThan(mounted);
     measure.mockRestore();
+  });
+
+  it('reports the icon-rail status once per label change', () => {
+    const onStatusChange = vi.fn();
+    const props = { userId: 'one', collapsed: true, updateControl: update };
+    const { rerender } = render(
+      <SidebarDock {...props} onStatusChange={onStatusChange} />
+    );
+    rerender(<SidebarDock {...props} onStatusChange={onStatusChange} />);
+    expect(onStatusChange).toHaveBeenCalledTimes(1);
+    expect(onStatusChange).toHaveBeenCalledWith(
+      expect.objectContaining({ label: 'Update available' })
+    );
   });
 });

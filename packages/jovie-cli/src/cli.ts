@@ -16,6 +16,7 @@ import {
   normalizeBaseUrl,
   safeDiagnostic,
 } from './client.js';
+import { closedPipeListener, isClosedPipeError } from './closed-pipe.js';
 import { COMMANDS, type CommandSpec, findCommand } from './commands.js';
 import { installSkill } from './init.js';
 import { serveMcp } from './mcp.js';
@@ -608,22 +609,20 @@ export function isEntrypoint(
   }
 }
 
-/** A closed pipe (`jovie ... | head`) ends output, not the process with a trace. */
-export function closedPipeListener(
-  exit: (code: number) => void
-): (error: NodeJS.ErrnoException) => void {
-  return error => {
-    // Windows reports a closed pipe as EOF rather than EPIPE.
-    if (
-      error.code === 'EPIPE' ||
-      error.code === 'EOF' ||
-      error.code === 'ERR_STREAM_DESTROYED'
-    ) {
-      exit(Number(process.exitCode ?? 0));
-      return;
-    }
-    throw error;
-  };
+/**
+ * Exit code + report for a bug that escaped runCli (JOV-13096): a closed pipe
+ * is a hung-up consumer, exit with the pending code; anything else is a real
+ * bug: one redacted line, exit 1.
+ */
+export function fatalExitCode(
+  argv: readonly string[],
+  error: unknown,
+  stdout: CliOutput = process.stdout,
+  stderr: CliOutput = process.stderr
+): number {
+  if (isClosedPipeError(error)) return Number(process.exitCode ?? 0);
+  reportFatal(argv, error, stdout, stderr);
+  return 1;
 }
 
 /** Last-resort report for a bug that escaped runCli: one line, exit 1. */
@@ -682,10 +681,11 @@ if (isEntrypoint(import.meta.url, process.argv[1])) {
   process.stdout.on('error', onClosedPipe);
   process.stderr.on('error', onClosedPipe);
   const fatal = (error: unknown) => {
-    reportFatal(argv, error);
-    process.exitCode = 1;
-    // Let the one-line report flush, but never keep a broken process alive.
-    setTimeout(() => process.exit(1), 50).unref();
+    const code = fatalExitCode(argv, error);
+    process.exitCode = code;
+    // A report gets 50ms to flush; a hung-up consumer exits immediately.
+    if (code > 0) setTimeout(() => process.exit(1), 50).unref();
+    else process.exit(0);
   };
   process.on('uncaughtException', fatal);
   process.on('unhandledRejection', fatal);

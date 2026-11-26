@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@jovie/ui';
-import { type ChangeEvent, type KeyboardEvent } from 'react';
+import { type ChangeEvent, type KeyboardEvent, useEffect, useRef } from 'react';
 
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import {
@@ -78,6 +78,13 @@ export function ReleaseDspLinks({
   onNewLinkKeyDown,
   showHeading = false,
 }: ReleaseDspLinksProps) {
+  const urlInputRef = useRef<HTMLInputElement>(null);
+  const isAddingForm = isEditable && isAddingLink;
+  // The URL field appears from the Add click; move focus to it then.
+  useEffect(() => {
+    if (isAddingForm) urlInputRef.current?.focus();
+  }, [isAddingForm]);
+
   const providerKeys = Object.keys(providerConfig) as ProviderKey[];
   const availableProviders = providerKeys
     .filter(key => !release.providers.some(p => p.key === key))
@@ -231,6 +238,7 @@ export function ReleaseDspLinks({
           </DrawerFormGridRow>
           <DrawerFormGridRow label='URL'>
             <Input
+              ref={urlInputRef}
               type='url'
               value={newLinkUrl}
               onChange={(event: ChangeEvent<HTMLInputElement>) => {
@@ -242,7 +250,6 @@ export function ReleaseDspLinks({
               inputMode='url'
               autoCapitalize='none'
               autoCorrect='off'
-              autoFocus
               className='h-8 rounded-md border-subtle bg-surface-0 text-xs'
             />
           </DrawerFormGridRow>

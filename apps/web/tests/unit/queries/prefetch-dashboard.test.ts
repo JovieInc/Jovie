@@ -5,7 +5,9 @@ import { prefetchForRoute } from '@/lib/queries/prefetch-dashboard';
 import { DEFAULT_TASK_WORKSPACE_FILTERS } from '@/lib/tasks/query-defaults';
 
 const mocks = vi.hoisted(() => ({
-  fetchWithTimeout: vi.fn(async () => []),
+  fetchWithTimeout: vi.fn(
+    async (_url: string, _init?: { signal?: AbortSignal }) => [] as unknown[]
+  ),
   getTasks: vi.fn(async () => ({ nextCursor: null, tasks: [] })),
   loadTourDates: vi.fn(async () => []),
   loadReleaseMatrix: vi.fn(async (profileId: string) => [
@@ -15,10 +17,6 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/releases/release-matrix-loader', () => ({
   loadReleaseMatrix: mocks.loadReleaseMatrix,
-}));
-
-vi.mock('@/app/app/(shell)/dashboard/presence/actions', () => ({
-  loadDspPresenceForProfile: vi.fn(async () => []),
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/tour-dates/actions', () => ({
@@ -102,5 +100,32 @@ describe('prefetchForRoute', () => {
         )
       ).toEqual({ nextCursor: null, tasks: [] });
     });
+  });
+
+  it('does not warm Audience on nav hover (SSR-only wins ties)', () => {
+    const queryClient = new QueryClient();
+    const prefetchSpy = vi.spyOn(queryClient, 'prefetchQuery');
+    const prefetchInfiniteSpy = vi.spyOn(queryClient, 'prefetchInfiniteQuery');
+
+    prefetchForRoute('audience', queryClient, 'profile-123');
+
+    expect(prefetchSpy).not.toHaveBeenCalled();
+    expect(prefetchInfiniteSpy).not.toHaveBeenCalled();
+    expect(mocks.fetchWithTimeout).not.toHaveBeenCalled();
+    expect(
+      queryClient.getQueryData(queryKeys.audience.members('profile-123'))
+    ).toBeUndefined();
+  });
+
+  it('does not warm dspEnrichment.presence for Identity (presence route)', () => {
+    const queryClient = new QueryClient();
+    const prefetchSpy = vi.spyOn(queryClient, 'prefetchQuery');
+    const prefetchInfiniteSpy = vi.spyOn(queryClient, 'prefetchInfiniteQuery');
+
+    prefetchForRoute('presence', queryClient, 'profile-123');
+
+    expect(prefetchSpy).not.toHaveBeenCalled();
+    expect(prefetchInfiniteSpy).not.toHaveBeenCalled();
+    expect(mocks.fetchWithTimeout).not.toHaveBeenCalled();
   });
 });

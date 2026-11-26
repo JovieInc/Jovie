@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ChatError } from '@/components/jovie/types';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { OnboardingMessageRecoveryRow } from './OnboardingMessageRecoveryRow';
 
 const noop = () => {};
@@ -183,5 +184,42 @@ describe('OnboardingMessageRecoveryRow', () => {
         name: 'Create a free account to keep going',
       })
     ).not.toBeInTheDocument();
+  });
+
+  it('has no accessibility violations in the retryable and rate limited states', async () => {
+    const { container, rerender } = render(
+      <OnboardingMessageRecoveryRow
+        chatError={makeChatError({ failedMessage: 'hello' })}
+        handleRetry={noop}
+        isBusy={false}
+        isSubmitted={false}
+      />
+    );
+    await expectNoA11yViolations(container);
+
+    rerender(
+      <OnboardingMessageRecoveryRow
+        chatError={makeChatError({ type: 'rate_limit', retryAfter: 45 })}
+        handleRetry={noop}
+        isBusy={false}
+        isSubmitted={false}
+      />
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('renders the retry control as the design system plain button', () => {
+    render(
+      <OnboardingMessageRecoveryRow
+        chatError={makeChatError({ failedMessage: 'hello' })}
+        handleRetry={noop}
+        isBusy={false}
+        isSubmitted={false}
+      />
+    );
+
+    const retry = screen.getByRole('button', { name: 'Retry message' });
+    expect(retry).toHaveAttribute('data-slot', 'plain-button');
+    expect(retry).toHaveAttribute('type', 'button');
   });
 });

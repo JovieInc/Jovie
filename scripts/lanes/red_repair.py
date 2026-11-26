@@ -160,7 +160,7 @@ def incident_checks(failures: dict[str, dict[int, str]], now: float) -> dict[str
 
 
 def incident_event(check: str, prs: list[int], now: float) -> dict:
-    """One fingerprinted remediation intake per check: `upsert_intake` keeps one open issue."""
+    """One fingerprinted remediation intake per check: `upsert_intake` keeps one Linear issue."""
     excerpt = (f"Infra incident: required check `{check}` failed on {len(prs)} open PRs within "
                f"{INFRA_WINDOW_S // 60} min ({', '.join(f'#{n}' for n in prs[:20])}). Treated as one "
                "incident: no PR gets lane-fix-red for it; the reconcile sweep re-checks once it clears.")

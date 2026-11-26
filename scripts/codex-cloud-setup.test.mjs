@@ -103,7 +103,7 @@ test('installs frozen dependencies in the repository without touching environmen
   bootstrap(root, env);
   assert.equal(
     readFileSync(join(root, 'install-receipt'), 'utf8'),
-    `${root}\ninstall --frozen-lockfile --prefer-offline\n1\nskip\ntrue\n`
+    `${root}\ninstall --offline --frozen-lockfile\n1\nskip\ntrue\n`
   );
   assert.equal(
     readFileSync(join(root, '.env.local'), 'utf8'),
@@ -140,7 +140,7 @@ test('the shared frozen install leaves the Node gate to its caller', t => {
   frozenInstall(root, env);
   assert.equal(
     readFileSync(join(root, 'install-receipt'), 'utf8'),
-    `${root}\ninstall --frozen-lockfile --prefer-offline\n1\nskip\ntrue\n`
+    `${root}\ninstall --offline --frozen-lockfile\n1\nskip\ntrue\n`
   );
   for (const packageManager of [undefined, 'pnpm@latest']) {
     writeFileSync(
@@ -169,7 +169,7 @@ test('the install subcommand that setup.sh and SessionStart call runs the frozen
   assert.equal(install.status, 0, install.stderr);
   assert.match(
     readFileSync(join(root, 'install-receipt'), 'utf8'),
-    /^install --frozen-lockfile --prefer-offline$/mu
+    /^install --offline --frozen-lockfile$/mu
   );
   rmSync(join(root, 'install-receipt'));
   const unknown = cli(['reinstall']);
@@ -183,7 +183,7 @@ test('main dispatches install, bootstrap and unknown commands in-process', t => 
   assert.equal(main(['install'], root, env), 0);
   assert.match(
     readFileSync(join(root, 'install-receipt'), 'utf8'),
-    /^install --frozen-lockfile --prefer-offline$/mu
+    /^install --offline --frozen-lockfile$/mu
   );
   assert.equal(main([], root, env), 0);
   writeFileSync(join(root, '.nvmrc'), '0.0.0');
@@ -221,6 +221,37 @@ test('fails closed on missing pnpm, wrong package manager, and failed version pr
     () => bootstrap(root, { PATH: join(root, 'missing') }),
     /ENOENT/
   );
+});
+
+test('falls back once to prefer-offline on a cold store, then fails closed', t => {
+  const { root, env } = fixture(t);
+  // Warm-enough store: the --offline attempt fails, the cache-first
+  // --prefer-offline attempt succeeds (exactly one fallback, no loops).
+  writeFileSync(
+    join(root, 'bin/pnpm'),
+    `#!/bin/bash
+if [[ "$*" == '--version' ]]; then echo '9.15.9'; exit 0; fi
+printf '%s\\n' "$PWD" "$*" > "$PWD/install-receipt"
+[[ "$*" == *--prefer-offline* ]] && exit 0
+exit 1
+`,
+    { mode: 0o755 }
+  );
+  bootstrap(root, env);
+  assert.match(
+    readFileSync(join(root, 'install-receipt'), 'utf8'),
+    /^install --prefer-offline --frozen-lockfile$/mu
+  );
+  // Cold store and registry unavailable: both attempts fail, error reports it.
+  writeFileSync(
+    join(root, 'bin/pnpm'),
+    `#!/bin/bash
+if [[ "$*" == '--version' ]]; then echo '9.15.9'; exit 0; fi
+exit 1
+`,
+    { mode: 0o755 }
+  );
+  assert.throws(() => bootstrap(root, env), /pnpm install failed \(1\)/);
 });
 
 test('propagates installer failures and signals', t => {
@@ -332,7 +363,7 @@ ${behavior}
       else
         assert.match(
           readFileSync(join(root, 'install-receipt'), 'utf8'),
-          /install --frozen-lockfile/
+          /install --offline --frozen-lockfile/
         );
       assert.equal(
         readFileSync(join(root, 'hook-configured'), 'utf8'),

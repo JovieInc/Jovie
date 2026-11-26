@@ -60,11 +60,15 @@ describe('goldenPathStatus', () => {
     expect(out).toMatchObject({ ledger: 'missing', total: 8, certified: 0 });
     expect(out.surfaces.every(s => s.status === 'missing')).toBe(true);
   });
-  it('certifies fresh passes and keeps failed, blocked and expired apart', () => {
+  it('certifies passes on the served release and keeps failed, blocked and expired apart', () => {
     const out = goldenPathStatus(
       ledger({
-        landing: receipt('landing', 'passed', '2026-11-01T10:00:00.000Z'),
-        claim: receipt('claim', 'passed', '2026-10-30T10:00:00.000Z'),
+        // Weeks old, same release: still certified (JOV-14402, no decay).
+        landing: receipt('landing', 'passed', '2026-10-01T10:00:00.000Z'),
+        // An older release's pass: superseded, so expired.
+        claim: receipt('claim', 'passed', '2026-10-30T10:00:00.000Z', {
+          sha: 'b'.repeat(40),
+        }),
         checkout: receipt('checkout', 'failed', '2026-11-01T11:00:00.000Z'),
         chat: receipt('chat', 'blocked', '2026-11-01T11:00:00.000Z'),
       }),
@@ -169,5 +173,85 @@ describe('golden-path steps from checks[] (prod-cert receipts, 2026-11-01 run on
       status: 'blocked',
       fixPr: null,
     });
+  });
+
+  it('projects real prod-cert check IDs into steps and counts a carried receipt as its pass', () => {
+    const older = '2026-10-20T13:00:00.000Z';
+    const out = goldenPathStatus(
+      ledger({
+        claim: r('claim', 'failed', [
+          ['claim-renders', 'passed'],
+          ['claim-param-renders', 'passed'],
+          ['start-renders', 'passed'],
+          ['start-preserves-handle', 'passed'],
+          ['start-chat-first-reply', 'passed'],
+          ['golden-path-preview-has-release', 'passed'],
+          ['claimed-profile-owned', 'passed'],
+          ['pen.design-exists', 'failed'],
+        ]),
+        onboarding: r('onboarding', 'passed', [
+          ['fresh-user-onboarding-first-value', 'passed'],
+        ]),
+        chat: r('chat', 'passed', [['first-reply', 'passed']]),
+        checkout: r('checkout', 'failed', [
+          ['offer-canonical-pricing', 'passed'],
+          ['checkout-entry-renders', 'passed'],
+          ['fresh-user-checkout-entry', 'blocked'],
+        ]),
+        landing: receipt('landing', 'passed', older, { sha: 'b'.repeat(40) }),
+        smartlink: receipt('smartlink', 'passed', 'not-a-timestamp'),
+      }),
+      NOW
+    );
+    const stepsById = Object.fromEntries(out.steps.map(s => [s.id, s]));
+    expect(stepsById['claim-landing']?.status).toBe('passed');
+    expect(stepsById.start?.status).toBe('passed');
+    expect(stepsById['qualify-chat']?.status).toBe('passed');
+    expect(stepsById['profile-reveal']?.status).toBe('passed');
+    expect(stepsById['claim-decision']?.status).toBe('passed');
+    expect(stepsById['first-use']?.status).toBe('passed');
+    expect(stepsById.upgrade).toMatchObject({
+      status: 'blocked',
+      surface: 'checkout',
+    });
+    expect(stepsById.outreach?.status).toBe('missing');
+    expect(stepsById['hosted-test-checkout']?.status).toBe('missing');
+    expect(stepsById['paid-value']?.status).toBe('missing');
+    expect(out.stepsPassed).toBe(6);
+
+    const surfacesById = Object.fromEntries(out.surfaces.map(s => [s.id, s]));
+    expect(surfacesById.landing?.status).toBe('expired');
+    expect(surfacesById.smartlink?.status).toBe('certified');
+  });
+
+  it('counts a carried receipt as the pass of every check it carries', () => {
+    const carried = {
+      ...receipt('chat', 'passed', '2026-11-01T11:00:00.000Z'),
+      checks: [
+        {
+          id: 'carried-forward',
+          status: 'passed',
+          startedAt: '2026-11-01T11:00:00.000Z',
+          endedAt: '2026-11-01T11:00:00.000Z',
+          summary: 'untouched',
+        },
+      ],
+      carriedFrom: {
+        sha: 'b'.repeat(40),
+        endedAt: '2026-10-30T11:00:00.000Z',
+        runUrl: null,
+      },
+    } as unknown as ProdGoldenPathReceipt;
+    const out = goldenPathStatus(
+      ledger({
+        chat: carried,
+        onboarding: r('onboarding', 'passed', [
+          ['fresh-user-onboarding-first-value', 'passed'],
+        ]),
+      }),
+      NOW
+    );
+    expect(out.steps.find(s => s.id === 'first-use')?.status).toBe('passed');
+    expect(out.surfaces.find(s => s.id === 'chat')?.status).toBe('certified');
   });
 });

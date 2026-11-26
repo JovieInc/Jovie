@@ -234,6 +234,23 @@ describe('<PreferredDspRedirect>', () => {
     );
   });
 
+  it('hops in the same tick even when tracking would hang (no blank pre-hop wait)', () => {
+    const replaceMock = setLocation();
+    setPreferredDsp('spotify');
+    vi.mocked(postJsonBeacon).mockImplementation(() => {
+      // Simulate a collector that never settles — hop must not await it.
+      return false;
+    });
+
+    renderRedirect();
+
+    expect(replaceMock).toHaveBeenCalledTimes(1);
+    expect(replaceMock).toHaveBeenCalledWith(
+      'https://open.spotify.com/album/abc?utm_source=jovie'
+    );
+    expect(postJsonBeacon).toHaveBeenCalled();
+  });
+
   it('stays on an axe-clean page when no provider link matches', async () => {
     vi.mocked(postJsonBeacon).mockClear();
     const replaceMock = setLocation();

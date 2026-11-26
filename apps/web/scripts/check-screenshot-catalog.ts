@@ -202,7 +202,17 @@ async function inspectDirectory(
   const imageFiles = actualFiles.filter(file => extname(file) === '.png');
   let totalBytes = 0;
   for (const file of imageFiles) {
-    const fileBytes = (await stat(join(directory, file))).size;
+    const path = join(directory, file);
+    const linkStats = await lstat(path);
+    // Catalog may store byte-identical dedupe symlinks. Do not re-count the
+    // canonical blob in the catalog directory budget (git Size Guard already
+    // skips mode 120000). Public export budgets still follow the symlink.
+    if (linkStats.isSymbolicLink() && label.startsWith('screenshot-catalog')) {
+      continue;
+    }
+    const fileBytes = linkStats.isSymbolicLink()
+      ? (await stat(path)).size
+      : linkStats.size;
     totalBytes += fileBytes;
     if (fileBytes > maxImageBytes) {
       violations.push(
@@ -251,13 +261,17 @@ export async function checkScreenshotCatalog({
       entry.publicExportPath ? [entry.publicExportPath] : []
     )
   );
+  // Catalog may hold byte-identical dedupe symlinks (mode 120000) so the
+  // combined-tree Size Guard does not count the same PNG blob twice. Public
+  // exports still resolve through realpath to the canonical regular file.
   const catalog = await inspectDirectory(
     paths.catalogDirectory,
     catalogFiles,
     budgets.catalog,
     budgets.maxImageBytes,
     'screenshot-catalog/current',
-    violations
+    violations,
+    true
   );
   const publicExports = await inspectDirectory(
     paths.publicExportDirectory,
@@ -282,7 +296,15 @@ export async function checkScreenshotCatalog({
       entry.publicExportPath
     );
     const publicStats = await lstat(publicPath).catch(() => null);
-    if (publicStats?.isSymbolicLink()) {
+    // Public exports must be tracked symlinks into screenshot-catalog/current.
+    // A regular-file copy doubles the combined-tree byte budget (merge-queue
+    // Size Guard counts every 100644/100755 blob) and was the dominant
+    // other_workflow_eject cause when main sat near the ceiling.
+    if (!publicStats?.isSymbolicLink()) {
+      violations.push(
+        `${entry.id}: public export must be a symlink to its canonical catalog image (regular-file copies double the combined-tree byte budget)`
+      );
+    } else {
       const [resolvedPublicPath, resolvedCatalogPath] = await Promise.all([
         realpath(publicPath).catch(() => null),
         realpath(join(paths.catalogDirectory, entry.imagePath)).catch(

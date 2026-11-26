@@ -125,7 +125,7 @@ export function HowItWorksSection({
     <section className={`relative py-14 sm:py-18 ${className}`}>
       {/* Section accent border */}
       {showAccentBorder && (
-        <div className='absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-blue-500/50 via-purple-500/50 to-cyan-500/50' />
+        <div className='absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-accent-blue/50 via-accent-purple/50 to-accent-blue/50' />
       )}
 
       <div className='mx-auto max-w-7xl px-6 lg:px-8'>

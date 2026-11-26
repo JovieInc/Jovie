@@ -137,10 +137,6 @@
       "tables": 0,
       "rates": 2
     },
-    "components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.tsx": {
-      "tables": 0,
-      "rates": 1
-    },
     "components/features/dashboard/organisms/AnalyticsSidebar.tsx": {
       "tables": 0,
       "rates": 1

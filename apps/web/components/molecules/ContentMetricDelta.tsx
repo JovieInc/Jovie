@@ -1,22 +1,24 @@
 import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
+import {
+  DELTA_TEXT_CLASS,
+  type DeltaDirection,
+  deltaSentiment,
+  type MetricPolarity,
+} from '@/lib/design/metric-tone';
 import { cn } from '@/lib/utils';
 
-export type ContentMetricDeltaDirection = 'up' | 'down' | 'flat';
+export type ContentMetricDeltaDirection = DeltaDirection;
 
 export interface ContentMetricDeltaProps {
   readonly value: string;
   readonly direction: ContentMetricDeltaDirection;
+  /** Whether a rise is good news. Color follows sentiment, not direction. */
+  readonly polarity: MetricPolarity;
   readonly className?: string;
   readonly iconClassName?: string;
   readonly 'aria-label'?: string;
   readonly 'data-testid'?: string;
 }
-
-const DIRECTION_CLASSNAME: Record<ContentMetricDeltaDirection, string> = {
-  up: 'text-success',
-  down: 'text-error',
-  flat: 'text-tertiary-token',
-};
 
 const DIRECTION_ICON = {
   up: TrendingUp,
@@ -27,6 +29,7 @@ const DIRECTION_ICON = {
 export function ContentMetricDelta({
   value,
   direction,
+  polarity,
   className,
   iconClassName,
   'aria-label': ariaLabel,
@@ -38,7 +41,7 @@ export function ContentMetricDelta({
     <div
       className={cn(
         'inline-flex items-center gap-1.5 text-app font-medium tabular-nums',
-        DIRECTION_CLASSNAME[direction],
+        DELTA_TEXT_CLASS[deltaSentiment(direction, polarity)],
         className
       )}
       data-testid={testId}

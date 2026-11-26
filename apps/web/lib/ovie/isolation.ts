@@ -21,6 +21,8 @@ export const SUMMER_SAFE_TOOLS = [
   'record_operational_memory',
   'coordinate_linear_work',
   'get_proof_brief',
+  // Read-only: an inline chart Ovie builds from a registered metric id.
+  'get_company_metric_chart',
 ] as const;
 
 export type SummerSafeTool = (typeof SUMMER_SAFE_TOOLS)[number];

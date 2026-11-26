@@ -127,7 +127,7 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
           cell: info => info.getValue(),
         }),
         columnHelper.accessor('externalUrl', {
-          header: '',
+          header: () => <span className='sr-only'>Provider dashboard</span>,
           cell: info => {
             const url = info.getValue();
             if (!url) return null;
@@ -184,7 +184,7 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
     <AdminTableShell testId='admin-costs-table' toolbar={toolbar}>
       {() => (
         <AdminDataTable
-          rowMode='description'
+          rowMode='dense'
           data={items}
           columns={columns}
           emptyState={

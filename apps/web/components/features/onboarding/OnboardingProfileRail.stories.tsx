@@ -20,6 +20,7 @@ const CONFIRMED_ARTIST_STATE: OnboardingProfileBuilderState = {
     genres: ['progressive house'],
   },
   artistConfirmed: true,
+  handleConfirmed: false,
   handle: 'testartist',
   socialLinks: [],
 };

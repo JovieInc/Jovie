@@ -7,20 +7,22 @@ import * as React from 'react';
 import { Button, type ButtonProps, type ButtonVariant } from './button';
 import type { ButtonSize } from './button-contract';
 import {
+  ICON_BUTTON_FADE_CLASSNAME,
   ICON_BUTTON_SIZE_NAMES,
   ICON_BUTTON_VARIANT_NAMES,
+  ICON_BUTTON_VISIBLE_CLASSNAME,
   type IconButtonSize,
   type IconButtonVariant,
 } from './icon-button-contract';
 
 /**
- * Canonical icon-only button (JOV-4871).
+ * Canonical icon-only button (JOV-4871 / Drift T2.1).
  *
  * Single size/variant contract for every icon button in the product, built on
  * the base Button so the focus ring, disabled state, and 44px hit target are
- * identical everywhere. The legacy web atoms (CircleIconButton,
- * AppIconButton, HeaderIconButton, InlineIconButton, DrawerInlineIconButton)
- * are thin compat wrappers over this component.
+ * identical everywhere. Compose with TooltipShortcut / SimpleTooltip at the
+ * callsite. Justified patterns that wrap this atom (e.g. RailToggleButton)
+ * must stay thin and document why they are not a second primitive.
  */
 
 const ICON_BUTTON_SIZE_TO_BUTTON_SIZE: Record<IconButtonSize, ButtonSize> = {
@@ -36,7 +38,8 @@ const ICON_BUTTON_VARIANT_TO_BUTTON_VARIANT: Record<
   ButtonVariant
 > = {
   surface: 'secondary',
-  frosted: 'ghost',
+  // Project through Button's first-class frosted glass variant (Drift T2.3).
+  frosted: 'frosted',
   ghost: 'ghost',
   secondary: 'ghost',
   outline: 'secondary',
@@ -49,7 +52,7 @@ const ICON_BUTTON_VARIANT_TO_BUTTON_VARIANT: Record<
 // Shared chrome for the circular surface family (profile chrome, auth back
 // buttons): soft-material layering plus the legacy circular transition.
 const CIRCLE_CHROME_CLASSNAME =
-  'relative isolate cursor-pointer overflow-visible transition-colors duration-subtle ease-subtle';
+  'relative isolate cursor-pointer overflow-visible';
 
 // Applied after variant chrome so quiet/ghost token colors cannot override
 // the shared Button destructive state.
@@ -59,7 +62,7 @@ const ICON_BUTTON_DESTRUCTIVE_CLASSNAME =
 const iconButtonVariants = cva(
   // Shared base: uniform reduced-motion + touch behavior. Focus ring and
   // hit target come from the base Button so they cannot drift.
-  'touch-manipulation select-none [-webkit-tap-highlight-color:transparent] motion-reduce:transition-none',
+  'touch-manipulation select-none [-webkit-tap-highlight-color:transparent]',
   {
     variants: {
       variant: {
@@ -70,13 +73,8 @@ const iconButtonVariants = cva(
           'shadow-sm',
           'hover:bg-surface-2 hover:text-primary-token hover:shadow-md'
         ),
-        // Frosted - glassmorphic with backdrop blur
-        frosted: cn(
-          CIRCLE_CHROME_CLASSNAME,
-          'border border-subtle bg-icon-button-frosted text-primary-token backdrop-blur-sm',
-          'shadow-sm',
-          'hover:bg-icon-button-frosted-hover'
-        ),
+        // Frosted — circular chrome only; glass fill/blur lives on Button.
+        frosted: cn(CIRCLE_CHROME_CLASSNAME, 'shadow-sm'),
         // Ghost - transparent with hover background
         ghost: cn(
           CIRCLE_CHROME_CLASSNAME,
@@ -118,10 +116,10 @@ const iconButtonVariants = cva(
         ),
         // Control - app shell toolbar chrome (28px control height)
         control:
-          'shrink-0 border border-subtle bg-surface-1 text-secondary-token shadow-none transition-[background-color,color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-0 hover:text-primary-token hover:shadow-none active:border-default active:bg-surface-1 active:shadow-none',
+          'shrink-0 border border-subtle bg-surface-1 text-secondary-token shadow-none hover:border-default hover:bg-surface-0 hover:text-primary-token hover:shadow-none active:border-default active:bg-surface-1 active:shadow-none',
         // Inline - transparent drawer/edit affordance
         inline:
-          'shrink-0 p-0.5 text-secondary-token leading-none shadow-none transition-[opacity,background-color,color,box-shadow,transform] duration-subtle ease-subtle hover:bg-surface-1 focus-visible:bg-surface-1 [&_svg]:block',
+          'shrink-0 p-0.5 text-secondary-token leading-none shadow-none hover:bg-surface-1 focus-visible:bg-surface-1 [&_svg]:block',
       },
       size: {
         // Glyph sizing is only enforced for the compact control/header
@@ -163,6 +161,8 @@ export type IconButtonName =
       readonly 'aria-labelledby': string;
     };
 
+export type IconButtonFade = 'parent' | 'visible';
+
 export type IconButtonProps = Omit<
   ButtonProps,
   'size' | 'variant' | 'aria-label' | 'aria-labelledby'
@@ -171,6 +171,13 @@ export type IconButtonProps = Omit<
   readonly variant?: IconButtonVariant;
   /** Container size: xs 24 / sm 28 / md 32 / lg 40 / xl 44px. */
   readonly size?: IconButtonSize;
+  /**
+   * Contract fade modifiers owned by the primitive (JOV-4871). Prefer this
+   * over className — `shadcn/no-restyle` treats opacity/padding as restyles.
+   * - `parent`: reveal on parent group-hover / group-focus-within
+   * - `visible`: always faintly visible, full opacity on hover/focus
+   */
+  readonly fade?: IconButtonFade;
 } & IconButtonName;
 
 export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
@@ -181,6 +188,7 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       'aria-label': ariaLabelProp,
       variant = 'ghost',
       size = 'lg',
+      fade,
       className,
       destructive = false,
       ...props
@@ -197,6 +205,8 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         destructive={destructive}
         className={cn(
           iconButtonVariants({ variant, size }),
+          fade === 'parent' && ICON_BUTTON_FADE_CLASSNAME,
+          fade === 'visible' && ICON_BUTTON_VISIBLE_CLASSNAME,
           destructive && ICON_BUTTON_DESTRUCTIVE_CLASSNAME,
           className
         )}

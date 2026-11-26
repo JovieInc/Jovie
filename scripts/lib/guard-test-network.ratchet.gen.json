@@ -1,0 +1,233 @@
+{
+  "schema": "jovie-guard-test-network-ratchet/v1",
+  "entries": {
+    ".github/scripts/controller-quota-replay.test.mjs": {
+      "provider-host": 1,
+      "curl-github": 1
+    },
+    ".github/scripts/pen-still-diff-comment.test.mjs": {
+      "gh-subprocess": 1
+    },
+    ".github/scripts/production-continuity.test.mjs": {
+      "provider-host": 2
+    },
+    ".github/scripts/staging-supersession-policy.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/automation-liveness-gate.test.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs": {
+      "provider-host": 1,
+      "gh-subprocess": 12
+    },
+    "scripts/ci-workflow-topology.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/codex-cloud-setup.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/deprecation-intake.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/desktop-release-guard.test.mjs": {
+      "provider-host": 1,
+      "gh-subprocess": 10
+    },
+    "scripts/installation-budget-sentinel.test.mjs": {
+      "provider-host": 2
+    },
+    "scripts/invariants/registry.test.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/invariants/screen-certification.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/admission-hold-labels.test.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/lib/__tests__/agent-branch-pattern.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/api-quota-report.test.mjs": {
+      "provider-host": 1
+    },
+    "scripts/lib/__tests__/attach-changelog-writer-proof.test.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/auto-ready-green-drafts.test.mjs": {
+      "gh-subprocess": 3
+    },
+    "scripts/lib/__tests__/automation-liveness-lost-state-recovery.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/automation-liveness-quota-defer.test.mjs": {
+      "provider-host": 4
+    },
+    "scripts/lib/__tests__/automation-liveness.test.mjs": {
+      "provider-host": 1
+    },
+    "scripts/lib/__tests__/ci-harness.test.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/lib/__tests__/ci-schedule-inventory.test.mjs": {
+      "gh-subprocess": 11
+    },
+    "scripts/lib/__tests__/ci-timing-github.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/daily-changelog-publication.test.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/lib/__tests__/dependabot-update-policy.test.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/lib/__tests__/dependabot-workflow-run-adapter.test.mjs": {
+      "provider-host": 1
+    },
+    "scripts/lib/__tests__/external-api-guard.test.mjs": {
+      "provider-host": 2,
+      "gh-subprocess": 6
+    },
+    "scripts/lib/__tests__/flaky-test-filing.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/fleet-rules-lookup-token.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/gh-api-hold-retry.test.mjs": {
+      "provider-host": 6
+    },
+    "scripts/lib/__tests__/github-installation-quota.test.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/lib/__tests__/golden-path-lock.test.mjs": {
+      "provider-host": 2
+    },
+    "scripts/lib/__tests__/hermetic-ci-guard.test.mjs": {
+      "provider-host": 3
+    },
+    "scripts/lib/__tests__/linear-sync-on-merge.test.mjs": {
+      "provider-host": 4
+    },
+    "scripts/lib/__tests__/main-red-eject-quota-failover.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/main-release-readiness.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/merge-group-failure-hold.test.mjs": {
+      "provider-host": 3,
+      "gh-subprocess": 2
+    },
+    "scripts/lib/__tests__/merge-group-size-bootstrap-contract.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/merge-group-victim-rearm.test.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/lib/__tests__/merge-group-workflow-contract.test.mjs": {
+      "gh-subprocess": 3
+    },
+    "scripts/lib/__tests__/merge-queue-backend.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/merge-queue-guard.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/pr-conflict-handler.test.mjs": {
+      "gh-subprocess": 5
+    },
+    "scripts/lib/__tests__/pr-size-guard-label-override.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/pr-visual-review.test.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/lib/__tests__/production-lane-range.test.mjs": {
+      "provider-host": 2
+    },
+    "scripts/lib/__tests__/production-release-supersession.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/queue-deferred-release.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/release-lineage-gate.test.mjs": {
+      "provider-host": 3
+    },
+    "scripts/lib/__tests__/remediation-detector-plans.test.mjs": {
+      "provider-host": 5
+    },
+    "scripts/lib/__tests__/rolling-ci-dispatch.test.mjs": {
+      "gh-subprocess": 9
+    },
+    "scripts/lib/__tests__/screen-proof-resolver.transport-retry.test.mjs": {
+      "gh-subprocess": 3
+    },
+    "scripts/lib/__tests__/setup-worktree-health.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/shipping-slo.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/staging-controller-supersession.test.mjs": {
+      "gh-subprocess": 4
+    },
+    "scripts/lib/__tests__/staging-generation-lineage.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/staging-receipt-fetch-real-gh.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/validation-sync.test.mjs": {
+      "provider-host": 3
+    },
+    "scripts/lib/__tests__/visual-baseline-refresh.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/__tests__/wins-ledger.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/observability-fingerprint.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/lib/preflight-failure-summary.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/merge-queue-green-enroll.test.mjs": {
+      "provider-host": 1
+    },
+    "scripts/pr-fleet-rules.test.mjs": {
+      "provider-host": 1
+    },
+    "scripts/preflight-changed.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/preflight-install.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/publish-coverage-report.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/resolve-main-sha.test.mjs": {
+      "gh-subprocess": 1
+    },
+    "scripts/schedule-trigger-guard.test.mjs": {
+      "provider-host": 1,
+      "gh-subprocess": 2
+    },
+    "scripts/verify-workflow-references.test.mjs": {
+      "gh-subprocess": 5
+    },
+    "scripts/workflow-token-budget-guard.test.mjs": {
+      "gh-subprocess": 2
+    },
+    "scripts/workflow-token-scope.test.mjs": {
+      "gh-subprocess": 10
+    }
+  }
+}

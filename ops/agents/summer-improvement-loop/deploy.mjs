@@ -11,14 +11,21 @@
 // macOS Keychain item `jovie-summer-loop-github`. Store it once, with hidden
 // input, so it never appears in a terminal:
 //   security add-generic-password -a jovie -s jovie-summer-loop-github -w
-//   node .../deploy.mjs ready | pin | run | pause | unpause | status
+//   node .../deploy.mjs ready | pin | run | pause | unpause | status | promote-wins
 //   (run `pin` after every `apply` that changes agent.md)
 //
 // Kill switch: `deploy.mjs pause` (or `ant beta:deployments pause --deployment-id <id>`)
 // stops scheduled firings; running sessions finish under their own budget cap.
 // The deployment id is stored in deployment-lock.json beside this file.
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   buildDeploymentBody,
@@ -174,6 +181,68 @@ const commands = {
     ant(['beta:deployments', 'unpause', '--deployment-id', deploymentId()], {
       inherit: true,
     });
+  },
+  /**
+   * Post-verify hop: pull Summer loop runs.jsonl from the memory store and
+   * promote measurable verifies into company wins-ledger receipts (--store).
+   * Requires SUMMER_STORE_URL + SUMMER_STORE_TOKEN in the host env.
+   */
+  'promote-wins'() {
+    const storeId = lockedId('memory_store-runs.yaml');
+    const memories = ant([
+      'beta:memory-stores:memories',
+      'list',
+      '--memory-store-id',
+      storeId,
+      '--format',
+      'jsonl',
+      '--transform',
+      '{id,path}',
+    ])
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map(line => JSON.parse(line));
+    const runsMem = memories.find(
+      m => m.path === 'runs.jsonl' || String(m.path).endsWith('runs.jsonl')
+    );
+    if (!runsMem) throw new Error('memory store has no runs.jsonl');
+    const full = antJson([
+      'beta:memory-stores:memories',
+      'retrieve',
+      '--memory-store-id',
+      storeId,
+      '--memory-id',
+      runsMem.id,
+    ]);
+    const dir = mkdtempSync(join(tmpdir(), 'summer-loop-'));
+    const runsPath = join(dir, 'runs.jsonl');
+    try {
+      writeFileSync(runsPath, full.content ?? '');
+      const repoRoot = join(LOOP_DIR, '../../..');
+      const res = spawnSync(
+        process.execPath,
+        [
+          join(repoRoot, 'scripts/wins-ledger.mjs'),
+          'summer-verify',
+          '--store',
+          '--runs',
+          runsPath,
+          '--json',
+        ],
+        {
+          cwd: repoRoot,
+          encoding: 'utf8',
+          env: process.env,
+        }
+      );
+      process.stdout.write(res.stdout || '');
+      if (res.stderr) process.stderr.write(res.stderr);
+      if (res.status !== 0)
+        throw new Error(`summer-verify exited ${res.status}`);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   },
   review() {
     // Everything a run review needs: the latest (or given) session's status,

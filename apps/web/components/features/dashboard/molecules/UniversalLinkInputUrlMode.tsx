@@ -1,10 +1,14 @@
 'use client';
 
-import { Input } from '@jovie/ui';
+import { Input, PlainButton } from '@jovie/ui';
 import { ArrowUp, Check, Mic, Sparkles, X } from 'lucide-react';
 import React from 'react';
 
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import {
+  NEUTRAL_BRAND_FALLBACK_HEX,
+  ON_BRAND_WHITE_HEX,
+} from '@/constants/platforms/brand-colors';
 import { cn } from '@/lib/utils';
 import { contrastRatio, isBrandDark } from '@/lib/utils/color';
 import { type DetectedLink } from '@/lib/utils/platform-detection';
@@ -116,13 +120,13 @@ export function UniversalLinkInputUrlMode({
 }: UniversalLinkInputUrlModeProps) {
   const brandColor = detectedLink?.platform.color
     ? `#${detectedLink.platform.color}`
-    : '#6b7280';
+    : `#${NEUTRAL_BRAND_FALLBACK_HEX}`;
 
   const isDarkBrand = isBrandDark(brandColor);
   // Use WCAG 3:1 contrast ratio for text-on-brand-bg color selection
-  const useWhiteIcon = contrastRatio('#ffffff', brandColor) >= 3;
-  const iconColor = useWhiteIcon ? '#ffffff' : brandColor;
-  const iconBg = isDarkBrand ? 'rgba(255,255,255,0.08)' : `${brandColor}15`;
+  const useWhiteIcon = contrastRatio(`#${ON_BRAND_WHITE_HEX}`, brandColor) >= 3;
+  const iconColor = useWhiteIcon ? `#${ON_BRAND_WHITE_HEX}` : brandColor;
+  const iconBg = isDarkBrand ? undefined : `${brandColor}15`;
 
   const isDictationOpen = dictationState !== 'idle';
   const keyboardHint = '⌘/Ctrl + Shift + M';
@@ -176,7 +180,7 @@ export function UniversalLinkInputUrlMode({
 
         <div className='flex items-center gap-1 pr-1'>
           {voiceInputEnabled && (
-            <button
+            <PlainButton
               type='button'
               onClick={onVoiceInput}
               className='flex h-10 w-10 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
@@ -189,12 +193,15 @@ export function UniversalLinkInputUrlMode({
               aria-keyshortcuts='Control+Shift+M Meta+Shift+M'
             >
               <Mic className='h-4 w-4' />
-            </button>
+            </PlainButton>
           )}
 
           {url && detectedLink && (
             <div
-              className='flex h-8 w-8 items-center justify-center rounded-lg sm:h-6 sm:w-6 sm:rounded-full'
+              className={cn(
+                'flex h-8 w-8 items-center justify-center rounded-lg sm:h-6 sm:w-6 sm:rounded-full',
+                isDarkBrand && 'bg-surface-2'
+              )}
               style={{
                 backgroundColor: iconBg,
                 color: iconColor,
@@ -209,17 +216,17 @@ export function UniversalLinkInputUrlMode({
           )}
 
           {url && (
-            <button
+            <PlainButton
               type='button'
               onClick={onClear}
-              className='flex h-9 w-9 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+              className='flex h-10 w-10 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
               aria-label='Clear Input'
             >
               <X className='h-4 w-4' />
-            </button>
+            </PlainButton>
           )}
 
-          <button
+          <PlainButton
             type='button'
             onClick={onSubmit}
             disabled={disabled || !canSubmit}
@@ -227,7 +234,7 @@ export function UniversalLinkInputUrlMode({
             aria-label='Submit'
           >
             <ArrowUp className='h-4 w-4' />
-          </button>
+          </PlainButton>
         </div>
       </div>
 
@@ -243,14 +250,14 @@ export function UniversalLinkInputUrlMode({
         <div className='rounded-xl border border-(--app-shell-frame-seam) bg-surface-1 px-3 py-2'>
           {dictationState === 'listening' ? (
             <div className='flex items-center gap-2'>
-              <button
+              <PlainButton
                 type='button'
                 onClick={onCancelVoiceRecording}
-                className='flex h-9 w-9 items-center justify-center rounded-lg text-tertiary-token transition-colors hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+                className='flex h-10 w-10 items-center justify-center rounded-lg text-tertiary-token transition-colors hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
                 aria-label='Cancel Voice Recording'
               >
                 <X className='h-4 w-4' />
-              </button>
+              </PlainButton>
               <div className='flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg border border-(--app-shell-frame-seam) bg-surface-0 px-3 py-2'>
                 <div className='flex min-w-0 items-center gap-3'>
                   <VoiceRecordingWaveform levels={waveformLevels} />
@@ -262,14 +269,14 @@ export function UniversalLinkInputUrlMode({
                   {recordingDurationLabel}
                 </span>
               </div>
-              <button
+              <PlainButton
                 type='button'
                 onClick={onSendVoiceRecording}
-                className='flex h-9 w-9 items-center justify-center rounded-lg bg-secondary-token text-primary-inverse transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+                className='flex h-10 w-10 items-center justify-center rounded-lg bg-secondary-token text-primary-inverse transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
                 aria-label='Send Voice Recording'
               >
                 <Check className='h-4 w-4' />
-              </button>
+              </PlainButton>
             </div>
           ) : null}
 
@@ -293,13 +300,13 @@ export function UniversalLinkInputUrlMode({
                 We could not access your microphone. Allow microphone access and
                 try again.
               </p>
-              <button
+              <PlainButton
                 type='button'
                 onClick={onDismissPermissionError}
                 className='rounded-md px-2 py-1 text-sm font-medium text-primary-token transition-colors hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
               >
                 Dismiss
-              </button>
+              </PlainButton>
             </div>
           ) : null}
 

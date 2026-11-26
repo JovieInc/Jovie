@@ -8,6 +8,7 @@ import type { Artist } from '@/types/db';
 export interface SettingsProfileSectionProps {
   readonly artist: Artist;
   readonly avatarQuality?: AvatarQuality;
+  readonly presentation?: 'page' | 'drawer';
   readonly onArtistUpdate?: (updatedArtist: Artist) => void;
   readonly onRefresh: () => void;
 }
@@ -22,4 +23,4 @@ export type ProfileFormData = Pick<
   | 'hometown'
   | 'careerHighlights'
   | 'targetPlaylists'
->;
+> & { bio: string };

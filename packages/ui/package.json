@@ -1,6 +1,6 @@
 {
   "name": "@jovie/ui",
-  "version": "26.11.4",
+  "version": "26.11.5",
   "private": true,
   "sideEffects": [
     "*.css"
@@ -14,6 +14,7 @@
     ".": "./index.ts",
     "./atoms/*": "./atoms/*",
     "./brand": "./brand/index.ts",
+    "./brand/OStroke": "./brand/OStroke.tsx",
     "./brand/geometry.gen": "./brand/geometry.gen.ts",
     "./brand/jovie-o-geometry": "./brand/jovie-o-geometry.ts",
     "./brand/*": "./brand/*",

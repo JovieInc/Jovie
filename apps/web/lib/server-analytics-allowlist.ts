@@ -304,6 +304,11 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     events: ['claim_started'],
   },
   {
+    path: 'app/api/dashboard/first-ready/route.ts',
+    invocations: 1,
+    events: ['first_dashboard_ready'],
+  },
+  {
     path: 'lib/analytics/signup-funnel.server.ts',
     invocations: 1,
     events: ['funnel_step'],

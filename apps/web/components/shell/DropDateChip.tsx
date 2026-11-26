@@ -49,7 +49,7 @@ export function DropDateChip({ label, tone, className }: DropDateChipProps) {
         <Calendar
           className={cn(
             'h-2.5 w-2.5',
-            isSoon ? 'text-cyan-300/80' : 'text-quaternary-token'
+            isSoon ? 'text-accent-text/80' : 'text-quaternary-token'
           )}
           strokeWidth={2.25}
         />

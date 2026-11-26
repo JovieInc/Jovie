@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { X } from 'lucide-react';
 import Image from 'next/image';
 import { type CSSProperties } from 'react';
@@ -89,7 +90,7 @@ export function EntityChip({
       )}
       <span className='min-w-0 truncate'>{data.label}</span>
       {onRemove ? (
-        <button
+        <PlainButton
           type='button'
           aria-label={removeLabel ?? `Remove ${data.label}`}
           onMouseDown={event => {
@@ -102,7 +103,7 @@ export function EntityChip({
           className='system-b-entity-chip-remove'
         >
           <X className='h-3 w-3' />
-        </button>
+        </PlainButton>
       ) : null}
     </span>
   );

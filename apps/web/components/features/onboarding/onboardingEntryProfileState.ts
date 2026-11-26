@@ -28,6 +28,7 @@ export function buildEntryProfileBuilderState(
       genres: entryProfile.genres,
     },
     artistConfirmed: false,
+    handleConfirmed: false,
     handle: entryProfile.handle,
     socialLinks: entryProfile.socialLinks,
   };

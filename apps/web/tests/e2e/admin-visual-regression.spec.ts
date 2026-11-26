@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Locator, test } from '@playwright/test';
 import {
   ensureSignedInUser,
   getAdminCredentials,
@@ -9,8 +9,11 @@ import {
   ADMIN_MOBILE_SNAPSHOT_SURFACES,
   ADMIN_RENDER_SURFACES,
   type AdminSurfaceDescriptor,
+  getAdminDesktopSnapshotName,
   getAdminSurfaceSelector,
 } from './utils/admin-surface-manifest';
+import { freshShippingProjection } from './utils/admin-visual-shipping-fixture';
+import { expectCaptureReady } from './utils/visual-capture-ready';
 
 const DESKTOP_VIEWPORT = { width: 1440, height: 1100 } as const;
 const MOBILE_VIEWPORT = { width: 390, height: 844 } as const;
@@ -329,6 +332,37 @@ async function registerAdminVisualStubs(page: import('@playwright/test').Page) {
     )
   );
 
+  // Ovie Home leads with the revenue blocker read from the cached company
+  // snapshot. CI has no snapshot, so the real route answers 503 and Home shows
+  // "Revenue state unavailable"; pin one fixed blocker instead.
+  await page.route('**/api/ovie/home/blocker', route =>
+    route.fulfill(
+      jsonResponse({
+        blocker: {
+          schema: 'jovie.company-blocker/v1',
+          id: 'funnel:paid',
+          kind: 'funnel',
+          step: 'paid',
+          tone: 'warn',
+          text: 'No artist has paid yet.',
+          detailsHref: '/app/admin/product',
+          since: null,
+          nextAction: null,
+          observedAt: '2099-01-01T12:00:00.000Z',
+        },
+        generatedAt: '2099-01-01T12:00:00.000Z',
+      })
+    )
+  );
+
+  // Shipping and Ops read the delivery projection the fleet host publishes.
+  // CI has no fleet host, so the card reads "Disconnected" with source gaps.
+  // Answer one fresh, connected projection, stamped when the page asks so its
+  // relative times stay small and stable.
+  await page.route('**/api/hud/shipping-state**', route =>
+    route.fulfill(jsonResponse(freshShippingProjection()))
+  );
+
   await page.route('**/api/admin/investors/settings', route =>
     route.fulfill(
       jsonResponse({
@@ -368,6 +402,50 @@ async function openSurface(
   return locator;
 }
 
+/** The section a deep link expanded, scrolled into view for the snapshot. */
+async function openedAccordion(
+  page: import('@playwright/test').Page,
+  title: string
+) {
+  const toggle = page.getByRole('button', { name: title, exact: true });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true', {
+    timeout: 30_000,
+  });
+  const section = toggle.locator('xpath=..');
+  await section.scrollIntoViewIfNeeded();
+  return section;
+}
+
+/**
+ * Help copy that names an error word without being an error. Keep each
+ * pattern to the one sentence it allows.
+ */
+const CAPTURE_ALLOWED_COPY: Readonly<Record<string, readonly RegExp[]>> = {
+  'share-studio': [/when native file\s+share is unavailable/i],
+};
+
+async function expectOvieRouteControls(root: Locator, id: string) {
+  if (id === 'shipping') {
+    const history = root.getByRole('region', { name: 'Source Merge History' });
+    const work = root.getByTestId('shipping-matrix');
+    await expect(history).toBeVisible();
+    await expect(work).toBeVisible();
+    expect((await history.boundingBox())?.y).toBeLessThan(
+      (await work.boundingBox())?.y ?? 0
+    );
+  }
+  if (id === 'costs') {
+    const capacity = root.getByRole('link', { name: 'View capacity' });
+    await expect(capacity).toBeVisible();
+    await expect(capacity).toHaveAttribute('href', '/app/ov/capacity');
+  }
+  if (id === 'inbox') {
+    const inbox = root.getByTestId('ovie-inbox');
+    await expect(inbox.getByRole('heading', { name: 'Inbox' })).toHaveCount(0);
+    await expect(inbox.getByRole('button', { name: 'Refresh' })).toBeVisible();
+  }
+}
+
 test.describe('admin visual regression', () => {
   test.beforeEach(async ({ page }) => {
     test.skip(!hasAdminCredentials(), 'Admin auth not available');
@@ -384,10 +462,17 @@ test.describe('admin visual regression', () => {
 
   for (const surface of ADMIN_RENDER_SURFACES) {
     test(`${surface.name} desktop`, async ({ page }) => {
-      const locator = await openSurface(page, surface, DESKTOP_VIEWPORT);
+      const root = await openSurface(page, surface, DESKTOP_VIEWPORT);
+      await expectOvieRouteControls(root, surface.id);
+      const locator = surface.snapshotAccordion
+        ? await openedAccordion(page, surface.snapshotAccordion)
+        : root;
 
+      await expectCaptureReady(locator, {
+        allowCopy: CAPTURE_ALLOWED_COPY[surface.id],
+      });
       await expect(locator).toHaveScreenshot(
-        `${surface.snapshotSlug}-desktop.png`
+        getAdminDesktopSnapshotName(surface)
       );
     });
   }
@@ -395,7 +480,11 @@ test.describe('admin visual regression', () => {
   for (const surface of ADMIN_MOBILE_SNAPSHOT_SURFACES) {
     test(`${surface.name} mobile`, async ({ page }) => {
       const locator = await openSurface(page, surface, MOBILE_VIEWPORT);
+      await expectOvieRouteControls(locator, surface.id);
 
+      await expectCaptureReady(locator, {
+        allowCopy: CAPTURE_ALLOWED_COPY[surface.id],
+      });
       await expect(locator).toHaveScreenshot(
         `${surface.snapshotSlug}-mobile.png`
       );

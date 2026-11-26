@@ -35,7 +35,7 @@ export const TAB_BAR_SEGMENT_TRIGGER_ACTIVE_CLASSNAME =
   'bg-surface-0 font-semibold text-primary-token';
 
 const TAB_BAR_SEGMENT_OVERFLOW_TRIGGER_CLASSNAME =
-  'h-8 w-8 sm:before:h-8 sm:before:w-8';
+  'h-7 w-7 sm:before:h-7 sm:before:w-7';
 
 const TAB_BAR_OVERFLOW_TRIGGER_CLASSNAME_BY_VARIANT = {
   drawer: undefined,

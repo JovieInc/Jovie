@@ -1,7 +1,9 @@
 'use client';
 
-import { Loader2, Pause, Play } from 'lucide-react';
+import { PlainButton } from '@jovie/ui';
+import { Loader2, Pause } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
+import { PlayIcon } from '@/components/atoms/PlayIcon';
 import { SeekBar } from '@/components/atoms/SeekBar';
 import { toast } from '@/components/feedback';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
@@ -105,14 +107,13 @@ export function SmartLinkAudioPreview({
   return (
     <div className='space-y-1.5' data-testid='smart-link-audio-preview'>
       <div className='flex min-h-10 items-center gap-2.5'>
-        <button
-          type='button'
+        <PlainButton
           onClick={handleToggle}
           aria-label={statusLabel}
           aria-pressed={isPlaying}
           aria-busy={isLoading || undefined}
           disabled={isLoading}
-          className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/90 text-black dark:text-black transition-colors duration-fast hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70 disabled:opacity-70'
+          className='relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full before:absolute before:left-1/2 before:top-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 bg-on-media/90 text-ink-on-media transition-colors duration-fast hover:bg-on-media focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-on-media/70 disabled:opacity-70'
         >
           {isLoading ? (
             <Loader2
@@ -123,9 +124,9 @@ export function SmartLinkAudioPreview({
           ) : isPlaying ? (
             <Pause className='h-3.5 w-3.5' aria-hidden='true' />
           ) : (
-            <Play className='h-3.5 w-3.5 translate-x-px' aria-hidden='true' />
+            <PlayIcon size={14} aria-hidden='true' />
           )}
-        </button>
+        </PlainButton>
 
         <div className='min-w-0 flex-1 space-y-1'>
           <div className='flex h-4 items-center'>

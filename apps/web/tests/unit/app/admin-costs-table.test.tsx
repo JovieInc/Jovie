@@ -19,7 +19,7 @@ describe('CostsTable', () => {
     expect(screen.getByTestId('admin-costs-table')).toBeInTheDocument();
     expect(screen.getByRole('table')).toHaveAttribute(
       'data-table-row-mode',
-      'description'
+      'dense'
     );
     expect(
       screen.getByText(

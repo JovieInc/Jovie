@@ -87,7 +87,7 @@ extension of the input.
 | `--noir-ion-ultra` / pulse / mint / orange / red | lock hexes | `#A982FF` / `#FF48D2` / `#39E58C` / `#FFC857` / `#FF677D` | **Lock** |
 | aqua / gold / flare | alias mint / orange / red | distinct 7th–9th hues | **Lock** |
 | Light `--color-accent` | ion `#11AFFF` | `#7170FF` then `#1F7BF5` | **Lock** |
-| `--linear-accent-blue` | marketing System A | `#2563ff` | **Conflict** (held) |
+| `--linear-accent-blue` | retired → `--color-accent-blue` ion | was `#2563ff` | **Resolved** (Drift T1.2 unify-ion) |
 | Scene `uiAnchor` | product UI hex `#11AFFF` | old `#11AFFF` family | **Lock** (scene refs stay) |
 | Brand-kit `PALETTE.feature` | 6 accents | 7 hues including Aqua | **Lock** |
 
@@ -95,7 +95,7 @@ extension of the input.
 
 | Atom | Lock | React before this PR | Status |
 |---|---|---|---|
-| iOS `JovieActionButtonMetrics` | native 32 / 510 / r999 | 32 / 510 / 999 | **Native** (web KEEP is 28) |
+| iOS `JovieActionButtonMetrics` | KEEP 28/44/510/r999 | 28/44/510/999 | **Match** (Chat 32) |
 | `--font-weight-medium` | 510 | 510 | **Match** |
 | Button `rounded-full` | r999 | `rounded-full` / `--radius-full` 9999px | **Match** |
 | `packages/ui` Button `sm`/`md`/`lg`/`marketing` | 28 visible / 44 mobile hit | `h-7` + 44px `::before` | **Lock** |
@@ -128,15 +128,15 @@ extension of the input.
 
 ## Tim KEEP conflicts (not picked)
 
-- **C1** Aug-22 palette-core-accents vs noir-ion — marketing
-  `--linear-accent-blue: #2563ff` and homepage / waitlist copies stay.
-  Do not rewrite homepage.
+- **C1** Aug-22 palette-core-accents vs noir-ion — **resolved** Drift T1.2
+  unify-ion: `--linear-accent*` / `--linear-info*` / btn+pricing accent defs
+  deleted; consumers use System B ion `#11AFFF`. Homepage not rewritten.
 - **C3** homepage JOV-5092 vs #17055 / `#17156` HOLD — homepage not rewritten.
 - **C4** full dual-token architecture — `linear-tokens.css` not deleted.
   Wholesale namespace collapse is blocked on Tim.
 
-C2 (ActionButton 32-in-44 vs 32/510) is superseded by the 2026-09-10 KEEP:
-web ActionButton is 28 / 44 mobile / 510 / 999.
+C2 (ActionButton 32-in-44 vs 32/510) is superseded by KEEP + sync-28:
+web/iOS ActionButton are 28/44/510/999; Chat face stays 32.
 
 Other leftovers: shell carbon ladder; `--color-info` = mint after aqua→mint;
 light ion-on-light surfaces below 3:1 (KEEP — do not invent a darker ion);

@@ -1,0 +1,55 @@
+{
+  "gates": {
+    "apps/web/components/features/admin/feedback-table/AdminFeedbackTable.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/DashboardAudienceWorkspace.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/AudienceTableLoadingShell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/DashboardAudienceTableUnified.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/admin/feedback-table/AdminFeedbackTable.tsx": {
+      "loading": "The table receives items the admin page already loaded on the server and renders no loading face of its own."
+    },
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/AudienceTableLoadingShell.tsx": {
+      "empty": "The shell is the loading face of the Audience table and owns no collection that could be empty.",
+      "long-content": "The shell takes no props and draws fixed skeleton bars, so there is no caller text that could grow.",
+      "offline": "The shell never fetches or mutates and takes no props; the real offline handling lives in the table that replaces it."
+    },
+    "apps/web/components/features/dashboard/organisms/dashboard-audience-table/DashboardAudienceTableUnified.tsx": {
+      "loading": "The table receives rows its page already loaded; the loading face is AudienceTableLoadingShell, which has its own states story.",
+      "error": "The table has no error view: a failed member removal or copy only raises toast.error in the app-wide toaster, outside the table surface.",
+      "offline": "The table has no offline view: its fetch calls (remove member, source link) report failures through toast.error, outside the table surface."
+    }
+  }
+}

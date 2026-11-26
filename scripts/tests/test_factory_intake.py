@@ -29,7 +29,7 @@ class FakeLinear:
 
     def gql(self, query, variables):
         if query == fi.TEAM:
-            return {"teams": {"nodes": [{"id": "t", "states": {"nodes": [{"id": "todo", "name": "Todo"}]},
+            return {"teams": {"nodes": [{"id": "t", "states": {"nodes": [{"id": "todo", "name": "Todo"}, {"id": "backlog", "name": "Backlog"}]},
                                          "labels": {"nodes": [{"id": "l-factory", "name": "factory"}]}}]}}
         if query == fi.EXISTING:
             return {"issues": {"nodes": [{"id": "x", "identifier": "JOV-1"}] if variables["l"] in self.existing else []}}
@@ -89,7 +89,7 @@ class FactoryIntakeTest(unittest.TestCase):
         out = fi.apply(linear, items, limit=2)
         self.assertEqual([r["action"] for r in out], ["exists", "filed", "filed", "deferred", "deferred"])
         self.assertEqual(len(linear.created), 2)
-        self.assertEqual(linear.created[0]["stateId"], "todo")
+        self.assertEqual(linear.created[0]["stateId"], "backlog", "filed in Backlog: admission promotes it")
         self.assertIn("ws:symphony-throughput", linear.labels)
 
     def test_read_signals_reports_bad_files_and_run_pass_never_raises(self):

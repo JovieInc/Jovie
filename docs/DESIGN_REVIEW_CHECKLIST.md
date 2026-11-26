@@ -7,6 +7,14 @@ Uncovered forms / overflow / media / l10n / browser / a11y checks live in
 [`.agents/skills/gstack/design-review/references/web-interface-gaps.md`](../.agents/skills/gstack/design-review/references/web-interface-gaps.md).
 Do not invoke `web-design-guidelines` as a parallel skill.
 
+## Review findings encoding
+
+Findings from this checklist, PR reviews and audits must be classified —
+token | component/variant | deterministic lint | visual regression/Storybook |
+env/preview fixture | doc last — and encoded in the same or a linked PR, with
+the finding logged in the ledger at `apps/web/review-findings/`. See
+[REVIEW_FINDINGS_ENCODING.md](./design-system/REVIEW_FINDINGS_ENCODING.md).
+
 ## Rendered page review
 
 Use the existing marketing-factory visual review and its

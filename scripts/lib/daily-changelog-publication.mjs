@@ -6,12 +6,12 @@ import {
   DAILY_SOURCE_SCHEMA,
   evaluateDailyWindow,
   extractDailyReceipts,
-  insertDailyDigest,
   isSafeActionHref,
   processedDailySourceIds,
   renderDailyDigest,
 } from './daily-changelog.mjs';
 import { hasRequiredAuthSmoke } from './daily-changelog-evidence.mjs';
+import * as receipts from './daily-changelog-receipts.mjs';
 
 export const NOTE_SCHEMA = 'customer-changelog/v1';
 const NOTE_RE = /<!--\s*customer-changelog\/v1\s+([\s\S]*?)\s*-->/g;
@@ -614,7 +614,7 @@ export function planDailyPublication({
   }
   result.receipt.stories = result.stories;
   result.receipt.publicationHead = marker.sha;
-  result.receipt.audit = audit;
+  result.receipt.auditCounts = receipts.countAuditReasons(audit);
   result.receipt.deferred = deferred;
   result.receipt.pending = audit
     .filter(item => item.reason === 'unavailable')
@@ -630,7 +630,7 @@ export function planDailyPublication({
     : 'publish';
   const block = status === 'publish' ? renderDailyDigest(result) : '';
   const content = block
-    ? insertDailyDigest(markdown, block, windowKey)
+    ? receipts.insertCompactedDigest(markdown, block, windowKey)
     : markdown;
   return {
     status,

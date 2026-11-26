@@ -286,8 +286,16 @@ describe('claim verification review', () => {
     expect(mocks.state.updates[1]).toMatchObject({
       spotifyId: '06HL4z0CvFAxyc27GXpf02',
     });
-    expect(mocks.invalidateProfileCache).toHaveBeenCalledWith('famousartist');
-    expect(mocks.invalidateProfileCache).toHaveBeenCalledWith('requester');
+    expect(mocks.invalidateProfileCache).toHaveBeenCalledWith(
+      'famousartist',
+      null,
+      { privacyChanged: true }
+    );
+    expect(mocks.invalidateProfileCache).toHaveBeenCalledWith(
+      'requester',
+      null,
+      { privacyChanged: true }
+    );
   });
 
   it('approve never takes over a claimed, held or reserved identity', async () => {

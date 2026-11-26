@@ -24,27 +24,29 @@ import {
   SIDEBAR_ENTRY_ICON_SLOT_CLASS,
   SIDEBAR_ENTRY_LABEL_INSET_CLASS,
 } from './sidebar-optical';
+import {
+  getSidebarThreadAccessibleStatus,
+  getSidebarThreadStatus,
+  isTimestampAfter,
+  type ThreadStatus,
+} from './sidebar-thread-status';
 import { observeSidebarThreadTitle } from './sidebar-thread-title-observer';
 import { SEAM_BOUNDARY_SELECTOR, Tooltip } from './Tooltip';
+
+export {
+  getSidebarThreadAccessibleStatus,
+  getSidebarThreadStatus,
+  isTimestampAfter,
+  readThreadReadState,
+  THREAD_READ_STORAGE_KEY,
+  type ThreadStatus,
+  writeThreadReadState,
+} from './sidebar-thread-status';
 
 // Chat list types — co-located so consumers import from one place. Production
 // adapters should map real conversation records into this flat shell contract.
 
-export type ThreadStatus = 'running' | 'complete' | 'errored';
 export type SidebarThreadListState = 'idle' | 'loading' | 'error';
-export const THREAD_READ_STORAGE_KEY = 'jovie:sidebar-thread-read-at';
-
-const IN_PROGRESS_CHAT_TURN_STATUSES = new Set([
-  'reserved',
-  'running',
-  'streaming',
-]);
-const FAILED_CHAT_TURN_STATUSES = new Set([
-  'failed_tool_unavailable',
-  'failed_model_error',
-  'failed_timeout',
-  'failed_network',
-]);
 
 export interface SidebarThread {
   readonly id: string;
@@ -78,65 +80,6 @@ export interface SidebarThreadsSectionProps {
   readonly tight?: boolean;
   // `collapsed` hides the section entirely (sidebar icon mode).
   readonly collapsed: boolean;
-}
-
-export function getSidebarThreadStatus(
-  latestTurnStatus: string | null | undefined
-): ThreadStatus {
-  if (!latestTurnStatus) {
-    return 'complete';
-  }
-
-  if (IN_PROGRESS_CHAT_TURN_STATUSES.has(latestTurnStatus)) {
-    return 'running';
-  }
-
-  if (FAILED_CHAT_TURN_STATUSES.has(latestTurnStatus)) {
-    return 'errored';
-  }
-
-  return 'complete';
-}
-
-export function readThreadReadState(): Record<string, string> {
-  try {
-    const stored = globalThis.localStorage?.getItem(THREAD_READ_STORAGE_KEY);
-    if (!stored) return {};
-    const parsed = JSON.parse(stored) as unknown;
-    if (!parsed || typeof parsed !== 'object') return {};
-
-    return Object.fromEntries(
-      Object.entries(parsed as Record<string, unknown>).filter(
-        (entry): entry is [string, string] => typeof entry[1] === 'string'
-      )
-    );
-  } catch {
-    return {};
-  }
-}
-
-export function writeThreadReadState(value: Record<string, string>): void {
-  try {
-    globalThis.localStorage?.setItem(
-      THREAD_READ_STORAGE_KEY,
-      JSON.stringify(value)
-    );
-  } catch {
-    // Storage can be unavailable in restricted browsers; row state still works.
-  }
-}
-
-export function isTimestampAfter(
-  candidate: string | null | undefined,
-  baseline: string | null | undefined
-): boolean {
-  if (!candidate) return false;
-  if (!baseline) return true;
-  const candidateMs = Date.parse(candidate);
-  const baselineMs = Date.parse(baseline);
-  return Number.isFinite(candidateMs) && Number.isFinite(baselineMs)
-    ? candidateMs > baselineMs
-    : candidate > baseline;
 }
 
 export function toSidebarThread(
@@ -234,6 +177,13 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
     return observeSidebarThreadTitle(title, measureTitle);
   }, [measureTitle, thread.title, unread, active, calm, tight]);
 
+  const accessibleStatus = getSidebarThreadAccessibleStatus(
+    thread.status,
+    unread
+  );
+  const rowAccessibleName = accessibleStatus
+    ? `${thread.title}, ${accessibleStatus}`
+    : undefined;
   const rowClasses = cn(
     getSidebarNavRowClassName({
       active,
@@ -250,9 +200,13 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
   const rowContent = (
     <>
       <span className={SIDEBAR_ENTRY_ICON_SLOT_CLASS}>
+        {/* JOV-14005 A: keep semantic status micro-dot visible in calm + dense.
+            Accessible status phrase lives on the control name, not inside the
+            paint-only dot (dot must not be the only decision cue). */}
         <span
+          aria-hidden='true'
           className={cn(
-            calm ? 'sr-only' : 'h-1.5 w-1.5 rounded-full',
+            'h-1.5 w-1.5 rounded-full',
             thread.status === 'running'
               ? 'bg-accent/85 anim-calm-breath'
               : thread.status === 'errored'
@@ -304,6 +258,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
           <Link
             href={thread.href}
             prefetch={false}
+            aria-label={rowAccessibleName}
             aria-current={active ? 'page' : undefined}
             className={rowClasses}
             onContextMenu={e => onThreadContextMenu?.(e, thread)}
@@ -316,6 +271,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
             variant='ghost'
             onClick={() => onSelect?.(thread.id)}
             onContextMenu={e => onThreadContextMenu?.(e, thread)}
+            aria-label={rowAccessibleName}
             aria-pressed={active}
             className={rowClasses}
           >

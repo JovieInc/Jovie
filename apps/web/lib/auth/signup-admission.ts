@@ -17,12 +17,14 @@ import { users } from '@/lib/db/schema/auth';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { isProdcertCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 import { getEmailDomain, normalizeEmail } from '@/lib/utils/email';
+import { isPublicSignupClosed } from '@/lib/waitlist/public-signup-gate';
 
 /**
- * Public account creation stays closed, across OTP and OAuth alike. This hook
- * runs only for new Better Auth identities; existing-user sign-in is unchanged.
- * Recipient ownership must already be proven by Better Auth's OTP/provider.
- * The issued invitation remains subject to token redemption after sign-in.
+ * New-account admission gate for Better Auth (`user.create.before`).
+ * Recipient ownership must always be proven by Better Auth's OTP/provider.
+ * While `PUBLIC_SIGNUP_CLOSED` is false (canon/PRODUCT.md, 2026-11-09), any
+ * verified email may create an account; setting `FEATURE_PUBLIC_SIGNUP_CLOSED=true`
+ * activates the invite-only kill switch.
  */
 export async function assertNewAccountAdmission(user: {
   email: string;
@@ -60,6 +62,8 @@ export async function assertNewAccountAdmission(user: {
     console.info(`[auth] dogfood account admitted ${JSON.stringify(dogfood)}`);
     return;
   }
+
+  if (!isPublicSignupClosed()) return;
 
   // Never use the cached post-auth gate here: pending/noncanonical entries,
   // expired/redeemed invitations and revoked approval cannot admit a user.

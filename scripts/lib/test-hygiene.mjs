@@ -1,7 +1,7 @@
 // Static test-hygiene rules for slop mutation testing can't see (2026-11-15 sweep): a test that can never fail, never runs,
 // or only checks its own mocks still scores as coverage. Pure: path and text in, findings out.
 import ts from 'typescript';
-
+import * as landmines from './test-hygiene-landmines.mjs';
 export const RULES = Object.freeze({
   focused: 'focused test (only modifier, fit, fdescribe) left in',
   skipped:
@@ -21,10 +21,11 @@ export const RULES = Object.freeze({
   'over-mocked':
     'a vi.mock beyond the 8th in one file: the test mostly checks its own mocks',
 });
-
 /** Rules with no baseline: any finding fails. */
-export const ZERO_TOLERANCE = Object.freeze(['focused']);
-
+export const ZERO_TOLERANCE = Object.freeze([
+  'focused',
+  ...landmines.LANDMINE_ZERO_TOLERANCE,
+]);
 const TEST_FNS = new Set(['it', 'test']);
 const SUITE_FNS = new Set(['describe', 'suite']);
 // Members that keep test(...) one test; test.describe, test.step and hooks are not tests of their own.
@@ -183,20 +184,16 @@ function isAwaitedOrReturned(call) {
   );
 }
 
-/** Facts about one test body. */
-function scanTest(fn, helpers) {
-  const facts = {
-    expects: [],
-    asserts: 0,
-    sleeps: [],
-    unawaited: 0,
-  };
+/** Facts about one test body. Under fake timers, a timer callback runs when the test advances time. */
+function scanTest(fn, helpers, fakeTimers = false) {
+  const facts = { expects: [], asserts: 0, sleeps: [], unawaited: 0 };
   const visit = (node, deferredBy) => {
     if (ts.isCallExpression(node)) {
       const e = readExpect(node);
       if (e) {
         facts.expects.push(e);
-        if (deferredBy) facts.unawaited += 1;
+        if (deferredBy && !(deferredBy === 'timer' && fakeTimers))
+          facts.unawaited += 1;
       } else {
         const path = calleePath(node.expression);
         const root = path[0] ?? '';
@@ -227,7 +224,8 @@ function scanTest(fn, helpers) {
               (name === 'setTimeout' || name === 'setInterval'))) &&
           !isAwaitedOrReturned(node)
         ) {
-          for (const arg of node.arguments) visit(arg, true);
+          for (const arg of node.arguments)
+            visit(arg, name === 'then' ? 'then' : 'timer');
           visit(node.expression, deferredBy);
           return;
         }
@@ -400,7 +398,10 @@ export function scanTestFile(file, text, { unit = true } = {}) {
           members.every(member => LEAF_MEMBERS.has(member)) &&
           fn;
         if (isLeafTest) {
-          for (const rule of classify(scanTest(fn, helpers), imports)) {
+          for (const rule of classify(
+            scanTest(fn, helpers, fakeTimers),
+            imports
+          )) {
             if (rule === 'real-sleep' && fakeTimers) continue;
             findings.push({ rule, line: line(node), name });
           }
@@ -412,6 +413,7 @@ export function scanTestFile(file, text, { unit = true } = {}) {
   visit(source);
   for (let n = MOCK_BUDGET + 1; n <= mocks; n++)
     findings.push({ rule: 'over-mocked', line: 1, name: `vi.mock #${n}` });
+  findings.push(...landmines.landmineFindings(file, source, line));
   return findings;
 }
 

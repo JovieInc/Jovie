@@ -16,6 +16,11 @@ describe('ArtistProfileAdaptiveSection', () => {
     const root = screen.getByTestId('marketing-section-feature-split');
     expect(root).toHaveAttribute('data-marketing-variant', 'phone-right');
     expect(root).toHaveAttribute('data-marketing-occurrence', 'adaptive');
+    // Live LP embeds ModeSwitcher in the hero; this owner stays for Storybook.
+    expect(root).toHaveAttribute(
+      'data-marketing-owner',
+      'apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSection.tsx'
+    );
     expect(container.querySelector('#adaptive')).toBe(root);
     expect(
       within(root).getByRole('tablist', { name: 'Profile Modes' })

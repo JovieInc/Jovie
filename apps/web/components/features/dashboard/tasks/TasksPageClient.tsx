@@ -490,7 +490,7 @@ const TaskMetaTrigger = forwardRef<
       ref={ref}
       type='button'
       className={cn(
-        '-mx-1 relative inline-flex h-8 min-w-0 items-center rounded-full px-2 text-secondary-token transition-[background-color,color] duration-subtle before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,transparent)] hover:text-primary-token data-[state=open]:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,transparent)] data-[state=open]:text-primary-token sm:before:h-8 sm:before:min-w-0',
+        '-mx-2 relative inline-flex h-7 min-w-0 items-center rounded-full px-2 text-secondary-token transition-[background-color,color] duration-subtle before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,transparent)] hover:text-primary-token data-[state=open]:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,transparent)] data-[state=open]:text-primary-token sm:before:h-7 sm:before:min-w-0',
         className
       )}
       {...props}

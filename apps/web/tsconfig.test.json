@@ -7,12 +7,19 @@
   "include": [
     "tests/**/*.ts",
     "tests/**/*.tsx",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
     "scripts/**/*.ts",
     "drizzle.config.ts",
     "dangerfile.ts"
   ],
   "exclude": [
     "node_modules",
+    ".storybook/**",
+    "data/**",
+    "eslint-rules/**",
     "tests/e2e/**",
     "tests/eval/**",
     "tests/audit/**",

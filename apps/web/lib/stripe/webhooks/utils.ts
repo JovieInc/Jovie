@@ -194,12 +194,12 @@ export async function getUserIdFromStripeCustomer(
   // Let DB errors propagate so the webhook returns 5xx and Stripe retries.
   // Only return null for a genuine "user not found" (no matching row).
   const [user] = await db
-    .select({ clerkId: users.clerkId })
+    .select({ id: users.id, clerkId: users.clerkId })
     .from(users)
     .where(eq(users.stripeCustomerId, stripeCustomerId))
     .limit(1);
 
-  return user?.clerkId || null;
+  return user?.clerkId || user?.id || null;
 }
 
 /**

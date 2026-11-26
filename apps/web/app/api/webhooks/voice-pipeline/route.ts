@@ -9,6 +9,7 @@
  * - HMAC-SHA256 signature verification (ELEVENLABS_WEBHOOK_SECRET)
  *   using timingSafeEqual. Header: `elevenlabs-signature` (or override via env).
  * - Dedupe via acquireRecentDispatch (Redis-backed 60s lock per event id).
+ * - Require a stable provider event id before ack (never synthesize).
  * - Structured logging + critical error capture.
  *
  * Flow:
@@ -88,16 +89,20 @@ function verifySignature(
   }
 }
 
-function getEventId(payload: VoicePipelineWebhookPayload): string {
+function getEventId(payload: VoicePipelineWebhookPayload): string | null {
   if (typeof payload.id === 'string' && payload.id.length > 0) {
     return payload.id;
   }
 
-  if (payload.data && typeof payload.data.id === 'string') {
+  if (
+    payload.data &&
+    typeof payload.data.id === 'string' &&
+    payload.data.id.length > 0
+  ) {
     return payload.data.id;
   }
 
-  return `evt_${Date.now()}`;
+  return null;
 }
 
 export async function POST(request: NextRequest) {
@@ -153,6 +158,15 @@ export async function POST(request: NextRequest) {
     }
 
     const eventId = getEventId(payload);
+    if (!eventId) {
+      logger.warn('[Voice Pipeline Webhook] Missing provider event id', {
+        type: payload.type,
+      });
+      return NextResponse.json(
+        { error: 'Missing event id in payload' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
 
     dedupeKey = eventId;
 

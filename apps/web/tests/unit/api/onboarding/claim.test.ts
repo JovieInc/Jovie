@@ -725,6 +725,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
       expect.any(Error),
       expect.objectContaining({ route: '/api/onboarding/claim' })
     );
+    expect(mockClearOnboardingSessionCookie).not.toHaveBeenCalled();
   });
 
   it('claims ownership but defers the handoff when the interview has no terminal decision (JOV-8068)', async () => {
@@ -744,9 +745,8 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     const res = await POST(makeRequest());
 
     expect(res.status).toBe(200);
-    // Ownership is claimed, but no waitlist receipt, no materialized profile,
-    // and no checkout signal — the user stays on /start until proposeNextStep
-    // records a durable terminal decision.
+    // Ownership is claimed, but no waitlist receipt or checkout signal until
+    // proposeNextStep records a durable terminal decision.
     expect(await res.json()).toEqual({
       claimed: 1,
       conversationId: 'conv_mid_interview',

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
@@ -172,9 +172,10 @@ describe('MarketingHeader', () => {
     );
     expect(screen.queryByRole('link', { name: 'About' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'For Artists' })).toBeNull();
-    expect(screen.getByRole('button', { name: /Customers/ })).toHaveAttribute(
-      'aria-expanded',
-      'false'
+    // One audience page so far: a plain link, not a caret over a single item.
+    expect(screen.getByRole('link', { name: 'Customers' })).toHaveAttribute(
+      'href',
+      '/solutions/artists'
     );
     expect(screen.queryByRole('button', { name: /For/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Tools/ })).toBeNull();
@@ -191,19 +192,24 @@ describe('MarketingHeader', () => {
     ).toHaveAttribute('href', '/start');
   });
 
-  it('orders Customers, Product, and Pricing after the wordmark', () => {
+  it('orders Customers, Product, and Pricing without a nav wordmark', () => {
     render(<MarketingHeader />);
 
     const navItems = Array.from(
       document.querySelector('.marketing-glass-header__nav')?.children ?? []
-    ).map(item => item.textContent);
+    ).map(item => {
+      // Flyouts stay mounted for native popover entry; read the trigger only.
+      const trigger = item.querySelector('button, a');
+      return (trigger?.textContent ?? item.textContent ?? '').trim();
+    });
 
-    expect(navItems).toEqual(['Jovie', 'Customers', 'Product', 'Pricing']);
+    // LogoLink is the home control; do not duplicate "Jovie" in the nav (JOV-14240).
+    expect(navItems).toEqual(['Customers', 'Product', 'Pricing']);
     expect(
       document.querySelector(
         '.marketing-glass-header__nav .marketing-glass-header__brand-wordmark'
       )
-    ).toHaveTextContent('Jovie');
+    ).toBeNull();
     expect(
       screen
         .getByTestId('site-logo-link')
@@ -214,29 +220,16 @@ describe('MarketingHeader', () => {
     expect(screen.queryByRole('button', { name: /Resources/ })).toBeNull();
   });
 
-  it('opens the compact Customers flyout with only audiences that have a page', () => {
+  it('renders Customers as a plain link with no caret while only one audience has a page', () => {
     render(<MarketingHeader />);
 
-    const trigger = screen.getByRole('button', { name: /Customers/ });
-    fireEvent.focus(trigger);
-    expect(trigger).toHaveAttribute('aria-expanded', 'true');
-
-    const flyout = document.getElementById('marketing-header-flyout-customers');
-    expect(flyout).toHaveClass('marketing-glass-header__flyout--compact');
-    expect(flyout).toHaveTextContent('Customers');
-    const links = within(flyout as HTMLElement).getAllByRole('link');
+    expect(screen.queryByRole('button', { name: /Customers/ })).toBeNull();
+    const link = screen.getByRole('link', { name: 'Customers' });
+    expect(link).toHaveAttribute('href', '/solutions/artists');
+    expect(link.querySelector('svg')).toBeNull();
     expect(
-      links.map(link => [link.textContent, link.getAttribute('href')])
-    ).toEqual([['Artists', '/solutions/artists']]);
-    for (const absent of ['Founders', 'Authors', 'Creators', 'Investors']) {
-      expect(within(flyout as HTMLElement).queryByText(absent)).toBeNull();
-    }
-    expect(
-      flyout?.querySelectorAll('.marketing-glass-header__flyout-arrow')
-    ).toHaveLength(1);
-    expect(
-      flyout?.querySelectorAll('.marketing-glass-header__flyout-description')
-    ).toHaveLength(0);
+      document.getElementById('marketing-header-flyout-customers')
+    ).toBeNull();
   });
 
   it('uses the one claim CTA on the homepage header', () => {
@@ -360,13 +353,18 @@ describe('MarketingHeader', () => {
     }
   });
 
-  it('keeps the desktop wordmark lockup by default and marks it for the reveal guard', () => {
+  it('keeps the logo reveal guard without a duplicate nav wordmark (JOV-14240)', () => {
     render(<MarketingHeader />);
 
-    expect(screen.getByTestId('header-nav')).toHaveAttribute(
-      'data-brand-lockup',
-      'desktop'
+    // Inner marketing pages use the mark as the only brand control in chrome.
+    expect(screen.getByTestId('header-nav')).not.toHaveAttribute(
+      'data-brand-lockup'
     );
+    expect(
+      document.querySelector(
+        '.marketing-glass-header__nav .marketing-glass-header__brand-wordmark'
+      )
+    ).toBeNull();
     expect(screen.getByTestId('site-logo-link')).toHaveAttribute(
       'data-logo-reveal',
       'true'

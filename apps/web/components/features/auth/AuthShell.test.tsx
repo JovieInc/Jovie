@@ -217,4 +217,23 @@ describe('AuthShell states', () => {
     );
     await expectNoA11yViolations(container);
   });
+
+  it('titles waitlist access as Reserve @handle (ONB-23)', async () => {
+    const { container } = render(
+      <AuthShell
+        mode='sign-up'
+        suppressOneTap
+        claimHandle='motion'
+        accessKind='waitlist'
+      />
+    );
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Reserve @motion' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { level: 1, name: 'Claim @motion' })
+    ).not.toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
 });

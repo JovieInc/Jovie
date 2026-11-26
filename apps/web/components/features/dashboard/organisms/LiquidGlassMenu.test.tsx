@@ -7,7 +7,7 @@ import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { LiquidGlassMenu } from './LiquidGlassMenu';
 
 const { mockPathname } = vi.hoisted(() => ({
-  mockPathname: vi.fn(() => APP_ROUTES.CONTACTS),
+  mockPathname: vi.fn((): string => APP_ROUTES.CONTACTS),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -130,5 +130,41 @@ describe('LiquidGlassMenu', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('shows no badge, and no stray zero, when an item has nothing to count', async () => {
+    const user = userEvent.setup();
+    render(
+      <LiquidGlassMenu
+        primaryItems={primary}
+        expandedItems={[{ ...expanded[0], badge: 0 }]}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: 'More options' }));
+    const audience = screen.getByRole('link', { name: /Audience/ });
+    expect(audience).toHaveTextContent(/^Audience$/);
+  });
+});
+
+describe('LiquidGlassMenu press', () => {
+  it('presses its destinations and toggle through the shared press utility', () => {
+    mockPathname.mockReturnValue(APP_ROUTES.DASHBOARD);
+    render(
+      <LiquidGlassMenu
+        primaryItems={[
+          {
+            id: 'home',
+            label: 'Home',
+            href: APP_ROUTES.DASHBOARD,
+            icon: Home,
+          },
+        ]}
+        expandedItems={[]}
+      />
+    );
+    expect(screen.getByRole('link', { name: /home/i })).toHaveClass('press');
+    expect(screen.getByRole('button', { name: /more options/i })).toHaveClass(
+      'press'
+    );
   });
 });

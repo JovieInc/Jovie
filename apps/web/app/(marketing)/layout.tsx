@@ -20,7 +20,8 @@ export default async function MarketingLayout({
       <PublicPageShell
         chrome={chrome}
         className='system-b-marketing overflow-x-clip bg-base text-primary-token'
-        logoSize='xs'
+        canonicalMarketingHeader
+        footerVariant='expanded'
       >
         {children}
         <MarketingEmailSignup />

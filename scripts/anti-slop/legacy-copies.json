@@ -10,5 +10,21 @@
   ],
   "titleCaseHeadings": [
     "apps/web/app/app/(shell)/admin/investors/settings/page.tsx: title='Investor Settings'"
+  ],
+  "dashboardColor": [
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-accent'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-accent'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-info'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-info'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-info'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-success'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-success'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-success'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-success'",
+    "decorative-color apps/web/components/features/admin/FunnelMetricsStrip.tsx: iconClassName='text-warning'",
+    "decorative-color apps/web/components/features/admin/SentryMetricsCard.tsx: iconClassName='text-accent'",
+    "decorative-color apps/web/components/features/admin/SentryMetricsCard.tsx: iconClassName='text-error'",
+    "decorative-color apps/web/components/features/admin/SentryMetricsCard.tsx: iconClassName='text-info'",
+    "decorative-color apps/web/components/features/admin/SentryMetricsCard.tsx: iconClassName='text-warning'"
   ]
 }

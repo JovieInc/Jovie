@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { useEffect } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { useHeaderActions } from '@/contexts/HeaderActionsContext';
@@ -58,7 +59,7 @@ export function HeaderSearchSurfaceFromContext({
   // name carries that text; compact and default keep the branded name
   // ('Search' is contained in 'Search Jovie').
   const trigger = (
-    <button
+    <PlainButton
       type='button'
       data-app-search-trigger='true'
       onClick={isCommandPaletteOpen ? closeCommandPalette : openCommandPalette}
@@ -101,7 +102,7 @@ export function HeaderSearchSurfaceFromContext({
           />
         </>
       )}
-    </button>
+    </PlainButton>
   );
   return compact ? (
     <Tooltip label='Search Jovie' shortcut={SHORTCUTS.search} side='bottom'>

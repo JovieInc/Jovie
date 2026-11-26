@@ -66,6 +66,18 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+export const PartialStreamedShell: Story = {
+  args: { framePlaceholder: true },
+  play: async ({ canvasElement }) => {
+    await expect(
+      canvasElement.querySelector('[data-app-shell-placeholder="true"]')
+    ).toBeInTheDocument();
+    await expect(
+      canvasElement.querySelector('[data-app-shell-frame="true"]')
+    ).toBeNull();
+  },
+};
+
 /** A signed-in account with no creator profile yet: the shell mounts with an
  * empty profile list and the route owns its own empty prompt. */
 export const EmptyNoProfiles: Story = {

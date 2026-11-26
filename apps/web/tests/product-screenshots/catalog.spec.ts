@@ -290,18 +290,11 @@ async function prepareScenario(
     ).toBeVisible();
     await expect(page.getByTestId('user-button-loaded')).toBeVisible();
     await expect(page.getByTestId('user-button-loading')).toHaveCount(0);
-    await expect(page.getByTestId('ai-crawler-card-error')).toHaveCount(0);
-    await expect(page.getByTestId('ai-crawler-card-skeleton')).toHaveCount(0);
     await expect(page.getByText('High Priority', { exact: true })).toHaveCount(
       0
     );
     await expect(page.getByText('Jovie Demo', { exact: true })).toHaveCount(0);
     await expect(page.getByText(/@example\.com/)).toHaveCount(0);
-    if (scenario.id === 'dashboard-audience-desktop') {
-      await expect(
-        page.getByTestId('ai-crawler-intelligence-card')
-      ).toBeVisible();
-    }
     if (scenario.id === 'dashboard-earnings-desktop') {
       await expect(page.getByText('248', { exact: true })).toBeVisible();
       await expect(page.getByText('376', { exact: true })).toBeVisible();

@@ -40,7 +40,7 @@ describe('ActivityHoverRow', () => {
         danger
       />
     );
-    expect(container.firstElementChild?.className).toContain('rose');
+    expect(container.firstElementChild?.className).toContain('text-error-text');
   });
 
   it('fires onClick when the row is clicked', () => {

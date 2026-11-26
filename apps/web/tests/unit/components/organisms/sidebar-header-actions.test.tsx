@@ -66,10 +66,9 @@ vi.mock('@/components/organisms/user-button', () => ({
   UserButton: () => <div data-testid='user-button' />,
 }));
 
+// The bridge owns only the footer (dock and O); the header is under test.
 vi.mock('@/components/organisms/SidebarDockBridge', () => ({
-  SidebarDockBridge: (props: {
-    readonly children: (status: undefined) => ReactNode;
-  }) => <>{props.children(undefined)}</>,
+  SidebarDockBridge: () => null,
 }));
 
 const dashboardData = {
@@ -299,125 +298,48 @@ describe('sidebar header actions row', () => {
     const { controls } = headerControls();
     expect(controls.bell).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
     expect(controls.bell).toHaveAttribute('data-inbox-attention', 'available');
-    expect(controls.bell).toHaveAccessibleName(/^Inbox — /);
+    expect(controls.bell).toHaveAccessibleName(/^Home — /);
     expect(controls.bell.querySelector('span.bg-accent')).not.toBeNull();
   });
 });
 
-describe('sidebar header logo', () => {
+describe('sidebar header brand', () => {
   afterEach(() => {
     document.cookie = 'sidebar:state=; path=/; max-age=0';
   });
 
-  /**
-   * Every "Jovie" text node in the brand row must sit inside a wordmark box
-   * the reveal CSS keys on, inside its trigger. A label outside that pair is
-   * painted at rest (Tim's 2026-11-14 screenshot: admins get the workspace
-   * switcher, whose label was always visible).
-   */
-  function expectBrandWordOnlyInRevealBox(
-    triggerSelector: string,
-    wordmarkSelector: string
-  ) {
-    const row = document.querySelector('[data-sidebar-brand-row]');
-    expect(row).not.toBeNull();
-    const walker = document.createTreeWalker(
-      row as Element,
-      NodeFilter.SHOW_TEXT
-    );
-    const hosts: Element[] = [];
-    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-      if (node.textContent?.includes('Jovie') && node.parentElement) {
-        hosts.push(node.parentElement);
-      }
-    }
-    expect(hosts.length).toBeGreaterThan(0);
-    for (const host of hosts) {
-      const wordmark = host.closest(wordmarkSelector);
-      expect(
-        wordmark,
-        `"${host.textContent}" outside the reveal box`
-      ).not.toBeNull();
-      expect(wordmark?.closest(triggerSelector)).not.toBeNull();
-    }
-  }
-
-  it('keeps the customer brand word inside the Ask Jovie reveal box', () => {
+  it('shows the customer brand word as plain text with no glyph or popover', () => {
     renderHeader();
-    const trigger = screen.getByRole('button', { name: 'Ask Jovie' });
-    expect(trigger).toHaveClass('ask-jovie-mark');
-    expect(trigger.querySelector('.ask-jovie-wordmark')).toHaveTextContent(
-      'Jovie'
-    );
-    expectBrandWordOnlyInRevealBox('.ask-jovie-mark', '.ask-jovie-wordmark');
+    const row = document.querySelector('[data-sidebar-brand-row]');
+    expect(row).toHaveTextContent('Jovie');
+    expect(row?.querySelector('[data-brand-variant]')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Ask Jovie' })
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ask-jovie-trigger')).toBeNull();
   });
 
-  it('keeps the admin workspace label inside the same reveal box', () => {
+  it('shows the admin workspace as text and a chevron with no glyph', () => {
     renderHeader({ data: { isAdmin: true } });
     const trigger = screen.getByRole('button', {
       name: 'Switch Workspace: Jovie',
     });
-    expect(trigger).toHaveClass('sidebar-wordmark-reveal');
-    expect(trigger.querySelector('.sidebar-wordmark')).toHaveTextContent(
-      'Jovie'
-    );
-    expectBrandWordOnlyInRevealBox(
-      '.sidebar-wordmark-reveal',
-      '.sidebar-wordmark'
-    );
-    const css = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8');
-    expect(css).toMatch(
-      /\.sidebar-wordmark-reveal \.sidebar-wordmark[^{]*\{[^}]*grid-template-columns: 0fr;[^}]*opacity: 0;/
-    );
+    expect(trigger).toHaveTextContent('Jovie');
+    expect(trigger.querySelector('svg.lucide-chevron-down')).not.toBeNull();
+    expect(trigger.querySelector('[data-brand-variant]')).toBeNull();
   });
 
-  it('shows the mark at rest and reveals the clipped wordmark without moving the actions', () => {
-    renderHeader();
-    const trigger = screen.getByTestId('ask-jovie-trigger');
-    const wordmark = trigger.querySelector('.ask-jovie-wordmark');
-    expect(wordmark).not.toBeNull();
-    // The reveal animates width inside its own clip box.
-    expect(wordmark).toHaveClass('overflow-hidden');
-    // The logo slot absorbs the reveal: it is the flex-1 track, so the
-    // actions keep their x position while the wordmark grows.
-    const logoSlot = trigger.closest('[data-sidebar-brand-row] > div');
-    expect(logoSlot).toHaveClass('min-w-0', 'flex-1');
-    // Themed ring instead of a raw white/30 one.
-    expect(trigger).toHaveClass('focus-ring-themed');
-    expect(tokens(trigger).some(token => token.includes('white/'))).toBe(false);
-
-    const css = readFileSync(join(process.cwd(), 'app/globals.css'), 'utf8');
-    // Read the rule blocks whose selector lists name the Ask Jovie wordmark.
-    const blocks = [...css.matchAll(/([^{}]+)\{([^}]*)\}/g)].filter(
-      ([, selectors]) => selectors.includes('.ask-jovie-wordmark')
-    );
-    const rest = blocks.find(
-      ([, selectors]) =>
-        /\.ask-jovie-mark \.ask-jovie-wordmark\s*,/.test(selectors) &&
-        !selectors.includes(':hover')
-    )?.[2];
-    expect(rest).toContain('opacity: 0');
-    expect(rest).toContain('grid-template-columns: 0fr');
-    expect(rest).toMatch(/transition:[^;]*opacity/);
-    const reveal = blocks.find(
-      ([, selectors]) =>
-        selectors.includes('.ask-jovie-mark:hover .ask-jovie-wordmark') &&
-        selectors.includes(
-          '.ask-jovie-mark:focus-visible .ask-jovie-wordmark'
-        ) &&
-        !selectors.includes('[data-collapsible')
-    )?.[2];
-    expect(reveal).toContain('opacity: 1');
-    expect(reveal).toContain('grid-template-columns: 1fr');
-  });
-
-  it('keeps a named logo control in the collapsed rail', () => {
+  it('leaves only the collapse control in the icon rail header', () => {
     renderHeader({ open: false });
-    const trigger = screen.getByTestId('ask-jovie-trigger');
-    // The mark is the Ask Jovie popover trigger (JOV-6569); its name keeps
-    // the visible "Jovie" wordmark (WCAG 2.5.3) and says what it does.
-    expect(trigger).toHaveAccessibleName('Ask Jovie');
-    expect(trigger).not.toHaveAttribute('aria-hidden');
-    expect(trigger.closest('[inert]')).toBeNull();
+    const slot = document.querySelector('[data-sidebar-brand-slot]');
+    expect(slot).not.toBeNull();
+    expect(slot?.querySelector('[data-brand-variant]')).toBeNull();
+    const css = readFileSync(
+      join(process.cwd(), 'components/organisms/UnifiedSidebar.css'),
+      'utf8'
+    );
+    expect(css).toMatch(
+      /\.group\[data-collapsible="icon"\] \[data-sidebar-brand-slot\]\s*\{\s*display: none;/
+    );
   });
 });

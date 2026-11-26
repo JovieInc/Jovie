@@ -1,0 +1,8 @@
+{
+  "$comment": "Single source for PR Size Guard caps. Read by scripts/hooks/pr-size-local.mjs (pre-push). A LATER workflow PR will also place this file at .github/pr-size-policy.json and point .github/workflows/pr-size-guard.yml at it instead of vars.PR_MAX_LINES / vars.PR_MAX_FILES. Values match the caps CI printed on 2026-11 runs (cap 1500/75). Raising them is a reviewed policy change, not a hook tweak.",
+  "maxLines": 1500,
+  "maxFiles": 75,
+  "optOutLabels": ["big-pr", "codemod"],
+  "skipAuthors": ["dependabot[bot]"],
+  "skipHeadRefs": ["screenshots/auto-update"]
+}

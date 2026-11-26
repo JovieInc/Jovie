@@ -101,14 +101,13 @@ vi.mock('@/lib/auth/cached', () => ({
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: async () => undefined,
 }));
-
 vi.mock('@/lib/entitlements/server', () => ({
   getCurrentUserEntitlements: async () => ({
     canAccessAdPixels: true,
     hasAdvancedFeatures: false,
+    isPro: true,
   }),
 }));
-
 vi.mock('@/lib/notifications/providers/slack', () => ({
   notifySlackFeedbackSubmission: async () => undefined,
   notifySlackGrowthRequest: async () => undefined,

@@ -1,6 +1,7 @@
 // @coverage-via apps/web/tests/unit/profile/profile-compact-template.test.tsx
 'use client';
 
+import { IconButton } from '@jovie/ui';
 import { ArrowRight, ChevronLeft, MoreHorizontal } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
@@ -12,7 +13,6 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { ShareLinkButton } from '@/components/features/share/ShareLinkButton';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { BASE_URL } from '@/constants/app';
@@ -381,8 +381,10 @@ export function ProfileCompactSurface({
       ? 'profile'
       : requestedPrimaryTab;
   const hasTourDates = tourDates.length > 0;
+  // JOV-14241: useCanonicalProfileMode owns the URL rewrite; render Home.
   const activeVisiblePrimaryTab =
-    !allowFanCapture && activePrimaryTab === 'subscribe'
+    (!allowFanCapture && activePrimaryTab === 'subscribe') ||
+    (activePrimaryTab === 'tour' && !hasTourDates)
       ? 'profile'
       : activePrimaryTab;
   const currentAnalyticsTab = mapPrimaryTabToAnalyticsTab(
@@ -681,14 +683,14 @@ export function ProfileCompactSurface({
           >
             {showBackChevron ? (
               <div className='pointer-events-auto'>
-                <CircleIconButton
+                <IconButton
                   onClick={onBack}
-                  size='lg'
+                  size='xl'
                   variant='pearlQuiet'
                   ariaLabel='Back'
                 >
                   <ChevronLeft className='h-5 w-5' />
-                </CircleIconButton>
+                </IconButton>
               </div>
             ) : (
               <div className='h-11 w-11 shrink-0' aria-hidden='true' />
@@ -714,9 +716,9 @@ export function ProfileCompactSurface({
                     });
                   }}
                 />
-                <CircleIconButton
+                <IconButton
                   onClick={onOpenMenu}
-                  size='lg'
+                  size='xl'
                   variant='pearlQuiet'
                   ariaLabel='Menu'
                 >
@@ -724,7 +726,7 @@ export function ProfileCompactSurface({
                       the trigger wears the overflow ellipsis — never a brand
                       mark or gear. */}
                   <MoreHorizontal className='h-5 w-5' />
-                </CircleIconButton>
+                </IconButton>
               </div>
             )}
           </div>
@@ -903,7 +905,7 @@ export function ProfileCompactSurface({
             aboveNav={
               proofClaimCta ? (
                 <div
-                  className='pointer-events-auto mb-2 md:hidden'
+                  className='pointer-events-auto mb-3 md:hidden'
                   data-testid='profile-proof-claim-bar'
                 >
                   <ProofClaimCtaLink

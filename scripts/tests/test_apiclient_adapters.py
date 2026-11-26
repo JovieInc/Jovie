@@ -154,6 +154,46 @@ class AdapterTest(unittest.TestCase):
 class GhTest(unittest.TestCase):
     LOG_ARGS = ["run", "view", "--repo", "o/r", "--job", "12", "--attempt", "2", "--log"]
 
+    def test_free_probe_preserves_the_full_secondary_backoff_at_core_zero(self):
+        for reset_seconds, retry_seconds in ((120, 60), (60, 120)):
+            with self.subTest(reset_seconds=reset_seconds, retry_seconds=retry_seconds):
+                clock, store, calls = FakeClock(), MemoryLedgerStore(), []
+                started = clock.now
+                reset = started // 1000 + reset_seconds
+
+                def transport(args, env):
+                    calls.append(args)
+                    if len(calls) == 1:
+                        return 1, (f"HTTP/2.0 403 Forbidden\nX-Ratelimit-Limit: 5000\n"
+                                   f"X-Ratelimit-Remaining: 0\nX-Ratelimit-Reset: {reset}\n"
+                                   f"Retry-After: {retry_seconds}\n\n"
+                                   '{"message":"You have exceeded a secondary rate limit"}'), ""
+                    return 0, ("HTTP/2.0 200 OK\nX-Ratelimit-Limit: 5000\n"
+                               f"X-Ratelimit-Remaining: 0\nX-Ratelimit-Reset: {clock.now // 1000 + 900}\n\n{{}}"), ""
+
+                options = dict(priority="poll", store=store, credential="free-probe", run=transport,
+                               now=clock.read, sleep=clock.sleep, log=quiet, max_wait_ms=0)
+                self.assertEqual(run_gh(["api", "rate_limit"], **options)["code"], 75)
+                self.assertEqual(run_gh(["api", "rate_limit"], **options)["code"], 75)
+                self.assertEqual(len(calls), 1)
+                clock.now = started + max(reset_seconds, retry_seconds) * 1000 - 1
+                self.assertEqual(run_gh(["api", "rate_limit"], **options)["code"], 75)
+                self.assertEqual(len(calls), 1)
+                clock.now += 1
+                self.assertEqual(run_gh(["api", "rate_limit"], **options)["code"], 0)
+                self.assertEqual(len(calls), 2)
+                self.assertEqual(run_gh(["api", "repos/o/r"], **options)["code"], 75)
+                self.assertEqual(len(calls), 2)
+
+    def test_only_safe_github_quota_reads_are_primary_free(self):
+        for target in ("rate_limit", "/rate_limit", "https://api.github.com/rate_limit"):
+            self.assertEqual(gh_shape(["api", target]).get("cost"), 0)
+        for suffix in (["-XPOST"], ["--method=POST"], ["-ffield=x"], ["-Ffield=x"],
+                       ["--field=field=x"], ["--raw-field=field=x"], ["--input=body.json"],
+                       ["--hostname", "example.com"], ["--hostname=example.com"]):
+            with self.subTest(suffix=suffix):
+                self.assertNotEqual(gh_shape(["api", "rate_limit", *suffix]).get("cost"), 0)
+
     def test_quota_free_refresh_observes_only_the_active_credential(self):
         clock, store = FakeClock(), MemoryLedgerStore()
         reset = clock.now + 60000

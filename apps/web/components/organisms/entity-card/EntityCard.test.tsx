@@ -120,8 +120,8 @@ describe('EntityCard', () => {
     expect(screen.getByText('Shop')).toBeInTheDocument();
     expect(screen.getByText('Premium tee').tagName).toBe('SPAN');
     expect(screen.getByText('Profit $11.87').tagName).toBe('SPAN');
+    expect(screen.getByText('Shop')).not.toHaveClass('uppercase');
   });
-
   it('hides the status pill in the compact treatment (progressive disclosure)', () => {
     const view = render(
       <EntityCard model={merchModel} treatment='compact' media='none' />

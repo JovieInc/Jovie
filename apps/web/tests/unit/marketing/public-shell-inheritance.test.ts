@@ -14,6 +14,12 @@ describe('public marketing shell inheritance', () => {
 
     expect(source).toContain("from '@/components/site/PublicPageShell'");
     expect(source).toContain('<PublicPageShell');
+    if (sourcePath !== 'app/brand/layout.tsx') {
+      expect(source).toContain('canonicalMarketingHeader');
+      expect(source).not.toMatch(
+        /header(?:Variant|Cta|HidePrimaryCta|Brand)=|headerHidePrimaryCta\s/
+      );
+    }
   });
 
   it('bleeds the homepage hero under the docked shell header', () => {

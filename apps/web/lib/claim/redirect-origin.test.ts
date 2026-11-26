@@ -43,4 +43,41 @@ describe('buildClaimRedirectUrl', () => {
       'http://localhost/'
     );
   });
+
+  it('honors [::1] Host and keeps request protocol', () => {
+    const httpsRequest = {
+      url: 'https://localhost/claim/fixture-token',
+      headers: new Headers({ host: '[::1]:3100' }),
+    };
+    expect(buildClaimRedirectUrl(httpsRequest, '/signin').toString()).toBe(
+      'https://[::1]:3100/signin'
+    );
+
+    const httpRequest = {
+      url: 'http://localhost/claim/fixture-token',
+      headers: new Headers({ host: '[::1]' }),
+    };
+    expect(buildClaimRedirectUrl(httpRequest, '/signin').toString()).toBe(
+      'http://[::1]/signin'
+    );
+  });
+
+  it('rejects empty, oversize, and port-invalid Host headers', () => {
+    for (const host of [
+      '',
+      '   ',
+      '127.0.0.1:abc',
+      '127.0.0.1:99999',
+      '[::1]:99999',
+      'a'.repeat(256),
+    ]) {
+      const request = {
+        url: 'http://localhost:3100/claim/fixture-token',
+        headers: new Headers(host === '' ? {} : { host }),
+      };
+      expect(buildClaimRedirectUrl(request, '/x').origin).toBe(
+        'http://localhost:3100'
+      );
+    }
+  });
 });

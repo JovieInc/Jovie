@@ -82,6 +82,9 @@ describe('ReleasesView', () => {
     expect(newestArtwork).toHaveAttribute('data-priority', 'true');
     expect(within(links[0]!).queryByRole('button')).not.toBeInTheDocument();
     expect(olderArtwork).toHaveAttribute('data-priority', 'false');
+    // Cover thumbs stay in the list for releaseCover ViewTransition (JOV-14244).
+    expect(newestArtwork).toBeVisible();
+    expect(olderArtwork).toBeVisible();
   });
 
   it('formats collaborator credits through the canonical conjunction formatter', () => {

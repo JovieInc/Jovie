@@ -16,8 +16,8 @@ Run comprehensive E2E smoke tests, capture all browser console errors, fix them 
 Before starting, verify the environment:
 
 ```bash
-# Ensure dependencies are installed
-pnpm install
+# Ensure dependencies are installed (offline-first; --prefer-offline if the store is cold)
+pnpm install --offline --frozen-lockfile
 
 # Ensure Playwright browsers are installed
 cd apps/web && pnpm exec playwright install chromium

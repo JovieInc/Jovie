@@ -1,6 +1,11 @@
 import { tool } from 'ai';
 import { z } from 'zod';
-import { summarizeCanvasStatus } from '@/lib/services/canvas/service';
+import {
+  buildCanvasMetadata,
+  summarizeCanvasStatus,
+} from '@/lib/services/canvas/service';
+import { resolveChatRelease } from '../catalog-query';
+import { updateOwnedReleaseMetadata } from '../release-writes';
 import { chatToolSchema } from '../strict-schema';
 import type { ReleaseCatalogMeta, ReleaseContext } from '../types';
 
@@ -87,6 +92,73 @@ export function createCheckCanvasStatusTool(
           withoutCanvas: summary.withoutCanvas,
         },
         releases: releaseList,
+      };
+    },
+  });
+}
+
+/**
+ * Creates the markCanvasUploaded tool.
+ * Lets artists self-report that they've uploaded a canvas to Spotify for Artists.
+ * Since Spotify has no public API for canvas status, this is the only reliable way to track it.
+ * Lives beside the status tool so the chat-creative outcome check can call the
+ * real write (docs/product/outcome-coverage.json).
+ */
+export function createMarkCanvasUploadedTool(
+  profileId: string | null,
+  releases: ReleaseContext[]
+) {
+  return tool({
+    description:
+      "Mark a release as having a Spotify Canvas video uploaded. Use this when the artist confirms they've already set a canvas for a track/release in Spotify for Artists, or when they tell you a canvas is already uploaded.",
+    inputSchema: chatToolSchema({
+      releaseTitle: z
+        .string()
+        .describe('The title of the release that has a canvas uploaded'),
+    }),
+    execute: async ({ releaseTitle }) => {
+      if (!profileId) {
+        return { success: false, error: 'Profile ID required' };
+      }
+
+      const release = await resolveChatRelease(profileId, releases, {
+        releaseTitle,
+      });
+
+      if (!release) {
+        return {
+          success: false,
+          error: `Release "${releaseTitle}" not found. Available releases: ${releases
+            .slice(0, 10)
+            .map(r => r.title)
+            .join(', ')}`,
+        };
+      }
+
+      const updated = await updateOwnedReleaseMetadata({
+        releaseId: release.id,
+        creatorProfileId: profileId,
+        metadata: {
+          ...release.metadata,
+          ...buildCanvasMetadata('uploaded'),
+        },
+      });
+
+      if (!updated) {
+        return {
+          success: false,
+          error: 'Release not found or unauthorized',
+        };
+      }
+
+      return {
+        success: true,
+        release: {
+          title: release.title,
+          previousStatus: release.canvasStatus,
+          newStatus: 'uploaded',
+        },
+        message: `Marked "${release.title}" as having a Spotify Canvas uploaded.`,
       };
     },
   });

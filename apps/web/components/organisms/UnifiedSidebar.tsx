@@ -1,6 +1,6 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/components/organisms/UnifiedSidebar.library.test.tsx
+// @coverage-via apps/web/tests/unit/components/organisms/UnifiedSidebar.header.test.tsx
 
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
@@ -8,8 +8,6 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
-import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { WorkspaceSelector } from '@/components/molecules/WorkspaceSelector';
 import {
   Sidebar,
@@ -27,6 +25,7 @@ import {
   SHELL_RAIL_LABEL,
 } from '@/components/shell/rail-motion';
 import { SidebarHeaderActions } from '@/components/shell/SidebarHeaderActions';
+import { SidebarDockStatusProvider } from '@/components/shell/sidebar-dock-status';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
@@ -51,6 +50,7 @@ import {
 import { IdentitySwitcher } from './ProfileSwitcher';
 import { SettingsNavGroup } from './SettingsNavGroup';
 import { SidebarDockBridge } from './SidebarDockBridge';
+import './UnifiedSidebar.css';
 
 // Founder-only (OV) block: split out so creator routes never ship it.
 const OperatorListsNav = dynamic(() =>
@@ -197,7 +197,11 @@ function SidebarHeaderNav({
     <div className='flex w-full items-center' data-sidebar-brand-row='true'>
       {/* Keep the canonical brand painted; only its labels and secondary
           actions stage out. The icon and toggle both fit the 52px rail. */}
-      <div className='min-w-0 flex-1'>
+      {/* The rail's header row keeps only the collapse control. */}
+      <div
+        className='min-w-0 flex-1'
+        data-sidebar-brand-slot={isRouteSidebar ? undefined : ''}
+      >
         {(() => {
           if (isRouteSidebar) {
             return (
@@ -224,18 +228,7 @@ function SidebarHeaderNav({
           }
           if (isDemoRoute) {
             return (
-              <div
-                className={cn(
-                  'flex h-7 w-full items-center gap-(--app-shell-sidebar-icon-gap) rounded-full',
-                  'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
-                )}
-              >
-                <BrandLogo
-                  size='chrome'
-                  tone='auto'
-                  rounded={false}
-                  className='rounded-sm shrink-0'
-                />
+              <div className='flex h-7 w-full items-center'>
                 <span
                   className={cn(
                     'truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
@@ -258,32 +251,19 @@ function SidebarHeaderNav({
           if (hasMultipleIdentities && !isOperatorSection) {
             return <IdentitySwitcher />;
           }
-          // Clean header: the Jovie mark is the global "Ask Jovie" entry point
-          // (JOV-6569). OV skin keeps its static identity wordmark; user menu
-          // lives in the bottom Settings button.
+          // Clean header: text only. The one O in the sidebar docks in the
+          // footer (SidebarOPresence), so no skin draws a glyph up here and
+          // the icon rail keeps only the collapse control.
           return (
-            <div
-              className={cn(
-                'flex h-7 w-full items-center gap-(--app-shell-sidebar-icon-gap)',
-                'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
-              )}
-            >
-              {variant === 'ov' ? (
-                <>
-                  <BrandLogo
-                    size='compact'
-                    tone='auto'
-                    variant={variant}
-                    rounded={false}
-                    className='rounded-sm shrink-0'
-                  />
-                  <span className={cn('truncate', SHELL_RAIL_LABEL)}>
-                    {BRAND_WORDMARKS[variant]}
-                  </span>
-                </>
-              ) : (
-                <AskJovieMark variant={variant} />
-              )}
+            <div className='flex h-7 w-full items-center'>
+              <span
+                className={cn(
+                  'truncate text-app tracking-tight text-sidebar-item-foreground [font-weight:var(--font-weight-nav)]',
+                  SHELL_RAIL_LABEL
+                )}
+              >
+                {BRAND_WORDMARKS[variant]}
+              </span>
             </div>
           );
         })()}
@@ -350,82 +330,87 @@ export function UnifiedSidebar({
         variant === 'ov' && 'ov-mode'
       )}
     >
-      <SidebarHeader
-        data-electron-drag-region='true'
-        // Same height as the content header, so the logo row and the page
-        // title share one center line (Tim, Nov 14: the 64px header sat the
-        // brand row 12px below "Home").
-        // Every sidebar (customer, route and operator) uses the one unified
-        // header-height token (founder lock 2026-09-25).
-        className={cn(
-          'relative justify-center gap-0 px-(--app-shell-sidebar-inset) group-data-[collapsible=icon]:px-0',
-          'h-(--app-shell-header-height) py-0.5'
-        )}
-      >
-        <SidebarHeaderNav
-          headerOwnsCollapsedToggle={headerOwnsCollapsedToggle}
-          isRouteSidebar={isRouteSidebar}
-          isOperatorSection={isOperatorSection}
-          canSwitchWorkspaces={canSwitchWorkspaces}
-          hasMultipleIdentities={hasMultipleIdentities}
-          isDemoRoute={isDemoRoute}
-          variant={variant}
-          routeBackHref={sidebarOverride?.backHref}
-          routeBackLabel={sidebarOverride?.backLabel}
-        />
-      </SidebarHeader>
-
-      <SidebarContent className='min-h-0 flex-1 overflow-anchor-none px-0 pb-(--space-2-5) pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
-        <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
-          <SidebarGroupContent className='flex min-h-0 flex-1 flex-col'>
-            {section === 'ov' ? (
-              <OperatorNavigation pathname={pathname} />
-            ) : isInSettings ? (
-              <div className='flex flex-1 flex-col overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
-                <SettingsNavigation pathname={pathname} section={section} />
-              </div>
-            ) : sidebarOverride ? (
-              sidebarOverride.content
-            ) : (
-              <DashboardNav
-                headerOwnsInbox={!isDemoRoute && !isOperatorSection}
-              >
-                {isDemoRoute ? (
-                  <HeaderSearchSurfaceFromContext className='w-full max-w-none sm:w-full lg:w-full' />
-                ) : null}
-              </DashboardNav>
-            )}
-          </SidebarGroupContent>
-        </SidebarGroup>
-        {/* JOV-8137: the completion widget persists on every page's sidebar
-            until the profile hits 100% — it hides itself once complete. */}
-        {showProfileCompletionWidget ? (
-          <div
-            className='group-data-[collapsible=icon]:hidden px-(--app-shell-sidebar-inset)'
-            data-testid='sidebar-profile-completion'
-          >
-            <ProfileCompletionCard />
-          </div>
-        ) : null}
-      </SidebarContent>
-
-      <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 py-(--space-1) [&_[data-slot=common-dropdown-trigger]]:min-h-8'>
-        <SidebarDockBridge
-          userId={user?.id ?? ''}
-          userState={{ hasClaimedHandle: Boolean(dockProfile?.username) }}
-          collapsed={isSidebarCollapsed}
-        >
-          {dockStatus => (
-            <SidebarIdentityGroup
-              calm={!isRouteSidebar}
-              profileHref={section === 'ov' ? undefined : profileHref}
-              showAccountMenu={!isInSettings}
-              dockStatus={dockStatus}
-              label={section === 'ov' ? 'Account' : undefined}
-            />
+      <SidebarDockStatusProvider>
+        <SidebarHeader
+          data-electron-drag-region='true'
+          // Same height as the content header, so the logo row and the page
+          // title share one center line (Tim, Nov 14: the 64px header sat the
+          // brand row 12px below "Home").
+          // Every sidebar (customer, route and operator) uses the one unified
+          // header-height token (founder lock 2026-09-25).
+          className={cn(
+            'relative justify-center gap-0 px-(--app-shell-sidebar-inset) group-data-[collapsible=icon]:px-0',
+            'h-(--app-shell-header-height) py-0.5'
           )}
-        </SidebarDockBridge>
-      </SidebarFooter>
+        >
+          <SidebarHeaderNav
+            headerOwnsCollapsedToggle={headerOwnsCollapsedToggle}
+            isRouteSidebar={isRouteSidebar}
+            isOperatorSection={isOperatorSection}
+            canSwitchWorkspaces={canSwitchWorkspaces}
+            hasMultipleIdentities={hasMultipleIdentities}
+            isDemoRoute={isDemoRoute}
+            variant={variant}
+            routeBackHref={sidebarOverride?.backHref}
+            routeBackLabel={sidebarOverride?.backLabel}
+          />
+        </SidebarHeader>
+        <div
+          data-sidebar-top-identity=''
+          className='shrink-0 border-b border-subtle [&_[data-slot=common-dropdown-trigger]]:min-h-8'
+        >
+          <SidebarIdentityGroup
+            calm={!isRouteSidebar}
+            profileHref={section === 'ov' ? undefined : profileHref}
+            showAccountMenu={!isInSettings}
+            label={section === 'ov' ? 'Account' : undefined}
+          />
+        </div>
+
+        <SidebarContent className='min-h-0 flex-1 overflow-anchor-none px-0 pb-(--space-2-5) pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+          <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
+            <SidebarGroupContent className='flex min-h-0 flex-1 flex-col'>
+              {section === 'ov' ? (
+                <OperatorNavigation pathname={pathname} />
+              ) : isInSettings ? (
+                <div className='flex flex-1 flex-col overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+                  <SettingsNavigation pathname={pathname} section={section} />
+                </div>
+              ) : sidebarOverride ? (
+                sidebarOverride.content
+              ) : (
+                <DashboardNav
+                  headerOwnsInbox={!isDemoRoute && !isOperatorSection}
+                >
+                  {isDemoRoute ? (
+                    <HeaderSearchSurfaceFromContext className='w-full max-w-none sm:w-full lg:w-full' />
+                  ) : null}
+                </DashboardNav>
+              )}
+            </SidebarGroupContent>
+          </SidebarGroup>
+          {/* JOV-8137: the completion widget persists on every page's sidebar
+        until the profile hits 100% — it hides itself once complete. */}
+          {showProfileCompletionWidget ? (
+            <div
+              className='group-data-[collapsible=icon]:hidden px-(--app-shell-sidebar-inset)'
+              data-testid='sidebar-profile-completion'
+            >
+              <ProfileCompletionCard />
+            </div>
+          ) : null}
+        </SidebarContent>
+
+        <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 py-(--space-1)'>
+          <SidebarDockBridge
+            userId={user?.id ?? ''}
+            userState={{ hasClaimedHandle: Boolean(dockProfile?.username) }}
+            collapsed={isSidebarCollapsed}
+            oHref={section === 'ov' ? APP_ROUTES.ADMIN_CHAT : APP_ROUTES.CHAT}
+            variant={variant}
+          />
+        </SidebarFooter>
+      </SidebarDockStatusProvider>
     </Sidebar>
   );
 }

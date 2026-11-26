@@ -1,3 +1,4 @@
+// Drift T2.1: IconButton alias retirement — callsite migration coverage.
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -19,6 +20,9 @@ describe('ExpandButton certificate', () => {
 
     const button = screen.getByRole('button', { name: 'Expand tracks' });
     expect(button).toHaveAttribute('aria-expanded', 'false');
+    // size=xs (h-6) matches the single-track spacer — no className restyle.
+    expect(button.className).toMatch(/\bh-6\b/);
+    expect(button.className).toMatch(/\bw-6\b/);
     await expectNoA11yViolations(container);
 
     await user.click(button);
@@ -78,10 +82,10 @@ describe('ExpandButton certificate', () => {
       );
 
       expect(screen.queryByRole('button')).toBeNull();
-      expect(container.firstElementChild).toHaveAttribute(
-        'aria-hidden',
-        'true'
-      );
+      const spacer = container.firstElementChild;
+      expect(spacer).toHaveAttribute('aria-hidden', 'true');
+      expect(spacer?.className).toMatch(/\bh-6\b/);
+      expect(spacer?.className).toMatch(/\bw-6\b/);
       await expectNoA11yViolations(container);
     }
   );

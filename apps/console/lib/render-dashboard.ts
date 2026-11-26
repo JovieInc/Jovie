@@ -15,13 +15,10 @@ export interface DashboardRenderInput {
   readonly factoryHealth: FactoryHealthSnapshot;
 }
 
-const LABEL_STYLES: Record<
-  string,
-  { bg: string; text: string; label: string }
-> = {
+const LABEL_STYLES = {
   'needs:taste': { bg: '#9b4dff22', text: '#9b4dff', label: 'Taste call' },
   'needs:human': { bg: '#ffab2e22', text: '#ffab2e', label: 'Human action' },
-};
+} satisfies Record<string, { bg: string; text: string; label: string }>;
 
 const PRIORITY_COLORS: Record<number, string> = {
   1: '#ff4d5f',
@@ -40,8 +37,9 @@ function escapeHtml(value: string): string {
 }
 
 function renderIssueCard(issue: DashboardIssueView): string {
-  const style = LABEL_STYLES[issue.label] ?? LABEL_STYLES['needs:human'];
-  const priorityColor = PRIORITY_COLORS[issue.priority] ?? PRIORITY_COLORS[0];
+  const style = LABEL_STYLES[issue.label];
+  const priorityColor =
+    PRIORITY_COLORS[issue.priority] ?? PRIORITY_COLORS[0] ?? '#52535a';
   const screenshotBlock =
     issue.label === 'needs:taste'
       ? issue.screenshotPath

@@ -1,10 +1,11 @@
 name: Next Build Cache Warm
 
-# Writes the Turbopack persistent build cache that CI's "Build + Layout
-# (combined)" job (ci.yml `ci-build-layout`) restores on merge-group and
-# dispatch runs. ci.yml cannot write it: queue-proven main pushes skip Path
-# Changes and therefore skip Build + Layout, so its trusted-main save step
-# almost never runs and every merge-group build compiled cold.
+# Writes the Turbopack persistent build caches that CI's "Build + Layout
+# (combined)" job (ci.yml `ci-build-layout`) and "Ovie Build (combined)"
+# job (ci.yml `ci-build-ovie`) restore on merge-group and dispatch runs.
+# ci.yml cannot reliably write them: queue-proven main pushes skip Path
+# Changes and therefore skip those jobs, so their trusted-main save steps
+# almost never run and every merge-group build compiled cold.
 #
 # Trust boundary: only push to main and a manual dispatch on main run this job.
 # No PR, fork or merge-group code ever reaches the save step, so a PR can never
@@ -116,3 +117,78 @@ jobs:
         with:
           path: apps/web/.next/cache/turbopack
           key: ${{ steps.next-build-cache-lookup.outputs.cache-primary-key }}
+
+  warm-ovie:
+    name: Warm Ovie Next build cache
+    if: >-
+      github.repository == 'JovieInc/Jovie' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Same hour and key scheme as ci.yml's "Restore Ovie Next build cache
+      # (read-only)" step. The hour is resolved once so lookup and save can
+      # never straddle an hour boundary with different keys.
+      - name: Resolve Ovie Next build cache hour
+        id: ovie-next-build-cache-hour
+        run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
+      - name: Look up this hour's Ovie Next build cache
+        id: ovie-next-build-cache-lookup
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/ovie/.next/cache/turbopack
+          key: ${{ runner.os }}-next-build-ovie-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/ovie/package.json', 'apps/ovie/next.config.mjs') }}-${{ steps.ovie-next-build-cache-hour.outputs.hour }}
+          lookup-only: true
+      - name: Report existing Ovie Next build cache
+        if: ${{ steps.ovie-next-build-cache-lookup.outputs.cache-hit == 'true' }}
+        run: echo "::notice::Ovie Next build cache for this hour already exists; nothing to warm."
+      - uses: ./.github/actions/setup-node-pnpm
+        if: ${{ steps.ovie-next-build-cache-lookup.outputs.cache-hit != 'true' }}
+      # Always compile cold. Same rationale as the web warmer: restoring an
+      # older entry makes Turbopack append to it and can grow past the save
+      # bound. A cold entry holds exactly one main head's compiler state.
+      # Same Ovie build and env as ci.yml "Build independent Ovie app", so
+      # the compiler state matches what Ovie Build restores. No remote Turbo
+      # credentials: a remote hit would replay outputs without compiling and
+      # leave the Turbopack cache empty.
+      - name: Build Ovie for cache
+        if: ${{ steps.ovie-next-build-cache-lookup.outputs.cache-hit != 'true' }}
+        run: NEXT_IGNORE_TYPECHECK=1 pnpm --filter @jovie/ovie build
+        env:
+          NEXT_PUBLIC_APP_URL: http://localhost:3105
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3105
+      - name: Measure Ovie Next build cache (trusted main only)
+        id: ovie-next-build-cache-size
+        if: ${{ success() && steps.ovie-next-build-cache-lookup.outputs.cache-hit != 'true' }}
+        env:
+          NEXT_BUILD_CACHE_MAX_BYTES: '3221225472'
+        run: |
+          set -euo pipefail
+          cache_root='apps/ovie/.next/cache/turbopack'
+          eligible=false
+          if [ -L "$cache_root" ]; then
+            echo "::error::Ovie Next build cache root must not be a symlink"
+            exit 1
+          fi
+          if [ -d "$cache_root" ]; then
+            cache_bytes="$(du -sb "$cache_root" | awk '{print $1}')"
+            echo "Ovie Next build cache size: ${cache_bytes} bytes"
+            if [ "$cache_bytes" -le "$NEXT_BUILD_CACHE_MAX_BYTES" ]; then
+              eligible=true
+            else
+              echo "::notice::Ovie Next build cache exceeds ${NEXT_BUILD_CACHE_MAX_BYTES} bytes; not saving."
+            fi
+          else
+            echo "::warning::Build left no ${cache_root}; nothing to save."
+          fi
+          echo "eligible=$eligible" >> "$GITHUB_OUTPUT"
+      - name: Save Ovie Next build cache (trusted main only)
+        if: ${{ success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && steps.ovie-next-build-cache-size.outputs.eligible == 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/ovie/.next/cache/turbopack
+          key: ${{ steps.ovie-next-build-cache-lookup.outputs.cache-primary-key }}

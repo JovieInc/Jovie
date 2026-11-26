@@ -3,9 +3,14 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const webRoot = path.resolve(__dirname, '../../../..');
+const repoRoot = path.resolve(webRoot, '../..');
 
 function readWebFile(relativePath: string) {
   return readFileSync(path.join(webRoot, relativePath), 'utf8');
+}
+
+function readRepoFile(relativePath: string) {
+  return readFileSync(path.join(repoRoot, relativePath), 'utf8');
 }
 
 const contextualActionColumns = [
@@ -35,7 +40,8 @@ describe('table action contract', () => {
     expect(source).toContain("headerVisibility: 'sr-only'");
     expect(source).not.toContain("actionVisibility: 'contextual'");
     expect(source).toContain("aria-label='Edit Jovie Profile'");
-    expect(source).toContain('aria-label={`Actions for ${row.label}`}');
+    expect(source).toContain('ariaLabel={`Actions for ${row.label}`}');
+    expect(source).toContain('TableRowOverflowTrigger');
   });
 
   it('routes legacy action renderers through the shared contextual slot', () => {
@@ -46,5 +52,24 @@ describe('table action contract', () => {
         'system-b-table-contextual-action'
       );
     }
+  });
+
+  it('locks one ranking capacity and one row-action bar over TableActionMenu', () => {
+    const ranking = readRepoFile('packages/ui/lib/action-ranking.ts');
+    expect(ranking).toContain('export const ACTION_OVERFLOW_MAX_PRIMARY = 2');
+    expect(ranking).toContain('export function partitionRankedActions');
+
+    const bar = readWebFile(
+      'components/organisms/table/molecules/TableRowActionBar.tsx'
+    );
+    expect(bar).toContain('partitionRankedActions');
+    expect(bar).toContain('TableActionMenu');
+    expect(bar).toContain('ACTION_OVERFLOW_MAX_PRIMARY');
+
+    const drawer = readWebFile(
+      'components/molecules/drawer-header/DrawerHeaderActions.tsx'
+    );
+    expect(drawer).toContain('ACTION_OVERFLOW_MAX_PRIMARY');
+    expect(drawer).toContain('TableActionMenu');
   });
 });

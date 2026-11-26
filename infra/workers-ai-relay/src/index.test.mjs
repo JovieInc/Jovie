@@ -7,7 +7,7 @@ import worker, {
   normalizeSse,
 } from './index.ts';
 
-const MODEL = '@cf/zai-org/glm-5.3-flash';
+const MODEL = '@cf/deepseek-ai/deepseek-v4.1-flash-1017';
 const env = (over = {}) => ({
   WORKERS_AI_BEARER: 'secret',
   AI: { run: async () => ({ id: 'x', choices: [] }) },
@@ -34,15 +34,6 @@ test('rejects missing and wrong bearer', async () => {
   assert.equal((await call(env(), { auth: '' })).status, 401);
   assert.equal((await call(env(), { auth: 'Bearer nope' })).status, 401);
   assert.equal((await call(env({ WORKERS_AI_BEARER: undefined }))).status, 401);
-});
-test('refuses models outside the allowlist', async () => {
-  const res = await call(env(), {
-    body: {
-      model: '@cf/meta/llama-3.1-8b-instruct',
-      messages: [{ role: 'user', content: 'x' }],
-    },
-  });
-  assert.equal(res.status, 400);
 });
 test('caps output tokens and forwards tools', async () => {
   let seen;

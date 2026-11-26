@@ -19,7 +19,7 @@ export const PROFILES_TABLE_SKELETON_COLUMNS = [
     header: 'Profile',
     size: 200,
     minSize: 140,
-    meta: { className: 'px-3' },
+    meta: { className: cn('px-3', styles.identityNameColumn) },
   },
   { id: 'type', header: 'Type', size: 48, meta: { className: 'hidden' } },
   {
@@ -32,25 +32,30 @@ export const PROFILES_TABLE_SKELETON_COLUMNS = [
     id: 'rank',
     header: 'Search Rank',
     size: 72,
-    meta: { className: 'max-lg:hidden' },
+    meta: { className: cn('max-lg:hidden', styles.identityDetailColumn) },
   },
   {
     id: 'change',
     header: 'Change',
     size: 78,
-    meta: { className: 'max-xl:hidden' },
+    meta: { className: cn('max-xl:hidden', styles.identityDetailColumn) },
   },
   {
     id: 'monitoring',
     header: 'Monitoring',
     size: 124,
-    meta: { className: 'hidden 2xl:table-cell' },
+    meta: {
+      className: cn('hidden 2xl:table-cell', styles.identityDetailColumn),
+    },
   },
   {
     id: 'actions',
     header: 'Actions',
     size: 112,
-    meta: { className: 'px-3', headerVisibility: 'sr-only' },
+    meta: {
+      className: cn('px-3', styles.identityActionsColumn),
+      headerVisibility: 'sr-only',
+    },
   },
 ] as ColumnDef<Record<string, never>, unknown>[];
 
@@ -77,7 +82,6 @@ export function ProfilesRouteSkeleton() {
       frame='none'
       contentPadding='none'
       surfaceMode='table'
-      maxWidth='wide'
       data-testid='profiles-route-skeleton'
       toolbar={
         <PageToolbar
@@ -99,8 +103,8 @@ export function ProfilesRouteSkeleton() {
         columns={PROFILES_TABLE_SKELETON_COLUMNS}
         skeletonColumnConfig={[...PROFILES_SKELETON_CONFIG]}
         skeletonRows={8}
-        rowMode='list'
-        containerClassName='min-h-0 flex-1'
+        rowMode='dense'
+        containerClassName={cn('min-h-0 flex-1', styles.identityContainer)}
         minWidth='0'
         className={styles.table}
       />

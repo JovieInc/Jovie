@@ -1,3 +1,4 @@
+import { PlainButton } from '@jovie/ui';
 import { ChevronRight } from 'lucide-react';
 import type { ComponentPropsWithoutRef, ReactElement } from 'react';
 import { cn, rowState } from '../table.styles';
@@ -106,7 +107,7 @@ export function getShellListRowFrameClassName({
         : '';
 
   return cn(
-    'relative min-w-0 rounded-md border border-transparent outline-none',
+    'relative min-w-0 rounded-md border-y border-transparent outline-none',
     rowState.base,
     chrome === 'shell' && 'system-b-table-row-shell',
     shellListRowDensityClassName[density],
@@ -214,7 +215,7 @@ export function ShellListRowButton({
   ...props
 }: Readonly<ShellListRowButtonProps>) {
   return (
-    <button
+    <PlainButton
       type={type}
       data-shell-list-row='true'
       data-selected={isSelected ? 'true' : undefined}

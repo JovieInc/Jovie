@@ -55,10 +55,7 @@ test('root node_modules installed from a different lockfile fails with the fix',
     assert.match(r.problems.join('\n'), /different lockfile/);
     assert.match(r.message, /node_modules is from a different install/);
     assert.ok(r.message.includes(INSTALL_FIX));
-    assert.match(
-      INSTALL_FIX,
-      /pnpm install --frozen-lockfile --prefer-offline/
-    );
+    assert.match(INSTALL_FIX, /pnpm install --offline --frozen-lockfile/);
   }));
 
 test('root node_modules without an installed lockfile copy fails', async () =>

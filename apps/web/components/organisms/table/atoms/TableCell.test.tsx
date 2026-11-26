@@ -37,7 +37,7 @@ describe('TableCell', () => {
 
     const cell = screen.getByRole('cell');
     expect(cell).toHaveClass('px-3');
-    expect(cell).toHaveClass('py-1');
+    expect(cell).not.toHaveClass('py-1');
     expect(cell).toHaveClass('text-app');
     expect(cell).toHaveClass('text-primary-token');
     expect(cell).not.toHaveClass('py-0.5');
@@ -55,7 +55,7 @@ describe('TableCell', () => {
       const cell = screen.getByRole('cell');
       expect(cell).toHaveClass(`text-${align}`);
       expect(cell).toHaveClass('px-3');
-      expect(cell).toHaveClass('py-1');
+      expect(cell).not.toHaveClass('py-1');
       expect(screen.getByText('High').parentElement).toHaveAttribute(
         'data-table-cell-content',
         'stable'

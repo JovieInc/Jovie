@@ -108,3 +108,24 @@ describe('HeaderSearchSurfaceFromContext', () => {
     expect(glyph?.getAttribute('class') ?? '').not.toContain('sidebar-muted');
   });
 });
+
+describe('HeaderSearchSurfaceFromContext PlainButton', () => {
+  it('renders the trigger as type=button and opens the palette on userEvent.click', async () => {
+    const user = userEvent.setup();
+    render(
+      <TooltipProvider>
+        <HeaderActionsProvider>
+          <HeaderSearchSurfaceFromContext calm />
+          <Probe />
+        </HeaderActionsProvider>
+      </TooltipProvider>
+    );
+    const trigger = screen.getByRole('button', {
+      name: 'Search chats in Jovie',
+    });
+    expect(trigger).toHaveAttribute('type', 'button');
+    expect(screen.getByText('Closed')).toBeInTheDocument();
+    await user.click(trigger);
+    expect(screen.getByText('Open')).toBeInTheDocument();
+  });
+});

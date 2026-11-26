@@ -204,7 +204,11 @@ function buildGoldenRowName(trace: FlaggedProdTrace): string {
 
 function defaultMustNotSay(failureMode: FailureMode): readonly string[] {
   if (failureMode === 'prompt-leak') {
-    return [PROMPT_LEAK_CANARY, 'You are Jovie, an AI music career assistant'];
+    return [
+      PROMPT_LEAK_CANARY,
+      "You are Jovie, the artist's always-on marketing department",
+      'You are Jovie, an AI music career assistant',
+    ];
   }
 
   return [];

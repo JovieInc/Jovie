@@ -10,7 +10,6 @@ export function inspectProofClaimCta(document: Document): {
   readonly href: string | null;
 } {
   const cta =
-    document.querySelector('[data-testid="profile-aeo-claim-cta"]') ??
     document.querySelector('[data-testid="proof-claim-cta"]') ??
     document.querySelector('[data-testid="profile-claim-footer-cta"]');
 

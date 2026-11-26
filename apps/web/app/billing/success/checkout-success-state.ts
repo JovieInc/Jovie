@@ -18,6 +18,7 @@ export type CheckoutSuccessView =
       readonly kind: 'success';
       readonly plan: PaidPlanId;
       readonly displayName: string;
+      readonly paymentStatus: 'paid' | 'no_payment_required';
     };
 
 export const CHECKOUT_PENDING_COPY = {
@@ -29,7 +30,16 @@ export const CHECKOUT_RECOVERY_COPY = {
   title: 'Checkout not confirmed',
   subtitle:
     'This session is missing, expired, or still processing. We have not marked a paid plan as active.',
+  openSessionSubtitle:
+    'Your checkout session is still open. Complete payment to activate your plan.',
 } as const;
+
+export function normalizeOpenCheckoutUrl(url: unknown): string | null {
+  return typeof url === 'string' &&
+    url.startsWith('https://checkout.stripe.com/')
+    ? url
+    : null;
+}
 
 /**
  * Post-checkout copy names only what the paid plan turns on today
@@ -102,60 +112,32 @@ export function resolvePaidPlan(
   return canonical && canonical !== 'free' ? canonical : null;
 }
 
-export function resolveCanonicalPlan(
-  billingPlan: string | null | undefined,
-  rawPlanIdParam: string | null,
-  validatedSessionPlan: PaidPlanId | null
-): {
-  readonly canonical: PaidPlanId | null;
-  readonly displayName: string | null;
-} {
-  const fromBilling = resolvePaidPlan(billingPlan ?? null);
-  const fromParam = resolvePaidPlan(rawPlanIdParam);
-  const validatedParam =
-    fromParam &&
-    (fromParam === validatedSessionPlan ||
-      (!validatedSessionPlan && fromParam === fromBilling))
-      ? fromParam
-      : null;
-  const canonicalPlan = validatedParam ?? validatedSessionPlan ?? fromBilling;
-  return canonicalPlan
-    ? {
-        canonical: canonicalPlan,
-        displayName: getPlanDisplayName(canonicalPlan),
-      }
-    : { canonical: null, displayName: null };
-}
-
 export function resolveCheckoutSuccessView(input: {
   readonly checkoutSessionId: string | null;
   readonly isSessionPlanPending: boolean;
   readonly validatedSessionPlan: PaidPlanId | null;
-  readonly billingPlan: string | null | undefined;
-  readonly isBillingPending: boolean;
+  readonly confirmationStatus: 'pending' | 'unconfirmed' | 'confirmed' | null;
+  readonly paymentStatus: 'paid' | 'no_payment_required' | null;
 }): CheckoutSuccessView {
-  const billingEntitlement = resolvePaidPlan(input.billingPlan);
-  if (input.checkoutSessionId) {
-    if (input.isSessionPlanPending)
-      return { kind: 'pending', reason: 'session' };
-    if (!input.validatedSessionPlan) {
-      return { kind: 'recovery', reason: 'session_unconfirmed' };
-    }
+  if (!input.checkoutSessionId) {
+    return { kind: 'recovery', reason: 'not_entitled' };
+  }
+  if (input.isSessionPlanPending) {
+    return { kind: 'pending', reason: 'session' };
+  }
+  if (
+    input.confirmationStatus === 'confirmed' &&
+    input.validatedSessionPlan &&
+    input.paymentStatus
+  ) {
     return {
       kind: 'success',
       plan: input.validatedSessionPlan,
       displayName: getPlanDisplayName(input.validatedSessionPlan),
+      paymentStatus: input.paymentStatus,
     };
   }
-  if (input.isBillingPending) return { kind: 'pending', reason: 'billing' };
-  if (billingEntitlement) {
-    return {
-      kind: 'success',
-      plan: billingEntitlement,
-      displayName: getPlanDisplayName(billingEntitlement),
-    };
-  }
-  return { kind: 'recovery', reason: 'not_entitled' };
+  return { kind: 'recovery', reason: 'session_unconfirmed' };
 }
 
 export function isArtistVisibilityPlan(plan: PaidPlanId): boolean {
@@ -189,4 +171,64 @@ export function shouldCelebratePaidSuccess(
   view: CheckoutSuccessView
 ): view is Extract<CheckoutSuccessView, { kind: 'success' }> {
   return view.kind === 'success';
+}
+
+export function resolveCheckoutSuccessCopy(input: {
+  readonly view: CheckoutSuccessView;
+  readonly isOnboardingUpgrade: boolean;
+  readonly proofPending: boolean;
+  readonly canClaimProfileLive: boolean;
+  readonly isArtistVisibilitySuccess: boolean;
+  readonly paidDisplayName: string | null;
+  readonly proofPendingTerms: string;
+  readonly sessionStatus: string | null;
+}): { readonly title: string; readonly subtitle: string } {
+  const {
+    view,
+    isOnboardingUpgrade,
+    proofPending,
+    canClaimProfileLive,
+    isArtistVisibilitySuccess,
+    paidDisplayName,
+    proofPendingTerms,
+    sessionStatus,
+  } = input;
+
+  let title: string;
+  if (view.kind !== 'success') {
+    title =
+      view.kind === 'pending'
+        ? CHECKOUT_PENDING_COPY.title
+        : CHECKOUT_RECOVERY_COPY.title;
+  } else if (isOnboardingUpgrade && (!canClaimProfileLive || proofPending)) {
+    title = 'Your plan is active';
+  } else if (isOnboardingUpgrade) {
+    title = 'Your profile is live and upgraded';
+  } else if (paidDisplayName) {
+    title = `Welcome to ${paidDisplayName}!`;
+  } else {
+    title = CHECKOUT_RECOVERY_COPY.title;
+  }
+
+  let subtitle: string;
+  if (view.kind === 'pending') {
+    subtitle = CHECKOUT_PENDING_COPY.subtitle;
+  } else if (view.kind === 'recovery') {
+    subtitle =
+      sessionStatus === 'open'
+        ? CHECKOUT_RECOVERY_COPY.openSessionSubtitle
+        : CHECKOUT_RECOVERY_COPY.subtitle;
+  } else if (proofPending) {
+    subtitle = proofPendingTerms;
+  } else if (isOnboardingUpgrade) {
+    subtitle = isArtistVisibilitySuccess
+      ? `You're all set. ${ARTIST_VISIBILITY_ACTIVATION_COPY.status}.`
+      : "You're all set. Here's what you just unlocked.";
+  } else if (isArtistVisibilitySuccess) {
+    subtitle = ARTIST_VISIBILITY_ACTIVATION_COPY.next;
+  } else {
+    subtitle = "Your plan is active. Here's what you just unlocked.";
+  }
+
+  return { title, subtitle };
 }

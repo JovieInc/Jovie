@@ -203,7 +203,8 @@ function buildProfilePageSchema(
   profile: CreatorProfile,
   artistName: string,
   profileUrl: string,
-  entityId: string
+  entityId: string,
+  aboutText?: string
 ): Record<string, unknown> {
   return {
     '@type': 'ProfilePage',
@@ -211,6 +212,7 @@ function buildProfilePageSchema(
     mainEntity: { '@id': entityId },
     url: profileUrl,
     name: `${artistName} | Jovie`,
+    ...(aboutText ? { description: aboutText } : {}),
     ...(profile.created_at && { dateCreated: profile.created_at }),
     ...(profile.updated_at && { dateModified: profile.updated_at }),
   };
@@ -302,7 +304,8 @@ export function generateProfileStructuredData(
   links: LegacySocialLink[],
   tourDates: TourDateViewModel[] = [],
   identityLinks: EntityIdentityLink[] = [],
-  entityMentions: readonly ProfileEntityMention[] = []
+  entityMentions: readonly ProfileEntityMention[] = [],
+  aboutText?: string
 ) {
   const artistName = profile.display_name || profile.username;
   const normalizedUsername =
@@ -325,7 +328,8 @@ export function generateProfileStructuredData(
     profile,
     artistName,
     profileUrl,
-    entityId
+    entityId,
+    aboutText
   );
   const breadcrumbSchema = buildBreadcrumbObject([
     { name: 'Home', url: BASE_URL },

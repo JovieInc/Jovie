@@ -115,7 +115,7 @@ Turbo 2.8 automatically shares local cache across Git worktrees. No configuratio
 git worktree add ../Jovie-agent-1 -b agent/task-1
 
 # Each worktree needs its own node_modules but shares turbo cache
-cd ../Jovie-agent-1 && pnpm install && pnpm turbo build
+cd ../Jovie-agent-1 && pnpm install --offline --frozen-lockfile && pnpm turbo build
 
 # Clean up when done
 git worktree remove ../Jovie-agent-1

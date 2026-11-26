@@ -45,8 +45,8 @@ vi.mock('./dashboard/DashboardDataContext', () => ({
     </div>
   ),
 }));
-vi.mock('@/features/workspace-lock/WorkspaceLockScreen', () => ({
-  WorkspaceLockScreen: () => <div>Unlock Ovie</div>,
+vi.mock('@/lib/app-shell/WorkspaceLockScreenLazy', () => ({
+  WorkspaceLockScreenLazy: () => <div>Unlock Ovie</div>,
 }));
 
 import { OviePrivacyLockControl } from '@/components/organisms/user-button/OviePrivacyLockControl';

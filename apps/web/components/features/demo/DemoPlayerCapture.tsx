@@ -1,7 +1,11 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import {
+  requestFullAudioPlayer,
+  useAudioChromeSnapshot,
+} from '@/components/organisms/audio-chrome-state';
 import { captureTrackPlayback } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { FOUNDER_DEMO_PERSONA } from '@/lib/demo-personas';
 import { formatReleaseArtistLine } from '@/lib/discography/formatting';
@@ -30,5 +34,17 @@ export function DemoPlayerCapture() {
       ),
     [currentTime]
   );
+  // A play lands in the sidebar O and leaves the full player closed (#26754).
+  // The capture exists to show the open dock, so once the lazily mounted
+  // player reports this track, ask it to open, once, the same way the O's
+  // Show Player does. A later close is left alone.
+  const { activeTrackId, fullPlayerVisible } = useAudioChromeSnapshot();
+  const openRequestedRef = useRef(false);
+  useEffect(() => {
+    if (openRequestedRef.current) return;
+    if (activeTrackId !== DEMO_PLAYER_RELEASE.id || fullPlayerVisible) return;
+    openRequestedRef.current = true;
+    requestFullAudioPlayer();
+  }, [activeTrackId, fullPlayerVisible]);
   return null;
 }

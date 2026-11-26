@@ -12,18 +12,15 @@ export interface AudienceReturningCellProps {
 /** Pre-allocated icon elements to avoid creating components during render. */
 const RETURNING_ICON = (
   <ArrowLeftRight
-    className='h-3.5 w-3.5 shrink-0 text-blue-400'
+    className='h-3.5 w-3.5 shrink-0 text-info'
     aria-hidden='true'
   />
 );
 const FIRST_ICON = (
-  <Star className='h-3.5 w-3.5 shrink-0 text-amber-400' aria-hidden='true' />
+  <Star className='h-3.5 w-3.5 shrink-0 text-warning' aria-hidden='true' />
 );
 const NEW_ICON = (
-  <Sparkles
-    className='h-3.5 w-3.5 shrink-0 text-emerald-400'
-    aria-hidden='true'
-  />
+  <Sparkles className='h-3.5 w-3.5 shrink-0 text-success' aria-hidden='true' />
 );
 
 export function AudienceReturningCell({

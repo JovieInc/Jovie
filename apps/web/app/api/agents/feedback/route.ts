@@ -4,10 +4,11 @@ import { captureError } from '@/lib/error-tracking';
 import { createFeedbackItem } from '@/lib/feedback';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
-  allowIfRateLimitBackendDegraded,
   createRateLimitHeaders,
   getClientIP,
   publicClickLimiter,
+  rateLimitDenialMessage,
+  rateLimitDenialStatus,
 } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
@@ -57,16 +58,20 @@ function fail(status: number, code: string, message: string, headers = {}) {
  */
 export async function POST(request: Request) {
   // ponytail: shares the public click bucket like /api/report; give it its
-  // own limiter if agent reports need a different budget.
-  const rateLimit = allowIfRateLimitBackendDegraded(
-    await publicClickLimiter.limit(getClientIP(request)),
-    { route: '/api/agents/feedback' }
-  );
+  // own limiter if agent reports need a different budget. Fail closed when
+  // Redis is unavailable so intake cannot become unbounded.
+  const rateLimit = await publicClickLimiter.limit(getClientIP(request));
   if (!rateLimit.success) {
     return fail(
-      429,
-      'RATE_LIMITED',
-      'Too many reports from this address.',
+      rateLimitDenialStatus(rateLimit),
+      rateLimit.unavailable === true
+        ? 'TEMPORARILY_UNAVAILABLE'
+        : 'RATE_LIMITED',
+      rateLimitDenialMessage(
+        rateLimit,
+        'Too many reports from this address.',
+        'Report intake is temporarily unavailable. Please try again later.'
+      ),
       createRateLimitHeaders(rateLimit)
     );
   }

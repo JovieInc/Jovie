@@ -143,7 +143,10 @@ export async function auditOvieAppShell(repoRoot = defaultRepoRoot) {
     table: [
       'apps/web/components/organisms/table/organisms/UnifiedTable.tsx',
       text =>
-        text.includes('rowHeight = TABLE_ROW_HEIGHTS.STANDARD') &&
+        // Dense 32px is owned via TABLE_CANONICAL_ROW_MODE (DRI-21); legacy
+        // TABLE_ROW_HEIGHTS.STANDARD default still satisfies the same geometry.
+        (text.includes('rowMode = TABLE_CANONICAL_ROW_MODE') ||
+          text.includes('rowHeight = TABLE_ROW_HEIGHTS.STANDARD')) &&
         text.includes("'w-full min-w-0 overflow-auto'"),
       'UnifiedTable must own full width and the canonical fixed row height',
     ],

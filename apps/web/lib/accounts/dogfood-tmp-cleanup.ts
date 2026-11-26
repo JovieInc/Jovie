@@ -19,6 +19,7 @@ import {
   FOUNDER_REVIEW_SOURCE,
   FOUNDER_REVIEW_UPLOAD_LEASE_SOURCE,
 } from '@/lib/founder-review/contract';
+import { PRODCERT_NEW_USER_EMAIL_PATTERN } from '@/lib/synthetic/prodcert-identities';
 import {
   DOGFOOD_ACCOUNT_EMAIL_TAG,
   FOUNDER_EMAIL_DOMAIN,
@@ -73,10 +74,52 @@ function tmpId(email: string): string {
   return email.slice(TMP_PREFIX.length, email.lastIndexOf('@'));
 }
 
+/**
+ * Per-run production certification users
+ * (`browse-ready+synthetic-prodcert-<run>@jov.ie`): every release signs one
+ * up through the real email-code flow, and nothing used to remove them.
+ * They are only needed for the run that made them, so two days is generous.
+ * The fixed canaries (returning, claim, chat-health, admin) never match the
+ * per-run pattern, so they are never touched.
+ */
+const PRODCERT_RUN_PREFIX = 'browse-ready+synthetic-prodcert-';
+const PRODCERT_RUN_LIKE = `${PRODCERT_RUN_PREFIX}%@jov.ie`;
+export const PRODCERT_RUN_MAX_AGE_DAYS = 2;
+
+export type TestAccountCleanupFamily = 'dogfood-tmp' | 'prodcert-run';
+
+interface FamilyRules {
+  readonly like: string;
+  readonly maxAgeDays: number;
+  readonly isExpired: (email: string, createdAt: Date, now: Date) => boolean;
+  readonly redact: (email: string) => string;
+}
+
+const FAMILIES: Record<TestAccountCleanupFamily, FamilyRules> = {
+  'dogfood-tmp': {
+    like: TMP_EMAIL_LIKE,
+    maxAgeDays: EPHEMERAL_DOGFOOD_MAX_AGE_DAYS,
+    isExpired: (email, createdAt, now) =>
+      isExpiredEphemeralDogfoodAccount({ email, createdAt }, now),
+    redact: email => `tmp-${tmpId(email)}`,
+  },
+  'prodcert-run': {
+    like: PRODCERT_RUN_LIKE,
+    maxAgeDays: PRODCERT_RUN_MAX_AGE_DAYS,
+    isExpired: (email, createdAt, now) =>
+      PRODCERT_NEW_USER_EMAIL_PATTERN.test(email) &&
+      now.getTime() - createdAt.getTime() >= PRODCERT_RUN_MAX_AGE_DAYS * DAY_MS,
+    redact: email =>
+      `run-${email.slice(PRODCERT_RUN_PREFIX.length, email.lastIndexOf('@'))}`,
+  },
+};
+
 export async function runDogfoodTmpCleanup(
   db: DogfoodTmpCleanupDb,
   options: {
     apply: boolean;
+    /** Which test-account family to sweep; the founder tmp family by default. */
+    family?: TestAccountCleanupFamily;
     now?: Date;
     sampleSize?: number;
     /** Runs after commit with the removed profiles' handles (cache busting). */
@@ -84,14 +127,13 @@ export async function runDogfoodTmpCleanup(
   }
 ): Promise<DogfoodTmpCleanupReport> {
   const now = options.now ?? new Date();
-  const cutoff = new Date(
-    now.getTime() - EPHEMERAL_DOGFOOD_MAX_AGE_DAYS * DAY_MS
-  );
+  const family = FAMILIES[options.family ?? 'dogfood-tmp'];
+  const cutoff = new Date(now.getTime() - family.maxAgeDays * DAY_MS);
   const guard = and(
     isNotNull(users.accountClass),
     isNull(users.deletedAt),
     lt(users.createdAt, cutoff),
-    drizzleSql`lower(${users.email}) like ${TMP_EMAIL_LIKE}`
+    drizzleSql`lower(${users.email}) like ${family.like}`
   );
 
   const handles: string[] = [];
@@ -137,12 +179,7 @@ export async function runDogfoodTmpCleanup(
     const matched: (typeof rows)[number][] = [];
     for (const row of rows) {
       const email = row.email?.trim().toLowerCase() ?? '';
-      if (
-        !isExpiredEphemeralDogfoodAccount(
-          { email, createdAt: row.createdAt },
-          now
-        )
-      ) {
+      if (!family.isExpired(email, row.createdAt, now)) {
         skippedNotEphemeral++;
       } else if (row.subscriptionId) {
         skippedBilling++;
@@ -233,7 +270,7 @@ export async function runDogfoodTmpCleanup(
       removed,
       sample: matched
         .slice(0, options.sampleSize ?? 10)
-        .map(row => `tmp-${tmpId(row.email ?? '')}`),
+        .map(row => family.redact(row.email ?? '')),
     } satisfies DogfoodTmpCleanupReport;
   });
   if (handles.length > 0) await options.afterRemoval?.(handles);

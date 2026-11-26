@@ -36,7 +36,10 @@ test.describe('canonical artist navigation', () => {
       };
       const before = await revision();
       try {
-        await certifyProfileModeHistory(page, testInfo, 'tim');
+        // /tim has no upcoming events, so JOV-14241 hides Events there.
+        await certifyProfileModeHistory(page, testInfo, 'tim', {
+          events: 'hidden',
+        });
       } finally {
         const after = await revision();
         const path = testInfo.outputPath('navigation-revision.json');

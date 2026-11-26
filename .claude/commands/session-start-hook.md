@@ -10,7 +10,7 @@ It ensures the development environment is properly configured before any work be
    # Check if node_modules exists and has content
    if [ ! -d "node_modules" ] || [ -z "$(ls -A node_modules 2>/dev/null)" ]; then
      echo "Installing dependencies..."
-     pnpm install --frozen-lockfile
+     pnpm install --offline --frozen-lockfile || pnpm install --prefer-offline --frozen-lockfile
    fi
    ```
 
@@ -37,7 +37,7 @@ Run the following commands to set up the environment:
 ```bash
 # 1. Install dependencies if needed
 if [ ! -d "node_modules" ] || [ -z "$(ls -A node_modules 2>/dev/null)" ]; then
-  pnpm install --frozen-lockfile
+  pnpm install --offline --frozen-lockfile || pnpm install --prefer-offline --frozen-lockfile
 fi
 
 # 2. Make hooks executable

@@ -78,6 +78,7 @@ struct ProfileLoadContext {
 final class AppState {
   let configuration: AppConfiguration
   let launchMode: LaunchMode
+  var readyShellInitialTab: AppShellTab = .chat // JOV-13845
   let brightnessManager: BrightnessControlling
 
   var route: AppRouter = .launching
@@ -248,6 +249,8 @@ final class AppState {
       dashboardState = .idle
       isOffline = false
     }
+
+    lockReadyShellIfCurrentlyReadyForFixtures()
   }
 
   func handleSignedInUserChange(_ userID: String?) async {
@@ -386,9 +389,8 @@ final class AppState {
     } else {
       // Paint the interactive shell immediately with a loading skeleton instead
       // of holding first-run users on SplashView for the full /me round-trip.
-      route = .ready
-      dashboardState = .loading
-      isOffline = false
+      // Optimistic first-value land; do not mark until a loaded ready profile.
+      enterSpeculativeReadyShell(dashboardState: .loading, isOffline: false)
       MobileAuthDiagnostics.record("mobile_me_loading")
     }
   }
@@ -440,9 +442,10 @@ final class AppState {
     if let error = error as? APIClientError, case .transportFailed = error {
       didTransportFail = true
     }
-    route = .ready
-    dashboardState = .error("Couldn't load your profile.")
-    isOffline = didTransportFail
+    enterSpeculativeReadyShell(
+      dashboardState: .error("Couldn't load your profile."),
+      isOffline: didTransportFail
+    )
     MobileAuthDiagnostics.record("mobile_me_error", detail: error.localizedDescription)
   }
 
@@ -456,8 +459,7 @@ final class AppState {
   private func apply(response: MobileMeResponse) {
     switch response.state {
     case .ready:
-      route = .ready
-      dashboardState = .loaded(response)
+      applyLoadedReadyProfile(response)
     case .needsOnboarding:
       route = .needsOnboarding
       // Keep the resolved profile payload so continueOnWebURL and cache paint
@@ -522,9 +524,7 @@ final class AppState {
 
   func retry() async {
     if launchMode.recoversProfileErrorOnRetry {
-      route = .ready
-      dashboardState = .loaded(.previewReady)
-      isOffline = false
+      enterSpeculativeReadyShell(dashboardState: .loaded(.previewReady), isOffline: false)
       return
     }
 

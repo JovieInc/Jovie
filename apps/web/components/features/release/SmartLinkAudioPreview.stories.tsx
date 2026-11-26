@@ -36,3 +36,52 @@ export const NoPreview: Story = {
     previewUrl: null,
   },
 };
+
+export const Empty: Story = {
+  args: {
+    previewUrl: null,
+  },
+};
+
+export const Partial: Story = {
+  args: {
+    artworkUrl: null,
+    isrc: null,
+    previewVerification: 'fallback',
+    previewSource: 'audio_url',
+  },
+};
+
+export const LongContent: Story = {
+  args: {
+    title:
+      'An Exceptionally Long Track Title That Keeps Going Well Past One Line Of Text',
+    artistName: 'An Equally Long Artist Name Collective Featuring Many Guests',
+    previewVerification: 'fallback',
+    previewSource: 'musicfetch',
+  },
+};
+
+function RtlDecorator({ children }: { readonly children: React.ReactNode }) {
+  return (
+    <div dir='rtl' className='w-full max-w-xs'>
+      {children}
+    </div>
+  );
+}
+
+export const Rtl: Story = {
+  args: {
+    title: 'أغنية بعنوان طويل جدا',
+    artistName: 'فنان',
+  },
+  decorators: [
+    function WithRtl(StoryComponent) {
+      return (
+        <RtlDecorator>
+          <StoryComponent />
+        </RtlDecorator>
+      );
+    },
+  ],
+};

@@ -1,6 +1,7 @@
 // @coverage-via apps/web/tests/unit/auth/AuthUnavailableCard.compact.test.tsx
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -35,7 +36,7 @@ export function AuthUnavailableCard({
       ? 'Sign up is temporarily unavailable'
       : 'Sign in is temporarily unavailable';
   const actionClassName =
-    'inline-flex h-(--linear-button-height-md) min-h-10 w-full items-center justify-center rounded-full border border-subtle bg-white dark:bg-surface-1 px-4 text-(--linear-caption-size) font-(--linear-caption-weight) text-(--color-bg-base) shadow-button transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle ease-out hover:bg-white dark:bg-surface-1/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/24 disabled:cursor-not-allowed disabled:opacity-70';
+    'inline-flex h-(--linear-button-height-md) min-h-10 w-full items-center justify-center rounded-full border border-subtle bg-on-media dark:bg-surface-1 px-4 text-(--linear-caption-size) font-(--linear-caption-weight) text-(--color-bg-base) shadow-button transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle ease-out hover:bg-on-media dark:bg-surface-1/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-media/24 disabled:cursor-not-allowed disabled:opacity-70';
 
   return (
     <section
@@ -52,10 +53,10 @@ export function AuthUnavailableCard({
       />
 
       <div className='mt-5 space-y-2'>
-        <h1 className='text-[1.5rem] font-[650] leading-[1.16] tracking-[-0.02em] text-white dark:text-white text-balance'>
+        <h1 className='text-[1.5rem] font-[650] leading-[1.16] tracking-[-0.02em] text-on-media text-balance'>
           {headline}
         </h1>
-        <p className='mx-auto max-w-[20rem] text-[0.875rem] leading-[1.55] tracking-[-0.011em] text-white/60 text-pretty'>
+        <p className='mx-auto max-w-[20rem] text-[0.875rem] leading-[1.55] tracking-[-0.011em] text-on-media/60 text-pretty'>
           This environment&apos;s sign-in setup is not ready.
         </p>
       </div>
@@ -66,9 +67,9 @@ export function AuthUnavailableCard({
           method='post'
           className='mt-5 flex w-full justify-center'
         >
-          <button type='submit' className={actionClassName}>
+          <PlainButton type='submit' className={actionClassName}>
             Reset session and retry
-          </button>
+          </PlainButton>
         </form>
       ) : (
         <div className='mt-5 flex w-full justify-center'>
@@ -79,18 +80,18 @@ export function AuthUnavailableCard({
       )}
 
       {showSignupLegal ? (
-        <p className='mt-4 text-xs leading-[1.6] tracking-[-0.01em] text-white/50'>
+        <p className='mt-4 text-xs leading-[1.6] tracking-[-0.01em] text-on-media/50'>
           By signing up, you agree to our{' '}
           <Link
             href={APP_ROUTES.LEGAL_TERMS}
-            className='rounded-md text-white/76 underline underline-offset-2 focus-ring-themed'
+            className='rounded-md text-on-media/76 underline underline-offset-2 focus-ring-themed'
           >
             Terms of Service
           </Link>{' '}
           and{' '}
           <Link
             href={APP_ROUTES.LEGAL_PRIVACY}
-            className='rounded-md text-white/76 underline underline-offset-2 focus-ring-themed'
+            className='rounded-md text-on-media/76 underline underline-offset-2 focus-ring-themed'
           >
             Privacy Policy
           </Link>

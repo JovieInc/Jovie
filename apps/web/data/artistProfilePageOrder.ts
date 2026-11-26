@@ -5,14 +5,15 @@ export type ArtistProfileSectionId =
   | 'adaptive'
   | 'outcomes'
   | 'capture'
+  | 'howItWorks'
+  | 'showcase'
+  | 'finalCta'
+  // Retained for Storybook / certificate fixtures that still mount cut sections.
   | 'opinionated'
   | 'specWall'
-  | 'showcase'
   | 'specBento'
-  | 'howItWorks'
   | 'releaseCycle'
-  | 'faq'
-  | 'finalCta';
+  | 'faq';
 
 export interface ArtistProfileSectionOrderEntry {
   readonly id: ArtistProfileSectionId;
@@ -27,6 +28,11 @@ export type ArtistProfileScreenshotSectionOrderEntry =
     readonly screenshotScenarioId: string;
   };
 
+/**
+ * Six-section homepage-system order for /solutions/artists (JOV-14242).
+ * The mode switcher lives inside the hero (`adaptive` test id) and is not a
+ * separate ordered sibling.
+ */
 export const ARTIST_PROFILE_SECTION_ORDER: readonly ArtistProfileSectionOrderEntry[] =
   [
     {
@@ -34,12 +40,6 @@ export const ARTIST_PROFILE_SECTION_ORDER: readonly ArtistProfileSectionOrderEnt
       label: 'Hero',
       testId: 'artist-profile-section-hero',
       screenshotScenarioId: 'artist-profile-hero-section-desktop',
-    },
-    {
-      id: 'adaptive',
-      label: 'Adaptive Profile',
-      testId: 'artist-profile-section-adaptive',
-      screenshotScenarioId: 'artist-profile-adaptive-section-desktop',
     },
     {
       id: 'outcomes',
@@ -54,44 +54,15 @@ export const ARTIST_PROFILE_SECTION_ORDER: readonly ArtistProfileSectionOrderEnt
       screenshotScenarioId: 'artist-profile-capture-section-desktop',
     },
     {
-      id: 'opinionated',
-      label: 'Opinionated by Design',
-      testId: 'artist-profile-section-opinionated',
-      screenshotScenarioId: 'artist-profile-opinionated-section-desktop',
-    },
-    {
-      id: 'specWall',
-      label: 'Product Truth',
-      testId: 'artist-profile-section-spec-wall',
-      screenshotScenarioId: 'artist-profile-spec-wall-section-desktop',
-    },
-    {
-      id: 'showcase',
-      label: 'Live Artist Sites',
-      testId: 'artist-profile-section-showcase',
-    },
-    {
-      id: 'specBento',
-      label: 'Platform Spec',
-      testId: 'artist-profile-section-spec-bento',
-    },
-    {
       id: 'howItWorks',
       label: 'How It Works',
       testId: 'artist-profile-section-how-it-works',
       screenshotScenarioId: 'artist-profile-how-it-works-section-desktop',
     },
     {
-      id: 'releaseCycle',
-      label: 'Release Cycle',
-      testId: 'artist-profile-section-release-cycle',
-    },
-    {
-      id: 'faq',
-      label: 'FAQ',
-      testId: 'artist-profile-section-faq',
-      screenshotScenarioId: 'artist-profile-faq-section-desktop',
-      enabledByFlag: 'FAQ',
+      id: 'showcase',
+      label: 'Live Artist Sites',
+      testId: 'artist-profile-section-showcase',
     },
     {
       id: 'finalCta',
@@ -110,6 +81,19 @@ function hasScreenshotScenario(
 export const ARTIST_PROFILE_SECTION_SCREENSHOT_ORDER =
   ARTIST_PROFILE_SECTION_ORDER.filter(hasScreenshotScenario);
 
-export const ARTIST_PROFILE_SECTION_TEST_IDS = Object.fromEntries(
-  ARTIST_PROFILE_SECTION_ORDER.map(section => [section.id, section.testId])
-) as Readonly<Record<ArtistProfileSectionId, string>>;
+export const ARTIST_PROFILE_SECTION_TEST_IDS: Readonly<
+  Record<ArtistProfileSectionId, string>
+> = {
+  hero: 'artist-profile-section-hero',
+  adaptive: 'artist-profile-section-adaptive',
+  outcomes: 'artist-profile-section-outcomes',
+  capture: 'artist-profile-section-capture',
+  howItWorks: 'artist-profile-section-how-it-works',
+  showcase: 'artist-profile-section-showcase',
+  finalCta: 'artist-profile-section-final-cta',
+  opinionated: 'artist-profile-section-opinionated',
+  specWall: 'artist-profile-section-spec-wall',
+  specBento: 'artist-profile-section-spec-bento',
+  releaseCycle: 'artist-profile-section-release-cycle',
+  faq: 'artist-profile-section-faq',
+};

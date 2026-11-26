@@ -4,7 +4,10 @@
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true,
     "types": ["node"],
-    "tsBuildInfoFile": ".cache/tsbuildinfo"
+    "tsBuildInfoFile": ".cache/tsbuildinfo",
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true
   },
   "include": ["*.ts"]
 }

@@ -87,7 +87,7 @@ describe('POST /api/admin/investors/links', () => {
     const data = await res.json();
 
     expect(res.status).toBe(400);
-    expect(data.error).toBe('Label is required');
+    expect(data.error).toBe('Invalid request body');
     expect(mockInsert).not.toHaveBeenCalled();
   });
 

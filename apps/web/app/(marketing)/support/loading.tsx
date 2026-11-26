@@ -18,10 +18,7 @@ export default function SupportLoading() {
         <div className='h-7 w-48 skeleton rounded' />
         <div className='mt-6 grid gap-6 sm:grid-cols-3'>
           {SUPPORT_CHANNEL_KEYS.map(channelKey => (
-            <div
-              key={channelKey}
-              className='rounded-2xl border border-subtle bg-surface-1 p-6'
-            >
+            <div key={channelKey} className='p-6'>
               <div className='h-5 w-5 skeleton rounded' />
               <div className='mt-4 h-5 w-28 skeleton rounded' />
               <div className='mt-2 h-4 w-full skeleton rounded' />

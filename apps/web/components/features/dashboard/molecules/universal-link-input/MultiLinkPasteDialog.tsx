@@ -7,7 +7,7 @@
  * which ones to add. Displays duplicate warnings for links that already exist.
  */
 
-import { Button } from '@jovie/ui';
+import { Button, PlainButton } from '@jovie/ui';
 
 import { Icon } from '@/components/atoms/Icon';
 import {
@@ -21,6 +21,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
+import { NEUTRAL_BRAND_FALLBACK_HEX } from '@/constants/platforms/brand-colors';
 import { cn } from '@/lib/utils';
 import { getContrastTextOnBrand } from '@/lib/utils/color';
 
@@ -75,13 +76,15 @@ function LinkItem({
   const { platform, normalizedUrl } = detectedLink;
 
   const iconMeta = getPlatformIconMetadata(platform.icon);
-  const iconHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
+  const iconHex = iconMeta?.hex
+    ? `#${iconMeta.hex}`
+    : `#${NEUTRAL_BRAND_FALLBACK_HEX}`;
 
   const isDisabled = isDuplicate;
   const isChecked = isSelected && !isDuplicate;
 
   return (
-    <button
+    <PlainButton
       type='button'
       onClick={onToggle}
       disabled={isDisabled}
@@ -91,16 +94,14 @@ function LinkItem({
       )}
     >
       {/* Checkbox */}
-      <div
+      <span
         className={cn(
           'flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition',
           getCheckboxStyles(isDisabled, isChecked)
         )}
       >
-        {isChecked && (
-          <Icon name='Check' className='h-3 w-3 text-white dark:text-white' />
-        )}
-      </div>
+        {isChecked && <Icon name='Check' className='h-3 w-3 text-on-accent' />}
+      </span>
 
       {/* Platform icon */}
       <span
@@ -120,7 +121,7 @@ function LinkItem({
             {platform.name}
           </span>
           {isDuplicate && (
-            <span className='flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-3xs font-caption text-amber-600 dark:text-amber-400'>
+            <span className='flex items-center gap-1 rounded bg-surface-3 px-1.5 py-0.5 text-3xs font-caption text-secondary-token'>
               <Icon name='AlertTriangle' className='h-3 w-3' />
               Already added
             </span>
@@ -128,7 +129,7 @@ function LinkItem({
         </div>
         <p className='truncate text-app text-tertiary-token'>{normalizedUrl}</p>
       </div>
-    </button>
+    </PlainButton>
   );
 }
 
@@ -146,19 +147,21 @@ export function MultiLinkPasteDialog({
 
   return (
     <Dialog open={open} onClose={onClose} size='md'>
-      <DialogTitle className='flex items-center gap-3'>
-        <div className='flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10'>
-          <Icon name='Link' className='h-4 w-4 text-accent' />
-        </div>
-        <span>
-          Found {totalLinks} link{totalLinks === 1 ? '' : 's'}
+      <DialogTitle>
+        <span className='flex items-center gap-3'>
+          <span className='flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10'>
+            <Icon name='Link' className='h-4 w-4 text-accent' />
+          </span>
+          <span>
+            Found {totalLinks} link{totalLinks === 1 ? '' : 's'}
+          </span>
         </span>
       </DialogTitle>
 
       <DialogDescription>
         Select which links you&apos;d like to add to your profile.
         {duplicateCount > 0 && (
-          <span className='text-amber-600 dark:text-amber-400'>
+          <span className='text-secondary-token'>
             {' '}
             {duplicateCount} already added.
           </span>

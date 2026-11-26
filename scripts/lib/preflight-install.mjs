@@ -15,7 +15,7 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 
 export const INSTALL_FIX =
-  'run `pnpm install --frozen-lockfile --prefer-offline` in this worktree';
+  'run `pnpm install --offline --frozen-lockfile` in this worktree (falls back to `pnpm install --prefer-offline --frozen-lockfile` when the store is cold)';
 
 const sha = text => createHash('sha256').update(text).digest('hex');
 

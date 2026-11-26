@@ -65,6 +65,26 @@ export function evidenceLabel(href: string): string {
   }
 }
 
+const IMAGE_KIND_ORDER = ['after', 'overlay', 'baseline'] as const;
+
+/**
+ * The only image-bearing field an inbox case carries is `evidence`: Visual QA
+ * refs (`/api/admin/hud/visual-qa/<run>/<surface>/<kind>`) serve PNGs. Other
+ * evidence (PRs, Linear issues, links) has no preview, so no thumbnail.
+ */
+export function decisionCardThumbnail(
+  evidence: readonly string[]
+): string | null {
+  const images = evidence.filter(ref =>
+    ref.startsWith('/api/admin/hud/visual-qa/')
+  );
+  for (const kind of IMAGE_KIND_ORDER) {
+    const match = images.find(ref => ref.split('?')[0].endsWith(`/${kind}`));
+    if (match) return match;
+  }
+  return null;
+}
+
 function isRenderableEvidence(ref: string): boolean {
   return (
     /^https?:\/\//u.test(ref) || ref.startsWith('/api/admin/hud/visual-qa/')

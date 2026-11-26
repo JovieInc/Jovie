@@ -63,6 +63,7 @@ export const SCREEN_CERT_SMARTLINK_FIXTURE_CREATOR: FixtureCreator = {
   appleMusicUrl: null,
   youtubeUrl: null,
   musicbrainzId: null,
+  isPublic: true,
   isClaimed: true,
 };
 

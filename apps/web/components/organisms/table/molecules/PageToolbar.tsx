@@ -2,6 +2,7 @@
 
 // @coverage-via apps/web/tests/unit/components/table/PageToolbar.test.tsx
 import { Button, TooltipShortcut } from '@jovie/ui';
+import { ACTION_BUTTON_PRESET } from '@jovie/ui/atoms/button-contract';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import type { ComponentProps, ReactNode } from 'react';
@@ -246,7 +247,7 @@ export function PageToolbarActionButton({
     <Button
       type='button'
       variant='ghost'
-      size='sm'
+      size={ACTION_BUTTON_PRESET.size}
       onClick={onClick}
       disabled={disabled}
       {...buttonProps}
