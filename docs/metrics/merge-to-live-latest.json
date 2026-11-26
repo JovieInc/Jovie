@@ -1,106 +1,106 @@
 {
   "schema": "jovie-merge-to-live/v1",
-  "generatedAt": "2026-11-24T19:24:43.062Z",
+  "generatedAt": "2026-11-26T18:15:05.542Z",
   "unit": "seconds",
   "promotions": 10,
   "leadSeconds": {
     "n": 10,
-    "p50": 3697,
-    "p95": 4357
+    "p50": 2913,
+    "p95": 4521
   },
   "stages": {
     "ci_staging": {
       "n": 10,
-      "p50": 2062,
-      "p95": 3071
+      "p50": 1629,
+      "p95": 2061
     },
     "prod_queue": {
       "n": 10,
-      "p50": 418,
-      "p95": 935
+      "p50": 4,
+      "p95": 1544
     },
     "pre_promote": {
       "n": 10,
-      "p50": 283,
-      "p95": 376
+      "p50": 280,
+      "p95": 410
     },
     "promote": {
       "n": 10,
-      "p50": 934,
-      "p95": 1086
+      "p50": 841,
+      "p95": 1063
     }
   },
   "slowestStage": "ci_staging",
   "latest": [
     {
-      "sha": "28b315d",
-      "mergedAt": "2026-11-24T17:49:47Z",
-      "liveAt": "2026-11-24T18:44:19Z",
-      "leadSeconds": 3272,
-      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45458910832"
+      "sha": "16912aa",
+      "mergedAt": "2026-11-26T06:52:24Z",
+      "liveAt": "2026-11-26T08:07:45Z",
+      "leadSeconds": 4521,
+      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45774486659"
     },
     {
-      "sha": "8cc5dea",
-      "mergedAt": "2026-11-24T15:51:07Z",
-      "liveAt": "2026-11-24T16:52:44Z",
-      "leadSeconds": 3697,
-      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45436183730"
+      "sha": "39be173",
+      "mergedAt": "2026-11-26T06:32:13Z",
+      "liveAt": "2026-11-26T07:31:12Z",
+      "leadSeconds": 3539,
+      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45771947637"
     },
     {
-      "sha": "b87d489",
-      "mergedAt": "2026-11-24T15:18:13Z",
-      "liveAt": "2026-11-24T16:14:29Z",
-      "leadSeconds": 3376,
-      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45430401631"
+      "sha": "045040d",
+      "mergedAt": "2026-11-26T06:08:57Z",
+      "liveAt": "2026-11-26T06:57:15Z",
+      "leadSeconds": 2898,
+      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45769573168"
     },
     {
-      "sha": "6ac9abf",
-      "mergedAt": "2026-11-24T12:38:39Z",
-      "liveAt": "2026-11-24T13:40:45Z",
-      "leadSeconds": 3726,
-      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45401441663"
+      "sha": "b444e3d",
+      "mergedAt": "2026-11-26T02:39:52Z",
+      "liveAt": "2026-11-26T03:34:52Z",
+      "leadSeconds": 3300,
+      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45746783570"
     },
     {
-      "sha": "dde812f",
-      "mergedAt": "2026-11-24T11:38:33Z",
-      "liveAt": "2026-11-24T12:46:51Z",
-      "leadSeconds": 4098,
-      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45391923657"
+      "sha": "b3cb871",
+      "mergedAt": "2026-11-26T02:23:05Z",
+      "liveAt": "2026-11-26T03:10:04Z",
+      "leadSeconds": 2819,
+      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45745681914"
     },
     {
-      "sha": "d00d68b",
-      "mergedAt": "2026-11-24T08:48:53Z",
-      "liveAt": "2026-11-24T09:47:59Z",
-      "leadSeconds": 3546,
-      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45364699523"
+      "sha": "70ba6ae",
+      "mergedAt": "2026-11-25T23:58:40Z",
+      "liveAt": "2026-11-26T00:50:37Z",
+      "leadSeconds": 3117,
+      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45729529018"
     },
     {
-      "sha": "bbd5b16",
-      "mergedAt": "2026-11-24T08:13:17Z",
-      "liveAt": "2026-11-24T09:22:41Z",
-      "leadSeconds": 4164,
-      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45360074410"
+      "sha": "7088e60",
+      "mergedAt": "2026-11-25T23:28:33Z",
+      "liveAt": "2026-11-26T00:17:06Z",
+      "leadSeconds": 2913,
+      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45725005579"
     },
     {
-      "sha": "30e5a96",
-      "mergedAt": "2026-11-24T08:00:46Z",
-      "liveAt": "2026-11-24T08:54:52Z",
-      "leadSeconds": 3246,
-      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45356602675"
+      "sha": "59fb6f4",
+      "mergedAt": "2026-11-25T06:19:12Z",
+      "liveAt": "2026-11-25T07:08:33Z",
+      "leadSeconds": 2961,
+      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45563348873"
     },
     {
-      "sha": "e9f4163",
-      "mergedAt": "2026-11-24T06:59:28Z",
-      "liveAt": "2026-11-24T08:12:05Z",
-      "leadSeconds": 4357,
-      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45351130736"
+      "sha": "e70e9a3",
+      "mergedAt": "2026-11-25T04:17:11Z",
+      "liveAt": "2026-11-25T04:57:02Z",
+      "leadSeconds": 2391,
+      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45548805430"
     },
     {
-      "sha": "fc71155",
-      "mergedAt": "2026-11-24T06:16:46Z",
-      "liveAt": "2026-11-24T07:29:20Z",
-      "leadSeconds": 4354,
-      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45343818510"
+      "sha": "4a6c382",
+      "mergedAt": "2026-11-25T03:35:08Z",
+      "liveAt": "2026-11-25T04:12:41Z",
+      "leadSeconds": 2253,
+      "receipt": "https://github.com/JovieInc/Jovie/actions/runs/45542892859"
     }
   ]
 }
