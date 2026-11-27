@@ -939,16 +939,16 @@ describe('Playwright artifact secret boundary', () => {
   }, 120_000);
 
   it.each([0, 37])(
-    'keeps Storybook base-fetch auth scoped and propagates exit %i',
+    'keeps structural base-fetch auth scoped and propagates exit %i',
     fetchExit => {
       const workflow = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
-      const job = jobBlock(workflow, 'ci-fast-remaining-shards');
+      const job = jobBlock(workflow, 'ci-path-changes');
       const step = stepBlock(job, 'Decide structural lane');
       expect(step).toContain('GH_TOKEN: ${{ github.token }}');
-      const command = step
-        .split(/ {8}run: (?:&[\w-]+ )?\|\n/)[1]
-        .replaceAll('${{ github.event_name }}', 'pull_request')
-        .replaceAll('${{ github.base_ref }}', 'main');
+      const command = readFileSync(
+        join(repoRoot, '.github/scripts/select-ci-structural-lane.sh'),
+        'utf8'
+      );
       const directory = fixture();
       const calls = join(directory, 'calls');
       const result = spawnSync(
@@ -973,6 +973,8 @@ describe('Playwright artifact secret boundary', () => {
           encoding: 'utf8',
           env: {
             ...process.env,
+            GITHUB_EVENT_NAME: 'pull_request',
+            GITHUB_BASE_REF: 'main',
             GH_TOKEN: 'fixture-token',
             FETCH_EXIT: String(fetchExit),
             FETCH_CALLS: calls,

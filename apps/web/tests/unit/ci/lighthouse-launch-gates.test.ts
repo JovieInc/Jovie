@@ -303,7 +303,7 @@ describe('Lighthouse identity admission', () => {
     // run_full_ci (from run_dashboard_lighthouse) gates every probe step, so a
     // PR touching only one of these must not skip the measurement and pass.
     const source = readFileSync(
-      join(REPO_ROOT, '.github/workflows/ci.yml'),
+      join(REPO_ROOT, '.github/scripts/detect-ci-path-changes.sh'),
       'utf8'
     );
     const match = source.match(/DASHBOARD_LIGHTHOUSE_PATTERN='([^']+)'/);

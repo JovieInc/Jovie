@@ -409,7 +409,8 @@ runtime behavior, or Summer commissioning.
 - Groups stuck in AWAITING_CHECKS with a CI run named
   `.github/workflows/ci.yml`, zero jobs and event `push` on the
   `gh-readonly-queue/*` ref: GitHub could not load ci.yml, so no merge_group
-  check reports. The known cause is an interpolated `run:` script whose
+  check reports. Known causes include a workflow exceeding the 500 KB file
+  limit and an interpolated `run:` script whose
   `format()` expression exceeds GitHub's 21,000-character limit (2026-10-20,
   #21826). `node scripts/workflow-expression-budget.mjs --ref HEAD --merge-with
   origin/main` reproduces it. Source Validation runs that check on the head and

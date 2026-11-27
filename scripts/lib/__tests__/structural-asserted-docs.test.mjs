@@ -8,17 +8,13 @@ import {
   structuralControlPattern,
 } from '../structural-asserted-doc-paths.mjs';
 
-const CI_WORKFLOW = readFileSync(
-  resolve(REPO_ROOT, '.github/workflows/ci.yml'),
+const STRUCTURAL_DECISION = readFileSync(
+  resolve(REPO_ROOT, '.github/scripts/select-ci-structural-lane.sh'),
   'utf8'
 );
 
 function structuralUiPattern() {
-  const decision = CI_WORKFLOW.slice(
-    CI_WORKFLOW.indexOf('- name: Decide structural lane'),
-    CI_WORKFLOW.indexOf('- name: Select Storybook browser proof')
-  );
-  const match = decision.match(/STRUCTURAL_UI_PATTERN='([^']+)'/);
+  const match = STRUCTURAL_DECISION.match(/STRUCTURAL_UI_PATTERN='([^']+)'/);
   expect(match, 'STRUCTURAL_UI_PATTERN in Decide structural lane').toBeTruthy();
   return match[1];
 }

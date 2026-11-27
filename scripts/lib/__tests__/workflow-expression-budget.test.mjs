@@ -16,6 +16,8 @@ import {
   formatExpressionLength,
   introducedOverBudget,
   runScriptSizes,
+  WORKFLOW_FILE_BYTE_LIMIT,
+  workflowFileSizesAt,
 } from '../../workflow-expression-budget.mjs';
 
 const SCRIPT = resolve('scripts/workflow-expression-budget.mjs');
@@ -228,5 +230,67 @@ test('the workflow load guard runs from a trusted-base extraction (JOV-8840)', (
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(guardRoot, { recursive: true, force: true });
+  }
+});
+
+test('whole-file byte budget rejects new violations even without a YAML parser', () => {
+  const root = mkdtempSync(join(tmpdir(), 'workflow-byte-budget-'));
+  const git = (...args) =>
+    execFileSync('git', args, { cwd: root, encoding: 'utf8', env: fixtureEnv });
+  const path = '.github/workflows/whole-file.yml';
+  const write = text => writeFileSync(join(root, path), text);
+  const run = (yamlLoader, ...args) =>
+    spawnSync(process.execPath, [SCRIPT, ...args], {
+      cwd: root,
+      encoding: 'utf8',
+      env: { ...fixtureEnv, WORKFLOW_BUDGET_YAML: yamlLoader },
+    });
+  try {
+    git('init', '--quiet', '--initial-branch=main');
+    git('config', 'user.name', 'Budget test');
+    git('config', 'user.email', 'budget@example.invalid');
+    mkdirSync(join(root, '.github/workflows'), { recursive: true });
+    write(workflow('echo healthy'));
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'base');
+    git('checkout', '--quiet', '-b', 'over');
+    // UTF-8 characters consume multiple bytes. The file contains no Actions
+    // interpolation, so the original expression-only budget cannot catch it.
+    const padding = `# ${'é'.repeat(250_000)}\n`;
+    const oversized = workflow('echo plain') + padding;
+    assert.ok(oversized.length < WORKFLOW_FILE_BYTE_LIMIT);
+    write(oversized);
+    git('commit', '--quiet', '-am', 'oversized');
+    assert.deepEqual(workflowFileSizesAt('HEAD', root), [
+      { path, length: Buffer.byteLength(oversized) },
+    ]);
+    const exact = run('yq', '--ref', 'HEAD');
+    assert.equal(exact.status, 1, exact.stdout + exact.stderr);
+    assert.match(exact.stdout, /over the 500000-byte budget/);
+    const introduced = run('yq', '--ref', 'over', '--introduced-since', 'main');
+    assert.equal(introduced.status, 1, introduced.stdout + introduced.stderr);
+    assert.match(introduced.stdout, /combined head over: workflow file is/);
+    const inherited = run('yq', '--ref', 'over', '--introduced-since', 'over');
+    assert.equal(inherited.status, 0, inherited.stdout + inherited.stderr);
+    assert.match(inherited.stdout, /already exceeded at the group base/);
+
+    // Existing file overflow cannot hide a newly unloadable expression.
+    write(workflow(detectScript(21_052)) + padding);
+    git('commit', '--quiet', '-am', 'expression overflow on oversized base');
+    const newExpression = run(
+      '',
+      '--ref',
+      'HEAD',
+      '--introduced-since',
+      'HEAD^'
+    );
+    assert.equal(
+      newExpression.status,
+      1,
+      newExpression.stdout + newExpression.stderr
+    );
+    assert.match(newExpression.stdout, /over the 20950 budget/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

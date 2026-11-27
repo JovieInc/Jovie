@@ -80,7 +80,7 @@ const LEDGER = {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-remaining-shards/Decide structural lane': {
+  'ci-path-changes/Decide structural lane': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
@@ -100,10 +100,6 @@ const LEDGER = {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-structural-python/Decide structural lane': {
-    kind: 'git-auth',
-    greenGroupCalls: 0,
-  },
   'ci-fast-structural-python/Run structural pytest shards': {
     kind: 'git-auth',
     greenGroupCalls: 0,
@@ -112,19 +108,11 @@ const LEDGER = {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-structural-web/Decide structural lane': {
-    kind: 'git-auth',
-    greenGroupCalls: 0,
-  },
   'ci-fast-structural-web/Run structural web commands': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
   'ci-fast-structural-lanes-shards/Start base-branch history fetch': {
-    kind: 'git-auth',
-    greenGroupCalls: 0,
-  },
-  'ci-fast-structural-lanes-shards/Decide structural lane': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
@@ -238,10 +226,16 @@ describe('ci.yml merge-group GITHUB_TOKEN budget', () => {
   it('uses the token only for git in git-auth shell steps', () => {
     for (const { key, step } of tokenSteps()) {
       if (LEDGER[key]?.kind !== 'git-auth') continue;
-      const run = String(step.run ?? '');
-      if (run.trim() === 'node scripts/ci-fast-lanes.mjs') continue;
-      expect(run, key).not.toMatch(/\bgh\s|\bcurl\b|api\.github\.com|octokit/);
-      expect(run, key).toContain('extraheader');
+      const run = String(step.run ?? '').trim();
+      if (run === 'node scripts/ci-fast-lanes.mjs') continue;
+      const script = /^bash (\.github\/scripts\/[\w-]+\.sh)$/.exec(run);
+      const source = script
+        ? readFileSync(resolve(ROOT, script[1]), 'utf8')
+        : run;
+      expect(source, key).not.toMatch(
+        /\bgh\s|\bcurl\b|api\.github\.com|octokit/
+      );
+      expect(source, key).toContain('extraheader');
     }
   });
 
@@ -268,7 +262,7 @@ describe('ci.yml merge-group GITHUB_TOKEN budget', () => {
 
   it('makes no REST call when a merge group decides the structural lane', () => {
     const decide = tokenSteps().find(
-      ({ key }) => key === 'ci-fast-structural-web/Decide structural lane'
+      ({ key }) => key === 'ci-path-changes/Decide structural lane'
     )?.step.run;
     expect(decide).toBeTruthy();
     const dir = mkdtempSync(join(tmpdir(), 'mg-token-budget-'));
@@ -282,18 +276,19 @@ describe('ci.yml merge-group GITHUB_TOKEN budget', () => {
       writeFileSync(calls, '');
       const output = join(dir, 'output');
       writeFileSync(output, '');
-      const script = String(decide).replaceAll(
-        '${{ github.event_name }}',
-        'merge_group'
+      const result = spawnSync(
+        'bash',
+        ['-euo', 'pipefail', '-c', String(decide)],
+        {
+          env: {
+            GITHUB_EVENT_NAME: 'merge_group',
+            PATH: `${dir}:${process.env.PATH}`,
+            GH_TOKEN: 'test-token',
+            GITHUB_OUTPUT: output,
+          },
+          encoding: 'utf8',
+        }
       );
-      const result = spawnSync('bash', ['-euo', 'pipefail', '-c', script], {
-        env: {
-          PATH: `${dir}:${process.env.PATH}`,
-          GH_TOKEN: 'test-token',
-          GITHUB_OUTPUT: output,
-        },
-        encoding: 'utf8',
-      });
       expect(result.status, result.stderr).toBe(0);
       expect(readFileSync(output, 'utf8')).toContain('skip=false');
       expect(readFileSync(calls, 'utf8')).toBe('');
