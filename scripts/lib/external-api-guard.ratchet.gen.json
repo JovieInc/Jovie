@@ -109,9 +109,6 @@
     ".github/workflows/agent-harness-health-report.yml": {
       "gh-shell": 3
     },
-    ".github/workflows/ci-duration-ratchet.yml": {
-      "gh-shell": 1
-    },
     ".github/workflows/ci.yml": {
       "gh-shell": 2,
       "github-script": 1,

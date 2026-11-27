@@ -94,35 +94,6 @@ export function prProvider(pr) {
 }
 
 /**
- * Per-workflow/per-event CI wall-clock percentiles for runs created inside
- * [sinceMs, nowMs]. Returns { '<event>.p95': seconds|null, detail: {...} }.
- */
-export function ciWalltimeByEvent(
-  runs,
-  sinceMs,
-  nowMs,
-  events = ['pull_request', 'merge_group']
-) {
-  const out = {};
-  for (const event of events) {
-    const durations = (runs ?? [])
-      .filter(
-        r =>
-          r &&
-          r.event === event &&
-          r.status === 'completed' &&
-          r.conclusion === 'success' &&
-          Date.parse(r.created_at) >= sinceMs &&
-          Date.parse(r.created_at) <= nowMs
-      )
-      .map(r => secondsBetween(r.created_at, r.updated_at))
-      .filter(Number.isFinite);
-    out[event] = percentiles(durations);
-  }
-  return out;
-}
-
-/**
  * Merge-queue wait + ejection. timelines: per-PR arrays of
  * { type: 'added_to_merge_queue'|'removed_from_merge_queue'|'merged', at: ISO }.
  * Wait = last added_to_merge_queue → merged. Ejection = removed without merge.
@@ -477,7 +448,11 @@ function heldDays(history, key, base, fraction) {
  *   tightenCandidates[] : { key, baseline, observed } — eligible for ratchet PR
  *   throughput        : { wowGrowth, growthTrend, flatWeeks, flatStall }
  */
-export function evaluateShippingSlo(flat, baseline, { today = null } = {}) {
+export function evaluateShippingSlo(
+  flat,
+  baseline,
+  { today = null, ciGateHistory = null } = {}
+) {
   const thresholds = { ...DEFAULT_THRESHOLDS, ...(baseline?.thresholds ?? {}) };
   const base = baseline?.metrics ?? {};
   const history = baseline?.history ?? [];
@@ -519,10 +494,19 @@ export function evaluateShippingSlo(flat, baseline, { today = null } = {}) {
     if (
       isImproved(def.key, observed, baseValue, thresholds.improvementFraction)
     ) {
-      // today counts as one held day; the rest must come from history.
+      // A new endpoint can tighten its target only across comparable days.
+      const comparableHistory =
+        ciGateHistory && def.key.startsWith('ci_walltime.')
+          ? ciGateHistory
+          : history;
       const held =
         1 +
-        heldDays(history, def.key, baseValue, thresholds.improvementFraction);
+        heldDays(
+          comparableHistory,
+          def.key,
+          baseValue,
+          thresholds.improvementFraction
+        );
       if (held >= thresholds.improvementHoldDays)
         tightenCandidates.push({
           key: def.key,

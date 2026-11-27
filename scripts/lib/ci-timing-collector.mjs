@@ -15,6 +15,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import {
+  attemptJobsPath,
   CAPS,
   ghApi,
   pruneDeletions,
@@ -304,7 +305,7 @@ export async function collectRunRows({
   // rerun's jobs: the general /runs/{id}/jobs URL serves the latest attempt
   // and can mix two attempts' jobs when a rerun starts mid-collection.
   const attempt = Number(run.run_attempt) || 1;
-  const jobsPath = `/repos/{owner}/{repo}/actions/runs/${run.id}/attempts/${attempt}/jobs?per_page=${CAPS.jobsPerPage}`;
+  const jobsPath = attemptJobsPath(run.id, attempt);
   const {
     items: jobs,
     pagesFetched,

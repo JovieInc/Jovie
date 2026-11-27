@@ -1,12 +1,13 @@
 name: CI Duration Ratchet
 # clock-class: skip-if-unchanged
-# github-token-budget: 201 calls/run - one p95 sample read, plus at most ~200 total_count and skipped-run reads by the fan-out budget job (scripts/ci-trigger-budget.mjs) once a night
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: TimWhite
+# necessary-trust-boundary: The existing hosted clock checks the read-only Shipping SLO receipt and fleet fan-out budgets, and attributes unattended failures to their original probe for remediation. It never modifies CI admission or release authority.
+# removal-trigger: Remove this clock when the Shipping SLO publisher and native workflow health evidence enforce receipt freshness, dev-loop and fan-out checks and publish probe-specific outcomes.
+# github-token-budget: 201 calls/run - one unchanged-SHA read, plus at most ~200 total_count and skipped-run reads by the fan-out budget job (scripts/ci-trigger-budget.mjs) once a night
 
-# Nightly p95 gate-duration measurement + SLO guard.
-# Measures the rolling p95 wall-clock of recent PR merge-gate CI runs and
-# warns when p95 exceeds the committed baseline + margin.
-# Baseline lockfile: .github/ci-harness/duration-ratchet.json
-# CLI:               node scripts/ci-duration-ratchet.mjs
+# Nightly freshness and p95 guard over Shipping SLO's canonical gate evidence.
+# Dev-loop latency and workflow fan-out are independently measured here.
 
 on:
   schedule:
@@ -26,11 +27,6 @@ on:
       - 'scripts/dev-loop-latency.mjs'
       - 'apps/web/scripts/next-proxy-guard.mjs'
   workflow_dispatch:
-    inputs:
-      sample_limit:
-        description: 'Number of recent CI runs to sample (default: 50)'
-        required: false
-        default: '50'
 
 permissions:
   contents: read
@@ -39,7 +35,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: ci-duration-ratchet
+  group: ci-duration-ratchet-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
@@ -47,6 +43,9 @@ jobs:
     # Local (pre-CI) loop: every .husky/pre-commit rung + pre-push publication
     # against budgets in scripts/dev-loop-latency.mjs.
     name: Measure dev-loop hook latency
+    outputs:
+      hooks-proof: ${{ steps.time-hooks.outcome == 'success' }}
+      scheduled-proof: ${{ steps.time-hooks.outcome == 'success' && steps.typecheck.outcome == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -67,10 +66,12 @@ jobs:
         if: steps.unchanged.outputs.skip != 'true'
 
       - name: Time pre-commit and pre-push rungs
+        id: time-hooks
         if: steps.unchanged.outputs.skip != 'true'
         run: node scripts/dev-loop-latency.mjs
 
       - name: Enforce repeated typecheck performance ratchet
+        id: typecheck
         if: github.event_name != 'push' && steps.unchanged.outputs.skip != 'true'
         run: pnpm typecheck:performance -- --scenario ci --samples 3 --enforce --output "$RUNNER_TEMP/typecheck-performance.json"
 
@@ -93,112 +94,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Measure p95 and check ratchet
-        id: measure
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          SAMPLE_LIMIT: ${{ github.event.inputs.sample_limit || '50' }}
+      - name: Check canonical source and combined gate evidence
         run: |
           set -euo pipefail
-
-          # Fetch recent completed CI runs on PRs (pull_request event only).
-          # We compute wall-clock from run.created_at to run.updated_at for
-          # runs where all merge-gate jobs succeeded, which approximates
-          # fast-gate wall-clock (the dominant gate tier on PRs).
-          RUNS=$(gh api \
-            "repos/$GH_REPO/actions/workflows/ci.yml/runs?event=pull_request&status=success&per_page=$SAMPLE_LIMIT" \
-            --jq '.workflow_runs[] | {id: .id, created_at: .created_at, updated_at: .updated_at}' \
-            2>/dev/null || echo "")
-
-          if [[ -z "$RUNS" ]]; then
-            echo "No completed CI runs found; skipping measurement."
-            echo "p95_seconds=" >> "$GITHUB_OUTPUT"
-            echo "sample_size=0" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          # Compute elapsed seconds for each run (created_at → updated_at).
-          # jq iterates line-by-line; each line is a JSON object from above.
-          DURATIONS=$(echo "$RUNS" | jq -r '
-            (.updated_at | fromdateiso8601) - (.created_at | fromdateiso8601)
-            | if . < 0 then 0 else . end
-          ')
-
-          SAMPLE_SIZE=$(echo "$DURATIONS" | wc -l | tr -d ' ')
-
-          # Compute p95 via sort + head (shell math for percentile).
-          SORTED=$(echo "$DURATIONS" | sort -n)
-          P95_INDEX=$(echo "$SAMPLE_SIZE * 95 / 100" | bc)
-          # Ensure at least index 1
-          if [[ "$P95_INDEX" -lt 1 ]]; then P95_INDEX=1; fi
-          P95_SECONDS=$(echo "$SORTED" | sed -n "${P95_INDEX}p")
-
-          echo "sample_size=$SAMPLE_SIZE" >> "$GITHUB_OUTPUT"
-          echo "p95_seconds=$P95_SECONDS" >> "$GITHUB_OUTPUT"
-
-          echo "Sampled $SAMPLE_SIZE CI runs"
-          echo "p95 gate duration: ${P95_SECONDS}s"
-
-      - name: Check ratchet
-        id: ratchet
-        if: ${{ steps.measure.outputs.p95_seconds != '' }}
-        env:
-          P95_SECONDS: ${{ steps.measure.outputs.p95_seconds }}
-          SAMPLE_SIZE: ${{ steps.measure.outputs.sample_size }}
-        run: |
-          set -euo pipefail
-
-          node scripts/ci-duration-ratchet.mjs check --p95 "$P95_SECONDS"
-          echo "ratchet_ok=true" >> "$GITHUB_OUTPUT"
-
-      - name: Write Job Summary
-        if: always()
-        env:
-          P95_SECONDS: ${{ steps.measure.outputs.p95_seconds }}
-          SAMPLE_SIZE: ${{ steps.measure.outputs.sample_size }}
-          RATCHET_OK: ${{ steps.ratchet.outputs.ratchet_ok || 'false' }}
-        run: |
-          set -euo pipefail
-
-          BASELINE_P95=$(node -e "
-            const b = JSON.parse(require('fs').readFileSync('.github/ci-harness/duration-ratchet.json','utf8'));
-            console.log(b.slo.p95GateSeconds);
-          ")
-          MARGIN=$(node -e "
-            const b = JSON.parse(require('fs').readFileSync('.github/ci-harness/duration-ratchet.json','utf8'));
-            console.log((b.slo.marginFraction * 100).toFixed(0));
-          ")
-          CEILING=$(echo "$BASELINE_P95 * (100 + $MARGIN) / 100" | bc)
-
-          STATUS_ICON="✅"
-          STATUS_TEXT="Within SLO"
-          if [[ "$RATCHET_OK" != "true" ]]; then
-            STATUS_ICON="❌"
-            STATUS_TEXT="SLO BREACHED — p95 exceeds ceiling"
-          fi
-          if [[ -z "${P95_SECONDS:-}" ]]; then
-            STATUS_ICON="⚠️"
-            STATUS_TEXT="No data — 0 CI runs sampled"
-          fi
-
-          {
-            echo "## CI Duration Ratchet — p95 Gate SLO"
-            echo
-            echo "| Metric | Value |"
-            echo "| --- | --- |"
-            echo "| Baseline p95 | ${BASELINE_P95}s ($(node -e "const s=${BASELINE_P95}; const m=Math.floor(s/60),r=Math.round(s%60); console.log(m>0&&r>0?m+'m '+r+'s':m>0?m+'m':r+'s')")) |"
-            echo "| Margin | ${MARGIN}% |"
-            echo "| Ceiling | ${CEILING}s |"
-            echo "| Measured p95 | ${P95_SECONDS:-N/A}s |"
-            echo "| Sample size | ${SAMPLE_SIZE:-0} CI runs |"
-            echo "| Status | ${STATUS_ICON} ${STATUS_TEXT} |"
-            echo
-            echo "**SLO:** p95 gate wall-clock ≤ ${CEILING}s"
-            echo
-            echo "_Baseline lockfile: \`.github/ci-harness/duration-ratchet.json\`_"
-            echo "_Update with: \`node scripts/ci-duration-ratchet.mjs update --p95 <seconds> --sample-size ${SAMPLE_SIZE:-0}\`_"
-          } >> "$GITHUB_STEP_SUMMARY"
+          node scripts/ci-duration-ratchet.mjs check-snapshot | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Promotion-loss metrics (JOV-6836)
         if: always()
@@ -218,40 +117,15 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           }
 
-      - name: Fail when SLO is breached
-        if: ${{ steps.measure.outputs.p95_seconds != '' && steps.ratchet.outputs.ratchet_ok != 'true' }}
-        run: |
-          echo "::error title=CI Duration SLO Breached::p95 gate wall-clock exceeds baseline + 20% margin. See job summary for details and remediation steps."
-          exit 1
-
       - name: Slack alert on failure
         if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
         env:
-          P95_SECONDS: ${{ steps.measure.outputs.p95_seconds }}
-          SAMPLE_SIZE: ${{ steps.measure.outputs.sample_size }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          PAYLOAD=$(cat <<EOF
-          {
-            "text": "CI duration ratchet SLO breached",
-            "attachments": [
-              {
-                "color": "danger",
-                "fields": [
-                  { "title": "Workflow", "value": "CI Duration Ratchet", "short": true },
-                  { "title": "Measured p95", "value": "${P95_SECONDS:-n/a}s", "short": true },
-                  { "title": "Sample size", "value": "${SAMPLE_SIZE:-0}", "short": true },
-                  { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
-                ]
-              }
-            ]
-          }
-          EOF
-          )
-          curl -sS -X POST \
-            -H 'Content-type: application/json' \
-            --data "$PAYLOAD" \
-            "$SLACK_WEBHOOK_URL"
+          jq -n --arg run "$RUN_URL" \
+            '{text: ("CI duration SLO breached or evidence unavailable. <" + $run + "|View summary>")}' \
+            | curl -sS -X POST -H 'Content-type: application/json' --data @- "$SLACK_WEBHOOK_URL"
 
   # Audit finding 4: runs per merged PR and always-skipped workflows, measured
   # on the same nightly cron (no new clock). Read-only; never a PR check.
@@ -292,8 +166,8 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: node scripts/ci-trigger-budget.mjs
 
-  # Nothing fails without a repair or a success (JOV-14467): a red main run opens or updates this
-  # workflow's repair issue and the next green resolves it.
+  # JOV-14467: each red probe owns its repair. Only the same probe's
+  # completed evidence may resolve it; push doesn't run the nightly probes.
   report-outcome:
     name: Report outcome
     needs: [dev-loop, measure, fan-out-budget]
@@ -313,8 +187,36 @@ jobs:
             packages/api-client
             scripts/lib
             scripts/remediation-signal-intake.mjs
-      - uses: ./.github/actions/report-outcome
+      - name: Report nightly duration and fan-out outcome
+        if: always() && github.event_name == 'schedule'
+        uses: ./.github/actions/report-outcome
         with:
-          results: ${{ toJSON(needs) }}
+          conclusion: ${{
+            (needs.measure.result == 'failure' || needs.fan-out-budget.result == 'failure') && 'failure'
+            || (needs.measure.result == 'success' && needs.fan-out-budget.result == 'success') && 'success'
+            || 'cancelled' }}
+          detail: ${{ format('Gate duration evidence {0}, CI fan-out {1}', needs.measure.result, needs.fan-out-budget.result) }}
+          linear-api-key: ${{ secrets.LINEAR_API_KEY }}
+          intake-disabled: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+      - name: Report scheduled dev-loop outcome
+        if: always() && github.event_name == 'schedule'
+        uses: ./.github/actions/report-outcome
+        with:
+          fingerprint: workflow-ci-dev-loop-scheduled
+          conclusion: ${{
+            needs.dev-loop.result == 'failure' && 'failure'
+            || (needs.dev-loop.result == 'success' && needs.dev-loop.outputs.scheduled-proof == 'true') && 'success'
+            || 'cancelled' }}
+          linear-api-key: ${{ secrets.LINEAR_API_KEY }}
+          intake-disabled: ${{ vars.REMEDIATION_INTAKE_DISABLED }}
+      - name: Report push dev-loop outcome
+        if: always() && github.event_name == 'push'
+        uses: ./.github/actions/report-outcome
+        with:
+          fingerprint: workflow-ci-dev-loop-push
+          conclusion: ${{
+            needs.dev-loop.result == 'failure' && 'failure'
+            || (needs.dev-loop.result == 'success' && needs.dev-loop.outputs.hooks-proof == 'true') && 'success'
+            || 'cancelled' }}
           linear-api-key: ${{ secrets.LINEAR_API_KEY }}
           intake-disabled: ${{ vars.REMEDIATION_INTAKE_DISABLED }}

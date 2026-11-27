@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "_comment": "CI-duration ratchet baseline. Nightly workflow (ci-duration-ratchet.yml) measures the rolling p95 wall-clock of recent PR merge-gate runs and fails when p95 > p95GateSeconds × (1 + marginFraction). To lock in a new (lower) baseline after sustained improvement: update p95GateSeconds and commit. To grant a temporary waiver, set 'waiver' to a future ISO date and document the reason.",
+  "_comment": "Historical scalar baseline for the legacy CLI check/update commands. The nightly workflow checks the source PR Ready and combined-tree PR Ready cohorts from the Shipping SLO snapshot against docs/metrics/shipping-slo-baseline.json.",
   "updatedAt": "2026-10-11T18:46:24.331Z",
   "sampleSize": 50,
   "slo": {
