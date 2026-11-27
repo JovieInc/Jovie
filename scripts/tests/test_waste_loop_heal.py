@@ -8,6 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT / "scripts" / "lanes"), str(ROOT / "scripts" / "capacity")]
@@ -77,7 +78,17 @@ class SyncShare(unittest.TestCase):
                 # Avoid Summer store network during the publish pass.
                 os.environ.pop("SUMMER_STORE_URL", None)
                 os.environ.pop("SUMMER_STORE_TOKEN", None)
-                out = heal.heal(SimpleNamespace(repo=ROOT), rev="HEAD", force_run=True)
+                # Load the actual installed module with external collectors stubbed.
+                load_waste = heal._load_waste
+
+                def load_offline_waste():
+                    waste = load_waste()
+                    waste.gh_json = lambda _args: None
+                    waste.col_summer = lambda: {}
+                    return waste
+
+                with patch.object(heal, "_load_waste", load_offline_waste):
+                    out = heal.heal(SimpleNamespace(repo=ROOT), rev="HEAD", force_run=True)
                 self.assertEqual(out["status"], "ok", out)
                 receipt = state / "waste-latest.json"
                 self.assertTrue(receipt.is_file())

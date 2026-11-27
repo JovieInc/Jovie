@@ -374,7 +374,7 @@
       "id": "tech-debt",
       "label": "Tech debt (a form of waste)",
       "owner": "summer",
-      "unit": "oversized files; cert-screens debt entries",
+      "unit": "oversized files; cert-screens debt entries; largest workflow bytes",
       "metrics": [
         {
           "id": "debt.oversized_files",
@@ -385,6 +385,18 @@
             "kind": "wow",
             "pct": 0.1,
             "floor": 5
+          }
+        },
+        {
+          "id": "debt.workflow_max_bytes",
+          "label": "Largest tracked GitHub Actions workflow",
+          "unit": "bytes",
+          "source": "debt.workflowMaxBytes",
+          "repairOwner": "ci",
+          "settleAtCeiling": true,
+          "detector": {
+            "kind": "ceiling",
+            "max": 450000
           }
         },
         {
@@ -402,6 +414,7 @@
       "feeds": [
         "gem:waste-loop → waste-latest.json (Summer owns tech-debt class observe/prioritize; no separate debt workflow)",
         "observer: docs/design-system/cert-screens.json#debt cardinality (Object.keys length) — repair stays ds-cert-loop / component-certificate",
+        "CI owns workflow byte repairs; 450000 bytes is a local early-warning ceiling with room for the merge group, independent of GitHub's workflow file-size limit",
         "scripts/waste-sweep.mjs dead code (#23690)",
         "slop ratchets",
         "findings ledger (#23709)"

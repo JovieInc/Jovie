@@ -1,4 +1,4 @@
-import json, sys, tempfile, unittest
+import json, subprocess, sys, tempfile, unittest
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "capacity"), str(ROOT / "lanes")]
@@ -193,7 +193,7 @@ class TechDebtOwnership(unittest.TestCase):
         cls = next(c for c in REG["classes"] if c["id"] == "tech-debt")
         self.assertEqual(cls["owner"], "summer")
         self.assertEqual({m["id"] for m in cls["metrics"]},
-                         {"debt.oversized_files", "debt.cert_screen_entries"})
+                         {"debt.oversized_files", "debt.cert_screen_entries", "debt.workflow_max_bytes"})
         self.assertTrue(any("waste-latest.json" in f for f in cls["feeds"]))
         cert = next(m for m in cls["metrics"] if m["id"] == "debt.cert_screen_entries")
         self.assertEqual(cert["source"], "debt.certScreenEntries")
@@ -223,6 +223,111 @@ class TechDebtOwnership(unittest.TestCase):
         self.assertEqual(rows["debt.cert_screen_entries"]["status"], "OK")
         self.assertEqual(rows["debt.cert_screen_entries"]["value"], float(len(live)))
         self.assertEqual(rows["debt.cert_screen_entries"]["owner"], "summer")
+
+
+class WorkflowDebt(unittest.TestCase):
+    metric = "debt.workflow_max_bytes"
+
+    def sample(self, repo: Path) -> dict:
+        data = {"debt": w.col_debt(repo), "inputs": {"activeUsers": 0}}
+        return next(row for row in w.evaluate(REG, data, {}) if row["id"] == self.metric)
+
+    def git(self, *args: str) -> str:
+        return subprocess.check_output(["git", "-C", str(self.repo), *args], text=True).strip()
+
+    def publish(self, count: int) -> str:
+        self.workflow.write_bytes(b"#" * count)
+        self.git("add", ".github")
+        self.git("-c", "user.email=test@example.com", "-c", "user.name=Fixture", "commit", "-qm", "workflow fixture")
+        sha = self.git("rev-parse", "HEAD")
+        self.git("update-ref", "refs/remotes/origin/main", sha)
+        return sha
+
+    def setUp(self):
+        checkout = tempfile.TemporaryDirectory()
+        self.addCleanup(checkout.cleanup)
+        self.repo = Path(checkout.name)
+        self.git("init", "-q")
+        self.workflow = self.repo / ".github/workflows/ci.yml"
+        self.workflow.parent.mkdir(parents=True)
+
+    def test_only_committed_workflow_blob_bytes_on_main_count(self):
+        other = self.workflow.parent / "extra.txt"
+        other.write_bytes(b"#" * 500001)
+        sha = self.publish(450001)
+        self.workflow.write_text("# local uncommitted shrink should not hide debt")
+        self.git("add", ".github")
+        self.git("-c", "user.email=test@example.com", "-c", "user.name=Fixture", "commit", "-qm", "local only")
+        row = self.sample(self.repo)
+        self.assertEqual((row["status"], row["value"]), ("WASTE", 450001))
+        self.assertEqual(row["evidence"]["sha"], sha)
+        self.assertEqual(row["evidence"]["path"], ".github/workflows/ci.yml")
+        result = w.signal(REG, row, SPECS[self.metric])
+        self.assertIsNone(fi.validate(result))
+        self.assertIn("Owner: summer. Repair owner: ci.", result["problem"])
+        self.assertIn(sha, result["problem"])
+        self.assertEqual(result["metric"]["target"], 450000)
+        self.assertEqual(result["fingerprint"], "waste-debt-workflow-max-bytes")
+
+    def test_unavailable_source_is_gap_never_success_and_shows_in_digest(self):
+        self.workflow.write_bytes(b"#" * 450001)
+        row = self.sample(self.repo)
+        self.assertEqual((row["status"], row["value"]), ("GAP", None))
+        self.assertNotIn("evidence", row)
+        self.assertEqual(w.digest(REG, [row], self.repo, 0)["techDebt"], [row])
+
+    def test_stale_rollback_or_malformed_measurement_cannot_close(self):
+        old_sha = self.publish(449999)
+        older = self.sample(self.repo)
+        current_sha = self.publish(450001)
+        bad = self.sample(self.repo)
+        state = self.repo / "state"
+        state.mkdir()
+        w.settle_wins(REG, [bad], state, 0, repo=self.repo)
+
+        self.git("update-ref", "refs/remotes/origin/main", old_sha)
+        self.assertEqual(w.settle_wins(REG, [older], state, 1, repo=self.repo), [])
+        self.git("update-ref", "refs/remotes/origin/main", current_sha)
+        self.publish(450000)
+        fixed = self.sample(self.repo)
+        malformed = {**fixed, "evidence": {"sha": "invalid"}}
+        self.assertEqual(w.settle_wins(REG, [malformed], state, 2, repo=self.repo), [])
+        self.assertEqual(w.settle_wins(REG, [{**fixed, "value": 0}], state, 2, repo=self.repo), [])
+        self.git("update-ref", "refs/remotes/origin/main", current_sha)
+        self.assertEqual(w.settle_wins(REG, [fixed], state, 3, repo=self.repo), [])
+
+    def test_regression_uses_same_fingerprint_and_new_evidence_after_proven_fix(self):
+        self.publish(450001)
+        bad = self.sample(self.repo)
+        state = self.repo / "state"
+        state.mkdir()
+        queue = self.repo / "lanes"
+        self.assertTrue(w.write_signals(REG, [bad], SPECS, queue))
+        self.assertEqual(w.write_signals(REG, [bad], SPECS, queue), [])
+        self.assertEqual(w.settle_wins(REG, [bad], state, 0, repo=self.repo), [])
+        self.git("update-ref", "-d", "refs/remotes/origin/main")
+        gap = self.sample(self.repo)
+        self.assertEqual(w.settle_wins(REG, [gap], state, 1, repo=self.repo), [])
+        fixed_sha = self.publish(450000)
+        good = self.sample(self.repo)
+        self.assertEqual(good["status"], "OK")
+        wins = w.settle_wins(REG, [good], state, 2, repo=self.repo)
+        self.assertEqual(len(wins), 1)
+        self.assertEqual([r["sha"] for r in wins[0]["receipts"]], [bad["evidence"]["sha"], fixed_sha])
+        self.assertEqual([r["value"] for r in wins[0]["receipts"]], [450001, 450000])
+        w.drop_signal(self.metric, queue)
+        self.publish(450001)
+        regressed = self.sample(self.repo)
+        self.assertEqual(regressed["status"], "WASTE")
+        self.assertTrue(w.write_signals(REG, [regressed], SPECS, queue))
+        original = w.signal(REG, bad, SPECS[self.metric])
+        recurrence = w.signal(REG, regressed, SPECS[self.metric])
+        self.assertEqual(original["fingerprint"], recurrence["fingerprint"])
+        self.assertNotEqual(fi.body(original), fi.body(recurrence))
+        self.assertEqual(w.settle_wins(REG, [regressed], state, 3, repo=self.repo), [])
+        self.publish(449999)
+        second = w.settle_wins(REG, [self.sample(self.repo)], state, 4, repo=self.repo)
+        self.assertNotEqual(wins[0]["id"], second[0]["id"])
 
 
 if __name__ == "__main__":
