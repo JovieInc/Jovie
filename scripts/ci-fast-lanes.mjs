@@ -1132,6 +1132,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/hooks/pr-size-local.test.mjs',
   'scripts/hooks/company-size.test.mjs',
   'scripts/hooks/warden-local-review.test.mjs',
+  'scripts/hooks/warden-observation.test.mjs',
   'scripts/hooks/warden-triage.test.mjs',
   'scripts/node-runtime-bump.test.mjs',
   'scripts/invariants/art-direction/hero-scroll.test.mjs',

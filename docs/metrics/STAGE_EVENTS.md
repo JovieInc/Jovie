@@ -259,3 +259,36 @@ off `paid` for high-reach artist claims. They are not steps in the linear
 funnel. The app records them in `acquisition_journey_stages`, and the admin
 artist-offer funnel report (`branches[]`) already returns their counts and
 p50/p95.
+
+### Local advisory review (`local-review`)
+
+The local hook appends `jovie-stage-event/v1` rows to
+`${XDG_STATE_HOME:-~/.local/state}/jovie-warden/stage-events.ndjson`
+(`WARDEN_OBSERVATION_DIR` overrides). CI exits before review or telemetry.
+The existing stage-event parser/aggregator produces local `stage-timings-latest.json`
+with n/p50/p95/coverage; `localReview` adds outcomes, completions, reuses and
+missing model/cost/result counts. This source is not a published fleet metric.
+
+`decision` times identity/routing; `review` times actual Warden attempts;
+`finished` embeds the versioned observation binding mode/base/head/staged tree,
+diff/context/policy/model config digests, timestamps, route/reason and outcome.
+Whole non-ignored context is hashed; dependency-aware reuse is unsupported.
+Exit status alone never proves a clean review, findings count, model or cost.
+
+The published `@sentry/warden@0.54.0` CLI's `--json` emits finalized chunks and a
+trailing summary (`dist/cli/main.js`, `dist/cli/output/jsonl.js`). `reviewCompleted`
+and reuse require complete chunks for every configured built-in skill, no skips/
+errors/failed hunks/extractions, a consistent summary, identical identity and exit
+0 or 1. Replay preserves original output/strict exit and records `skipped` plus
+`reusedFrom`. Unknown/partial/over-1-MiB output and remote/unknown skills cannot
+qualify. Requested model selectors require observed token usage; provider identity
+(`modelActuallyAttempted`) and billing cost (`knownCostUsd`) stay null.
+`runtimeReportedCostUsd` is a runtime accounting estimate, populated only when
+scan/auxiliary component usage and chunk-to-summary arithmetic agree. Local skill
+overrides and any potentially enabled external service memory disable reuse.
+PATH Warden installs also disable reuse: their launchers do not bind imported
+distribution files or bundled policy. Reuse is limited to the pinned npm lane.
+The known optional source-snippet schema is validated with the finding.
+The supported chunk-v1 contract is validated; a PATH CLI version is not attested.
+Telemetry I/O never changes hook results. Node owns the
+portable deadline/process-group cleanup; timeout/interruption stay advisory.

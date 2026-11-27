@@ -13,11 +13,11 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, it } from 'node:test';
-
 import {
   localHookChildEnv,
   localHookTestsMissingCiIsolation,
 } from './local-hook-child-env.mjs';
+import { structuredResult } from './warden-review-fixture.mjs';
 
 const repoRoot = resolve(import.meta.dirname, '..', '..');
 const script = resolve(repoRoot, 'scripts/hooks/warden-local-review.sh');
@@ -57,6 +57,7 @@ function configuredEnv(extraEnv = {}) {
     WARDEN_TRIAGE: 'off',
     WARDEN_PUSH_REVIEW: 'on',
     XDG_CACHE_HOME: cache,
+    WARDEN_OBSERVATION_DIR: join(cache, 'observations'),
     ...extraEnv,
   };
 }
@@ -112,6 +113,7 @@ describe('warden-local-review.sh', () => {
       'npm',
       `for arg in "$@"; do printf '%s\\n' "$arg" >> "${log}"; done\nprintf 'PI=%s\\n' "$PI_CODING_AGENT_DIR" >> "${log}"`
     );
+    symlinkSync(process.execPath, join(bin, 'node'));
     // Only the stub npm and system tools; a real warden must not shadow it.
     const result = spawnSync('bash', [script, 'staged'], {
       encoding: 'utf8',
@@ -138,7 +140,7 @@ describe('warden-local-review.sh', () => {
     );
   });
 
-  it('exits 0 with a warning when neither warden nor npm is available', () => {
+  it('exits 0 with a warning when Node is unavailable', () => {
     const bin = mkdtempSync(join(tmpdir(), 'jovie-warden-bare-'));
     temporaryDirectories.push(bin);
     const dirname = spawnSync('bash', ['-c', 'command -v dirname'], {
@@ -153,8 +155,7 @@ describe('warden-local-review.sh', () => {
       env: { ...localHookChildEnv(configuredEnv(), bin), PATH: bin },
     });
     assert.equal(result.status, 0);
-    assert.match(result.stderr, /warden CLI not installed and npm not found/);
-    assert.match(result.stderr, /npm install -g @sentry\/warden@/);
+    assert.match(result.stderr, /Node unavailable/);
   });
 
   it('skips with a setup pointer when no Warden key is configured', () => {
@@ -208,15 +209,17 @@ describe('warden-local-review.sh', () => {
     assert.match(result.stderr, /NOT blocked/);
   });
 
-  const hasTimeout =
-    spawnSync('bash', ['-c', 'command -v timeout || command -v gtimeout'])
-      .status === 0;
-
-  it('reports a timeout without blocking', { skip: !hasTimeout }, () => {
+  it('reports a portable Node timeout without blocking even in strict mode', () => {
     const bin = makeStub('warden', 'sleep 5');
-    const result = runHook('staged', bin, { WARDEN_TIMEOUT_SECONDS: '1' });
+    // A broken GNU timeout must never be called; Node owns the deadline.
+    writeFileSync(join(bin, 'timeout'), '#!/bin/sh\nexit 42\n');
+    chmodSync(join(bin, 'timeout'), 0o755);
+    const result = runHook('staged', bin, {
+      WARDEN_TIMEOUT_SECONDS: '0.1',
+      WARDEN_LOCAL_REVIEW: 'strict',
+    });
     assert.equal(result.status, 0);
-    assert.match(result.stderr, /timed out after 1s/);
+    assert.match(result.stderr, /timed out after 0.1s/);
   });
 
   it('pins Haiku 5.5 for both the agent and auxiliary models', () => {
@@ -252,7 +255,7 @@ describe('warden-local-review.sh', () => {
     const result = runHook('staged', bin);
     assert.equal(result.status, 0);
     const recorded = readFileSync(join(logDir, 'args'), 'utf8');
-    assert.match(recorded, /^--staged\ninvoked\n/);
+    assert.match(recorded, /^--staged\n--json\ninvoked\n/);
   });
 
   it('still invokes warden when the parent process has CI set', () => {
@@ -289,5 +292,76 @@ describe('warden-local-review.sh', () => {
     assert.equal(runHook('nonsense').status, 0);
     const inCi = runHook('branch', '', { CI: '1' });
     assert.equal(inCi.status, 0);
+  });
+});
+
+describe('PATH package policy identity', () => {
+  it('never reuses a thin PATH launcher when its distribution or built-in policy can change', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'jovie-warden-path-policy-'));
+    temporaryDirectories.push(directory);
+    const repo = join(directory, 'repo');
+    const packageRoot = join(directory, 'package');
+    const bin = join(directory, 'bin');
+    mkdirSync(repo);
+    mkdirSync(bin);
+    mkdirSync(join(packageRoot, 'bin'), { recursive: true });
+    mkdirSync(join(packageRoot, 'dist', 'cli'), { recursive: true });
+    mkdirSync(join(packageRoot, 'src', 'builtin-skills'), { recursive: true });
+    writeFileSync(join(packageRoot, 'package.json'), '{"type":"module"}');
+    const launcher = join(packageRoot, 'bin', 'warden.js');
+    const launcherSource =
+      '#!/usr/bin/env node\nimport "../dist/cli/index.mjs";\n';
+    writeFileSync(launcher, launcherSource);
+    chmodSync(launcher, 0o755);
+    symlinkSync(launcher, join(bin, 'warden'));
+    const distribution = join(packageRoot, 'dist', 'cli', 'index.mjs');
+    const policy = join(packageRoot, 'src', 'builtin-skills', 'code-review.md');
+    writeFileSync(
+      distribution,
+      `process.stdout.write(${JSON.stringify(structuredResult())});`
+    );
+    writeFileSync(policy, 'policy one');
+    const git = args => {
+      const result = spawnSync('git', ['-C', repo, ...args], {
+        encoding: 'utf8',
+      });
+      assert.equal(result.status, 0, result.stderr);
+    };
+    git(['init', '-q']);
+    writeFileSync(join(repo, 'app.ts'), 'export const value = 1;\n');
+    git(['add', 'app.ts']);
+    writeFileSync(
+      join(repo, 'warden.toml'),
+      '[[skills]]\nname = "security-review"\n[[skills]]\nname = "code-review"\n'
+    );
+    const env = configuredEnv();
+    for (const mutation of ['initial', 'distribution', 'policy']) {
+      if (mutation === 'distribution')
+        writeFileSync(
+          distribution,
+          readFileSync(distribution, 'utf8') + '\n// upgraded distribution\n'
+        );
+      if (mutation === 'policy') writeFileSync(policy, 'policy two');
+      const result = spawnSync('bash', [script, 'staged'], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: localHookChildEnv(env, bin),
+      });
+      assert.equal(result.status, 0);
+      assert.doesNotMatch(result.stdout, /reusing completed JSONL/);
+      const rows = readFileSync(
+        join(env.WARDEN_OBSERVATION_DIR, 'stage-events.ndjson'),
+        'utf8'
+      )
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line));
+      const observation = rows.at(-1).observation;
+      assert.equal(observation.commandAttempted, true);
+      assert.equal(observation.reviewCompleted, true);
+      assert.equal(observation.reuseEligible, false);
+      assert.match(observation.reuseReason, /PATH/);
+      assert.equal(readFileSync(launcher, 'utf8'), launcherSource);
+    }
   });
 });
