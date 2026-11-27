@@ -123,9 +123,7 @@ describe('ContactDetailSidebar', () => {
     ).toBeInTheDocument();
     await expectNoA11yViolations(container);
 
-    await user.click(
-      screen.getByRole('button', { name: 'Close', exact: true })
-    );
+    await user.click(screen.getByRole('button', { name: 'Close' }));
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onSave).not.toHaveBeenCalled();
