@@ -185,12 +185,15 @@ vi.mock('@/components/jovie/components', async importOriginal => ({
   ...(await importOriginal<typeof import('@/components/jovie/components')>()),
   ChatInput: ({
     desktopConversationReady,
+    onFileAttach,
   }: {
     desktopConversationReady?: boolean;
+    onFileAttach?: () => void;
   }) => (
     <div
       data-testid='chat-input'
       data-desktop-conversation-ready={desktopConversationReady}
+      data-attachment-picker={Boolean(onFileAttach)}
     />
   ),
   ChatMessage: (props: { isThinking?: boolean }) =>
@@ -756,14 +759,13 @@ describe('JovieChat styling regressions', () => {
     ).toBeNull();
   });
 
-  it('renders a supplied Home canvas as the empty-state affordance', () => {
+  it('keeps founder Home composable with its file picker gated', () => {
     mockChatState.hasMessages = false;
     mockChatState.isLoading = false;
-    mockChatState.isSubmitting = false;
     mockChatState.status = 'ready';
     mockChatState.messages = [];
 
-    const { container } = renderWithQueryClient(
+    const { getByTestId, queryByTestId } = renderWithQueryClient(
       <JovieChat
         profileId='profile-1'
         chatMode='ov'
@@ -771,16 +773,14 @@ describe('JovieChat styling regressions', () => {
       />
     );
 
-    expect(
-      container.querySelector('[data-testid="home-canvas-fixture"]')
-    ).toBeTruthy();
-    expect(
-      container
-        .querySelector('[data-testid="chat-empty-state-viewport"]')
-        ?.getAttribute('data-empty-affordance')
-    ).toBe('home-canvas');
+    expect(getByTestId('home-canvas-fixture')).toBeVisible();
+    expect(getByTestId('chat-empty-state-viewport')).toHaveAttribute(
+      'data-empty-affordance',
+      'home-canvas'
+    );
     // The canvas owns the empty-state chrome layer — no usage banner stack.
-    expect(container.querySelector('[data-testid="chat-usage"]')).toBeNull();
+    expect(queryByTestId('chat-usage')).toBeNull();
+    expect(getByTestId('chat-input').dataset.attachmentPicker).toBe('false');
   });
 
   it('keeps a living Home canvas as the surface after messages, with the transcript on request', () => {

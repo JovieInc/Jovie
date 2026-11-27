@@ -19,6 +19,7 @@ import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPan
 import { ChatThreadNavigationRail } from '@/components/features/chat/navigation-rail';
 import { chatTranscriptRangeWithPinnedTail } from '@/components/jovie/chat-transcript-range';
 import { AUDIO_FILE_ACCEPT } from '@/lib/audio/constants';
+import { FOUNDER_CHAT_ATTACHMENT_ERROR } from '@/lib/chat/founder-attachment-copy';
 import {
   CHAT_TRANSCRIPT_ROW_ESTIMATE_PX,
   CHAT_TRANSCRIPT_WINDOW,
@@ -93,6 +94,9 @@ export function JovieChat({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioFileInputRef = useRef<HTMLInputElement>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
+  const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null);
+  const attachmentUnavailableReason =
+    chatMode === 'ov' ? FOUNDER_CHAT_ATTACHMENT_ERROR : undefined;
   /**
    * Pinned opportunity card for empty-thread → card-open mode
    * (GH #13177 / #13174 / JOV-3933). Declared before useJovieChat so the
@@ -206,8 +210,14 @@ export function JovieChat({
   );
 
   const handleUploadError = useCallback(
-    (message: string) => setChatError({ type: 'unknown', message }),
-    [setChatError]
+    (message: string) => {
+      if (attachmentUnavailableReason) {
+        setAttachmentNotice(message);
+      } else {
+        setChatError({ type: 'unknown', message });
+      }
+    },
+    [attachmentUnavailableReason, setChatError]
   );
 
   const {
@@ -227,6 +237,7 @@ export function JovieChat({
     onError: handleUploadError,
     onAudioUploaded: handleAudioUploaded,
     resetKey: activeConversationId ?? conversationId ?? null,
+    disabled: attachmentUnavailableReason,
   });
 
   // Manifest collapse state: when uploading and user scrolls/types, show collapsed bar
@@ -273,7 +284,8 @@ export function JovieChat({
   const handleSubmitWithFiles = useCallback(
     (e?: React.FormEvent) => {
       if (isLoading || isSubmitting) return;
-      const files = toFileUIParts();
+      const files = attachmentUnavailableReason ? [] : toFileUIParts();
+      setAttachmentNotice(null);
       notifyJankSend();
       handleSubmit(e, files.length > 0 ? files : undefined);
       clearFiles();
@@ -287,6 +299,7 @@ export function JovieChat({
       isLoading,
       isSubmitting,
       notifyJankSend,
+      attachmentUnavailableReason,
     ]
   );
 
@@ -683,8 +696,8 @@ export function JovieChat({
       isSubmitting,
       isStreaming,
       onStop: stop,
-      onFileAttach: openFilePicker,
-      onAudioAttach: openAudioPicker,
+      onFileAttach: attachmentUnavailableReason ? undefined : openFilePicker,
+      onAudioAttach: attachmentUnavailableReason ? undefined : openAudioPicker,
       isFileProcessing: isUploading,
       pendingFiles,
       onRemoveFile: removeFile,
@@ -707,6 +720,7 @@ export function JovieChat({
       isSubmitting,
       isStreaming,
       stop,
+      attachmentUnavailableReason,
       openFilePicker,
       openAudioPicker,
       isUploading,
@@ -748,6 +762,21 @@ export function JovieChat({
       draft={draft}
       chatInputProps={chatInputProps}
       chatMode={chatMode}
+      attachmentNotice={
+        attachmentUnavailableReason && attachmentNotice ? (
+          <div className='mb-1.5 flex items-center justify-between gap-3 text-xs text-secondary-token'>
+            <p role='alert'>{attachmentNotice}</p>
+            <Button
+              type='button'
+              variant='ghost'
+              size='sm'
+              onClick={() => setAttachmentNotice(null)}
+            >
+              Dismiss
+            </Button>
+          </div>
+        ) : null
+      }
       showThreadView={showThreadView}
       // one-chrome-layer-v1: the Home canvas owns the empty-state chrome
       // layer, so the usage banner yields to it.

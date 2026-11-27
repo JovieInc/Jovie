@@ -42,6 +42,7 @@ import { isWeeklyPlanLimitError } from './utils';
 interface ChatComposerSurfaceProps {
   readonly chatInputProps: ChatInputProps;
   readonly chatMode?: 'ov';
+  readonly attachmentNotice?: ReactNode;
   readonly showThreadView: boolean;
   /**
    * one-chrome-layer-v1: when the empty state already shows a chrome
@@ -105,6 +106,7 @@ export function ChatDraftWorkState({
 export function ChatComposerSurface({
   chatInputProps,
   chatMode,
+  attachmentNotice,
   showThreadView,
   suppressUsageAlert = false,
   isRateLimited,
@@ -128,6 +130,7 @@ export function ChatComposerSurface({
   return (
     <div className={CHAT_CONTENT_SHELL_CLASSNAME}>
       {suppressUsageAlert ? null : <ChatUsageAlert />}
+      {attachmentNotice}
 
       {isRateLimited ? (
         <p className='mb-1.5 text-xs text-tertiary-token' aria-live='polite'>
