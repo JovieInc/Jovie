@@ -1,0 +1,20 @@
+/* Cursor / opacity for ChatAvatarUploadCard PlainButtons — layout-only at call site. */
+
+.chat-avatar-upload-retry[data-slot="plain-button"] {
+  cursor: pointer;
+}
+
+.chat-avatar-upload-retry[data-slot="plain-button"]:hover {
+  background-color: color-mix(in srgb, var(--color-error) 10%, transparent);
+}
+
+.chat-avatar-upload-dropzone[data-slot="plain-button"] {
+  cursor: pointer;
+}
+
+.chat-avatar-upload-dropzone[data-slot="plain-button"][data-uploading],
+.chat-avatar-upload-dropzone[data-slot="plain-button"]:disabled {
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.6;
+}

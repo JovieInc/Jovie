@@ -114,7 +114,7 @@ describe('ArtistProfileLandingRoute runtime composition', () => {
       }))
     );
     expect(
-      screen.getByTestId('artist-profile-adaptive-sequence')
+      screen.getByTestId('artist-profile-section-adaptive')
     ).toBeInTheDocument();
   });
 

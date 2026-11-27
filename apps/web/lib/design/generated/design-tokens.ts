@@ -62,7 +62,7 @@ export const DESIGN_TOKENS = {
     }
   },
   "interactive": {
-    "$description": "Interactive accent projects ZiaWI ion #11AFFF in both modes (Tim KEEP 2026-09-10). Marketing --linear-accent-blue stays #2563ff until namespace-collapse.",
+    "$description": "Interactive accent projects ZiaWI ion #11AFFF in both modes (Tim KEEP 2026-09-10). Drift T1.2 unify-ion collapsed marketing --linear-accent* onto System B ion.",
     "accent": "#11afff",
     "accent-hover-light": "#11afff",
     "accent-active-light": "#11afff",
@@ -91,12 +91,7 @@ export const DESIGN_TOKENS = {
     "slow": "300ms"
   },
   "divergences": {
-    "$description": "Known same-concept/different-value pairs across legacy namespaces, tracked for the namespace-collapse wave. Do NOT silently unify these — each is a visual change requiring its own migration slice.",
-    "accent-blue": {
-      "canonical-dark": "#11afff",
-      "linear-marketing": "#2563ff",
-      "note": "--color-accent-blue is product ion #11AFFF (Tim KEEP 2026-09-10). --linear-accent-blue remains marketing System A until namespace-collapse."
-    }
+    "$description": "Known same-concept/different-value pairs across legacy namespaces. Accent-blue marketing divergence (#2563ff vs ion #11AFFF) resolved Drift T1.2 unify-ion — --linear-accent* retired; consumers use --color-accent / --color-accent-blue."
   }
 } as const;
 

@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from '@jovie/ui';
 import { useDebouncer } from '@tanstack/react-pacer';
-import { Check, Copy, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
@@ -23,10 +23,7 @@ import {
   EntityTabbedRail,
 } from '@/components/molecules/drawer';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
-import {
-  type DrawerHeaderAction,
-  DrawerHeaderActions,
-} from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
 import {
@@ -35,7 +32,6 @@ import {
   getContactRoleLabel,
   summarizeTerritories,
 } from '@/lib/contacts/constants';
-import { useNotifications } from '@/lib/hooks/useNotifications';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { cn } from '@/lib/utils';
 import type { ContactChannel, ContactRole } from '@/types/contacts';
@@ -57,76 +53,6 @@ const CONTACT_TERRITORY_OPTIONS = CONTACT_TERRITORY_PRESETS.map(territory => ({
   value: territory,
   label: territory,
 }));
-
-function useContactDetailHeaderParts({
-  role,
-  customLabel,
-  email,
-  onDelete,
-  onClose,
-  menuItems,
-}: Readonly<{
-  role: ContactRole;
-  customLabel?: string | null;
-  email?: string | null;
-  onDelete: () => void;
-  onClose?: () => void;
-  menuItems?: readonly CommonDropdownItem[];
-}>) {
-  const notifications = useNotifications();
-  const [isCopied, setIsCopied] = useState(false);
-  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(
-    () => () => {
-      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-    },
-    []
-  );
-
-  const handleCopyEmail = useCallback(() => {
-    if (!email) return;
-    void navigator.clipboard.writeText(email);
-    notifications.success('Email copied');
-    setIsCopied(true);
-    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-    copyTimeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
-  }, [email, notifications]);
-
-  const primaryActions: DrawerHeaderAction[] = [];
-  if (email) {
-    // eslint-disable-next-line react-hooks/refs -- ref value read is intentional for action state
-    primaryActions.push({
-      id: 'copy',
-      label: isCopied ? 'Copied!' : 'Copy email',
-      icon: Copy,
-      activeIcon: Check,
-      isActive: isCopied,
-      onClick: handleCopyEmail,
-    });
-  }
-  const overflowActions: DrawerHeaderAction[] = [
-    { id: 'delete', label: 'Delete Contact', icon: Trash2, onClick: onDelete },
-  ];
-
-  return {
-    title: getContactRoleLabel(role, customLabel),
-    actions:
-      primaryActions.length > 0 || overflowActions.length > 0 || onClose ? (
-        <DrawerHeaderActions
-          primaryActions={primaryActions}
-          overflowActions={overflowActions}
-          menuItems={menuItems}
-          onClose={onClose}
-        />
-      ) : undefined,
-    primaryActions,
-    overflowActions,
-  };
-}
-
-const CONTACT_SECTION_LABEL_CLASSNAME =
-  'inline-flex cursor-pointer items-center text-app font-medium tracking-normal leading-none text-secondary-token';
 
 const CONTACT_TERRITORY_CHIP_CLASSNAME = cn(
   badgeVariants({ size: 'sm' }),
@@ -237,16 +163,6 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     [contact, onUpdate, debouncedSave]
   );
 
-  const { title: headerTitle, actions: headerActions } =
-    useContactDetailHeaderParts({
-      role: contact?.role ?? 'other',
-      customLabel: contact?.customLabel,
-      email: contact?.email,
-      onDelete,
-      onClose: handleClose,
-      menuItems: contextMenuItems,
-    });
-
   const hasContact = Boolean(contact);
   const roleLabel = contact
     ? getContactRoleLabel(contact.role, contact.customLabel)
@@ -290,7 +206,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
               onUpdate({ [field]: nextValue } as Partial<EditableContact>);
               debouncedSave();
             }}
-            copyValue={value ?? null}
+            copyValue={field === 'email' || field === 'phone' ? value : ''}
             actions={contactFieldActions(field, value)}
             displayClassName='truncate text-app text-primary-token'
             emptyClassName='text-tertiary-token italic'
@@ -307,7 +223,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     <EntityTabbedRail
       isOpen={isOpen}
       ariaLabel='Contact details'
-      title={headerTitle}
+      title={roleLabel || COPY_FALLBACKS.contact}
       onClose={hasContact ? undefined : handleClose}
       hideMinimalHeaderBar={hasContact}
       contextMenuItems={contextMenuItems}
@@ -347,7 +263,21 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                 </div>
               ) : undefined
             }
-            actions={headerActions}
+            actions={
+              <DrawerHeaderActions
+                primaryActions={[]}
+                overflowActions={[
+                  {
+                    id: 'delete',
+                    label: 'Delete Contact',
+                    icon: Trash2,
+                    onClick: onDelete,
+                  },
+                ]}
+                menuItems={contextMenuItems}
+                onClose={handleClose}
+              />
+            }
             className='px-3 pt-3'
             titleClassName='text-base leading-5 tracking-tighter'
             data-testid='contact-detail-entity-header'
@@ -358,76 +288,60 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       {contact ? (
         <>
           {activeTab === 'info' && (
-            <>
-              <DrawerSection
-                title='Role'
-                className='space-y-2 border-b border-subtle pb-3'
-              >
-                <span className={CONTACT_SECTION_LABEL_CLASSNAME}>
-                  Contact Type
-                </span>
-                <Select value={contact.role} onValueChange={handleRoleChange}>
-                  <SelectTrigger aria-label='Contact Type'>
-                    <SelectValue>{roleLabel}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CONTACT_ROLE_OPTIONS.map(option => (
-                      <SelectItem key={option.value} value={option.value}>
-                        <div className='flex items-center gap-2'>
-                          <Icon
-                            name={option.iconName}
-                            className='h-4 w-4 text-tertiary-token'
-                          />
-                          <span>{option.label}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </DrawerSection>
-
-              <DrawerSection
-                title='Contact Info'
-                className='space-y-2 border-b border-subtle pb-3'
-              >
-                <div className='space-y-1'>
-                  {renderEditableField(
-                    'personName',
-                    'Name',
-                    contact.personName,
-                    'Contact name'
-                  )}
-                  {renderEditableField(
-                    'companyName',
-                    'Company',
-                    contact.companyName,
-                    'Company name'
-                  )}
-                  {renderEditableField(
-                    'email',
-                    'Email',
-                    contact.email,
-                    'Email'
-                  )}
-                  {renderEditableField(
-                    'phone',
-                    'Phone',
-                    contact.phone,
-                    'Phone'
-                  )}
-                </div>
-              </DrawerSection>
-
-              {/* Preferred Channel */}
+            <div className='space-y-1'>
+              {renderEditableField(
+                'personName',
+                'Name',
+                contact.personName,
+                'Contact name'
+              )}
+              {renderEditableField(
+                'companyName',
+                'Company',
+                contact.companyName,
+                'Company name'
+              )}
+              <DrawerPropertyRow
+                label='Role'
+                value={
+                  <Select value={contact.role} onValueChange={handleRoleChange}>
+                    <SelectTrigger aria-label='Role'>
+                      <SelectValue>{roleLabel}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CONTACT_ROLE_OPTIONS.map(option => (
+                        <SelectItem key={option.value} value={option.value}>
+                          <div className='flex items-center gap-2'>
+                            <Icon
+                              name={option.iconName}
+                              className='h-4 w-4 text-tertiary-token'
+                            />
+                            <span>{option.label}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                }
+                labelWidth={96}
+                labelClassName='normal-case tracking-normal text-xs'
+              />
+              {renderEditableField(
+                'email',
+                'Email',
+                contact.email,
+                'Add Email'
+              )}
+              {renderEditableField(
+                'phone',
+                'Phone',
+                contact.phone,
+                'Add Phone'
+              )}
               {hasEmailAndPhone && (
-                <DrawerSection
-                  title='Preferred Contact'
-                  className='space-y-2 border-b border-subtle pb-3'
-                >
-                  <div className='space-y-2'>
-                    <span className={CONTACT_SECTION_LABEL_CLASSNAME}>
-                      Default Action
-                    </span>
+                <DrawerPropertyRow
+                  label='Preferred'
+                  value={
                     <Select
                       value={contact.preferredChannel || ''}
                       onValueChange={handlePreferredChannelChange}
@@ -442,14 +356,16 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                         <SelectItem value='phone'>Phone</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-                </DrawerSection>
+                  }
+                  labelWidth={96}
+                  labelClassName='normal-case tracking-normal text-xs'
+                />
               )}
-            </>
+            </div>
           )}
 
           {activeTab === 'territories' && (
-            <DrawerSection title='Territories' className='space-y-2'>
+            <DrawerSection className='space-y-2'>
               <div className='space-y-2'>
                 <DrawerPropertyRow
                   label='Coverage'

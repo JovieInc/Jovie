@@ -61,20 +61,6 @@ vi.mock('@jovie/ui', () => ({
   }) => children,
 }));
 
-vi.mock('@/components/atoms/AppIconButton', () => ({
-  AppIconButton: ({
-    children,
-    ariaLabel,
-  }: {
-    readonly children: ReactNode;
-    readonly ariaLabel: string;
-  }) => (
-    <button type='button' aria-label={ariaLabel}>
-      {children}
-    </button>
-  ),
-}));
-
 vi.mock('@/components/atoms/BrandLogo', () => ({
   BrandLogo: () => <svg aria-hidden='true' data-testid='brand-logo' />,
 }));

@@ -249,7 +249,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(attempts).toBe(2);
     expect(screen.getByRole('table')).toHaveAttribute(
       'data-table-row-mode',
-      'list'
+      'dense'
     );
     const rowPhoto = within(screen.getByRole('table')).getByTestId(
       'presence-identity-photo'
@@ -277,14 +277,16 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       )
     );
     renderWorkspace(data);
-    await user.click(
-      screen.getByRole('button', { name: /Review Suggestions/ })
-    );
+    const review = screen.getByRole('button', { name: 'Review Suggestions' });
+    await user.click(review);
     expect(await screen.findByText("Couldn't Load Suggestions")).toBeVisible();
     expect(
       screen.queryByText('Saved suggestions are still available. Try again.')
     ).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Close Suggestions' }));
+    expect(review).toHaveAccessibleName('Review Suggestions');
+    await user.click(review);
     await user.click(screen.getByRole('button', { name: 'Try Again' }));
     expect(
       await screen.findByRole('list', {
@@ -407,7 +409,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     });
     expect(review).toBeVisible();
     expect(
-      screen.getByRole('button', { name: 'Review Suggestions (0)' })
+      await screen.findByRole('button', { name: 'Review Suggestions (0)' })
     ).toBeVisible();
     // Keyboard activation opens the existing inspector, never an approval.
     review.focus();
@@ -468,7 +470,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       screen.queryByRole('button', { name: /Review Identities/ })
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Review Suggestions (0)' })
+      screen.getByRole('button', { name: 'Review Suggestions' })
     ).toBeVisible();
   });
 
@@ -930,6 +932,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(
       screen.getByRole('button', { name: 'Close Suggestions' })
     ).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('suggested-connections-review')).toHaveFocus();
     expect(navigationMock.replace).toHaveBeenCalledWith('/app/presence');
     expect(navigationMock.replace).not.toHaveBeenCalledWith(
       '/app/settings/connectors'
@@ -1273,6 +1276,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     ).toBeEnabled();
 
     expect(screen.getByText('Preview only · not saved')).toBeInTheDocument();
+    expect(screen.getByText('3 profiles', { exact: true })).toBeVisible();
 
     const previewRow = screen
       .getByText('Preview only · not saved')
@@ -1326,10 +1330,10 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     renderWorkspace(data);
 
     const table = screen.getByRole('table');
-    expect(table).toHaveAttribute('data-table-row-mode', 'list');
-    expect(table.style.getPropertyValue('--table-row-height')).toBe('44px');
+    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
+    expect(table.style.getPropertyValue('--table-row-height')).toBe('32px');
     expect(table.style.getPropertyValue('--table-cell-content-height')).toBe(
-      '36px'
+      '24px'
     );
     expect(table.parentElement).toHaveClass(
       'overflow-auto',
@@ -1346,17 +1350,19 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     ).toBeInTheDocument();
   });
 
-  it('locks Presence controls to 32px desktop geometry with the 44px hit target on mobile only', () => {
+  it('locks Presence controls to their desktop geometry with the 44px hit target on mobile only', () => {
     renderWorkspace(data);
 
-    // Row overflow action: 44px mobile target, 32px visible on desktop.
+    // Row overflow: shared TableRowOverflowTrigger = IconButton sm (KEEP 28)
+    // with the base Button 44px hit target (taste decisions 5 + 8).
     const rowAction = screen.getByRole('button', {
       name: 'Actions for Spotify',
     });
-    expect(rowAction).toHaveClass('h-11', 'w-11', 'sm:h-8', 'sm:w-8');
+    expect(rowAction).toHaveClass('h-7', 'w-7');
+    expect(rowAction.className).toMatch(/before:h-11/);
     expect(rowAction.className).not.toContain('sm:h-7');
 
-    // Status pill renders at the locked 32px minimum.
+    // Status pill (a badge, not a control) keeps its 32px row minimum.
     const spotifyRow = rowAction.closest('tr');
     const status = within(spotifyRow as HTMLElement)
       .getAllByText('Limit Reached')[0]
@@ -1370,7 +1376,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
 
     // Text controls collapse both hit-target axes on desktop, not just height.
     expect(PRESENCE_BUTTON_DESKTOP_DENSITY.split(' ')).toEqual(
-      expect.arrayContaining(['sm:before:min-h-8', 'sm:before:min-w-0'])
+      expect.arrayContaining(['sm:before:min-h-7', 'sm:before:min-w-0'])
     );
   });
 

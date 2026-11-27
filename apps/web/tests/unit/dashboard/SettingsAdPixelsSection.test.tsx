@@ -49,6 +49,15 @@ vi.mock('@jovie/ui', () => ({
       {children}
     </button>
   ),
+  PlainButton: ({
+    children,
+    type = 'button',
+    ...props
+  }: React.ComponentProps<'button'>) => (
+    <button type={type} {...props}>
+      {children}
+    </button>
+  ),
   Input: (props: Record<string, unknown>) => <input {...props} />,
   Label: ({ children }: { children: React.ReactNode }) => (
     // biome-ignore lint/a11y/noLabelWithoutControl: test mock
@@ -385,7 +394,9 @@ describe('SettingsAdPixelsSection', () => {
 
     getAllByRole('button', { name: 'Test' })[0]?.click();
 
-    expect(await findByRole('status')).toHaveTextContent('Event received');
+    const status = await findByRole('status');
+    expect(status).toHaveTextContent('Event received');
+    expect(status.className).toContain('text-success-text');
   });
 
   it('announces failed test events as alerts', async () => {
@@ -430,5 +441,26 @@ describe('SettingsAdPixelsSection', () => {
     const indicator = getByText('Check Credentials');
     expect(indicator.className).toContain('text-error');
     expect(indicator.className).not.toMatch(/\bred-\d/);
+  });
+
+  it('colors healthy and degraded platform indicators with status text tokens', () => {
+    const platform = (status: 'healthy' | 'degraded') => ({
+      status,
+      totalSent: 10,
+      totalFailed: 0,
+      lastSuccessAt: null,
+    });
+    pixelHealthState.data = {
+      platforms: {
+        facebook: platform('healthy'),
+        google: platform('degraded'),
+      },
+      aggregate: { totalEventsThisWeek: 0, overallSuccessRate: 1 },
+    };
+
+    const { getByText } = fastRender(<SettingsAdPixelsSection isPro />);
+
+    expect(getByText('Healthy').className).toContain('text-success-text');
+    expect(getByText('Degraded').className).toContain('text-warning-text');
   });
 });

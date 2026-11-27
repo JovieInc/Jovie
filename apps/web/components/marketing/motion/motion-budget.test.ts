@@ -65,6 +65,8 @@ describe('marketing motion budgets', () => {
     ].map(match => match[0].split('{')[0].trim());
 
     expect(rawStaggerDelays).toEqual([]);
-    expect(css.match(/var\(--stagger-block\)/gu)?.length).toBe(11);
+    // Eight token steps remain after CSS scroll-reveal replaced JS
+    // transition-delay staggers on reveal-on-scroll (JOV-14244).
+    expect(css.match(/var\(--stagger-block\)/gu)?.length).toBe(8);
   });
 });

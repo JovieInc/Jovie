@@ -9,10 +9,13 @@
 # branch-protection rule, or merge gate here. Do not add a `pull_request`
 # trigger or a `.github/workflows/warden.yml` in this repo.
 #
-# Local auth: set WARDEN_MODEL plus the matching provider key (e.g.
-# WARDEN_OPENAI_API_KEY or WARDEN_ANTHROPIC_API_KEY) in your environment —
-# never commit keys. Without a key, Warden can fall back to local Claude
-# Code auth when available.
+# Model: Claude Haiku 5.5 for every call (agent and auxiliary), paid by the
+# Anthropic API credits that come with the Claude plan. Set
+# WARDEN_ANTHROPIC_API_KEY in your environment (never ANTHROPIC_API_KEY, and
+# never commit keys); without it the hook skips the review. The model id is
+# newer than Warden's built-in catalog, so the hook supplies
+# scripts/hooks/warden-pi-models.json. Both models are pinned here on purpose:
+# an unpinned auxiliary model falls back to pi's default (an Opus model).
 
 version = 1
 
@@ -26,6 +29,13 @@ failOn = "high"
 reportOn = "medium"
 # Local review compares this branch to the default branch
 defaultBranch = "main"
+
+[defaults.agent]
+model = "anthropic/claude-haiku-5-5"
+
+[defaults.auxiliary]
+model = "anthropic/claude-haiku-5-5"
+effort = "low"
 
 [[skills]]
 name = "security-review"

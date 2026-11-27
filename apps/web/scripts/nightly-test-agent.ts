@@ -31,6 +31,10 @@ import {
 } from '@/lib/testing/reliability-entropy';
 
 import { findRepoRoot } from './nightly-test-agent-root';
+import {
+  loadSkillDeltaMemory,
+  scoreRiskItemWithSkillDelta,
+} from './nightly-test-agent-skill-delta';
 
 type RepoKey = 'jovie' | 'ops';
 type TestLane =
@@ -312,21 +316,6 @@ function resolveFromRoot(repoRoot: string, filePath: string): string {
   return path.isAbsolute(filePath) ? filePath : path.join(repoRoot, filePath);
 }
 
-function normalizePath(filePath: string): string {
-  return filePath.replaceAll('\\', '/').replace(/^\.?\//, '');
-}
-
-function pathMatches(filePath: string, patterns: readonly string[]): boolean {
-  const normalized = normalizePath(filePath);
-  return patterns.some(pattern => {
-    const cleanPattern = normalizePath(pattern);
-    if (cleanPattern.endsWith('/')) {
-      return normalized.startsWith(cleanPattern);
-    }
-    return normalized === cleanPattern;
-  });
-}
-
 function findFiles(
   rootDir: string,
   predicate: (filePath: string) => boolean
@@ -423,71 +412,28 @@ function parseAttributes(value: string): Record<string, string> {
   return attributes;
 }
 
-function relatedFailureCount(
-  item: RiskItem,
-  failures: readonly FailureRecord[]
-): number {
-  return failures.filter(record => {
-    const file = record.file ?? record.testId;
-    return (
-      record.module === item.id ||
-      record.module === item.module ||
-      pathMatches(file, item.paths) ||
-      pathMatches(file, item.relatedTests ?? [])
-    );
-  }).length;
-}
-
-function quarantineHit(
-  item: RiskItem,
-  quarantine: readonly QuarantineRecord[]
-): number {
-  return quarantine.some(record =>
-    pathMatches(record.id, [...item.paths, ...(item.relatedTests ?? [])])
-  )
-    ? 1
-    : 0;
-}
-
 function scoreRiskItem(params: {
   item: RiskItem;
   profile: RepoProfile;
   failures: readonly FailureRecord[];
+  skillDelta: NightlyAgentSkillDelta | null;
 }): SelectedTarget {
-  const { item, profile, failures } = params;
-  const recentFailures = relatedFailureCount(item, failures);
-  const inQuarantine = quarantineHit(item, profile.quarantine);
-  const protectedPath = item.paths.some(itemPath =>
-    pathMatches(itemPath, profile.protectedPathPrefixes)
-  )
-    ? 1
-    : 0;
-  const duration = item.avgDurationMs
-    ? Math.min(1, item.avgDurationMs / 120_000)
-    : 0;
-  const weights = profile.riskWeights;
-  const scoreBreakdown = {
-    criticality: item.criticality * weights.criticality,
-    recentFailure:
-      Math.min(1, recentFailures / 3 + (item.historicFailRate ?? 0)) *
-      weights.recentFailure,
-    mutationSurvivor:
-      Math.min(1, (item.mutationSurvivors ?? 0) / 8) * weights.mutationSurvivor,
-    flake: (item.flakeScore ?? 0) * weights.flake,
-    duration: duration * weights.duration,
-    quarantine: inQuarantine * weights.quarantine,
-    protectedPath: protectedPath * 8,
-  };
-  const score = Object.values(scoreBreakdown).reduce(
-    (total, value) => total + value,
-    0
-  );
+  const { item, profile, failures, skillDelta } = params;
+  const scored = scoreRiskItemWithSkillDelta({
+    item,
+    failures,
+    quarantine: profile.quarantine,
+    protectedPathPrefixes: profile.protectedPathPrefixes,
+    riskWeights: profile.riskWeights,
+    skillDelta,
+  });
   return {
     ...item,
+    reasons: scored.reasons,
     selectedAt: new Date().toISOString(),
-    score: Math.round(score * 100) / 100,
-    scoreBreakdown,
-    recommendedLanes: [...new Set(item.lanes)],
+    score: scored.score,
+    scoreBreakdown: scored.scoreBreakdown,
+    recommendedLanes: scored.recommendedLanes as TestLane[],
   };
 }
 
@@ -515,12 +461,21 @@ function commandContext(repoRoot: string, args: Record<string, string>): void {
 function commandSelect(repoRoot: string, args: Record<string, string>): void {
   const repo = normalizeRepoKey(args.repo);
   const profile = getManifest(repoRoot).repos[repo];
+  // Consume-before-select: skill-delta must load before ranking weak targets.
+  const skillDeltaMemory = loadSkillDeltaMemory(repoRoot, args, repo);
   const failures = loadFailureMemory(repoRoot, args, repo);
   const limit = args.limit
     ? Number.parseInt(args.limit, 10)
     : profile.nightlyBudget.maxTargets;
   const selectedTargets = profile.riskItems
-    .map(item => scoreRiskItem({ item, profile, failures }))
+    .map(item =>
+      scoreRiskItem({
+        item,
+        profile,
+        failures,
+        skillDelta: skillDeltaMemory.delta,
+      })
+    )
     .sort((first, second) => second.score - first.score)
     .slice(
       0,
@@ -531,6 +486,11 @@ function commandSelect(repoRoot: string, args: Record<string, string>): void {
     generatedAt: new Date().toISOString(),
     repo,
     failureMemoryRecords: failures.length,
+    skillDeltaConsumed: skillDeltaMemory.consumed,
+    skillDeltaPath: skillDeltaMemory.path
+      ? path.relative(repoRoot, skillDeltaMemory.path)
+      : null,
+    skillDeltaGeneratedAt: skillDeltaMemory.delta?.generatedAt ?? null,
     selectedTargets,
   });
   writeText(
@@ -540,6 +500,10 @@ function commandSelect(repoRoot: string, args: Record<string, string>): void {
       '',
       `Repo: ${profile.displayName}`,
       `Generated: ${new Date().toISOString()}`,
+      `Skill delta consumed: ${skillDeltaMemory.consumed ? 'yes' : 'no'}`,
+      skillDeltaMemory.path
+        ? `Skill delta path: ${path.relative(repoRoot, skillDeltaMemory.path)}`
+        : 'Skill delta path: none',
       '',
       '| Rank | Target | Score | Lanes | Reason |',
       '|---:|---|---:|---|---|',
@@ -550,7 +514,13 @@ function commandSelect(repoRoot: string, args: Record<string, string>): void {
       '',
     ].join('\n')
   );
-  console.log(`Selected ${selectedTargets.length} nightly target(s).`);
+  const skillDeltaLog =
+    skillDeltaMemory.consumed && skillDeltaMemory.path
+      ? ` (skill-delta consumed from ${path.relative(repoRoot, skillDeltaMemory.path)}).`
+      : ' (no prior skill-delta).';
+  console.log(
+    `Selected ${selectedTargets.length} nightly target(s)${skillDeltaLog}`
+  );
 }
 
 function parseJUnit(params: {
@@ -1217,12 +1187,18 @@ async function commandPublishStatus(
     repoRoot,
     'apps/web/reports/nightly-agent/last-run.json'
   );
+  const durableSkillDeltaPath = resolveFromRoot(
+    repoRoot,
+    'apps/web/reports/nightly-agent/skill-delta.json'
+  );
   const reportMarkdown = readFileSync(reportPath, 'utf8');
   writeText(
     reportDocPath,
     buildCommittedReportMarkdown(reportMarkdown, args['workflow-run-url'])
   );
   writeJson(snapshotPath, status);
+  // Durable copy for the next select (consume-before-select) when present in-tree.
+  writeJson(durableSkillDeltaPath, skillDelta);
 
   const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
   const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;

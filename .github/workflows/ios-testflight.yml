@@ -371,7 +371,7 @@ jobs:
               echo "::error::GitHub returned malformed Production Controller job evidence."
               exit 1
             }
-            verified_count="$(jq --arg sha "$controller_transport_sha" '
+            verification_outcome="$(jq -r --arg sha "$controller_transport_sha" '
               [
                 .[].jobs[]?
                 | select(
@@ -380,7 +380,16 @@ jobs:
                     .status == "completed" and
                     .conclusion == "success"
                   )
-              ] | length
+              ]
+              | if length == 1 then
+                  (.[0].steps // [])
+                  | def skipped($name):
+                      map(select(.name == $name))
+                      | length == 1 and .[0].status == "completed" and .[0].conclusion == "skipped";
+                  if skipped("Finalize exact current release generation") and
+                    skipped("Preserve exact verified-generation marker")
+                  then "yielded" else "success" end
+                else empty end
             ' <<<"$jobs_json")"
             verified_skipped="$(jq --arg sha "$controller_transport_sha" '
               [
@@ -392,8 +401,13 @@ jobs:
                   )
               ] | length
             ' <<<"$jobs_json")"
-            if [ "$verified_count" = "1" ]; then
+            if [ "$verification_outcome" = "success" ]; then
               production_proven=true
+            elif [ "$verification_outcome" = "yielded" ]; then
+              # The controller can finish successfully after yielding without
+              # publishing a marker for this attempt.
+              echo "::notice::Production Verified skipped marker publication for $release_sha; no TestFlight release is due."
+              exit 0
             fi
           fi
 

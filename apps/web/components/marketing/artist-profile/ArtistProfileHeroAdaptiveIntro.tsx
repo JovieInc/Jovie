@@ -6,7 +6,6 @@ import {
   type LogoPlacement,
   permittedLogoAssetIds,
 } from '@/data/product-truth/logo-permissions';
-import { ArtistProfileAdaptiveSection } from './ArtistProfileAdaptiveSection';
 import { ArtistProfileHero } from './ArtistProfileHero';
 import './ArtistProfileHeroAdaptiveIntro.css';
 
@@ -17,6 +16,10 @@ interface ArtistProfileHeroAdaptiveIntroProps {
   readonly logoPlacement: LogoPlacement;
 }
 
+/**
+ * Section 1 of the six-section artist LP: left-aligned homepage-system hero
+ * with one mode-morphing profile mock (no duplicate phones below).
+ */
 export function ArtistProfileHeroAdaptiveIntro({
   hero,
   adaptive,
@@ -27,7 +30,7 @@ export function ArtistProfileHeroAdaptiveIntro({
   return (
     <div className='ap-hero-intro relative overflow-x-clip'>
       <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.hero}>
-        <ArtistProfileHero hero={hero} />
+        <ArtistProfileHero hero={hero} adaptive={adaptive} />
       </div>
 
       {showLogos ? (
@@ -41,10 +44,6 @@ export function ArtistProfileHeroAdaptiveIntro({
           />
         </div>
       ) : null}
-
-      <div data-testid={ARTIST_PROFILE_SECTION_TEST_IDS.adaptive}>
-        <ArtistProfileAdaptiveSection adaptive={adaptive} />
-      </div>
     </div>
   );
 }

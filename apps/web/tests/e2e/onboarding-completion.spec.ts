@@ -76,6 +76,7 @@ test.describe('Onboarding Completion & Empty States', () => {
     try {
       user = await createFreshUser(page, seed);
     } catch (error) {
+      if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') throw error;
       console.log(
         `⚠ createFreshUser failed (possible Clerk dev cap) — skipping: ${error}`
       );
@@ -254,7 +255,8 @@ test.describe('Onboarding State Persistence', () => {
     let user: { email: string; clerkUserId: string };
     try {
       user = await createFreshUser(page, seed);
-    } catch {
+    } catch (error) {
+      if (process.env.E2E_USE_TEST_AUTH_BYPASS === '1') throw error;
       test.skip(true, 'Clerk user creation failed — possible dev instance cap');
       return;
     }

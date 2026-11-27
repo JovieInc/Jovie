@@ -95,3 +95,20 @@ export const Stacked: Story = {
     </div>
   ),
 };
+
+/** Loading: the pill shows the platform while its data is still being fetched. */
+export const LoadingPlatform: Story = {
+  args: {
+    state: 'loading',
+    secondaryText: 'Checking connection',
+  },
+};
+
+/** Offline: a disconnected platform shows as an unconnected, faded pill. */
+export const OfflineDisconnected: Story = {
+  args: {
+    state: 'ready',
+    tone: 'faded',
+    secondaryText: 'Reconnect when you are back online',
+  },
+};

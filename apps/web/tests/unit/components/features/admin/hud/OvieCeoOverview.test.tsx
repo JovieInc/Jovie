@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OvieCeoOverview } from '@/components/features/admin/hud/OvieCeoOverview';
 import type { HudMetrics } from '@/types/hud';
@@ -56,19 +56,14 @@ describe('OvieCeoOverview', () => {
     render(<OvieCeoOverview metrics={buildMetrics()} />);
 
     expect(screen.getByTestId('ovie-ceo-overview')).toBeInTheDocument();
-    expect(screen.getAllByTestId(/^ovie-core-metric-/)).toHaveLength(3);
+    expect(screen.getAllByTestId(/^ovie-core-metric-/)).toHaveLength(1);
     expect(screen.getByText('Alive')).toBeInTheDocument();
-    expect(screen.getAllByText('Not Measured')).toHaveLength(2);
-    expect(screen.getAllByText('Summer')).toHaveLength(3);
+    expect(screen.queryByText('Not Measured')).toBeNull();
+    expect(screen.getByTestId('ovie-ceo-syncing')).toBeInTheDocument();
+    expect(screen.getAllByText('Summer')).toHaveLength(1);
     expect(
       screen.getByRole('link', { name: /Inspect Stripe/i })
     ).toHaveAttribute('href', 'https://dashboard.stripe.com/');
-    expect(
-      screen.getByRole('link', { name: /Inspect Customers/i })
-    ).toHaveAttribute('href', '/app/ov/people');
-    expect(
-      screen.getByRole('link', { name: /Inspect Releases/i })
-    ).toHaveAttribute('href', '/app/ov/releases');
   });
 
   it('reserves fixed rows when financial telemetry degrades', () => {
@@ -92,21 +87,11 @@ describe('OvieCeoOverview', () => {
     };
     rerender(<OvieCeoOverview metrics={metrics} onRetry={onRetry} />);
 
-    const rows = screen.getAllByTestId(/^ovie-core-metric-/);
-    expect(rows).toHaveLength(3);
-    for (const row of rows) {
-      expect(row.className).toContain('h-72');
-      expect(row.className).toContain('lg:h-40');
-    }
-    expect(
-      screen.getByTestId('ovie-core-metric-company-survival')
-    ).toHaveAttribute('data-state', 'degraded');
-    expect(screen.getByText('Unknown')).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: /Inspect Mercury/i })
-    ).toHaveAttribute('href', 'https://app.mercury.com/');
-    fireEvent.click(screen.getByRole('button', { name: /Retry/i }));
-    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(screen.queryAllByTestId(/^ovie-core-metric-/)).toHaveLength(0);
+    expect(screen.getByTestId('ovie-ceo-syncing')).toBeInTheDocument();
+    expect(screen.queryByText('Unknown')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Retry/i })).toBeNull();
+    expect(onRetry).not.toHaveBeenCalled();
   });
 
   it('preserves presentation-specific value density classes', () => {
@@ -119,9 +104,8 @@ describe('OvieCeoOverview', () => {
     );
 
     expect(screen.getByText('Alive')).toHaveClass('text-7xl');
-    for (const value of screen.getAllByText('Not Measured')) {
-      expect(value).toHaveClass('text-4xl');
-    }
+    expect(screen.queryByText('Not Measured')).toBeNull();
+    expect(screen.getByTestId('ovie-ceo-syncing')).toBeInTheDocument();
   });
 
   it('ages retained metrics from fresh to stale on the live client clock', () => {

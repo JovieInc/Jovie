@@ -10,12 +10,19 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { cn } from '@/lib/utils';
+
+export type HomeLoopAnswerSurface = 'panel' | 'flat';
 
 /**
  * The generated part of a living Home canvas: the prompt, the reply, and the
  * structured cards rendered in place. History controls step through earlier
  * canvas states without leaving Home. The panel reserves its minimum height
  * while a reply streams, so the card swap does not move the sections below.
+ *
+ * `surface="flat"` drops card chrome for Story First melt-to-chat (editorial
+ * type on the continuous canvas). Default `panel` keeps the bordered card for
+ * denser Home Loop layouts.
  */
 export function HomeLoopAnswerPanel({
   prompt,
@@ -28,6 +35,7 @@ export function HomeLoopAnswerPanel({
   onHome,
   onOpenTranscript,
   children,
+  surface = 'panel',
 }: Readonly<{
   readonly prompt: string;
   readonly reply: string;
@@ -41,14 +49,21 @@ export function HomeLoopAnswerPanel({
   readonly onOpenTranscript: () => void;
   /** Structured cards for this turn, already rendered by the persona. */
   readonly children?: ReactNode;
+  readonly surface?: HomeLoopAnswerSurface;
 }>) {
   return (
     <section
       aria-busy={pending}
       aria-label='Generated Answer'
       aria-live='polite'
-      className='flex min-h-32 flex-col gap-2 rounded-lg border border-subtle bg-surface-1 px-3 py-2'
+      className={cn(
+        'flex min-h-32 flex-col gap-2',
+        surface === 'panel'
+          ? 'rounded-lg border border-subtle bg-surface-1 px-3 py-2'
+          : 'px-0 py-1'
+      )}
       data-state={pending ? 'pending' : 'ready'}
+      data-surface={surface}
       data-testid='home-loop-answer'
     >
       <header className='flex items-center gap-2'>

@@ -109,6 +109,17 @@ export const PartialSpotifyPreferred: Story = {
   },
 };
 
+/** Long content: an artist name far past one line beside the listen action. */
+export const LongContentArtistName: Story = {
+  args: {
+    showCapture: false,
+    artist: {
+      ...PROFILE_STORY_ARTIST,
+      name: 'The Extraordinarily Long Named Independent Collective Featuring Many Guests',
+    },
+  },
+};
+
 /** Right-to-left: the listen CTA in an Arabic document direction. */
 export const RtlArabicDocument: Story = {
   args: { showCapture: false },

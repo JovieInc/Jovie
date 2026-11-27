@@ -84,3 +84,64 @@ export const Copied: Story = {
     ).toHaveClass('text-success');
   },
 };
+
+async function openAddLinkForm(canvasElement: HTMLElement, url: string) {
+  const canvas = within(canvasElement);
+  await userEvent.click(
+    canvas.getByRole('button', {
+      name: /^Show provider availability details:/i,
+    })
+  );
+  const page = within(canvasElement.ownerDocument.body);
+  await userEvent.click(await page.findByRole('button', { name: /Add link/ }));
+  await userEvent.type(await page.findByPlaceholderText('Paste URL...'), url);
+  await userEvent.click(page.getByRole('button', { name: 'Confirm URL' }));
+  return page;
+}
+
+export const Error: Story = {
+  play: async ({ canvasElement }) => {
+    const page = await openAddLinkForm(canvasElement, 'https://example.com/x');
+    await expect(await page.findByText(/URL must be from/)).toBeVisible();
+  },
+};
+
+export const Offline: Story = {
+  args: { onAddUrl: fn().mockRejectedValue(new TypeError('Failed to fetch')) },
+  play: async ({ canvasElement }) => {
+    const page = await openAddLinkForm(
+      canvasElement,
+      'https://music.apple.com/us/album/x/1'
+    );
+    // The parent owns the error toast; the field keeps the typed URL.
+    await expect(await page.findByPlaceholderText('Paste URL...')).toHaveValue(
+      'https://music.apple.com/us/album/x/1'
+    );
+  },
+};
+
+export const LongContent: Story = {
+  args: {
+    release: {
+      ...release,
+      title:
+        'An Extraordinarily Long Release Title That Keeps Going Past One Line',
+    },
+  },
+};
+
+function RtlFrame({ children }: { readonly children: React.ReactNode }) {
+  return <div dir='rtl'>{children}</div>;
+}
+
+export const Rtl: Story = {
+  decorators: [
+    function WithRtl(StoryComponent) {
+      return (
+        <RtlFrame>
+          <StoryComponent />
+        </RtlFrame>
+      );
+    },
+  ],
+};

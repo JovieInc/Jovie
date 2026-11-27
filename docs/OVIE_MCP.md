@@ -16,3 +16,37 @@ Mac lander (no ChatGPT): founder session **or** founder OAuth bearer **or** a fo
 ChatGPT: Settings → Apps → Advanced → Developer mode → connector URL above. Authorize uses Jovie `/signin` (Google or email), not Apple-only `/identity`. Sign in as founder (`tim@meetjovie.com` or `t@timwhite.co`). A wrong-account session is reset first so waitlist Hide-My-Email cannot trap the flow.
 
 Test: unauthenticated `initialize` -> 401; an OAuth founder bearer can list and call the founder-gated tools above; a non-founder gets 403.
+
+## OAuth TTLs and refresh (MCP clients)
+
+Discovery at `/.well-known/oauth-authorization-server/api/ovie/oauth` advertises `grant_types_supported: authorization_code` and `refresh_token`.
+
+| Token | TTL | Notes |
+|-------|-----|--------|
+| Access | 1 hour | HMAC-signed bearer; same shape as lander tokens |
+| Refresh | 30 days | HMAC-signed; **rotates on every refresh** |
+| Auth code | 5 minutes | Single PKCE exchange |
+
+**Root cause of 15-minute disconnects:** access tokens previously expired in 15 minutes with no `refresh_token` grant, so ChatGPT and Cursor MCP clients could not renew and fell back to manual `mcp_auth`.
+
+### Refresh flow
+
+1. Complete founder OAuth (PKCE) once via `/api/ovie/oauth/authorize` → `token` with `authorization_code`.
+2. Store `refresh_token` and `client_id` from the token response (clients that support OAuth 2.1 refresh do this automatically).
+3. Before access expiry, `POST /api/ovie/oauth/token` with `grant_type=refresh_token`, `refresh_token`, and `client_id` (form-urlencoded or JSON, same as code exchange).
+4. Response includes a new `access_token`, a **new** `refresh_token`, and `expires_in` (3600). Replace the stored refresh token with the rotated value.
+
+Founder gate is unchanged: only founders receive codes and tokens; refresh claims require `admin: true`.
+
+### Cursor cloud agents and ChatGPT
+
+- **Preferred:** Use the MCP OAuth connector URL `https://jov.ie/api/ovie/mcp`. After one founder sign-in, the client should refresh hourly without another browser step.
+- **Cursor Project / cloud agent:** In the project MCP settings, configure OAuth against the Ovie resource above (not a static bearer copied from a 15-minute token). If the client stores refresh credentials, agents stay connected across runs.
+- **Offline bootstrap (founder workstation only):** Mint a long-lived refresh pair with production `BETTER_AUTH_SECRET`:
+
+  ```bash
+  doppler run -- pnpm tsx apps/web/scripts/ovie/mint-mcp-oauth-tokens.ts \
+    --redirect-uri 'https://www.cursor.com/agents/mcp/oauth/callback'
+  ```
+
+  Use the printed `client_id` and `refresh_token` only in founder-controlled MCP OAuth config. There is **no** public mint HTTP route. Do not set `OVIE_AGENT_MCP_TOKEN` to a short-lived access token — use OAuth refresh or `issueOvieLanderAccessToken` for non-OAuth lander HTTP only.

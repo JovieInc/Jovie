@@ -72,8 +72,11 @@ CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/jovie-ci/$PIN"
 # Fetch the pinned guard once into the cache. The commit SHA pins the content.
 # Uses whatever git credential helper the environment already has; never
 # prompts, never writes credentials, bounded in time.
-fetch_pin() {
-  local tmp
+fetch_pin() (
+  local tmp git_var
+  # Hooks export the caller's Git directory and index. Clear them only in
+  # this child repository; staged measurement below must retain that index.
+  while IFS= read -r git_var; do unset "$git_var"; done < <(git rev-parse --local-env-vars)
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/jovie-ci.XXXXXX")" || return 1
   if GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never timeout 30s \
        git -c core.hooksPath=/dev/null -C "$tmp" init -q 2>/dev/null &&
@@ -90,7 +93,7 @@ fetch_pin() {
   fi
   rm -rf "$tmp"
   return 1
-}
+)
 
 if [[ "$MODE" == "warm" ]]; then
   [[ -f "$CACHE/guards/size.mjs" ]] && exit 0

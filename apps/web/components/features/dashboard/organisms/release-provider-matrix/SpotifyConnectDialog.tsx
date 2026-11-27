@@ -6,6 +6,7 @@ import {
   Input,
   Kbd,
   Spinner as LoadingSpinner,
+  PlainButton,
 } from '@jovie/ui';
 import { BadgeCheck, Search } from 'lucide-react';
 import Image from 'next/image';
@@ -37,6 +38,11 @@ import {
   releasesEmptyStateReducer,
   useSpotifyConnect,
 } from './releases-empty-state';
+import {
+  canSelectArtist,
+  getNextSelectableIndex,
+  isSpotifyUrl,
+} from './spotify-connect-helpers';
 
 const LOADING_SKELETON_KEYS = ['skeleton-1', 'skeleton-2', 'skeleton-3'];
 const DEFAULT_PLACEHOLDER = 'Search your artist name or paste a Spotify link';
@@ -115,34 +121,10 @@ function SearchResultsLoadingSkeleton() {
   );
 }
 
-function canSelectArtist(artist: SpotifyArtist): boolean {
-  return !artist.isClaimed || artist.isClaimedByCurrentUser === true;
-}
-
-function getNextSelectableIndex(
-  activeIndex: number,
-  direction: 1 | -1,
-  results: SpotifyArtist[]
-): number {
-  const startIndex =
-    activeIndex >= 0 ? activeIndex : direction === 1 ? -1 : results.length;
-  for (let offset = 1; offset <= results.length; offset += 1) {
-    const nextIndex =
-      (startIndex + direction * offset + results.length) % results.length;
-    if (results[nextIndex] && canSelectArtist(results[nextIndex])) {
-      return nextIndex;
-    }
-  }
-  return -1;
-}
-
-function isSpotifyUrl(value: string): boolean {
-  const trimmed = value.trim();
-  return (
-    trimmed.startsWith('https://open.spotify.com/') ||
-    trimmed.startsWith('open.spotify.com/') ||
-    trimmed.startsWith('spotify.com/')
-  );
+/** Focus the field once the dialog has painted; returns the cancel function. */
+function scheduleFocus(ref: React.RefObject<HTMLInputElement | null>) {
+  const timer = setTimeout(() => ref.current?.focus(), 100);
+  return () => clearTimeout(timer);
 }
 
 const KEYBOARD_HINTS = [
@@ -201,7 +183,20 @@ interface SpotifyConnectDialogProps {
   readonly onImportStart?: (artistName: string) => void;
 }
 
-export function SpotifyConnectDialog({
+export function SpotifyConnectDialog(props: SpotifyConnectDialogProps) {
+  // Opening the dialog starts a fresh session: the keyed child remounts with
+  // empty search state instead of an effect resetting fields on the open flag.
+  const [session, setSession] = useState(0);
+  const [wasOpen, setWasOpen] = useState(props.open);
+  if (props.open !== wasOpen) {
+    setWasOpen(props.open);
+    if (props.open) setSession(current => current + 1);
+  }
+
+  return <SpotifyConnectDialogContent key={session} {...props} />;
+}
+
+function SpotifyConnectDialogContent({
   open,
   onOpenChange,
   connected,
@@ -280,22 +275,10 @@ export function SpotifyConnectDialog({
     };
   }, [search]);
 
-  const prevOpenRef = useRef(open);
   useEffect(() => {
-    if (prevOpenRef.current !== open) {
-      prevOpenRef.current = open;
-      if (open) {
-        dispatch({ type: 'RESET_STATE' });
-        setShowChangeSearch(false);
-        setSelectedArtist(null);
-        setSucceeded(false);
-        clear();
-      } else if (successTimerRef.current) clearTimeout(successTimerRef.current);
-    }
     if (!open || !isSearchMode) return;
-    const timer = setTimeout(() => inputRef.current?.focus(), 100);
-    return () => clearTimeout(timer);
-  }, [open, clear, isSearchMode]);
+    return scheduleFocus(inputRef);
+  }, [open, isSearchMode]);
 
   useEffect(
     () => () => {
@@ -487,10 +470,8 @@ export function SpotifyConnectDialog({
 
   return (
     <Dialog open={open} onClose={() => onOpenChange(false)} size='lg'>
-      <DialogTitle className='text-base font-semibold text-primary-token'>
-        Connect Spotify
-      </DialogTitle>
-      <DialogDescription className='text-app text-secondary-token'>
+      <DialogTitle>Connect Spotify</DialogTitle>
+      <DialogDescription>
         Search your artist name or paste a Spotify artist link.
       </DialogDescription>
 
@@ -629,9 +610,8 @@ export function SpotifyConnectDialog({
                     className='max-h-64 overflow-y-auto py-1'
                   >
                     {visibleResults.map((artist, index) => (
-                      <button
+                      <PlainButton
                         key={artist.id}
-                        type='button'
                         role='option'
                         id={`spotify-connect-result-${index}`}
                         aria-selected={index === formState.activeResultIndex}
@@ -702,7 +682,7 @@ export function SpotifyConnectDialog({
                             <span className='sr-only'>Verified artist</span>
                           </div>
                         )}
-                      </button>
+                      </PlainButton>
                     ))}
                   </div>
                 )}

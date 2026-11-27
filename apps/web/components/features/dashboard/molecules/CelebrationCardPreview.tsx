@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui/atoms/button';
+import { PlainButton } from '@jovie/ui/atoms/plain-button';
 import { Download, Share2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { track } from '@/lib/analytics';
@@ -94,9 +95,8 @@ export function CelebrationCardPreview({
       {/* Size picker */}
       <div className='flex gap-2'>
         {(Object.keys(SIZE_LABELS) as CardSize[]).map(size => (
-          <button
+          <PlainButton
             key={size}
-            type='button'
             onClick={() => {
               setSelectedSize(size);
               onInteraction?.();
@@ -108,7 +108,7 @@ export function CelebrationCardPreview({
             }`}
           >
             {SIZE_LABELS[size]}
-          </button>
+          </PlainButton>
         ))}
       </div>
 
@@ -122,7 +122,9 @@ export function CelebrationCardPreview({
         <img
           src={cardUrl}
           alt='Your shareable profile card'
-          className={`w-full ${
+          width={1080}
+          height={selectedSize === 'story' ? 1920 : 1080}
+          className={`h-auto w-full ${
             selectedSize === 'story' ? 'max-w-45' : 'max-w-60'
           }`}
         />

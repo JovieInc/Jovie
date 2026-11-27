@@ -14,34 +14,38 @@ A passing linkage receipt proves those references exist; it does not prove all l
 runtime behavior. Scoped rules are policy guards, not automated regression tests.
 No lesson is declared unable to recur in this inventory. H-EX-06 stays partial
 until shadow-qualification and promotion receipts meet `canon/ENGINEERING.md`;
-policy-only fingerprints are listed explicitly and do not prove executable prevention.
+remaining policy-only fingerprints are listed in the linkage receipt and do not
+prove executable prevention.
 
-## Linkage audit — 2026-10-21 (JOV-7355)
+## Linkage audit — 2026-11-21 (RSI win #5)
 
 Reviewed every level-three lesson heading and its guard rationale against the
-current source, including the three marketing fingerprints added after the
-original 36-lesson audit. The companion inventory has no exclusions, duplicate
-fingerprints, orphan entries, changed lesson digests or missing guard anchors.
+current source. Promoted eight high-leverage policy-only fingerprints to named
+executable tests (CTA routes, traction copy, Calvin identity, hover motion,
+eyebrow caps, Doppler pin, migration journal allow, zero-test CI rejection) and
+repaired the stale homepage H1 guard anchor. The companion inventory has no
+exclusions, duplicate fingerprints, orphan entries, changed-unreviewed lesson
+digests or missing guard anchors.
 
 | Existing linkage receipt | Result |
 | --- | --- |
-| Fingerprints linked / total | 39 / 39 |
-| Fingerprints with named test links | 21 |
-| Fingerprints with scoped rules only | 18 |
-| Test links / scoped-rule links | 33 / 20 |
+| Fingerprints linked / total | 43 / 43 |
+| Fingerprints with named test links | 33 |
+| Fingerprints with scoped rules only | 10 |
+| Test links / scoped-rule links | 48 / 22 |
 | Cannot-recur dispositions / unlinked fingerprints | 0 / 0 |
 | `ok` / findings | `true` / `[]` |
+
+Counts are total guard links from `auditFeedbackLinkage()` (`testLinks` / `ruleLinks`), not unique `path#anchor` identities (the Self-Improvement Loop rule is linked from two fingerprints).
 
 The existing `jovie.feedback-linkage-qualification/v1` receipt includes every
 fingerprint, reviewed lesson digest, guard path, exact anchor, rationale and
 guard-source digest. SHA-256 of `JSON.stringify(receipt.lessons)` for this review:
-`48f29f68ece99b109131a78f8d24e340ea98fcc547afb650d8a7ef83cbe11bac`.
-Source base: `5d32064364b29dd67f6c9ff09aa4fbf83e9b1d16`.
+`4dde29f2c026136f52246d41eec3f1b578e36cc8a70221ff555e96e26938aae7`.
 
-The initial audit failed on the removed deployment-test anchor. Commit
-`76e7e0e871368266bb0859cde86c89f8d74c1cf2` replaced that test with the executed
-canary-shell suite; its exact-deployment, cookie-only, no-redirect test now owns
-the link. Lesson digests remain unchanged after review.
+Prior audit (2026-10-21 / JOV-7355) recorded 39 / 39 linked with 18 policy-only.
+This pass keeps that receipt historical and refreshes counts after the RSI
+promotion batch.
 
 Reproduce the full receipt and its digest from the repository root with the
 pinned Node version:
@@ -59,11 +63,10 @@ JS
 ```
 
 This records source linkage; linked-test execution is separate evidence. The
-18 policy-only fingerprints remain identified in the full receipt. The existing
-audit remains nonblocking, and this receipt does not renew H-EX-06 or promote it.
-Ship now: repair the stale reference and record the exhaustive audit.
-Re-evaluate when a lesson or linked guard changes; then review that linkage and
-regenerate the receipt before reusing this dated evidence.
+10 remaining policy-only fingerprints stay listed in the full receipt. The
+existing audit remains nonblocking, and this receipt does not renew H-EX-06.
+Ship now: executable guards for the promoted batch. Re-evaluate when a lesson
+or linked guard changes; then review that linkage and regenerate the receipt.
 
 ---
 
@@ -316,6 +319,33 @@ regenerate the receipt before reusing this dated evidence.
 **Mistake:** Production and staging duplicated a Vercel bypass exchange in shell, while preview and release workflows exposed secrets and runtime values in process arguments. Exact-deployment probes assumed every target was `production`, searched only the newest deployment page, and accepted status-only page evidence. A 200 not-found profile, a 204 critical route, a duplicate same-SHA deployment, or a partially propagated READY record could therefore look healthy. Static auth liveness/configuration stood in for the actual provider UI and Better Auth catch-all, independently named auth secrets could be mixed, an interrupted marker upload could suppress same-SHA recovery forever, and workflow jobs carried credentials/permissions they did not need. Separate Lighthouse validation and upload also left a same-UID mutable, symlink-following artifact gap.
 
 **Rule:** All protected Vercel probes use `apps/web/scripts/vercel-protected-origin.cjs`. Read protection and CLI secrets only from process environment; never put `--token` or `--env KEY=value` on argv. Require the caller to choose `preview` or `production`, bind the exact URL and deployment ID through deadline-bounded pagination, retry only missing/known-transient evidence, fail immediately on present contradictions, verify the full commit through a host-only cookie, and require semantic HTTP-200 content. After exact staging alias ownership, click both real provider buttons and prove their Better Auth catch-all POST plus external navigation and callback URI; `/api/auth/ok` is not runtime auth proof. Select one complete named auth credential pair and derive auth status from the completed test result. Runtime cookies must be masked and included in artifact scans. Browser routes must be awaited before navigation. Lighthouse validation owns upload from one hash-sealed mode-0400 isolated copy, re-proves source and isolated file identity after the same-UID child, and rejects symlinks, FIFOs, directories, and mutation. Grant OIDC/attestation only to a dedicated no-checkout, no-secret attestation job; secret-bearing checkout/deploy jobs must never receive it. Disable persisted credentials on every checkout, and accept a production marker only with completed-success controller and verification evidence; consume the single SHA-bound interrupted-marker recovery lease before mutation.
+
+## RSI AI-slop prevention (pre-merge)
+
+### Intentional stream and paint waits are AI slop
+**Mistake:** Agents insert `smoothStream({ delayInMs })`, `await new Promise(r => setTimeout(...))`, or similar sleeps on the success / first-readable-paint path because demos look “paced.” Production tip carried `delayInMs: 15` (JOV-3525); a claimed `delayInMs: 5` was not present at tip (AI SDK default is 10ms) and must stay unverifiable.
+
+**Rule:** No artificial waits on the response or first-paint path. Documented bounded retry, backoff, and debounce off the success path are allowed. Verify first readable paint and full output, not headers. Encode hits as ASR-042 / RF-0003; do not treat skipped evidence as PASS (ASR-046).
+
+### Prefetch keys must match the consumer key and shape
+**Mistake:** Nav hover warmed `queryKeys.audience.members(profileId)` while the Audience table reads an infinite query keyed with sort/direction/segments/view; Identity (`/app/presence`) warmed `dspEnrichment.presence` while the route mounts ProfilesWorkspace. Dead warms burned the request budget and left the click cold. A “fixed” Audience infinite warm still lost to SSR: the route awaits the first page, and hover cache can block newer SSR `initialData`.
+
+**Rule:** Warm queries must use the same TanStack key and request params the destination reads — or do not warm. Stock/SSR-only wins ties. Do not keep or invent a hover warm without a matched authenticated hover→navigate A/B proving faster first usable rows, no request-budget regression, and correct freshness when SSR is newer. Keep request builders with the real consumer; do not extract a second module for a deleted hover path. Never speculatively render a route that can write. ASR-043 / RF-0004.
+
+### Optional or stale data must not become zero or a period spike
+**Mistake:** Missing counts coerced with `?? 0`, lifetime totals shown as period spikes, and refresh clearing prior valid rows so the UI flickers empty or invents a surge.
+
+**Rule:** Keep prior valid values during refresh (`keepPreviousData` / equivalent). Skipped counts stay null. Period metrics stay period-scoped. Test stale, failure, and recovery. ASR-044 / RF-0005.
+
+### Shared UI contracts beat per-screen patches
+**Mistake:** One-off screen fixes for popover detachment, hover focus rings, nested radius clipping, drawer-resize reordering columns, or composer focus activating Attach — then the next surface regresses.
+
+**Rule:** Encode on shared primitives and browser fixtures. Keyboard focus rings only; nested radius = outer − padding; drawer resize ≠ reorder animation; composer focus ≠ Attach. ASR-045 / RF-0006.
+
+### Skipped or unverifiable evidence is never PASS
+**Mistake:** Treating skipped fixtures, missing browser runs, or unverifiable claims as green so slop merges.
+
+**Rule:** Aggregate pass requires every mandatory item verified with empty residual. Unverifiable holds closure (`outcome-residual-policy.mjs`). ASR-046 / RF-0007.
 
 ## Marketing copy guardrails
 

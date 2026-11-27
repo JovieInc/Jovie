@@ -136,16 +136,17 @@ describe('PlaceholderImage', () => {
       const placeholder = container.querySelector('div');
 
       expect(placeholder?.className).toContain('bg-gradient-to-br');
-      expect(placeholder?.className).toContain('from-gray-200');
-      expect(placeholder?.className).toContain('to-gray-300');
+      expect(placeholder?.className).toContain('from-surface-2');
+      expect(placeholder?.className).toContain('to-surface-3');
     });
 
-    it('applies dark mode gradient classes', () => {
+    it('follows the theme through surface tokens, with no raw palette classes', () => {
       const { container } = render(<PlaceholderImage />);
       const placeholder = container.querySelector('div');
+      const svg = container.querySelector('svg');
 
-      expect(placeholder?.className).toContain('dark:from-gray-700');
-      expect(placeholder?.className).toContain('dark:to-gray-800');
+      expect(placeholder?.className).not.toMatch(/\bgray-\d/);
+      expect(svg?.getAttribute('class')).not.toMatch(/\bgray-\d/);
     });
 
     it('centers content', () => {
@@ -169,8 +170,7 @@ describe('PlaceholderImage', () => {
       const { container } = render(<PlaceholderImage />);
       const svg = container.querySelector('svg');
 
-      expect(svg).toHaveClass('text-gray-400');
-      expect(svg).toHaveClass('dark:text-gray-500');
+      expect(svg).toHaveClass('text-tertiary-token');
     });
 
     it('SVG has fill attribute', () => {

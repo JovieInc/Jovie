@@ -359,12 +359,7 @@
     }
   },
   "sideEffectGaps": {
-    "apps/web/app/api/chat/confirm-link/route.ts": ["socialLinks"],
-    "apps/web/app/api/chat/confirm-remove-link/route.ts": ["socialLinks"],
     "apps/web/app/api/dashboard/social-links/route.post.ts": ["socialLinks"],
-    "apps/web/app/api/suggestions/social-links/[id]/approve/route.ts": [
-      "socialLinks"
-    ],
     "apps/web/lib/db/batch.ts": ["socialLinks"],
     "apps/web/lib/db/social-links-sync.ts": ["socialLinks"],
     "apps/web/lib/discography/unclaimed-artist-enrichment.ts": ["socialLinks"],

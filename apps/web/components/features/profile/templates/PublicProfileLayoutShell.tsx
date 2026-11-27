@@ -100,6 +100,11 @@ export function PublicProfileLayoutShell({
           />
         </div>
         <div className='absolute inset-0 bg-(image:--profile-stage-scrim)' />
+        {/* JOV-14241: one thin cover-lit accent line (art direction: one glow, one accent). */}
+        <div
+          className='profile-cover-accent-line pointer-events-none absolute left-1/2 h-px w-28 -translate-x-1/2 bg-(--profile-cover-accent-line)'
+          data-testid='profile-cover-accent-line'
+        />
       </div>
 
       <div

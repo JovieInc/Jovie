@@ -66,6 +66,10 @@ import {
   archiveLibraryMerchCard,
   restoreLibraryMerchCard,
 } from '@/app/app/(shell)/library/actions';
+import {
+  computeLibraryStatusHiddenNote,
+  LibraryStatusBar,
+} from '@/app/app/(shell)/library/library-status-bar';
 import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
@@ -180,7 +184,6 @@ import {
   type RowSelectionState,
 } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
-import { pluralize } from '@/lib/utils/pluralize';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import {
   LIBRARY_CATALOG_ROW_MODE,
@@ -252,10 +255,10 @@ const LIBRARY_CARD_FOCUS_CLASS =
 const LIBRARY_BUTTON_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface) outline-none';
 const LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS =
-  'h-8 min-h-8 lg:before:h-8 lg:before:min-w-0';
+  'h-7 min-h-7 lg:before:h-7 lg:before:min-w-0';
 const LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS = cn(
   LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS,
-  'w-8 min-w-8'
+  'w-7 min-w-7'
 );
 
 type LibraryPresetId = LibraryView;
@@ -1900,9 +1903,9 @@ function LibraryReleaseTable({
       containerClassName='h-full'
       skeletonRows={SKELETON_ROW_COUNT.TABLE}
       skeletonColumnConfig={
-        rowMode === LIBRARY_CATALOG_ROW_MODE
-          ? LIBRARY_CATALOG_SKELETON_CONFIG
-          : LIBRARY_TABLE_SKELETON_CONFIG
+        hideHeader
+          ? LIBRARY_TABLE_SKELETON_CONFIG
+          : LIBRARY_CATALOG_SKELETON_CONFIG
       }
     />
   );
@@ -2833,29 +2836,6 @@ function AssetDrawer({
   );
 }
 
-function LibraryStatusBar({
-  visibleCount,
-  totalCount,
-  activePreviewTitle,
-}: {
-  readonly visibleCount: number;
-  readonly totalCount: number;
-  readonly activePreviewTitle: string | null;
-}) {
-  return (
-    <div className='system-b-library-status-bar hidden h-(--app-shell-footer-row-height) shrink-0 items-center justify-between gap-3 border-t border-(--app-shell-frame-seam) px-(--app-shell-header-padding-x) sm:flex'>
-      <span className='min-w-0 truncate'>
-        {visibleCount} of {pluralize(totalCount, 'Item')}
-      </span>
-      {activePreviewTitle ? (
-        <span className='min-w-0 truncate text-right'>
-          Playing {activePreviewTitle}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 const EMPTY_MERCH_PRODUCTS: readonly LibraryMerchProductOption[] = [];
 const EMPTY_WORK_LAUNCHES: readonly WorkLaunchSummary[] = [];
 
@@ -3556,6 +3536,11 @@ export function LibrarySurface({
     filters.providers.size +
     (preset === 'all' ? 0 : 1);
 
+  const statusHiddenNote = useMemo(
+    () => computeLibraryStatusHiddenNote(preset, effectiveAssets),
+    [effectiveAssets, preset]
+  );
+
   const filterPanel = useMemo(
     () => (
       <LibraryFilterPanel
@@ -3859,6 +3844,7 @@ export function LibrarySurface({
           <LibraryStatusBar
             visibleCount={visibleAssets.length}
             totalCount={effectiveAssets.length}
+            hiddenNote={statusHiddenNote}
             activePreviewTitle={activePreviewTitle}
           />
         </div>

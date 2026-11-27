@@ -108,7 +108,7 @@ vi.mock('node:fs', async importOriginal => {
     readFileSync: (...args: Parameters<typeof actual.readFileSync>) => {
       if (
         routeFixture.source !== null &&
-        String(args[0]).endsWith('/app/api/chat/route.ts')
+        String(args[0]).endsWith('/lib/chat/tools/album-art.ts')
       ) {
         return routeFixture.source;
       }
@@ -117,8 +117,8 @@ vi.mock('node:fs', async importOriginal => {
   };
 });
 
-const currentRoute = readFileSync(
-  new URL('../../../app/api/chat/route.ts', import.meta.url),
+const currentTool = readFileSync(
+  new URL('../../../lib/chat/tools/album-art.ts', import.meta.url),
   'utf8'
 );
 
@@ -185,7 +185,7 @@ describe('album art deterministic provider-order contract', () => {
     return payload.route.facts;
   }
 
-  it.each([currentRoute, currentRoute.replaceAll('        ', '\t')])(
+  it.each([currentTool, currentTool.replaceAll('        ', '\t')])(
     'recognizes the actual awaited owned lookup across indentation',
     async source => {
       expect(

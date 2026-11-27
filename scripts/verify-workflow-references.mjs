@@ -141,7 +141,8 @@ function generatedActionReferences(root, relativeWorkflow, source) {
     const mergeIndex = steps.findIndex(
       step => field(step, 'id') === 'source_guard_merge'
     );
-    const shard = "matrix.shard == '4/4'";
+    const shard =
+      "matrix.shard == '4/4' && steps.reuse.outputs.reuse != 'true'";
     const condition = `${shard} && (steps.source_guard_merge.outputs.dependency_changed == 'true')`;
     const helper = 'scripts/lib/source-guard-action-snapshot.mjs';
     if (

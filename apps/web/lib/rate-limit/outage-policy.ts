@@ -108,8 +108,9 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   aiChat: advisoryAllow,
   avatarUpload: advisoryDeny,
   artworkUpload: advisoryDeny,
-  api: advisoryDenyFixed,
-  handleCheck: advisoryDenyFixed,
+  api: mandatoryDenyFixed,
+  // Enumeration surface: durable Redis + deny on outage (SEC-04).
+  handleCheck: mandatoryDenyFixed,
   dashboardLinks: advisoryDenyFixed,
   headerSearch: advisoryDenyFixed,
   adminFitScores: advisoryDeny,
@@ -118,11 +119,11 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   publicProfile: advisoryAllow,
   publicVisit: advisoryAllow,
   spotifySearch: advisoryDenyFixed,
-  spotifySearchApi: advisoryDenyFixed,
+  spotifySearchApi: mandatoryDenyFixed,
   spotifyClaim: advisoryDeny,
   spotifyRefresh: advisoryDeny,
   appleMusicLookup: advisoryDeny,
-  appleMusicSearch: advisoryDenyFixed,
+  appleMusicSearch: mandatoryDenyFixed,
   appleMusicBulkIsrc: advisoryDeny,
   deezerLookup: advisoryDeny,
   dspDiscovery: advisoryDeny,
@@ -134,7 +135,7 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   releaseRefreshPaid: advisoryDeny,
   bandsintownSync: advisoryDeny,
   wrapLink: advisoryDeny,
-  wrapLinkAnonymous: advisoryDeny,
+  wrapLinkAnonymous: mandatoryDenyFixed,
   accountExport: advisoryDeny,
   accountEmail: advisoryDeny,
   verificationRequest: advisoryDeny,
@@ -144,6 +145,8 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   inspectPressSourceHourly: advisoryDeny,
 
   navigationTelemetry: optionalDrop,
+  // Durable Redis (requireRedis) + caller drop on outage — never memory
+  // fallback and never mislabel an outage as quota 429 (SEC-04).
   trackingClicks: optionalDrop,
   trackingVisits: optionalDrop,
   trackingIpClicks: optionalDrop,
@@ -163,9 +166,9 @@ export interface RedisDataConsumerPolicy {
 
 export const REDIS_DATA_CONSUMERS = {
   'auth/rate-limit': {
-    class: 'advisory',
+    class: 'mandatory',
     recovery:
-      'Degrade open when Redis is missing. Sessions stay in Postgres plus the cookie cache',
+      'When store is Upstash/local Redis and the backend is down: fail closed for OTP/passwordless/credential paths (deny + Retry-After). Intentional non-prod memory store uses a process-local counter (not treated as outage). Fail open only for non-abuse Better Auth paths during durable-backend outage. Sessions stay in Postgres plus the cookie cache',
   },
   'musicfetch/budget-guard': {
     class: 'mandatory',

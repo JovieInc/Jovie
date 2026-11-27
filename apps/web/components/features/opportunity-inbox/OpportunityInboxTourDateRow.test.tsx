@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { OpportunityInboxTourDateItem } from '@/lib/connectors/opportunity-inbox-types';
 import { OpportunityInboxTourDateRow } from './OpportunityInboxTourDateRow';
@@ -95,5 +96,30 @@ describe('OpportunityInboxTourDateRow', () => {
     expect(
       screen.queryByRole('button', { name: 'Reject Tour Date' })
     ).not.toBeInTheDocument();
+  });
+
+  it('renders PlainButton confirm and reject as type=button that fire on click', async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    const onReject = vi.fn();
+
+    render(
+      <OpportunityInboxTourDateRow
+        item={tourDate()}
+        onConfirm={onConfirm}
+        onReject={onReject}
+      />
+    );
+
+    const confirm = screen.getByRole('button', { name: 'Confirm Tour Date' });
+    const reject = screen.getByRole('button', { name: 'Reject Tour Date' });
+    expect(confirm).toHaveAttribute('type', 'button');
+    expect(reject).toHaveAttribute('type', 'button');
+
+    await user.click(confirm);
+    await user.click(reject);
+
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onReject).toHaveBeenCalledTimes(1);
   });
 });

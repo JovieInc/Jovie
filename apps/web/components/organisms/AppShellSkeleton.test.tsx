@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { expectFlatState } from '@/tests/utils/flat-state';
 import { AppShellSkeleton } from './AppShellSkeleton';
 
 describe('AppShellSkeleton', () => {
@@ -144,5 +145,13 @@ describe('AppShellSkeleton', () => {
       </div>
     );
     await expectNoA11yViolations(container);
+  });
+
+  it('draws the loading table rows flat, with no well behind them', () => {
+    const { container } = render(<AppShellSkeleton />);
+    const table = container.querySelector('.space-y-2.p-2\\.5');
+
+    expect(table).not.toBeNull();
+    expectFlatState(table as Element);
   });
 });

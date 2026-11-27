@@ -113,7 +113,7 @@ describe('test coverage audit workflow', () => {
     );
     expect(workflow).toContain('actions: read');
     expect(getStepBlock(workflow, 'Restore coverage evidence')).toContain(
-      'restoreCoverageBaseline'
+      "restoreCoverageBaseline({ onQuota: 'defer' })"
     );
     expect(workflow.indexOf('- name: Restore coverage evidence')).toBeLessThan(
       workflow.indexOf('- name: Find and file quality gaps')

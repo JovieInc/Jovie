@@ -187,8 +187,9 @@ doppler secrets set SECRET_NAME=value --project jovie-web --config dev
 Production signup and anonymous onboarding chat are blocked unless these keys are present in `prd`:
 
 ```bash
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-CLERK_SECRET_KEY
+BETTER_AUTH_SECRET
+BETTER_AUTH_URL
+NEXT_PUBLIC_BETTER_AUTH_URL
 DATABASE_URL
 SESSION_SECRET
 AI_GATEWAY_API_KEY
@@ -229,7 +230,7 @@ E2E_PROD_OTP_CHECK_TOKEN=<shared bearer token>
 ```
 
 The Cloudflare worker should receive the catch-all route for the dedicated e2e
-domain, store only recent Clerk OTP messages for `synthetic-signup+*@...`, and
+domain, store only recent synthetic signup OTP messages for `synthetic-signup+*@...`, and
 serve the latest code from `E2E_PROD_OTP_CHECK_URL` only when called with the
 bearer token.
 

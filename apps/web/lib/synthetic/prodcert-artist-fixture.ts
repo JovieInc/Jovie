@@ -17,6 +17,17 @@ export interface ProdcertArtistFixture {
   readonly name: string;
   /** Canonical open.spotify.com artist URL pasted into /start. */
   readonly url: string;
+  /**
+   * Minimum real catalog releases expected on `/start` preview. Defaults to 1
+   * for standard artist fixtures; set to 0 for valid zero-release debut fixtures.
+   */
+  readonly expectedMinReleases?: number;
+}
+
+export function resolveExpectedMinCatalogReleases(
+  fixture: Pick<ProdcertArtistFixture, 'expectedMinReleases'>
+): number {
+  return Math.max(0, fixture.expectedMinReleases ?? 1);
 }
 
 /**

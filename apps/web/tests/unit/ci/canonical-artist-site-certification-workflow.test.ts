@@ -7,8 +7,9 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runInNewContext } from 'node:vm';
 import { load as parseYaml } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 import {
@@ -38,6 +39,7 @@ const parsedCi = parseYaml(ci) as {
         name?: string;
         run?: string;
         if?: string;
+        env?: Record<string, string>;
         'continue-on-error'?: boolean;
       }[];
     }
@@ -47,19 +49,72 @@ const parsedCi = parseYaml(ci) as {
 describe('JOV-6572 canonical artist-site certification workflow', () => {
   it('runs the exact approved profile and outbound journey on the daily lane', () => {
     const command = packageJson.scripts['test:e2e:golden-path:ci'];
+    const surfaces = packageJson.scripts['test:e2e:golden-path:surfaces'];
+    // Auth/billing JOURNEY_OUTCOME is claim + welcome + golden-path only.
     expect(command).toContain('claim-prebuilt.smoke.spec.ts');
     expect(command).toContain('golden-path-home-welcome.spec.ts');
     expect(command).toContain('golden-path.spec.ts');
-    expect(command).toContain('start-entry-continuity.spec.ts');
-    expect(command).toContain('entry-first-html-visual.spec.ts');
+    expect(command).not.toContain('start-entry-continuity.spec.ts');
+    expect(command).not.toContain('entry-first-html-visual.spec.ts');
     expect(command).toContain('GOLDEN_PATH_REQUIRED=1');
     expect(command).not.toContain('money-path-persistence.spec.ts');
+    // Layout/visual surfaces stay in CI but never rewrite JOURNEY_OUTCOME.
+    expect(surfaces).toContain('start-entry-continuity.spec.ts');
+    expect(surfaces).toContain('entry-first-html-visual.spec.ts');
+    expect(ci).toContain('test:e2e:golden-path:surfaces');
+    expect(ci).toContain('JOURNEY_EXIT=$?');
+    expect(ci).toContain('exit "$JOURNEY_EXIT"');
     expect(ci).toContain('Seed required premade profile claim fixture');
     expect(ci).toContain('pnpm --filter=@jovie/web run seed:test-data');
     expect(cronGapMinutes(workflowTriggers(nightly)).max).toBeLessThanOrEqual(
       1440
     );
     expect(nightly).toContain('workflow run ci.yml');
+  });
+
+  it('keeps journey keyframes when later Playwright runs clear their output', () => {
+    // Playwright deletes its outputDir at the start of every run. The surfaces
+    // run after the journey suite wiped test-results, including the keyframe
+    // manifest the visual review reads (runs 44988834237, 44989470204).
+    const journey = parsedCi.jobs['ci-golden-path']?.steps?.find(
+      step => step.id === 'canonical_journey'
+    );
+    const keyframes = relative(
+      '${{ github.workspace }}/apps/web',
+      journey?.env?.GOLDEN_PATH_KEYFRAME_DIR ?? ''
+    );
+    expect(keyframes).toBe('test-results/golden-path-keyframes/first');
+    const config = readFileSync(
+      resolve(repoRoot, 'apps/web/playwright.config.ts'),
+      'utf8'
+    );
+    // No config outputDir, so a run without --output clears test-results.
+    expect(config).not.toMatch(/\boutputDir\s*:/);
+    const scripts = [
+      ...(journey?.run ?? '').matchAll(
+        /pnpm --filter @jovie\/web run (test:e2e:golden-path:\S+)/g
+      ),
+    ].map(match => match[1]);
+    expect(scripts).toEqual([
+      'test:e2e:golden-path:ci',
+      'test:e2e:golden-path:surfaces',
+    ]);
+    for (const script of scripts.slice(1)) {
+      const command = packageJson.scripts[script] ?? '';
+      const outputDir =
+        command.match(/--output[= ](\S+)/)?.[1] ?? 'test-results';
+      const kept = relative(outputDir, keyframes);
+      expect(
+        kept === '' || (!kept.startsWith('..') && !isAbsolute(kept)),
+        `${script} clears ${outputDir}, which holds the journey keyframes`
+      ).toBe(false);
+      const json =
+        command.match(/PLAYWRIGHT_JSON_OUTPUT_FILE=(\S+)/)?.[1] ??
+        'test-results/results.json';
+      expect(json, `${script} overwrites the journey JSON report`).not.toBe(
+        'test-results/results.json'
+      );
+    }
   });
 
   it('provides an ephemeral signing key before starting the claim server (JOV-8550)', () => {
@@ -286,10 +341,123 @@ process.stdout.write('${source}\\n${live}\\n');
     expect(step('canonical_waitlist')?.['continue-on-error']).toBe(true);
     expect(step('canonical_revenue')?.['continue-on-error']).toBe(true);
     expect(step('canonical_profile')?.['continue-on-error']).toBe(true);
+    expect(step('canonical_navigation')?.['continue-on-error']).toBe(true);
+    expect(step('visual_review')?.['continue-on-error']).toBeFalsy();
     expect(step('canonical_certification')?.['continue-on-error']).toBeFalsy();
-    expect(step('canonical_certification')?.if).toBe(
-      '${{ always() && !cancelled() }}'
+    for (const stepId of [
+      'canonical_revenue',
+      'canonical_claim_contract',
+      'canonical_waitlist',
+      'canonical_profile',
+      'canonical_navigation',
+      'canonical_certification',
+    ]) {
+      expect(
+        step(stepId)?.if,
+        `${stepId} must run after visual_review failure`
+      ).toBe('${{ always() && !cancelled() }}');
+    }
+  });
+
+  it('records all 5 canonical evidence steps and certificate writer after visual_review exits 1 while keeping job failure gating intact', () => {
+    const steps = parsedCi.jobs['ci-golden-path']?.steps ?? [];
+    const evalStepIf = (
+      rawIf: string | undefined,
+      state: { readonly jobFailed: boolean; readonly isCancelled: boolean }
+    ): boolean => {
+      if (!rawIf) return !state.jobFailed && !state.isCancelled;
+      const expr = rawIf
+        .replace(/^\$\{\{\s*|\s*\}\}$/g, '')
+        .replace(/\b(steps|needs)\.([\w-]+)/g, '$1["$2"]');
+      return Boolean(
+        runInNewContext(expr, {
+          always: () => true,
+          cancelled: () => state.isCancelled,
+          failure: () => state.jobFailed && !state.isCancelled,
+          success: () => !state.jobFailed && !state.isCancelled,
+          steps: {
+            canonical_journey: { outcome: 'success' },
+            'neon-branch': { outputs: { branch_id: '' } },
+          },
+          needs: {
+            'ci-path-changes': { outputs: { golden_path_no_ui_diff: 'false' } },
+            'neon-db': { result: 'success' },
+          },
+          hashFiles: () => 'hash',
+        })
+      );
+    };
+
+    const simulateJobAfterJourney = (
+      outcomesById: Record<string, 'success' | 'failure'>,
+      isCancelled = false
+    ) => {
+      const startIndex = steps.findIndex(s => s.id === 'canonical_journey');
+      expect(startIndex).toBeGreaterThan(-1);
+      let jobFailed = false;
+      const executedIds: string[] = [];
+      for (const candidate of steps.slice(startIndex)) {
+        if (!evalStepIf(candidate.if, { jobFailed, isCancelled })) continue;
+        if (candidate.id) executedIds.push(candidate.id);
+        const outcome =
+          (candidate.id && outcomesById[candidate.id]) ?? 'success';
+        if (outcome === 'failure' && candidate['continue-on-error'] !== true) {
+          jobFailed = true;
+        }
+      }
+      return {
+        executedIds,
+        conclusion: isCancelled
+          ? 'cancelled'
+          : jobFailed
+            ? 'failure'
+            : 'success',
+      };
+    };
+
+    // Regression for run 44680980672: visual_review exited 1, and all 5
+    // canonical evidence steps + canonical_certification must still run while
+    // the job conclusion stays failure even if certification itself exits 0.
+    const visualFailureRun = simulateJobAfterJourney({
+      canonical_journey: 'success',
+      visual_review: 'failure',
+      canonical_certification: 'success',
+    });
+    expect(visualFailureRun.executedIds).toEqual(
+      expect.arrayContaining([
+        'canonical_journey',
+        'visual_review',
+        'canonical_revenue',
+        'canonical_claim_contract',
+        'canonical_waitlist',
+        'canonical_profile',
+        'canonical_navigation',
+        'canonical_certification',
+      ])
     );
+    expect(visualFailureRun.conclusion).toBe('failure');
+
+    // Conversely, if visual_review passes and canonical_certification fails,
+    // the job conclusion still fails.
+    const certFailureRun = simulateJobAfterJourney({
+      canonical_journey: 'success',
+      visual_review: 'success',
+      canonical_certification: 'failure',
+    });
+    expect(certFailureRun.conclusion).toBe('failure');
+
+    // Cancelled runs must skip the canonical evidence probes and writer.
+    const cancelledRun = simulateJobAfterJourney({}, true);
+    for (const stepId of [
+      'canonical_revenue',
+      'canonical_claim_contract',
+      'canonical_waitlist',
+      'canonical_profile',
+      'canonical_navigation',
+      'canonical_certification',
+    ]) {
+      expect(cancelledRun.executedIds).not.toContain(stepId);
+    }
   });
 
   it('still certifies when the shared database lane fails (JOV-8614)', () => {

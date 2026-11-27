@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 vi.mock('@/components/jovie/components/ChatInput', () => ({
   ChatInput: ({ placeholder }: { placeholder?: string }) => (
@@ -100,5 +102,54 @@ describe('JOV-5466 token retire', () => {
   it('does not keep retired --linear-app-* tokens', () => {
     const source = readFileSync(resolve(__dirname, './ThreadView.tsx'), 'utf8');
     expect(source).not.toMatch(/--linear-app-/);
+  });
+
+  describe('scroll to bottom', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+      Reflect.deleteProperty(Element.prototype, 'scrollTo');
+    });
+
+    it('offers a scroll control when scrolled up and scrolls on press, axe-clean', async () => {
+      const user = userEvent.setup();
+      vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(
+        1000
+      );
+      vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(
+        100
+      );
+      const scrollTo = vi.fn();
+      Object.defineProperty(Element.prototype, 'scrollTo', {
+        configurable: true,
+        value: scrollTo,
+      });
+      const { container } = render(
+        <ThreadView thread={baseThread}>
+          <ThreadTurn speaker='jovie'>hi</ThreadTurn>
+        </ThreadView>
+      );
+      const button = await screen.findByRole('button', {
+        name: 'Scroll To Bottom',
+      });
+      expect(button).toHaveAttribute('type', 'button');
+      await expectNoA11yViolations(container);
+      await user.click(button);
+      expect(scrollTo).toHaveBeenCalledWith({
+        top: 1000,
+        behavior: 'smooth',
+      });
+    });
+
+    it('omits the scroll control when already at the bottom, axe-clean', async () => {
+      const { container } = render(
+        <ThreadView thread={baseThread}>
+          <ThreadTurn speaker='jovie'>hi</ThreadTurn>
+        </ThreadView>
+      );
+      expect(
+        screen.queryByRole('button', { name: 'Scroll To Bottom' })
+      ).toBeNull();
+      await expectNoA11yViolations(container);
+    });
   });
 });

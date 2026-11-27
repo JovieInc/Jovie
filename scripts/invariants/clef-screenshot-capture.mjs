@@ -16,24 +16,44 @@ return CAPTURE_VIEWPORTS.desktop; }
 /** Light is the derived variant. Anything else, including omission, is dark. */
 export function resolveCaptureColorScheme(mode) {
 return mode === 'light' ? 'light' : CAPTURE_COLOR_SCHEME_DEFAULT; }
+/**
+* True when the capture stayed on the intended surface. Exact path match is
+* required, except `/app/chat` may land on `/app/chat/{threadId}` after the
+* chat shell selects a thread (JOV-11623 / JOV-10150) — that is still chat,
+* not an auth or onboarding redirect.
+* @param {string | null | undefined} landedPath
+* @param {string | null | undefined} expectedPath
+*/
+export function capturePathMatchesExpected(landedPath, expectedPath) {
+if (!landedPath || !expectedPath) return false;
+const norm = path => {
+const trimmed = String(path).replace(/\/+$/u, '');
+return trimmed.length === 0 ? '/' : trimmed;
+};
+const landed = norm(landedPath);
+const expected = norm(expectedPath);
+if (landed === expected) return true;
+return expected === '/app/chat' && landed.startsWith('/app/chat/');
+}
 /** @param {(browser: import('playwright').Browser) => Promise<unknown>} run */
 export async function withCaptureBrowser(run) { const { chromium } = await import('playwright');
 const browser = await chromium.launch(); try { return await run(browser); } finally { await browser.close(); } }
 /**
 * @param {import('playwright').Browser} browser
-* @param {{url: string, viewport?: string | number, mode?: string, selector?: string, mockupSelector?: string, click?: string, wait?: number, expectedPath?: string}} options
+* @param {{url: string, viewport?: string | number, mode?: string, selector?: string, mockupSelector?: string, click?: string, wait?: number, expectedPath?: string, storageState?: Parameters<import('playwright').Browser['newPage']>[0]['storageState']}} options
 */
 export async function captureSurfacePng(browser, options) {
-const { url, viewport = 'desktop', mode, selector, mockupSelector, click, wait = 1500, expectedPath } = options;
+const { url, viewport = 'desktop', mode, selector, mockupSelector, click, wait = 1500, expectedPath, storageState } = options;
 const target = resolveCaptureViewport(viewport); const page = await browser.newPage({
 viewport: { width: target.width, height: target.height }, deviceScaleFactor: target.deviceScaleFactor,
-isMobile: target.isMobile, colorScheme: resolveCaptureColorScheme(mode), }); try {
+isMobile: target.isMobile, colorScheme: resolveCaptureColorScheme(mode),
+...(storageState ? { storageState } : {}), }); try {
 await page.goto(url, { waitUntil: 'networkidle', timeout: 60_000 });
 // A capture that landed on a different route (auth redirect, closed-signup
 // handoff) is not this frame's surface: report it instead of screenshotting
 // whatever page answered (JOV-11623).
 const finalUrl = page.url();
-if (expectedPath && new URL(finalUrl).pathname !== expectedPath) {
+if (expectedPath && !capturePathMatchesExpected(new URL(finalUrl).pathname, expectedPath)) {
 return { png: null, geometry: null, viewport: target.width,
 mode: resolveCaptureColorScheme(mode), finalUrl, redirected: true }; }
 if (click) await page.click(click, { timeout: 5_000 }).catch(() => {}); await page.waitForTimeout(wait);

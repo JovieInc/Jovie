@@ -1,6 +1,7 @@
 // @coverage-via apps/web/tests/unit/organisms/AvatarUpload.test.tsx
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { useCallback, useRef, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
@@ -84,14 +85,13 @@ export function AvatarUpload({
       />
 
       <div className='flex-1 space-y-3'>
-        <button
-          type='button'
+        <PlainButton
           onClick={() => uploadableRef.current?.click()}
           disabled={isUploading}
           className='inline-flex items-center justify-center rounded-md border border-subtle bg-surface-1 px-4 py-2 text-sm font-medium text-primary-token transition-colors hover:bg-surface-2 focus-ring disabled:cursor-not-allowed disabled:opacity-60'
         >
           {isUploading ? 'Uploading…' : 'Upload photo'}
-        </button>
+        </PlainButton>
 
         <p className='text-sm text-secondary-token'>
           {ACCEPTED_TYPE_LABEL} accepted. Auto-optimized to AVIF/WebP (JPEG

@@ -68,7 +68,7 @@ describe('WaitlistPublicLanding', () => {
         showFooterPrompt: false,
       })
     );
-    expect(authLayoutMock.mock.calls[0]?.[0].chrome).not.toBe('splash-b');
+    expect(authLayoutMock.mock.calls[0]?.[0].chrome).toBe('splash-b');
     expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
         mode: 'sign-up',
@@ -109,14 +109,16 @@ describe('WaitlistPublicLanding', () => {
     const { container } = render(<WaitlistPublicLanding signupClosed />);
 
     expect(screen.getByTestId('role-form')).toBeInTheDocument();
-    // Same invite words as the homepage form, and sentence case sign-in.
+    // Waitlist copy, never invitation copy (Tim, 2026-11-19), and sentence
+    // case sign-in.
     expect(roleFormMock).toHaveBeenCalledWith(
-      expect.objectContaining({ qualify: true, title: 'Request an invite' })
+      expect.objectContaining({ qualify: true, title: 'Join the waitlist' })
     );
     expect(screen.queryByTestId('auth-shell')).not.toBeInTheDocument();
     expect(authShellMock).not.toHaveBeenCalled();
     expect(authLayoutMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        chrome: 'splash-b',
         showFooterPrompt: true,
         footerLinkHref: APP_ROUTES.SIGNIN,
         footerLinkText: 'Log in',

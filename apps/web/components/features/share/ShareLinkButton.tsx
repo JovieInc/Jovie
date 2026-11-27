@@ -1,10 +1,7 @@
 'use client';
 
+import { IconButton, type IconButtonVariant } from '@jovie/ui';
 import { Check, Share2 } from 'lucide-react';
-import {
-  CircleIconButton,
-  type CircleIconButtonVariant,
-} from '@/components/atoms/CircleIconButton';
 import { type ShareLinkResult, useShareLink } from '@/hooks/useShareLink';
 
 interface ShareLinkButtonProps {
@@ -12,7 +9,7 @@ interface ShareLinkButtonProps {
   /** Resolved at click time so SSR and client agree on the shared URL. */
   readonly getUrl: () => string;
   readonly ariaLabel?: string;
-  readonly variant?: CircleIconButtonVariant;
+  readonly variant?: IconButtonVariant;
   readonly testId?: string;
   readonly onShare?: (result: ShareLinkResult) => void;
 }
@@ -33,8 +30,8 @@ export function ShareLinkButton({
   const { share, copied } = useShareLink();
 
   return (
-    <CircleIconButton
-      size='lg'
+    <IconButton
+      size='xl'
       variant={variant}
       ariaLabel={copied ? 'Link copied' : ariaLabel}
       data-testid={testId}
@@ -51,6 +48,6 @@ export function ShareLinkButton({
       <span aria-live='polite' className='sr-only'>
         {copied ? 'Link copied' : ''}
       </span>
-    </CircleIconButton>
+    </IconButton>
   );
 }

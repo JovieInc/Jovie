@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 import { ArtistProfileMonetizationSection } from './ArtistProfileMonetizationSection';
 
@@ -96,5 +98,54 @@ describe('single container width', () => {
   ])('%s takes its width from the shared container, not its own cap', file => {
     const source = readFileSync(join(process.cwd(), file), 'utf8');
     expect(source).not.toMatch(OWN_WIDTH_CAP);
+  });
+});
+
+describe('ArtistProfileMonetizationSection carousel controls', () => {
+  function renderSection() {
+    const view = render(
+      <ArtistProfileMonetizationSection
+        monetization={ARTIST_PROFILE_COPY.monetization}
+      />
+    );
+    const scroller = screen.getByTestId('artist-profile-monetization-scroller');
+    const scrollTo = vi.fn();
+    scroller.scrollTo = scrollTo;
+    return { ...view, scrollTo };
+  }
+
+  it('starts on the first card with the previous control disabled and stays axe-clean', async () => {
+    const { container } = renderSection();
+    const prev = screen.getByRole('button', {
+      name: 'Scroll Monetization Left',
+    });
+    expect(prev).toBeDisabled();
+    expect(prev).toHaveAttribute('data-slot', 'plain-button');
+    expect(
+      screen.getByRole('button', { name: 'Scroll Monetization Right' })
+    ).toBeEnabled();
+    await expectNoA11yViolations(container);
+  });
+
+  it('scrolls to the next card from the nav and keyboard skip buttons', async () => {
+    const user = userEvent.setup();
+    const { scrollTo } = renderSection();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Scroll Monetization Right' })
+    );
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole('button', { name: 'Scroll Monetization Left' })
+    ).toBeEnabled();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Browse monetization cards' })
+    );
+    expect(scrollTo).toHaveBeenCalledTimes(2);
+    await user.click(
+      screen.getByRole('button', { name: 'Scroll Monetization Left' })
+    );
+    expect(scrollTo).toHaveBeenCalledTimes(3);
   });
 });

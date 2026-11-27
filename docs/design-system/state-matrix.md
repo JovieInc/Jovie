@@ -39,7 +39,7 @@ These states apply across families and were previously undocumented.
 | Default | `--linear-btn-primary-bg`, `--linear-btn-primary-fg` | `[data-state="idle"]`, `button` base | `shadcn/Button/Primary` | `packages/ui/atoms/button.tsx` |
 | Hover | `--linear-btn-primary-hover`, `--color-interactive-hover` | `:hover`, `hover:bg-*` | `shadcn/Button/Primary` | `packages/ui/atoms/button.tsx` |
 | Focus-visible | `--color-focus-ring`, `--linear-border-focus` | `:focus-visible`, `focus-visible:ring-*` | `shadcn/Button/Primary` | `packages/ui/atoms/button.tsx` |
-| Active/pressed | `--color-interactive-active` | `:active`, `active:scale-[0.96]` | `shadcn/Button/Primary` | `packages/ui/atoms/button.tsx` |
+| Active/pressed | `--color-interactive-active`, `--scale-press` | `:active`, `active:scale-press` | `shadcn/Button/Primary` | `packages/ui/atoms/button.tsx` |
 | Disabled | `--state-disabled-opacity`, `--color-text-disabled-token` | `[data-state="disabled"]`, `:disabled` | `shadcn/Button/Disabled` | `packages/ui/atoms/button.tsx` |
 | Loading | `--linear-text-primary` (spinner) | `[data-state="loading"]`, `[aria-busy="true"]` | `shadcn/Button/Loading` | `packages/ui/atoms/button.tsx` |
 | Success | `--color-success`, `--color-success-subtle` | `[data-state="success"]` | `Molecules/FormStatus/Success` | `apps/web/components/molecules/FormStatus.tsx` |
@@ -114,11 +114,11 @@ regression covers the pending state without claiming DOM-ready proves hydration.
 | --- | --- | --- | --- | --- |
 | Free | `--linear-text-primary` | `[data-plan-id="free"]`, `.marketing-pricing-plan-card` | `Pricing/PricingCTA/Default` | `apps/web/components/features/pricing/MarketingPricingPlans.tsx` |
 | Paid | `--linear-btn-primary-bg` | `[data-plan-id="pro"]` | `Pricing/PricingCTA/Default` | `apps/web/components/features/pricing/MarketingPricingPlans.tsx` |
-| Max/early access | `--linear-accent-purple` | `[data-plan-id="max"]`, `.marketing-pricing-plan-card__badge` | `Pricing/PricingCTA/Default` | `apps/web/components/features/pricing/MarketingPricingPlans.tsx` |
+| Max/early access | `--color-accent-purple` | `[data-plan-id="max"]`, `.marketing-pricing-plan-card__badge` | `Pricing/PricingCTA/Default` | `apps/web/components/features/pricing/MarketingPricingPlans.tsx` |
 | Included | `--linear-success`, `--system-b-accent-cyan` | `.marketing-pricing-plan-card__features svg` | `Pricing/PricingCTA/Default` | `apps/web/components/features/pricing/MarketingPricingPlans.tsx` |
 | Not included | `--linear-text-tertiary` | `.marketing-pricing-plan-card__features li[data-included="false"]` | `Pricing/PricingCTA/Default` | `apps/web/components/features/pricing/PricingComparisonChart.tsx` |
 | Coming soon | `--color-warning-subtle` | `.marketing-pricing-plan-card__badge` (Soon copy) | `Pricing/PricingCTA/Default` | `apps/web/components/features/pricing/MarketingPricingPlans.tsx` |
-| Upgrade available | `--linear-btn-accent-bg` | `.marketing-pricing-plan-card__cta` | `Pricing/PricingCTA/Default` | `apps/web/components/features/pricing/PricingCTA.tsx` |
+| Upgrade available | `--color-accent` | `.marketing-pricing-plan-card__cta` | `Pricing/PricingCTA/Default` | `apps/web/components/features/pricing/PricingCTA.tsx` |
 | Current plan | `--linear-border-focus` | `[data-plan-active="true"]` | `Pricing/PricingCTA/Default` | `apps/web/components/features/pricing/MarketingPricingPlans.tsx` |
 
 ---
@@ -130,11 +130,11 @@ regression covers the pending state without claiming DOM-ready proves hydration.
 | Hero shown | `--profile-pearl-primary-bg` | `[data-module="hero"][data-visible="true"]` | `Organisms/ProfileShell/Default` | `apps/web/components/organisms/profile-shell/ProfileShell.tsx` |
 | Latest release available | `--color-success` | `[data-module="releases"][data-state="available"]` | `Organisms/ProfileShell/WithReleases` | `apps/web/components/organisms/ProfileShell.stories.tsx` |
 | No release | `--color-text-tertiary-token` | `[data-module="releases"][data-state="empty"]` | `Organisms/ProfileShell/Default` | `apps/web/components/organisms/ProfileShell.tsx` |
-| Tour available | `--linear-accent-teal` | `[data-module="tour"][data-state="available"]` | `Organisms/ListenSection/Default` | `apps/web/components/organisms/ListenSection.stories.tsx` |
+| Tour available | `--color-accent-teal` | `[data-module="tour"][data-state="available"]` | `Organisms/ListenSection/Default` | `apps/web/components/organisms/ListenSection.stories.tsx` |
 | No tour dates | `--color-text-tertiary-token` | `[data-has-tour-dates="false"]` | `Organisms/ProfileShell/Default` | `apps/web/components/organisms/profile-shell/ProfileCompactSurface.tsx` |
 | Tips enabled | `--linear-success` | `[data-module="tips"][data-enabled="true"]` | `Organisms/PaySection/Default` | `apps/web/components/organisms/PaySection.stories.tsx` |
 | Tips disabled | `--color-text-disabled-token` | `[data-module="tips"][data-enabled="false"]` | `Organisms/PaySection/Default` | `apps/web/components/organisms/PaySection.tsx` |
-| Notifications enabled | `--linear-accent-blue` | `[data-module="subscribe"][data-enabled="true"]` | `Organisms/ProfileShell/Default` | `apps/web/components/features/profile/ProfilePrimaryCTA.tsx` |
+| Notifications enabled | `--color-accent-blue` | `[data-module="subscribe"][data-enabled="true"]` | `Organisms/ProfileShell/Default` | `apps/web/components/features/profile/ProfilePrimaryCTA.tsx` |
 | Notifications unavailable | `--color-warning` | `[data-module="subscribe"][data-state="unavailable"]` | `Organisms/ProfileShell/Default` | `apps/web/components/features/profile/ProfilePrimaryCTA.tsx` |
 | Footer shown | `--linear-bg-footer` | `[data-module="footer"][data-visible="true"]` | `Organisms/Footer/Default` | `apps/web/components/organisms/footer-module/Footer.tsx` |
 | Profile not found | `--linear-text-primary` | `[data-profile-state="not-found"]` | route `not-found.tsx` | `apps/web/app/[username]/not-found.tsx` |

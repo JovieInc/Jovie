@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, PlainButton } from '@jovie/ui';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useProfileNotifications } from '@/components/organisms/profile-shell/ProfileNotificationsContext';
@@ -184,7 +184,7 @@ export function ProfilePrimaryCTA({
     return (
       <div className='space-y-4'>
         <div className='flex justify-center'>
-          <button
+          <PlainButton
             type='button'
             onClick={() => setDrawerOpen(true)}
             className={cn(ctaLinkClass, 'max-w-sm')}
@@ -192,7 +192,7 @@ export function ProfilePrimaryCTA({
             aria-label='Open music streaming links'
           >
             Listen now
-          </button>
+          </PlainButton>
         </div>
         <ListenDrawer
           open={drawerOpen}

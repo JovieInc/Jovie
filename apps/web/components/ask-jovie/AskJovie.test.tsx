@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/app/dashboard',
@@ -95,5 +97,45 @@ describe('AskJovieMark', () => {
     ];
     expect(JSON.parse(init.body).intent).toBe('task');
     expect(screen.getByText('Open Jovie chat')).toBeInTheDocument();
+  });
+
+  it('keeps typed text and focus when the parent rerenders', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<AskJovieMark />);
+    await user.click(screen.getByTestId('ask-jovie-trigger'));
+    const input = screen.getByLabelText('Message Jovie');
+    await user.type(input, 'Why is my link slow');
+    rerender(<AskJovieMark variant='jovie' />);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByLabelText('Message Jovie')).toBeNull();
+    await user.click(screen.getByTestId('ask-jovie-trigger'));
+    expect(screen.getByLabelText('Message Jovie')).toBeInTheDocument();
+  });
+
+  it('sends a typed message with Enter, clears the field and uses token surfaces', async () => {
+    const user = userEvent.setup();
+    render(<AskJovieMark />);
+    await user.click(screen.getByTestId('ask-jovie-trigger'));
+    const input = screen.getByLabelText('Message Jovie');
+    expect(screen.getByTestId('ask-jovie-send')).toBeDisabled();
+    await user.type(input, 'I found a bug{Enter}');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(input).toHaveValue('');
+    const messages = screen.getByTestId('ask-jovie-messages');
+    const user_ = messages.querySelector('[data-role="user"]');
+    expect(user_?.className).toContain('bg-surface-2');
+    expect(messages.innerHTML).not.toMatch(/white\//);
+    expect(input).toHaveAttribute('data-host-drawn');
+  });
+
+  it('has no accessibility violations closed, open and after a reply', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<AskJovieMark />);
+    await expectNoA11yViolations(container);
+    await user.click(screen.getByTestId('ask-jovie-trigger'));
+    await expectNoA11yViolations(screen.getByTestId('ask-jovie-panel'));
+    await user.click(screen.getByText('Get help'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await expectNoA11yViolations(screen.getByTestId('ask-jovie-panel'));
   });
 });

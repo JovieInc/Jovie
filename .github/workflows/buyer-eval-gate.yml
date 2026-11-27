@@ -1,0 +1,98 @@
+name: Buyer Eval Gate
+
+# Hermetic fail-closed acquisition gate for CONE_WORKFLOWS.buyerEval
+# (apps/web/lib/acquisition/eligibility.ts -> scripts/buyer-eval/gate.mjs).
+# Tier B persona briefs and walk recordings stay in private host state and are
+# never committed to this repository; without calibrated receipts and a passing
+# Golden Path certificate for TARGET_SHA, gate.mjs exits 1 so this workflow is
+# green on main if and only if buyer-eval/gate.mjs passes.
+on:
+  workflow_dispatch:
+    inputs:
+      subject:
+        description: Calibration subject id (canon/certification/<subject>-calibration.json)
+        required: false
+        default: jovie-web
+        type: string
+      sha:
+        description: Exact 40-char commit SHA to evaluate (defaults to dispatched ref HEAD)
+        required: false
+        type: string
+      cert_path:
+        description: Optional path to Golden Path certificate JSON inside restored state
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: buyer-eval-gate-${{ inputs.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  buyer-eval-gate:
+    name: Buyer Eval Gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout target revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Prime Node toolcache
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Verify buyer-eval rubric and gate contracts
+        run: node --test scripts/buyer-eval/buyer-eval.test.mjs scripts/buyer-eval/gate.test.mjs
+
+      - name: Restore calibrated buyer-eval state
+        uses: ./.github/actions/vendor/actions-cache/restore # actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 v6.1.0 (vendored, JOV-8754)
+        with:
+          path: ${{ runner.temp }}/buyer-eval-state
+          key: buyer-eval-state-${{ inputs.sha || github.sha }}
+          restore-keys: buyer-eval-state-
+
+      - name: Evaluate buyer-eval acquisition gate
+        env:
+          BUYER_EVAL_STATE: ${{ runner.temp }}/buyer-eval-state
+          EVAL_SUBJECT: ${{ inputs.subject || 'jovie-web' }}
+          TARGET_SHA: ${{ inputs.sha || github.sha }}
+          CERT_PATH: ${{ inputs.cert_path || '' }}
+        run: |
+          set -euo pipefail
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          mkdir -p "$BUYER_EVAL_STATE"
+          status=0
+          if [ -n "$CERT_PATH" ]; then
+            node scripts/buyer-eval/gate.mjs "$EVAL_SUBJECT" "$TARGET_SHA" "$CERT_PATH" \
+              > "$RUNNER_TEMP/buyer-eval-gate-decision.json" || status=$?
+          else
+            node scripts/buyer-eval/gate.mjs "$EVAL_SUBJECT" "$TARGET_SHA" \
+              > "$RUNNER_TEMP/buyer-eval-gate-decision.json" || status=$?
+          fi
+          if [ -s "$RUNNER_TEMP/buyer-eval-gate-decision.json" ]; then
+            cat "$RUNNER_TEMP/buyer-eval-gate-decision.json"
+          fi
+          exit "$status"
+
+      - name: Upload buyer-eval gate receipt
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: buyer-eval-gate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/buyer-eval-gate-decision.json
+          if-no-files-found: ignore
+          retention-days: 30

@@ -4509,7 +4509,7 @@ function OnboardingCanvas({ onComplete }: { onComplete: () => void }) {
                 <button
                   type='button'
                   onClick={onComplete}
-                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-xs font-medium bg-white dark:bg-surface-1 text-black dark:text-primary-token hover:brightness-110 active:scale-[0.99] shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition-colors duration-subtle ease-out'
+                  className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full text-xs font-medium bg-white dark:bg-surface-1 text-black dark:text-primary-token hover:brightness-110 press shadow-[0_4px_14px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.45)]'
                 >
                   Open Jovie
                   <ArrowRight className='h-3 w-3' strokeWidth={2.5} />
@@ -4695,7 +4695,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-xs font-medium bg-white dark:bg-surface-1 text-black dark:text-primary-token hover:brightness-110 active:scale-[0.99] transition-colors duration-subtle ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-xs font-medium bg-white dark:bg-surface-1 text-black dark:text-primary-token hover:brightness-110 press'
             >
               {`Upgrade to ${PRO_PLAN_DISPLAY_NAME}`}
             </button>

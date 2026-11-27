@@ -202,6 +202,10 @@ export const PUBLIC_AGENT_PATHS: Readonly<
         '400': failure('Invalid report or context.', 'VALIDATION_FAILED'),
         '429': failure('Client IP quota exceeded.', 'RATE_LIMITED'),
         '500': failure('Report could not be saved.', 'INTERNAL'),
+        '503': failure(
+          'Limiter backend unavailable; intake fails closed.',
+          'TEMPORARILY_UNAVAILABLE'
+        ),
       },
     },
   },

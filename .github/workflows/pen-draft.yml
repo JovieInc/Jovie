@@ -7,8 +7,10 @@ name: Pen draft missing frames
 
 # Design first (Tim, 2026-11-08): every Golden Path screen gets a Pen design
 # before code. This drafts one frame per brief in docs/design-system/pen-briefs
-# from the canonical workspace and uploads the drafts for review. A push
-# drafts only the briefs it changed (every brief when the drafter changed),
+# from the canonical workspace and uploads the drafts for review. A PR or a
+# direct push drafts only the briefs it changed (one canary brief when only
+# the drafter changed), a later push to a PR only what that push changed, and
+# a queue merge nothing, its PR already did,
 # one job per frame, so no frame waits on another's retry budget. It never
 # writes back to the canonical file or approves anything in pen-bindings.json.
 # A run without the Pen secrets fails and says which one is missing.
@@ -39,11 +41,11 @@ on:
 
 permissions: {}
 
-# One group per commit: a push drafts only the briefs its own commit changed,
-# so a shared group would let GitHub drop a queued run and those briefs with it.
-# PRs share their own group; each PR plan includes every brief.
+# One group per commit, PR pushes included: each push drafts only the briefs
+# its own commit changed, so a shared group would let GitHub drop a queued run
+# and those briefs with it. The draft job's editor group still runs one at a time.
 concurrency:
-  group: pen-draft-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  group: pen-draft-${{ github.event_name }}-${{ github.event.pull_request.number || 'push' }}-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -62,8 +64,28 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # The pushed commit and its parent, to list what the push changed.
+          # The pushed commit and its parent (for a PR, the merge commit and
+          # its base), to list what the push or PR changed.
           fetch-depth: 2
+
+      # A later push to an open PR was drafted up to its previous head, so
+      # only what this push changed is drafted again. GitHub serves a
+      # force-pushed-over head by its sha, so this read works then too.
+      - name: Checkout the PR's previous head
+        id: before
+        if: ${{ github.event_name == 'pull_request' && github.event.action == 'synchronize' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.before }}
+          path: .pen-before
+          sparse-checkout: |
+            docs/design-system/pen-briefs
+            scripts/design/pen-draft.mjs
+            scripts/design/pen-draft-annotation.mjs
+            scripts/design/pen-trim.mjs
+            .github/workflows/pen-draft.yml
+          sparse-checkout-cone-mode: false
 
       - name: Prime Node toolcache (no GitHub API manifest call)
         if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
@@ -80,16 +102,37 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
+          PR_BEFORE: ${{ steps.before.outcome }}
           ONLY: ${{ inputs.only }}
         run: |
           set -euo pipefail
           args=(--plan)
           if [ -n "${ONLY:-}" ]; then args+=(--only "$ONLY"); fi
-          # A push of one commit (a queue merge) drafts what that commit
-          # changed. Any other push drafts every brief.
-          if [ "$EVENT" = push ] && [ "$(git rev-parse -q --verify HEAD^ || true)" = "${BEFORE:-}" ]; then
-            changed="$RUNNER_TEMP/pen-changed.txt"
-            git diff --name-only HEAD^ HEAD > "$changed"
+          changed="$RUNNER_TEMP/pen-changed.txt"
+          if [ "$EVENT" = pull_request ] && [ "${PR_BEFORE:-}" = success ]; then
+            # What this push changed: the PR head (the merge commit's second
+            # parent) against the previous head, file by file.
+            { git ls-tree -r --name-only HEAD^2 -- docs/design-system/pen-briefs
+              find .pen-before/docs/design-system/pen-briefs -maxdepth 1 -type f -printf 'docs/design-system/pen-briefs/%f\n' 2>/dev/null || true
+              printf '%s\n' scripts/design/pen-draft.mjs scripts/design/pen-trim.mjs .github/workflows/pen-draft.yml
+            } | sort -u | while IFS= read -r f; do
+              git show "HEAD^2:$f" 2>/dev/null | cmp -s - ".pen-before/$f" || echo "$f"
+            done > "$changed"
+            args+=(--changed "$changed")
+          elif [ "$EVENT" = pull_request ]; then
+            # What the PR changes against its base: the merge commit's
+            # first parent.
+            git diff --name-only HEAD^1 HEAD > "$changed"
+            args+=(--changed "$changed")
+          elif [ "$EVENT" = push ] && [ "$(git rev-parse -q --verify HEAD^ || true)" = "${BEFORE:-}" ]; then
+            # A queue merge was drafted on its own PR, and those pictures
+            # are published from the PR run, so it drafts nothing again.
+            # Any other single-commit push drafts what it changed.
+            if git log -1 --format=%s | grep -Eq '\(#[0-9]+\)$'; then
+              : > "$changed"
+            else
+              git diff --name-only HEAD^ HEAD > "$changed"
+            fi
             args+=(--changed "$changed")
           fi
           frames=$(node scripts/design/pen-draft.mjs "${args[@]}")

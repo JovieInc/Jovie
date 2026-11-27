@@ -1,9 +1,9 @@
 'use client';
 
+import { IconButton, type IconButtonSize } from '@jovie/ui';
 import { Copy, ExternalLink, Link2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { DrawerInlineIconButton } from './DrawerInlineIconButton';
 
 export interface ShareableLinkRowProps {
   readonly url: string;
@@ -26,27 +26,33 @@ export interface ShareableLinkRowProps {
   readonly testId?: string;
 }
 
+/**
+ * Density → IconButton size (visible container + [&_svg] glyph). Hit target
+ * stays 44px via Button's pseudo-element. Compact/rail/table rows are
+ * 24–32px tall; `lg` (40px) overflows those rows. Glyph size classes on
+ * children are redundant — `[&_svg]` on xs/sm/md wins on specificity.
+ */
 const DENSITY_CLASSES = {
   compact: {
     container: 'h-6 gap-1 rounded-full px-2',
     icon: 'h-3 w-3',
     value: 'text-3xs',
-    button: 'h-6 w-6 rounded-full',
-    glyph: 'h-3 w-3',
+    // Was h-6 chrome + h-3 glyph; xs is 24/12.
+    iconButtonSize: 'xs' as const satisfies IconButtonSize,
   },
   rail: {
     container: 'h-8 gap-1.5 rounded-full px-2.5',
     icon: 'h-3 w-3',
     value: 'text-2xs',
-    button: 'h-5 w-5 rounded-full',
-    glyph: 'h-3 w-3',
+    // Prior 20px (`h-5`) chrome → closest xs (24); glyph was already h-3.
+    iconButtonSize: 'xs' as const satisfies IconButtonSize,
   },
   table: {
     container: 'h-8 gap-1.5 rounded-full px-3',
     icon: 'h-3.5 w-3.5',
     value: 'text-2xs',
-    button: 'h-6 w-6 rounded-full',
-    glyph: 'h-3.5 w-3.5',
+    // Prior 24px chrome + 14px glyph (lg had no [&_svg]). sm keeps 14px glyph.
+    iconButtonSize: 'sm' as const satisfies IconButtonSize,
   },
 } as const;
 
@@ -161,29 +167,29 @@ export function ShareableLinkRow({
             'opacity-0 focus-within:opacity-100 group-hover:opacity-100'
         )}
       >
-        <DrawerInlineIconButton
+        <IconButton
+          size={styles.iconButtonSize}
+          variant='inline'
           onClick={handleCopy}
           title={isCopied ? 'Copied!' : copyButtonTitle}
           aria-label={isCopied ? 'Copied' : copyButtonTitle}
-          className={cn(
-            'shrink-0 text-tertiary-token',
-            styles.button,
-            isCopied && 'text-success'
-          )}
+          className='shrink-0'
         >
-          <Copy className={styles.glyph} />
+          <Copy className={cn(isCopied && 'text-success')} />
           <span className='sr-only'>{isCopied ? 'Copied' : 'Copy'}</span>
-        </DrawerInlineIconButton>
+        </IconButton>
         {showOpen ? (
-          <DrawerInlineIconButton
+          <IconButton
+            size={styles.iconButtonSize}
+            variant='inline'
             onClick={handleOpen}
             title={openButtonTitle}
             aria-label={openButtonTitle}
-            className={cn('shrink-0 text-tertiary-token', styles.button)}
+            className='shrink-0'
           >
-            <ExternalLink className={styles.glyph} />
+            <ExternalLink />
             <span className='sr-only'>Open</span>
-          </DrawerInlineIconButton>
+          </IconButton>
         ) : null}
       </span>
     </div>

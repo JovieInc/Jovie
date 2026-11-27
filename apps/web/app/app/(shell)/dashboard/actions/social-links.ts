@@ -12,10 +12,6 @@ import { unstable_noStore as noStore } from 'next/cache';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import {
-  buildSocialLinksVerificationSelect,
-  getSocialLinksVerificationColumnSupport,
-} from '@/lib/db/queries/social-links-verification';
 import { users } from '@/lib/db/schema/auth';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -94,10 +90,11 @@ export async function getProfileSocialLinks(
     }
 
     return await withDbSession(async appUserId => {
-      // Query against creatorProfiles with ownership check and left-join links
-      const hasVerificationColumns =
-        await getSocialLinksVerificationColumnSupport(db);
-
+      // Query against creatorProfiles with ownership check and left-join links.
+      // The verification columns are in the v1 baseline schema, so this read
+      // selects them directly instead of probing information_schema first:
+      // the probe was one more serial round trip on Home's page stream
+      // whenever an instance's 60 s cache was cold (JOV-14411).
       const rows = await db
         .select({
           profileId: creatorProfiles.id,
@@ -113,7 +110,9 @@ export async function getProfileSocialLinks(
           sourcePlatform: socialLinks.sourcePlatform,
           sourceType: socialLinks.sourceType,
           evidence: socialLinks.evidence,
-          ...buildSocialLinksVerificationSelect(hasVerificationColumns),
+          verificationStatus: socialLinks.verificationStatus,
+          verificationToken: socialLinks.verificationToken,
+          verifiedAt: socialLinks.verifiedAt,
           version: socialLinks.version,
         })
         .from(creatorProfiles)

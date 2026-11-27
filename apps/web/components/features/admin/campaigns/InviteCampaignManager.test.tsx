@@ -9,6 +9,7 @@ import {
   buildInvite,
   buildPreview,
   type CampaignRoutes,
+  campaignStats,
   inviteList,
   json,
   never,
@@ -202,6 +203,36 @@ describe('InviteCampaignManager', () => {
       screen.queryByText('Sample profiles to invite:')
     ).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
+  });
+
+  it('tints Failed and Missing Email only when they are non-zero', async () => {
+    const valueOf = (subtitle: string, text: string) =>
+      within(
+        screen
+          .getByText(subtitle)
+          .closest<HTMLElement>('.h-full') as HTMLElement
+      ).getByText(text);
+    useRoutes({ preview: json(buildPreview(2, 4)) });
+    const { unmount } = renderManager();
+    await screen.findByText('Send 2 Invites');
+    expect(valueOf('Need follow-up', '3')).toHaveClass('text-error-text');
+    expect(valueOf('Needs enrichment first', '4')).toHaveClass(
+      'text-warning-text'
+    );
+    unmount();
+
+    useRoutes({
+      stats: json({
+        ...campaignStats,
+        campaign: { ...campaignStats.campaign, failed: 0 },
+      }),
+    });
+    renderManager();
+    await screen.findByText('Send 2 Invites');
+    expect(valueOf('Need follow-up', '0')).not.toHaveClass('text-error-text');
+    expect(valueOf('Needs enrichment first', '0')).not.toHaveClass(
+      'text-warning-text'
+    );
   });
 
   it('shows the preview error and keeps sending disabled', async () => {

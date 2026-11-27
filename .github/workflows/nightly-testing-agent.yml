@@ -1,5 +1,6 @@
 # Evidence is data: it ships as the run artifact below, never as a PR (JovieInc/ci canon/COMPANY.md, "Data vs behaviour").
 name: Nightly Testing Agent
+# github-token-budget: 11 calls/run - one prior-run list plus up to 10 skill-delta artifact downloads for consume-before-select
 
 on:
   push:
@@ -49,10 +50,48 @@ jobs:
           pnpm --filter=@jovie/web run test:nightly-agent:context --
           --out apps/web/test-results/nightly-agent/context
 
+      # Restore prior skill-delta before select so ranking compounds across nights.
+      # github-token-budget: 11 calls/run - one prior-run list plus up to 10 skill-delta downloads
+      - name: Restore prior skill delta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          prior_dir=apps/web/test-results/nightly-agent/prior
+          mkdir -p "$prior_dir"
+          run_ids=()
+          if list_out="$(node packages/api-client/cli.ts gh --priority default -- run list \
+            --workflow=nightly-testing-agent.yml \
+            --branch main \
+            --status success \
+            --limit 10 \
+            --json databaseId \
+            --jq '.[].databaseId')"; then
+            mapfile -t run_ids <<<"$list_out"
+          else
+            echo "Prior-run list unavailable; select will rank without skill-delta memory."
+            exit 0
+          fi
+          for run_id in "${run_ids[@]}"; do
+            if [ -z "$run_id" ] || [ "$run_id" = "${{ github.run_id }}" ]; then
+              continue
+            fi
+            if node packages/api-client/cli.ts gh --priority default -- run download "$run_id" \
+              --name "nightly-agent-report-${run_id}" \
+              --dir "$prior_dir"; then
+              if [ -f "$prior_dir/skill-delta.json" ]; then
+                echo "Restored skill-delta.json from run ${run_id}"
+                exit 0
+              fi
+            fi
+          done
+          echo "No prior skill-delta artifact found; select will rank without memory."
+
       - name: Select risk-ranked targets
         run: >-
           pnpm --filter=@jovie/web run test:nightly-agent:select --
           --out apps/web/test-results/nightly-agent/context
+          --skill-delta apps/web/test-results/nightly-agent/prior/skill-delta.json
 
       - name: Upload agent context
         if: ${{ always() && hashFiles('apps/web/test-results/nightly-agent/context/context.json') != '' && hashFiles('apps/web/test-results/nightly-agent/context/selected-targets.json') != '' }}
@@ -212,6 +251,7 @@ jobs:
             apps/web/test-results/nightly-agent/skill-delta.json
             docs/NIGHTLY_TESTING_AGENT_REPORT.md
             apps/web/reports/nightly-agent/last-run.json
+            apps/web/reports/nightly-agent/skill-delta.json
         run: >-
           node .github/scripts/guard-playwright-artifacts.mjs --run -- pnpm --filter=@jovie/web run test:nightly-agent:publish-status --
           --input-dir apps/web/test-results/nightly-agent/incoming
@@ -222,7 +262,7 @@ jobs:
         run: cat apps/web/test-results/nightly-agent/nightly-report.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload final report
-        if: ${{ always() && hashFiles('apps/web/test-results/nightly-agent/nightly-report.md') != '' && hashFiles('apps/web/test-results/nightly-agent/skill-delta.json') != '' && hashFiles('docs/NIGHTLY_TESTING_AGENT_REPORT.md') != '' && hashFiles('apps/web/reports/nightly-agent/last-run.json') != '' }}
+        if: ${{ always() && hashFiles('apps/web/test-results/nightly-agent/nightly-report.md') != '' && hashFiles('apps/web/test-results/nightly-agent/skill-delta.json') != '' && hashFiles('docs/NIGHTLY_TESTING_AGENT_REPORT.md') != '' && hashFiles('apps/web/reports/nightly-agent/last-run.json') != '' && hashFiles('apps/web/reports/nightly-agent/skill-delta.json') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: nightly-agent-report-${{ github.run_id }}
@@ -231,6 +271,7 @@ jobs:
             apps/web/test-results/nightly-agent/skill-delta.json
             docs/NIGHTLY_TESTING_AGENT_REPORT.md
             apps/web/reports/nightly-agent/last-run.json
+            apps/web/reports/nightly-agent/skill-delta.json
           allow-markdown: 'true'
           retention-days: 90
 

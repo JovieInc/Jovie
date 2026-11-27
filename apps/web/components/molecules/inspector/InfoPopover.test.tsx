@@ -28,4 +28,21 @@ describe('InfoPopover', () => {
       screen.getByRole('button', { name: 'About downloads' })
     ).toHaveAttribute('data-disclosure-level', 'l2');
   });
+
+  it('names the popover content with the same label as its trigger', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <InfoPopover label='About downloads' testId='downloads-info'>
+        Email gate to file.
+      </InfoPopover>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'About downloads' }));
+
+    expect(screen.getByTestId('downloads-info-content')).toHaveAttribute(
+      'aria-label',
+      'About downloads'
+    );
+  });
 });

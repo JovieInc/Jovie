@@ -77,8 +77,8 @@ export const PartialChipsWithoutNote: Story = {
   args: {
     presentation: 'chips',
     headingLevel: 2,
-    title: 'Jovie opens by invitation.',
-    submitLabel: 'Request invite',
+    title: 'Your handle is reserved. You’re on the waitlist.',
+    submitLabel: 'Join the waitlist',
   },
 };
 

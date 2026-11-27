@@ -77,6 +77,7 @@ vi.mock('@/lib/cache/profile', () => ({ invalidateProfileCache: vi.fn() }));
 vi.mock('@/lib/cache/releases', () => ({ invalidateReleaseCaches: vi.fn() }));
 vi.mock('@/lib/claim/claim-verification.server', () => ({
   lookupArtistReach: mocks.reach,
+  scheduleClaimVerificationCard: vi.fn(),
 }));
 vi.mock('@/lib/waitlist/settings', () => ({
   isWaitlistGateEnabled: mocks.gate,
@@ -192,7 +193,6 @@ beforeEach(() => {
 describe('claimAgentDraft', () => {
   it('reserves the draft first, claims privately through finalize and persists attribution', async () => {
     const row = draftRow();
-    // draft, prior profile, spotify profiles, tx owned, existing release, providers
     mocks.selects = [[row], [], [], [], [], [{ id: 'spotify' }]];
     expect(await claim(row)).toEqual({
       status: 'claimed',
@@ -215,7 +215,6 @@ describe('claimAgentDraft', () => {
       userId: 'user-1',
       isClaimed: false,
       isPublic: false,
-      // Untrusted image host is dropped.
       avatarUrl: null,
       settings: {
         agentAcquisition: {
@@ -229,6 +228,7 @@ describe('claimAgentDraft', () => {
     expect(mocks.track.mock.calls.map(call => call[1])).toEqual([
       'claim_completed',
       'activation_achieved',
+      'claim_private_created',
     ]);
     expect(mocks.upsertRelease).toHaveBeenCalledWith(
       expect.objectContaining({

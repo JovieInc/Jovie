@@ -21,8 +21,8 @@ describe('DrawerFormField certificate', () => {
     await user.click(screen.getByText('Profile URL'));
     const field = screen.getByLabelText('Profile URL');
     expect(field).toHaveFocus();
-    await user.type(field, 'jovie.com/tim');
-    expect(field).toHaveValue('jovie.com/tim');
+    await user.type(field, 'jov.ie/tim');
+    expect(field).toHaveValue('jov.ie/tim');
     await expectNoA11yViolations(container);
   });
 
@@ -48,13 +48,13 @@ describe('DrawerFormField certificate', () => {
           htmlFor='rtl-url'
           helperText={helper}
         >
-          <Input id='rtl-url' defaultValue='jovie.com/amr' />
+          <Input id='rtl-url' defaultValue='jov.ie/amr' />
         </DrawerFormField>
       </div>
     );
 
     expect(screen.getByLabelText('رابط الملف الشخصي')).toHaveValue(
-      'jovie.com/amr'
+      'jov.ie/amr'
     );
     expect(screen.getByText(helper)).toHaveClass('text-tertiary-token');
     await expectNoA11yViolations(container);

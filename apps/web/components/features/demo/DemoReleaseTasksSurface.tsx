@@ -132,12 +132,12 @@ export function DemoReleaseTasksSurface() {
       <div className='mx-auto w-full max-w-215 px-6 py-8'>
         <section
           data-testid='demo-showcase-release-tasks'
-          className='overflow-hidden rounded-3xl border border-subtle bg-surface-0 shadow-[0_24px_80px_rgba(0,0,0,0.28)]'
+          className='overflow-hidden rounded-3xl border border-subtle bg-surface-0 shadow-popover'
         >
-          <div className='border-b border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0))] px-6 py-5'>
+          <div className='border-b border-subtle px-6 py-5'>
             <div className='flex items-start justify-between gap-4'>
               <div>
-                <p className='text-2xs uppercase tracking-[0.08em] text-tertiary-token'>
+                <p className='text-2xs text-tertiary-token'>
                   Demo · Apr 2, 2026
                 </p>
                 <h2 className='mt-2 text-2xl font-[580] tracking-[-0.03em] text-primary-token text-balance'>
@@ -149,25 +149,25 @@ export function DemoReleaseTasksSurface() {
                 </p>
               </div>
 
-              <div className='rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-2xs text-white/72'>
+              <div className='rounded-full bg-surface-1 px-3 py-1.5 text-2xs text-secondary-token'>
                 Apr 4, 2026 release
               </div>
             </div>
 
             <div className='mt-5 grid gap-3 sm:grid-cols-3'>
-              <div className='rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3'>
+              <div className='rounded-xl bg-surface-1 px-3 py-3'>
                 <p className='text-2xs text-tertiary-token'>Total tasks</p>
                 <p className='mt-2 text-xl font-[580] tracking-[-0.03em] text-primary-token'>
                   {TASKS.length}
                 </p>
               </div>
-              <div className='rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3'>
+              <div className='rounded-xl bg-surface-1 px-3 py-3'>
                 <p className='text-2xs text-tertiary-token'>Done</p>
                 <p className='mt-2 text-xl font-[580] tracking-[-0.03em] text-primary-token tabular-nums'>
                   {doneCount}
                 </p>
               </div>
-              <div className='rounded-xl border border-white/8 bg-white/[0.03] px-3 py-3'>
+              <div className='rounded-xl bg-surface-1 px-3 py-3'>
                 <p className='text-2xs text-tertiary-token'>Next Review</p>
                 <p className='mt-2 flex items-center gap-2 text-sm font-semibold text-primary-token'>
                   <CalendarDays className='h-4 w-4 text-tertiary-token' />

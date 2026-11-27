@@ -6,7 +6,7 @@
  * stay "Not measured"; a stub never reads as a real zero.
  */
 
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, OVIE_METRIC_ANCHORS } from '@/constants/routes';
 import {
   HOME_LOOP_NOT_MEASURED,
   type HomeLoopTile,
@@ -77,8 +77,12 @@ export function buildCompanyTiles(input: {
   readonly goldenPath: readonly OvieGoldenPathRow[] | null;
 }): readonly OvieCompanyTile[] {
   const { overview, funnel, goldenPath } = input;
-  const ops = APP_ROUTES.ADMIN_OPERATIONS;
+  const ops = `${APP_ROUTES.ADMIN_OPS}#${OVIE_METRIC_ANCHORS.companyNow}`;
   const finance = overview?.financialDataAvailable ? overview : null;
+  const revenue =
+    overview?.financialDataAvailable || overview?.mrrAvailable
+      ? overview
+      : null;
 
   const runway: OvieCompanyTile =
     finance && finance.runwayMonths !== null
@@ -99,18 +103,18 @@ export function buildCompanyTiles(input: {
         }
       : unmeasured('runway', 'Runway', ops);
 
-  const mrr: OvieCompanyTile = finance
+  const mrr: OvieCompanyTile = revenue
     ? {
         key: 'mrr',
         label: 'MRR',
-        value: usd.format(finance.mrrUsd),
+        value: usd.format(revenue.mrrUsd),
         was:
-          finance.weekAgo === undefined
+          revenue.weekAgo === undefined
             ? null
-            : `${usd.format(finance.weekAgo.mrrUsd)} 7d ago`,
-        tone: trendTone(finance.mrrUsd, finance.weekAgo?.mrrUsd),
+            : `${usd.format(revenue.weekAgo.mrrUsd)} 7d ago`,
+        tone: trendTone(revenue.mrrUsd, revenue.weekAgo?.mrrUsd),
         measured: true,
-        target: `${finance.activeSubscribers} paying`,
+        target: `${revenue.activeSubscribers} paying`,
         href: ops,
       }
     : unmeasured('mrr', 'MRR', ops);

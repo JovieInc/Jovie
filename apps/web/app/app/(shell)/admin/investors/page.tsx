@@ -311,7 +311,7 @@ function TableSkeleton() {
         columns={INVESTOR_TABLE_SKELETON_COLUMNS}
         skeletonRows={5}
         skeletonColumnConfig={INVESTOR_TABLE_SKELETON_COLUMN_CONFIG}
-        rowMode='two-line'
+        rowMode='dense'
         minWidth={INVESTOR_TABLE_MIN_WIDTH}
       />
     </ContentSurfaceCard>

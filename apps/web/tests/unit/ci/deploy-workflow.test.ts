@@ -19,6 +19,12 @@ import {
   triggerNames,
   workflowTriggers,
 } from '../../../../../scripts/lib/workflow-triggers.mjs';
+import {
+  getJobBlock,
+  getShellRunBlocks,
+  getStepBlock,
+  getStepRunScript,
+} from './deploy-workflow-yaml';
 
 type CheckoutStep = {
   uses?: string;
@@ -143,86 +149,12 @@ afterAll(() => {
   );
 });
 
-function getStepBlock(workflow: string, stepName: string): string {
-  const lines = workflow.split('\n');
-  const start = lines.findIndex(line => line.trim() === `- name: ${stepName}`);
-
-  expect(start, `Missing workflow step: ${stepName}`).toBeGreaterThanOrEqual(0);
-
-  const block: string[] = [];
-
-  for (let index = start; index < lines.length; index++) {
-    const line = lines[index]!;
-
-    if (index > start && line.startsWith('      - name: ')) break;
-    if (index > start && /^[a-zA-Z0-9_-]+:/.test(line)) break;
-
-    block.push(line);
-  }
-
-  return block.join('\n');
-}
-
 function getSentryStatsRequests(action: string): string[] {
   return (
     action.match(
       /STATS_RESPONSE=\$\(sentry_read_json[\s\S]*?"https:\/\/sentry\.io\/api\/0\/organizations\/\$SENTRY_ORG\/events-stats\/"\)/g
     ) ?? []
   );
-}
-
-function getJobBlock(workflow: string, jobKey: string): string {
-  const lines = workflow.split('\n');
-  const start = lines.findIndex(line => line === `  ${jobKey}:`);
-
-  expect(start, `Missing workflow job: ${jobKey}`).toBeGreaterThanOrEqual(0);
-
-  const block: string[] = [];
-
-  for (let index = start; index < lines.length; index++) {
-    const line = lines[index]!;
-
-    if (index > start && /^  [a-zA-Z0-9_-]+:/.test(line)) break;
-
-    block.push(line);
-  }
-
-  return block.join('\n');
-}
-
-function getShellRunBlocks(workflow: string): string[] {
-  const lines = workflow.split('\n');
-  const blocks: string[] = [];
-  for (let index = 0; index < lines.length; index++) {
-    const line = lines[index]!;
-    const match = /^(\s*)run:\s*(.*)$/.exec(line);
-    if (!match) continue;
-    const indentation = match[1]!.length;
-    const block = [match[2]!];
-    while (index + 1 < lines.length) {
-      const next = lines[index + 1]!;
-      if (next.trim() && next.search(/\S/) <= indentation) break;
-      block.push(next);
-      index += 1;
-    }
-    blocks.push(block.join('\n'));
-  }
-  return blocks;
-}
-
-function getStepRunScript(step: string): string {
-  const lines = step.split('\n');
-  const run = lines.findIndex(line => /^\s+run:\s*\|\s*$/.test(line));
-
-  expect(run, 'Missing multiline run script').toBeGreaterThanOrEqual(0);
-
-  const body = lines.slice(run + 1);
-  const indentation = Math.min(
-    ...body.filter(line => line.trim()).map(line => line.search(/\S/))
-  );
-  return body
-    .map(line => (line.trim() ? line.slice(indentation) : ''))
-    .join('\n');
 }
 
 describe('source PR path-output reachability contract', () => {
@@ -1043,7 +975,9 @@ describe('deploy workflow Vercel env resolution', () => {
     );
     expect(authorization).toContain('.aggregatePassed == true');
     expect(authorization).toContain('.total_count == (.jobs | length)');
-    expect(authorization).not.toContain('gh api --paginate --slurp');
+    expect(authorization).toMatch(
+      /gh api --paginate --slurp[^\n]*\n[^\n]*attempts\/\$source_run_attempt\/jobs\?per_page=100[^\n]*\n[^\n]*\| node scripts\/lib\/exact-github-listing\.mjs/
+    );
     expect(releaseCaller).not.toContain('concurrency:');
     expect(verified).not.toContain('concurrency:');
     expect(verified).toContain(
@@ -1176,6 +1110,11 @@ describe('deploy workflow Vercel env resolution', () => {
         fakeVercel,
         `#!/usr/bin/env bash
 set -euo pipefail
+# Post-upload settle calls inspect; capture deploy argv only.
+if [[ " $* " == *" inspect "* ]]; then
+  printf '%s\\n' '{"readyState":"READY","id":"dpl_argv"}'
+  exit 0
+fi
 printf '%s\\0' "$@" > "$ARGV_CAPTURE"
 printf 'raw-cli-output:%s\\n' "$VERCEL_TOKEN"
 printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
@@ -3290,7 +3229,15 @@ describe('CI E2E smoke workflow', () => {
       'Golden path requires the dedicated real-auth lane'
     );
     expect(goldenPathSpec).toContain('prepareBetterAuthEmailOtp(page, {');
-    expect(goldenPathSpec).toContain('beforeResponseFulfill: ensureDbUser,');
+    // Keep → auth (JOV-14011): approve the app user and record operator
+    // proof before the claim response so the mount claim can publish.
+    expect(goldenPathSpec).toContain(
+      'beforeResponseFulfill: async betterAuthUserId => {'
+    );
+    expect(goldenPathSpec).toContain('await ensureDbUser(betterAuthUserId);');
+    expect(goldenPathSpec).toContain(
+      'await recordOperatorApproval(sql, betterAuthUserId, email);'
+    );
     expect(authHelper).toContain(
       "const signInRoute = '**/api/auth/sign-in/email-otp'"
     );

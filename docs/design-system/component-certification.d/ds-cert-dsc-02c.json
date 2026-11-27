@@ -1,0 +1,49 @@
+{
+  "waivers": {
+    "apps/web/components/features/dashboard/organisms/LazyDashboardAudienceClient.tsx": {
+      "offline": "The wrapper only code-splits DashboardAudienceClient behind a loading shell and owns no network request; a failed chunk load is handled by the Next route error boundary, not by this component."
+    },
+    "apps/web/components/features/demo/DemoReleaseTasksSurface.tsx": {
+      "empty": "The surface renders a fixed six-task demo schedule from module constants and takes no props, so there is no collection that can be empty.",
+      "long-content": "All copy and task titles are fixed demo constants with known lengths; no caller supplies content that could run long."
+    }
+  },
+  "gates": {
+    "apps/web/components/features/dashboard/organisms/LazyDashboardAudienceClient.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/releases/ReleaseEditDialog.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/releases/cells/AvailabilityCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/demo/DemoReleaseTasksSurface.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  }
+}

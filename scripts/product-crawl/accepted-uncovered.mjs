@@ -13,6 +13,8 @@ export const ACCEPTED_UNCOVERED = Object.freeze({
     'private share-drop link: the token is minted per drop and only its recipients hold it; no page links to one',
   '/p/[token]':
     'secret asset share link: the token is the access grant itself; no page links to one',
+  '/v/[token]':
+    'secret view share link: the token is the access grant itself; no page links to one',
   '/claim/agent/[draftId]':
     'agent draft claim link: the draft id and handoff code exist only in the link sent to that artist',
   '/content-preview/[versionId]':

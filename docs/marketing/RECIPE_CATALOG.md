@@ -60,13 +60,12 @@ as a full pricing table (use artist-lp with monetization one-liner — creator R
 ## #recipe-artist-lp (proven)
 
 **Reference:** `/artist-profiles` (canonical; `/artist-profile` is an alias).
-**Audience:** artist. **Sections (11):** hero → feature-split (adaptive) →
-feature-grid (outcomes) → capture → feature-split (reactivation) →
-monetization → spec-wall → how-it-works → social-proof → faq → cta.
+**Audience:** artist. **Sections (6):** hero (left-phone + mode morph) →
+feature-grid (outcomes) → capture → how-it-works → product-gallery (shipped
+sites) → cta.
 
-**Arc (creator R9 — NO problem/agitation beat):** recognition → identity →
-aspiration → capability (capture) → capability (reactivation) → money-reality →
-detail → low-risk → relatability → permission → action.
+**Arc (creator R9 — NO problem/agitation beat):** recognition → aspiration →
+capability (capture) → low-risk → relatability → action.
 
 **CTA cadence:** dense-tiered, "Claim your Jovie" (possession verb; cost-objection
 in button: "Try N days free"), every-2-3-sections-after-proof. Substitution:

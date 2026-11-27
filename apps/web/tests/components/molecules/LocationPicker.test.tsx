@@ -1,5 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import {
+  cloneElement,
+  isValidElement,
+  type MouseEvent,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 // ── Mock @jovie/ui Popover primitives ──
@@ -7,42 +14,58 @@ import { describe, expect, it, vi } from 'vitest';
 let popoverOpen = false;
 let popoverOnOpenChange: ((open: boolean) => void) | undefined;
 
-vi.mock('@jovie/ui', () => ({
-  Popover: ({
-    children,
-    open,
-    onOpenChange,
-  }: {
-    children: React.ReactNode;
-    open?: boolean;
-    onOpenChange?: (open: boolean) => void;
-  }) => {
-    popoverOpen = open ?? false;
-    popoverOnOpenChange = onOpenChange;
-    return <div data-testid='popover-root'>{children}</div>;
-  },
-  PopoverTrigger: ({
-    children,
-  }: {
-    children: React.ReactNode;
-    asChild?: boolean;
-  }) => (
-    <button
-      data-testid='popover-trigger'
-      type='button'
-      onClick={() => popoverOnOpenChange?.(!popoverOpen)}
-    >
-      {children}
-    </button>
-  ),
-  PopoverContent: ({
-    children,
-  }: {
-    children: React.ReactNode;
-    [key: string]: unknown;
-  }) =>
-    popoverOpen ? <div data-testid='popover-content'>{children}</div> : null,
-}));
+vi.mock('@jovie/ui', async importOriginal => {
+  const actual = await importOriginal<typeof import('@jovie/ui')>();
+  return {
+    ...actual,
+    Popover: ({
+      children,
+      open,
+      onOpenChange,
+    }: {
+      children: ReactNode;
+      open?: boolean;
+      onOpenChange?: (open: boolean) => void;
+    }) => {
+      popoverOpen = open ?? false;
+      popoverOnOpenChange = onOpenChange;
+      return <div data-testid='popover-root'>{children}</div>;
+    },
+    PopoverTrigger: ({
+      children,
+      asChild,
+    }: {
+      children: ReactNode;
+      asChild?: boolean;
+    }) => {
+      const open = () => popoverOnOpenChange?.(!popoverOpen);
+      if (asChild && isValidElement(children)) {
+        const child = children as ReactElement<{
+          onClick?: (event: MouseEvent) => void;
+        }>;
+        return cloneElement(child, {
+          'data-testid': 'popover-trigger',
+          onClick: (event: MouseEvent) => {
+            child.props.onClick?.(event);
+            open();
+          },
+        } as never);
+      }
+      return (
+        <button data-testid='popover-trigger' type='button' onClick={open}>
+          {children}
+        </button>
+      );
+    },
+    PopoverContent: ({
+      children,
+    }: {
+      children: ReactNode;
+      [key: string]: unknown;
+    }) =>
+      popoverOpen ? <div data-testid='popover-content'>{children}</div> : null,
+  };
+});
 
 import { LocationPicker } from '@/components/molecules/LocationPicker';
 

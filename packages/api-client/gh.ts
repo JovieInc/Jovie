@@ -4,6 +4,9 @@
  * via `gh api --include`, bounded retries, and exit 75 when deferred.
  */
 import { spawn } from 'node:child_process';
+import { closeSync, openSync, readFileSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { EX_TEMPFAIL } from './client.ts';
 import {
   CONTRACT,
@@ -30,6 +33,11 @@ import { defaultStore, hashCredential, type LedgerStore } from './store.ts';
 
 export interface GhResult {
   readonly code: number;
+  /**
+   * UTF-8 text for JSON responses. Artifact `/zip` bodies are captured as a
+   * latin1 string (lossless byte↔string) so callers that write with
+   * `Buffer.from(stdout, 'latin1')` keep a valid archive.
+   */
   readonly stdout: string;
   readonly stderr: string;
 }
@@ -39,6 +47,17 @@ export type GhRunner = (
   env: NodeJS.ProcessEnv
 ) => Promise<GhResult>;
 
+/** Artifact zip bodies are binary; gh refuses pipes and UTF-8 decode corrupts them. */
+export function ghWantsFileStdout(args: readonly string[]): boolean {
+  return args.some(
+    arg => typeof arg === 'string' && /\/zip$/.test(arg.split('?')[0] ?? '')
+  );
+}
+
+/** Decode stdout to bytes — latin1 for `/zip`, UTF-8 otherwise. */
+export function ghStdoutBytes(stdout: string, args: readonly string[]): Buffer {
+  return Buffer.from(stdout, ghWantsFileStdout(args) ? 'latin1' : 'utf8');
+}
 export interface RunGhOptions {
   readonly priority?: PriorityName;
   readonly credential?: string;
@@ -112,17 +131,25 @@ export function ghShape(args: readonly string[]): {
     );
     const effective = method ?? (hasFields ? 'POST' : 'GET');
     const write = effective !== 'GET' && effective !== 'HEAD';
-    if (
-      (target === 'rate_limit' || target === '/rate_limit') &&
-      effective === 'GET'
-    )
-      return { resource: 'core', write: false, idempotent: true, cost: 0 };
     return {
       resource: target.replace(/^\//, '').startsWith('search/')
         ? 'search'
         : 'core',
       write,
       idempotent: !write || effective === 'PUT' || effective === 'DELETE',
+      // GET /rate_limit is exempt from primary quota, never secondary limits.
+      ...(effective === 'GET' &&
+      !args.includes('--hostname') &&
+      !args.some(arg =>
+        /^(?:--(?:hostname|method|field|raw-field|input)=|-X.|-[fF].)/.test(arg)
+      ) &&
+      [
+        'rate_limit',
+        '/rate_limit',
+        'https://api.github.com/rate_limit',
+      ].includes(target)
+        ? { cost: 0 }
+        : {}),
     };
   }
   const read = args[0] === 'search' || READ_PORCELAIN.has(args[1] ?? '');
@@ -147,8 +174,11 @@ export function splitIncluded(
   return { headers, body: stdout.slice(end).replace(/^\r?\n\r?\n/, '') };
 }
 
-const defaultRun: GhRunner = (args, env) =>
-  new Promise(resolve => {
+function capturePipe(
+  args: readonly string[],
+  env: NodeJS.ProcessEnv
+): Promise<GhResult> {
+  return new Promise(resolve => {
     const child = spawn('gh', [...args], {
       env,
       stdio: ['inherit', 'pipe', 'pipe'],
@@ -168,6 +198,85 @@ const defaultRun: GhRunner = (args, env) =>
       })
     );
   });
+}
+
+function captureToFile(
+  args: readonly string[],
+  env: NodeJS.ProcessEnv
+): Promise<GhResult> {
+  return new Promise(resolve => {
+    const file = join(
+      tmpdir(),
+      `gh-body-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}.bin`
+    );
+    let fd: number;
+    try {
+      fd = openSync(file, 'w');
+    } catch (error) {
+      resolve({ code: 127, stdout: '', stderr: String(error) });
+      return;
+    }
+    let child;
+    try {
+      child = spawn('gh', [...args], {
+        env,
+        stdio: ['inherit', fd, 'pipe'],
+      });
+    } catch (error) {
+      closeSync(fd);
+      try {
+        unlinkSync(file);
+      } catch {
+        // best-effort cleanup
+      }
+      resolve({ code: 127, stdout: '', stderr: String(error) });
+      return;
+    }
+    closeSync(fd);
+    const stderr = child.stderr;
+    if (!stderr) {
+      child.kill();
+      try {
+        unlinkSync(file);
+      } catch {
+        // best-effort cleanup
+      }
+      resolve({
+        code: 127,
+        stdout: '',
+        stderr: 'gh stderr pipe missing',
+      });
+      return;
+    }
+    const err: Buffer[] = [];
+    let settled = false;
+    const finish = (code: number, message: string) => {
+      if (settled) return;
+      settled = true;
+      let bytes = Buffer.alloc(0);
+      try {
+        bytes = readFileSync(file);
+      } catch {
+        bytes = Buffer.alloc(0);
+      }
+      try {
+        unlinkSync(file);
+      } catch {
+        // The body was already read, or the file was never created.
+      }
+      // latin1 is a 1:1 byte map; UTF-8 would corrupt zip local headers.
+      resolve({ code, stdout: bytes.toString('latin1'), stderr: message });
+    };
+    stderr.on('data', c => err.push(c));
+    child.on('error', e => finish(127, String(e)));
+    child.on('close', code =>
+      finish(code ?? 1, Buffer.concat(err).toString('utf8'))
+    );
+  });
+}
+
+const defaultRun: GhRunner = (args, env) =>
+  ghWantsFileStdout(args) ? captureToFile(args, env) : capturePipe(args, env);
 
 export function ghCredential(env: NodeJS.ProcessEnv): string {
   if (env.JOVIE_GITHUB_CREDENTIAL) return env.JOVIE_GITHUB_CREDENTIAL;
@@ -209,11 +318,15 @@ export async function runGh(
   args: readonly string[],
   options: RunGhOptions = {}
 ): Promise<GhResult & { deferred: boolean }> {
-  const env = {
+  const wantsFile = ghWantsFileStdout(args);
+  const env: NodeJS.ProcessEnv = {
     ...(options.env ?? process.env),
     NO_COLOR: '1',
-    GH_FORCE_TTY: '0',
   };
+  // gh 2.102 treats every GH_FORCE_TTY value as a terminal and refuses
+  // application/zip. JSON calls still force tty off so the body stays text.
+  if (wantsFile) delete env.GH_FORCE_TTY;
+  else env.GH_FORCE_TTY = '0';
   const spec = providerSpec('github');
   const store = options.store ?? defaultStore(env);
   const persistenceFailures = () =>
@@ -235,6 +348,7 @@ export async function runGh(
   const shape = ghShape(args);
   const include =
     args[0] === 'api' &&
+    !wantsFile &&
     !args.some(
       a =>
         a === '--paginate' ||
@@ -264,6 +378,7 @@ export async function runGh(
         s,
         {
           priority,
+          // A free quota observation still passes the same circuit breaker.
           costs: shape.cost === 0 ? {} : { [shape.resource]: shape.cost ?? 1 },
           write: shape.write,
           minWriteIntervalMs: spec.minWriteIntervalMs,
@@ -302,6 +417,7 @@ export async function runGh(
         : classifyFailure(spec, {
             status,
             headers,
+            // Zip failures are rare; latin1 error text is still readable enough.
             text: `${result.stderr}\n${body}`,
             nowMs: at,
           });
@@ -312,7 +428,14 @@ export async function runGh(
       !GH_TRANSIENT.test(result.stderr)
         ? 'client'
         : failure.kind;
-    const settled: Failure = { kind, retryAtMs: failure.retryAtMs };
+    // A primary-free endpoint cannot spend core quota. If a server throttle
+    // carries an empty core header, keep the secondary breaker authoritative
+    // and preserve the full provider reset/backoff window for free probes.
+    const freeProbeThrottle = shape.cost === 0 && kind === 'primary';
+    const settled: Failure = {
+      kind: freeProbeThrottle ? 'secondary' : kind,
+      retryAtMs: failure.retryAtMs,
+    };
     const observations = parseBudget(spec, headers, at, shape.resource);
     if (result.code === 0 && shape.cost === 0) {
       const headerResources = new Set(observations.map(row => row.resource));

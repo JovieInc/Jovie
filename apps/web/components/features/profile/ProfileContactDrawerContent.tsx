@@ -1,6 +1,12 @@
 'use client';
 
-import { Badge, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
+import {
+  Badge,
+  PlainButton,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@jovie/ui';
 import { ChannelIcon } from '@/features/profile/artist-contacts-button/ContactIcons';
 import { formatPublicContactChannelAriaLabel } from '@/features/profile/artist-contacts-button/contact-channel-label';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
@@ -35,13 +41,13 @@ function TerritoryPills({
       <Badge size='sm'>{primaryTerritory}</Badge>
       <Popover>
         <PopoverTrigger asChild>
-          <button
+          <PlainButton
             type='button'
             className='inline-flex h-6 items-center rounded-full border border-on-media/[0.08] bg-on-media/[0.04] px-2 text-2xs font-semibold text-on-media/58 transition-colors duration-subtle hover:bg-on-media/[0.08] hover:text-on-media/82 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
             aria-label={`+${territories.length - 1} more territories for ${contact.roleLabel}`}
           >
             +{territories.length - 1}
-          </button>
+          </PlainButton>
         </PopoverTrigger>
         <PopoverContent
           size='bare'

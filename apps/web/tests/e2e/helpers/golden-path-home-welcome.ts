@@ -1,12 +1,23 @@
 import { type BoundingBox, expect, type Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 
-/** Open Home and capture the greeting and composer box once both have mounted. */
-export async function openHomeWelcome(page: Page) {
+/**
+ * Open Home and capture the greeting and composer box once both have mounted.
+ *
+ * `greetsName`, when given, is the name the signed-in identity must be greeted
+ * by. The greeting is captured only once it names them: under E2E the chat
+ * page renders a stand-in profile ("E2E Chat Smoke") while the dashboard data
+ * has no profile yet, and freezing that stand-in as the "initial" greeting
+ * made the later swap to the real artist read as the welcome moving (Golden
+ * Path run 45436250396: "Good afternoon, UNMARKED." vs the captured stand-in).
+ * The no-move assertions downstream keep their full strength from that point.
+ */
+export async function openHomeWelcome(page: Page, greetsName?: string) {
   // Slow images must not hold the welcome; read it as soon as the DOM is in.
   await page.goto(APP_ROUTES.CHAT, { waitUntil: 'domcontentloaded' });
   const heading = page.getByTestId('chat-empty-state-greeting-text');
   await expect(heading).toBeVisible();
+  if (greetsName) await expect(heading).toContainText(greetsName);
   const initialGreeting = await heading.textContent();
   // The composer is a client-shell surface: the greeting is server-rendered,
   // but the composer mounts on hydration, which can land after this read on a

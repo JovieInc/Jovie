@@ -59,6 +59,28 @@ export const EmptyReply: Story = {
   },
 };
 
+/**
+ * Partial: Story First flat surface — answer without card chrome while the
+ * board melts. Optional `surface` + `children` make this a reachable state.
+ */
+export const PartialFlatSurface: Story = {
+  args: {
+    surface: 'flat',
+    prompt: 'Why is checkout blocking revenue?',
+    reply:
+      'Entitlement after payment is uncertified — the same words Summer will say in chat.',
+    position: 1,
+    total: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId('home-loop-answer')).toHaveAttribute(
+      'data-surface',
+      'flat'
+    );
+  },
+};
+
 /** Long content: a long prompt truncates and a long reply clamps to four lines. */
 export const LongContentReply: Story = {
   args: {

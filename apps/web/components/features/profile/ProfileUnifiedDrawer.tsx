@@ -86,6 +86,8 @@ interface ProfileUnifiedDrawerProps {
   readonly hasReleases: boolean;
   readonly releases?: readonly PublicRelease[];
   readonly presentation?: ProfileSurfacePresentation;
+  /** Desktop: anchor a compact popover to this element instead of a sheet. */
+  readonly anchorRef?: React.RefObject<HTMLElement | null>;
   readonly onOpenReleaseCredits?: () => void;
 }
 
@@ -242,6 +244,7 @@ export function ProfileUnifiedDrawer({
   releases = [],
   onOpenReleaseCredits,
   presentation = 'standalone',
+  anchorRef,
 }: ProfileUnifiedDrawerProps) {
   const visibleReleases = useMemo(
     () => releases.filter(r => Boolean(r.slug)),
@@ -322,15 +325,10 @@ export function ProfileUnifiedDrawer({
     visibleReleases.length,
   ]);
 
-  // Intentionally do NOT mutate `view` when capability flips false.
-  // `resolveRenderedView` already returns 'menu' for that case (line 124),
-  // and `resolveViewMeta` falls back to the menu title (line 104). Mutating
-  // here causes the drawer to flicker whenever the releases query refetches
-  // and transiently returns empty data — the effect would snap view back to
-  // 'menu', the data would resolve, and the user would see a blink as the
-  // drawer re-rendered releases content. The view stays as 'releases' in
-  // parent state; rendering is the source of truth for what the user sees.
-  // See JOV-2150.
+  // Intentionally do NOT mutate `view` when capability flips false: rendering
+  // already falls back to 'menu' via `resolveRenderedView`/`resolveViewMeta`,
+  // and snapping parent state back would blink the drawer whenever the
+  // releases query transiently returns empty data. See JOV-2150.
 
   const venmoLink =
     socialLinks.find(link => link.platform === 'venmo')?.url ?? null;
@@ -371,6 +369,7 @@ export function ProfileUnifiedDrawer({
       floating={isDirectShare}
       dataTestId='profile-menu-drawer'
       presentation={presentation}
+      anchorRef={anchorRef}
       centerTitle={renderedView === 'pay'}
     >
       <AnimatePresence mode='wait' initial={false}>
@@ -520,15 +519,13 @@ export function ProfileUnifiedDrawer({
           {renderedView === 'pay' && (
             <div data-testid='profile-mode-drawer-pay'>
               {hasValidVenmoLink ? (
-                <>
-                  <PayView
-                    profileId={artist.id}
-                    artistHandle={artist.handle}
-                    venmoLink={venmoLink ?? ''}
-                    venmoUsername={venmoUsername}
-                    amounts={PAY_AMOUNTS}
-                  />
-                </>
+                <PayView
+                  profileId={artist.id}
+                  artistHandle={artist.handle}
+                  venmoLink={venmoLink ?? ''}
+                  venmoUsername={venmoUsername}
+                  amounts={PAY_AMOUNTS}
+                />
               ) : (
                 <div className='rounded-(--profile-drawer-radius-mobile) border border-subtle bg-[color:var(--color-interactive-hover)] px-4 py-5 text-center'>
                   <p className='text-sm font-semibold text-primary-token'>

@@ -1,9 +1,11 @@
 import {
+  lstat,
   mkdir,
   mkdtemp,
   readdir,
   readFile,
   rm,
+  symlink,
   writeFile,
 } from 'node:fs/promises';
 import os from 'node:os';
@@ -85,5 +87,26 @@ describe('replaceWithAtomicSibling', () => {
 
     await expect(readdir(root)).resolves.toEqual(['catalog.png']);
     await expect(readdir(target)).resolves.toEqual([]);
+  });
+
+  it('replaces a symlinked target with a regular file even when the content is unchanged', async () => {
+    const root = await makeFixture();
+    const shared = path.join(root, 'playlist-fallback.png');
+    const target = path.join(root, 'tour-nearby.png');
+    await writeFile(shared, 'same');
+    await symlink('playlist-fallback.png', target);
+
+    await expect(
+      replaceWithAtomicSibling(target, async temporaryPath => {
+        await writeFile(temporaryPath, 'same');
+        return false;
+      })
+    ).resolves.toBe(true);
+
+    const stats = await lstat(target);
+    expect(stats.isSymbolicLink()).toBe(false);
+    expect(stats.isFile()).toBe(true);
+    await expect(readFile(target, 'utf8')).resolves.toBe('same');
+    await expect(readFile(shared, 'utf8')).resolves.toBe('same');
   });
 });

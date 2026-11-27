@@ -33,7 +33,6 @@
       "candidates": [
         "deepseek/deepseek-v4.1-flash",
         "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
-        "@cf/zai-org/glm-5.3-flash",
         "claude-haiku-5-5",
         "claude-sonnet-5-5",
         "claude-opus-5-5",

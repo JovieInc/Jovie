@@ -9,7 +9,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Idle-loads MarketingScrollUnlock and ScrollRevealInit — both behavior-only (scroll listeners), so this renders no visible DOM once mounted.',
+          'Idle-loads MarketingScrollUnlock. Scroll reveals are CSS-only (view timelines); this mounts no reveal observer.',
       },
     },
   },

@@ -22,14 +22,11 @@ import { withSerializableRetry } from '@/lib/db/serializable-retry';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { hashEmail } from '@/lib/notifications/suppression';
 import { logger } from '@/lib/utils/logger';
+import { readFreshAdmissionEvidenceHold } from '@/lib/waitlist/admission-evidence.server';
 import {
   approveWaitlistEntryInTx,
   finalizeWaitlistApproval,
 } from '@/lib/waitlist/approval';
-import {
-  countOpenCohortLearnings,
-  MAX_OPEN_COHORT_LEARNINGS,
-} from '@/lib/waitlist/cohort-learnings';
 import { enqueueWaitlistApprovalInviteEmail } from '@/lib/waitlist/email-jobs';
 import {
   getWaitlistSettings,
@@ -147,7 +144,9 @@ export async function runWaitlistAutoAccept(
     };
   }
 
-  if (!(await isGoldenPathReady())) {
+  // Readiness and cohort learnings before any scan. Unreadable evidence holds.
+  const evidenceHold = await readFreshAdmissionEvidenceHold();
+  if (evidenceHold) {
     return {
       enabled: settings.autoAcceptEnabled,
       scanned: 0,
@@ -155,23 +154,7 @@ export async function runWaitlistAutoAccept(
       skipped: 0,
       failed: 0,
       capacityRemaining,
-      pausedReason: 'golden_path_not_green',
-    };
-  }
-
-  // Resolve the current cohort's learnings before admitting the next one.
-  // Unknown counts fail closed.
-  const openLearnings = await countOpenCohortLearnings();
-  if (openLearnings === null || openLearnings >= MAX_OPEN_COHORT_LEARNINGS) {
-    return {
-      enabled: settings.autoAcceptEnabled,
-      scanned: 0,
-      approved: 0,
-      skipped: 0,
-      failed: 0,
-      capacityRemaining,
-      pausedReason:
-        openLearnings === null ? 'learnings_unavailable' : 'open_learnings',
+      pausedReason: evidenceHold,
     };
   }
 
@@ -226,11 +209,27 @@ export async function runWaitlistAutoAccept(
     }
 
     try {
+      let attempt = 0;
       const approval = await withSerializableRetry(async () => {
+        attempt += 1;
         // Evidence can expire during a drain or serialization backoff. Re-read
-        // on every attempt, before acquiring the database transaction.
-        if (!(await isGoldenPathReady())) {
-          return { outcome: 'readiness_held' as const };
+        // readiness on every attempt, and cohort learnings again after a
+        // conflict, before acquiring the database transaction.
+        let attemptHold: Awaited<
+          ReturnType<typeof readFreshAdmissionEvidenceHold>
+        > = null;
+        if (attempt === 1) {
+          if (!(await isGoldenPathReady())) {
+            attemptHold = 'golden_path_not_green';
+          }
+        } else {
+          attemptHold = await readFreshAdmissionEvidenceHold();
+        }
+        if (attemptHold) {
+          return {
+            outcome: 'evidence_held' as const,
+            pausedReason: attemptHold,
+          };
         }
         return withSystemIngestionSession(
           async tx => {
@@ -296,8 +295,8 @@ export async function runWaitlistAutoAccept(
         );
       });
 
-      if (approval.outcome === 'readiness_held') {
-        pausedReason = 'golden_path_not_green';
+      if (approval.outcome === 'evidence_held') {
+        pausedReason = approval.pausedReason;
         break;
       }
       if (approval.outcome === 'capacity_full') {

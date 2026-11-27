@@ -1,5 +1,5 @@
 'use client';
-import { Button } from '@jovie/ui';
+import { Button, IconButton } from '@jovie/ui';
 import { Plus } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -17,7 +17,6 @@ import {
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { toast } from '@/components/feedback';
 import {
   DrawerTabbedCard,
@@ -259,16 +258,18 @@ function getConflictVersion(error: unknown): number | undefined {
  * Live badge, a More dropdown (open / copy / UTM builder), live view/click stats
  * + copy URL, and an Edit profile button that flips the rail into edit mode.
  */
-export function ProfileContactSidebar() {
+export function ProfileContactSidebar({
+  contextOccupied = false,
+}: {
+  readonly contextOccupied?: boolean;
+} = {}) {
   const { isOpen, isFloating, close } = usePreviewPanelState();
-  // Props shared by every rail state. A hover/focus preview floats over the
-  // route (placement outlives visibility, so its exit stays an overlay too);
-  // an open or pinned rail pushes it, and pinning makes the route yield in step.
+  // Only an unoccupied passive preview floats; an occupied slot stays in flow.
   const railProps = {
     id: 'shell-artist-profile-rail',
     onClose: close,
     isOpen,
-    presentation: isFloating ? 'overlay' : 'push',
+    presentation: isFloating && !contextOccupied ? 'overlay' : 'push',
     workspaceSurface: 'raised',
     headerMode: 'minimal',
     hideMinimalHeaderBar: true,
@@ -1296,14 +1297,16 @@ export function ProfileContactSidebar() {
             ariaLabel='Profile sidebar view'
             actions={
               supportsAddAction ? (
-                <AppIconButton
+                <IconButton
+                  size='sm'
+                  variant='control'
                   type='button'
                   onClick={() => handleAddLink(resolvedCategory)}
-                  className='h-7 w-7 rounded-full border-0 bg-transparent text-tertiary-token shadow-none hover:bg-surface-0 hover:text-primary-token'
+                  className='rounded-full border-0 bg-transparent text-tertiary-token shadow-none hover:bg-surface-0 hover:text-primary-token'
                   ariaLabel={`Add ${PROFILE_TAB_OPTIONS_BASE.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
                 >
                   <Plus className='h-3.5 w-3.5' />
-                </AppIconButton>
+                </IconButton>
               ) : undefined
             }
             actionsClassName='h-7 w-7'

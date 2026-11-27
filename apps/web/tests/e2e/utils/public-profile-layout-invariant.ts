@@ -7,6 +7,7 @@ type PublicProfileLayoutViolationCode =
   | 'claim_cta_overflow'
   | 'claim_cta_wrap'
   | 'desktop_bottom_nav'
+  | 'desktop_card_clipped_at_fold'
   | 'desktop_card_outside_column'
   | 'desktop_column_gutter'
   | 'desktop_column_overlap'
@@ -327,6 +328,37 @@ export async function auditPublicProfileLayout(page: Page) {
           code: 'banner_reserved_geometry',
           detail: `banner=${bannerHeight} top reservation=${surfaceBox.top - shellBox.top} bottom gap=${shellBox.bottom - surfaceBox.bottom}`,
         });
+      }
+      const scrollPane = visible(
+        '[data-testid="profile-desktop-content-scroll"]'
+      )[0];
+      const homeOverview = visible(
+        '[data-testid="profile-desktop-home-overview"]'
+      )[0];
+      // At standard desktop heights (--profile-desktop-min-height: 720px ->
+      // un-bannered surface >= 660px), home overview cards must fit above the
+      // scrollport fold; shorter viewports (e.g. 1920x600) scroll vertically.
+      if (
+        surfaceBox.height >= 660 &&
+        scrollPane &&
+        homeOverview &&
+        scrollPane.scrollTop <= 1
+      ) {
+        const scrollBox = scrollPane.getBoundingClientRect();
+        const overviewCards = visible(
+          '[data-testid="profile-desktop-secondary-grid"] > section, [data-testid="profile-desktop-side-rail"] > section'
+        );
+        for (const card of overviewCards) {
+          const cardBox = card.getBoundingClientRect();
+          const heading =
+            card.querySelector('h2')?.textContent?.trim() ?? 'card';
+          if (cardBox.bottom > scrollBox.bottom + 1) {
+            violations.push({
+              code: 'desktop_card_clipped_at_fold',
+              detail: `${heading} bottom (${cardBox.bottom.toFixed(1)}px) clips past desktop scrollport bottom (${scrollBox.bottom.toFixed(1)}px)`,
+            });
+          }
+        }
       }
     }
 

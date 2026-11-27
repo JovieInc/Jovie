@@ -1,3 +1,5 @@
+import { ABOUT_COPY, ABOUT_FACTS } from '@/data/aboutCopy';
+import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS } from './utils/smoke-test-utils';
 
@@ -27,6 +29,44 @@ test.describe('marketing document titles', () => {
     await page.route('**/api/track', route =>
       route.fulfill({ status: 200, body: '{}' })
     );
+  });
+
+  test('links to the About page for the same Jovie organization', async ({
+    page,
+  }) => {
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page).toHaveTitle(HOMEPAGE_EDITORIAL_COPY.seo.title);
+    const organizations = () =>
+      page
+        .locator('script[type="application/ld+json"]')
+        .evaluateAll(scripts =>
+          scripts
+            .map(script => JSON.parse(script.textContent ?? '{}'))
+            .filter(node => node['@type'] === 'Organization')
+        );
+
+    const [publisher] = await organizations();
+    expect(publisher).toMatchObject({
+      '@id': expect.any(String),
+      name: 'Jovie',
+      sameAs: ABOUT_FACTS.organizationSameAs,
+    });
+
+    const aboutLink = page.getByRole('contentinfo').getByRole('link', {
+      name: 'About',
+      exact: true,
+    });
+    await expect(aboutLink).toBeVisible();
+    await aboutLink.focus();
+    await aboutLink.press('Enter');
+    await expect(page).toHaveURL(/\/about$/);
+    await expect(page).toHaveTitle(ABOUT_COPY.metadataTitle);
+    await expect.poll(organizations).toEqual([
+      expect.objectContaining({
+        '@id': publisher['@id'],
+        sameAs: publisher.sameAs,
+      }),
+    ]);
   });
 
   for (const route of ROUTES) {

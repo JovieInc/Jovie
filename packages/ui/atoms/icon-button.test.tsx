@@ -1,3 +1,4 @@
+// Drift T2.1: IconButton alias retirement — fade prop coverage.
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -209,7 +210,7 @@ describe('IconButton', () => {
       });
       expect(button).toHaveClass('focus-visible:ring-focus');
       expect(button).not.toHaveClass('focus-visible:ring-focus/55');
-      expect(button.className).toContain('motion-reduce:transition-none');
+      expect(button).toHaveClass('press');
       expect(button.className).not.toContain('focus-visible:ring-ring');
       expect(button.className).not.toContain('focus-visible:ring-focus/16');
       unmount();
@@ -269,12 +270,12 @@ describe('IconButton', () => {
     );
     const button = screen.getByRole('button');
 
-    expect(button.className).toContain('duration-subtle');
-    expect(button.className).toContain('ease-subtle');
+    expect(button).toHaveClass('press');
+    expect(button.className).not.toContain('duration-subtle');
     expect(button.className).not.toContain('ease-out');
   });
 
-  it('uses named frosted background utilities', () => {
+  it('projects frosted through Button glass variants', () => {
     render(
       <IconButton ariaLabel='Frosted action' variant='frosted'>
         <svg aria-hidden='true' />
@@ -282,8 +283,10 @@ describe('IconButton', () => {
     );
 
     const button = screen.getByRole('button', { name: 'Frosted action' });
+    expect(button).toHaveAttribute('data-variant', 'frosted');
     expect(button.className).toContain('bg-icon-button-frosted');
     expect(button.className).toContain('hover:bg-icon-button-frosted-hover');
+    expect(button.className).toContain('backdrop-blur-sm');
     expect(button.className).not.toMatch(/bg-\[/);
   });
 
@@ -418,5 +421,49 @@ describe('IconButton accessible name', () => {
     expect(
       screen.getByRole('button', { name: 'Close panel' })
     ).toBeInTheDocument();
+  });
+
+  it('applies contract fade modifiers via the fade prop', () => {
+    const { rerender } = render(
+      <IconButton ariaLabel='Fade parent' fade='parent'>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+    expect(
+      screen.getByRole('button', { name: 'Fade parent' }).className
+    ).toContain('opacity-0');
+
+    rerender(
+      <IconButton ariaLabel='Fade visible' fade='visible'>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+    expect(
+      screen.getByRole('button', { name: 'Fade visible' }).className
+    ).toContain('opacity-60');
+  });
+});
+
+describe('IconButton press', () => {
+  it('presses on every variant and skips static', () => {
+    for (const variant of ['quiet', 'surface', 'control', 'inline'] as const) {
+      const { unmount } = render(
+        <IconButton ariaLabel={`${variant} press`} variant={variant}>
+          <svg aria-hidden='true' />
+        </IconButton>
+      );
+      expect(
+        screen.getByRole('button', { name: `${variant} press` })
+      ).toHaveClass('press');
+      unmount();
+    }
+    render(
+      <IconButton ariaLabel='static press' static>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+    expect(
+      screen.getByRole('button', { name: 'static press' })
+    ).toHaveAttribute('data-static', 'true');
   });
 });

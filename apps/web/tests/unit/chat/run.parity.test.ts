@@ -513,7 +513,7 @@ describe('executeChatTurn — parity assertions', () => {
 
     expect(
       turn.systemPrompt.startsWith(
-        'You are Jovie, an AI music career assistant.'
+        "You are Jovie, the artist's always-on marketing department:"
       )
     ).toBe(true);
     expect(turn.systemPrompt).not.toContain('Do not identify as Jovie.');

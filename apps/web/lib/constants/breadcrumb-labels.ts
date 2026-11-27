@@ -8,8 +8,8 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   // Dashboard routes
   dashboard: 'Dashboard',
   profile: 'Profile',
-  profiles: 'Profiles',
-  presence: 'Profiles',
+  profiles: 'Identity',
+  presence: 'Identity',
   contacts: 'Contacts',
   library: 'Work',
   releases: 'Releases',
@@ -44,9 +44,9 @@ export const BREADCRUMB_LABELS: Record<string, string> = {
   feedback: 'Feedback',
   'visibility-audit': 'Visibility Audit',
 
-  // Root routes. `/app` is the Inbox: the header bell is its only shell
-  // entry and is named Inbox, so header, tab title and bell agree.
-  app: 'Inbox',
+  // Root routes. `/app` is Home: the header bell is its shell entry when the
+  // rail drops the Home row, so header, tab title and bell agree (T0.2).
+  app: 'Home',
 } as const;
 
 /**

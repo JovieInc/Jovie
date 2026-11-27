@@ -108,13 +108,32 @@ describe('ProductClaimHandleForm server draft retention', () => {
     }
   );
 
-  it('retains invalid early text and prevents a wrong-handle handoff', async () => {
-    const { input, container } = await hydrateDraft('not valid');
-    expect(input).toHaveValue('not valid');
+  it('routes a display-name prior to Spotify search without handle=', async () => {
+    const { input, container } = await hydrateDraft('Taylor Swift');
+    expect(input).toHaveValue('taylor swift');
+    expect(input).not.toHaveAttribute('aria-invalid');
+    expect(
+      within(container).getByTestId('homepage-handle-status')
+    ).toHaveTextContent('look that name up on Spotify');
+    expect(
+      within(container).getByRole('button', { name: 'Claim' })
+    ).not.toBeDisabled();
+    fireEvent.click(within(container).getByRole('button', { name: 'Claim' }));
+    const target = new URL(push.mock.calls[0][0], 'https://jov.ie');
+    expect(target.pathname).toBe('/start');
+    expect(target.searchParams.get('handle')).toBeNull();
+    expect(target.searchParams.get('starter_prompt')).toBe(
+      'I want to claim my profile. Find taylor swift on Spotify.'
+    );
+  });
+
+  it('retains a too-short draft and prevents a wrong-handle handoff', async () => {
+    const { input, container } = await hydrateDraft('ab');
+    expect(input).toHaveValue('ab');
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(
       within(container).getByTestId('homepage-handle-status')
-    ).toHaveTextContent('Handle can only contain');
+    ).toHaveTextContent('Handle must be at least 3 characters');
     fireEvent.submit(within(container).getByTestId('homepage-claim-form'));
     expect(push).not.toHaveBeenCalled();
     expect(input).toHaveFocus();

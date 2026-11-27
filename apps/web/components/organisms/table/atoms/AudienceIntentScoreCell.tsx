@@ -24,15 +24,12 @@ export function AudienceIntentScoreCell({
 
   if (intentLevel === 'high') {
     icon = (
-      <Flame
-        className='h-3.5 w-3.5 shrink-0 text-emerald-500'
-        aria-hidden='true'
-      />
+      <Flame className='h-3.5 w-3.5 shrink-0 text-success' aria-hidden='true' />
     );
   } else if (intentLevel === 'medium') {
     icon = (
       <TrendingUp
-        className='h-3.5 w-3.5 shrink-0 text-amber-400'
+        className='h-3.5 w-3.5 shrink-0 text-warning'
         aria-hidden='true'
       />
     );

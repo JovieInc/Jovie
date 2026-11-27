@@ -1,12 +1,12 @@
 {
   "schema": "jovie.summer-commissioning.registry/v1",
   "companyServiceId": "company.summer",
-  "registryVersion": "2026-09-18.1",
+  "registryVersion": "2026-11-23.1",
   "certificationContract": "jovie.certification/v1",
   "issue": "JOV-5853",
   "intendedEnvironment": "production-like",
   "trustedAttestationKeyFingerprints": [],
-  "auditedAt": "2026-09-02T04:32:56Z",
+  "auditedAt": "2026-11-23T22:00:00Z",
   "sourceSnapshot": {
     "repository": "JovieInc/Jovie",
     "ref": "codex/jov-5853-product-quality-governor-registry",
@@ -848,6 +848,109 @@
             "kind": "file_contains",
             "path": "apps/web/tests/journey-auditor/README.md",
             "value": "production bug \u2192 scout reproduction \u2192 product promise \u2192 deterministic test \u2192 fix"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUMMER-COMM-017",
+      "capability": "Tech-debt closed loop",
+      "canonicalPath": [
+        "Discover/quantify via gem:waste-loop + ops/registry/waste.json tech-debt class \u2192 factory_intake \u2192 Linear factory-fp \u2192 ds-cert-loop / governed remediators \u2192 shrink-only guard \u2192 waste wins / receipt-trust",
+        "canon/automation-registry.jsonl#gem:waste-loop",
+        "ops/registry/waste.json",
+        "scripts/lanes/factory_intake.py",
+        "scripts/ds-cert-loop.mjs",
+        "scripts/summer-commissioning/receipt-trust.mjs",
+        "scripts/certification-inventory/inventory.json#capability:tech-debt-closed-loop"
+      ],
+      "implementationState": "in_flight",
+      "status": "blocked",
+      "critical": true,
+      "evidence": [
+        {
+          "kind": "source",
+          "ref": "canon/automation-registry.jsonl#gem:waste-loop",
+          "summary": "gem:waste-loop purpose names Summer as owner of the tech-debt waste class observe/prioritize path via waste-latest.json; no separate debt workflow."
+        },
+        {
+          "kind": "source",
+          "ref": "ops/registry/waste.json#tech-debt",
+          "summary": "tech-debt class owner is summer; wins and digest feed the Summer store through the existing waste loop."
+        },
+        {
+          "kind": "source",
+          "ref": "scripts/lanes/factory_intake.py",
+          "summary": "Open work dedupes on factory-fp:<fingerprint>; re-signal yields action exists, not a second issue."
+        },
+        {
+          "kind": "source",
+          "ref": "scripts/lib/component-cert-screens.mjs",
+          "summary": "cert-screens.debt is shrink-only except screen enroll / new criterion \u2014 first autonomous debt class guard."
+        },
+        {
+          "kind": "in_flight",
+          "ref": "JOV-14715",
+          "summary": "First E2E cert-screens.debt slice (SwipeToReveal) proves repair + factory-fp recovery; independent cert still needs live production-like receipts for digest freshness and certified outcome."
+        },
+        {
+          "kind": "gap",
+          "ref": "JOV-5853",
+          "summary": "No production-like attested probe receipt yet for waste digest freshness + autonomous remediated debt class + factory-fp recovery together."
+        }
+      ],
+      "lastVerified": null,
+      "invalidationCondition": "Waste tech-debt ownership, gem:waste-loop purpose, factory-fp dedupe semantics, cert-screens shrink-only gate, receipt-trust schema, or certification-inventory object for this capability changes.",
+      "ownerRemediation": {
+        "owner": "Summer tech-debt closed loop",
+        "refs": ["JOV-14725", "JOV-5853"]
+      },
+      "probe": {
+        "id": "summer.debt.closed-loop",
+        "version": "1.0.0",
+        "fixture": "tech-debt-closed-loop-live-receipts/v1",
+        "expectedState": "waste_digest_fresh_and_autonomous_debt_class_remediated_with_factory_fp_dedupe",
+        "requiresRuntimeReceipt": true,
+        "sourceAssertions": [
+          {
+            "kind": "file_contains",
+            "path": "canon/automation-registry.jsonl",
+            "value": "Summer owns the tech-debt waste class"
+          },
+          {
+            "kind": "file_contains",
+            "path": "ops/registry/waste.json",
+            "value": "\"id\": \"tech-debt\""
+          },
+          {
+            "kind": "file_contains",
+            "path": "ops/registry/waste.json",
+            "value": "\"owner\": \"summer\""
+          },
+          {
+            "kind": "file_contains",
+            "path": "scripts/lanes/factory_intake.py",
+            "value": "factory-fp:"
+          },
+          {
+            "kind": "file_contains",
+            "path": "scripts/lanes/factory_intake.py",
+            "value": "\"action\": \"exists\""
+          },
+          {
+            "kind": "file_contains",
+            "path": "scripts/lib/component-cert-screens.mjs",
+            "value": "debt only shrinks"
+          },
+          {
+            "kind": "file_contains",
+            "path": "scripts/summer-commissioning/receipt-trust.mjs",
+            "value": "jovie.summer-commissioning.probe-receipt/v1"
+          },
+          {
+            "kind": "file_contains",
+            "path": "scripts/certification-inventory/inventory.json",
+            "value": "capability:tech-debt-closed-loop"
           }
         ]
       }

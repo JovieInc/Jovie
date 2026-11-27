@@ -47,6 +47,7 @@ export const NON_REFERENCE_SOURCES = new Set<string>([
   'apps/web/app/app/(shell)/dashboard/tasks/page.tsx',
   'apps/web/app/app/(shell)/dashboard/tipping/page.tsx',
   'apps/web/app/app/(shell)/dashboard/tour-dates/page.tsx',
+  'apps/web/app/app/(shell)/dashboards/page.tsx',
   'apps/web/app/app/(shell)/feature-flags/page.tsx',
   'apps/web/app/app/(shell)/profiles/page.tsx',
   'apps/web/app/app/(shell)/profile/page.tsx',

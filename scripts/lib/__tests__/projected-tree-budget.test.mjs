@@ -10,6 +10,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import {
+  collectLfsBlobs,
+  collectSnapshotBudget,
+  parseLfsPointer,
+  plainLfsBlobErrors,
+} from '../lfs-blobs.mjs';
 import { parseTrackedRegularTree } from '../merge-group-member-policy.mjs';
 import {
   enforceProjectedTreeBudget,
@@ -242,17 +248,17 @@ process.exit(17);
     );
   });
 
-  it('stays quiet at or below the 90% plan line', () => {
-    expect(trackedBytesBudgetPlanWarning(90, 100)).toBeNull();
-    expect(trackedBytesBudgetWarnings(90, 100)).toEqual([]);
+  it('stays quiet at or below the 80% plan line', () => {
+    expect(trackedBytesBudgetPlanWarning(80, 100)).toBeNull();
+    expect(trackedBytesBudgetWarnings(80, 100)).toEqual([]);
   });
 
-  it('plans the next prune in the 90-95% band without failing', () => {
-    expect(trackedBytesBudgetWarning(93, 100)).toBeNull();
-    const plan = trackedBytesBudgetPlanWarning(93, 100);
-    expect(plan).toMatch(/93\.00% .*headroom/);
-    expect(plan).toMatch(/90% plan line/);
-    expect(trackedBytesBudgetWarnings(93, 100)).toEqual([plan]);
+  it('plans the next prune in the 80-95% band without failing', () => {
+    expect(trackedBytesBudgetWarning(81, 100)).toBeNull();
+    const plan = trackedBytesBudgetPlanWarning(81, 100);
+    expect(plan).toMatch(/81\.00% .*headroom/);
+    expect(plan).toMatch(/80% plan line \(under 20% headroom\)/);
+    expect(trackedBytesBudgetWarnings(81, 100)).toEqual([plan]);
   });
 
   it('keeps the shrink-now warning first and silent plan level above 95%', () => {
@@ -279,7 +285,7 @@ process.exit(17);
     });
     expect(result.bytes).toBe(bytes);
     expect(logs[0]).toMatch(
-      /^::warning::Projected combined tree: .*90% plan line/
+      /^::warning::Projected combined tree: .*80% plan line/
     );
     expect(logs.at(-1)).toMatch(/^Projected combined tree: PASS/);
   });
@@ -338,6 +344,7 @@ process.exit(17);
           GIT_AUTHOR_EMAIL: 't@example.com',
           GIT_COMMITTER_NAME: 't',
           GIT_COMMITTER_EMAIL: 't@example.com',
+          GIT_LFS_SKIP_SMUDGE: '1',
         },
       });
     try {
@@ -387,6 +394,100 @@ process.exit(17);
         { cwd: dir, encoding: 'utf8' }
       );
       expect(output).toContain('PASS — 1300 tracked regular-file bytes');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('Git LFS blobs in the tracked-bytes budget', () => {
+  const SNAPSHOTS = 'apps/web/tests/e2e/__snapshots__';
+  const pointer = size =>
+    `version https://git-lfs.github.com/spec/v1\noid sha256:${'a'.repeat(64)}\nsize ${size}\n`;
+
+  it('parses only well-formed pointers', () => {
+    expect(parseLfsPointer(pointer(9_000))).toEqual({
+      oid: 'a'.repeat(64),
+      objectBytes: 9_000,
+    });
+    expect(parseLfsPointer('\x89PNG not a pointer')).toBeNull();
+    expect(parseLfsPointer(`${pointer(1)}${'x'.repeat(1_024)}`)).toBeNull();
+  });
+
+  it('counts pointers at their blob size and rejects a plain blob', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'lfs-blobs-'));
+    // Blobs are written with --no-filters, so the test needs no git-lfs. A
+    // runner with git-lfs installed globally would still smudge the fake
+    // pointers on checkout, so the lfs filter is switched off here.
+    const noLfs = [
+      '-c',
+      'filter.lfs.process=',
+      '-c',
+      'filter.lfs.smudge=cat',
+      '-c',
+      'filter.lfs.clean=cat',
+      '-c',
+      'filter.lfs.required=false',
+    ];
+    const git = (args, input) =>
+      execFileSync('git', ['-C', dir, ...noLfs, ...args], {
+        encoding: 'utf8',
+        input,
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 't',
+          GIT_AUTHOR_EMAIL: 't@example.com',
+          GIT_COMMITTER_NAME: 't',
+          GIT_COMMITTER_EMAIL: 't@example.com',
+        },
+      });
+    const stage = (path, content) => {
+      const oid = git(
+        ['hash-object', '-w', '--no-filters', '--stdin'],
+        content
+      ).trim();
+      git(['update-index', '--add', '--cacheinfo', `100644,${oid},${path}`]);
+    };
+    try {
+      git(['init', '-q', '-b', 'main']);
+      writeFileSync(
+        join(dir, '.gitattributes'),
+        `${SNAPSHOTS}/**/*.png filter=lfs diff=lfs merge=lfs -text\n`
+      );
+      git(['add', '.gitattributes']);
+      const lfsPath = `${SNAPSHOTS}/home.spec.ts/home.png`;
+      const plainPath = `${SNAPSHOTS}/home.spec.ts/plain.png`;
+      stage(lfsPath, pointer(9_000));
+      stage(plainPath, 'p'.repeat(2_000));
+      stage('docs/other.png', 'o'.repeat(3_000));
+      const paths = ['.gitattributes', lfsPath, plainPath, 'docs/other.png'];
+
+      const staged = collectLfsBlobs({ paths, cwd: dir, staged: true });
+      expect([...staged.keys()].sort()).toEqual([lfsPath, plainPath]);
+      expect(staged.get(lfsPath)).toEqual({
+        blobBytes: pointer(9_000).length,
+        pointer: true,
+        objectBytes: 9_000,
+      });
+      expect(staged.get(plainPath)).toMatchObject({
+        blobBytes: 2_000,
+        pointer: false,
+      });
+      const errors = plainLfsBlobErrors(staged);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain(`git add --renormalize ${plainPath}`);
+
+      git(['commit', '-qm', 'baselines']);
+      expect(collectLfsBlobs({ paths, cwd: dir }).get(lfsPath)?.pointer).toBe(
+        true
+      );
+
+      // The snapshot budget keeps counting a baseline at its image size.
+      git(['checkout', '-q', '--', '.']);
+      expect(collectSnapshotBudget(dir, staged)).toEqual({
+        bytes: 11_000,
+        files: 2,
+      });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

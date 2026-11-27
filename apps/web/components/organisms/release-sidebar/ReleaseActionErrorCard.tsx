@@ -2,7 +2,7 @@
 
 import { AlertTriangle } from 'lucide-react';
 
-import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
+import { DrawerButton } from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
 
 type ReleaseActionErrorCardVariant = 'card' | 'inline';
@@ -29,9 +29,10 @@ export function ReleaseActionErrorCard({
   className,
 }: ReleaseActionErrorCardProps) {
   const isCard = variant === 'card';
+  // Error states are always flat: no card, fill, border or shadow.
   const shellClassName = isCard
-    ? 'space-y-2 rounded-3xl border border-destructive/20 bg-destructive/5 p-3'
-    : 'flex w-full items-start gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-2.5 py-2';
+    ? 'space-y-2 p-3'
+    : 'flex w-full items-start gap-2 px-2.5 py-2';
   const iconWrapperClassName = isCard
     ? 'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-destructive'
     : 'mt-0.25 flex h-3.5 w-3.5 shrink-0 items-center justify-center text-destructive';
@@ -54,37 +55,17 @@ export function ReleaseActionErrorCard({
         </div>
       </div>
       <div className='flex flex-wrap items-center gap-2'>
-        <DrawerButton
-          type='button'
-          onClick={onRetry}
-          className='h-7 px-2 text-2xs'
-        >
+        <DrawerButton type='button' onClick={onRetry}>
           {actionLabel}
         </DrawerButton>
         {onDismiss ? (
-          <DrawerButton
-            type='button'
-            onClick={onDismiss}
-            tone='ghost'
-            className='h-7 px-2 text-2xs'
-          >
+          <DrawerButton type='button' onClick={onDismiss} tone='ghost'>
             Dismiss
           </DrawerButton>
         ) : null}
       </div>
     </>
   );
-
-  if (isCard) {
-    return (
-      <DrawerSurfaceCard
-        className={cn(shellClassName, className)}
-        testId={testId}
-      >
-        {content}
-      </DrawerSurfaceCard>
-    );
-  }
 
   return (
     <div data-testid={testId} className={cn(shellClassName, className)}>

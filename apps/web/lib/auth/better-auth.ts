@@ -391,9 +391,10 @@ export const auth = betterAuth({
   session: {
     expiresIn: 604800, // 7 days
     updateAge: 86400, // roll expiry at most once per day
-    cookieCache: { enabled: true, maxAge: 300 },
+    cookieCache: { enabled: true, maxAge: 120 },
     // Postgres is the durable session store. The cookie cache covers repeat
-    // reads for five minutes. Redis is not a session replica.
+    // reads for two minutes. Privileged routes bypass it via session:'fresh'.
+    // Redis is not a session replica.
     storeSessionInDatabase: true,
   },
   verification: {

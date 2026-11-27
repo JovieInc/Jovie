@@ -17,6 +17,10 @@ vi.mock('@/components/organisms/table', () => ({
 
 // Mock @jovie/ui to avoid Radix rendering issues in jsdom
 vi.mock('@jovie/ui', () => ({
+  PlainButton: ({
+    type = 'button',
+    ...props
+  }: React.ComponentProps<'button'>) => <button type={type} {...props} />,
   Button: ({
     children,
     className,

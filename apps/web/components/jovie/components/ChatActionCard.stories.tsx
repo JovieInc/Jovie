@@ -60,3 +60,36 @@ export const BuildProfile: Story = {
   args: starterArgs('build-artist-profile'),
 };
 export const ReviewSignals: Story = { args: starterArgs('review-signals') };
+
+/** Partial: the card with a short body and no extra aria label. */
+export const PartialShortBody: Story = {
+  args: { title: 'Connect Spotify', body: 'Link your artist account.' },
+};
+
+/** Long content: a long title and body wrap inside the card. */
+export const LongContentWrapped: Story = {
+  args: {
+    title:
+      'Review the imported profile links that need confirmation before they go public',
+    body: 'Jovie found three profile links across streaming, social and ticketing services. Confirm each one so your public profile only shows accounts you own, and so fans always land on the right page.',
+    ariaLabel: 'three imported profile links',
+  },
+};
+
+/** Rtl: right-to-left copy mirrors the icon, copy and dismiss layout. */
+export const RtlCopy: Story = {
+  args: {
+    title: 'مراجعة الروابط المستوردة',
+    body: 'وجد Jovie ثلاثة روابط تحتاج إلى تأكيد قبل ظهورها للجمهور.',
+    actionLabel: 'مراجعة الروابط',
+  },
+  decorators: [
+    function RtlFrame(Story) {
+      return (
+        <div dir='rtl' className='w-full max-w-md'>
+          <Story />
+        </div>
+      );
+    },
+  ],
+};

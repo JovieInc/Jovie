@@ -22,6 +22,17 @@ export function renderProofBriefText(
     brief.hero.sentence,
   ];
 
+  // The certified sentence may describe a result without spelling out its
+  // formatted value. Keep that exact value available in the text companion.
+  if (brief.hero.value != null) {
+    const metric = [brief.hero.value, brief.hero.label]
+      .filter(Boolean)
+      .join(' ');
+    if (!brief.hero.sentence.toLowerCase().includes(metric.toLowerCase())) {
+      lines.push(metric);
+    }
+  }
+
   for (const point of brief.supportingPoints) {
     lines.push(`- ${point.value ? `${point.value} ` : ''}${point.label}`);
   }

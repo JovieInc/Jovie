@@ -14,7 +14,7 @@ import {
   buildProductionSignupEmail,
   isProductionSyntheticSignupEmail,
 } from '../utils/production-signup-canary';
-import { createFreshUser } from './e2e-helpers';
+import { createFreshUser, ensureServerAuthenticated } from './e2e-helpers';
 
 export interface OnboardingRobotUser {
   readonly authStrategy: 'clerk_sign_in_token' | 'clerk_testing_session';
@@ -246,7 +246,14 @@ export async function authenticateOnboardingRobotUser(
     });
   }
 
-  await waitForAuthenticatedHealth(page, user.clerkUserId);
+  if (
+    user.authStrategy === 'clerk_testing_session' &&
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1'
+  ) {
+    await ensureServerAuthenticated(page, user.clerkUserId);
+  } else {
+    await waitForAuthenticatedHealth(page, user.clerkUserId);
+  }
   await emitSyntheticOnboardingRobotEvent(
     page,
     ONBOARDING_FUNNEL_EVENTS.AUTH_COMPLETED

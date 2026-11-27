@@ -254,6 +254,18 @@ describe('scanTestFile', () => {
     ]);
   });
 
+  it('lets a timer callback assert when the file uses fake timers, but not a .then', () => {
+    const timer =
+      "it('a', () => { setTimeout(() => { expect(f()).toBe(1); }, 50); vi.advanceTimersByTime(50); });";
+    expect(rules(timer)).toEqual(['unawaited-expect']);
+    expect(rules(`vi.useFakeTimers();\n${timer}`)).toEqual([]);
+    expect(
+      rules(
+        "vi.useFakeTimers();\nit('a', () => { load().then(v => { expect(v).toBe(1); }); });"
+      )
+    ).toEqual(['unawaited-expect']);
+  });
+
   it('flags expect inside an un-awaited .then, not an awaited or returned one', () => {
     expect(
       rules("it('a', () => { load().then(v => { expect(v).toBe(1); }); });")

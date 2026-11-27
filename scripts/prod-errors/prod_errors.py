@@ -28,6 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from apiclient import LINEAR_API_URL, ApiClient, LinearClient, LinearGraphQLError, run_gh  # noqa: E402
 from apiclient.contract import provider_spec  # noqa: E402
+from claim_parking import escalate_or_park  # noqa: E402
 
 SCHEMA = "jovie-prod-errors/v1"
 OWNER = "Jovie Owner (798b223e)"
@@ -56,6 +57,9 @@ EVENT_THRESHOLD = int(os.environ.get("PROD_ERRORS_EVENT_THRESHOLD", "3"))
 # Only production counts. Preview/staging/dev errors are recorded as ignored with this reason, never silenced silently.
 ENVIRONMENT = os.environ.get("PROD_ERRORS_ENVIRONMENT", "production")
 CLAIM_S = int(os.environ.get("PROD_ERRORS_CLAIM_S", str(4 * 3600)))
+# Claim-expiry escalations before the claim parks (JOV-10504): re-arming forever spammed an
+# open linked issue every CLAIM_S; a parked claim binds a later fix PR again.
+MAX_CLAIM_ESCALATIONS = int(os.environ.get("PROD_ERRORS_MAX_CLAIM_ESCALATIONS", "3"))
 QUIET_S = 24 * 3600
 # A main run still in progress past this is a hang, even if nothing cancelled it.
 RUN_TIMEOUT_S = int(os.environ.get("PROD_ERRORS_RUN_TIMEOUT_S", str(2 * 3600)))
@@ -353,17 +357,26 @@ class Linear:
         d = self.gql("query($i:String!){issue(id:$i){state{type}}}", {"i": ident})
         return (d["issue"].get("state") or {}).get("type")
 
+    def comment_bodies(self, ident: str, limit: int = 30) -> list[str]:
+        """Newest-first comment bodies on a Linear issue (for terminal-notice idempotency)."""
+        d = self.gql("query($i:String!,$n:Int!){issue(id:$i){comments(first:$n){nodes{body}}}}",
+                     {"i": ident, "n": limit})
+        return [c.get("body") or "" for c in (d["issue"].get("comments") or {}).get("nodes") or []]
+
 
 def fetch_prs() -> list[dict]:
     """PR list a claim can bind to, deduped across two searches. 'Sentry in:body' alone excluded
     merged fix PRs whose body references the Linear identifier but never says 'Sentry' -- e.g.
     #21394 ('Refs JOV-8073') -- so those claims expired forever, re-firing claim-expired alerts
-    on Done issues every cycle (JOV-10213). Fetch the issue-reference convention too."""
+    on Done issues every cycle (JOV-10213). Fetch the issue-reference convention too.
+
+    Include closedAt so advance() can ignore closed-unmerged PRs: those must not unpark a
+    parked claim (false re-arm → duplicate 'Parking this claim' every CLAIM_S)."""
     prs: list[dict] = []
     seen: set[int] = set()
     for term in ("Sentry in:body", "JOV in:body"):
         for p in gh_json(["pr", "list", "-R", REPO, "--state", "all", "--search", term, "--limit", "100",
-                          "--json", "number,title,body,headRefName,mergedAt"]) or []:
+                          "--json", "number,title,body,headRefName,mergedAt,closedAt"]) or []:
             if p["number"] not in seen:
                 seen.add(p["number"])
                 prs.append(p)
@@ -490,6 +503,9 @@ def handle_issue(issue: dict, ledger: dict, sentry: Sentry, linear: Linear, merg
     entry.update(users=issue.get("userCount"), lastSeen=last_seen)
     if entry["status"] in ("closed", "deployed") and last_seen > (entry.get("closedAt") or entry.get("deployedAt") or at):
         entry.update(status="claimed", reopenedAt=at, claimExpiresAt=at + CLAIM_S, reopens=entry.get("reopens", 0) + 1)
+        # Genuine new event: allow a fresh terminal stand-down/park notice on this episode.
+        entry.pop("standDownNotifiedAt", None)
+        entry.pop("parkNotifiedAt", None)
         relink = False
         if entry.get("linear"):
             try:
@@ -509,51 +525,29 @@ def handle_issue(issue: dict, ledger: dict, sentry: Sentry, linear: Linear, merg
 
 
 def advance(ledger: dict, linear: Linear, sentry: Sentry, prs: list[dict], at: float, state: Path = STATE) -> int:
-    """claim expiry -> escalate; merged PR -> deployed; 24h quiet after deploy -> close (only closer).
-    Returns how many stale ledger links were hit this pass (deleted/invisible Linear ids are
-    relinked or logged, never fatal)."""
+    """claim expiry -> escalate (parked at the cap); merged PR -> deployed; 24h quiet after deploy
+    -> close (only closer). Returns how many stale ledger links were hit this pass (deleted/
+    invisible Linear ids are relinked or logged, never fatal)."""
     stale = 0
     for sid, e in ledger.items():
-        if e["status"] == "claimed" and e.get("linear"):
+        # 'parked' binds PRs like 'claimed' (a later open/merged PR unparks); only 'claimed'
+        # enters the claim-expiry branch, so parked entries never re-arm or re-alert.
+        if e["status"] in ("claimed", "parked") and e.get("linear"):
             pr = next((p for p in prs if e["linear"] in (p.get("title", "") + p.get("body", "") + p.get("headRefName", ""))
                        or f"sentry:{sid}" in p.get("body", "")), None)
             if pr and pr.get("mergedAt"):
                 e.update(status="deployed", deployedAt=parse_ts(pr["mergedAt"]), pr=pr["number"])
-            elif pr:
+            elif pr and not pr.get("closedAt"):
+                # OPEN fix PR only. Closed-unmerged PRs (mergedAt null, closedAt set) must not
+                # unpark: that re-armed parked claims and re-posted 'Parking this claim'.
+                if e["status"] == "parked":  # a later open PR unparks; the claim window re-arms
+                    e.update(status="claimed", claimExpiresAt=at + CLAIM_S)
+                    e.pop("parkNotifiedAt", None)  # a real open PR may park again with a fresh notice
                 e.update(pr=pr["number"], prOpenedAt=e.get("prOpenedAt") or at)
-            elif at > e["claimExpiresAt"] and not e.get("gate"):
-                try:
-                    linked_state = linear.state_type(e["linear"]) or ""
-                except LinearIssueMissing:
-                    linked_state = ""  # fall through: escalation's own refile handles a dead link
-                if linked_state in ("completed", "canceled"):
-                    # The linked issue was completed/canceled externally (e.g. closed with
-                    # receipts while this claim was live, and the merged fix PR sits outside
-                    # the PR fetch window). Respect it and stand the claim down: escalating
-                    # here re-files a duplicate claim-expired alert on a DONE issue every
-                    # cycle (JOV-10213).
-                    e.update(status="closed", closedAt=at)
-                    try:
-                        linear.comment(e["linear"], "prod-errors loop: the linked issue is already "
-                                       "completed/canceled -- standing the claim down, no further "
-                                       f"claim-expired alerts (Sentry {sid}).")
-                    except LinearIssueMissing:
-                        pass
-                    continue
-                e["claimExpiresAt"] = at + CLAIM_S
-                e["escalations"] = e.get("escalations", 0) + 1
-                try:
-                    linear.comment(e["linear"], "Claim expired with no PR. Escalated to Jovie Owner; re-arming claim.")
-                except LinearIssueMissing as exc:
-                    refile_missing(sid, e, linear, e.get("title") or "prod error",
-                                   f"Claim expired with no PR (Sentry {sid}); the previous Linear issue went away "
-                                   f"({exc}). The claim is re-armed on this fresh issue.",
-                                   [f"sentry:{sid}", "prod-error"] + (["golden-path"] if e.get("flow") else [])
-                                   + (["human-gate", "hold"] if e.get("gate") else ["agent-ready"]),
-                                   1 if e.get("flow") else 2, str(exc))
-                    stale += 1
-                alert("claim-expired", f"No PR for Sentry {sid} ({e['linear']}) within claim window.",
-                      e.get("flow") == "checkout", linear, state)
+            elif e["status"] == "claimed" and at > e["claimExpiresAt"] and not e.get("gate"):
+                # Pass the live module so claim_parking catches our LinearIssueMissing and
+                # reads our CLAIM_S/MAX when this file is exec'd as __main__ (Gem run.sh).
+                stale += escalate_or_park(sid, e, linear, at, state, pe=sys.modules[__name__])
         if e["status"] == "deployed" and at - e["deployedAt"] >= QUIET_S and e.get("lastSeen", 0) <= e["deployedAt"]:
             e.update(status="closed", closedAt=at)
             try:

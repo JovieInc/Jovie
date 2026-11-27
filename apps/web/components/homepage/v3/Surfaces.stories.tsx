@@ -41,6 +41,17 @@ export const CommandPalette: Story = {
 };
 
 /**
+ * JOV-13065 parity canary (Aeon finding 4): the keyboard-shortcut chip
+ * (`hv3-kbd`, esc/⌘K) plus its linked rows, isolated and deterministic so
+ * the visual-regression suite proves tool-vs-repo parity on the chip before
+ * more page variants are scaled. Additive to SYM-4 — never weakens it.
+ */
+export const ShortcutChipCanary: Story = {
+  name: 'Shortcut chip canary',
+  render: () => <CommandPaletteCard />,
+};
+
+/**
  * Long content: a long callout label. The motion layer shortens the leader
  * before the label crosses a frame guide; unplaced, it sits at rest.
  */

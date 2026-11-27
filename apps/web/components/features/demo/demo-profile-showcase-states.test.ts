@@ -29,10 +29,10 @@ describe('demo profile query-state admission', () => {
     ],
     [
       'events-empty',
-      'tour',
+      'menu',
       'none',
       'Events Empty',
-      'The empty Events tab should still offer alerts.',
+      'Empty Events stays hidden; Get Updates remains the entry.',
       undefined,
     ],
     [

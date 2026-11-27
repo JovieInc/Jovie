@@ -47,19 +47,45 @@ const analytics: DashboardAnalyticsResponse = {
   ],
 };
 
+type AnalyticsMode = 'data' | 'loading' | 'error' | 'offline';
+
+function seedAnalytics(
+  queryClient: QueryClient,
+  range: (typeof ANALYTICS_PAGE_RANGES)[number],
+  data: DashboardAnalyticsResponse,
+  mode: AnalyticsMode
+) {
+  const queryKey = queryKeys.dashboard.analytics(range);
+  if (mode === 'data') {
+    queryClient.setQueryData(queryKey, data);
+    return;
+  }
+  const queryFn = (): Promise<DashboardAnalyticsResponse> => {
+    if (mode === 'loading') return new Promise(() => {});
+    return Promise.reject(
+      mode === 'offline'
+        ? new TypeError('Failed to fetch')
+        : new Error('Analytics unavailable')
+    );
+  };
+  void queryClient.prefetchQuery({ queryKey, queryFn });
+}
+
 function AnalyticsStoryFrame({
   children,
   data,
+  mode,
 }: {
   readonly children: ReactNode;
   readonly data: DashboardAnalyticsResponse;
+  readonly mode: AnalyticsMode;
 }) {
   const [client] = useState(() => {
     const queryClient = new QueryClient({
       defaultOptions: { queries: { ...STABLE_CACHE, retry: false } },
     });
     for (const range of ANALYTICS_PAGE_RANGES) {
-      queryClient.setQueryData(queryKeys.dashboard.analytics(range), data);
+      seedAnalytics(queryClient, range, data, mode);
     }
     return queryClient;
   });
@@ -77,7 +103,10 @@ const meta = {
   },
   decorators: [
     (Story, context) => (
-      <AnalyticsStoryFrame data={context.parameters.analyticsData ?? analytics}>
+      <AnalyticsStoryFrame
+        data={context.parameters.analyticsData ?? analytics}
+        mode={context.parameters.analyticsMode ?? 'data'}
+      >
         <DashboardDataProvider value={dashboardData}>
           <div className='min-h-screen bg-surface-0 p-6 text-primary-token'>
             <Story />
@@ -116,5 +145,56 @@ export const Empty: Story = {
     await expect(
       within(canvasElement).getByText('No operating system data yet')
     ).toBeVisible();
+  },
+};
+
+export const LoadingMetrics: Story = {
+  parameters: { analyticsMode: 'loading' },
+};
+
+export const ErrorAnalyticsUnavailable: Story = {
+  parameters: { analyticsMode: 'error' },
+};
+
+export const OfflineAnalyticsUnreachable: Story = {
+  parameters: { analyticsMode: 'offline' },
+};
+
+export const PartialOnlyProfileViews: Story = {
+  parameters: {
+    analyticsData: {
+      profile_views: 40,
+    } satisfies Partial<DashboardAnalyticsResponse>,
+  },
+};
+
+export const LongContentNames: Story = {
+  parameters: {
+    analyticsData: {
+      ...analytics,
+      top_cities: [
+        {
+          city: 'Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch, Wales',
+          count: 9,
+        },
+      ],
+      top_referrers: [
+        {
+          referrer:
+            'a-very-long-referrer-hostname.example-subdomain.example-company.co.uk',
+          count: 8,
+        },
+      ],
+    } satisfies DashboardAnalyticsResponse,
+  },
+};
+
+export const RtlCityNames: Story = {
+  parameters: {
+    analyticsData: {
+      ...analytics,
+      top_cities: [{ city: 'القاهرة', count: 9 }],
+      top_countries: [{ country: 'EG', count: 9 }],
+    } satisfies DashboardAnalyticsResponse,
   },
 };

@@ -55,6 +55,7 @@ const SAVE_DEBOUNCE_MS = 900;
 interface ProfileUpdateData {
   displayName: string;
   username: string;
+  bio?: string;
   location: string;
   hometown: string;
   careerHighlights: string;
@@ -91,6 +92,7 @@ export function useSettingsProfile({
   const [formData, setFormData] = useState<ProfileFormData>({
     username: identityFields.username,
     displayName: identityFields.displayName,
+    bio: artist.tagline ?? '',
     location: identityFields.location,
     hometown: identityFields.hometown,
     careerHighlights: identityFields.careerHighlights,
@@ -105,6 +107,7 @@ export function useSettingsProfile({
   const lastProfileSavedRef = useRef<ProfileUpdateData | null>({
     displayName: identityFields.displayName,
     username: identityFields.username,
+    bio: artist.tagline?.trim() ?? '',
     location: identityFields.location,
     hometown: identityFields.hometown,
     careerHighlights: identityFields.careerHighlights,
@@ -150,6 +153,7 @@ export function useSettingsProfile({
     saveFn: async (data, meta: AutoSaveAttemptMeta) => {
       const displayName = data.displayName?.trim() ?? '';
       const username = data.username?.trim() ?? '';
+      const bio = data.bio?.trim();
       const location = normalizePlace(data.location);
       const hometown = normalizePlace(data.hometown);
       const careerHighlights = data.careerHighlights?.trim() ?? '';
@@ -176,6 +180,7 @@ export function useSettingsProfile({
       if (
         lastSaved?.displayName === displayName &&
         lastSaved?.username === username &&
+        (bio === undefined || lastSaved?.bio === bio) &&
         lastSaved?.location === (location ?? '') &&
         lastSaved?.hometown === (hometown ?? '') &&
         lastSaved?.careerHighlights === careerHighlights &&
@@ -194,6 +199,7 @@ export function useSettingsProfile({
           updates: {
             username,
             displayName,
+            ...(bio !== undefined && bio !== lastSaved?.bio ? { bio } : {}),
             location,
             hometown,
             careerHighlights,
@@ -221,6 +227,7 @@ export function useSettingsProfile({
       lastProfileSavedRef.current = {
         displayName,
         username,
+        bio: bio ?? lastSaved?.bio,
         location: location ?? '',
         hometown: hometown ?? '',
         careerHighlights,
@@ -241,6 +248,7 @@ export function useSettingsProfile({
           ...artistRef.current,
           handle: response.profile.username ?? artistRef.current.handle,
           name: response.profile.displayName ?? artistRef.current.name,
+          tagline: bio ?? artistRef.current.tagline,
           location: response.profile.location ?? location,
           hometown: nextHometown,
           settings: nextSettings,
@@ -359,6 +367,7 @@ export function useSettingsProfile({
     lastProfileSavedRef.current = {
       displayName: identityFields.displayName,
       username: identityFields.username,
+      bio: artist.tagline?.trim() ?? '',
       location: identityFields.location,
       hometown: identityFields.hometown,
       careerHighlights: identityFields.careerHighlights,
@@ -367,6 +376,7 @@ export function useSettingsProfile({
     setFormData({
       displayName: identityFields.displayName,
       username: identityFields.username,
+      bio: artist.tagline ?? '',
       location: identityFields.location,
       hometown: identityFields.hometown,
       careerHighlights: identityFields.careerHighlights,
@@ -374,6 +384,7 @@ export function useSettingsProfile({
     });
     setProfileSaveStatus(buildProfileSaveState());
   }, [
+    artist.tagline,
     identityFields.displayName,
     identityFields.hometown,
     identityFields.location,

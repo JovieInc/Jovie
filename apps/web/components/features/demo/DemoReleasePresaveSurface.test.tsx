@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -22,6 +23,7 @@ vi.mock('@/features/share/PublicShareMenu', () => ({
   PublicShareActionList: () => null,
 }));
 
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { DemoReleasePresaveSurface } from './DemoReleasePresaveSurface';
 
 describe('DemoReleasePresaveSurface', () => {
@@ -41,12 +43,33 @@ describe('DemoReleasePresaveSurface', () => {
     expect(art).not.toContainElement(title);
     expect(art).not.toContainElement(artist);
     expect(art.textContent).toBe('');
-    expect(screen.getByText('Out now')).toBeInTheDocument();
+    const badge = screen.getByText('Out now');
+    expect(badge).toBeInTheDocument();
+    expect(badge.className).toContain('border-on-media/10');
+    expect(badge.className).not.toContain('border-white');
+    expect(badge.className).not.toContain('uppercase');
     expect(
       screen.getByRole('link', { name: /Made with Jovie/i })
     ).toHaveAttribute(
       'href',
       '/?utm_source=via_jovie&utm_medium=footer&utm_campaign=via-jovie-footer'
     );
+  });
+
+  it('opens the listen link and stays axe-clean', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<DemoReleasePresaveSurface />);
+    const listen = screen.getByRole('link', { name: /Listen Everywhere/i });
+    const onClick = vi.fn((event: Event) => event.preventDefault());
+    listen.addEventListener('click', onClick);
+
+    await user.click(listen);
+
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(listen).toHaveAttribute(
+      'href',
+      'https://cosmicgate.choons.at/thedeepend'
+    );
+    await expectNoA11yViolations(container);
   });
 });

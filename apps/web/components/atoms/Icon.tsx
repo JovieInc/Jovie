@@ -99,6 +99,10 @@ import {
   RailRightClosed,
   RailRightOpen,
 } from '@/components/atoms/rail-icons';
+import {
+  iconStrokeForSize,
+  opticalSizeFromClassName,
+} from '@/lib/design/icon-stroke';
 import { cn } from '@/lib/utils';
 import { logger } from '@/lib/utils/logger';
 
@@ -234,18 +238,25 @@ export function Icon({
   className,
   ariaLabel,
   ariaHidden,
+  size,
+  strokeWidth,
+  'aria-label': ariaLabelAttr,
   ...props
 }: IconProps) {
   const iconName = resolveIconName(String(name));
   if (!iconName) return null;
 
-  // Accessibility logic:
-  // - If no ariaLabel: always hide from screen readers (ignore ariaHidden prop)
-  // - If ariaLabel provided: default to visible, but allow explicit ariaHidden override
-  const shouldHide = ariaLabel ? (ariaHidden ?? false) : true;
+  // Prefer the dedicated prop; still honor raw aria-label from Lucide/SVG props
+  // so spreading {...props} first cannot wipe a caller-supplied label (Sentry 20808968).
+  const resolvedAriaLabel = ariaLabel ?? ariaLabelAttr;
 
-  // Development warning: ariaHidden=false without ariaLabel is an a11y violation
-  if (ariaHidden === false && !ariaLabel) {
+  // Accessibility logic:
+  // - If no label: always hide from screen readers (ignore ariaHidden prop)
+  // - If label provided: default to visible, but allow explicit ariaHidden override
+  const shouldHide = resolvedAriaLabel ? (ariaHidden ?? false) : true;
+
+  // Development warning: ariaHidden=false without a label is an a11y violation
+  if (ariaHidden === false && !resolvedAriaLabel) {
     logger.warn(
       'Setting ariaHidden={false} without providing ariaLabel creates an accessibility violation. ' +
         'Either provide an ariaLabel or remove ariaHidden to allow the default behavior.',
@@ -255,13 +266,23 @@ export function Icon({
   }
 
   const LucideIcon = iconRegistry[iconName];
+  // Prefer explicit `size`; else infer from Tailwind size/h/w classes so
+  // `className='h-6 w-6'` still climbs the optical ladder (Sentry 20808840).
+  const resolvedSize =
+    typeof size === 'number' ? size : opticalSizeFromClassName(className);
+  // JOV-14004: optical default; explicit strokeWidth always wins.
+  const resolvedStroke =
+    strokeWidth === undefined ? iconStrokeForSize(resolvedSize) : strokeWidth;
+
   return (
     <LucideIcon
+      {...props}
       className={cn(className)}
       aria-hidden={shouldHide}
-      role={ariaLabel && !shouldHide ? 'img' : undefined}
-      aria-label={ariaLabel}
-      {...props}
+      role={resolvedAriaLabel && !shouldHide ? 'img' : undefined}
+      aria-label={resolvedAriaLabel}
+      size={size}
+      strokeWidth={resolvedStroke}
     />
   );
 }

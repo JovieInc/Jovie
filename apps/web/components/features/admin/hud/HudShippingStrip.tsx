@@ -6,45 +6,46 @@ import { ArrowRight } from 'lucide-react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { computeRatePercent } from '@/lib/analytics/metrics';
+import { hasKnownMetricText } from '@/lib/ovie/metrics-presentation';
 import type { ShippingStateView } from '@/lib/ovie/shipping-state-client';
 
-const NOT_MEASURED = '—';
-
-function count(value: number | null): string {
-  return value === null ? NOT_MEASURED : value.toLocaleString('en-US');
+function count(value: number | null): string | null {
+  return value === null ? null : value.toLocaleString('en-US');
 }
 
 const LYB_REPO = 'JovieInc/LogYourBody';
 
 /** LogYourBody production: commits behind main, or Failing when its deploys are red (deploy-health feed block). */
 function lybBehind(view: ShippingStateView): {
-  readonly value: string;
+  readonly value: string | null;
   readonly tone: 'neutral' | 'bad';
 } {
   const lyb = view.delivery.lanes.deployHealth?.repos.find(
     repo => repo.repo === LYB_REPO
   );
-  if (!lyb) return { value: NOT_MEASURED, tone: 'neutral' };
-  if (lyb.status === 'failing')
+  if (!lyb) return { value: null, tone: 'neutral' };
+  const behind = count(lyb.behindMain);
+  if (lyb.status === 'failing') {
+    if (behind === null) return { value: 'Failing', tone: 'bad' };
     return {
-      value: `Failing, ${count(lyb.behindMain)} behind`,
+      value: `Failing, ${behind} behind`,
       tone: 'bad',
     };
-  return { value: count(lyb.behindMain), tone: 'neutral' };
+  }
+  return { value: behind, tone: 'neutral' };
 }
 
 const JOVIE_REPO = 'JovieInc/Jovie';
 
 /** Jovie merge-to-production lag p95 against its target; bad when over target. */
 function prodLag(view: ShippingStateView): {
-  readonly value: string;
+  readonly value: string | null;
   readonly tone: 'neutral' | 'bad';
 } {
   const lag = view.delivery.lanes.deployHealth?.lag?.find(
     row => row.repo === JOVIE_REPO
   );
-  if (!lag || lag.p95Min === null)
-    return { value: NOT_MEASURED, tone: 'neutral' };
+  if (!lag || lag.p95Min === null) return { value: null, tone: 'neutral' };
   const target = lag.targetP95Min === null ? '' : ` / ${lag.targetP95Min}m`;
   return {
     value: `p95 ${Math.round(lag.p95Min)}m${target}`,
@@ -55,14 +56,14 @@ function prodLag(view: ShippingStateView): {
   };
 }
 
-function ciLabel(view: ShippingStateView): string {
-  if (view.ciGreen.value === null) return NOT_MEASURED;
+function ciLabel(view: ShippingStateView): string | null {
+  if (view.ciGreen.value === null) return null;
   return view.ciGreen.value ? 'Green' : 'Failing';
 }
 
-function mergeRate(view: ShippingStateView): string {
+function mergeRate(view: ShippingStateView): string | null {
   const last = view.delivery.merges.last7Days.value;
-  if (last === null) return NOT_MEASURED;
+  if (last === null) return null;
   const prior = view.delivery.merges.prior7Days.value;
   if (prior === null || prior === 0) return last.toLocaleString('en-US');
   const change = computeRatePercent(last - prior, prior, 0);
@@ -75,9 +76,10 @@ function Chip({
   tone = 'neutral',
 }: Readonly<{
   readonly label: string;
-  readonly value: string;
+  readonly value: string | null;
   readonly tone?: 'neutral' | 'good' | 'bad';
 }>) {
+  if (!hasKnownMetricText(value)) return null;
   const valueClass =
     tone === 'good'
       ? 'text-success'

@@ -439,9 +439,7 @@ test.describe('Public profile surface sizing', () => {
   });
 });
 
-// JOV-8629 §6.2: the profile document is ISR-cached behind the proxy's
-// per-request publication gate. A published handle renders its header; an
-// unknown handle never renders a profile body.
+// JOV-8629 §6.2: the profile document is ISR-cached behind the proxy's per-request publication gate; unknown handles never render a profile body.
 test.describe('profile publication gate', () => {
   test('renders a published handle and refuses an unknown one', async ({
     page,
@@ -455,10 +453,8 @@ test.describe('profile publication gate', () => {
     expect(await unknown.text()).not.toContain('profile-compact-shell');
   });
 
-  // JOV-12153: the unknown-handle 404 head carries exactly ONE robots meta
-  // containing "noindex" — Next's automatic NonIndex noindex for status > 400
-  // renders. Explicit robots on 404 metadata used to emit a second tag and
-  // fail the synthetic smoke's noindex-count-1 assertion.
+  // JOV-12153: exactly ONE noindex robots meta on the 404 — Next's automatic
+  // NonIndex; explicit robots on 404 metadata used to emit a second tag.
   test('unknown-handle 404 serves exactly one noindex robots meta', async ({
     page,
   }) => {
@@ -473,12 +469,10 @@ test.describe('profile publication gate', () => {
     ).toHaveLength(1);
   });
 
-  // JOV-12081: the unknown-handle 404 must be server-rendered. The miss
-  // rewrite used to target the prerendered profile-mode-render route, where
-  // notFound() during the ISR fallback render served Next's flight-only
-  // `__next_error__` shell — no rendered body, no robots meta — so axe, the
-  // overflow guard and the visual audit all timed out waiting for the branded
-  // boundary. The dynamic profile-miss route renders it in the first HTML.
+  // JOV-12081: the unknown-handle 404 must be server-rendered — the old
+  // miss rewrite's ISR-fallback notFound() served the flight-only
+  // `__next_error__` shell (no body, no robots meta); the dynamic
+  // profile-miss route renders the branded boundary in the first HTML.
   test('unknown-handle 404 renders the branded boundary in the SSR HTML', async ({
     page,
   }) => {
@@ -490,10 +484,24 @@ test.describe('profile publication gate', () => {
     expect(html).not.toContain('profile-compact-shell');
   });
 
-  // JOV-12081: `?mode=` must survive the prerendered profile route. The
-  // rewrite used to sit in afterFiles, which never wins over a prerendered
-  // route, so ?mode=listen silently rendered the home document and the DSP
-  // audit exercised only the home's Spotify CTA.
+  // JOV-13104: the miss destination itself must render the branded boundary
+  // in the first HTML (not the flight-only __next_error__ shell) when
+  // visited directly — the same response the gate's rewrite serves.
+  test('profile-miss route serves the branded boundary in the SSR HTML', async ({
+    page,
+  }) => {
+    const response = await page.request.get(
+      '/zz-no-such-artist-e2e-gate/profile-miss'
+    );
+    expect(response.status()).toBe(404);
+    const html = await response.text();
+    expect(html).not.toContain('__next_error__');
+    expect(html).toContain('data-testid="not-found"');
+  });
+
+  // JOV-12081: `?mode=` must survive the prerendered profile route — the
+  // afterFiles rewrite never beat it, so ?mode=listen silently rendered
+  // the home document.
   test('?mode=listen renders the listen surface in the SSR HTML', async ({
     page,
   }) => {
@@ -515,9 +523,7 @@ test.describe('profile LCP artwork', () => {
   });
 });
 
-// The latest-release credits now load in the same batch as the other profile
-// reads instead of after them. The document must still arrive whole: status
-// 200 with the artwork in the first HTML, for visits that overlap.
+// The latest-release credits load in the same batch as the other profile reads; the document must still arrive whole (200 + artwork in the first HTML) for overlapping visits.
 test.describe('profile batched reads', () => {
   test('serves the whole profile document to overlapping visits', async ({
     page,

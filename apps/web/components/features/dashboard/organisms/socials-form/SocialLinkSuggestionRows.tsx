@@ -1,9 +1,9 @@
 'use client';
 
+import { IconButton } from '@jovie/ui';
+import { Button } from '@jovie/ui/atoms/button';
 import { Check, Loader2, X } from 'lucide-react';
-import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { cn } from '@/lib/utils';
 import type { SocialLinkSuggestion } from './useSocialLinkSuggestions';
 
 interface SocialLinkSuggestionRowsProps {
@@ -51,15 +51,11 @@ export function SocialLinkSuggestionRows({
                 </p>
               </div>
               <div className='flex items-center gap-1.5 shrink-0'>
-                <button
-                  type='button'
+                <Button
+                  variant='primary'
+                  size='sm'
                   onClick={() => onConfirm(suggestion)}
                   disabled={isActioning}
-                  className={cn(
-                    'inline-flex items-center gap-1 px-2 py-1 text-app font-caption rounded-md',
-                    'border border-(--linear-btn-primary-border) bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--linear-btn-primary-hover) hover:bg-btn-primary-hover',
-                    'disabled:opacity-50 transition-colors'
-                  )}
                 >
                   {isActioning ? (
                     <Loader2 className='h-3 w-3 animate-spin' />
@@ -67,11 +63,12 @@ export function SocialLinkSuggestionRows({
                     <Check className='h-3 w-3' />
                   )}
                   Add
-                </button>
-                <InlineIconButton
+                </Button>
+                <IconButton
+                  size='lg'
+                  variant='inline'
                   onClick={() => onDismiss(suggestion)}
                   disabled={isActioning}
-                  className='[&_svg]:h-3 [&_svg]:w-3 disabled:opacity-50'
                   aria-label={`Dismiss ${suggestion.platformLabel}`}
                 >
                   {isActioning ? (
@@ -79,7 +76,7 @@ export function SocialLinkSuggestionRows({
                   ) : (
                     <X className='h-3 w-3' />
                   )}
-                </InlineIconButton>
+                </IconButton>
               </div>
             </div>
           );

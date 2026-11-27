@@ -3,8 +3,9 @@
   "$id": "pen-still-manifest/v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "surface", "primaryMode", "frames"],
+  "required": ["schema", "frames"],
   "properties": {
+    "$schema": { "type": "string" },
     "schema": { "const": "pen-still-manifest/v1" },
     "surface": { "type": "string", "minLength": 1 },
     "primaryMode": { "const": "dark" },
@@ -26,7 +27,6 @@
         "required": [
           "sectionId",
           "penNodeId",
-          "fileHash",
           "stillPath",
           "viewport",
           "mode",
@@ -35,11 +35,13 @@
         "properties": {
           "sectionId": { "type": "string", "minLength": 1 },
           "penNodeId": { "type": "string", "minLength": 1 },
+          "penFile": { "type": "string", "minLength": 1 },
           "fileHash": { "type": ["string", "null"] },
           "stillPath": { "type": "string", "minLength": 1 },
           "viewport": { "enum": [1440, 390] },
           "mode": { "enum": ["dark", "light"] },
           "status": { "enum": ["active", "parked", "fork"] },
+          "auth": { "enum": ["none", "required"] },
           "route": { "type": "string" },
           "story": { "type": "string" },
           "sectionSelector": { "type": "string" },

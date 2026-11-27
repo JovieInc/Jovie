@@ -1,10 +1,64 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { COUNTRY_OPTIONS, CountrySelector } from './CountrySelector';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import {
+  COUNTRY_OPTIONS,
+  type CountryOption,
+  CountrySelector,
+} from './CountrySelector';
 
-const [US, CA] = COUNTRY_OPTIONS;
+const [US, CA] = COUNTRY_OPTIONS as [CountryOption, CountryOption];
 
 describe('CountrySelector', () => {
+  it.each([
+    { state: 'closed', isOpen: false },
+    { state: 'open', isOpen: true },
+  ])('has no axe violations when $state', async ({ isOpen }) => {
+    const { container } = render(
+      <CountrySelector
+        country={US}
+        isOpen={isOpen}
+        onOpenChange={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no axe violations in an RTL overflow frame', async () => {
+    const { container } = render(
+      <div dir='rtl' className='w-56'>
+        <CountrySelector
+          country={{
+            ...CA,
+            label: 'كندا — رمز الاتصال',
+          }}
+          isOpen
+          onOpenChange={vi.fn()}
+          onSelect={vi.fn()}
+        />
+      </div>
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('uses PlainButton for the trigger and options', () => {
+    render(
+      <CountrySelector
+        country={US}
+        isOpen
+        onOpenChange={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    );
+    const trigger = screen.getByTestId('country-selector-trigger');
+    expect(trigger.getAttribute('data-slot')).toBe('plain-button');
+    const options = screen.getAllByTestId('country-selector-option');
+    expect(options).toHaveLength(2);
+    expect(options[0]?.getAttribute('data-slot')).toBe('plain-button');
+    expect(options[0]?.className).toContain('border-(--profile-pearl-border)');
+  });
+
   it('includes the visible dial code in the trigger name', () => {
     render(
       <CountrySelector

@@ -54,7 +54,7 @@ export const REAL_AUDIO_FIXTURES = [
     formatId: 'aiff',
     fileName: 'tone.aiff',
     mimeType: 'audio/aiff',
-    sha256: '8cdf21107c6c4472304ba700f1cfc49183b1cd8278f576772091ae3146dd66f3',
+    sha256: '03cc54430fec4e4413f7a1cd38c56dbd2ba662e9f472b45e016740a80b4caec2',
     expectedChromiumCanPlayType: '',
     expectedChromiumDecode: 'unsupported',
     decodedDurationSeconds: { minimum: 0, maximum: 0 },

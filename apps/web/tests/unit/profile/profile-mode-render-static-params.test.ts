@@ -2,20 +2,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PROFILE_MODE_ALIAS_MARKER } from '@/lib/render-fixture-policy';
 import { aliasBudgetProfileModeParams } from '@/lib/routing/alias-budget-static-params';
 
-const { getProfilesByUsernamesMock, loggerErrorMock } = vi.hoisted(() => ({
-  getProfilesByUsernamesMock: vi.fn(),
-  loggerErrorMock: vi.fn(),
+// JOV-13104: the prerender decision is single-sourced from the generated set
+// the pre-build script writes (and the proxy bounds the ?mode= rewrite to).
+// The mocked module uses a getter so each test controls the set per call.
+const prerenderedState = vi.hoisted(() => ({ keys: [] as string[] }));
+
+vi.mock('@/lib/routing/generated/profile-mode-prerender-set', () => ({
+  get PROFILE_MODE_PRERENDERED_KEYS() {
+    return prerenderedState.keys;
+  },
 }));
 
+// Keep the transitive services import inert: getProfileStaticParams (the
+// canonical [username] prerender) still reads profiles through this module.
 vi.mock('@/lib/services/profile/queries', () => ({
-  getProfilesByUsernames: (...args: unknown[]) =>
-    getProfilesByUsernamesMock(...args),
+  getProfilesByUsernames: vi.fn(),
   getTopProfilesForStaticGeneration: vi.fn(),
 }));
 
 vi.mock('@/lib/utils/logger', () => ({
   logger: {
-    error: (...args: unknown[]) => loggerErrorMock(...args),
+    error: vi.fn(),
   },
 }));
 
@@ -25,16 +32,18 @@ const { getProfileModeRenderStaticParams } = await import(
 
 describe('getProfileModeRenderStaticParams', () => {
   beforeEach(() => {
-    getProfilesByUsernamesMock.mockReset();
-    loggerErrorMock.mockReset();
+    prerenderedState.keys = [];
   });
 
-  it('prerenders pay mode for the public unclaimed tipping profile', async () => {
-    getProfilesByUsernamesMock.mockResolvedValue(
-      new Map([['testartist', { isPublic: true, isClaimed: false }]])
-    );
+  it('prerenders exactly the generated prerender set, in alias-budget order', async () => {
+    prerenderedState.keys = ['testartist:pay', 'dualipa:listen'];
 
-    await expect(getProfileModeRenderStaticParams()).resolves.toEqual([
+    expect(getProfileModeRenderStaticParams()).toEqual([
+      {
+        username: 'dualipa',
+        profileMode: 'listen',
+        marker: PROFILE_MODE_ALIAS_MARKER,
+      },
       {
         username: 'testartist',
         profileMode: 'pay',
@@ -42,77 +51,44 @@ describe('getProfileModeRenderStaticParams', () => {
       },
     ]);
     expect(PROFILE_MODE_ALIAS_MARKER).toBe('__profile-mode-alias');
-    expect(getProfilesByUsernamesMock).toHaveBeenCalledWith([
-      'dualipa',
-      'testartist',
+  });
+
+  it('prerenders nothing when the build database had no public pairs', () => {
+    prerenderedState.keys = [];
+
+    expect(getProfileModeRenderStaticParams()).toEqual([]);
+  });
+
+  it('ignores generated keys outside the alias budget', () => {
+    // A drifting script (or hand-edited generated file) must not smuggle
+    // pairs into the prerender that the budget does not carry — the route
+    // and the rewrite stay locked to aliasBudgetProfileModeParams.
+    prerenderedState.keys = [
+      'someoneelse:pay',
+      'dualipa:not-a-budget-mode',
+      'dualipa:tour',
+    ];
+
+    expect(getProfileModeRenderStaticParams()).toEqual([
+      {
+        username: 'dualipa',
+        profileMode: 'tour',
+        marker: PROFILE_MODE_ALIAS_MARKER,
+      },
     ]);
   });
 
-  it('prerenders every seeded alias destination when both profiles are public', async () => {
-    getProfilesByUsernamesMock.mockResolvedValue(
-      new Map([
-        ['dualipa', { isPublic: true, isClaimed: true }],
-        ['testartist', { isPublic: true, isClaimed: false }],
-      ])
-    );
+  it('prerenders every budget pair when the generated set carries the full budget', () => {
+    prerenderedState.keys = [
+      'dualipa:listen',
+      'dualipa:subscribe',
+      'dualipa:releases',
+      'dualipa:tour',
+      'testartist:pay',
+    ];
 
-    await expect(getProfileModeRenderStaticParams()).resolves.toEqual(
+    expect(getProfileModeRenderStaticParams()).toEqual(
       aliasBudgetProfileModeParams()
-    );
-  });
-
-  it('omits missing or private featured modes while keeping public tipping', async () => {
-    for (const featuredProfile of [undefined, { isPublic: false }]) {
-      getProfilesByUsernamesMock.mockResolvedValue(
-        new Map([
-          ['dualipa', featuredProfile],
-          ['testartist', { isPublic: true }],
-        ])
-      );
-
-      await expect(getProfileModeRenderStaticParams()).resolves.toEqual([
-        {
-          username: 'testartist',
-          profileMode: 'pay',
-          marker: PROFILE_MODE_ALIAS_MARKER,
-        },
-      ]);
-    }
-  });
-
-  it('keeps public featured modes when the tipping profile is private', async () => {
-    getProfilesByUsernamesMock.mockResolvedValue(
-      new Map([
-        ['dualipa', { isPublic: true }],
-        ['testartist', { isPublic: false }],
-      ])
-    );
-
-    await expect(getProfileModeRenderStaticParams()).resolves.toEqual(
-      aliasBudgetProfileModeParams().filter(mode => mode.username === 'dualipa')
-    );
-  });
-
-  it('omits a missing or private tipping profile', async () => {
-    getProfilesByUsernamesMock.mockResolvedValue(new Map());
-    await expect(getProfileModeRenderStaticParams()).resolves.toEqual([]);
-
-    getProfilesByUsernamesMock.mockResolvedValue(
-      new Map([['testartist', { isPublic: false, isClaimed: false }]])
-    );
-    await expect(getProfileModeRenderStaticParams()).resolves.toEqual([]);
-  });
-
-  it('degrades a build-time lookup failure to an empty param list', async () => {
-    getProfilesByUsernamesMock.mockRejectedValue(new Error('neon cold start'));
-
-    await expect(getProfileModeRenderStaticParams()).resolves.toEqual([]);
-    expect(loggerErrorMock).toHaveBeenCalledWith(
-      'Failed to load profile mode render static params',
-      expect.objectContaining({
-        route: '/[username]/profile-mode-render/[profileMode]/[marker]',
-      }),
-      'public-profile'
     );
   });
 });

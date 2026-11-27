@@ -109,10 +109,6 @@ const SECURITY_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/security.yml'),
   'utf8'
 );
-const NEXT_BUILD_CACHE_WARM_WORKFLOW = readFileSync(
-  resolve(REPO_ROOT, '.github/workflows/next-build-cache-warm.yml'),
-  'utf8'
-);
 const MEMBER_POLICY = readFileSync(
   resolve(REPO_ROOT, 'scripts/lib/merge-group-member-policy.mjs'),
   'utf8'
@@ -214,12 +210,12 @@ function parseExactCiFastFailureOperands(script) {
     .map(
       clause =>
         clause.match(
-          /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT|STRUCTURAL_PYTHON_RESULT|STRUCTURAL_WEB_RESULT|STRUCTURAL_LANES_RESULT)"\s+!=\s+"success"$/
+          /^"\$(TYPECHECK_RESULT|REMAINING_RESULT|PROFILE_BROWSER_RESULT|PROFILE_VIEWPORT_SWEEP_RESULT|STRUCTURAL_PYTHON_RESULT|STRUCTURAL_WEB_RESULT|STRUCTURAL_LANES_RESULT)"\s+!=\s+"success"$/
         )?.[1]
     );
   if (
     operands.sort().join() !==
-    'PROFILE_BROWSER_RESULT,REMAINING_RESULT,STRUCTURAL_LANES_RESULT,STRUCTURAL_PYTHON_RESULT,STRUCTURAL_WEB_RESULT,TYPECHECK_RESULT'
+    'PROFILE_BROWSER_RESULT,PROFILE_VIEWPORT_SWEEP_RESULT,REMAINING_RESULT,STRUCTURAL_LANES_RESULT,STRUCTURAL_PYTHON_RESULT,STRUCTURAL_WEB_RESULT,TYPECHECK_RESULT'
   )
     throw new Error('Invalid ci-fast fail-closed result set');
   return operands;
@@ -229,12 +225,20 @@ const BLOBLESS_BASE_FETCH_JOBS = new Set([
   'ci-exact-head-coverage-shard',
   'ci-exact-head-coverage',
   'ci-profile-admission-browser',
-  'ci-fast-remaining',
+  'ci-profile-viewport-sweep',
+  'ci-fast-remaining-shards',
 ]);
 
-const BACKGROUND_BASE_FETCH_JOBS = new Set(['ci-fast-remaining']);
+const BACKGROUND_BASE_FETCH_JOBS = new Set(['ci-fast-remaining-shards']);
 
 describe('merge_group workflow contract', () => {
+  it('keeps ci.yml under the size GitHub will start', () => {
+    // A 515,363-byte ci.yml produced startup_failure runs with zero jobs
+    // (runs 45001660220 and 45001666190); 507,101 bytes started normally.
+    // Move long scripts or path lists into files instead of growing ci.yml.
+    expect(Buffer.byteLength(CI_WORKFLOW, 'utf8')).toBeLessThan(512_000);
+  });
+
   it('runs the web build for changelog-only releases without turning ordinary docs into builds', () => {
     const script = CI_WORKFLOW.slice(
       CI_WORKFLOW.indexOf('# CHANGELOG.md is customer-facing web content'),
@@ -280,9 +284,9 @@ describe('merge_group workflow contract', () => {
   it('accepts reordered exact ci-fast failure operands', () => {
     expect(
       parseExactCiFastFailureOperands(
-        'if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$STRUCTURAL_LANES_RESULT" != "success" || "$STRUCTURAL_WEB_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
+        'if [[ "$PROFILE_BROWSER_RESULT" != "success" || "$PROFILE_VIEWPORT_SWEEP_RESULT" != "success" || "$STRUCTURAL_LANES_RESULT" != "success" || "$STRUCTURAL_WEB_RESULT" != "success" || "$STRUCTURAL_PYTHON_RESULT" != "success" || "$TYPECHECK_RESULT" != "success" || "$REMAINING_RESULT" != "success" ]]; then'
       )
-    ).toHaveLength(6);
+    ).toHaveLength(7);
   });
 
   it('rejects a ci-fast failure condition missing a required operand', () => {
@@ -311,7 +315,7 @@ describe('merge_group workflow contract', () => {
     );
 
     const consumers =
-      'ci-fast-typecheck ci-fast-remaining ci-profile-admission-browser ci-fast-structural-python ci-fast-structural-web ci-fast-structural-lanes ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes drizzle-migration-guard';
+      'ci-fast-typecheck ci-fast-remaining-shards ci-profile-admission-browser ci-profile-viewport-sweep ci-fast-structural-python ci-fast-structural-web ci-fast-structural-lanes-shards ci-promptfoo-evals ci-golden-eval-set ci-build-layout ci-build-ovie ci-typecheck-ovie ci-storybook-surfaces ci-cross-product-integration ci-unit-tests ci-exact-head-coverage-shard ci-golden-path-lock ci-visual-snapshot-compare ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes drizzle-migration-guard';
     for (const jobId of consumers.split(' ')) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
       expect(job, jobId).toContain('ci-merge-group-workspace');
@@ -471,6 +475,9 @@ describe('merge_group workflow contract', () => {
     expect(admission).toContain(
       "pr_number: ${{ steps.admission.outputs.pr_number || '' }}"
     );
+    expect(admission).toContain(
+      "source_head_sha: ${{ steps.admission.outputs.source_head_sha || '' }}"
+    );
     expect(admission).toContain('pull-requests: read');
     expect(admission).toContain('ref: main');
     expect(admission).toContain('node "$policy" --print-contract-version');
@@ -483,6 +490,7 @@ describe('merge_group workflow contract', () => {
     );
     expect(admission).toContain('echo "pr_number=${BASH_REMATCH[1]}"');
     expect(admission).toContain('echo "synthetic_head_sha=$GITHUB_SHA"');
+    expect(admission).toContain("echo 'source_head_sha='");
     expect(admission).toContain(
       "echo 'current_queue_state=LEGACY_EXACT_REF_BOOTSTRAP'"
     );
@@ -577,7 +585,7 @@ describe('merge_group workflow contract', () => {
       admissionTimeoutMinutes * 60_000 - MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS
     ).toBeGreaterThanOrEqual(MERGE_GROUP_ADMISSION_WAIT_MS + 90_000);
 
-    for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
+    for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining-shards']) {
       const job = getJobBlock(CI_WORKFLOW, jobId);
       expect(job, jobId).toContain('ci-merge-group-admission');
       expect(job, jobId).toMatch(/if: (&[\w-]+ )?>-\s+!cancelled\(\) &&/);
@@ -589,12 +597,31 @@ describe('merge_group workflow contract', () => {
       expect(job, jobId).toContain(
         "needs.ci-merge-group-admission.outputs.admitted == 'true'"
       );
+      // JOV-12618 remainder: same-tree typecheck/lint reuse (JOV-13081).
+      expect(job, jobId).toContain('Decide typecheck/lint reuse');
+      expect(job, jobId).toContain(
+        'node scripts/lib/merge-group-typecheck-lint-reuse.mjs'
+      );
+      expect(job, jobId).toContain(
+        'needs.ci-merge-group-admission.outputs.source_head_sha'
+      );
     }
 
-    const remaining = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining');
+    const typecheck = getJobBlock(CI_WORKFLOW, 'ci-fast-typecheck');
+    expect(typecheck).toContain("steps.reuse.outputs.reuse != 'true'");
+    expect(typecheck).toContain(
+      'Validate CI/release incident prevention contract'
+    );
+
+    const remaining = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining-shards');
     expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
+    expect(remaining).toContain('CI_FAST_SKIP_LANE_IDS:');
     expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
-    expect(remaining).toContain('github.event_name }}" != "pull_request"');
+    // JOV-12618: PRs path-gate; docs-only merge groups may skip; else skip=false.
+    expect(remaining).toContain('github.event_name }}" == "pull_request"');
+    expect(remaining).toContain(
+      '"${{ github.event_name }}" == "merge_group" && "${STRUCTURAL_DOCS_ONLY:-}" == "true"'
+    );
     expect(remaining).toContain('echo "skip=false"');
     expect(remaining).toContain('apps/web/\\.storybook/');
     expect(remaining).toContain('apps/web/package\\.json$');
@@ -651,7 +678,7 @@ describe('merge_group workflow contract', () => {
     expect(ciFast).toContain('TYPECHECK_RESULT');
     expect(ciFast).toContain('REMAINING_RESULT');
     expect(ciFast).toContain('PROFILE_BROWSER_RESULT');
-    expect(parseExactCiFastFailureOperands(ciFast)).toHaveLength(6);
+    expect(parseExactCiFastFailureOperands(ciFast)).toHaveLength(7);
     expect(ciFast).toContain('exit 1');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     expect(units).not.toContain('ci-unit-runner-route');
@@ -803,12 +830,15 @@ describe('merge_group workflow contract', () => {
     // The absent-app guard is preserved on both the setup and build steps.
     expect(
       build.match(/if: hashFiles\('apps\/ovie\/package\.json'\) != ''/g)
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(buildLayout).not.toContain('@jovie/ovie');
     expect(ovieBuild).toContain('pnpm --filter @jovie/ovie build');
     expect(ovieBuild).toContain('set -euo pipefail');
     expect(ovieBuild).toContain(
-      'NEXT_IGNORE_TYPECHECK=1 TURBO_ENGINE_READ_ONLY=1 pnpm --filter @jovie/ovie build'
+      '[ "$GITHUB_EVENT_NAME" = push ] || export TURBO_ENGINE_READ_ONLY=1\n'
+    );
+    expect(ovieBuild).toContain(
+      'NEXT_IGNORE_TYPECHECK=1 pnpm --filter @jovie/ovie build'
     );
     expect(ovieBuild.match(/NEXT_IGNORE_TYPECHECK/g)).toHaveLength(1);
     // The build may skip Next's duplicate type pass only because the
@@ -911,7 +941,10 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain('ci-build-layout');
     expect(aggregate).toContain('ci-build-ovie');
     expect(aggregate).toContain('ci-typecheck-ovie');
-    expect(aggregate).toContain('ci-storybook-surfaces');
+    // Wave 1: Storybook + MG Lighthouse off MG PR Ready fan-in.
+    expect(aggregate).not.toContain('ci-storybook-surfaces');
+    expect(aggregate).not.toContain('ci-lighthouse-dashboard-pr');
+    expect(aggregate).not.toContain('ci-lighthouse-onboarding-pr');
     expect(aggregate).toContain('ci-ios');
     expect(aggregate).toContain('ci-macos');
     expect(aggregate).toContain('ci-cross-product-integration');
@@ -943,7 +976,7 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain(
       '"Web Ovie Typecheck:$RUN_WEB:$OVIE_TYPECHECK_RESULT"'
     );
-    expect(aggregate).toContain(
+    expect(aggregate).not.toContain(
       'STORYBOOK_SURFACES_RESULT="${{ needs.ci-storybook-surfaces.result }}"'
     );
     expect(aggregate).toContain('RUN_PROMPTFOO');
@@ -1105,9 +1138,10 @@ describe('merge_group workflow contract', () => {
     );
     expect(macos).toContain("needs.mac.outputs.run_hosted == 'true'");
     // Node-only web inputs run the Mac lane's node checks on ubuntu; swift
-    // and the MenuMonitor artifact stay macOS-only.
+    // and the MenuMonitor artifact stay macOS-only. Queue-proven main recovers
+    // native via ci-apple-post-queue when Path Changes was skipped.
     expect(macosCaller).toContain(
-      "native: ${{ needs.ci-path-changes.outputs.run_macos_native != 'false' }}"
+      "native: ${{ (needs.ci-apple-post-queue.outputs.run_macos_native || needs.ci-path-changes.outputs.run_macos_native) != 'false' }}"
     );
     expect(CI_WORKFLOW).toContain(
       "run_macos_native: ${{ steps.detect.outputs.run_macos_native || 'true' }}"
@@ -1271,8 +1305,9 @@ describe('merge_group workflow contract', () => {
 
   it('fetches only HEAD ancestry and the base branch for diff-base jobs', () => {
     for (const jobId of [
-      'ci-fast-remaining',
+      'ci-fast-remaining-shards',
       'ci-profile-admission-browser',
+      'ci-profile-viewport-sweep',
       'ci-exact-head-coverage-shard',
       'ci-exact-head-coverage',
     ]) {
@@ -1304,13 +1339,15 @@ describe('merge_group workflow contract', () => {
         job.indexOf('name: Fetch base-branch history'),
         jobId
       ).toBeLessThan(
-        job.search(/git diff|ci-fast-lanes\.mjs|check-changed-test-coverage/)
+        job.search(
+          /git diff|ci-fast-lanes\.mjs|check-changed-test-coverage|viewport-sweep-admission\.sh/
+        )
       );
     }
   });
 
   it('overlaps the full ci-fast (remaining) base fetch with dependency install and fails closed', () => {
-    const job = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining');
+    const job = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining-shards');
     const start = getStepRunScript(job, 'Start base-branch history fetch');
     const wait = getStepRunScript(job, 'Fetch base-branch history');
     const startAt = job.indexOf('- name: Start base-branch history fetch');
@@ -2004,14 +2041,22 @@ describe('merge_group workflow contract', () => {
     expect(units).toContain("outputs.run_web == 'true'");
     expect(buildLayout).toContain("outputs.run_web == 'true'");
     expect(ios).toContain("outputs.run_ios == 'true'");
+    expect(ios).toContain('ci-apple-post-queue');
+    expect(ios).toContain(
+      "needs.ci-apple-post-queue.outputs.run_ios == 'true'"
+    );
     expect(macos).toContain("outputs.run_macos == 'true'");
+    expect(macos).toContain('ci-apple-post-queue');
+    expect(macos).toContain(
+      "needs.ci-apple-post-queue.outputs.run_macos == 'true'"
+    );
     expect(crossProduct).toContain("outputs.run_cross_product == 'true'");
     expect(
       getStepRunScript(crossProduct, 'Run model-free shared contracts')
         .trim()
         .split('\n')
     ).toContain('pnpm --filter @jovie/release-channel-contracts test');
-    expect(getJobBlock(CI_WORKFLOW, 'ci-fast-remaining')).toContain(
+    expect(getJobBlock(CI_WORKFLOW, 'ci-fast-remaining-shards')).toContain(
       'CI_PRODUCT_LANES: ${{ needs.ci-path-changes.outputs.selected_lanes }}'
     );
     expect(aggregate).toContain(
@@ -2047,16 +2092,19 @@ describe('merge_group workflow contract', () => {
       .slice(loopStart, loopEnd + '          done'.length)
       .replace(/^ {10}/gm, '');
 
+    // Wave 1: Storybook is off MG PR Ready selected-gate fail-close; keep
+    // unused STORYBOOK_SURFACES_RESULT env only so older case rows stay
+    // parseable without changing column order.
     const cases = `unselected Web accepts skipped jobs|false|skipped|skipped|false|skipped|0|skipped|skipped|skipped
 unselected Web rejects unit execution|false|success|skipped|false|skipped|1|skipped|skipped|skipped
 unselected Web rejects build execution|false|skipped|success|false|skipped|1|skipped|skipped|skipped
-unselected Web rejects Storybook execution|false|skipped|skipped|false|skipped|1|skipped|success|skipped
+unselected Web ignores Storybook execution|false|skipped|skipped|false|skipped|0|skipped|success|skipped
 healthy Web passes with iOS skipped|true|success|success|false|skipped|0|success|success|success
 selected Web rejects skipped jobs|true|skipped|skipped|false|skipped|1|skipped|skipped|skipped
 selected Web rejects failed unit shard|true|failure|success|false|skipped|1|success|success|success
 selected Web rejects cancelled unit siblings|true|cancelled|success|false|skipped|1|success|success|success
 selected Web rejects failed Ovie build|true|success|success|false|skipped|1|failure|success|success
-selected Web rejects skipped Storybook matrix|true|success|success|false|skipped|1|success|skipped|success
+selected Web ignores skipped Storybook matrix|true|success|success|false|skipped|0|success|skipped|success
 unselected Web rejects Ovie typecheck execution|false|skipped|skipped|false|skipped|1|skipped|skipped|success
 selected Web rejects failed Ovie typecheck|true|success|success|false|skipped|1|success|success|failure
 deliberate-red iOS fails with Web skipped|false|skipped|skipped|true|failure|1|skipped|skipped|skipped`;
@@ -2364,207 +2412,6 @@ ${selectedGateScript}`,
     expect(buildLayout).not.toContain('actions/download-artifact');
   });
 
-  it('restores the Build+Layout Turbopack cache read-only and writes it only from trusted main', () => {
-    const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
-    const stepAt = name => buildLayout.indexOf(`      - name: ${name}\n`);
-    const step = name => {
-      const start = stepAt(name);
-      expect(start, name).toBeGreaterThan(-1);
-      const next = buildLayout.indexOf('\n      - ', start + 1);
-      return buildLayout.slice(start, next === -1 ? undefined : next);
-    };
-    const restore = step('Restore Next build cache (read-only)');
-    const measure = step('Measure Next build cache (trusted main only)');
-    const save = step('Save Next build cache (trusted main only)');
-    const trustedMain =
-      "success() && github.event_name == 'push' && github.ref == 'refs/heads/main'";
-
-    // Restore runs on every event and happens before the build it warms.
-    expect(stepAt('Restore Next build cache (read-only)')).toBeLessThan(
-      stepAt('Build exact combined head')
-    );
-    expect(restore).toContain('uses: actions/cache/restore@');
-    expect(restore).not.toMatch(/^\s+if:/m);
-    expect(restore).toContain('path: apps/web/.next/cache/turbopack');
-    expect(restore).toContain(
-      "key: ${{ runner.os }}-next-build-web-v1-${{ hashFiles('pnpm-lock.yaml', 'apps/web/package.json', 'apps/web/next.config.js') }}-${{ steps.next-build-cache-hour.outputs.hour }}"
-    );
-    expect(restore).toMatch(/^\s+\$\{\{ runner\.os \}\}-next-build-web-v1-$/m);
-
-    // Only compiler state is cached: never fetch/image caches or build output.
-    expect(buildLayout).not.toMatch(/path: apps\/web\/\.next\/cache\s*$/m);
-    expect(buildLayout).not.toContain('uses: actions/cache@');
-
-    // Writes happen after the layout guard, only from trusted main pushes,
-    // only on a primary-key miss, and only below the size bound.
-    expect(stepAt('Run deterministic layout behavior guard')).toBeLessThan(
-      stepAt('Save Next build cache (trusted main only)')
-    );
-    expect(measure).toContain(`if: \${{ ${trustedMain} &&`);
-    expect(measure).toContain(
-      "steps.next-build-cache.outputs.cache-hit != 'true'"
-    );
-    expect(measure).toContain("NEXT_BUILD_CACHE_MAX_BYTES: '3221225472'");
-    expect(measure).toContain('must not be a symlink');
-    expect(save).toContain(`if: \${{ ${trustedMain} &&`);
-    expect(save).toContain(
-      "steps.next-build-cache-size.outputs.eligible == 'true'"
-    );
-    expect(save).toContain('uses: actions/cache/save@');
-    expect(save).toContain('path: apps/web/.next/cache/turbopack');
-    expect(save).toContain(
-      'key: ${{ steps.next-build-cache.outputs.cache-primary-key }}'
-    );
-    expect(buildLayout.match(/actions\/cache\/save@/g)).toHaveLength(1);
-    // Non-saving runs skip the cache write; push must still persist it.
-    expect(step('Build exact combined head')).toContain(
-      '[ "$GITHUB_EVENT_NAME" = push ] || export TURBO_ENGINE_READ_ONLY=1\n'
-    );
-    expect(buildLayout).not.toContain('pull_request_target');
-    expect(buildLayout).not.toContain('secrets.');
-  });
-
-  it('writes the Build+Layout Turbopack cache only from a trusted-main warmer with the identical key', () => {
-    const warm = NEXT_BUILD_CACHE_WARM_WORKFLOW;
-    const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
-    const stepIn = (block, name) => {
-      const start = block.indexOf(`      - name: ${name}\n`);
-      expect(start, name).toBeGreaterThan(-1);
-      const next = block.indexOf('\n      - ', start + 1);
-      return block.slice(start, next === -1 ? undefined : next);
-    };
-    const stepAt = name => warm.indexOf(`      - name: ${name}\n`);
-    const keyLines = step =>
-      step
-        .split('\n')
-        .filter(line => line.includes('-next-build-web-v1-'))
-        .map(line => line.trim());
-
-    // Triggers: only push to main and manual dispatch. No PR, fork,
-    // merge-group or workflow_run code can reach the save step.
-    const header = warm.slice(0, warm.indexOf('\njobs:'));
-    expect(header).toMatch(
-      /^on:\n {2}push:\n {4}branches: \[main\]\n {2}workflow_dispatch:\n\npermissions:/m
-    );
-    for (const trigger of [
-      'pull_request',
-      'pull_request_target',
-      'merge_group',
-      'workflow_run',
-      'schedule',
-    ]) {
-      expect(header).not.toMatch(new RegExp(`^\\s+${trigger}:`, 'm'));
-    }
-    expect(header).toMatch(/^permissions:\n {2}contents: read\n\n/m);
-    expect(header).toContain('group: next-build-cache-warm-${{ github.ref }}');
-    expect(warm).not.toContain('secrets.');
-    expect(warm).not.toContain('TURBO_TOKEN');
-    expect(warm).toContain('persist-credentials: false');
-    expect(warm).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
-
-    const job = getJobBlock(warm, 'warm');
-    expect(job).toContain("github.ref == 'refs/heads/main' &&");
-    expect(job).toContain(
-      "(github.event_name == 'push' || github.event_name == 'workflow_dispatch')"
-    );
-
-    // Key scheme is byte-identical to the Build + Layout restore.
-    const ciRestore = stepIn(
-      buildLayout,
-      'Restore Next build cache (read-only)'
-    );
-    const lookup = stepIn(warm, "Look up this hour's Next build cache");
-    expect(keyLines(ciRestore)).toHaveLength(3);
-    expect(keyLines(lookup)).toEqual(keyLines(ciRestore).slice(0, 1));
-
-    // The warmer always compiles cold. Building on top of a restored older
-    // entry grew the cache past the 3 GiB save bound (3.51-3.54 GB vs 2.37 GB
-    // cold), so the warmer rebuilt on every main push and never saved.
-    expect(warm.match(/actions\/cache\/restore@/g)).toHaveLength(1);
-    expect(warm).not.toContain('restore-keys:');
-    const dayRun = step =>
-      step.split('\n').find(line => line.trim().startsWith('run:'));
-    expect(dayRun(stepIn(warm, 'Resolve Next build cache hour'))).toBe(
-      dayRun(stepIn(buildLayout, 'Resolve Next build cache hour'))
-    );
-    // Hourly keys keep merge groups on a recent main; older hours still
-    // restore through the hash prefix.
-    expect(dayRun(stepIn(warm, 'Resolve Next build cache hour'))).toContain(
-      'hour=$(date -u +%Y%m%d%H)'
-    );
-    expect(lookup).toContain('path: apps/web/.next/cache/turbopack');
-
-    // Lookup-only early exit: nothing heavy runs on an exact-key hit.
-    expect(lookup).toContain('lookup-only: true');
-    expect(lookup).not.toMatch(/^\s+if:/m);
-    const miss = "steps.next-build-cache-lookup.outputs.cache-hit != 'true'";
-    const setupAt = warm.indexOf('- uses: ./.github/actions/setup-node-pnpm');
-    expect(stepAt("Look up this hour's Next build cache")).toBeLessThan(
-      setupAt
-    );
-    expect(
-      warm.slice(setupAt, warm.indexOf('\n      - ', setupAt + 1))
-    ).toContain(miss);
-    for (const name of [
-      'Build web for cache',
-      'Measure Next build cache (trusted main only)',
-    ]) {
-      expect(stepIn(warm, name), name).toContain(miss);
-    }
-
-    // Same web build and public mock env as the combined head build.
-    const build = stepIn(warm, 'Build web for cache');
-    expect(build).toContain('run: pnpm turbo build --filter=@jovie/web\n');
-    expect(warm).not.toContain('TURBO_ENGINE_READ_ONLY');
-    const envLines = step =>
-      step.split('\n').filter(line => /^ {10}NEXT_[A-Z_]+:/.test(line));
-    const ciBuild = stepIn(buildLayout, 'Build exact combined head');
-    expect(envLines(build).length).toBeGreaterThan(0);
-    expect(envLines(build)).toEqual(envLines(ciBuild));
-
-    // The homepage visual compare restores the same entry, so it builds with
-    // the same NEXT_* env and task hash. NEXT_DISABLE_TOOLBAR is the one extra:
-    // turbo does not hash it and the homepage baselines render without the
-    // cookie banner it disables. No DATABASE_URL/VERCEL_ENV pass-through.
-    const visualBuild = stepIn(
-      getJobBlock(CI_WORKFLOW, 'ci-visual-snapshot-compare'),
-      'Build homepage for rendered snapshot compare'
-    );
-    expect(envLines(visualBuild)).toEqual([
-      ...envLines(build),
-      "          NEXT_DISABLE_TOOLBAR: '1'",
-    ]);
-    expect(visualBuild).not.toMatch(/^ {10}(DATABASE_URL|VERCEL_ENV):/m);
-
-    // Size/symlink guard and a single trusted-main save of the primary key.
-    const measure = stepIn(
-      warm,
-      'Measure Next build cache (trusted main only)'
-    );
-    const save = stepIn(warm, 'Save Next build cache (trusted main only)');
-    expect(measure).toContain("NEXT_BUILD_CACHE_MAX_BYTES: '3221225472'");
-    expect(measure).toContain('must not be a symlink');
-    expect(stepAt('Build web for cache')).toBeLessThan(
-      stepAt('Save Next build cache (trusted main only)')
-    );
-    expect(save).toContain(
-      "if: ${{ success() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && steps.next-build-cache-size.outputs.eligible == 'true' }}"
-    );
-    expect(save).toContain('path: apps/web/.next/cache/turbopack');
-    expect(save).toContain(
-      'key: ${{ steps.next-build-cache-lookup.outputs.cache-primary-key }}'
-    );
-    expect(warm.match(/actions\/cache\/save@/g)).toHaveLength(1);
-    expect(warm).not.toContain('uses: actions/cache@');
-
-    // Every pinned action SHA is one ci.yml already uses.
-    const pins = source =>
-      new Set(source.match(/uses: actions\/[\w/-]+@[0-9a-f]{40}/g));
-    const ciPins = pins(CI_WORKFLOW);
-    expect(pins(warm).size).toBeGreaterThan(0);
-    for (const pin of pins(warm)) expect(ciPins.has(pin), pin).toBe(true);
-  });
-
   it('supersedes stale iOS flights by stable queue PR identity (JOV-5800)', () => {
     const workflowHeader = IOS_CI_WORKFLOW.slice(
       0,
@@ -2586,6 +2433,44 @@ ${selectedGateScript}`,
     );
   });
 
+  it('recovers path-selected Apple lanes on queue-proven main (post-queue)', () => {
+    const apple = getJobBlock(CI_WORKFLOW, 'ci-apple-post-queue');
+    const ios = getJobBlock(CI_WORKFLOW, 'ci-ios');
+    const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
+    const release = getJobBlock(CI_WORKFLOW, 'main-release-ready');
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+
+    expect(apple).toContain("queue_proven == 'true'");
+    expect(apple).toContain('apple-post-queue-selection.mjs');
+    expect(apple).toContain('product-lane-classifier.mjs');
+    expect(apple).toContain('actions/setup-node@');
+    expect(apple).toContain("node-version-file: '.nvmrc'");
+    expect(apple).toContain(
+      "run_ios: ${{ steps.classify.outputs.run_ios || 'false' }}"
+    );
+    expect(ios).toContain('ci-apple-post-queue');
+    expect(macos).toContain('ci-apple-post-queue');
+    expect(release).toContain('ci-apple-post-queue');
+    expect(release).toContain('Queue-proven main deferred');
+    expect(release).not.toContain('"iOS Fast Unit + Coverage:$IOS_RESULT"');
+    // Queue still drops Apple lanes; only selected ones are recorded as deferred.
+    expect(pathChanges).toContain(
+      'merge queue does not wait on the hosted macOS pool'
+    );
+    expect(pathChanges).toContain('($selected | index($lane)) != null');
+  });
+
+  it('runs JovieMac Release boundary only on full regression', () => {
+    const iosGate = getJobBlock(IOS_CI_WORKFLOW, 'test');
+    const macBoundary = getStepBlock(
+      iosGate,
+      'Test native Mac development boundary'
+    );
+    expect(macBoundary).toContain('mac_configurations=(Debug)');
+    expect(macBoundary).toContain('mac_configurations=(Debug Release)');
+    expect(macBoundary).toContain('inputs.full-regression');
+  });
+
   it('avoids redundant SwiftPM uploads on persistent Mac runners (JOV-7346)', () => {
     const iosGate = getJobBlock(IOS_CI_WORKFLOW, 'test');
     const cache = getStepBlock(iosGate, 'Restore Swift package cache');
@@ -2596,20 +2481,33 @@ ${selectedGateScript}`,
     const fastGate = getStepBlock(iosGate, 'Run fast unit and coverage gate');
     const fullGate = getStepBlock(iosGate, 'Run full simulator regression');
 
-    // actions/cache saves in its post step too. Gating the action itself keeps
-    // both remote restore and upload off persistent runners, while hosted VMs
-    // still receive the lockfile- and toolchain-scoped package cache.
+    // Restore + explicit save (not actions/cache post) keeps remote I/O off
+    // persistent runners while still warming hosted primary keys after a
+    // successful resolve even when a later step fails (JOV-14016).
     expect(cache).toContain("if: ${{ runner.environment == 'github-hosted' }}");
-    expect(cache).toContain('uses: actions/cache@');
+    expect(cache).toContain('uses: actions/cache/restore@');
     expect(cache).toContain('.build/ios-ci/SourcePackages');
     expect(cache).toContain('~/Library/Caches/org.swift.swiftpm');
     expect(cache).toContain('steps.xcode-version.outputs.cache_key');
     expect(cache).toContain('Package.resolved');
     expect(cache).toContain('restore-keys:');
 
-    // Only remote caching is conditional on runner ownership. Both runner
-    // classes must resolve dependencies and execute their selected test gate.
-    expect(resolvePackages).not.toMatch(/^\s+if:/m);
+    // Remote cache restore stays github-hosted only. Resolve skips only on a
+    // full primary-key hit (cache-hit=true). Partial restore-keys hits and
+    // self-hosted runners (cache step skipped → empty output) still resolve.
+    expect(cache).toContain('id: swiftpm-cache');
+    expect(resolvePackages).toContain(
+      "if: ${{ steps.swiftpm-cache.outputs.cache-hit != 'true' }}"
+    );
+    expect(resolvePackages).toContain('id: swiftpm-resolve');
+    const savePackages = getStepBlock(iosGate, 'Save Swift package cache');
+    expect(savePackages).toContain('uses: actions/cache/save@');
+    expect(savePackages).toContain(
+      "steps.swiftpm-resolve.outcome == 'success'"
+    );
+    const receipt = getStepBlock(iosGate, 'Record SwiftPM cache receipt');
+    expect(receipt).toContain('ios-ci-swiftpm-cache-receipt.mjs');
+    expect(receipt).toContain('SWIFTPM_CACHE_HIT');
     expect(fastGate).toContain('if: ${{ !inputs.full-regression }}');
     expect(fastGate).toContain('bash apps/ios/scripts/run-unit-tests.sh');
     expect(fastGate).toContain('bash apps/ios/scripts/check_coverage.sh');
@@ -3035,7 +2933,25 @@ ${selectedGateScript}`,
       'group: production-mutation'
     );
     expect(POSTDEPLOY_PROBES_WORKFLOW).not.toContain('secrets: inherit');
-    expect(POSTDEPLOY_PROBES_WORKFLOW).not.toContain('environment:');
+    // JOV-9826: auth-smoke alone binds Preview – jovie so Stripe TEST keys
+    // resolve (repo-level secrets are empty). Every other probe job stays
+    // environment-free so read-only evidence never waits on env protection.
+    const authSmoke = getJobBlock(POSTDEPLOY_PROBES_WORKFLOW, 'auth-smoke');
+    expect(authSmoke).toMatch(/^\s+environment:\s+Preview – jovie\s*$/m);
+    for (const jobId of [
+      'resolve-target',
+      'smoke',
+      'lighthouse',
+      'golden-path-cert',
+      'product-crawl',
+      'product-crawl-merge',
+      'remediation',
+      'notify-failure',
+    ]) {
+      const job = getJobBlock(POSTDEPLOY_PROBES_WORKFLOW, jobId);
+      if (!job) continue;
+      expect(job, jobId).not.toMatch(/^\s+environment:/m);
+    }
 
     const resolve = getJobBlock(POSTDEPLOY_PROBES_WORKFLOW, 'resolve-target');
     expect(resolve).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);

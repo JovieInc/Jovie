@@ -1,7 +1,6 @@
 import { cleanup, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
-import { APP_ROUTES } from '@/constants/routes';
 
 const { renderHeaderNav, renamedLinks } = vi.hoisted(() => ({
   renderHeaderNav: vi.fn(),
@@ -40,12 +39,8 @@ describe('marketing header language independence', () => {
 
     expect(renderHeaderNav).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        navLinks: [
-          { href: APP_ROUTES.HOME, label: 'Jovie', treatment: 'wordmark' },
-          renamedLinks[0],
-          renamedLinks[1],
-          renamedLinks[2],
-        ],
+        // LogoLink owns the brand; desktop nav is destinations only (JOV-14240).
+        navLinks: [renamedLinks[0], renamedLinks[1], renamedLinks[2]],
         mobileNavLinks: renamedLinks,
       })
     );

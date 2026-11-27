@@ -1,5 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { MetadataAgentPanel } from './MetadataAgentPanel';
 
 const PALETTE = /\b(?:bg|text|border)-(?:red|amber|emerald)-\d{2,3}\b/;
@@ -96,5 +98,101 @@ describe('MetadataAgentPanel status callouts', () => {
       await screen.findByText('No open drift issues on the latest snapshot.')
     ).toHaveClass('text-success-text');
     expect(screen.getByText('Bounce once')).toHaveClass('text-error-text');
+  });
+  it('prepares a package with a POST and rebuilds from the status', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(
+      async (url: string, init?: { method?: string }) => ({
+        ok: true,
+        json: async () => {
+          if (url.includes('/providers')) return { providers: [] };
+          if (url.includes('/prepare')) return { success: true };
+          return { requests: [] };
+        },
+        init,
+      })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { container } = renderPanel();
+
+    const prepare = await screen.findByRole('button', {
+      name: 'Prepare Package',
+    });
+    await waitFor(() => expect(prepare).toBeEnabled());
+    await user.click(prepare);
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/metadata-submissions/prepare',
+        expect.objectContaining({ method: 'POST' })
+      )
+    );
+    await expectNoA11yViolations(container);
+  });
+
+  it('approves and sends an awaiting package', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => {
+        if (url.includes('/providers')) return { providers: [] };
+        if (url.includes('/approve-send')) return { success: true };
+        return { requests: [baseRequest({ status: 'awaiting_approval' })] };
+      },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderPanel();
+
+    const approve = await screen.findByRole('button', {
+      name: 'Approve And Send',
+    });
+    await waitFor(() => expect(approve).toBeEnabled());
+    await user.click(approve);
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/metadata-submissions/approve-send',
+        expect.objectContaining({ method: 'POST' })
+      )
+    );
+  });
+
+  it('drafts a correction for open drift issues and shows a failure', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (url: string) => ({
+      ok: !url.includes('/draft-correction'),
+      json: async () => {
+        if (url.includes('/providers')) return { providers: [] };
+        if (url.includes('/draft-correction')) {
+          return { success: false, error: 'Draft failed.' };
+        }
+        return {
+          requests: [
+            baseRequest({
+              status: 'live',
+              issues: [
+                {
+                  id: 'i1',
+                  field: 'title',
+                  issueType: 'mismatch',
+                  severity: 'high',
+                  expectedValue: 'A',
+                  observedValue: 'B',
+                  status: 'open',
+                },
+              ],
+            }),
+          ],
+        };
+      },
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { container } = renderPanel();
+
+    const draft = await screen.findByRole('button', {
+      name: 'Draft Correction',
+    });
+    await waitFor(() => expect(draft).toBeEnabled());
+    await user.click(draft);
+    expect(await screen.findByText('Draft failed.')).toBeVisible();
+    await expectNoA11yViolations(container);
   });
 });

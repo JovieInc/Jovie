@@ -117,21 +117,42 @@ describe('ArtistProfileLandingPage', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('leaves the FAQ out when its flag is off', async () => {
+  it('ships the six homepage-system sections without cut mid-page chapters', async () => {
     const { container } = render(
       <ArtistProfileLandingPage
         copy={ARTIST_PROFILE_COPY}
-        flags={{ ...ARTIST_PROFILE_FLAGS, FAQ: false }}
+        flags={ARTIST_PROFILE_FLAGS}
         logoPlacement={{ page: '/artist-profiles' }}
       />
     );
 
     expect(
-      screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.specWall)
+      screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.hero)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.adaptive)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.outcomes)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.capture)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.howItWorks)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.showcase)
     ).toBeInTheDocument();
     expect(
       screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.finalCta)
     ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.opinionated)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.specWall)
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.faq)
     ).not.toBeInTheDocument();

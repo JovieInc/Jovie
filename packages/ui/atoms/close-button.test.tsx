@@ -158,3 +158,9 @@ describe('CloseButton accessibility', () => {
     await expectNoA11yViolations(container);
   });
 });
+
+describe('closeButtonClassName press', () => {
+  it('presses through the shared press utility', () => {
+    expect(closeButtonClassName.split(' ')).toContain('press');
+  });
+});

@@ -1,13 +1,11 @@
 'use client';
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { Button } from '@jovie/ui';
+import { Button, IconButton } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { useClipboard } from '@/hooks/useClipboard';
-import { cn } from '@/lib/utils';
 import { DrawerPropertyRow } from './DrawerPropertyRow';
 import { DrawerTabs } from './DrawerTabs';
 import { EntityHeader } from './EntityHeader';
@@ -72,24 +70,24 @@ function PropertyCopyButton({
 }) {
   const { copy, isSuccess } = useClipboard();
   return (
-    <InlineIconButton
+    <IconButton
+      fade='parent'
+      variant='inline'
       type='button'
       size='sm'
-      fadeOnParentHover
       aria-label={`Copy ${label}`}
       onClick={() => {
         copy(copyValue).catch(() => {
           // Copy failures are non-critical; useClipboard reports the error.
         });
       }}
-      className={cn(isSuccess && 'text-success')}
     >
       {isSuccess ? (
-        <Check className='h-3.5 w-3.5' aria-hidden='true' />
+        <Check className='h-3.5 w-3.5 text-success' aria-hidden='true' />
       ) : (
         <Copy className='h-3.5 w-3.5' aria-hidden='true' />
       )}
-    </InlineIconButton>
+    </IconButton>
   );
 }
 

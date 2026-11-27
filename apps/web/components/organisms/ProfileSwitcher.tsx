@@ -7,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  PlainButton,
 } from '@jovie/ui';
 import { Check, ChevronDown, Loader2, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -67,7 +68,7 @@ export function IdentitySwitcher() {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button
+          <PlainButton
             type='button'
             className={cn(
               'flex h-7 w-full items-center gap-1.5 rounded-full px-2 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:bg-sidebar-accent/60',
@@ -101,7 +102,7 @@ export function IdentitySwitcher() {
               className='size-2.5 shrink-0 text-sidebar-item-icon group-data-[collapsible=icon]:hidden'
               aria-hidden='true'
             />
-          </button>
+          </PlainButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align='start' sideOffset={4} className='w-55'>
           {identities.map(identity => {

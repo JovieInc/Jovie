@@ -28,6 +28,12 @@ class FakeGH:
             if path.endswith("/comments") and "POST" in args:
                 body = next(a[5:] for a in args if a.startswith("body="))
                 self.comments.append({"id": 7, "body": body})
+            elif "/issues/comments/" in path and "PATCH" in args:
+                body = next(a[5:] for a in args if a.startswith("body="))
+                cid = int(path.rsplit("/", 1)[-1])
+                for c in self.comments:
+                    if c["id"] == cid:
+                        c["body"] = body
             return 0, "{}"
         if "/issues/" in path and path.split("?")[0].endswith("/comments"):
             return 0, json.dumps(self.comments)
@@ -127,6 +133,45 @@ class Routing(unittest.TestCase):
         second = R.route(event(), gh, now=NOW + 60)  # same holder keeps the lease: no extra label call
         self.assertIsNone(second["labeled"])
         self.assertEqual(sum(1 for a in gh.writes() if "/labels" in " ".join(a)), 1)
+
+
+    def test_same_holder_new_failing_head_is_renewed_recorded_and_notified(self):  # JOV-13117
+        gh = FakeGH(jobs=RED_JOB, notes=RED_NOTE)
+        first = R.route(event(), gh, now=NOW)
+        self.assertEqual(first["lane"], "codex")
+        head2 = "11ea61c9e17d4ef47584af3d5df7781816370350"
+        second = R.route(event(head=head2), gh, now=NOW + 60)
+        self.assertEqual(second["lane"], "codex")                 # holder keeps it
+        self.assertEqual(second["epoch"], first["epoch"])         # no duplicate grant
+        self.assertTrue(second["head_renewed"])                   # lease followed the head
+        self.assertEqual(second["linear"], "skipped:no-key")      # holder woken about the new head
+        lease = L.parse_lease(gh.comments[-1]["body"])
+        self.assertEqual(lease["head_sha"], head2)
+        self.assertEqual(lease["lifetime_attempts"], 1)           # the failure was recorded
+        self.assertEqual(lease["attempts"][0]["head"], head2)
+
+    def test_many_failing_heads_same_holder_one_attempt_per_head(self):  # JOV-13117
+        gh = FakeGH(jobs=RED_JOB, notes=RED_NOTE)
+        R.route(event(), gh, now=NOW)
+        heads = [f"{i:02d}ea61c9e17d4ef47584af3d5df7781816370350" for i in range(1, 4)]
+        receipts = [R.route(event(head=h), gh, now=NOW + 60 + i) for i, h in enumerate(heads)]
+        self.assertTrue(all(r["lane"] == "codex" for r in receipts))
+        self.assertEqual([r["epoch"] for r in receipts], [1, 1, 1])   # grants never duplicated
+        lease = L.parse_lease(gh.comments[-1]["body"])
+        self.assertEqual(lease["lifetime_attempts"], 3)               # once per new head
+        self.assertEqual(sorted(a["head"][:2] for a in lease["attempts"]), ["01", "02", "03"])
+        self.assertEqual(lease["head_sha"], heads[-1])
+
+    def test_repeat_failure_on_same_head_records_once_and_never_renotifies(self):  # JOV-13117
+        gh = FakeGH(jobs=RED_JOB, notes=RED_NOTE)
+        first = R.route(event(), gh, now=NOW)
+        self.assertEqual(first["linear"], "skipped:no-key")           # woken once at grant
+        second = R.route(event(), gh, now=NOW + 60)                   # same head, re-delivered
+        self.assertEqual(second["epoch"], first["epoch"])             # no duplicate grant
+        self.assertFalse(second["head_renewed"])
+        self.assertNotIn("linear", second)                            # already woken for this head
+        lease = L.parse_lease(gh.comments[-1]["body"])
+        self.assertEqual(lease["lifetime_attempts"], 1)               # exactly one row, not two
 
     def test_kill_switch_makes_no_calls(self):
         os.environ["NOABANDON_ENABLED"] = "false"

@@ -4,7 +4,6 @@
  * Tests for the PaymentHandler which processes
  * invoice.payment_succeeded and invoice.payment_failed webhook events.
  */
-
 vi.mock('@/lib/server-analytics', () => ({
   trackServerEvent: vi.fn(async () => ({
     ok: true as const,
@@ -433,6 +432,7 @@ describe('@critical PaymentHandler', () => {
         amountPaid: 2999,
         currency: 'usd',
         priceId: 'price_pro',
+        invoiceId: 'in_recover',
       });
     });
 

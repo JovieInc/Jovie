@@ -14,6 +14,14 @@ stale and caused failing PRs):
 - **Branch model:** small PRs target `main` via the native GitHub merge queue.
   There is NO `develop`, `preview`, or `production` branch. Never push to
   `main` directly. See `docs/PR_FLOW.md` and `.github/MERGE_QUEUE.md`.
+- **Merge queue is hands-off:** green PRs merge on green. Enroll only your
+  own PR once it is green. Never dequeue, reorder or re-enroll any PR to jump
+  position, yours included, and never remove another PR because the queue is
+  slow. Report the wait and keep working; queue throughput belongs to the CI
+  owners.
+- **No deploys:** never run `wrangler deploy`, `vercel deploy --prod` or any
+  other production or infra deploy, or anything that spends money, without
+  Tim's explicit yes.
 - **Stack:** Next.js 16 + Neon PostgreSQL with Drizzle ORM. The app was
   MIGRATED OFF Supabase — do not write Supabase client code, RLS policies, or
   `auth.jwt()` SQL. See `.claude/rules/db.md`.

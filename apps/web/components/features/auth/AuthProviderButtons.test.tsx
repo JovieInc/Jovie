@@ -92,4 +92,15 @@ describe('AuthProviderButtons states', () => {
     expect(screen.getAllByRole('button')).toHaveLength(2);
     await expectNoA11yViolations(container);
   });
+
+  it('renders the provider pill as a type=button that suppresses the PlainButton outline', () => {
+    render(<AuthProviderButtonSlot provider='google' disabled={false} />);
+
+    const button = screen.getByRole('button', { name: 'Continue with Google' });
+    expect(button).toHaveAttribute('type', 'button');
+    expect(button).toHaveClass(
+      'auth-provider-button',
+      'focus-visible:outline-none'
+    );
+  });
 });

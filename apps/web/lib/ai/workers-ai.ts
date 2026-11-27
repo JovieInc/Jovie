@@ -8,9 +8,15 @@ import { env } from '@/lib/env-server';
  * startup credits, not the Vercel AI Gateway balance).
  *
  * Stock path: the AI SDK OpenAI-compatible provider against Jovie's Workers
- * AI relay (OpenAI-compatible `/v1/chat/completions`). The routed models are the SAME open-weight models the
- * Gateway serves (`zai/glm-5.3` and `zai/glm-5.3-flash`), so a failover or a
- * Workers-first route changes the bill, not the model.
+ * AI relay (OpenAI-compatible `/v1/chat/completions`). `zai/glm-5.3` maps to
+ * its same-weights Workers AI twin. `zai/glm-5.3-flash` no longer does:
+ * Cloudflare retired `@cf/zai-org/glm-5.3-flash` on 2026-11-20 (410 Gone,
+ * error 5028 — changelog "Planned model deprecations on Workers AI",
+ * 2026-11-05), so its Workers AI twin is now
+ * `@cf/deepseek-ai/deepseek-v4.1-flash-1017` (JOV-13141): 1M context,
+ * function calling, reasoning, vision; $0.30 per M input tokens, $1.20 per M
+ * output, $0.006 per M cached input (catalog 2026-11-19). A failover or a
+ * Workers-first route changes the bill and, for the flash tier, the model.
  *
  * Off by default: with no `WORKERS_AI_TOKEN` every helper reports "not
  * configured" and callers keep their Gateway-only behavior.
@@ -32,7 +38,7 @@ export const WORKERS_AI_RELAY_BASE_URL: string =
  */
 export const WORKERS_AI_MODEL_MAP: Readonly<Record<string, string>> = {
   'zai/glm-5.3': '@cf/zai-org/glm-5.3',
-  'zai/glm-5.3-flash': '@cf/zai-org/glm-5.3-flash',
+  'zai/glm-5.3-flash': '@cf/deepseek-ai/deepseek-v4.1-flash-1017',
 };
 
 export function workersAiModelFor(gatewayModelId: string): string | undefined {
