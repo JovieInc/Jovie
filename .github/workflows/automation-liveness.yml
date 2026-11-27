@@ -131,6 +131,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       missed_slot: ${{ steps.synthetic-heartbeat.outputs.missed_slot }}
+      receipt_coverage_complete: ${{ steps.compare-receipts.outputs.receipt_coverage_complete }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -199,6 +200,7 @@ jobs:
           fi
 
       - name: Compare receipts to max staleness
+        id: compare-receipts
         if: ${{ always() }}
         env:
           GH_TOKEN: ${{ github.token }}
@@ -276,6 +278,24 @@ jobs:
         with:
           path: .liveness-marker
           key: automation-liveness-ran-${{ needs.gate.outputs.bucket }}
+
+  receipt-coverage:
+    name: Check automation receipt coverage
+    needs: liveness
+    # A missing report supplies no verdict. Coverage is independent of the detector heartbeat.
+    if: ${{ !cancelled() && needs.liveness.outputs.receipt_coverage_complete != '' }}
+    permissions: {}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    steps:
+      - name: Check for live automations without receipts
+        env:
+          RECEIPT_COVERAGE_COMPLETE: ${{ needs.liveness.outputs.receipt_coverage_complete }}
+        run: |
+          if [ "$RECEIPT_COVERAGE_COMPLETE" != 'true' ]; then
+            echo '::error title=Automation receipt coverage unknown::Live automation entries have no run receipt. See the Evidence gaps section in the Check automation heartbeats job summary for entries, owners, and measurement gaps.'
+            exit 1
+          fi
 
   # JOV-6813: GitHub drops the 00:17 and 12:17 crons before a run exists, so
   # the six-hour canary goes quiet for about twelve hours and this dead-man

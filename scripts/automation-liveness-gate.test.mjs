@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -39,6 +39,37 @@ test('the liveness job marks its bucket after the check, even when the check fai
     workflow.jobs.gate.outputs.bucket,
     '${{ steps.bucket.outputs.bucket }}'
   );
+});
+
+test('unknown coverage fails its own job, positive evidence passes it, and an absent report skips it', () => {
+  const liveness = workflow.jobs.liveness;
+  const coverage = workflow.jobs['receipt-coverage'];
+  assert.equal(liveness.name, 'Check automation heartbeats');
+  assert.equal(
+    liveness.outputs.receipt_coverage_complete,
+    '${{ steps.compare-receipts.outputs.receipt_coverage_complete }}'
+  );
+  assert.equal(coverage.needs, 'liveness');
+  assert.equal(
+    coverage.if,
+    "${{ !cancelled() && needs.liveness.outputs.receipt_coverage_complete != '' }}"
+  );
+  const step = coverage.steps[0];
+  assert.equal(
+    step.env.RECEIPT_COVERAGE_COMPLETE,
+    '${{ needs.liveness.outputs.receipt_coverage_complete }}'
+  );
+  const run = value =>
+    spawnSync('bash', ['-e', '-c', step.run], {
+      env: { RECEIPT_COVERAGE_COMPLETE: value },
+      encoding: 'utf8',
+    });
+  const pass = run('true');
+  assert.equal(pass.status, 0);
+  assert.equal(pass.stdout, '');
+  const fail = run('false');
+  assert.equal(fail.status, 1);
+  assert.match(fail.stdout, /Automation receipt coverage unknown/);
 });
 
 for (const [event, seen, due] of [

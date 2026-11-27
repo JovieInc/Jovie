@@ -149,7 +149,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:synthetic-canary-catchup
-    jobCount: 4
+    jobCount: 5
   - name: Buyer Eval Gate
     path: .github/workflows/buyer-eval-gate.yml
     active: true

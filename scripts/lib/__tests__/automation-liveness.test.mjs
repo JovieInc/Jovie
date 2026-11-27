@@ -12,6 +12,7 @@ import {
   main as runMain,
 } from '../../automation-liveness.mjs';
 import { ADMISSION_BLOCKING_LABELS } from '../admission-hold-labels.mjs';
+import * as automationRegistry from '../automation-registry.mjs';
 import {
   livenessDecisions,
   livenessFingerprint,
@@ -1723,6 +1724,41 @@ describe('alert state preservation (JOV-8843)', () => {
   beforeEach(() => {
     vi.mocked(applyRemediationDecisionWithRetry).mockClear();
   });
+
+  it.each([
+    ['no receipt', 'vercel:jovie-web:frequent', 'degraded', false],
+    ['host-local receipt', 'gem:lanes-doctor', 'healthy', true],
+    ['hosted receipt', null, 'healthy', true],
+  ])(
+    'exports coverage separately from heartbeat evidence with %s',
+    async (_label, id, status, complete) => {
+      const fixture = only(
+        ...(id ? ['summer:model-turns', id] : ['summer:model-turns'])
+      );
+      const load = vi
+        .spyOn(automationRegistry, 'loadRegistry')
+        .mockReturnValue(fixture);
+      const heartbeat = persistState({});
+      const reportPath = `${heartbeat}.report`;
+      const output = `${heartbeat}.output`;
+      try {
+        await runMain({
+          argv: ['--output', reportPath],
+          env: { GITHUB_OUTPUT: output },
+          fetchImpl: recoveredFetch,
+        });
+        expect(JSON.parse(readFileSync(reportPath, 'utf8'))).toMatchObject({
+          status,
+          results: [{ status: 'fresh' }],
+        });
+        expect(readFileSync(output, 'utf8')).toBe(
+          `receipt_coverage_complete=${complete}\n`
+        );
+      } finally {
+        load.mockRestore();
+      }
+    }
+  );
 
   it('keeps filed alert state on a diagnostic run without --file', async () => {
     const path = persistState({ [FINGERPRINT]: 'red' });
