@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { runGh } from '../packages/api-client/gh.ts';
 import { runCheck as runCredentialsCheck } from './credentials-spend-check.mjs';
+import { runFindingRecoveryFromCheckpoint } from './lib/bot-finding-recovery.mjs';
 import {
   COMPANY_DOMAINS,
   parseRdap,
@@ -27,11 +28,6 @@ import { runDriftChecks } from './lib/source-drift.mjs';
 import { collectSwiftArchMetrics } from './swift-arch/guard.mjs';
 
 const execFileAsync = promisify(execFile);
-
-function argument(name) {
-  const index = process.argv.indexOf(name);
-  return index === -1 ? null : process.argv[index + 1];
-}
 
 async function gh(args) {
   const { stdout } = await execFileAsync('gh', args, {
@@ -459,7 +455,8 @@ function warn(message) {
 }
 
 async function main() {
-  const mode = argument('--mode') || 'all';
+  const modeArg = process.argv.indexOf('--mode');
+  const mode = (modeArg >= 0 && process.argv[modeArg + 1]) || 'all';
   const dryRun =
     process.argv.includes('--dry-run') || process.env.DRY_RUN === 'true';
   const token = readVercelReadonlyToken();
@@ -482,6 +479,11 @@ async function main() {
       return metrics;
     },
     loadProof: () => loadProofPlans(),
+    recoverFindings: () =>
+      runFindingRecoveryFromCheckpoint({
+        path: process.env.BOT_FINDINGS_CURSOR,
+        dryRun,
+      }),
     vercelTokenPresent: Boolean(token),
     upsert: upsertLinearIssueByTitleFingerprint,
     apiKey: process.env.LINEAR_API_KEY,

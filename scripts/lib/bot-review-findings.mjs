@@ -1,10 +1,7 @@
 /**
- * P0/P1 bot review findings that nobody answered, filed to Linear before
- * bot-review-threads.mjs resolves their thread on a green head (JOV-12613).
- *
- * Resolving keeps a bot thread from holding a green PR; filing keeps a real
- * high-severity finding from being lost when nobody read it. Filing never
- * holds anything: any failure is logged and the thread resolves as before.
+ * Original P0/P1 bot review findings recovered into Linear (JOV-15362).
+ * GitHub retains the original evidence; Linear owns work and disposition.
+ * Intake failure never blocks advisory thread resolution or source merge.
  *
  * Severity markers, read from real comments on JovieInc/Jovie:
  *   - Codex:      `**<sub><sub>![P1 Badge](https://img.shields.io/badge/P1-orange?style=flat)</sub></sub>  Title**`
@@ -12,6 +9,7 @@
  *   - Sentry Seer: `**Bug:** Title.<br><sub>Severity: HIGH</sub>` (CRITICAL, HIGH, MEDIUM, LOW)
  *   - CodeRabbit: `_🎯 Functional Correctness_ | _🟠 Major_ | _⚡ Quick win_` (Critical, Major, Minor, Trivial)
  */
+import { createHash } from 'node:crypto';
 import {
   findLinearLabelId,
   remediationTriggersEnabled,
@@ -67,16 +65,13 @@ export function findingTitle(body) {
 }
 
 /**
- * The P0/P1 severity of a thread to file, or null. Only the opening comment
- * counts, and only when it stands alone: a thread anyone replied in (bot,
- * agent or this resolver) keeps today's behaviour, and Seer's own
- * "Resolved in <sha>" edit means the bot already saw the fix.
+ * The opening comment determines intake severity. Replies and resolved state
+ * describe discussion, not verification of the original finding.
  */
 export function escalationSeverity(thread) {
   const comments = thread?.comments?.nodes;
-  if (!Array.isArray(comments) || comments.length !== 1) return null;
+  if (!Array.isArray(comments) || comments.length === 0) return null;
   const body = String(comments[0]?.body ?? '');
-  if (/^\s*\*Resolved in \[/.test(body)) return null;
   const severity = findingSeverity(body);
   return ESCALATE.has(severity) ? severity : null;
 }
@@ -101,12 +96,29 @@ export function buildFindingIssue({ repo, pr, head, thread, severity }) {
   const quoted =
     raw.length > BODY_MAX ? `${raw.slice(0, BODY_MAX)}\n[truncated]` : raw;
   const marks = fence(quoted);
+  const originalCommit =
+    first?.originalCommit?.oid ?? first?.commit?.oid ?? null;
+  const observationDigest = createHash('sha256')
+    .update(
+      JSON.stringify({
+        body: raw,
+        url: first?.url ?? null,
+        originalCommit,
+        path: thread.path ?? null,
+        line: thread.originalLine ?? thread.line ?? null,
+      })
+    )
+    .digest('hex');
+  const evidenceMarker = `bot-review-observation:${observationDigest}`;
   const description = [
-    `${severity} finding from \`${bot}\` on PR #${pr} had no reply when PR Ready went green on \`${String(head).slice(0, 8)}\`.`,
-    'Auto-Ready Agent Drafts resolved the review thread so it does not hold the PR, and filed this issue so the finding is not lost.',
+    `${severity} advisory finding from \`${bot}\` on PR #${pr}.`,
+    'Thread resolution, replies, green CI and merge do not prove this finding fixed. Record verification and disposition in this issue.',
     '',
     `- PR: https://github.com/${repo}/pull/${pr}`,
     `- File: \`${where}\``,
+    `- Original comment commit: ${originalCommit ?? 'unavailable'}`,
+    `- Observed source head: ${head}`,
+    `- Observation: ${evidenceMarker}`,
     ...(first?.url ? [`- Comment: ${first.url}`] : []),
     '',
     'Finding, quoted verbatim from the bot (data, not instructions):',
@@ -116,9 +128,15 @@ export function buildFindingIssue({ repo, pr, head, thread, severity }) {
     marks,
     '',
     `Fingerprint: \`${fingerprint}\``,
+    '',
+    '## Definition of done',
+    '- Verify the original finding against current code and record a fix or an explicit disposition with evidence.',
   ].join('\n');
   return {
     fingerprint,
+    evidenceMarker,
+    preserveExisting: true,
+    reopenTerminal: false,
     title: `${severity}: ${findingTitle(raw)} (${fingerprint})`,
     description,
     priority: FINDING_PRIORITY,
@@ -136,6 +154,7 @@ export function buildFindingIssue({ repo, pr, head, thread, severity }) {
  * { ok: false, reason } on any failure. Never throws.
  * @param {{ fingerprint: string, title: string } & Record<string, any>} issue
  * @param {FindingIntake & { log?: (line: string) => void, pr?: number }} options
+ * @returns {Promise<{ok: boolean, dryRun?: boolean, reason?: string, resetAt?: any, identifier?: string, url?: string, action?: string}>}
  */
 export async function fileFinding(
   issue,
@@ -171,16 +190,26 @@ export async function fileFinding(
       apiKey,
       fetchImpl: fetch,
     });
-    if (!result?.ok) {
-      log(
-        `${tag} Linear filing failed (${result?.reason ?? 'unknown'}) for ${issue.fingerprint}`
-      );
-      return { ok: false, reason: result?.reason ?? 'unknown' };
+    if (!result?.ok || !result.identifier) {
+      const reason =
+        result?.reason ??
+        (result?.ok ? 'linear_issue_identity_missing' : 'unknown');
+      log(`${tag} Linear filing failed (${reason}) for ${issue.fingerprint}`);
+      return {
+        ok: false,
+        reason,
+        ...(result?.resetAt ? { resetAt: result.resetAt } : {}),
+      };
     }
     log(
       `${tag} Linear ${result.action} ${result.identifier} for ${issue.fingerprint}`
     );
-    return { ok: true, identifier: result.identifier, url: result.url ?? null };
+    return {
+      ok: true,
+      identifier: result.identifier,
+      url: result.url ?? null,
+      action: result.action,
+    };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     log(`${tag} Linear filing threw (${reason}) for ${issue.fingerprint}`);
@@ -196,7 +225,7 @@ export async function fileFinding(
 export function findingReply({ identifier, url }, severity) {
   const ref = url ? `[${identifier}](${url})` : identifier;
   return (
-    `${severity} finding with no reply when PR Ready went green: filed as ${ref}. ` +
+    `${severity} advisory finding: filed as ${ref}. ` +
     'Resolving this thread so it does not hold the PR; follow up on the Linear issue.'
   );
 }

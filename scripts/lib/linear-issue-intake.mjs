@@ -1,5 +1,9 @@
 import { createHash } from 'node:crypto';
 import { linearRequest } from './linear-cooldown.mjs';
+import {
+  preserveLinearFindingEvidence,
+  readLinearEvidenceComments,
+} from './linear-issue-evidence.mjs';
 
 export const JOVIE_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
 
@@ -113,35 +117,10 @@ export async function listLinearIssueComments({
   apiKey = process.env.LINEAR_API_KEY,
   fetchImpl = fetch,
 }) {
-  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
-  if (!issueId) return { ok: false, reason: 'missing_issue_id' };
-  const result = await linearGraphql(
-    {
-      query: `
-        query ListLinearIssueComments($id: String!) {
-          issue(id: $id) {
-            comments(first: 100) {
-              nodes { id body createdAt }
-            }
-          }
-        }
-      `,
-      variables: { id: issueId },
-      apiKey,
-      fetchImpl,
-    },
-    'linear_comment_list'
+  return readLinearEvidenceComments(
+    { issueId, apiKey, fetchImpl },
+    linearGraphql
   );
-  if (!result.ok) return result;
-  const nodes = result.data?.issue?.comments?.nodes ?? [];
-  return {
-    ok: true,
-    comments: nodes.map(node => ({
-      id: node?.id ?? null,
-      body: String(node?.body ?? ''),
-      createdAt: node?.createdAt ?? null,
-    })),
-  };
 }
 
 const REMEDIATION_KEY_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -348,6 +327,9 @@ export async function upsertLinearIssueByTitleFingerprint({
   title,
   description,
   priority = 1,
+  // Opt-in: preserve the owning workpad, assignment, labels and disposition.
+  preserveExisting = false,
+  evidenceMarker = null,
   // Optional state name resolved from the team's workflow (JOV-5966). 'Todo'
   // files into Backlog: admission is the only Backlog -> Todo writer.
   createStateName = null,
@@ -463,6 +445,17 @@ export async function upsertLinearIssueByTitleFingerprint({
       labelSource
     );
   }
+
+  if (match && preserveExisting)
+    return preserveLinearFindingEvidence({
+      match,
+      evidenceMarker,
+      descriptionBody,
+      apiKey,
+      fetchImpl,
+      listComments: listLinearIssueComments,
+      addComment: addLinearIssueComment,
+    });
 
   let labelId = null;
   if (manageLabels) {
