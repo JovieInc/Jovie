@@ -1,0 +1,196 @@
+{
+  "schema": "jovie.code-review-corpus-recipe/v1",
+  "issue": "JOV-15364",
+  "manifest": {
+    "schema": "jovie.code-review-corpus/v1",
+    "cases": [
+      {
+        "id": "case-001",
+        "inputDigest": "f45c2e384762d0fdac289b6f3762592f39bd69311643fde722b31cb03ad9c3d7"
+      },
+      {
+        "id": "case-002",
+        "inputDigest": "61a168210125e3dbee899c46222d938cfef514bd275be53ec69f1912a91b00b7"
+      },
+      {
+        "id": "case-003",
+        "inputDigest": "7db6b9532784c36a6ff5c1c6024bc82eb82f5449d4213dcb98b100410ce5180e"
+      },
+      {
+        "id": "case-004",
+        "inputDigest": "e36e4330b32ee49251990b9e04d47eeb3ad0404fe0dbbc0fc06f410145e6a791"
+      },
+      {
+        "id": "case-005",
+        "inputDigest": "3e6aea794e392c781159171614e5b7c90a508d6b32b520adf42108b6edcb6115"
+      }
+    ],
+    "answersDigest": "4f53fc25a795755a44f05c7ea810ffe63eb1fc6a342bf5423120e5dde8721c03",
+    "corpusDigest": "3453dad76ececfd5b6604d94710e8be4c22cae4892e80de78e5b688da6415e45"
+  },
+  "materializer": "node scripts/capability-benchmark/review-benchmark.mjs materialize source.json NEW_DIR",
+  "sourceSchema": "jovie.code-review-corpus-source/v1",
+  "retrieval": "Fetch original PR metadata/diff and surrounding context via authenticated GitHub at the listed full SHAs; compare complete diff plus/minus counts to original PR additions/deletions. Reconstruct source.json per REVIEW_BENCHMARK.md, materialize, and compare corpusDigest to this trusted manifest. Original sources and answers must never be in reviewer workspace.",
+  "cases": [
+    {
+      "id": "case-001",
+      "source": {
+        "repository": "JovieInc/Jovie",
+        "originalPr": 19098,
+        "baseSha": "e9476e815d115bd2acba5114af9a2ff64994f1ef",
+        "headSha": "f9a19a258f79c7e4ed3e0bd24596d1578a74826d"
+      },
+      "context": [
+        {
+          "path": "apps/web/data/appScreens/validation.ts",
+          "revisionSha": "f9a19a258f79c7e4ed3e0bd24596d1578a74826d"
+        },
+        {
+          "path": "apps/web/data/appScreens/penParity.ts",
+          "revisionSha": "f9a19a258f79c7e4ed3e0bd24596d1578a74826d"
+        }
+      ],
+      "answer": {
+        "defects": [
+          {
+            "id": "pending-pen-decision",
+            "path": "apps/web/data/appScreens/validation.ts",
+            "startLine": 155,
+            "endLine": 194,
+            "rationale": "Reference eligibility is not rejected when a mapped Pen root still has pending geometry or ownership decisions. Promoting the table or entity sidebar is accepted despite unresolved decisions.",
+            "evidenceUrl": "https://github.com/JovieInc/Jovie/pull/19109"
+          }
+        ],
+        "scope": "listed-defects-only",
+        "verification": {
+          "fixSha": "541ef2fb5fa7a902f511f3c55479bae00e946847",
+          "evidenceUrl": "https://github.com/JovieInc/Jovie/pull/19109",
+          "rationale": "Adjudicated against original source and the linked repair diff. Reference eligibility is not rejected when a mapped Pen root still has pending geometry or ownership decisions. Promoting the table or entity sidebar is accepted despite unresolved decisions."
+        }
+      }
+    },
+    {
+      "id": "case-002",
+      "source": {
+        "repository": "JovieInc/Jovie",
+        "originalPr": 19417,
+        "baseSha": "75eae083949c9e30f4683df5c85ac44a28f868e7",
+        "headSha": "c0256dc76243b848760a6a44dcbcbdd8a995c484"
+      },
+      "context": [
+        {
+          "path": "apps/web/playwright.config.screenshots.ts",
+          "revisionSha": "c0256dc76243b848760a6a44dcbcbdd8a995c484"
+        }
+      ],
+      "answer": {
+        "defects": [
+          {
+            "id": "screenshot-test-selection",
+            "path": "apps/web/playwright.config.screenshots.ts",
+            "startLine": 27,
+            "endLine": 43,
+            "rationale": "The explicit testMatch allowlist excludes the two newly added smartlink screen-proof specs, so named CLI invocations select zero tests and fail before the new proof can be captured.",
+            "evidenceUrl": "https://github.com/JovieInc/Jovie/pull/19467"
+          }
+        ],
+        "scope": "listed-defects-only",
+        "verification": {
+          "fixSha": "60686a3945a143bc81bb1e99093e8d1608747681",
+          "evidenceUrl": "https://github.com/JovieInc/Jovie/pull/19467",
+          "rationale": "Adjudicated against original source and the linked repair diff. The explicit testMatch allowlist excludes the two newly added smartlink screen-proof specs, so named CLI invocations select zero tests and fail before the new proof can be captured."
+        }
+      }
+    },
+    {
+      "id": "case-003",
+      "source": {
+        "repository": "JovieInc/Jovie",
+        "originalPr": 21539,
+        "baseSha": "24802a9bcc6464180b3da58f2ddad6cdd39b137d",
+        "headSha": "c61f96cbbd4da62ed27c4d365c525c0091cfb512"
+      },
+      "context": [
+        {
+          "path": ".github/workflows/ci.yml",
+          "revisionSha": "c61f96cbbd4da62ed27c4d365c525c0091cfb512"
+        }
+      ],
+      "answer": {
+        "defects": [
+          {
+            "id": "write-scoped-lane-token",
+            "path": ".github/workflows/ci.yml",
+            "startLine": 1090,
+            "endLine": 7250,
+            "rationale": "Seventeen merge-group lanes gain statuses:write while executing third-party actions and queued code. Any compromised action or queued source can forge a successful required PR Ready status on the combined head. Isolate status writing into action-free jobs.",
+            "evidenceUrl": "https://github.com/JovieInc/Jovie/pull/21592"
+          }
+        ],
+        "scope": "listed-defects-only",
+        "verification": {
+          "fixSha": "ba0a5187091a5697ca0055012675371c0b7dd921",
+          "evidenceUrl": "https://github.com/JovieInc/Jovie/pull/21592",
+          "rationale": "Adjudicated against original source and the linked repair diff. Seventeen merge-group lanes gain statuses:write while executing third-party actions and queued code. Any compromised action or queued source can forge a successful required PR Ready status on the combined head. Isolate status writing into action-free jobs."
+        }
+      }
+    },
+    {
+      "id": "case-004",
+      "source": {
+        "repository": "JovieInc/Jovie",
+        "originalPr": 23336,
+        "baseSha": "1c88b8d41b8e8b3492904b6762837e419db58fcb",
+        "headSha": "b266a95e6d2bfabd83e261df6d51c1a0c5983a00"
+      },
+      "context": [
+        {
+          "path": ".github/workflows/source-validation.yml",
+          "revisionSha": "b266a95e6d2bfabd83e261df6d51c1a0c5983a00"
+        }
+      ],
+      "answer": {
+        "defects": [
+          {
+            "id": "trusted-guard-missing-base-data",
+            "path": ".github/workflows/source-validation.yml",
+            "startLine": 145,
+            "endLine": 208,
+            "rationale": "New trusted-base source guards read newly introduced files in the PR-only checkout. An existing PR branched before the registry was added is evaluated by main's new guard but lacks its data file, causing ENOENT instead of evaluating the combined source.",
+            "evidenceUrl": "https://github.com/JovieInc/Jovie/pull/23380"
+          }
+        ],
+        "scope": "listed-defects-only",
+        "verification": {
+          "fixSha": "59607b3b49308ef93b12b09ae88230ef7df4553c",
+          "evidenceUrl": "https://github.com/JovieInc/Jovie/pull/23380",
+          "rationale": "Adjudicated against original source and the linked repair diff. New trusted-base source guards read newly introduced files in the PR-only checkout. An existing PR branched before the registry was added is evaluated by main's new guard but lacks its data file, causing ENOENT instead of evaluating the combined source."
+        }
+      }
+    },
+    {
+      "id": "case-005",
+      "source": {
+        "repository": "JovieInc/Jovie",
+        "originalPr": 19467,
+        "baseSha": "2f87eb1ee5ba4ae89f04119865327edd08d61870",
+        "headSha": "60686a3945a143bc81bb1e99093e8d1608747681"
+      },
+      "context": [
+        {
+          "path": "apps/web/playwright.config.screenshots.ts",
+          "revisionSha": "60686a3945a143bc81bb1e99093e8d1608747681"
+        }
+      ],
+      "answer": {
+        "defects": [],
+        "scope": "listed-defects-only",
+        "verification": {
+          "fixSha": "60686a3945a143bc81bb1e99093e8d1608747681",
+          "evidenceUrl": "https://github.com/JovieInc/Jovie/pull/19467",
+          "rationale": "Negative control only for smartlink test selection: both exact spec names are present in testMatch at this revision. This is not proof that the entire change has no other defects."
+        }
+      }
+    }
+  ]
+}
