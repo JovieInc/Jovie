@@ -80,7 +80,7 @@ function normalizeReuseStep(step, opts = {}) {
         BASE_REF: '${{ github.base_ref }}',
         BASE_SHA: '${{ github.event.pull_request.base.sha }}',
         REQUIRE_LIVE_BASE:
-          "${{ github.job == 'unit' && matrix.shard == '4/4' }}",
+          "${{ github.job == 'unit' && contains(toJSON(matrix), '\"4/4\"') }}",
       });
     }
   } else {
