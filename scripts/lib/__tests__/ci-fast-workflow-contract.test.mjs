@@ -58,6 +58,7 @@ import {
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
 import { buildWebVitestFastArgs } from '../ci-web-vitest-fast-args.mjs';
 import { defineStorybookBrowserSelectionTests } from './ci-storybook-browser-selection.cases.mjs';
+import { readCiWorkflowShellSource } from './ci-workflow-shell-source.mjs';
 import { assertProfileClaimProof } from './profile-claim-proof.support.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -72,9 +73,8 @@ function structuralControlPattern() {
     .filter(line => line && !line.startsWith('#'))
     .join('|');
 }
-const WORKFLOW = readFileSync(
-  resolve(REPO_ROOT, '.github/workflows/ci.yml'),
-  'utf8'
+const WORKFLOW = readCiWorkflowShellSource(
+  resolve(REPO_ROOT, '.github/workflows/ci.yml')
 );
 const STRUCTURAL_DECISION = readFileSync(
   resolve(REPO_ROOT, '.github/scripts/select-ci-structural-lane.sh'),

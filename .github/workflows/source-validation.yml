@@ -1026,6 +1026,10 @@ jobs:
         env:
           CI_FAST_LANE_GROUP: remaining
           CI_FAST_SKIP_STRUCTURAL: 'true'
+          # Runner 4 verifies these against the actual merged tree with trusted
+          # guard code. Repeating them on this raw head can compare an old
+          # workflow fixture with a newer main and fail unrelated source PRs.
+          CI_FAST_SKIP_LANE_IDS: source-guards
           TURBO_SCM_BASE: ${{ steps.scope.outputs.base }}
         run: node scripts/ci-fast-lanes.mjs
       # The parity group overlaps three web tsc programs (~5.6 GB each cold)

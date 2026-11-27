@@ -15,11 +15,11 @@ import {
   LANES_COVERAGE_FLOORS,
   LANES_COVERAGE_GROUP_SHARDS,
 } from '../../ci-fast-lanes.mjs';
+import { readCiWorkflowShellSource } from './ci-workflow-shell-source.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
-const WORKFLOW = readFileSync(
-  resolve(REPO_ROOT, '.github/workflows/ci.yml'),
-  'utf8'
+const WORKFLOW = readCiWorkflowShellSource(
+  resolve(REPO_ROOT, '.github/workflows/ci.yml')
 );
 
 // Frozen post-shard schema (JOV-13072). Do not compare against live

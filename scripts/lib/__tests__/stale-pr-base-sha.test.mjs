@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { readCiWorkflowShellSource } from './ci-workflow-shell-source.mjs';
 
 // github.event.pull_request.base.sha is not refreshed when a PR head is
 // pushed (#18131 saw a three-day-old base right after merging main). Every
@@ -12,7 +13,9 @@ const WORKFLOWS = resolve(import.meta.dirname, '../../../.github/workflows');
 
 /** @param {string} file */
 function workflow(file) {
-  return readFileSync(join(WORKFLOWS, file), 'utf8');
+  return file === 'ci.yml'
+    ? readCiWorkflowShellSource(join(WORKFLOWS, file))
+    : readFileSync(join(WORKFLOWS, file), 'utf8');
 }
 
 /** @param {string} file @param {string} job */

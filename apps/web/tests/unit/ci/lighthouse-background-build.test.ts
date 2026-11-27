@@ -1,9 +1,11 @@
 // Executable background-build wait protocol used by the Lighthouse workflow.
+
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { readCiWorkflowShellSource } from '../../../../../scripts/lib/__tests__/ci-workflow-shell-source.mjs';
 
 const REPO_ROOT = resolve(process.cwd(), '../..');
 
@@ -200,9 +202,8 @@ describe('dashboard Lighthouse background build wait protocol', () => {
   });
 
   it('dashboard job overlaps the fallback compile with setup and waits before probes', () => {
-    const source = readFileSync(
-      resolve(REPO_ROOT, '.github/workflows/ci.yml'),
-      'utf8'
+    const source = readCiWorkflowShellSource(
+      resolve(REPO_ROOT, '.github/workflows/ci.yml')
     );
     const start = source.indexOf('  ci-lighthouse-dashboard-pr:');
     const end = source.indexOf('\n  ci-lighthouse-onboarding-pr:');

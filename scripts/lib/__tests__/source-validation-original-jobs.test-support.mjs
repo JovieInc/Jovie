@@ -314,6 +314,14 @@ export function assertOriginalJobsRetained(current, baseline) {
         assert.match(String(added[0]?.run), /remaining=false/);
         continue;
       }
+      if (name === REMAINING_TWIN && id === 'unit') {
+        const env = { ...added[0].env };
+        delete env.CI_FAST_SKIP_LANE_IDS;
+        const original = { ...kept[0].env };
+        delete original.CI_FAST_SKIP_LANE_IDS;
+        assert.deepEqual({ ...added[0], env }, { ...kept[0], env: original });
+        continue;
+      }
       assert.deepEqual(
         added.map(normalizeWebPartition),
         kept.map(normalizeWebPartition),
@@ -366,6 +374,7 @@ export function assertOriginalJobsRetained(current, baseline) {
   assert.equal(remaining?.run, 'node scripts/ci-fast-lanes.mjs');
   assert.equal(remaining?.env?.CI_FAST_LANE_GROUP, 'remaining');
   assert.equal(remaining?.env?.CI_FAST_SKIP_STRUCTURAL, 'true');
+  assert.equal(remaining?.env?.CI_FAST_SKIP_LANE_IDS, 'source-guards');
   assert.match(
     String(remaining?.if),
     /steps\.mq-parity\.outputs\.remaining == 'true'/

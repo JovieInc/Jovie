@@ -111,8 +111,10 @@ test('preview readiness prints a base64 URL the log mask cannot punch out', () =
   const start = workflow.indexOf('name: Wait for PR preview readiness');
   assert.ok(start >= 0);
   const step = workflow.slice(start, workflow.indexOf('\n      - ', start + 1));
+  const program = '.github/scripts/ci/await-pr-preview.sh';
+  assert.ok(step.includes(program));
   assert.match(
-    step,
+    readFileSync(new URL(`../../${program}`, import.meta.url), 'utf8'),
     /echo "DEPLOYMENT_URL_B64: \$\(printf '%s' "\$DEPLOYMENT_URL" \| base64 -w0\)"/
   );
 });

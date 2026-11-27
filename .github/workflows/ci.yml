@@ -119,91 +119,13 @@ jobs:
         env:
           IMAGE_TAG: jovie-runner:offline-${{ github.sha }}
           CACHE_SCOPE: runner-image-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ steps.runner-context.outputs.sha256 }}
-        run: |
-          set -euo pipefail
-          cleanup() {
-            docker buildx rm runner-image-first runner-image-second \
-              >/dev/null 2>&1 || true
-          }
-          trap cleanup EXIT
-
-          docker buildx create --name runner-image-first \
-            --driver docker-container --use
-          docker buildx inspect --bootstrap
-          docker buildx build \
-            --progress=plain \
-            --platform linux/amd64 \
-            --file .github/runner-image/Dockerfile \
-            --cache-from "type=gha,scope=$CACHE_SCOPE,version=2" \
-            --cache-to "type=gha,scope=$CACHE_SCOPE,mode=max,version=2" \
-            --metadata-file runner-image-evidence/first-build-metadata.json \
-            - < runner-image-evidence/context.tar \
-            2>&1 | tee runner-image-evidence/first-build.log
-          test "${PIPESTATUS[0]}" -eq 0
-
-          docker buildx rm runner-image-first
-          docker buildx create --name runner-image-second \
-            --driver docker-container --use
-          docker buildx inspect --bootstrap
-          docker buildx build \
-            --progress=plain \
-            --platform linux/amd64 \
-            --file .github/runner-image/Dockerfile \
-            --cache-from "type=gha,scope=$CACHE_SCOPE,version=2" \
-            --load \
-            --tag "$IMAGE_TAG" \
-            --metadata-file runner-image-evidence/second-build-metadata.json \
-            - < runner-image-evidence/context.tar \
-            2>&1 | tee runner-image-evidence/second-build.log
-          test "${PIPESTATUS[0]}" -eq 0
-
-          node .github/runner-image/verify-build-cache.mjs \
-            runner-image-evidence/second-build.log \
-            runner-image-evidence/cache-proof.json
-          docker image inspect "$IMAGE_TAG" \
-            > runner-image-evidence/image-inspect.json
+        run: exec bash --noprofile --norc -eo pipefail "$GITHUB_WORKSPACE/.github/scripts/ci/runner-image-build-cache-proof.sh"
 
       - name: Verify candidate with networking disabled
         shell: bash
         env:
           IMAGE_TAG: jovie-runner:offline-${{ github.sha }}
-        run: |
-          set -euo pipefail
-          docker run --rm --network none \
-            --entrypoint bash \
-            --volume "$PWD:/repo:ro" \
-            "$IMAGE_TAG" -lc '
-              set -euo pipefail
-              test "$(node --version)" = v24.22.3
-              test "$(cd / && COREPACK_ENABLE_NETWORK=0 pnpm --version)" = 9.15.9
-
-              dependency_status=$(JOVIE_RUNNER_REPO_ROOT=/repo \
-                node /repo/.github/runner-image/verify-prerequisites.mjs \
-                --component dependencies)
-              playwright_status=$(JOVIE_RUNNER_REPO_ROOT=/repo \
-                node /repo/.github/runner-image/verify-prerequisites.mjs \
-                --component playwright)
-              grep -qx "dependencies_warm=true" <<< "$dependency_status"
-              grep -qx "playwright_warm=true" <<< "$playwright_status"
-
-              archive_path=$(sed -n \
-                "s/^installed_tree_archive_path=//p" <<< "$dependency_status")
-              archive_sha=$(sed -n \
-                "s/^installed_tree_archive_sha256=//p" <<< "$dependency_status")
-              test -n "$archive_path"
-              [[ "$archive_sha" =~ ^[0-9a-f]{64}$ ]]
-              mkdir -p /tmp/offline-workspace
-              GITHUB_WORKSPACE=/tmp/offline-workspace \
-                /repo/.github/runner-image/restore-installed-tree.sh \
-                "$archive_path" "$archive_sha"
-              test -f /tmp/offline-workspace/node_modules/.modules.yaml
-              test -x /tmp/offline-workspace/node_modules/.bin/tsx
-              test -e /tmp/offline-workspace/apps/web/node_modules/next
-              printf "offline_image_proof=true\n"
-            ' 2>&1 | tee runner-image-evidence/offline-proof.log
-          test "${PIPESTATUS[0]}" -eq 0
-          grep -qx 'offline_image_proof=true' \
-            runner-image-evidence/offline-proof.log
+        run: exec bash --noprofile --norc -eo pipefail "$GITHUB_WORKSPACE/.github/scripts/ci/runner-image-network-off-proof.sh"
 
       - name: Bound runner image proof artifact
         if: always()
@@ -279,48 +201,7 @@ jobs:
 
       - name: Verify warm paths and toolchain
         shell: bash
-        run: |
-          set -euo pipefail
-          assert_equal() {
-            local name="$1" expected="$2" actual="$3"
-            if [[ "$actual" != "$expected" ]]; then
-              printf '::error title=Runner image canary::%s: expected %q, got %q\n' \
-                "$name" "$expected" "$actual"
-              return 1
-            fi
-          }
-          assert_line() {
-            local name="$1" expected="$2" actual="$3"
-            if ! grep -Fqx -- "$expected" <<< "$actual"; then
-              printf '::error title=Runner image canary::%s: missing line %q; output was %q\n' \
-                "$name" "$expected" "$actual"
-              return 1
-            fi
-          }
-          assert_executable() {
-            local name="$1" path="$2"
-            if [[ ! -x "$path" ]]; then
-              printf '::error title=Runner image canary::%s: not executable at %s\n' \
-                "$name" "$path"
-              return 1
-            fi
-          }
-
-          # The verifier normally writes machine-readable fields to the
-          # Actions-provided GITHUB_OUTPUT file. This assertion step needs those
-          # fields on stdout so command substitution can inspect them.
-          dependency_status=$(env -u GITHUB_OUTPUT node .github/runner-image/verify-prerequisites.mjs --component dependencies)
-          playwright_status=$(env -u GITHUB_OUTPUT node .github/runner-image/verify-prerequisites.mjs --component playwright)
-          assert_line 'dependency warm status' 'dependencies_warm=true' "$dependency_status"
-          assert_line 'pnpm store path' 'pnpm_store_path=/opt/jovie-pnpm-store' "$dependency_status"
-          assert_line 'Playwright warm status' 'playwright_warm=true' "$playwright_status"
-          assert_line 'Playwright browser path' 'playwright_browsers_path=/opt/ms-playwright' "$playwright_status"
-          assert_equal 'Node version' v24.22.3 "$(node --version)"
-          assert_equal 'pnpm version' 9.15.9 "$(pnpm --version)"
-          assert_equal 'PLAYWRIGHT_BROWSERS_PATH' /opt/ms-playwright "$PLAYWRIGHT_BROWSERS_PATH"
-          assert_executable 'Chromium' /opt/ms-playwright/chromium-1223/chrome-linux64/chrome
-          assert_executable 'Chromium headless shell' /opt/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell
-          assert_executable 'FFmpeg' /opt/ms-playwright/ffmpeg-1011/ffmpeg-linux
+        run: exec bash --noprofile --norc -eo pipefail "$GITHUB_WORKSPACE/.github/scripts/ci/runner-image-warm-path-proof.sh"
 
   # Start before path selection and queue admission. On a warm exact cache this
   # finishes inside their existing latency; on a miss, only this job fetches,
@@ -704,46 +585,7 @@ jobs:
         env:
           BASE_SHA: ${{ steps.detect.outputs.path_diff_base_sha }}
           HEAD_SHA: ${{ steps.detect.outputs.path_diff_head_sha }}
-        run: |
-          set -euo pipefail
-          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
-          root="$RUNNER_TEMP/product-lane-classification"
-          blog_receipt="$root/blog-content-receipt.json"
-          trusted_blog="$root/blog-content-ci.mjs"
-          if git cat-file -e "${BASE_SHA}:scripts/lib/blog-content-ci.mjs" 2>/dev/null; then
-            git show "${BASE_SHA}:scripts/lib/blog-content-ci.mjs" > "$trusted_blog"
-            node "$trusted_blog" \
-              --base "$BASE_SHA" --head "$HEAD_SHA" --policy-ref "$BASE_SHA" \
-              --json-out "$blog_receipt" --github-output "$GITHUB_OUTPUT"
-          else
-            jq -n --arg base "$BASE_SHA" --arg head "$HEAD_SHA" \
-              '{schema:"jovie-blog-content-ci/v1",profile:"full",contentOnly:false,baseSha:$base,headSha:$head,changedPaths:[],changes:[],changedPostSlugs:[],removedPostSlugs:[],changedAssets:[],affectedOutputs:[],selectedChecks:["applicable-broader-qualification"],rejections:[{status:null,path:null,oldPath:null,reason:"trusted-classifier-unavailable"}]}' \
-              > "$blog_receipt"
-            {
-              echo "blog_content_only=false"
-              echo "blog_qualification_profile=full"
-              echo "blog_changed_posts_json=[]"
-              echo 'blog_selected_checks_json=["applicable-broader-qualification"]'
-            } >> "$GITHUB_OUTPUT"
-          fi
-          profile=$(jq -er '.profile | select(. == "full" or . == "content-only")' "$blog_receipt")
-          trusted_product="$root/product-lane-classifier.mjs"
-          git show "${BASE_SHA}:scripts/lib/product-lane-classifier.mjs" > "$trusted_product"
-          node "$trusted_product" \
-            --files-from "$root/changed-paths.txt" \
-            --base-ref "$BASE_SHA" --head-ref "$HEAD_SHA" \
-            --qualification-profile "$profile" \
-            --json-out "$root/receipt.json" --summary-out "$root/summary.md"
-          for receipt in receipt.json blog-content-receipt.json; do
-            jq --arg sha "$GITHUB_SHA" --arg run_id "$GITHUB_RUN_ID" \
-              --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
-              '. + {provenance: {sha: $sha, runId: $run_id, runAttempt: $run_attempt}}' \
-              "$root/$receipt" > "$root/sealed.json"
-            mv "$root/sealed.json" "$root/$receipt"
-          done
-          cat "$root/summary.md" >> "$GITHUB_STEP_SUMMARY"
-          printf "\n### Blog content qualification\n\n- Profile: \`%s\`\n- Receipt: \`blog-content-receipt.json\`\n" \
-            "$profile" >> "$GITHUB_STEP_SUMMARY"
+        run: exec bash --noprofile --norc -eo pipefail "$GITHUB_WORKSPACE/.github/scripts/ci/classify-blog-qualification.sh"
 
       # The trusted classifier can still select mac or ios. The queue must
       # not wait on the hosted macOS pool for that selection. Push to main
@@ -752,78 +594,19 @@ jobs:
       - name: Drop hosted macOS lanes from the merge-queue receipt
         if: ${{ github.event_name == 'merge_group' }}
         shell: bash
-        run: |
-          set -euo pipefail
-          root="$RUNNER_TEMP/product-lane-classification"
-          # Only record ios/mac as queue-deferred when the classifier selected
-          # them. Unselected Apple lanes stay absent so post-queue main can tell
-          # deferral from "never touched Apple paths".
-          jq '
-            .selectedLanes as $selected
-            | .selectedLanes |= map(select(. != "ios" and . != "mac"))
-            | .skippedLanes = (
-                [.skippedLanes[] | select(.lane != "ios" and .lane != "mac")]
-                + (
-                    ["ios", "mac"]
-                    | map(
-                        select(. as $lane | ($selected | index($lane)) != null)
-                        | {
-                            lane: .,
-                            reason: "merge queue does not wait on the hosted macOS pool"
-                          }
-                      )
-                  )
-              )
-            | .requiredGates |= del(.ios, .mac)
-          ' "$root/receipt.json" > "$root/receipt.queue.json"
-          mv "$root/receipt.queue.json" "$root/receipt.json"
+        run: exec bash --noprofile --norc -eo pipefail "$GITHUB_WORKSPACE/.github/scripts/ci/defer-hosted-apple-lanes.sh"
 
       - name: Detect web coverage applicability
         id: coverage-detect
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
-        run: |
-          set -euo pipefail
-          CHANGED_PATHS="$RUNNER_TEMP/product-lane-classification/changed-paths.txt"
-          test -f "$CHANGED_PATHS"
-          # Promptfoo eval-infrastructure-only source PRs keep V8 on the combined head.
-          PROMPTFOO_INFRA_TRIGGER_PATTERN='^(\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/|apps/web/tests/eval/golden/)'
-          PROMPTFOO_INFRA_ALLOWED_PATTERN='^(\.github/workflows/ci\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/.*|apps/web/tests/eval/golden/.*|apps/web/vitest\.config\.golden-eval\.mts|apps/web/scripts/run-golden-eval-set-ci\.sh|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)$'
-          if [[ "$EVENT_NAME" == "pull_request" ]] &&
-            grep -q -E "$PROMPTFOO_INFRA_TRIGGER_PATTERN" "$CHANGED_PATHS" &&
-            ! grep -v -E "$PROMPTFOO_INFRA_ALLOWED_PATTERN" "$CHANGED_PATHS" | grep -q .; then
-            echo "has_web_coverage_changes=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # Full V8 coverage is meaningful only when the exact diff can affect
-          # web runtime behavior or its test/coverage substrate.
-          WEB_COVERAGE_PATTERN='^(apps/web/.*\.[cm]?[jt]sx?$|apps/web/package\.json$|packages/ui/|package\.json$|pnpm-lock\.yaml$|turbo\.json$)'
-          if grep -q -E "$WEB_COVERAGE_PATTERN" "$CHANGED_PATHS"; then
-            echo "has_web_coverage_changes=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_web_coverage_changes=false" >> "$GITHUB_OUTPUT"
-          fi
+        run: exec bash --noprofile --norc -eo pipefail "$GITHUB_WORKSPACE/.github/scripts/ci/select-web-coverage.sh"
 
       - name: Select rendered homepage visual gate
         id: homepage-visual
         shell: bash
-        run: |
-          set -euo pipefail
-          CHANGED_PATHS="$RUNNER_TEMP/product-lane-classification/changed-paths.txt"
-          test -f "$CHANGED_PATHS"
-          HOMEPAGE_VISUAL_PATTERN='^(\.github/workflows/(ci|pr-visual-review)\.yml|\.github/actions/setup-playwright/|\.github/scripts/guard-playwright-artifacts\.mjs|scripts/(lib/(__tests__/)?)?visual-snapshot-compare\.mjs|apps/web/app/\(home\)/|apps/web/app/(globals\.css|layout\.tsx)|apps/web/components/(homepage/|features/home/|site/(MarketingHeader|PublicPageShell|MarketingFooter|Container)\.|organisms/HeaderNav\.)|apps/web/data/homepage.*\.ts|apps/web/lib/(flags/marketing-static|screenshots/registry)|apps/web/public/product-screenshots/|apps/web/playwright\.config\.ts|apps/web/tests/e2e/(homepage|cookies|visual-regression)\.spec\.ts|apps/web/tests/e2e/__snapshots__/visual-regression\.spec\.ts/|packages/ui/)'
-          if grep -q -E "$HOMEPAGE_VISUAL_PATTERN" "$CHANGED_PATHS"; then
-            echo "run_homepage_visual=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run_homepage_visual=false" >> "$GITHUB_OUTPUT"
-          fi
-          MARKETING_DOM_PATTERN='^(\.github/workflows/ci\.yml|apps/web/app/\((marketing|home)\)/|apps/web/app/(globals\.css|layout\.tsx)|apps/web/components/(marketing|site|homepage|features/home|molecules/PhoneFrame)|apps/web/data/|apps/web/styles/|apps/web/public/(product-screenshots|device-bezels)/|apps/web/tests/e2e/utils/(route-dom-[a-z-]+|image-contrast-detector)\.ts|apps/web/tests/product-screenshots/route-dom-|apps/web/playwright\.config\.screenshots\.ts|packages/ui/)'
-          if grep -q -E "$MARKETING_DOM_PATTERN" "$CHANGED_PATHS"; then
-            echo "run_marketing_dom=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run_marketing_dom=false" >> "$GITHUB_OUTPUT"
-          fi
+        run: exec bash --noprofile --norc -eo pipefail "$GITHUB_WORKSPACE/.github/scripts/ci/select-marketing-visual-gates.sh"
 
       - name: Select Pen diff gate (bound or scope route touched)
         id: pen-diff-scope
@@ -1216,27 +999,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 1 }
       - name: Validate .env.example contains placeholders only
-        run: |
-          set -euo pipefail
-
-          if [ ! -f .env.example ]; then
-            echo "No .env.example found; skipping."
-            exit 0
-          fi
-
-          # Fail on common secret/token prefixes.
-          if grep -nE '(sk_live_|sk_test_|rk_live_|rk_test_|whsec_|ghp_|github_pat_|xoxb-|BEGIN PRIVATE KEY|-----BEGIN)' .env.example; then
-            echo "❌ .env.example appears to contain a real secret/token. Replace with placeholders."
-            exit 1
-          fi
-
-          # Fail on real-looking Stripe price IDs (these should be placeholders).
-          if grep -nE '^STRIPE_PRICE_.*=price_[A-Za-z0-9]+' .env.example; then
-            echo "❌ .env.example contains Stripe price IDs. Replace with placeholders."
-            exit 1
-          fi
-
-          echo "✅ .env.example looks safe (no obvious secrets)."
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/verify-env-example.sh"
 
   ci-secret-scan:
     needs: [main-queue-provenance]
@@ -1566,42 +1329,7 @@ jobs:
       # build tree) before any suite can download it. Fail closed pre-upload.
       - name: Smoke the packaged build
         if: needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true'
-        run: |
-          set -euo pipefail
-          SMOKE_ROOT="$RUNNER_TEMP/visual-compare-smoke/apps/web"
-          mkdir -p "$SMOKE_ROOT"
-          tar -xf "$RUNNER_TEMP/visual-compare-build.tar" -C "$SMOKE_ROOT"
-          export HOSTNAME=localhost
-          PORT=3231 node "$SMOKE_ROOT/.next/standalone/apps/web/server.js" > "$RUNNER_TEMP/visual-compare-smoke-server.log" 2>&1 &
-          SERVER_PID=$!
-          cleanup() {
-            kill "$SERVER_PID" 2>/dev/null || true
-            wait "$SERVER_PID" 2>/dev/null || true
-          }
-          trap cleanup EXIT
-          SMOKE_READY=false
-          SMOKE_DEADLINE=$((SECONDS + 45))
-          while [ "$SECONDS" -lt "$SMOKE_DEADLINE" ]; do
-            # A dead server must fail the smoke immediately, never ride the
-            # full deadline: probe liveness first, readiness second.
-            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-              wait "$SERVER_PID" 2>/dev/null || true
-              cat "$RUNNER_TEMP/visual-compare-smoke-server.log"
-              echo "::error::Packaged visual compare build server exited during the smoke probe."
-              exit 1
-            fi
-            if curl -sf --connect-timeout 2 --max-time 5 http://localhost:3231 > /dev/null 2>&1; then
-              SMOKE_READY=true
-              break
-            fi
-            sleep 1
-          done
-          if [ "$SMOKE_READY" = "false" ]; then
-            cat "$RUNNER_TEMP/visual-compare-smoke-server.log"
-            echo "::error::Packaged visual compare build did not serve within the deadline; refusing to publish."
-            exit 1
-          fi
-          echo "Packaged visual compare build serves on localhost:3231."
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/smoke-visual-snapshot-build.sh"
       # Sibling suite jobs start only after this upload completed (same
       # producer/consumer contract as nextjs-build-*); a failed upload fails
       # this job, and every suite fails closed on a missing artifact.
@@ -2057,7 +1785,7 @@ jobs:
               results: [],
             };
             fs.writeFileSync(process.env.CI_FAST_LANES_OUT, JSON.stringify(out, null, 2));
-            console.log(`typecheck lanes reused: ${reason}`);
+            console.log("typecheck lanes reused: " + reason);
           '
       # Save only after a green lane that actually rewrote the buildinfo, and
       # only from trusted refs: main pushes and same-repository PRs. GitHub
@@ -2184,28 +1912,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BASE_BRANCH: ${{ github.base_ref || 'main' }}
           BASE_FETCH_DIR: ${{ runner.temp }}/base-branch-fetch
-        run: &base-fetch-start |
-          set -euo pipefail
-          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          mkdir -p "$BASE_FETCH_DIR"
-          rm -f "$BASE_FETCH_DIR/status" "$BASE_FETCH_DIR/status.tmp"
-          {
-            echo "GIT_CONFIG_COUNT=1"
-            echo "GIT_CONFIG_KEY_0=http.https://github.com/.extraheader"
-            echo "GIT_CONFIG_VALUE_0=$AUTH_HEADER"
-          } >> "$GITHUB_ENV"
-          (
-            set +e
-            for attempt in 1 2 3; do
-              timeout 150 git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
-              fetch_rc=$?
-              [[ "$fetch_rc" == 0 ]] && break
-              echo "base-branch fetch attempt $attempt exited $fetch_rc"
-            done
-            echo "$fetch_rc" > "$BASE_FETCH_DIR/status.tmp"
-            mv "$BASE_FETCH_DIR/status.tmp" "$BASE_FETCH_DIR/status"
-          ) < /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &
-          echo "Base-branch history fetch started in the background (pid $!)."
+        run: &base-fetch-start exec bash --noprofile --norc -eo pipefail "$GITHUB_WORKSPACE/.github/scripts/ci/start-base-history-fetch.sh"
       # Pinned actionlint downloads (source, patch, shellcheck, pyflakes) from the
       # cache main writes in tsc-cache-warm.yml. Warm: none of them is fetched, so
       # a GitHub release outage cannot fail this step (29 merge groups on
@@ -2252,47 +1959,7 @@ jobs:
           BASE_BRANCH: ${{ github.base_ref || 'main' }}
           EVENT_NAME: ${{ github.event_name }}
           BASE_FETCH_DIR: ${{ runner.temp }}/base-branch-fetch
-        run: &base-fetch-await |
-          set -euo pipefail
-          for _ in $(seq 1 540); do
-            [[ -f "$BASE_FETCH_DIR/status" ]] && break
-            sleep 1
-          done
-          cat "$BASE_FETCH_DIR/fetch.log" 2>/dev/null || true
-          if [[ ! -f "$BASE_FETCH_DIR/status" ]]; then
-            echo "::error title=Base-branch fetch::background fetch did not finish within 540s"
-            exit 1
-          fi
-          fetch_status="$(cat "$BASE_FETCH_DIR/status")"
-          if [[ "$fetch_status" != '0' ]]; then
-            echo "::error title=Base-branch fetch::git fetch exited $fetch_status"
-            exit 1
-          fi
-          # No command in this job may kick detached `git maintenance run
-          # --auto` (or gc --auto): it keeps rewriting
-          # .git/objects/info/commit-graph while the structural lane's
-          # provenance guards read it, which intermittently flips
-          # `merge-base --is-ancestor` to a false "not an ancestor".
-          git config maintenance.auto false
-          git config gc.auto 0
-          if [[ "$(git rev-parse --is-shallow-repository)" != 'false' ]]; then
-            echo "::error title=Base-branch fetch::checkout is still shallow"
-            exit 1
-          fi
-          if ! git rev-parse --verify --quiet "refs/remotes/origin/${BASE_BRANCH}^{commit}" > /dev/null; then
-            echo "::error title=Base-branch fetch::origin/${BASE_BRANCH} is missing"
-            exit 1
-          fi
-          # A pull_request checkout is a merge onto the base as it was at
-          # checkout; the fetch above can land a newer base. Diffs against
-          # origin/<base> would then count commits merged since checkout as
-          # this PR's changes, so pin the ref to the merge's first parent.
-          if [[ "$EVENT_NAME" == 'pull_request' ]] \
-            && git rev-parse --verify --quiet 'HEAD^2^{commit}' > /dev/null \
-            && git merge-base --is-ancestor 'HEAD^1' "refs/remotes/origin/${BASE_BRANCH}"; then
-            git update-ref "refs/remotes/origin/${BASE_BRANCH}" "$(git rev-parse 'HEAD^1')"
-            echo "Pinned origin/${BASE_BRANCH} to the checkout merge base $(git rev-parse --short 'HEAD^1')."
-          fi
+        run: &base-fetch-await exec bash --noprofile --norc -eo pipefail "$GITHUB_WORKSPACE/.github/scripts/ci/await-base-history-fetch.sh"
       - name: Validate CI/release incident prevention contract
         if: ${{ success() && matrix.shard == 2 }}
         # This is intentionally outside the path-gated Structural Contract.
@@ -2543,58 +2210,7 @@ jobs:
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           PLAYWRIGHT_ARTIFACT_PATHS: apps/web/test-results
-        run: |
-          set -euo pipefail
-          specs=()
-          if [[ "$RUN_SPOTIFY" == 'true' ]]; then
-            specs+=(tests/e2e/storybook-spotify-connect.spec.ts)
-          fi
-          if [[ "$RUN_KBD" == 'true' ]]; then
-            specs+=(tests/e2e/storybook-kbd-motion.spec.ts)
-          fi
-          if [[ "$RUN_OVERLAY" == 'true' ]]; then
-            specs+=(tests/e2e/storybook-overlay-collisions.spec.ts)
-          fi
-          if [[ "$RUN_PRIVACY" == 'true' ]]; then
-            specs+=(tests/e2e/storybook-ovie-privacy-boundary.spec.ts)
-          fi
-          if [[ "$RUN_TASKS" == 'true' ]]; then
-            specs+=(tests/e2e/storybook-task-row-geometry.spec.ts)
-          fi
-          if [[ "$RUN_DESKTOP_UPDATE" == 'true' ]]; then
-            specs+=(tests/e2e/storybook-desktop-update-modal.spec.ts)
-            specs+=(tests/e2e/storybook-desktop-update-control.spec.ts)
-          fi
-          if [[ "$RUN_DSP" == 'true' ]]; then
-            specs+=(tests/e2e/storybook-dsp-details.spec.ts)
-          fi
-          if [[ "${RUN_SMART_LINK:-false}" == 'true' ]]; then
-            specs+=(tests/e2e/storybook-smart-link-reachability.spec.ts)
-          fi
-          if [[ "${RUN_ACCOUNT_SURFACE:-false}" == 'true' ]]; then
-            specs+=(tests/e2e/storybook-account-surface.spec.ts)
-          fi
-          test "${#specs[@]}" -gt 0
-          pnpm exec storybook dev -p 6006 --no-open &
-          STORYBOOK_PID=$!
-          trap 'kill "$STORYBOOK_PID" 2>/dev/null || true' EXIT
-
-          for _attempt in $(seq 1 150); do
-            kill -0 "$STORYBOOK_PID" 2>/dev/null || {
-              echo "::error::Storybook dev server died"
-              exit 1
-            }
-            if curl -sf http://localhost:6006/iframe.html >/dev/null 2>&1; then
-              node ../../.github/scripts/guard-playwright-artifacts.mjs --run -- \
-                pnpm exec playwright test \
-                  "${specs[@]}" \
-                  --config=playwright.config.storybook.ts --project=chromium --reporter=line
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "::error::Storybook dev server failed to start within 300s"
-          exit 1
+        run: exec bash --noprofile --norc -eo pipefail "$GITHUB_WORKSPACE/.github/scripts/ci/run-selected-storybook-browser-proof.sh"
       - name: Upload Storybook browser evidence
         if: ${{ steps.storybook-browser.outputs.run == 'true' && steps.storybook-browser-test.outcome == 'success' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
@@ -3118,21 +2734,7 @@ jobs:
           path: ${{ runner.temp }}/lanes-coverage/d
       - name: Require complete lanes coverage evidence
         id: coverage
-        run: |
-          node --input-type=module <<'NODE'
-          import { appendFileSync, existsSync, readFileSync } from 'node:fs';
-          import { LANES_COVERAGE_GROUP_SHARDS, lanesReceiptRanSuite } from './scripts/lib/ci-structural-shards.mjs';
-          const ran = Object.keys(LANES_COVERAGE_GROUP_SHARDS).map(group => {
-            const dir = `${process.env.RUNNER_TEMP}/lanes-coverage/${group}`;
-            const executed = lanesReceiptRanSuite(JSON.parse(readFileSync(`${dir}/receipt.json`, 'utf8')));
-            if (executed && !existsSync(`${dir}/jovie-lanes-${group}.coverage`)) {
-              throw new Error(`Missing lanes coverage data: ${group}`);
-            }
-            return executed;
-          });
-          if (ran.some(value => value !== ran[0])) throw new Error('Inconsistent lanes coverage receipts');
-          appendFileSync(process.env.GITHUB_OUTPUT, `ran=${ran[0]}\n`);
-          NODE
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/verify-lanes-coverage-receipts.sh"
       - name: Set up Python for combined lanes coverage
         if: steps.coverage.outputs.ran == 'true'
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -3145,21 +2747,7 @@ jobs:
         run: python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt
       - name: Combine lanes coverage and enforce all module floors
         if: steps.coverage.outputs.ran == 'true'
-        run: |
-          node --input-type=module <<'NODE'
-          import { spawnSync } from 'node:child_process';
-          import { LANES_COVERAGE_FLOORS, LANES_COVERAGE_GROUP_SHARDS } from './scripts/lib/ci-structural-shards.mjs';
-          const root = process.env.RUNNER_TEMP;
-          const env = { ...process.env, COVERAGE_FILE: `${root}/jovie-lanes.coverage` };
-          const run = args => {
-            const result = spawnSync('python3', ['-m', 'coverage', ...args], { env, stdio: 'inherit' });
-            if (result.status !== 0) process.exit(result.status ?? 1);
-          };
-          run(['combine', ...Object.keys(LANES_COVERAGE_GROUP_SHARDS).map(group => `${root}/lanes-coverage/${group}/jovie-lanes-${group}.coverage`)]);
-          for (const { include, floor } of LANES_COVERAGE_FLOORS) {
-            run(['report', `--include=${include}`, `--fail-under=${floor}`]);
-          }
-          NODE
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/merge-lanes-coverage.sh"
 
   ci-fast-structural-lanes-shards:
     name: ci-fast (structural lanes shard ${{ matrix.group }})
@@ -3307,24 +2895,7 @@ jobs:
         if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
         env:
           CONNECTION_FILE: ${{ steps.create-branch.outputs.connection_file }}
-        run: |
-          set -euo pipefail
-          CONNECTION_FILE="${CONNECTION_FILE:-${RUNNER_TEMP:-/tmp}/neon-connection/connection.json}"
-          if [ ! -f "$CONNECTION_FILE" ]; then
-            echo "Neon connection file missing after branch create: $CONNECTION_FILE"
-            echo "This indicates NEON_PROJECT_ID/NEON_API_KEY or the create-branch action is failing."
-            exit 1
-          fi
-          if ! jq -e '
-            (.db_url // "" | length > 0) and
-            (.db_url_pooled // "" | length > 0)
-          ' "$CONNECTION_FILE" >/dev/null; then
-            echo "Neon connection file is missing db_url/db_url_pooled."
-            exit 1
-          fi
-          # Intentionally do NOT expose DB_URL via job outputs.
-          # GitHub will drop outputs that look like secrets, which breaks downstream jobs.
-          echo "Neon DB URL resolved for this job (file-backed)."
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/finalize-neon-urls.sh"
 
       - name: Prepare shared Neon admission probe
         if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
@@ -3429,33 +3000,7 @@ jobs:
         env:
           BRANCH_NAME: ${{ steps.sanitize-branch.outputs.name }}
           CONNECTION_FILE: ${{ steps.create-branch.outputs.connection_file }}
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/neon-db-artifact
-          # Prefer the file written by neon-create-branch-with-retry (avoids
-          # re-interpolating DB passwords through GitHub expression expansion).
-          if [ -n "${CONNECTION_FILE:-}" ] && [ -f "$CONNECTION_FILE" ]; then
-            cp "$CONNECTION_FILE" /tmp/neon-db-artifact/connection.json
-          elif [ -f "${RUNNER_TEMP:-/tmp}/neon-connection/connection.json" ]; then
-            cp "${RUNNER_TEMP:-/tmp}/neon-connection/connection.json" /tmp/neon-db-artifact/connection.json
-          else
-            echo "Neon connection file missing; cannot persist artifact."
-            exit 1
-          fi
-          # Ensure branch_name is present for downstream diagnostics.
-          if [ -n "${BRANCH_NAME:-}" ]; then
-            jq --arg branch_name "$BRANCH_NAME" '.branch_name = $branch_name' \
-              /tmp/neon-db-artifact/connection.json > /tmp/neon-db-artifact/connection.json.tmp
-            mv /tmp/neon-db-artifact/connection.json.tmp /tmp/neon-db-artifact/connection.json
-          fi
-          # Fail closed if password is missing from the artifact URL.
-          if ! jq -e '
-            (.db_url // "" | test("^postgres(ql)?://[^:]+:[^@]+@")) and
-            (.db_url_pooled // "" | test("^postgres(ql)?://[^:]+:[^@]+@"))
-          ' /tmp/neon-db-artifact/connection.json >/dev/null; then
-            echo "Neon connection artifact is missing username/password credentials."
-            exit 1
-          fi
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/write-neon-connection-receipt.sh"
 
       - name: Emit preview-env admission receipt
         if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
@@ -3752,34 +3297,7 @@ jobs:
         # fixed debt still listed in the baseline. A few seconds.
         run: pnpm --filter @jovie/web seo:certify --sha "$GITHUB_SHA" --run-ref "ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
       - name: Run deterministic layout behavior guard
-        run: |
-          set -euo pipefail
-          cd apps/web
-          mapfile -t LAYOUT_GUARD_SPECS < <(node ../../.github/scripts/layout-guard-manifest.mjs)
-          mkdir -p tests/.auth
-          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          export HOSTNAME=localhost
-          export NEXT_PUBLIC_APP_URL=http://localhost:3230
-
-          PORT=3230 node .next/standalone/apps/web/server.js &
-          SERVER_PID=$!
-          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
-
-          for ((attempt = 1; attempt <= 30; attempt++)); do
-            kill -0 "$SERVER_PID" 2>/dev/null || {
-              echo "::error::Combined-head standalone server died"
-              exit 1
-            }
-            if curl -sf http://localhost:3230 >/dev/null 2>&1; then
-              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-                pnpm exec playwright test "${LAYOUT_GUARD_SPECS[@]}" \
-                  --config=playwright.config.noauth.ts --project=chromium --reporter=line
-              exit 0
-            fi
-            sleep 1
-          done
-          echo "::error::Combined-head standalone server failed to start"
-          exit 1
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/verify-layout-build.sh"
         env:
           BASE_URL: http://localhost:3230
           SMOKE_ONLY: '1'
@@ -4204,42 +3722,7 @@ jobs:
         shell: bash
         env:
           EVENT_PUSH_BEFORE_SHA: ${{ github.event.before }}
-        run: |
-          set -euo pipefail
-          PUSH_BASE_SHA="${EVENT_PUSH_BEFORE_SHA}"
-          if [[ ! "$PUSH_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] ||
-            [[ "$PUSH_BASE_SHA" == "0000000000000000000000000000000000000000" ]]; then
-            echo "::error::push.before is not a usable exact main base SHA"
-            exit 1
-          fi
-          git cat-file -e "${PUSH_BASE_SHA}^{commit}"
-          root="$RUNNER_TEMP/apple-post-queue"
-          mkdir -p "$root"
-          git diff --no-renames --name-only "$PUSH_BASE_SHA" HEAD > "$root/changed-paths.txt"
-          # Policy from the pre-push main tip so a bad landing cannot rewrite
-          # its own Apple selection rules for this deferred evidence pass.
-          git show "${PUSH_BASE_SHA}:scripts/lib/product-lane-classifier.mjs" \
-            > "$root/product-lane-classifier.mjs"
-          git show "${PUSH_BASE_SHA}:scripts/lib/apple-post-queue-selection.mjs" \
-            > "$root/apple-post-queue-selection.mjs" || {
-            # First land of this helper: fall back to the checked-out copy.
-            cp scripts/lib/apple-post-queue-selection.mjs "$root/apple-post-queue-selection.mjs"
-          }
-          node "$root/product-lane-classifier.mjs" \
-            --files-from "$root/changed-paths.txt" \
-            --base-ref "$PUSH_BASE_SHA" \
-            --head-ref HEAD \
-            --json-out "$root/receipt.json"
-          test -s "$root/receipt.json"
-          node "$root/apple-post-queue-selection.mjs" \
-            --receipt "$root/receipt.json" \
-            --github-output "$GITHUB_OUTPUT"
-          {
-            printf '### Apple post-queue selection\n\n'
-            printf -- '- run_ios: `%s`\n' "$(sed -n 's/^run_ios=//p' "$GITHUB_OUTPUT" | tail -n1)"
-            printf -- '- run_macos: `%s`\n' "$(sed -n 's/^run_macos=//p' "$GITHUB_OUTPUT" | tail -n1)"
-            printf -- '- run_macos_native: `%s`\n' "$(sed -n 's/^run_macos_native=//p' "$GITHUB_OUTPUT" | tail -n1)"
-          } >> "$GITHUB_STEP_SUMMARY"
+        run: exec bash --noprofile --norc -eo pipefail "$GITHUB_WORKSPACE/.github/scripts/ci/classify-apple-release-lanes.sh"
 
   # iOS unit coverage runs on push to main and on workflow_dispatch.
   # It does not run in the merge queue: the hosted macOS pool cannot hold
@@ -4434,32 +3917,7 @@ jobs:
           RISK_PREVIEW: ${{ needs.ci-risk-classifier.outputs.requires_preview }}
           RISK_BLOCKS: ${{ needs.ci-risk-classifier.outputs.blocks_unattended_auto_merge }}
           RISK_RULES: ${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}
-        run: |
-          set -euo pipefail
-          RISK_LEVEL="${RISK_LEVEL:-unknown}" RISK_SMOKE="${RISK_SMOKE:-true}" RISK_PREVIEW="${RISK_PREVIEW:-true}" RISK_BLOCKS="${RISK_BLOCKS:-true}"
-          lane_result() { [ "$1" = true ] && printf '%s' "$2" || printf skipped; }
-          root="$RUNNER_TEMP/product-lane-receipt"
-          if [[ "$GITHUB_EVENT_NAME" == merge_group && "$BLOG_CONTENT_ONLY" == true ]]; then
-            web_results="[\"$BLOG\",\"$FAST\"]"
-          else
-            web_results="[\"$(lane_result "$RUN_WEB" "$WEB_UNIT")\",\"$(lane_result "$RUN_WEB" "$WEB_BUILD")\",\"$(lane_result "$RUN_WEB" "$WEB_OVIE")\",\"$(lane_result "$RUN_WEB" "$WEB_OVIE_TYPECHECK")\",\"$(lane_result "$RUN_WEB" "$FAST")\"]"
-          fi
-          jq -n \
-            --argjson ios "[\"$(lane_result "$RUN_IOS" "$IOS")\",\"$(lane_result "$RUN_IOS" "$FAST")\"]" \
-            --argjson mac "[\"$(lane_result "$RUN_MAC" "$MAC")\",\"$(lane_result "$RUN_MAC" "$FAST")\"]" \
-            --argjson web "$web_results" \
-            --argjson operations "[\"$(lane_result "$RUN_OPERATIONS" "$FAST")\"]" \
-            --argjson cross "[\"$(lane_result "$RUN_CROSS" "$CROSS")\"]" \
-            --arg receipt "product-lane-final-${GITHUB_SHA}-${GITHUB_RUN_ATTEMPT}" \
-            --arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
-            --arg risk_level "$RISK_LEVEL" --arg rules "$RISK_RULES" \
-            --argjson requires_smoke "$RISK_SMOKE" --argjson requires_preview "$RISK_PREVIEW" --argjson blocks_unattended "$RISK_BLOCKS" \
-            '{lanes: {ios: $ios, mac: $mac, web: $web, operations: $operations, "cross-product": $cross}, receiptArtifact: $receipt, run: $run, riskReceipt: {schema: "jovie-ci-risk-receipt/v1", sha: env.GITHUB_SHA, run_id: env.GITHUB_RUN_ID, run_attempt: env.GITHUB_RUN_ATTEMPT, risk_level: $risk_level, requires_smoke: $requires_smoke, requires_preview: $requires_preview, blocks_unattended: $blocks_unattended, matched_rule_ids: ($rules | split(",") | map(select(length > 0)))}}' \
-            > "$root/results.json"
-          node scripts/lib/product-lane-finalize.mjs \
-            "$root/receipt.json" "$root/results.json" \
-            "$root/final.json" "$root/final.md"
-          cat "$root/final.md" >> "$GITHUB_STEP_SUMMARY"
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/join-product-lane-results.sh"
       - name: Preserve final product-lane receipt
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -4669,44 +4127,7 @@ jobs:
 
       - name: Run deterministic layout behavior guard
         if: steps.download.outcome == 'success'
-        run: |
-          set -euo pipefail
-          cd apps/web
-
-          LAYOUT_GUARD_MANIFEST=$(node ../../.github/scripts/layout-guard-manifest.mjs)
-          mapfile -t LAYOUT_GUARD_SPECS <<< "$LAYOUT_GUARD_MANIFEST"
-
-          if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
-            echo "::error::Layout Guard standalone server entrypoint is missing."
-            exit 1
-          fi
-
-          mkdir -p tests/.auth
-          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-          export HOSTNAME=localhost
-          export NEXT_PUBLIC_APP_URL=http://localhost:3230
-
-          PORT=3230 node .next/standalone/apps/web/server.js &
-          SERVER_PID=$!
-          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
-
-          SERVER_READY=false
-          for attempt in $(seq 1 30); do
-            kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
-            if curl -sf http://localhost:3230 > /dev/null 2>&1; then
-              SERVER_READY=true
-              break
-            fi
-            echo "Waiting for Layout Guard standalone server ($attempt/30)..."
-            sleep 1
-          done
-
-          if [ "$SERVER_READY" = "false" ]; then
-            echo "::error::Layout Guard standalone server failed to start within 30s."
-            exit 1
-          fi
-
-          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test "${LAYOUT_GUARD_SPECS[@]}" --config=playwright.config.noauth.ts --project=chromium --reporter=line
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/verify-layout-evidence.sh"
         env:
           BASE_URL: http://localhost:3230
           SMOKE_ONLY: '1'
@@ -5411,55 +4832,7 @@ jobs:
 
       - name: Run signed-in shell navigation
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: |
-          cd apps/web
-
-          export E2E_USE_TEST_AUTH_BYPASS=1
-          export NEXT_PUBLIC_AUTH_MOCK=1
-          export NEXT_PUBLIC_AUTH_PROXY_DISABLED=1
-
-          if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
-            echo "Standalone server not found — dashboard Lighthouse cannot start."
-            exit 1
-          fi
-
-          node .next/standalone/apps/web/server.js &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-
-          echo "Waiting for standalone server..."
-          SERVER_READY=false
-          for ((i = 1; i <= 30; i++)); do
-            kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
-            if curl -s http://localhost:3000 > /dev/null; then
-              SERVER_READY=true
-              break
-            fi
-            sleep 1
-          done
-
-          if [ "$SERVER_READY" = "false" ]; then
-            echo "Server failed to start within 30s."
-            exit 1
-          fi
-
-          # Lighthouse and route specs load each page with a full document
-          # load. Click the sidebar and the mobile tabs too: only a click
-          # proves the shell still moves between dashboard pages client-side.
-          # shell-route-health opens every sidebar destination both ways and
-          # fails on console errors, uncaught exceptions and error boundaries.
-          # releases-first-paint-visual fails if the release list moves after
-          # it first paints.
-          # chat-history-switcher fails if opening the chat history menu
-          # shifts layout, drops frames, or breaks search and keyboard select.
-          # Blocking, and run first so a nav break fails fast.
-          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-            pnpm exec playwright test tests/e2e/dashboard-click-navigation.spec.ts \
-            tests/e2e/shell-nav-click-through.spec.ts \
-            tests/e2e/shell-route-health.spec.ts \
-            tests/e2e/releases-first-paint-visual.spec.ts \
-            tests/e2e/chat-history-switcher.spec.ts \
-            --config=playwright.config.noauth.ts --project=chromium --reporter=line
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/run-dashboard-lighthouse.sh"
 
         env:
           CI: true
@@ -5673,44 +5046,7 @@ jobs:
 
       - name: Run authenticated onboarding Lighthouse
         if: steps.lighthouse-identity.outputs.available == 'true'
-        run: |
-          cd apps/web
-
-          if [ -z "$E2E_CLERK_USER_ID" ]; then
-            echo "E2E_CLERK_USER_ID not set — skipping onboarding Lighthouse."
-            exit 0
-          fi
-
-          export E2E_USE_TEST_AUTH_BYPASS=1
-          export NEXT_PUBLIC_AUTH_MOCK=1
-          export NEXT_PUBLIC_AUTH_PROXY_DISABLED=1
-
-          if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
-            echo "Standalone server not found — onboarding Lighthouse cannot start."
-            exit 1
-          fi
-
-          node .next/standalone/apps/web/server.js &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-
-          echo "Waiting for standalone server..."
-          SERVER_READY=false
-          for ((i = 1; i <= 30; i++)); do
-            kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
-            if curl -s http://localhost:3000 > /dev/null; then
-              SERVER_READY=true
-              break
-            fi
-            sleep 1
-          done
-
-          if [ "$SERVER_READY" = "false" ]; then
-            echo "Server failed to start within 30s."
-            exit 1
-          fi
-
-          pnpm run test:lighthouse:onboarding:pr
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/run-onboarding-lighthouse.sh"
         env:
           CI: true
           BASE_URL: http://localhost:3000
@@ -5803,44 +5139,7 @@ jobs:
           SKIP_SKILLS_CATALOG_SYNC: '1'
 
       - name: Run authenticated admin Lighthouse
-        run: |
-          cd apps/web
-
-          if [ -z "$E2E_CLERK_USER_ID" ]; then
-            echo "E2E_CLERK_USER_ID empty (no E2E_ADMIN_CLERK_USER_ID secret) — skipping admin Lighthouse."
-            exit 0
-          fi
-
-          export E2E_USE_TEST_AUTH_BYPASS=1
-          export NEXT_PUBLIC_AUTH_MOCK=1
-          export NEXT_PUBLIC_AUTH_PROXY_DISABLED=1
-
-          if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
-            echo "Standalone server not found — admin Lighthouse cannot start."
-            exit 1
-          fi
-
-          node .next/standalone/apps/web/server.js &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-
-          echo "Waiting for standalone server..."
-          SERVER_READY=false
-          for ((i = 1; i <= 30; i++)); do
-            kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
-            if curl -s http://localhost:3000 > /dev/null; then
-              SERVER_READY=true
-              break
-            fi
-            sleep 1
-          done
-
-          if [ "$SERVER_READY" = "false" ]; then
-            echo "Server failed to start within 30s."
-            exit 1
-          fi
-
-          pnpm run test:lighthouse:admin:pr
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/run-admin-lighthouse.sh"
         env:
           CI: true
           BASE_URL: http://localhost:3000
@@ -5934,44 +5233,7 @@ jobs:
           SKIP_SKILLS_CATALOG_SYNC: '1'
 
       - name: Run authenticated chat Lighthouse
-        run: |
-          cd apps/web
-
-          if [ -z "$E2E_CLERK_USER_ID" ]; then
-            echo "E2E_CLERK_USER_ID not set — skipping chat Lighthouse."
-            exit 0
-          fi
-
-          export E2E_USE_TEST_AUTH_BYPASS=1
-          export NEXT_PUBLIC_AUTH_MOCK=1
-          export NEXT_PUBLIC_AUTH_PROXY_DISABLED=1
-
-          if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
-            echo "Standalone server not found — chat Lighthouse cannot start."
-            exit 1
-          fi
-
-          node .next/standalone/apps/web/server.js &
-          SERVER_PID=$!
-          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
-
-          echo "Waiting for standalone server..."
-          SERVER_READY=false
-          for ((i = 1; i <= 30; i++)); do
-            kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
-            if curl -s http://localhost:3000 > /dev/null; then
-              SERVER_READY=true
-              break
-            fi
-            sleep 1
-          done
-
-          if [ "$SERVER_READY" = "false" ]; then
-            echo "Server failed to start within 30s."
-            exit 1
-          fi
-
-          pnpm run test:lighthouse:chat:pr
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/run-chat-lighthouse.sh"
         env:
           CI: true
           BASE_URL: http://localhost:3000
@@ -6143,28 +5405,7 @@ jobs:
         env:
           BUILD_SECONDS: ${{ steps.candidate-build.outputs.seconds || '0' }}
           SELECTED_CHECKS: ${{ needs.ci-path-changes.outputs.blog_selected_checks_json }}
-        run: |
-          set -euo pipefail
-          root="$RUNNER_TEMP/blog-content-qualification"
-          started_at=$(cat "$root/qualification-started-at.txt")
-          started_epoch=$(cat "$root/qualification-started-epoch.txt")
-          ended_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          ended_epoch=$(date +%s)
-          candidate_created_at=$(git show -s --format=%cI "$GITHUB_SHA")
-          jq -n \
-            --arg candidate_sha "$GITHUB_SHA" \
-            --arg candidate_created_at "$candidate_created_at" \
-            --arg qualification_started_at "$started_at" \
-            --arg qualification_ended_at "$ended_at" \
-            --argjson selected_checks "$SELECTED_CHECKS" \
-            --argjson retries "$((GITHUB_RUN_ATTEMPT - 1))" \
-            --argjson runner_seconds "$((ended_epoch - started_epoch))" \
-            --argjson build_seconds "$BUILD_SECONDS" \
-            --arg run_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
-            --slurpfile classification "$root/blog-content-receipt.json" \
-            '{schema:"jovie-blog-content-qualification/v1",candidateSha:$candidate_sha,candidateCreatedAt:$candidate_created_at,qualificationStartedAt:$qualification_started_at,qualificationEndedAt:$qualification_ended_at,queueEnteredAt:null,queueWaitSeconds:null,deployedAt:null,confirmedLiveAt:null,selectedChecks:$selected_checks,retries:$retries,cost:{runnerSeconds:$runner_seconds,buildSeconds:$build_seconds},runUrl:$run_url,classification:$classification[0]}' \
-            > "$root/qualification-receipt.json"
-          cat "$root/qualification-receipt.json" >> "$GITHUB_STEP_SUMMARY"
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/record-blog-qualification-latency.sh"
       - name: Preserve blog qualification receipt
         if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -6504,24 +5745,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.merge_group.head_sha }}
           MERGE_GROUP_BASE: ${{ github.event.merge_group.base_sha }}
-        run: |
-          set -euo pipefail
-          [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]
-          [[ "$BASE_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]]
-          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
-          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
-          git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
-          if [[ "$EVENT_NAME" == pull_request ]]; then
-            base_tip="$(git rev-parse --verify "refs/remotes/origin/${BASE_BRANCH}^{commit}")"
-            COVERAGE_BASE="$(GIT_NO_LAZY_FETCH=1 git merge-base "$base_tip" "$EXPECTED_HEAD")"
-          else
-            COVERAGE_BASE="$MERGE_GROUP_BASE"
-          fi
-          [[ "$COVERAGE_BASE" =~ ^[0-9a-f]{40}$ ]]
-          GIT_NO_LAZY_FETCH=1 git cat-file -e "${COVERAGE_BASE}^{commit}"
-          git -c "http.https://github.com/.extraheader=$AUTH_HEADER" diff --unified=0 --diff-filter=ACMR --no-renames "${COVERAGE_BASE}...${EXPECTED_HEAD}" -- apps/web > /dev/null
-          GIT_NO_LAZY_FETCH=1 git diff --unified=0 --diff-filter=ACMR --no-renames "${COVERAGE_BASE}...${EXPECTED_HEAD}" -- apps/web > /dev/null
-          echo "sha=$COVERAGE_BASE" >> "$GITHUB_OUTPUT"
+        run: exec bash --noprofile --norc -eo pipefail "$GITHUB_WORKSPACE/.github/scripts/ci/fetch-exact-coverage-history.sh"
 
       - name: Verify exact coverage head and diff base
         env:
@@ -7032,41 +6256,7 @@ jobs:
       - name: Run authenticated a11y specs
         id: a11y-authed
         if: env.DATABASE_URL != ''
-        run: |
-          cd apps/web
-          mkdir -p tests/.auth
-          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
-
-          cleanup() { kill "$SERVER_PID" 2>/dev/null || true; }
-          trap cleanup EXIT
-
-          if [ ! -f .next/standalone/apps/web/server.js ] || [ ! -f .next/standalone/apps/web/.next/BUILD_ID ]; then
-            echo "::error::Standalone server not found for authenticated a11y."
-            exit 1
-          fi
-
-          # Same server-side env export as mobile-overflow / e2e-smoke so
-          # test-auth enter is available on the production-built standalone.
-          export VERCEL_ENV=development
-          export E2E_USE_TEST_AUTH_BYPASS=1
-          export E2E_TEST_AUTH_PERSONA=creator-ready
-          export NEXT_PUBLIC_E2E_MODE=1
-          export NEXT_PUBLIC_AUTH_MOCK=1
-          export NEXT_PUBLIC_AUTH_PROXY_DISABLED=1
-          export HOSTNAME=localhost
-
-          PORT=3270 node .next/standalone/apps/web/server.js &
-          SERVER_PID=$!
-          for ((i = 1; i <= 30; i++)); do
-            kill -0 "$SERVER_PID" 2>/dev/null || { echo "Standalone server died"; exit 1; }
-            if curl -sf http://localhost:3270 > /dev/null 2>&1; then break; fi
-            sleep 1
-          done
-
-          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm exec playwright test \
-            tests/e2e/a11y.spec.ts \
-            tests/e2e/chat-axe.spec.ts \
-            --config=playwright.config.ts --project=chromium
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/run-authenticated-a11y.sh"
         env:
           BASE_URL: http://localhost:3270
           CI: true
@@ -7553,31 +6743,7 @@ jobs:
       - name: Review golden-path keyframes (visual verdict)
         id: visual_review
         if: ${{ !cancelled() && steps.canonical_journey.outcome == 'success' && needs.ci-path-changes.outputs.golden_path_no_ui_diff != 'true' }}
-        run: |
-          cd "$GITHUB_WORKSPACE"
-          # JOV-5489: recorded visual review of the golden-path keyframes. A
-          # suspected blocker is re-reviewed once; only a reproduced blocker fails.
-          # The gateway key is mapped in for the reviewer only, never the server.
-          KEYFRAMES="$GITHUB_WORKSPACE/apps/web/test-results/golden-path-keyframes"
-          # The review runs as its own guarded producer scoped to the keyframes
-          # only, so the staged evidence includes verdict.json and only these
-          # journey keyframes are declared public (failure captures never are).
-          review() {
-            AI_GATEWAY_API_KEY="$GOLDEN_PATH_REVIEW_GATEWAY_KEY" \
-              WORKERS_AI_TOKEN="$GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN" \
-              PLAYWRIGHT_ARTIFACT_PATHS=apps/web/test-results/golden-path-keyframes \
-              PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES=true \
-              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-              pnpm --filter @jovie/web exec tsx scripts/golden-path-visual-review.ts "$@"
-          }
-          review --dir "$KEYFRAMES/first" --out "$KEYFRAMES/first/verdict.json"
-          if [ "$(jq '.suspected | length' "$KEYFRAMES/first/verdict.json")" -gt 0 ]; then
-            echo "::warning::Golden path visual review suspects a blocker; re-reviewing to confirm."
-            # ponytail: independent second review of the same keyframes, not a
-            # journey replay: the journey claims a protected fixture once per DB.
-            # Ceiling: a capture-timing flake is judged twice on one frame.
-            review --dir "$KEYFRAMES/first" --out "$KEYFRAMES/first/confirm.json" --confirm-against "$KEYFRAMES/first/verdict.json"
-          fi
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/review-golden-path-keyframes.sh"
         env:
           GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.GOLDEN_PATH_REVIEW_GATEWAY_KEY }}
           # Workers AI (Cloudflare credits) is tried first by the reviewer; unset = Gateway only.
@@ -8073,39 +7239,7 @@ jobs:
       - name: Load quarantined E2E specs
         if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         id: quarantine
-        run: |
-          node .github/scripts/quarantine-ledger.mjs validate
-          FILE="apps/web/tests/quarantine.json"
-          QUARANTINED=()
-
-          if [ -f "$FILE" ]; then
-            mapfile -t QUARANTINED < <(jq -r '.entries[]? | select(.kind == "e2e") | .path' "$FILE")
-          fi
-
-          mapfile -t ALL_SPECS < <(git ls-files "apps/web/tests/e2e/**/*.spec.ts" "apps/web/tests/smoke/**/*.spec.ts")
-
-          ALLOWED_SPECS=()
-          for spec in "${ALL_SPECS[@]}"; do
-            skip=false
-            for quarantined in "${QUARANTINED[@]}"; do
-              if [[ "$spec" == "$quarantined" ]]; then
-                skip=true
-                break
-              fi
-            done
-            if [[ "$skip" == "false" ]]; then
-              ALLOWED_SPECS+=("$spec")
-            fi
-          done
-
-          echo "allowed_specs=${ALLOWED_SPECS[*]}" >> "$GITHUB_OUTPUT"
-          echo "quarantined_specs=${QUARANTINED[*]}" >> "$GITHUB_OUTPUT"
-
-          if [ ${#QUARANTINED[@]} -gt 0 ]; then
-            echo "has_quarantine=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_quarantine=false" >> "$GITHUB_OUTPUT"
-          fi
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/load-e2e-quarantine.sh"
 
       - name: E2E Full (Main Branch)
         if: ${{ github.ref == 'refs/heads/main' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
@@ -8322,30 +7456,7 @@ jobs:
       - name: Strip invalid Upstash env (preview)
         # `vercel pull` can surface a truthy-but-invalid UPSTASH_REDIS_REST_URL
         # (placeholder or non-https). It must never reach `vercel build`.
-        run: |
-          for env_file in .vercel/.env.preview.local .vercel/.env.local; do
-            if [ ! -f "$env_file" ]; then
-              continue
-            fi
-            url_line="$(grep -E '^UPSTASH_REDIS_REST_URL=' "$env_file" | head -n 1 || true)"
-            if [ -z "$url_line" ]; then
-              continue
-            fi
-            url_value="${url_line#UPSTASH_REDIS_REST_URL=}"
-            url_value="${url_value#\"}"
-            url_value="${url_value%\"}"
-            url_value="${url_value#\'}"
-            url_value="${url_value%\'}"
-            case "$url_value" in
-              https://*)
-                ;;
-              *)
-                echo "[env] dropping non-https UPSTASH_REDIS_REST_* entries from $env_file"
-                grep -v -E '^UPSTASH_REDIS_REST_(URL|TOKEN)=' "$env_file" > "${env_file}.tmp" || true
-                mv "${env_file}.tmp" "$env_file"
-                ;;
-            esac
-          done
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/strip-preview-upstash-env.sh"
       - name: Build (PR preview)
         timeout-minutes: 10
         run: |
@@ -8372,34 +7483,7 @@ jobs:
       - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
         timeout-minutes: 30
-        run: |
-          # For fast preview PRs: use main secrets (no Neon dependency)
-          # Fallback hierarchy for maximum compatibility
-          POOLED_URL=""
-          if [ -n "$DATABASE_URL_MAIN" ]; then
-            POOLED_URL="$DATABASE_URL_MAIN"
-            echo "Using main database URL"
-          elif [ -n "$DATABASE_URL" ]; then
-            POOLED_URL="$DATABASE_URL"
-            echo "Using fallback database URL"
-          else
-            # Provide cheap stub for UI-only deployments that might not need DB
-            POOLED_URL="postgresql://stub:***@localhost:5432/main_stub"
-            echo "Using stub database URL for UI-only deployment"
-          fi
-          export DATABASE_URL="$POOLED_URL"
-          export GIT_BRANCH
-
-          for i in {1..3}; do
-            if bash .github/scripts/vercel-prebuilt-deploy.sh deployment_url \
-              --env DATABASE_URL \
-              --env GIT_BRANCH; then
-              break
-            fi
-            echo "Vercel deploy attempt $i failed, retrying in 10s..."
-            sleep 10
-            if [ "$i" -eq 3 ]; then exit 1; fi
-          done
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/deploy-pr-preview.sh"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -8418,27 +7502,7 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          set -euo pipefail
-          # GitHub masks secret substrings in the DEPLOYMENT_URL env dump, which
-          # removes the hostname. The base64 line keeps an openable URL for the
-          # funnel gate without printing a second plaintext copy.
-          echo "DEPLOYMENT_URL_B64: $(printf '%s' "$DEPLOYMENT_URL" | base64 -w0)"
-          inspect_wait_status=0
-          ./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
-            --wait \
-            --timeout 8m \
-            --scope "$VERCEL_ORG_ID" || inspect_wait_status=$?
-          deployment_json="$(./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
-            --format=json \
-            --scope "$VERCEL_ORG_ID")"
-          deployment_state="$(jq -r '(.readyState // .state // .status // "unknown") | ascii_upcase' \
-            <<<"$deployment_json")"
-          echo "Current PR preview deployment state: $deployment_state"
-          if [ "$deployment_state" != "READY" ]; then
-            echo "::error::PR preview is $deployment_state after readiness wait (status $inspect_wait_status); refusing a false-green preview."
-            exit 1
-          fi
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/await-pr-preview.sh"
 
       - name: Emit preview-env admission receipt
         if: success()
@@ -9002,52 +8066,7 @@ jobs:
           CI_HARNESS_JOB_CI_GOLDEN_PATH: ${{ needs.ci-golden-path.result }}
           CI_HARNESS_JOB_CI_SMOKE_REQUIRED: ${{ needs.ci-smoke-required.result }}
           CI_HARNESS_JOB_CI_PR_VERCEL_PREVIEW: ${{ needs.ci-pr-vercel-preview.result }}
-        run: |
-          set -euo pipefail
-
-          mkdir -p "$RUNNER_TEMP/ci-harness"
-          RISK_JSON="$RUNNER_TEMP/ci-harness/risk.json"
-          ARTIFACT_JSON="$RUNNER_TEMP/ci-harness/ci-harness.v1.json"
-
-          risk_level="${RISK_LEVEL:-low}"
-          requires_smoke="${RISK_REQUIRES_SMOKE:-false}"
-          requires_preview="${RISK_REQUIRES_PREVIEW:-false}"
-          blocks_unattended="${RISK_BLOCKS_UNATTENDED:-false}"
-          risk_rules="${RISK_RULES:-}"
-
-          jq -n \
-            --arg riskLevel "$risk_level" \
-            --arg rules "$risk_rules" \
-            --argjson requiresSmoke "$requires_smoke" \
-            --argjson requiresPreview "$requires_preview" \
-            --argjson blocksUnattended "$blocks_unattended" \
-            '{
-              schemaVersion: 1,
-              riskLevel: $riskLevel,
-              requiresSmoke: $requiresSmoke,
-              requiresPreview: $requiresPreview,
-              blocksUnattendedAutoMerge: $blocksUnattended,
-              matchedRules: ($rules | split(",") | map(select(length > 0) | {id: ., title: ., level: $riskLevel, files: []})),
-              recommendedLabels: []
-            }' > "$RISK_JSON"
-
-          node scripts/ci-harness.mjs emit-artifact \
-            --risk "$RISK_JSON" \
-            --out "$ARTIFACT_JSON"
-
-          {
-            echo "### CI harness artifact"
-            echo
-            echo "- Artifact: \`ci-harness.v1.json\`"
-            echo "- Risk level: $risk_level"
-            echo "- Preview URL: ${PR_PREVIEW_URL:-none}"
-            echo
-            echo "Next local command:"
-            echo
-            echo '```bash'
-            echo "pnpm ci:harness:check"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/write-ci-harness-artifact.sh"
       - name: Upload CI harness artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

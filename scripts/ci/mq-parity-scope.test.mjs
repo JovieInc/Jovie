@@ -12,6 +12,8 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
+import { selectLanes } from '../ci-fast-lanes.mjs';
+import { parseSkipLaneIds } from '../lib/ci-fast-skip-lanes.mjs';
 import { selectMqParityScope } from './mq-parity-scope.mjs';
 
 const { load } = createRequire(import.meta.url)('js-yaml');
@@ -88,6 +90,56 @@ test('source-validation wires typecheck and remaining twins onto Affected Unit T
   assert.equal(remaining.env.CI_FAST_SKIP_STRUCTURAL, 'true');
   assert.match(String(remaining.if), /mq-parity\.outputs\.remaining == 'true'/);
   assert.match(String(remaining.if), /matrix\.shard == '1\/4'/);
+  const exclusions = parseSkipLaneIds(remaining.env.CI_FAST_SKIP_LANE_IDS);
+  assert.deepEqual([...exclusions], ['source-guards']);
+  const nativeLanes = selectLanes('remaining').map(lane => lane.id);
+  const sourceLanes = nativeLanes.filter(lane => !exclusions.has(lane));
+  // The same runner command still includes disk-read guards without the
+  // source-step override; never change the native remaining group.
+  assert.ok(nativeLanes.includes('source-guards'));
+  assert.deepEqual(
+    sourceLanes,
+    nativeLanes.filter(lane => lane !== 'source-guards')
+  );
+  const guard = steps.find(
+    step =>
+      step.name === 'Validate disk-read source contracts from trusted base'
+  );
+  assert.ok(guard);
+  assert.equal(
+    guard.if,
+    "matrix.shard == '4/4' && steps.reuse.outputs.reuse != 'true'"
+  );
+  assert.equal(guard.env.CI_FAST_SKIP_LANE_IDS, undefined);
+  assert.equal(workflow.env?.CI_FAST_SKIP_LANE_IDS, undefined);
+  assert.equal(workflow.jobs.unit.env?.CI_FAST_SKIP_LANE_IDS, undefined);
+  const ready = workflow.jobs.ready;
+  const fanIn = ready.steps.find(
+    step => step.name === 'Require every source proof'
+  );
+  assert.ok(fanIn);
+  assert.equal(ready.needs.filter(job => job === 'unit').length, 1);
+  for (const unitResult of ['success', 'failure', 'skipped', 'cancelled', '']) {
+    const results = ready.needs
+      .map(job => (job === 'unit' ? unitResult : 'success'))
+      .join(',');
+    // Execute the shipped fan-in with all other checks green. A failed or
+    // absent required unit outcome can never inherit a passing parity result.
+    const result = spawnSync('/bin/bash', ['-c', fanIn.run], {
+      env: { RESULTS: results },
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, unitResult === 'success' ? 0 : 1, unitResult);
+  }
+  // Source parity has no published native lane receipt. Its only artifact
+  // within the unit matrix is the nonblocking retry observation.
+  const uploads = steps.filter(step =>
+    step.uses?.startsWith('actions/upload-artifact@')
+  );
+  assert.deepEqual(
+    uploads.map(step => step.with.path),
+    ['apps/web/test-report.*.flaky.json']
+  );
 });
 
 test('older PR heads load new parity tools from trusted base without dirtying the source checkout', () => {

@@ -33,6 +33,7 @@ import {
   redactSecretValues,
   resolveArtifactFiles,
 } from '../../../../../.github/scripts/guard-playwright-artifacts.mjs';
+import { readCiWorkflowShellSource } from '../../../../../scripts/lib/__tests__/ci-workflow-shell-source.mjs';
 import {
   MAX_PLAYWRIGHT_PNG_HEIGHT,
   MAX_PLAYWRIGHT_PNG_PIXEL_BYTES,
@@ -179,7 +180,9 @@ const inheritedSecretAllowlist = new Set([
   'CF_TURBO_SIGNATURE_KEY',
 ]);
 const policyWorkflow = (file: string) =>
-  parseYaml(readFileSync(join(workflowsRoot, file), 'utf8')) as PolicyWorkflow;
+  parseYaml(
+    readCiWorkflowShellSource(join(workflowsRoot, file))
+  ) as PolicyWorkflow;
 const policyJob = (source: string): PolicyJob =>
   Object.values((parseYaml(source) as PolicyWorkflow).jobs ?? {})[0] ?? {};
 let parsedWorkflowJobs:
@@ -941,7 +944,7 @@ describe('Playwright artifact secret boundary', () => {
   it.each([0, 37])(
     'keeps structural base-fetch auth scoped and propagates exit %i',
     fetchExit => {
-      const workflow = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
+      const workflow = readCiWorkflowShellSource(join(workflowsRoot, 'ci.yml'));
       const job = jobBlock(workflow, 'ci-path-changes');
       const step = stepBlock(job, 'Decide structural lane');
       expect(step).toContain('GH_TOKEN: ${{ github.token }}');
@@ -1004,7 +1007,7 @@ describe('Playwright artifact secret boundary', () => {
   );
 
   it('keeps every combined Storybook run on manual Axe with scanned Markdown evidence', () => {
-    const source = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
+    const source = readCiWorkflowShellSource(join(workflowsRoot, 'ci.yml'));
     const job = jobBlock(source, 'ci-storybook-surfaces');
     const steps = workflowStepBlocks(job);
     const surface = steps.find(step =>
@@ -1033,7 +1036,7 @@ describe('Playwright artifact secret boundary', () => {
   });
 
   it('redacts smoke and full E2E error context and keeps golden-path keyframes off the failure upload', () => {
-    const source = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
+    const source = readCiWorkflowShellSource(join(workflowsRoot, 'ci.yml'));
     for (const [jobId, stepName] of [
       ['ci-e2e-smoke', 'Run E2E Smoke (Chromium)'],
       ['ci-smoke-required', 'Run Required Smoke Tests'],
@@ -1137,7 +1140,7 @@ describe('Playwright artifact secret boundary', () => {
     const safeUploadJobs = readdirSync(workflowsRoot)
       .filter(name => /\.ya?ml$/.test(name))
       .flatMap(file =>
-        workflowJobBlocks(readFileSync(join(workflowsRoot, file), 'utf8'))
+        workflowJobBlocks(readCiWorkflowShellSource(join(workflowsRoot, file)))
           .filter(job => job.source.includes(safeUploadAction))
           .map(job => ({ ...job, file }))
       );
@@ -1554,7 +1557,7 @@ ${fixtureCheckout}
     const discovered = readdirSync(workflowsRoot)
       .filter(name => /\.ya?ml$/.test(name))
       .flatMap(file => {
-        const source = readFileSync(join(workflowsRoot, file), 'utf8');
+        const source = readCiWorkflowShellSource(join(workflowsRoot, file));
         return workflowJobBlocks(source).flatMap(job =>
           workflowStepBlocks(job.source)
             .filter(
@@ -1579,7 +1582,7 @@ ${fixtureCheckout}
 
     for (const item of expected) {
       const [file, jobId, stepName] = item.split(':');
-      const source = readFileSync(join(workflowsRoot, file!), 'utf8');
+      const source = readCiWorkflowShellSource(join(workflowsRoot, file!));
       const job = workflowJobBlocks(source).find(({ id }) => id === jobId);
       expect(job, item).toBeDefined();
       if (!job) continue;

@@ -12,6 +12,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { load as parseYaml, dump as stringifyYaml } from 'js-yaml';
 import { afterAll, describe, expect, it } from 'vitest';
+import { readCiWorkflowShellSource } from '../../../../../scripts/lib/__tests__/ci-workflow-shell-source.mjs';
 import { storyEvidenceEligibility } from '../../../../../scripts/lib/component-render-inputs.mjs';
 import {
   cronGapMinutes,
@@ -164,7 +165,7 @@ const PATH_CHANGES_SCRIPT = readFileSync(
 
 describe('source PR path-output reachability contract', () => {
   it('runs fast required gates for workflow-only changes without source unit or build work', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const pathJob = getJobBlock(workflow, 'ci-path-changes');
     const provenance = getJobBlock(workflow, 'main-queue-provenance');
     const provenanceHeader = provenance.slice(
@@ -319,7 +320,7 @@ describe('source PR path-output reachability contract', () => {
 
 describe('CI Neon connection artifact contract', () => {
   it('binds every producer and consumer to the current run attempt', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const artifactLines = workflow
       .split('\n')
       .filter(line => line.includes('name: neon-db-connection-'));
@@ -345,7 +346,7 @@ describe('CI Neon connection artifact contract', () => {
 
 describe('CI test-performance path gate', () => {
   it('routes exact performance inputs to a hosted manual lane', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const pathJob = getJobBlock(workflow, 'ci-path-changes');
     const detectStep = PATH_CHANGES_SCRIPT;
     const performanceJob = getJobBlock(workflow, 'ci-test-performance');
@@ -424,7 +425,7 @@ describe('CI test-performance path gate', () => {
 
 describe('CI Storybook accessibility path gate', () => {
   it('classifies relevant paths; the main-push visual-a11y lane owns execution', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const pathJob = getJobBlock(workflow, 'ci-path-changes');
     const detectStep = PATH_CHANGES_SCRIPT;
 
@@ -549,7 +550,7 @@ function stagingReceiptRobotsPolicyValid(robotsBody: string): boolean {
 
 describe('deploy workflow Vercel env resolution', () => {
   it('gives every main SHA CI evidence and a production-controller opportunity', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const controller = readFileSync(productionControllerWorkflowPath, 'utf8');
     // Every main push runs CI (no path filter) and every completed main
     // Staging Controller run reaches the production controller.
@@ -570,7 +571,7 @@ describe('deploy workflow Vercel env resolution', () => {
   });
 
   it('keeps the dependency-free risk classifier off dependency caches', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const classifierJob = getJobBlock(workflow, 'ci-risk-classifier');
 
     expect(classifierJob).toContain('timeout-minutes: 3');
@@ -596,7 +597,7 @@ describe('deploy workflow Vercel env resolution', () => {
   });
 
   it('routes the direct-main fallback build and layout to one hosted workspace', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const buildJob = getJobBlock(workflow, 'ci-build-layout');
 
     expect(buildJob).toContain("github.ref == 'refs/heads/main'");
@@ -911,7 +912,7 @@ describe('deploy workflow Vercel env resolution', () => {
   });
 
   it('cross-proves one-shot CI evidence under one dedicated FIFO production lease', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const controller = readFileSync(productionControllerWorkflowPath, 'utf8');
     const controllerHeader = controller.slice(0, controller.indexOf('\njobs:'));
     const provenanceJob = getJobBlock(workflow, 'main-queue-provenance');
@@ -1022,7 +1023,7 @@ describe('deploy workflow Vercel env resolution', () => {
   });
 
   it('skips catalog mutation only for the manual PR preview build', () => {
-    const previewWorkflow = readFileSync(workflowPath, 'utf8');
+    const previewWorkflow = readCiWorkflowShellSource(workflowPath);
     const productionWorkflow = readFileSync(
       productionReleaseWorkflowPath,
       'utf8'
@@ -1047,7 +1048,7 @@ describe('deploy workflow Vercel env resolution', () => {
   });
 
   it('keeps Vercel secrets and runtime values out of every preview and production process argument', () => {
-    const previewWorkflow = readFileSync(workflowPath, 'utf8');
+    const previewWorkflow = readCiWorkflowShellSource(workflowPath);
     const productionWorkflow = readFileSync(
       productionReleaseWorkflowPath,
       'utf8'
@@ -1163,7 +1164,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       productionReleaseWorkflowPath,
       canaryWorkflowPath,
     ]) {
-      const workflow = readFileSync(workflowPath, 'utf8');
+      const workflow = readCiWorkflowShellSource(workflowPath);
       const runBlocks = getShellRunBlocks(workflow);
       expect(runBlocks.length).toBeGreaterThan(0);
       for (const runBlock of runBlocks) {
@@ -1189,7 +1190,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
   });
 
   it('pins Vercel pull and build commands to the configured project', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const productionWorkflow = readFileSync(
       productionReleaseWorkflowPath,
       'utf8'
@@ -1880,7 +1881,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     const reusable = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const canary = readFileSync(canaryWorkflowPath, 'utf8');
     const health = readFileSync(productionControllerHealthPath, 'utf8');
-    const ci = readFileSync(workflowPath, 'utf8');
+    const ci = readCiWorkflowShellSource(workflowPath);
     const controllerDefaults = controller.slice(
       0,
       controller.indexOf('\njobs:')
@@ -1968,7 +1969,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
 
 describe('unit-test runner capacity', () => {
   it('uses five-way hosted capacity while fixed runners are quarantined', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const routeJob = getJobBlock(workflow, 'ci-unit-runner-route');
     const unitJob = getJobBlock(workflow, 'ci-unit-tests');
 
@@ -2038,7 +2039,7 @@ describe('unit-test runner capacity', () => {
 
 describe('iOS stage contract', () => {
   it('keeps portable checks on source and Xcode on combined/fallback heads', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const iosWorkflow = readFileSync(iosWorkflowPath, 'utf8');
     const fastLanes = readFileSync(ciFastLanesPath, 'utf8');
     const pathChanges = getJobBlock(workflow, 'ci-path-changes');
@@ -2097,7 +2098,7 @@ describe('iOS stage contract', () => {
 
 describe('informational CI tail capacity', () => {
   it('keeps the manual evidence summary off the ephemeral unit-test pool', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const summaryJob = getJobBlock(workflow, 'ci-summary');
 
     expect(summaryJob).toContain('name: Manual Evidence Summary');
@@ -3140,7 +3141,7 @@ exit 23
 
 describe('CI E2E smoke workflow', () => {
   it('keeps the real-auth golden path inert in the bypass smoke lane', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const smokeStep = getStepBlock(
       getJobBlock(workflow, 'ci-e2e-smoke'),
       'Run E2E Smoke (Chromium)'
@@ -3384,7 +3385,7 @@ describe('CI E2E smoke workflow', () => {
   });
 
   it('seeds public QA fixtures on ephemeral Neon before PR smoke runs', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const smokeJob = getJobBlock(workflow, 'ci-e2e-smoke');
     const migrateStep = getStepBlock(
       smokeJob,
@@ -3409,7 +3410,7 @@ describe('CI E2E smoke workflow', () => {
   });
 
   it('builds the golden-path challenge fixture with a public test key and real auth', () => {
-    const workflow = parseYaml(readFileSync(workflowPath, 'utf8')) as {
+    const workflow = parseYaml(readCiWorkflowShellSource(workflowPath)) as {
       jobs: Record<
         string,
         {
@@ -3435,7 +3436,7 @@ describe('CI E2E smoke workflow', () => {
   });
 
   it('pins Better Auth to the local standalone origin for smoke and golden-path jobs', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     // Shared build artifact feeds multiple lanes on one self-hosted machine, so
     // each lane serves on its own loopback port; the baked-in public build URL
     // stays on the legacy default and is overridden by lane runtime exports.
@@ -3517,7 +3518,7 @@ describe('CI E2E smoke workflow', () => {
 
 describe('CI Golden Path Neon workflow', () => {
   it('prefers pooled endpoints and verifies connectivity before migrations', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const goldenPathJob = getJobBlock(workflow, 'ci-golden-path');
     const sharedResolver = getStepBlock(
       goldenPathJob,
@@ -3569,7 +3570,7 @@ describe('CI Golden Path Neon workflow', () => {
 
 describe('CI public lighthouse workflow', () => {
   it('pins the standalone server and browser to one loopback origin', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const lighthouseJob = getJobBlock(workflow, 'ci-lighthouse-pr');
     const runStep = getStepBlock(
       lighthouseJob,
@@ -3588,7 +3589,7 @@ describe('CI public lighthouse workflow', () => {
   });
 
   it('pins CHROME_PATH to the baked Playwright Chromium before running lhci', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const lighthouseJob = getJobBlock(workflow, 'ci-lighthouse-pr');
     const pinStep = getStepBlock(lighthouseJob, 'Pin Chrome for Lighthouse CI');
 
@@ -3617,7 +3618,7 @@ describe('CI public lighthouse workflow', () => {
   });
 
   it('uses seeded isolated Neon fixtures instead of the stable main DB', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const lighthouseJob = getJobBlock(workflow, 'ci-lighthouse-pr');
     const downloadArtifactStep = getStepBlock(
       lighthouseJob,
@@ -3720,7 +3721,7 @@ describe('CI public lighthouse workflow', () => {
 
 describe('CI mobile overflow workflow', () => {
   it('uses seeded isolated Neon fixtures instead of the stable main DB', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const mobileOverflowJob = getJobBlock(workflow, 'ci-mobile-overflow');
     const downloadArtifactStep = getStepBlock(
       mobileOverflowJob,
@@ -3783,7 +3784,7 @@ describe('CI mobile overflow workflow', () => {
 
 describe('CI required smoke materialization', () => {
   it('requires the shared manual Neon producer without a racing fallback', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const smokeJob = getJobBlock(workflow, 'ci-e2e-smoke');
 
     expect(smokeJob).toContain("github.event_name == 'workflow_dispatch'");
@@ -3802,7 +3803,7 @@ describe('CI required smoke materialization', () => {
 
 describe('CI bounded evidence parallelism', () => {
   it('isolates public Lighthouse below the observed server exhaustion horizon', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const lighthouse = getJobBlock(workflow, 'ci-lighthouse-pr');
 
     expect(lighthouse).toContain('max-parallel: 4');
@@ -3811,7 +3812,7 @@ describe('CI bounded evidence parallelism', () => {
   });
 
   it('runs all three mobile widths in parallel under expanded job headroom', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const mobile = getJobBlock(workflow, 'ci-mobile-overflow');
 
     expect(mobile).toContain('max-parallel: 3');
@@ -3838,7 +3839,7 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
   ] as const;
 
   it('caps cross-PR Neon branch creation with a four-slot queue', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
 
     for (const [jobKey, expectedGroupPrefix] of Object.entries(
       neonBranchCreateJobs
@@ -3864,7 +3865,7 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
   });
 
   it('scopes golden-path pending replacement to one PR', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const goldenPathJob = getJobBlock(workflow, 'ci-golden-path');
 
     expect(goldenPathJob).toContain(
@@ -3877,7 +3878,7 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
   });
 
   it('uses literal job prefixes because github.job is unavailable before a runner starts', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const poolGroups =
       workflow.match(/group: neon-endpoint-pool-[^\n]+/g) ?? [];
 
@@ -3889,7 +3890,7 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
   });
 
   it('keeps artifact consumers out of the branch-creation pool', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
 
     for (const jobKey of neonArtifactConsumerJobs) {
       const job = getJobBlock(workflow, jobKey);
@@ -3898,7 +3899,7 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
   });
 
   it('shortens shared neon-db branch TTL to release endpoint slots faster', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const neonDbJob = getJobBlock(workflow, 'neon-db');
     const createBranchStep = getStepBlock(
       neonDbJob,
@@ -3909,7 +3910,7 @@ describe('CI Neon endpoint pool concurrency (JOV-2497)', () => {
   });
 
   it('admits the shared Neon endpoint before publishing its connection artifact', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const neonDbJob = getJobBlock(workflow, 'neon-db');
     const prepareIndex = neonDbJob.indexOf(
       '- name: Prepare shared Neon admission probe'
@@ -3990,7 +3991,7 @@ describe('ci-fast critical deploy contract', () => {
 
 describe('CI public a11y workflow', () => {
   it('uses seeded isolated Neon fixtures instead of the stable main DB', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const a11yJob = getJobBlock(workflow, 'ci-a11y');
     const downloadArtifactStep = getStepBlock(
       a11yJob,
@@ -4051,7 +4052,7 @@ describe('CI public a11y workflow', () => {
 
 describe('CI PR neon migrate workflow', () => {
   it('uses seeded isolated Neon fixtures instead of the stable main DB', () => {
-    const workflow = readFileSync(workflowPath, 'utf8');
+    const workflow = readCiWorkflowShellSource(workflowPath);
     const migrateJob = getJobBlock(workflow, 'ci-pr-neon-migrate');
     const downloadArtifactStep = getStepBlock(
       migrateJob,

@@ -23,6 +23,7 @@ import {
 } from '../ci-control-plane.mjs';
 import { replaceGeneratedBlock } from '../ci-harness.mjs';
 import { extractWorkflowJobBlock } from '../merge-queue-guard.mjs';
+import { readCiWorkflowShellSource } from './ci-workflow-shell-source.mjs';
 
 const manifest = loadCiHarnessManifest();
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -218,9 +219,8 @@ describe('ci-harness manifest', () => {
   });
 
   it('keeps required source PR Ready deterministic and exact-head coverage gated', () => {
-    const workflow = readFileSync(
-      resolve(REPO_ROOT, '.github/workflows/ci.yml'),
-      'utf8'
+    const workflow = readCiWorkflowShellSource(
+      resolve(REPO_ROOT, '.github/workflows/ci.yml')
     );
     const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
 
@@ -331,9 +331,8 @@ describe('ci-harness manifest', () => {
   });
 
   it('runs manual Full E2E as four concurrent shared-Neon shards', () => {
-    const workflow = readFileSync(
-      resolve(REPO_ROOT, '.github/workflows/ci.yml'),
-      'utf8'
+    const workflow = readCiWorkflowShellSource(
+      resolve(REPO_ROOT, '.github/workflows/ci.yml')
     );
     const e2e = extractWorkflowJobBlock(workflow, 'ci-e2e-tests');
     const neonDb = extractWorkflowJobBlock(workflow, 'neon-db');
@@ -588,9 +587,8 @@ describe('ci-harness manifest', () => {
   });
 
   it('keeps build and layout in one hosted merge-group workspace', () => {
-    const workflow = readFileSync(
-      resolve(REPO_ROOT, '.github/workflows/ci.yml'),
-      'utf8'
+    const workflow = readCiWorkflowShellSource(
+      resolve(REPO_ROOT, '.github/workflows/ci.yml')
     );
     const buildLayout = extractWorkflowJobBlock(workflow, 'ci-build-layout');
     const sourceReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
