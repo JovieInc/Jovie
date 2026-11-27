@@ -36,6 +36,7 @@ import gh_app_token  # noqa: E402  (canonical GitHub read-budget floor)
 import merge_evidence  # noqa: E402  (shared complete merge-window reader)
 import file_overlap  # noqa: E402
 import fleet_ledger  # noqa: E402  (claim ledger view, ready-work recorder)
+import factory_visibility  # noqa: E402  (factory adoption evidence projection)
 import factory_intake  # noqa: E402  (fleet-improvement signals -> agent-ready issues)
 import factory_signals  # noqa: E402  (recurring-alarm adapter)
 import linear_sync, urgent_sla, work_lane  # noqa: E402  (local Linear mirror and outbox status; Urgent SLA; per-lane measure)
@@ -2613,7 +2614,9 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         except Exception:  # an adapter fault never fails the doctor
             pass
     if getattr(tracker, "linear", None) is not None:
-        result["factoryIntake"] = factory_intake.run_pass(host.state, tracker.linear)
+        previous_adoption = (previous.get("factoryIntake") or {}).get("adoption") or ()
+        result["factoryIntake"] = factory_intake.run_pass(
+            host.state, tracker.linear, previous_adoption=previous_adoption, now=obs["now"])
     result["poolEmptySince"] = previous["poolEmptySince"]
     result["admissionRepairSince"] = previous.get("admissionRepairSince")
     for key in ("diskHeldSince", "diskTop", "diskTopAt"):
@@ -2642,6 +2645,7 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
             feed = status_feed(host, lane, obs, alerts, obs.get("tick") or {}, previous, result["conditions"])
             result["idleQualifiedSince"] = feed.pop("_idleQualifiedSince", {})
             result["capacity"] = feed["capacity"]
+            feed["factoryIntake"] = factory_visibility.public_view(result.get("factoryIntake"))
             result["statusFeed"] = publish_status(host, lane, feed)
         except Exception as error:  # a broken feed never blocks the doctor
             result["statusFeedError"] = f"{type(error).__name__}: {error}"[:120]

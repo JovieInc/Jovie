@@ -434,7 +434,7 @@ def digest(reg: dict, rows: list[dict], state: Path, now: float) -> dict:
     return {"schema": "jovie.waste-digest/v1", "at": iso(now),
             "top": [{k: r[k] for k in ("id", "class", "label", "value", "unit", "excess", "why", "owner")} for r in top],
             "techDebt": [r for r in rows if r["class"] == "tech-debt"],
-            "fixesShippedThisWeek": [{"id": w["id"], "metric": w["metrics"][0]} for w in shipped],
+            "fixesShippedThisWeek": [{"id": w["id"], "metric": w["metrics"][0], "receipts": w.get("receipts", [])} for w in shipped],
             "trend": trend, "seeds": [{"id": s["id"], "status": s["status"], "outcome": s["outcome"]} for s in reg["seeds"]]}
 
 
