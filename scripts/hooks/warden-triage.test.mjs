@@ -22,23 +22,20 @@ describe('warden-triage', () => {
     assert.deepEqual(triage([]), { review: false, reason: 'no changes' });
   });
 
-  it('skips docs, lockfiles, assets, snapshots and tests', () => {
+  it('skips docs, lockfiles and assets', () => {
     const verdict = triage([
-      row('docs/PR_FLOW.md', 200),
+      row('docs/notes.md', 200),
       row('pnpm-lock.yaml', 900),
       row('apps/web/public/logo.png', null, null),
-      row('apps/web/components/__snapshots__/Card.test.tsx.snap', 40),
-      row('apps/web/lib/format.test.ts', 30),
-      row('apps/ios/JovieTests/FormatTests.swift', 12),
     ]);
     assert.equal(verdict.review, false);
     assert.match(verdict.reason, /only docs/);
   });
 
-  it('skips a tiny code diff', () => {
+  it('reviews even a tiny code diff', () => {
     const verdict = triage([row('apps/web/lib/format.ts', 1, 1)]);
-    assert.equal(verdict.review, false);
-    assert.match(verdict.reason, /tiny diff \(2 changed lines\)/);
+    assert.equal(verdict.review, true);
+    assert.match(verdict.reason, /2 changed lines/);
   });
 
   it('reviews an ordinary code change', () => {
@@ -71,9 +68,28 @@ describe('warden-triage', () => {
     }
   });
 
+  it('reviews instructions, configuration, removed assertions and renamed risk paths', () => {
+    for (const path of [
+      'AGENTS.md',
+      'canon/ENGINEERING.md',
+      '.claude/rules/ui.md',
+      'warden.toml',
+      'vitest.config.ts',
+      'scripts/check.mjs',
+      'format.test.ts',
+    ]) {
+      assert.equal(triage([row(path, 0, 1)]).review, true, path);
+    }
+    assert.equal(
+      triage([{ ...row('docs/old.md'), oldPath: 'auth.ts' }]).review,
+      true
+    );
+  });
+
   it('does not treat words that merely contain "auth" as risky', () => {
     const verdict = triage([row('apps/web/components/AuthorCard.tsx', 1)]);
-    assert.equal(verdict.review, false);
+    assert.equal(verdict.review, true);
+    assert.doesNotMatch(verdict.reason, /risky path/);
   });
 
   it('parses numstat rows, binaries and renames', () => {
@@ -116,6 +132,43 @@ describe('warden-triage', () => {
     });
     assert.equal(code.status, 0);
     assert.match(code.stdout, /^review: 1 code file/);
+  });
+
+  it('reviews renamed risk sources and respects the configured comparison branch', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'jovie-triage-rename-'));
+    temporaryDirectories.push(repo);
+    const git = args => {
+      const result = spawnSync('git', ['-C', repo, ...args], {
+        encoding: 'utf8',
+      });
+      assert.equal(result.status, 0, result.stderr);
+    };
+    git(['init', '-q', '-b', 'main']);
+    git(['config', 'user.name', 'Hook Test']);
+    git(['config', 'user.email', 'hook@example.test']);
+    writeFileSync(join(repo, 'auth.ts'), 'risky source\n');
+    git(['add', 'auth.ts']);
+    git(['commit', '-qm', 'test baseline']);
+    git(['branch', 'comparison']);
+    git(['mv', 'auth.ts', 'notes.md']);
+    const renamed = spawnSync('node', [script, 'staged'], {
+      cwd: repo,
+      encoding: 'utf8',
+    });
+    assert.equal(renamed.status, 0);
+    assert.match(renamed.stdout, /risky path auth.ts/);
+    git(['commit', '-qm', 'test rename']);
+    writeFileSync(
+      join(repo, 'warden.toml'),
+      '[defaults]\ndefaultBranch = "comparison"\n'
+    );
+    const branch = spawnSync('node', [script, 'branch'], {
+      cwd: repo,
+      encoding: 'utf8',
+    });
+    assert.equal(branch.status, 0);
+    assert.match(branch.stdout, /risky path auth.ts/);
+    assert.doesNotMatch(branch.stdout, /triage failed/);
   });
 
   it('CLI fails open (review) when git cannot answer', () => {

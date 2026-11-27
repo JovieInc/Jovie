@@ -528,11 +528,21 @@ hook says so, and nothing is charged unless the linked Console org also holds
 paid credits (then set a spend limit on the Warden workspace).
 
 **Free first pass.** Before any model call, `scripts/hooks/warden-triage.mjs`
-skips diffs that are only docs, lockfiles, assets, snapshots or tests, and
-diffs under 3 changed lines. Risky paths (auth, billing, migrations, SQL,
-workflows, secrets, env files, middleware/proxy, API routes, webhooks) are
-always reviewed. `WARDEN_TRIAGE=off` reviews everything.
-`WARDEN_TIMEOUT_SECONDS` (default 180, `0` disables) caps one review.
+skips ordinary docs, lockfiles and assets before checking credentials.
+Executable, instruction, configuration and test changes are selected regardless
+of size; rename sources are checked as well as destinations.
+`WARDEN_TRIAGE=off` reviews everything. `WARDEN_TIMEOUT_SECONDS` (default 180,
+`0` disables) uses a portable Node deadline with process cleanup.
+
+The hook records truthful local observations and n/p50/p95/missingness through
+the [canonical stage-event consumer](metrics/STAGE_EVENTS.md#local-advisory-review-local-review).
+Only complete supported Warden JSONL results qualify for exact-input reuse;
+replay preserves findings and the original strict-mode exit. A process exit
+alone never proves a clean result, findings count, provider model identity or
+billing cost. Requested selectors with observed usage and validated runtime
+accounting estimates are labeled separately; local skill overrides or external
+service memory disable reuse. PATH Warden installations also disable reuse
+because launcher bytes do not bind their imported package and bundled policy.
 
 One-time local setup (not committed):
 

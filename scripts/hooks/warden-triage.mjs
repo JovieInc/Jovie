@@ -2,7 +2,7 @@
 // Free first pass for the local Warden review (scripts/hooks/warden-local-review.sh).
 //
 // Deterministic rules decide whether a diff is worth a paid model review, so
-// docs-only, lockfile-only, asset-only, test-only and tiny diffs never spend
+// docs-only, lockfile-only and asset-only diffs may avoid
 // API credits. Risky paths (auth, billing, migrations, workflows, secrets,
 // middleware, API routes, webhooks) are always reviewed, whatever their size.
 //
@@ -11,23 +11,29 @@
 //   exit 0 = review, exit 3 = skip. Any other failure prints `review: …` and
 //   exits 0, so a broken triage never hides a review (nothing fails silently).
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const SKIP_EXIT = 3;
-export const MIN_CHANGED_LINES = 3;
 
 export const RISKY = [
   /(^|\/)(auth|authn|authz|session|sessions|login|oauth|sso|clerk)(\/|\.|-|_)/i,
   /(billing|stripe|payment|payments|checkout|invoice|subscription)/i,
   /(^|\/)(migrations?|drizzle|supabase)(\/|$)/i,
   /\.sql$/i,
-  /^\.github\/workflows\//,
+  /^\.github\//,
+  /^docs\/(PR_FLOW|AI_AGENT_GUIDE)\.md$/,
   /(secret|secrets|credential|security|permission|rbac)/i,
   /(^|\/)\.env(\.|$)/,
   /(^|\/)(middleware|proxy)\.(t|j)sx?$/,
   /(^|\/)app\/api\//,
   /(^|\/)api\/.*route\.(t|j)sx?$/,
   /webhooks?/i,
+  /(^|\/)(AGENTS|CLAUDE|CODEX)\.md$/i,
+  /^(canon\/|\.claude\/|\.codex\/|scripts\/)/,
+  /(^|\/)(package\.json|warden\.toml|[^/]*config\.[^/]+)$/i,
+  /\.toml$/i,
 ];
 
 const DOCS = /\.(md|mdx|txt|rst)$/i;
@@ -50,22 +56,27 @@ function isLowRisk(path) {
 }
 
 /**
- * @param {{ path: string, added: number | null, deleted: number | null }[]} files
+ * @param {{ path: string, oldPath?: string, added: number | null, deleted: number | null }[]} files
  *   numstat rows; null counts mean a binary file.
  * @returns {{ review: boolean, reason: string }}
  */
 export function triage(files) {
   if (files.length === 0) return { review: false, reason: 'no changes' };
 
-  const risky = files.find(file =>
-    RISKY.some(pattern => pattern.test(file.path))
+  const risky = files.find(
+    file =>
+      RISKY.some(
+        pattern => pattern.test(file.path) || pattern.test(file.oldPath ?? '')
+      ) ||
+      TESTS.test(file.path) ||
+      SNAPSHOT.test(file.path)
   );
   if (risky) return { review: true, reason: `risky path ${risky.path}` };
 
   if (files.every(file => isLowRisk(file.path))) {
     return {
       review: false,
-      reason: 'only docs, lockfiles, assets, snapshots or tests changed',
+      reason: 'only docs, lockfiles or assets changed',
     };
   }
 
@@ -73,10 +84,6 @@ export function triage(files) {
     (sum, file) => sum + (file.added ?? 0) + (file.deleted ?? 0),
     0
   );
-  if (changed < MIN_CHANGED_LINES) {
-    return { review: false, reason: `tiny diff (${changed} changed lines)` };
-  }
-
   const code = files.filter(file => !isLowRisk(file.path)).length;
   return {
     review: true,
@@ -112,11 +119,64 @@ function git(args) {
   return result.stdout;
 }
 
-function diffArgs(mode, base) {
-  if (mode === 'staged') return ['diff', '--cached', '--numstat', '-M'];
-  const target = base || 'origin/main';
+// Match Warden's configured default branch and origin-tracking preference.
+export function reviewBase() {
+  const root = git(['rev-parse', '--show-toplevel']).trim();
+  let config = '';
+  try {
+    config = readFileSync(join(root, 'warden.toml'), 'utf8');
+  } catch {
+    /* no config */
+  }
+  let branch = /^\s*defaultBranch\s*=\s*["']([^"']+)["']/m.exec(config)?.[1];
+  const exists = ref => {
+    try {
+      git(['rev-parse', '--verify', ref]);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  if (!branch)
+    branch =
+      [
+        'main',
+        'master',
+        'develop',
+        'origin/main',
+        'origin/master',
+        'origin/develop',
+      ].find(exists) || 'main';
+  return branch.includes('/') || !exists(`origin/${branch}`)
+    ? branch
+    : `origin/${branch}`;
+}
+
+export function diffArgs(mode, base) {
+  if (mode === 'staged')
+    return ['diff', '--cached', '--numstat', '--no-renames'];
+  const target = base || reviewBase();
   const mergeBase = git(['merge-base', target, 'HEAD']).trim();
-  return ['diff', '--numstat', '-M', `${mergeBase}...HEAD`];
+  return ['diff', '--numstat', '--no-renames', `${mergeBase}...HEAD`];
+}
+
+// NUL-separated paths preserve spaces, tabs and newlines. Disabling rename
+// detection presents both sides as delete/add, so a risky old path is reviewed.
+export function readTriage(mode, base) {
+  const args = [...diffArgs(mode, base), '-z'];
+  const files = git(args)
+    .split('\0')
+    .filter(Boolean)
+    .map(line => {
+      const match = /^(\d+|-)\t(\d+|-)\t([\s\S]*)$/.exec(line);
+      if (!match) throw new Error('invalid numstat row');
+      return {
+        path: match[3],
+        added: match[1] === '-' ? null : Number(match[1]),
+        deleted: match[2] === '-' ? null : Number(match[2]),
+      };
+    });
+  return triage(files);
 }
 
 export function main(argv = process.argv.slice(2)) {
@@ -126,7 +186,7 @@ export function main(argv = process.argv.slice(2)) {
     return 0;
   }
   try {
-    const verdict = triage(parseNumstat(git(diffArgs(mode, base))));
+    const verdict = readTriage(mode, base);
     console.log(`${verdict.review ? 'review' : 'skip'}: ${verdict.reason}`);
     return verdict.review ? 0 : SKIP_EXIT;
   } catch (error) {

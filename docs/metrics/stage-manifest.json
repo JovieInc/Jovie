@@ -12,6 +12,34 @@
     "minAbsoluteSeconds": 60
   },
   "entities": {
+    "local-review": {
+      "entityId": "local review invocation UUID; exact input digest is recorded on its observation",
+      "description": "Local advisory routing and Warden process timings; reviewCompleted requires complete structured proof. Process exit alone never proves a clean review. Skips/reuses/unavailable are not completed model reviews. Local snapshot uses the canonical aggregator.",
+      "endToEnd": [["decision", "finished"]],
+      "stages": [
+        {
+          "id": "decision",
+          "meaning": "free deterministic triage and exact input identity",
+          "producer": "scripts/hooks/warden-local-review.mjs",
+          "status": "pushed",
+          "source": "local-review-events"
+        },
+        {
+          "id": "review",
+          "meaning": "attempted Warden process only; excludes deterministic skips and unavailable tools/credentials",
+          "producer": "scripts/hooks/warden-local-review.mjs",
+          "status": "pushed",
+          "source": "local-review-events"
+        },
+        {
+          "id": "finished",
+          "meaning": "terminal observation, including skips and unavailable/error outcomes",
+          "producer": "scripts/hooks/warden-local-review.mjs",
+          "status": "pushed",
+          "source": "local-review-events"
+        }
+      ]
+    },
     "merch-concept": {
       "entityId": "merch generation batch UUID",
       "description": "Pre-art review receipts persist in private batch artistBrief JSON. Aggregate export is not wired; no live timings are claimed.",
@@ -898,6 +926,11 @@
     }
   },
   "sources": {
+    "local-review-events": {
+      "kind": "events",
+      "url": null,
+      "owner": "scripts/hooks/warden-local-review.mjs; local stage-events.ndjson and canonical stage-timings-latest.json under XDG_STATE_HOME/jovie-warden"
+    },
     "merch-concept-receipts": {
       "kind": "events",
       "url": null,
