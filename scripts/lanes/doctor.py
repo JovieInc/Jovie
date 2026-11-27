@@ -240,7 +240,6 @@ OUTCOME_OWED_MAX_S = 24 * 3600
 OUTCOME_QUEUE_SILENT_S = 2 * 3600
 AUTOMATION_LIVENESS_WORKFLOW = "automation-liveness.yml"
 AUTOMATION_LIVENESS_MAX_S = 60 * 60
-AUTOMATION_LIVENESS_TTL_S = 600
 
 
 def _iso_epoch(value) -> float | None:
@@ -369,27 +368,6 @@ def automation_watch(rows: list[dict] | None, host_name: str, now: float, home: 
     return {"known": True, "silent": silent}
 
 
-def automation_liveness(lane, now: float) -> dict:
-    """Latest *successful* run of the hosted automation-liveness workflow (Gem watches it back).
-
-    It follows Production Continuity Guard and runs its job only every 5th trigger, so most
-    runs are job-skipped: the latest run of any conclusion would make a dead check look alive."""
-    def fetch():
-        result = lane.sh(["gh", "api", f"repos/{lane.REPO_SLUG}/actions/workflows/{AUTOMATION_LIVENESS_WORKFLOW}"
-                          "/runs?branch=main&status=success&per_page=1",
-                          "--jq", "[.workflow_runs[0].created_at // \"\"]"], timeout=30)
-        if result.returncode != 0:
-            text = f"{result.stdout or ''} {result.stderr or ''}"
-            return {"installed": False} if "404" in text or "Not Found" in text else None
-        try:
-            created = json.loads(result.stdout)[0]
-        except (ValueError, IndexError, TypeError):
-            return None
-        return {"installed": True, "lastRunAt": created or None}
-    found = lane.shared("automation-liveness-success", AUTOMATION_LIVENESS_TTL_S, fetch)
-    return found if isinstance(found, dict) else {"installed": None}
-
-
 def automation_observation(host, lane, now: float) -> dict:
     """Registry watch for observe(); fixtures and self-tests read no registry or GitHub."""
     if os.environ.get("LANES_SELFTEST") or os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
@@ -412,7 +390,7 @@ def automation_observation(host, lane, now: float) -> dict:
         except Exception as error:  # noqa: BLE001
             watch["wasteLoopHeal"] = {"status": "error", "error": type(error).__name__}
     try:
-        liveness = automation_liveness(lane, now)
+        liveness = health_checks.automation_liveness(lane, now)
     except Exception as error:
         liveness = {"installed": None, "error": type(error).__name__}
     try:

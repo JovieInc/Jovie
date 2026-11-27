@@ -930,6 +930,9 @@ export async function main({
   const quotaDeferred = report.results
     .filter(isQuotaDeferredRow)
     .map(row => row.id);
+  const unknownReceipts = report.unmeasured.filter(
+    row => row.status === 'unknown'
+  ).length;
   const full = {
     ...report,
     startedAt,
@@ -952,6 +955,11 @@ export async function main({
     appendFileSync(
       env.GITHUB_STEP_SUMMARY,
       summary(report) + redGate.redMonitorSummary(report.redMonitors)
+    );
+  if (env.GITHUB_OUTPUT)
+    appendFileSync(
+      env.GITHUB_OUTPUT,
+      `receipt_coverage_complete=${unknownReceipts === 0}\n`
     );
   process.stdout.write(redGate.redMonitorAnnotations(report.redMonitors));
 
@@ -1011,7 +1019,7 @@ export async function main({
         'not a silence verdict. The next 20-minute bucket re-reads them.\n'
     );
   process.stdout.write(
-    `${JSON.stringify({ status: report.status, red: report.results.filter(row => !['fresh', 'deferred'].includes(row.status) && !isQuotaDeferredRow(row)).map(row => row.id), quotaDeferred, unknownReceipts: report.unmeasured.filter(row => row.status === 'unknown').length })}\n`
+    `${JSON.stringify({ status: report.status, red: report.results.filter(row => !['fresh', 'deferred'].includes(row.status) && !isQuotaDeferredRow(row)).map(row => row.id), quotaDeferred, unknownReceipts })}\n`
   );
   return full;
 }
