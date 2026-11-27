@@ -183,11 +183,22 @@ test('competing processes cannot share a holder or race an expired takeover', as
             stdout += b;
           });
           child.on('error', reject);
-          child.on('exit', code =>
-            code === 0
-              ? resolve(JSON.parse(stdout))
-              : reject(new Error(`exit ${code}`))
-          );
+          // A worker may exit before its stdout pipe has been drained.
+          child.on('close', code => {
+            if (code !== 0) {
+              reject(new Error(`lease worker exited with code ${code}`));
+              return;
+            }
+            try {
+              resolve(JSON.parse(stdout));
+            } catch (error) {
+              reject(
+                new Error('lease worker returned invalid JSON', {
+                  cause: error,
+                })
+              );
+            }
+          });
         })
     )
   );
