@@ -44,13 +44,16 @@ import {
   resolveMergeGroupPathDiff,
 } from '../resolve-merge-group-path-diff.mjs';
 
+import {
+  CI_SHELL_STEP,
+  readCiWorkflowShellSource,
+} from './ci-workflow-shell-source.mjs';
 import { assertNoopPathOutputs } from './fixtures/merge-group-noop-paths.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
-const CI_WORKFLOW = readFileSync(
-  resolve(REPO_ROOT, '.github/workflows/ci.yml'),
-  'utf8'
-);
+const CI_WORKFLOW_PATH = resolve(REPO_ROOT, '.github/workflows/ci.yml');
+const RAW_CI_WORKFLOW = readFileSync(CI_WORKFLOW_PATH, 'utf8');
+const CI_WORKFLOW = readCiWorkflowShellSource(CI_WORKFLOW_PATH);
 const PATH_CHANGES_SCRIPT = readFileSync(
   resolve(REPO_ROOT, '.github/scripts/detect-ci-path-changes.sh'),
   'utf8'
@@ -241,9 +244,82 @@ describe('merge_group workflow contract', () => {
     // A 515,363-byte ci.yml produced startup_failure runs with zero jobs
     // (runs 45001660220 and 45001666190); 507,101 bytes started normally.
     // Move long scripts or path lists into files instead of growing ci.yml.
-    expect(Buffer.byteLength(CI_WORKFLOW, 'utf8')).toBeLessThanOrEqual(
+    expect(Buffer.byteLength(RAW_CI_WORKFLOW, 'utf8')).toBeLessThanOrEqual(
       WORKFLOW_FILE_BYTE_LIMIT
     );
+  });
+
+  it('executes only checked-in and expression-free CI shell programs', () => {
+    const referenced = [...RAW_CI_WORKFLOW.matchAll(CI_SHELL_STEP)].map(
+      match => match.groups.script
+    );
+    const programs = readdirSync(resolve(REPO_ROOT, '.github/scripts/ci'))
+      .filter(file => file.endsWith('.sh'))
+      .map(file => `.github/scripts/ci/${file}`);
+    expect([...new Set(referenced)].sort()).toEqual(programs.sort());
+    expect(programs.length).toBeGreaterThan(0);
+    for (const program of programs) {
+      const path = resolve(REPO_ROOT, program);
+      expect(readFileSync(path, 'utf8')).not.toContain('${{');
+      const check = spawnSync('bash', ['-n', path], { encoding: 'utf8' });
+      expect(check.status, `${program}: ${check.stderr}`).toBe(0);
+    }
+  });
+
+  it('keeps workflow-specific lanes selected when an extracted shell program changes', () => {
+    const root = mkdtempSync(join(tmpdir(), 'ci-program-routing-'));
+    const receipt = join(root, 'product-lane-classification');
+    mkdirSync(receipt);
+    const output = join(root, 'output');
+    const pathRules = PATH_CHANGES_SCRIPT.slice(
+      PATH_CHANGES_SCRIPT.indexOf('TEST_PERFORMANCE_PATTERN=')
+    );
+    const scripts = [
+      ['-c', `set -euo pipefail\nemit_ci_lanes() { :; }\n${pathRules}`],
+      [
+        resolve(
+          REPO_ROOT,
+          '.github/scripts/ci/select-marketing-visual-gates.sh'
+        ),
+      ],
+    ];
+    const classify = file => {
+      writeFileSync(join(receipt, 'changed-paths.txt'), `${file}\n`);
+      writeFileSync(output, '');
+      for (const args of scripts) {
+        const result = spawnSync('bash', args, {
+          cwd: REPO_ROOT,
+          env: {
+            ...process.env,
+            CHANGED_FILES: file,
+            EVENT_NAME: 'merge_group',
+            GITHUB_OUTPUT: output,
+            IS_FORK: 'false',
+            RUNNER_TEMP: root,
+          },
+          encoding: 'utf8',
+        });
+        expect(result.status, result.stderr).toBe(0);
+      }
+      return readFileSync(output, 'utf8');
+    };
+    try {
+      const workflow = classify('.github/workflows/ci.yml');
+      expect(workflow).toContain('run_dashboard_lighthouse=true');
+      expect(workflow).toContain('run_marketing_dom=true');
+      for (const program of [
+        '.github/scripts/detect-ci-path-changes.sh',
+        '.github/scripts/select-ci-structural-lane.sh',
+        '.github/scripts/ci/run-onboarding-lighthouse.sh',
+      ]) {
+        expect(classify(program), program).toBe(workflow);
+      }
+      expect(classify('.github/scripts/ci/README.md')).toContain(
+        'run_dashboard_lighthouse=false'
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('runs the web build for changelog-only releases without turning ordinary docs into builds', () => {

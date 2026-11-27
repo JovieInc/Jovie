@@ -1,6 +1,7 @@
 // Contracts for the merge-group Lighthouse launch gates in ci.yml: the
 // dashboard gate runs signed-in shell navigation without an identity secret;
 // the onboarding gate still admits on E2E_CLERK_USER_ID.
+
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync,
@@ -15,6 +16,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
+import { readCiWorkflowShellSource } from '../../../../../scripts/lib/__tests__/ci-workflow-shell-source.mjs';
 import { SUITES } from '../../../scripts/lighthouse-relative-gate.mjs';
 import {
   type LighthouseJob,
@@ -32,7 +34,7 @@ function stepNamed(job: LighthouseJob, name: string): LighthouseStep {
 
 describe('Lighthouse identity admission', () => {
   const workflow = load(
-    readFileSync(resolve(REPO_ROOT, '.github/workflows/ci.yml'), 'utf8')
+    readCiWorkflowShellSource(resolve(REPO_ROOT, '.github/workflows/ci.yml'))
   ) as { jobs: Record<string, LighthouseJob> };
 
   const PROBE_NAMES = {

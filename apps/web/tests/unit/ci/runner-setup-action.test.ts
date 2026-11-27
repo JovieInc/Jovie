@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { delimiter, resolve } from 'node:path';
 import { load as parseYaml } from 'js-yaml';
 import { afterEach, describe, expect, it } from 'vitest';
+import { readCiWorkflowShellSource } from '../../../../../scripts/lib/__tests__/ci-workflow-shell-source.mjs';
 
 import {
   type ActionStep,
@@ -370,7 +371,7 @@ describe('self-hosted runner setup action', () => {
   it('disables package cache teardown only for the exact Mac product lane', () => {
     expect(setupAction.inputs.package_cache?.default).toBe('true');
     const ci = parseYaml(
-      readFileSync(resolve(repoRoot, '.github/workflows/ci.yml'), 'utf8')
+      readCiWorkflowShellSource(resolve(repoRoot, '.github/workflows/ci.yml'))
     ) as {
       jobs: Record<
         string,
@@ -542,9 +543,8 @@ describe('baked runner prerequisite contract', () => {
   );
   const createInstalledTree = readFileSync(createInstalledTreeScript, 'utf8');
   const restoreInstalledTree = readFileSync(restoreInstalledTreeScript, 'utf8');
-  const ciWorkflow = readFileSync(
-    resolve(repoRoot, '.github/workflows/ci.yml'),
-    'utf8'
+  const ciWorkflow = readCiWorkflowShellSource(
+    resolve(repoRoot, '.github/workflows/ci.yml')
   );
   const runnerImageOfflineProofStart = ciWorkflow.indexOf(
     '  runner-image-offline-proof:'

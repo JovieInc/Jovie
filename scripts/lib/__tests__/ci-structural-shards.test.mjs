@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { load } from 'js-yaml';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -11,6 +10,7 @@ import {
   runStructural,
   selectStructuralShard,
 } from '../../ci-fast-lanes.mjs';
+import { readCiWorkflowShellSource } from './ci-workflow-shell-source.mjs';
 
 describe('structural core matrix shards', () => {
   afterEach(() => vi.unstubAllEnvs());
@@ -38,9 +38,8 @@ describe('structural core matrix shards', () => {
 
   const workflow = /** @type {{ jobs: Record<string, any> }} */ (
     load(
-      readFileSync(
-        new URL('../../../.github/workflows/ci.yml', import.meta.url),
-        'utf8'
+      readCiWorkflowShellSource(
+        new URL('../../../.github/workflows/ci.yml', import.meta.url)
       )
     )
   );
@@ -94,9 +93,8 @@ describe('lanes coverage matrix legs', () => {
   it('runs exactly one leg command for only:<group>', async () => {
     const job = /** @type {{ jobs: Record<string, any> }} */ (
       load(
-        readFileSync(
-          new URL('../../../.github/workflows/ci.yml', import.meta.url),
-          'utf8'
+        readCiWorkflowShellSource(
+          new URL('../../../.github/workflows/ci.yml', import.meta.url)
         )
       )
     ).jobs['ci-fast-structural-lanes-shards'];

@@ -194,7 +194,7 @@ else
 fi
 
 PROMPTFOO_INFRA_TRIGGER_PATTERN='^(\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/|apps/web/tests/eval/golden/)'
-PROMPTFOO_INFRA_ALLOWED_PATTERN='^(\.github/workflows/ci\.yml|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/.*|apps/web/tests/eval/golden/.*|apps/web/vitest\.config\.golden-eval\.mts|apps/web/scripts/run-golden-eval-set-ci\.sh|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)$'
+PROMPTFOO_INFRA_ALLOWED_PATTERN='^(\.github/(workflows/ci\.yml|scripts/(ci/[^/]+\.sh|detect-ci-path-changes\.sh|select-ci-structural-lane\.sh))|\.github/workflows/README\.md|apps/web/tests/eval/promptfoo/.*|apps/web/tests/eval/golden/.*|apps/web/vitest\.config\.golden-eval\.mts|apps/web/scripts/run-golden-eval-set-ci\.sh|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)$'
 if [[ "${EVENT_NAME}" == "pull_request" ]] &&
   echo "$CHANGED_FILES" | grep -q -E "$PROMPTFOO_INFRA_TRIGGER_PATTERN" &&
   ! echo "$CHANGED_FILES" | grep -v -E "$PROMPTFOO_INFRA_ALLOWED_PATTERN" | grep -q .; then
@@ -244,7 +244,7 @@ else
   echo "run_test=false" >> "$GITHUB_OUTPUT"
 fi
 
-STORYBOOK_A11Y_PATTERN='^(apps/web/components/|apps/web/\.storybook/|apps/web/app/globals\.css|apps/web/styles/|apps/web/(tailwind|postcss)\.config\.|apps/web/vitest\.config\.storybook\.mts|apps/web/package\.json|packages/ui/|pnpm-lock\.yaml|\.github/workflows/(ci|visual-a11y)\.yml)'
+STORYBOOK_A11Y_PATTERN='^(apps/web/components/|apps/web/\.storybook/|apps/web/app/globals\.css|apps/web/styles/|apps/web/(tailwind|postcss)\.config\.|apps/web/vitest\.config\.storybook\.mts|apps/web/package\.json|packages/ui/|pnpm-lock\.yaml|\.github/(workflows/(ci|visual-a11y)\.yml|scripts/(ci/[^/]+\.sh|detect-ci-path-changes\.sh|select-ci-structural-lane\.sh)))'
 if echo "$CHANGED_FILES" | grep -q -E "$STORYBOOK_A11Y_PATTERN"; then
   echo "run_storybook_a11y=true" >> "$GITHUB_OUTPUT"
 else
@@ -252,7 +252,7 @@ else
 fi
 
 # Exclude screenshot exports (marketing assets) from public Lighthouse + Neon.
-PUBLIC_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|scripts/lighthouse-retry\.mjs|apps/web/\.lighthouserc\.pr\.json|apps/web/\.lighthouserc\.public-launch\.json|apps/web/app/\(home\)/|apps/web/app/\(marketing\)/|apps/web/app/\(dynamic\)/legal/|apps/web/content/legal/|apps/web/app/\[username\]/|apps/web/app/layout\.tsx|apps/web/app/globals\.css|apps/web/public/|apps/web/styles/|apps/web/components/features/home/|apps/web/components/features/marketing/|apps/web/components/features/profile/|apps/web/components/homepage/|apps/web/components/marketing/|apps/web/scripts/run-public-lighthouse\.ts|apps/web/scripts/public-route-qa\.ts|apps/web/scripts/public-surface-qa\.ts|apps/web/scripts/performance-route-manifest\.ts|apps/web/tests/e2e/public-exhaustive\.spec\.ts|apps/web/tests/e2e/profile-mobile-viewport-stability\.spec\.ts|apps/web/tests/e2e/axe-audit\.spec\.ts|apps/web/tests/e2e/utils/(public-surface-(manifest|helpers)|smoke-test-utils|mobile-profile-viewports)\.ts|packages/|apps/web/package.*\.json|package.*\.json|apps/web/tailwind\.config\.|apps/web/postcss\.config\.)'
+PUBLIC_LIGHTHOUSE_PATTERN='^(\.github/(workflows/ci\.yml|scripts/(ci/[^/]+\.sh|detect-ci-path-changes\.sh|select-ci-structural-lane\.sh))|scripts/lighthouse-retry\.mjs|apps/web/\.lighthouserc\.pr\.json|apps/web/\.lighthouserc\.public-launch\.json|apps/web/app/\(home\)/|apps/web/app/\(marketing\)/|apps/web/app/\(dynamic\)/legal/|apps/web/content/legal/|apps/web/app/\[username\]/|apps/web/app/layout\.tsx|apps/web/app/globals\.css|apps/web/public/|apps/web/styles/|apps/web/components/features/home/|apps/web/components/features/marketing/|apps/web/components/features/profile/|apps/web/components/homepage/|apps/web/components/marketing/|apps/web/scripts/run-public-lighthouse\.ts|apps/web/scripts/public-route-qa\.ts|apps/web/scripts/public-surface-qa\.ts|apps/web/scripts/performance-route-manifest\.ts|apps/web/tests/e2e/public-exhaustive\.spec\.ts|apps/web/tests/e2e/profile-mobile-viewport-stability\.spec\.ts|apps/web/tests/e2e/axe-audit\.spec\.ts|apps/web/tests/e2e/utils/(public-surface-(manifest|helpers)|smoke-test-utils|mobile-profile-viewports)\.ts|packages/|apps/web/package.*\.json|package.*\.json|apps/web/tailwind\.config\.|apps/web/postcss\.config\.)'
 PUBLIC_LIGHTHOUSE_FILES=$(echo "$CHANGED_FILES" | grep -v -E '^apps/web/public/product-screenshots/' || true)
 if echo "$PUBLIC_LIGHTHOUSE_FILES" | grep -q -E "$PUBLIC_LIGHTHOUSE_PATTERN"; then
   echo "run_public_lighthouse=true" >> "$GITHUB_OUTPUT"
@@ -260,33 +260,33 @@ else
   echo "run_public_lighthouse=false" >> "$GITHUB_OUTPUT"
 fi
 
-DASHBOARD_LIGHTHOUSE_PATTERN='^(\.github/(workflows/ci\.yml|scripts/lighthouse-.*)|apps/web/(\.lighthouserc\.(dashboard|chat|onboarding)\.pr\.json|scripts/lighthouse-.*)|scripts/ci/wait-background-build\.sh)$'
+DASHBOARD_LIGHTHOUSE_PATTERN='^(\.github/(workflows/ci\.yml|scripts/(lighthouse-.*|ci/[^/]+\.sh|detect-ci-path-changes\.sh|select-ci-structural-lane\.sh))|apps/web/(\.lighthouserc\.(dashboard|chat|onboarding)\.pr\.json|scripts/lighthouse-.*)|scripts/ci/wait-background-build\.sh)$'
 dash_lh=false
 if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$DASHBOARD_LIGHTHOUSE_PATTERN"; then dash_lh=true; fi
 echo "run_dashboard_lighthouse=$dash_lh" >> "$GITHUB_OUTPUT"
 
-ONBOARDING_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.onboarding\.pr\.json|apps/web/scripts/lighthouse-dashboard-auth\.cjs|apps/web/app/onboarding/|apps/web/components/features/dashboard/organisms/onboarding|apps/web/components/features/dashboard/organisms/apple-style-onboarding|apps/web/components/features/onboarding/|apps/web/lib/onboarding/)'
+ONBOARDING_LIGHTHOUSE_PATTERN='^(\.github/(workflows/ci\.yml|scripts/(ci/[^/]+\.sh|detect-ci-path-changes\.sh|select-ci-structural-lane\.sh))|apps/web/\.lighthouserc\.onboarding\.pr\.json|apps/web/scripts/lighthouse-dashboard-auth\.cjs|apps/web/app/onboarding/|apps/web/components/features/dashboard/organisms/onboarding|apps/web/components/features/dashboard/organisms/apple-style-onboarding|apps/web/components/features/onboarding/|apps/web/lib/onboarding/)'
 if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$ONBOARDING_LIGHTHOUSE_PATTERN"; then
   echo "run_onboarding_lighthouse=true" >> "$GITHUB_OUTPUT"
 else
   echo "run_onboarding_lighthouse=false" >> "$GITHUB_OUTPUT"
 fi
 
-ADMIN_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.admin\.pr\.json|apps/web/scripts/lighthouse-dashboard-auth\.cjs|apps/web/app/app/\(shell\)/admin/|apps/web/components/features/admin/)'
+ADMIN_LIGHTHOUSE_PATTERN='^(\.github/(workflows/ci\.yml|scripts/(ci/[^/]+\.sh|detect-ci-path-changes\.sh|select-ci-structural-lane\.sh))|apps/web/\.lighthouserc\.admin\.pr\.json|apps/web/scripts/lighthouse-dashboard-auth\.cjs|apps/web/app/app/\(shell\)/admin/|apps/web/components/features/admin/)'
 if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$ADMIN_LIGHTHOUSE_PATTERN"; then
   echo "run_admin_lighthouse=true" >> "$GITHUB_OUTPUT"
 else
   echo "run_admin_lighthouse=false" >> "$GITHUB_OUTPUT"
 fi
 
-CHAT_LIGHTHOUSE_PATTERN='^(\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.chat\.pr\.json|apps/web/scripts/lighthouse-dashboard-auth\.cjs|apps/web/app/app/\(shell\)/chat/|apps/web/components/jovie/|apps/web/components/chat/)'
+CHAT_LIGHTHOUSE_PATTERN='^(\.github/(workflows/ci\.yml|scripts/(ci/[^/]+\.sh|detect-ci-path-changes\.sh|select-ci-structural-lane\.sh))|apps/web/\.lighthouserc\.chat\.pr\.json|apps/web/scripts/lighthouse-dashboard-auth\.cjs|apps/web/app/app/\(shell\)/chat/|apps/web/components/jovie/|apps/web/components/chat/)'
 if [[ "$RUN_BUILD" == "true" || "$RUN_TEST" == "true" ]] || echo "$CHANGED_FILES" | grep -q -E "$CHAT_LIGHTHOUSE_PATTERN"; then
   echo "run_chat_lighthouse=true" >> "$GITHUB_OUTPUT"
 else
   echo "run_chat_lighthouse=false" >> "$GITHUB_OUTPUT"
 fi
 
-PROMPTFOO_EVAL_PATTERN='^(\.github/workflows/ci\.yml|apps/web/tests/eval/promptfoo/|apps/web/tests/eval/golden/|apps/web/vitest\.config\.golden-eval\.mts|apps/web/scripts/run-golden-eval-set-ci\.sh|apps/web/lib/chat/|apps/web/app/api/chat/|apps/web/data/onboarding-script-promotions/|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)'
+PROMPTFOO_EVAL_PATTERN='^(\.github/(workflows/ci\.yml|scripts/(ci/[^/]+\.sh|detect-ci-path-changes\.sh|select-ci-structural-lane\.sh))|apps/web/tests/eval/promptfoo/|apps/web/tests/eval/golden/|apps/web/vitest\.config\.golden-eval\.mts|apps/web/scripts/run-golden-eval-set-ci\.sh|apps/web/lib/chat/|apps/web/app/api/chat/|apps/web/data/onboarding-script-promotions/|apps/web/package.*\.json|package.*\.json|pnpm-lock\.yaml)'
 if echo "$CHANGED_FILES" | grep -q -E "$PROMPTFOO_EVAL_PATTERN"; then
   echo "run_promptfoo_evals=true" >> "$GITHUB_OUTPUT"
   echo "run_golden_eval_set=true" >> "$GITHUB_OUTPUT"
@@ -304,7 +304,7 @@ else
 fi
 
 # Launch-gate golden path (JOV-3758), mirroring docs/launch/LAUNCH_GATES.md.
-LAUNCH_GATE_PATTERN='^(apps/web/app/onboarding/|apps/web/components/features/onboarding/|apps/web/lib/onboarding/|apps/web/app/\(auth\)/|apps/web/app/sign-?(in|up)/|apps/web/app/app/\(shell\)/|apps/web/components/features/dashboard/|apps/web/components/organisms/sidebar/|apps/web/lib/app-shell/|apps/web/tests/e2e/(shell-(nav-click-through|route-health)|releases-first-paint-visual)\.spec\.ts|apps/web/(components/(shell|jovie|chat)/|instrumentation-client\.ts|proxy\.ts|tests/e2e/(utils/)?dashboard-click-navigation)|apps/web/lib/releases/|apps/web/app/api/stripe/|apps/web/app/api/billing/|apps/web/app/api/checkout/|apps/web/lib/stripe/|apps/web/tests/e2e/golden-path\.spec\.ts|apps/web/tests/helpers/auth.ts|apps/web/tests/global-setup\.ts|apps/web/playwright\.config\.ts|\.github/workflows/ci\.yml|apps/web/\.lighthouserc\.(dashboard|onboarding|chat)\.pr\.json|docs/launch/LAUNCH_GATES\.md|apps/web/package.*\.json|package.*\.json|scripts/ci/wait-background-build\.sh)'
+LAUNCH_GATE_PATTERN='^(apps/web/app/onboarding/|apps/web/components/features/onboarding/|apps/web/lib/onboarding/|apps/web/app/\(auth\)/|apps/web/app/sign-?(in|up)/|apps/web/app/app/\(shell\)/|apps/web/components/features/dashboard/|apps/web/components/organisms/sidebar/|apps/web/lib/app-shell/|apps/web/tests/e2e/(shell-(nav-click-through|route-health)|releases-first-paint-visual)\.spec\.ts|apps/web/(components/(shell|jovie|chat)/|instrumentation-client\.ts|proxy\.ts|tests/e2e/(utils/)?dashboard-click-navigation)|apps/web/lib/releases/|apps/web/app/api/stripe/|apps/web/app/api/billing/|apps/web/app/api/checkout/|apps/web/lib/stripe/|apps/web/tests/e2e/golden-path\.spec\.ts|apps/web/tests/helpers/auth.ts|apps/web/tests/global-setup\.ts|apps/web/playwright\.config\.ts|\.github/(workflows/ci\.yml|scripts/(ci/[^/]+\.sh|detect-ci-path-changes\.sh|select-ci-structural-lane\.sh))|apps/web/\.lighthouserc\.(dashboard|onboarding|chat)\.pr\.json|docs/launch/LAUNCH_GATES\.md|apps/web/package.*\.json|package.*\.json|scripts/ci/wait-background-build\.sh)'
 if echo "$CHANGED_FILES" | grep -q -E "$LAUNCH_GATE_PATTERN"; then
   echo "run_golden_path=true" >> "$GITHUB_OUTPUT"
 else
@@ -323,7 +323,7 @@ else
 fi
 
 # Isolated DB certification: database, authz, migration, harness, dependency inputs.
-NEON_PATTERN='^(apps/web/drizzle/|apps/web/lib/(db|queries|auth)/|apps/web/scripts/(drizzle-migrate|verify-db-migrations)\.ts|apps/web/tests/(integration/|setup-db\.ts)|apps/web/lib/domain/(releases|profile)\.ts|apps/web/lib/ai/tools/create-release\.ts|apps/web/lib/chat/tools/(tasks|merch-tools|canvas-status|release-pitch|album-art)\.ts|apps/web/app/api/(chat/confirm-[a-z-]+|account/delete)/|apps/web/lib/merch/(design-generation|concept-review(-store)?|generation-concepts|generation-quarantine|source-candidates|service)\.ts|apps/web/app/app/\(shell\)/dashboard/tasks/task-actions\.ts|apps/web/vitest\.config\.integration\.mts|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|.*\.sql$|apps/web/app/api/cron/|pnpm-lock\.yaml|\.github/workflows/ci\.yml)'
+NEON_PATTERN='^(apps/web/drizzle/|apps/web/lib/(db|queries|auth)/|apps/web/scripts/(drizzle-migrate|verify-db-migrations)\.ts|apps/web/tests/(integration/|setup-db\.ts)|apps/web/lib/domain/(releases|profile)\.ts|apps/web/lib/ai/tools/create-release\.ts|apps/web/lib/chat/tools/(tasks|merch-tools|canvas-status|release-pitch|album-art)\.ts|apps/web/app/api/(chat/confirm-[a-z-]+|account/delete)/|apps/web/lib/merch/(design-generation|concept-review(-store)?|generation-concepts|generation-quarantine|source-candidates|service)\.ts|apps/web/app/app/\(shell\)/dashboard/tasks/task-actions\.ts|apps/web/vitest\.config\.integration\.mts|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|.*\.sql$|apps/web/app/api/cron/|pnpm-lock\.yaml|\.github/(workflows/ci\.yml|scripts/(ci/[^/]+\.sh|detect-ci-path-changes\.sh|select-ci-structural-lane\.sh)))'
 if echo "$CHANGED_FILES" | grep -q -E "$NEON_PATTERN"; then
   echo "run_neon=true" >> "$GITHUB_OUTPUT"
 else

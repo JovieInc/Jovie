@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
+import { readCiWorkflowShellSource } from './ci-workflow-shell-source.mjs';
 
 // Every repo workflow shares one GITHUB_TOKEN REST bucket (5,000 calls/h per
 // repo), and merge-group rebuilds multiply each call. This ledger is the
@@ -21,7 +22,7 @@ import { describe, expect, it } from 'vitest';
 // API calls, so `git-auth` steps cost nothing against the bucket.
 const ROOT = resolve(import.meta.dirname, '../../..');
 const CI = /** @type {{ jobs: Record<string, any> }} */ (
-  load(readFileSync(resolve(ROOT, '.github/workflows/ci.yml'), 'utf8'))
+  load(readCiWorkflowShellSource(resolve(ROOT, '.github/workflows/ci.yml')))
 );
 const FAIL_FAST_STEP = 'Post a failing PR Ready on the combined head';
 
