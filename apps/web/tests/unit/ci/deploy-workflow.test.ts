@@ -157,6 +157,11 @@ function getSentryStatsRequests(action: string): string[] {
   );
 }
 
+const PATH_CHANGES_SCRIPT = readFileSync(
+  resolve(repoRoot, '.github/scripts/detect-ci-path-changes.sh'),
+  'utf8'
+);
+
 describe('source PR path-output reachability contract', () => {
   it('runs fast required gates for workflow-only changes without source unit or build work', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
@@ -175,10 +180,7 @@ describe('source PR path-output reachability contract', () => {
       provenance,
       'Resolve exact queue provenance once'
     );
-    const detectStep = getStepBlock(
-      pathJob,
-      'Detect path changes for all job types'
-    );
+    const detectStep = PATH_CHANGES_SCRIPT;
     const ciFast = getJobBlock(workflow, 'ci-fast');
     const migrationGuard = getJobBlock(workflow, 'drizzle-migration-guard');
     const prReady = getJobBlock(workflow, 'ci-pr-ready');
@@ -244,7 +246,7 @@ describe('source PR path-output reachability contract', () => {
 
     expect(pathJob).not.toContain('skip: ${{');
     expect(detectStep).not.toContain('echo "skip=');
-    expect(workflow).not.toContain('needs.ci-path-changes.outputs.skip');
+    expect(workflow).not.toMatch(/needs\.ci-path-changes\.outputs\.skip\b/);
 
     // Workflows, canonical changelog content, and compiled playbook sources
     // cannot take the docs-only exit. ci-fast additionally keys only
@@ -345,10 +347,7 @@ describe('CI test-performance path gate', () => {
   it('routes exact performance inputs to a hosted manual lane', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const pathJob = getJobBlock(workflow, 'ci-path-changes');
-    const detectStep = getStepBlock(
-      pathJob,
-      'Detect path changes for all job types'
-    );
+    const detectStep = PATH_CHANGES_SCRIPT;
     const performanceJob = getJobBlock(workflow, 'ci-test-performance');
 
     expect(pathJob).toContain(
@@ -383,10 +382,10 @@ describe('CI test-performance path gate', () => {
 
     expect(detectStep).not.toContain('DEEP_CI_LABEL');
     const generalTestElse = detectStep.match(
-      /TEST_PATTERN=[\s\S]*?else\n\s+RUN_TEST=false([\s\S]*?)\n\s+fi/
+      /^TEST_PATTERN=[\s\S]*?^else\n\s+RUN_TEST=false([\s\S]*?)^fi$/m
     )?.[1];
     expect(generalTestElse).not.toContain('run_test_performance');
-    const forkGuard = getStepRunScript(detectStep).match(
+    const forkGuard = detectStep.match(
       /^if \[\[ "\$IS_FORK" == "true" \]\]; then[\s\S]*?^fi$/m
     )?.[0];
     expect(forkGuard, 'fork path override').toBeDefined();
@@ -427,10 +426,7 @@ describe('CI Storybook accessibility path gate', () => {
   it('classifies relevant paths; the main-push visual-a11y lane owns execution', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const pathJob = getJobBlock(workflow, 'ci-path-changes');
-    const detectStep = getStepBlock(
-      pathJob,
-      'Detect path changes for all job types'
-    );
+    const detectStep = PATH_CHANGES_SCRIPT;
 
     expect(pathJob).toContain(
       "run_storybook_a11y: ${{ steps.detect.outputs.run_storybook_a11y || 'false' }}"
@@ -2072,11 +2068,13 @@ describe('iOS stage contract', () => {
     expect(pathChanges).toContain(
       "event_name == 'merge_group' && 'false' || steps.detect.outputs.run_ios"
     );
-    expect(pathChanges).toContain(
+    expect(PATH_CHANGES_SCRIPT).toContain(
       'git show "${CLASSIFICATION_POLICY_REF}:scripts/lib/product-lane-classifier.mjs"'
     );
-    expect(pathChanges).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
-    expect(pathChanges).not.toContain(
+    expect(PATH_CHANGES_SCRIPT).toContain(
+      'node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"'
+    );
+    expect(PATH_CHANGES_SCRIPT).not.toContain(
       'node scripts/lib/product-lane-classifier.mjs'
     );
     expect(ios).toContain("needs.ci-path-changes.outputs.run_ios == 'true'");

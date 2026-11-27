@@ -21,6 +21,7 @@ import {
   SHALLOW_DEEPEN_DEPTHS,
 } from '../../component-merge-group-storybook-cert.mjs';
 import { workflowDeclaresReadyForReviewType } from '../../invariants/pr-lifecycle-contract.mjs';
+import { WORKFLOW_FILE_BYTE_LIMIT } from '../../workflow-expression-budget.mjs';
 import {
   EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES,
   EXACT_HEAD_COVERAGE_STEP_TIMEOUT,
@@ -48,6 +49,10 @@ import { assertNoopPathOutputs } from './fixtures/merge-group-noop-paths.mjs';
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const CI_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ci.yml'),
+  'utf8'
+);
+const PATH_CHANGES_SCRIPT = readFileSync(
+  resolve(REPO_ROOT, '.github/scripts/detect-ci-path-changes.sh'),
   'utf8'
 );
 const SETUP_NODE_PNPM_ACTION = readFileSync(
@@ -172,7 +177,7 @@ function getStepRunScript(jobBlock, stepName) {
     .join('\n');
 }
 
-function materializeWorkflowDispatchScript(script) {
+function _materializeWorkflowDispatchScript(script) {
   return script
     .replaceAll('${{ github.event_name }}', 'workflow_dispatch')
     .replace(/\$\{\{[^}]+\}\}/g, '');
@@ -236,13 +241,17 @@ describe('merge_group workflow contract', () => {
     // A 515,363-byte ci.yml produced startup_failure runs with zero jobs
     // (runs 45001660220 and 45001666190); 507,101 bytes started normally.
     // Move long scripts or path lists into files instead of growing ci.yml.
-    expect(Buffer.byteLength(CI_WORKFLOW, 'utf8')).toBeLessThan(512_000);
+    expect(Buffer.byteLength(CI_WORKFLOW, 'utf8')).toBeLessThanOrEqual(
+      WORKFLOW_FILE_BYTE_LIMIT
+    );
   });
 
   it('runs the web build for changelog-only releases without turning ordinary docs into builds', () => {
-    const script = CI_WORKFLOW.slice(
-      CI_WORKFLOW.indexOf('# CHANGELOG.md is customer-facing web content'),
-      CI_WORKFLOW.indexOf('# Test paths')
+    const script = PATH_CHANGES_SCRIPT.slice(
+      PATH_CHANGES_SCRIPT.indexOf(
+        '# CHANGELOG.md is customer-facing web content'
+      ),
+      PATH_CHANGES_SCRIPT.indexOf('# Test paths')
     );
     const directory = mkdtempSync(join(tmpdir(), 'changelog-ci-routing-'));
     try {
@@ -334,27 +343,31 @@ describe('merge_group workflow contract', () => {
 
   it('runs deterministic CI against the synthetic base-to-head diff', () => {
     expect(CI_WORKFLOW).toMatch(/merge_group:\n\s+types: \[checks_requested\]/);
-    expect(CI_WORKFLOW).toContain(
+    expect(PATH_CHANGES_SCRIPT).toContain(
       'MERGE_GROUP_BASE_SHA="${EVENT_MERGE_GROUP_BASE_SHA}"'
     );
-    expect(CI_WORKFLOW).toContain(
+    expect(PATH_CHANGES_SCRIPT).toContain(
       'MERGE_GROUP_HEAD_SHA="${EVENT_MERGE_GROUP_HEAD_SHA}"'
     );
-    expect(CI_WORKFLOW).toContain(
+    expect(PATH_CHANGES_SCRIPT).toContain(
       'git show "${MERGE_GROUP_BASE_SHA}:scripts/lib/resolve-merge-group-path-diff.mjs"'
     );
-    expect(CI_WORKFLOW).toContain('node "$TRUSTED_PATH_DIFF_RESOLVER"');
-    expect(CI_WORKFLOW).not.toContain(
+    expect(PATH_CHANGES_SCRIPT).toContain('node "$TRUSTED_PATH_DIFF_RESOLVER"');
+    expect(PATH_CHANGES_SCRIPT).not.toContain(
       'node scripts/lib/resolve-merge-group-path-diff.mjs \\'
     );
-    expect(CI_WORKFLOW).not.toContain('source "$PATH_DIFF_DIR/meta.env"');
-    expect(CI_WORKFLOW).toContain(
+    expect(PATH_CHANGES_SCRIPT).not.toContain(
+      'source "$PATH_DIFF_DIR/meta.env"'
+    );
+    expect(PATH_CHANGES_SCRIPT).toContain(
       'git show "${MERGE_GROUP_BASE_SHA}:scripts/lib/ci-repo-lanes.mjs"'
     );
-    expect(CI_WORKFLOW).toContain('node "$TRUSTED_CI_REPO_LANES"');
-    expect(CI_WORKFLOW).not.toContain('node scripts/lib/ci-repo-lanes.mjs');
-    expect(CI_WORKFLOW).toContain('--base "$MERGE_GROUP_BASE_SHA"');
-    expect(CI_WORKFLOW).toContain('--head "$MERGE_GROUP_HEAD_SHA"');
+    expect(PATH_CHANGES_SCRIPT).toContain('node "$TRUSTED_CI_REPO_LANES"');
+    expect(PATH_CHANGES_SCRIPT).not.toContain(
+      'node scripts/lib/ci-repo-lanes.mjs'
+    );
+    expect(PATH_CHANGES_SCRIPT).toContain('--base "$MERGE_GROUP_BASE_SHA"');
+    expect(PATH_CHANGES_SCRIPT).toContain('--head "$MERGE_GROUP_HEAD_SHA"');
     expect(PATH_DIFF_HELPER).toContain(
       "['diff', '--no-renames', '--name-only', `${baseSha}...${headSha}`]"
     );
@@ -618,17 +631,25 @@ describe('merge_group workflow contract', () => {
     expect(remaining).toContain('CI_FAST_SKIP_LANE_IDS:');
     expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
     // JOV-12618: PRs path-gate; docs-only merge groups may skip; else skip=false.
-    expect(remaining).toContain('github.event_name }}" == "pull_request"');
-    expect(remaining).toContain(
-      '"${{ github.event_name }}" == "merge_group" && "${STRUCTURAL_DOCS_ONLY:-}" == "true"'
+    const structural = readFileSync(
+      resolve(REPO_ROOT, '.github/scripts/select-ci-structural-lane.sh'),
+      'utf8'
     );
-    expect(remaining).toContain('echo "skip=false"');
-    expect(remaining).toContain('apps/web/\\.storybook/');
-    expect(remaining).toContain('apps/web/package\\.json$');
-    expect(remaining).toContain('apps/web/scripts/');
-    expect(remaining).not.toContain('chromatic\\.config\\.json$');
-    expect(remaining).toContain('package\\.json$');
-    expect(remaining).toContain('shared-ui-visual-arbitrary');
+    expect(structural).toContain('"${GITHUB_EVENT_NAME}" == "pull_request"');
+    expect(structural).toContain(
+      '"${GITHUB_EVENT_NAME}" == "merge_group" && "${STRUCTURAL_DOCS_ONLY:-}" == "true"'
+    );
+    for (const input of [
+      'echo "skip=false"',
+      'apps/web/\\.storybook/',
+      'apps/web/package\\.json$',
+      'apps/web/scripts/',
+      'package\\.json$',
+      'shared-ui-visual-arbitrary',
+      'apps/web/tests/',
+    ])
+      expect(structural).toContain(input);
+    expect(structural).not.toContain('chromatic\\.config\\.json$');
     // Control-lane paths moved to data (JOV-6837).
     expect(
       readFileSync(
@@ -636,7 +657,6 @@ describe('merge_group workflow contract', () => {
         'utf8'
       )
     ).toContain('scripts/doc-freshness-lint');
-    expect(remaining).toContain('apps/web/tests/');
 
     for (const jobId of [
       'ci-unit-tests',
@@ -1171,7 +1191,9 @@ describe('merge_group workflow contract', () => {
     expect(macosCaller).toContain(
       "cancel-in-progress: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' }}"
     );
-    expect(CI_WORKFLOW).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
+    expect(PATH_CHANGES_SCRIPT).toContain(
+      'node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"'
+    );
     expect(macosCaller).toContain("github.event_name == 'merge_group'");
     expect(macosCaller).not.toContain("github.event_name == 'pull_request'");
     expect(macos).toContain(
@@ -1530,22 +1552,22 @@ describe('merge_group workflow contract', () => {
     const risk = getJobBlock(CI_WORKFLOW, 'ci-risk-classifier');
 
     // Path Changes: explicit merge_group branch with exact base/head SHAs.
-    expect(pathChanges).toContain(
+    expect(PATH_CHANGES_SCRIPT).toContain(
       'MERGE_GROUP_BASE_SHA="${EVENT_MERGE_GROUP_BASE_SHA}"'
     );
-    expect(pathChanges).toContain(
+    expect(PATH_CHANGES_SCRIPT).toContain(
       'MERGE_GROUP_HEAD_SHA="${EVENT_MERGE_GROUP_HEAD_SHA}"'
     );
-    expect(pathChanges).toContain('node "$TRUSTED_PATH_DIFF_RESOLVER"');
-    expect(pathChanges).toContain('--base "$MERGE_GROUP_BASE_SHA"');
-    expect(pathChanges).toContain('--head "$MERGE_GROUP_HEAD_SHA"');
+    expect(PATH_CHANGES_SCRIPT).toContain('node "$TRUSTED_PATH_DIFF_RESOLVER"');
+    expect(PATH_CHANGES_SCRIPT).toContain('--base "$MERGE_GROUP_BASE_SHA"');
+    expect(PATH_CHANGES_SCRIPT).toContain('--head "$MERGE_GROUP_HEAD_SHA"');
     expect(PATH_DIFF_HELPER).toContain(
       "['diff', '--no-renames', '--name-only', `${baseSha}...${headSha}`]"
     );
     expect(PATH_DIFF_HELPER).toContain(LIVE_MAIN_FETCH_REF);
     expect(PATH_DIFF_HELPER).not.toContain('github.event.before');
     expect(PATH_DIFF_HELPER).not.toContain('github.base_ref');
-    expect(pathChanges).toContain('IS_NOOP');
+    expect(PATH_CHANGES_SCRIPT).toContain('IS_NOOP');
     expect(pathChanges).toContain(
       "is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}"
     );
@@ -1561,17 +1583,17 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain(
       "run_summer_ops: ${{ steps.detect.outputs.run_summer_ops || 'false' }}"
     );
-    expect(pathChanges).toContain(
+    expect(PATH_CHANGES_SCRIPT).toContain(
       'node "$TRUSTED_CI_REPO_LANES" --emit-github-output'
     );
-    expect(pathChanges).toContain('elif [[ "${EVENT_NAME}" == "push" ]]; then');
-    expect(pathChanges).toContain(
+    expect(PATH_CHANGES_SCRIPT).toContain(
+      'elif [[ "${EVENT_NAME}" == "push" ]]; then'
+    );
+    expect(PATH_CHANGES_SCRIPT).toContain(
       'Unsupported event for path change detection'
     );
     // Must not treat merge_group as an implicit push (event.before is empty).
-    const detectStep = pathChanges.slice(
-      pathChanges.indexOf('Detect path changes for all job types')
-    );
+    const detectStep = PATH_CHANGES_SCRIPT;
     // The push branch is gated; merge_group never reads event.before.
     expect(detectStep).toMatch(
       /merge_group[\s\S]*?elif \[\[ "\$\{EVENT_NAME\}" == "push" \]\]/
@@ -1611,7 +1633,8 @@ describe('merge_group workflow contract', () => {
       step => step.id === 'detect'
     );
     if (!detect) throw new Error('ci-path-changes is missing the detect step');
-    expect(detect.run).not.toContain('${{');
+    expect(detect.run).toBe('bash .github/scripts/detect-ci-path-changes.sh');
+    expect(PATH_CHANGES_SCRIPT).not.toContain('${{');
     expect(detect.env).toEqual({
       EVENT_NAME: '${{ github.event_name }}',
       BASE_REF: '${{ github.base_ref }}',
@@ -1623,20 +1646,17 @@ describe('merge_group workflow contract', () => {
       EVENT_PUSH_BEFORE_SHA: '${{ github.event.before }}',
     });
     // Only the push branch may read the push base.
-    const pushStart = detect.run.indexOf(
+    const pushStart = PATH_CHANGES_SCRIPT.indexOf(
       'elif [[ "${EVENT_NAME}" == "push" ]]; then'
     );
     expect(pushStart).toBeGreaterThan(0);
-    expect(detect.run.indexOf('EVENT_PUSH_BEFORE_SHA')).toBeGreaterThan(
-      pushStart
-    );
+    expect(
+      PATH_CHANGES_SCRIPT.indexOf('EVENT_PUSH_BEFORE_SHA')
+    ).toBeGreaterThan(pushStart);
   });
 
   it('keeps the pull_request empty-diff docs-only hard-fail (JOV-4905)', () => {
-    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
-    const detectStep = pathChanges.slice(
-      pathChanges.indexOf('Detect path changes for all job types')
-    );
+    const detectStep = PATH_CHANGES_SCRIPT;
     const pullRequestStart = detectStep.indexOf(
       'elif [[ "${EVENT_NAME}" == "pull_request" ]]; then'
     );
@@ -1680,10 +1700,7 @@ describe('merge_group workflow contract', () => {
   });
 
   it('classifies the pull_request head diff when the merge result is tree-identical to base (JOV-6820)', () => {
-    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
-    const detectStep = pathChanges.slice(
-      pathChanges.indexOf('Detect path changes for all job types')
-    );
+    const detectStep = PATH_CHANGES_SCRIPT;
     const pullRequestBranch = detectStep.slice(
       detectStep.indexOf('elif [[ "${EVENT_NAME}" == "pull_request" ]]; then')
     );
@@ -1798,9 +1815,7 @@ describe('merge_group workflow contract', () => {
 
   it('materializes an empty path artifact for typed no-op merge groups', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
-    const detectStep = pathChanges.slice(
-      pathChanges.indexOf('Detect path changes for all job types')
-    );
+    const detectStep = PATH_CHANGES_SCRIPT;
     const noopStart = detectStep.indexOf(
       'if [[ "${IS_NOOP:-}" == "true" ]]; then'
     );
@@ -1913,19 +1928,13 @@ describe('merge_group workflow contract', () => {
   ])(
     'allows no-op classification only with exact proof: %s',
     (scenario, status) => {
-      const detect = getStepRunScript(
-        getJobBlock(CI_WORKFLOW, 'ci-path-changes'),
-        'Detect path changes for all job types'
-      );
-      assertNoopPathOutputs(REPO_ROOT, detect, scenario, status);
+      assertNoopPathOutputs(REPO_ROOT, PATH_CHANGES_SCRIPT, scenario, status);
     }
   );
 
   it('materializes the path artifact before a manual dispatch exits', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
-    const detectScript = materializeWorkflowDispatchScript(
-      getStepRunScript(pathChanges, 'Detect path changes for all job types')
-    );
+    const detectScript = PATH_CHANGES_SCRIPT;
     const homepageVisualScript = getStepRunScript(
       pathChanges,
       'Select rendered homepage visual gate'
@@ -2000,35 +2009,43 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain(
       "is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}"
     );
-    expect(pathChanges).toContain('product-lane-classifier.mjs');
+    expect(PATH_CHANGES_SCRIPT).toContain('product-lane-classifier.mjs');
     expect(pathChanges).toContain('persist-credentials: false');
     expect(pathChanges).toContain(
       'git show "${DIFF_BASE}:scripts/brand-scrub.py"'
     );
     expect(pathChanges).toContain('python3 "$TRUSTED_BRAND_SCRUBBER"');
     expect(pathChanges).not.toContain('python3 scripts/brand-scrub.py');
-    expect(pathChanges).toContain(
+    expect(PATH_CHANGES_SCRIPT).toContain(
       'git show "${CLASSIFICATION_POLICY_REF}:scripts/lib/product-lane-classifier.mjs"'
     );
-    expect(pathChanges).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
-    expect(pathChanges).not.toContain(
+    expect(PATH_CHANGES_SCRIPT).toContain(
+      'node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"'
+    );
+    expect(PATH_CHANGES_SCRIPT).not.toContain(
       'node scripts/lib/product-lane-classifier.mjs \\'
     );
-    expect(pathChanges).toContain('--base-ref "$CLASSIFICATION_BASE_REF"');
-    expect(pathChanges).toContain('--head-ref "$CLASSIFICATION_HEAD_REF"');
-    expect(pathChanges).toContain(
+    expect(PATH_CHANGES_SCRIPT).toContain(
+      '--base-ref "$CLASSIFICATION_BASE_REF"'
+    );
+    expect(PATH_CHANGES_SCRIPT).toContain(
+      '--head-ref "$CLASSIFICATION_HEAD_REF"'
+    );
+    expect(PATH_CHANGES_SCRIPT).toContain(
       'CLASSIFICATION_BASE_REF="$PATH_DIFF_BASE_SHA"'
     );
-    expect(pathChanges).toContain(
+    expect(PATH_CHANGES_SCRIPT).toContain(
       'CLASSIFICATION_HEAD_REF="$PATH_DIFF_HEAD_SHA"'
     );
-    expect(pathChanges).toContain(
+    expect(PATH_CHANGES_SCRIPT).toContain(
       'git merge-base --is-ancestor "$PATH_DIFF_BASE_SHA" "$PATH_DIFF_HEAD_SHA"'
     );
-    expect(pathChanges).toContain(
+    expect(PATH_CHANGES_SCRIPT).toContain(
       'CLASSIFICATION_BASE_REF="origin/${BASE_REF}"'
     );
-    expect(pathChanges).toContain('CLASSIFICATION_BASE_REF="$PUSH_BASE_SHA"');
+    expect(PATH_CHANGES_SCRIPT).toContain(
+      'CLASSIFICATION_BASE_REF="$PUSH_BASE_SHA"'
+    );
     expect(pathChanges).toContain(
       "run_web: ${{ steps.detect.outputs.run_web || 'false' }}"
     );
@@ -2580,7 +2597,7 @@ ${selectedGateScript}`,
     expect(pathChanges).toContain(
       'path_diff_base_sha: ${{ steps.detect.outputs.path_diff_base_sha'
     );
-    expect(pathChanges).toContain(
+    expect(PATH_CHANGES_SCRIPT).toContain(
       'echo "path_diff_base_sha=$PATH_DIFF_BASE_SHA" >> "$GITHUB_OUTPUT"'
     );
     expect(buildLayout).not.toContain(

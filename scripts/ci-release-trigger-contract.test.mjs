@@ -21,6 +21,9 @@ function jobBlock(jobId) {
   return workflow.slice(start, end);
 }
 
+const structuralSelectorPath = '.github/scripts/select-ci-structural-lane.sh';
+const structuralSelector = readFileSync(structuralSelectorPath, 'utf8');
+const ciPathChangesBlock = jobBlock('ci-path-changes');
 const ciFastTypecheckBlock = jobBlock('ci-fast-typecheck');
 const ciFastRemainingBlock = jobBlock('ci-fast-remaining-shards');
 const ciFastAggregateBlock = jobBlock('ci-fast');
@@ -52,17 +55,40 @@ test('CI prevention verifier runs for every source PR and exact merge-group head
     /run: node scripts\/ci-release-incident-contract\.mjs/
   );
   assert.match(ciFastRemainingBlock, /run: pnpm ci:incident-contract:validate/);
-  // JOV-12618: PRs path-gate; docs-only merge groups may skip; every other
-  // event (and non-docs merge groups) fail closed with skip=false.
+  // The producer owns classification. A missing decision must leave the
+  // structural proof live on every consumer.
   assert.match(
-    ciFastRemainingBlock,
-    /if \[\[ "\$\{\{ github\.event_name \}\}" == "pull_request" \]\]; then/
+    ciPathChangesBlock,
+    /id: structural[\s\S]+run: bash \.github\/scripts\/select-ci-structural-lane\.sh/
+  );
+  assert.match(
+    ciPathChangesBlock,
+    /skip_structural: \$\{\{ steps\.structural\.outputs\.skip \|\| 'false' \}\}/
+  );
+  assert.match(
+    ciPathChangesBlock,
+    /STRUCTURAL_DOCS_ONLY: \$\{\{ steps\.detect\.outputs\.docs_only \}\}/
+  );
+  assert.match(
+    ciPathChangesBlock,
+    /STRUCTURAL_DIFF_BASE_SHA: \$\{\{ steps\.detect\.outputs\.path_diff_base_sha \}\}/
   );
   assert.match(
     ciFastRemainingBlock,
-    /elif \[\[ "\$\{\{ github\.event_name \}\}" == "merge_group" && "\$\{STRUCTURAL_DOCS_ONLY:-\}" == "true" \]\]; then/
+    /needs\.ci-path-changes\.outputs\.skip_structural != 'true'/
   );
-  assert.match(ciFastRemainingBlock, /echo "skip=false"/);
+  assert.match(
+    structuralSelector,
+    /if \[\[ "\$\{GITHUB_EVENT_NAME\}" == "pull_request" \]\]; then/
+  );
+  assert.match(
+    structuralSelector,
+    /elif \[\[ "\$\{GITHUB_EVENT_NAME\}" == "merge_group" && "\$\{STRUCTURAL_DOCS_ONLY:-\}" == "true" \]\]; then/
+  );
+  assert.match(
+    structuralSelector,
+    /else\n  echo "skip=false" >> "\$GITHUB_OUTPUT"\n  exit 0\nfi/
+  );
   assert.match(
     ciFastAggregateBlock,
     /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-profile-viewport-sweep,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*ci-fast-structural-lanes,\s*\]/s
@@ -92,6 +118,15 @@ test('CI prevention verifier runs for every source PR and exact merge-group head
     ciFastAggregateBlock,
     /name: Validate CI\/release incident prevention contract|ci-release-incident-contract/
   );
+});
+
+test('CI path filters use the actual proxy rather than nonexistent middleware', () => {
+  const selectorPath = '.github/scripts/detect-ci-path-changes.sh';
+  const selector = readFileSync(selectorPath, 'utf8');
+  assert.ok(ciPathChangesBlock.includes(`run: bash ${selectorPath}`));
+  assert.doesNotMatch(workflow, /middleware\\?\.ts/);
+  assert.doesNotMatch(selector, /middleware\\?\.ts/);
+  assert.match(selector, /BUILD_PATTERN=.*apps\/web\/proxy\\\.ts/);
 });
 
 // GitHub refuses a workflow file over 512,000 bytes: the merge group then gets

@@ -43,18 +43,6 @@ function getStepBlock(jobBlock, stepName) {
   return lines.slice(start, end === -1 ? lines.length : end).join('\n');
 }
 
-function getStepRunScript(jobBlock, stepName) {
-  const lines = getStepBlock(jobBlock, stepName).split('\n');
-  const runStart = lines.findIndex(line =>
-    /^ {8}run: (?:&[\w-]+ )?\|$/.test(line)
-  );
-  expect(runStart, `Missing run block: ${stepName}`).toBeGreaterThanOrEqual(0);
-  return lines
-    .slice(runStart + 1)
-    .map(line => line.replace(/^ {10}/, ''))
-    .join('\n');
-}
-
 describe('docs-only product-lane classification', () => {
   it('classifies agent docs under apps/web as documentation, not web product input (JOV-12618)', () => {
     // Merge group run 43632801466 (#25544) ran every web lane for this diff.
@@ -190,12 +178,12 @@ describe('docs-only product-lane classification', () => {
 });
 
 describe('merge-group docs-only structural decision', () => {
-  // JOV-13072: same-name fan-ins (`ci-fast-remaining`, `ci-fast-structural-lanes`)
-  // no longer own the decision step. The anchor lives on remaining-shards;
-  // python/web/lanes-shards reuse it via `run: *structural-decision`.
-  const STRUCTURAL_DECISION_JOB = 'ci-fast-remaining-shards';
+  const STRUCTURAL_DECISION = resolve(
+    REPO_ROOT,
+    '.github/scripts/select-ci-structural-lane.sh'
+  );
   const STRUCTURAL_JOBS = [
-    STRUCTURAL_DECISION_JOB,
+    'ci-fast-remaining-shards',
     'ci-fast-structural-python',
     'ci-fast-structural-web',
     'ci-fast-structural-lanes-shards',
@@ -245,20 +233,15 @@ describe('merge-group docs-only structural decision', () => {
       }
       const output = join(repo, 'github-output');
       writeFileSync(output, '');
-      const script = getStepRunScript(
-        getJobBlock(CI_WORKFLOW, STRUCTURAL_DECISION_JOB),
-        'Decide structural lane'
-      )
-        .replaceAll('${{ github.event_name }}', event)
-        .replaceAll('${{ github.base_ref }}', '');
       const env = {
         PATH: process.env.PATH,
         HOME: process.env.HOME,
         GITHUB_OUTPUT: output,
+        GITHUB_EVENT_NAME: event,
         STRUCTURAL_DIFF_BASE_SHA: base === undefined ? baseSha : base,
       };
       if (docsOnly !== undefined) env.STRUCTURAL_DOCS_ONLY = docsOnly;
-      const result = spawnSync('bash', ['-c', script], {
+      const result = spawnSync('bash', [STRUCTURAL_DECISION], {
         cwd: repo,
         env,
         encoding: 'utf8',
@@ -270,24 +253,30 @@ describe('merge-group docs-only structural decision', () => {
     }
   }
 
-  it('wires the trusted docs-only verdict and classified base into every decision step', () => {
+  it('publishes one exact-diff decision and makes consumers fail closed when it is absent', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
     expect(pathChanges).toContain(
       "docs_only: ${{ steps.detect.outputs.docs_only || 'false' }}"
     );
+    expect(pathChanges).toContain(
+      "skip_structural: ${{ steps.structural.outputs.skip || 'false' }}"
+    );
+    const step = getStepBlock(pathChanges, 'Decide structural lane');
+    expect(step).toContain(
+      'STRUCTURAL_DOCS_ONLY: ${{ steps.detect.outputs.docs_only }}'
+    );
+    expect(step).toContain(
+      'STRUCTURAL_DIFF_BASE_SHA: ${{ steps.detect.outputs.path_diff_base_sha }}'
+    );
+    expect(step).toContain(
+      'run: bash .github/scripts/select-ci-structural-lane.sh'
+    );
     for (const jobId of STRUCTURAL_JOBS) {
-      const step = getStepBlock(
-        getJobBlock(CI_WORKFLOW, jobId),
-        'Decide structural lane'
-      );
-      expect(step, jobId).toContain(
-        'STRUCTURAL_DOCS_ONLY: ${{ needs.ci-path-changes.outputs.docs_only }}'
-      );
-      expect(step, jobId).toContain(
-        'STRUCTURAL_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}'
-      );
-      expect(getJobBlock(CI_WORKFLOW, jobId), jobId).toMatch(
-        /needs: \[[^\]]*ci-path-changes/
+      const consumer = getJobBlock(CI_WORKFLOW, jobId);
+      expect(consumer, jobId).not.toContain('Decide structural lane');
+      expect(consumer, jobId).toMatch(/needs: \[[^\]]*ci-path-changes/);
+      expect(consumer, jobId).toContain(
+        "needs.ci-path-changes.outputs.skip_structural != 'true'"
       );
     }
   });

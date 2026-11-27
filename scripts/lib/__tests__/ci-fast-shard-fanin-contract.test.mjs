@@ -119,11 +119,25 @@ describe('ci-fast shard fan-in contracts', () => {
     }
     expect(jobs['ci-path-changes'].name).toBe('Path Changes');
     expect(jobs['ci-path-changes']['runs-on']).toBe('ubuntu-24.04');
-    const decision = job =>
-      job.steps.find(step => step.id === 'structural').run;
-    const shared = decision(jobs[STRUCTURAL_DECISION_JOBS[0]]);
-    for (const id of STRUCTURAL_DECISION_JOBS)
-      expect(decision(jobs[id]), id).toBe(shared);
+    const path = jobs['ci-path-changes'];
+    expect(path.steps.find(step => step.id === 'structural').run).toBe(
+      'bash .github/scripts/select-ci-structural-lane.sh'
+    );
+    expect(path.outputs.skip_structural).toBe(
+      "${{ steps.structural.outputs.skip || 'false' }}"
+    );
+    for (const id of STRUCTURAL_DECISION_JOBS) {
+      expect(
+        jobs[id].steps.some(step => step.id === 'structural'),
+        id
+      ).toBe(false);
+      expect(
+        jobs[id].steps.some(step =>
+          step.if?.includes('outputs.skip_structural')
+        ),
+        id
+      ).toBe(true);
+    }
   });
 
   it.each(PAIRS)(

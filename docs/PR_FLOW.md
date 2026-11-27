@@ -110,6 +110,7 @@ in the merge queue, while network/deploy/exhaustive depth runs later.
 | **Deep / nightly** | CodeQL, Trivy, full-history secret scans, Scorecard, SonarCloud, full E2E matrix, exhaustive suites | schedule, event, or explicit manual dispatch |
 
 Rules:
+- On an explicit structural skip from Path Changes, Python and coverage shards publish receipts without preparing workspaces.
 - **Heavy scans never gate a source PR or a merge-queue batch.** Running CodeQL
   ×5 + the full security suite per-PR saturated the runner pool and made the
   native queue retry-storm itself into a 6-hour stall. CodeQL / Trivy / Scorecard scan the
