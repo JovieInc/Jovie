@@ -22,6 +22,11 @@ const TWIN_TSC_HOUR = 'Resolve parity tsc cache hour';
 const TWIN_TSC_RESTORE =
   'Restore web tsc incremental state for typecheck parity';
 const UNIT_FLAKY_UPLOAD = 'Preserve retried-then-passed unit tests';
+const UNIT_QUARANTINE = 'Load quarantined unit tests';
+const UNIT_WEB = 'Run web unit tests related to the exact PR diff';
+const BASE_PROOF =
+  'Bind merged guard proof to base ${{ github.event.pull_request.base.sha }}';
+const WEB_RUNNER_GATE = " && matrix.shard != '4/4'";
 const REUSE_STEP = 'Reuse exact-head proof for a metadata-only edit';
 
 /** Serial → pooled disk-read step is an owned migration (same guards, first
@@ -65,13 +70,27 @@ function normalizeReuseStep(step, opts = {}) {
   assert.match(run, /\.conclusion == "success"/);
   if (opts.requireCi28 || /Affected Unit Tests \(4\/4\)/.test(run)) {
     assert.match(run, /Affected Unit Tests \(4\/4\)/);
-    assert.match(run, /guard_job=/);
-    assert.match(run, /\[\[\s*"\$guard_job"\s*==\s*success\s*\]\]/);
     assert.match(run, /api-client\/cli\.ts/);
+    if (opts.requireCi28) {
+      assert.match(run, /Bind merged guard proof to base \$BASE_SHA/);
+      assert.match(run, /git -C .* ls-remote --exit-code origin/);
+      assert.match(run, /"\$live_base" == "\$BASE_SHA"/);
+      assert.deepEqual(step.env, {
+        ...step.env,
+        BASE_REF: '${{ github.base_ref }}',
+        BASE_SHA: '${{ github.event.pull_request.base.sha }}',
+        REQUIRE_LIVE_BASE:
+          "${{ github.job == 'unit' && contains(toJSON(matrix), '\"4/4\"') }}",
+      });
+    }
   } else {
     assert.match(run, /reuse=true/);
   }
-  return { ...step, run: 'PROOF_REUSE_NORMALIZED' };
+  const env = { ...step.env };
+  delete env.BASE_REF;
+  delete env.BASE_SHA;
+  delete env.REQUIRE_LIVE_BASE;
+  return { ...step, env, run: 'PROOF_REUSE_NORMALIZED' };
 }
 
 /**
@@ -180,26 +199,43 @@ function normalizeUnit4x4ReuseGate(step, opts = {}) {
   return step;
 }
 
+/** @param {Step} step */
+function normalizeWebPartition(step) {
+  if (![UNIT_WEB, UNIT_FLAKY_UPLOAD, UNIT_QUARANTINE].includes(step.name))
+    return step;
+  const ifExpr = String(step.if ?? '').replace(WEB_RUNNER_GATE, '');
+  if (step.name !== UNIT_WEB) return { ...step, if: ifExpr };
+  const env = { ...step.env };
+  delete env.UNIT_RUNNER;
+  const run = String(step.run).replace(
+    '--shard="${UNIT_RUNNER%/*}/3"',
+    '--shard=${{ matrix.shard }}'
+  );
+  return { ...step, if: ifExpr, env, run };
+}
+
 /** @param {Job} job @param {{ requireTypecheck?: boolean, requireRemaining?: boolean, requireCi28?: boolean }} [opts] */
 function normalizeUnitJob(job, opts = {}) {
   return {
     ...job,
-    steps: job.steps.map(step => {
-      let next = normalizeReuseStep(step, opts);
-      next = normalizeUnit4x4ReuseGate(next, opts);
-      if (next.name === DISK_READ_GUARD) {
-        const gatedIf = String(next.if ?? '');
-        next = { ...normalizeDiskReadStep(next), if: gatedIf };
-        if (opts.requireCi28) {
-          assert.match(gatedIf, /steps\.reuse\.outputs\.reuse != 'true'/);
+    steps: job.steps
+      .filter(step => step.name !== BASE_PROOF)
+      .map(step => {
+        let next = normalizeWebPartition(normalizeReuseStep(step, opts));
+        next = normalizeUnit4x4ReuseGate(next, opts);
+        if (next.name === DISK_READ_GUARD) {
+          const gatedIf = String(next.if ?? '');
+          next = { ...normalizeDiskReadStep(next), if: gatedIf };
+          if (opts.requireCi28) {
+            assert.match(gatedIf, /steps\.reuse\.outputs\.reuse != 'true'/);
+          }
+          return next;
+        }
+        if (next.name === SETUP_NODE || next.name === SETUP_PLAYWRIGHT) {
+          return normalizeSetupNodeStep(next, opts);
         }
         return next;
-      }
-      if (next.name === SETUP_NODE || next.name === SETUP_PLAYWRIGHT) {
-        return normalizeSetupNodeStep(next, opts);
-      }
-      return next;
-    }),
+      }),
   };
 }
 
@@ -278,11 +314,38 @@ export function assertOriginalJobsRetained(current, baseline) {
         assert.match(String(added[0]?.run), /remaining=false/);
         continue;
       }
-      assert.deepEqual(added, kept, `${id}: ${name}`);
+      assert.deepEqual(
+        added.map(normalizeWebPartition),
+        kept.map(normalizeWebPartition),
+        `${id}: ${name}`
+      );
     }
   }
 
   const unitSteps = current.jobs.unit.steps;
+  const web = unitSteps.find(step => step.name === UNIT_WEB);
+  assert.ok(web?.if?.includes(WEB_RUNNER_GATE));
+  assert.equal(
+    unitSteps.find(step => step.name === UNIT_QUARANTINE)?.if,
+    web?.if
+  );
+  assert.equal(web?.env?.UNIT_RUNNER, '${{ matrix.shard }}');
+  assert.ok(web?.run?.includes('--shard="${UNIT_RUNNER%/*}/3"'));
+  const receipt = unitSteps.find(step => step.name === BASE_PROOF);
+  assert.ok(receipt);
+  assert.ok(
+    unitSteps.indexOf(receipt) >
+      unitSteps.findIndex(step => step.id === 'source_guard_proof')
+  );
+  assert.equal(
+    receipt.if,
+    "matrix.shard == '4/4' && (steps.reuse.outputs.reuse == 'true' || (steps.source_guard_merge.outputs.prepared == 'true' && steps.source_guard_merge.outputs.trusted_ref == github.event.pull_request.base.sha))"
+  );
+  assert.deepEqual(receipt.env, {
+    TRUSTED_BASE: '${{ github.event.pull_request.base.sha }}',
+  });
+  assert.ok(receipt.run?.includes('[[ "$TRUSTED_BASE" =~ ^[0-9a-f]{40}$ ]]'));
+
   const tools = unitSteps.find(step => step.name === MQ_PARITY_TOOLS);
   assert.equal(tools?.id, 'mq-parity-tools');
   assert.equal(tools?.if, "steps.reuse.outputs.reuse != 'true'");
@@ -335,6 +398,7 @@ export function assertOriginalJobsRetained(current, baseline) {
     assert.equal(flaky.with?.['if-no-files-found'], 'ignore');
     assert.match(String(flaky.with?.name), /^unit-flaky-/);
     assert.equal(flaky['continue-on-error'], undefined);
+    assert.ok(flaky.if?.includes(WEB_RUNNER_GATE));
     assert.match(String(flaky.if), /steps\.reuse\.outputs\.reuse != 'true'/);
   }
 
