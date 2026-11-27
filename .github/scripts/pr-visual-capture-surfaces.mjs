@@ -7,6 +7,16 @@ const PUBLIC_CARD_CAPTURE_FILE =
 export const PUBLIC_PROFILE_CAPTURE_ROUTE = '/demo/showcase/public-profile';
 export const AUTHENTICATED_CHAT_CAPTURE_ROUTE = '/app/chat';
 export const CONTACTS_CAPTURE_ROUTE = '/app/contacts';
+export const ACCOUNT_CAPTURE_ROUTE = '/app/settings/account';
+export const TASKS_CAPTURE_ROUTE = '/app/tasks';
+export const RECORDING_TASK_CAPTURE_ROUTE =
+  '/app/tasks?capture=recording-prepared';
+export const RECORDING_HOST_CAPTURE_ROUTE = '/app/tasks?capture=recording-host';
+export const EXTERNAL_TASK_CAPTURE_ROUTE = '/app/tasks?capture=external-agent';
+export const RELEASE_ASSIGNEE_CAPTURE_ROUTE =
+  '/renders/surfaces/external-task-assignee';
+export const RECORDING_TAKES_CAPTURE_ROUTE =
+  '/renders/surfaces/task-recording-takes';
 const CONTACTS_CAPTURE_FILE =
   /^(?:apps\/web\/app\/app\/\(shell\)\/(?:contacts\/|dashboard\/contacts\/)|apps\/web\/components\/features\/dashboard\/(?:organisms\/(?:contacts-table\/|ContactsManager\.)|hooks\/useContactsManager\.|molecules\/Contact(?:ListRow|DeleteConfirmDialog)\.))/;
 const NATIVE_UI_FILE =
@@ -23,16 +33,46 @@ const AUTHENTICATED_SHELL_CAPTURE_FILE =
 const UNIT_TEST_FILE =
   /^(?:apps\/web\/(?:app|components|features|lib)\/|packages\/ui\/).*\.(?:test|spec)\.[cm]?[jt]sx?$/;
 
-// Reviewed non-rendering modules from the exact JOV-15384/JOV-8731 failures.
+// Reviewed non-rendering paths from the exact JOV-15384/JOV-8731 failures.
 // Keep this explicit: a library neighbor can contain presentation logic.
 // These HTTP/SQL/tool operations still require their functional source checks;
 // a homepage or an empty chat screenshot cannot certify their behavior.
 const NON_RENDERING_FILES = new Set([
+  'apps/web/app/api/agents/profiles/route.ts',
   'apps/web/app/api/chat/confirm-edit/route.ts',
+  'apps/web/app/api/cron/cleanup-idempotency-keys/route.ts',
+  'apps/web/app/api/cron/process-workflow-runs/route.ts',
+  'apps/web/app/api/teleprompter/takes/[takeId]/route.ts',
+  'apps/web/app/api/v1/actions/[actionId]/invoke/route.ts',
+  'apps/web/app/api/v1/actions/route.ts',
+  'apps/web/app/app/(shell)/dashboard/releases/catalog-task-actions.ts',
+  'apps/web/app/app/(shell)/dashboard/releases/task-actions.ts',
+  'apps/web/app/app/(shell)/dashboard/tasks/recording-actions.ts',
+  'apps/web/app/app/(shell)/dashboard/tasks/saved-release-plan-actions.ts',
   'apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts',
+  'apps/web/lib/actions/execution-ledger.server.ts',
+  'apps/web/lib/actions/fleet/dispatcher.ts',
+  'apps/web/lib/actions/fleet/worker-identity.ts',
+  'apps/web/lib/actions/owner/dispatcher.ts',
+  'apps/web/lib/actions/owner/http.ts',
+  'apps/web/lib/actions/owner/model.ts',
+  'apps/web/lib/actions/owner/retention.ts',
+  'apps/web/lib/actions/owner/tasks.ts',
+  'apps/web/lib/actions/task-agents/authority.server.ts',
+  'apps/web/lib/actions/task-agents/discovery.ts',
+  'apps/web/lib/actions/task-agents/http.ts',
+  'apps/web/lib/actions/task-agents/operations.server.ts',
   'apps/web/lib/ai/tools/bio-text.ts',
   'apps/web/lib/ai/tools/extract-bio-candidate.ts',
   'apps/web/lib/ai/tools/import-bio-from-url.ts',
+  'apps/web/lib/api/public-agent-openapi.ts',
+  'apps/web/lib/api/v1/openapi-types.ts',
+  'apps/web/lib/api/v1/openapi.ts',
+  'apps/web/lib/auth/agent-api-key.ts',
+  'apps/web/lib/auth/api-key-plugin.ts',
+  'apps/web/lib/auth/better-auth.ts',
+  'apps/web/lib/auth/profile-access.ts',
+  'apps/web/lib/auth/rate-limit-rules.ts',
   'apps/web/lib/chat/request-validation.ts',
   'apps/web/lib/chat/system-prompt.ts',
   'apps/web/lib/chat/tool-schemas.ts',
@@ -40,11 +80,115 @@ const NON_RENDERING_FILES = new Set([
   'apps/web/lib/chat/types.ts',
   'apps/web/lib/db/client/connection.ts',
   'apps/web/lib/db/client/schema-db.ts',
+  'apps/web/lib/db/client/types.ts',
+  'apps/web/lib/db/creator-documents/task-recording.ts',
+  'apps/web/lib/db/fleet-task-scope.ts',
+  'apps/web/lib/db/schema/action-executions.ts',
+  'apps/web/lib/db/schema/api-keys.ts',
+  'apps/web/lib/db/schema/enums.ts',
+  'apps/web/lib/db/schema/index.ts',
+  'apps/web/lib/db/schema/profile-creation-attributions.ts',
+  'apps/web/lib/db/schema/tasks.ts',
+  'apps/web/lib/entitlements/server.ts',
+  'apps/web/lib/ingestion/flows/profile-creation.ts',
+  'apps/web/lib/ingestion/flows/social-platform-flow.ts',
+  'apps/web/lib/ingestion/flows/social-platform-ingest.ts',
+  // Repository guidance; no rendered route or application import consumes it.
+  'apps/web/lib/queries/README.md',
+  'apps/web/lib/rate-limit/agent-profile-config.ts',
+  'apps/web/lib/rate-limit/agent-profile-limiters.ts',
+  'apps/web/lib/rate-limit/config.ts',
+  'apps/web/lib/rate-limit/index.ts',
+  'apps/web/lib/rate-limit/limiters.ts',
+  'apps/web/lib/rate-limit/outage-policy.ts',
+  'apps/web/lib/stripe/customer-sync.ts',
+  'apps/web/lib/stripe/customer-sync/billing-info.ts',
+  'apps/web/lib/stripe/customer-sync/index.ts',
+  'apps/web/lib/tasks/agent-assignment-contract.ts',
+  'apps/web/lib/tasks/agent-assignment-workflow.server.ts',
+  'apps/web/lib/tasks/agent-assignment.server.ts',
+  'apps/web/lib/tasks/agent-connection-state.server.ts',
+  'apps/web/lib/tasks/agent-connections.server.ts',
+  'apps/web/lib/tasks/agent-execution-state.server.ts',
+  'apps/web/lib/tasks/agent-execution.server.ts',
+  'apps/web/lib/tasks/agent-mutation-guard.server.ts',
+  'apps/web/lib/tasks/agent-results.server.ts',
+  'apps/web/lib/tasks/agent-retirement.server.ts',
+  'apps/web/lib/tasks/dedupe-release-tasks.ts',
   'apps/web/lib/tasks/errors.ts',
   'apps/web/lib/tasks/mutation-validation.server.ts',
   'apps/web/lib/tasks/mutations.server.ts',
+  'apps/web/lib/tasks/playbooks/instantiate.ts',
+  'apps/web/lib/tasks/playbooks/materialize-release-plan.server.ts',
+  'apps/web/lib/tasks/playbooks/saved-release-plan.server.ts',
+  'apps/web/lib/tasks/playbooks/saved-release-plan.ts',
+  'apps/web/lib/tasks/playbooks/types.ts',
+  'apps/web/lib/tasks/readers.server.ts',
+  'apps/web/lib/tasks/recording-attention-contract.ts',
+  'apps/web/lib/tasks/recording-attention-queue.ts',
+  'apps/web/lib/tasks/recording-attention-recipient.server.ts',
+  'apps/web/lib/tasks/recording-attention.server.ts',
+  'apps/web/lib/tasks/recording-intent.server.ts',
+  'apps/web/lib/tasks/recording-lease.ts',
+  'apps/web/lib/tasks/recording-state.server.ts',
+  'apps/web/lib/tasks/recording-takes.server.ts',
+  'apps/web/lib/tasks/recording-workflow.server.ts',
+  'apps/web/lib/tasks/task-move-helpers.server.ts',
+  'apps/web/lib/tasks/task-update.ts',
   'apps/web/lib/tasks/task-view.ts',
   'apps/web/lib/tasks/types.ts',
+  'apps/web/lib/teleprompter/takes/route-error.ts',
+  'apps/web/lib/teleprompter/takes/server.ts',
+]);
+
+// Exact shipped components and their state dependencies; unknown neighbors
+// remain unsupported. These producers certify presentation, not execution.
+const ACCOUNT_CAPTURE_FILES = new Set([
+  'apps/web/app/api/auth/[...all]/route.ts',
+  'apps/web/app/app/(shell)/settings/account/page.tsx',
+  'apps/web/components/features/dashboard/organisms/account-settings/AccountSettingsSection.tsx',
+  'apps/web/components/features/dashboard/organisms/account-settings/ApiKeysCard.stories.tsx',
+  'apps/web/components/features/dashboard/organisms/account-settings/ApiKeysCard.tsx',
+  'apps/web/lib/auth/api-key-policy.ts',
+  'apps/web/lib/auth/client.ts',
+  'apps/web/lib/screen-cert/account-read-fixture.server.ts',
+]);
+const TASKS_CAPTURE_FILES = new Set([
+  'apps/web/app/app/(shell)/dashboard/tasks/_lib/screen-cert-fixture.ts',
+  'apps/web/app/app/(shell)/tasks/TasksRoute.tsx',
+  'apps/web/lib/queries/keys.ts',
+  'apps/web/lib/queries/task-mutation-cache.ts',
+  'apps/web/lib/queries/task-readback.ts',
+  'apps/web/lib/queries/useTaskMutations.ts',
+  'apps/web/lib/queries/useTasksQuery.ts',
+]);
+const RECORDING_TASK_CAPTURE_FILES = new Set([
+  'apps/web/components/features/dashboard/tasks/TaskRecordingAction.stories.tsx',
+  'apps/web/components/features/dashboard/tasks/TaskRecordingAction.tsx',
+  'apps/web/components/features/dashboard/tasks/TasksPageClient.tsx',
+  'apps/web/components/features/dashboard/tasks/task-editor-feedback.ts',
+]);
+const RECORDING_HOST_CAPTURE_FILES = new Set([
+  'apps/web/components/features/teleprompter-studio/TeleprompterStudioHost.tsx',
+  'apps/web/components/features/teleprompter-studio/use-studio-takes.ts',
+  'apps/web/lib/tasks/recording-contract.ts',
+  'apps/web/lib/teleprompter/takes/contract.ts',
+  'apps/web/lib/teleprompter/types.ts',
+]);
+const RECORDING_TAKES_CAPTURE_FILES = new Set([
+  'apps/web/app/(marketing)/renders/surfaces/task-recording-takes/page.tsx',
+  'apps/web/components/features/teleprompter-studio/StudioTakesSheet.stories.tsx',
+  'apps/web/components/features/teleprompter-studio/StudioTakesSheet.tsx',
+  'apps/web/lib/screen-cert/RecordingTakesRenderFixture.tsx',
+  'apps/web/lib/teleprompter/takes/client.ts',
+]);
+
+const RELEASE_ASSIGNEE_CAPTURE_FILES = new Set([
+  'apps/web/app/(marketing)/renders/surfaces/external-task-assignee/page.tsx',
+  'apps/web/components/features/dashboard/release-tasks/ReleaseTaskAssigneeBadge.stories.tsx',
+  'apps/web/components/features/dashboard/release-tasks/ReleaseTaskAssigneeBadge.tsx',
+  'apps/web/lib/release-tasks/types.ts',
+  'apps/web/lib/screen-cert/ExternalAssigneeRenderFixture.tsx',
 ]);
 
 // DashboardNav chrome is visible in the existing loaded /app/chat shell.
@@ -95,6 +239,45 @@ export function routeChangedFiles(files) {
   const routes = new Set();
   const missingCoverage = [];
   for (const file of changed) {
+    if (ACCOUNT_CAPTURE_FILES.has(file)) {
+      routes.add(ACCOUNT_CAPTURE_ROUTE);
+      continue;
+    }
+    if (TASKS_CAPTURE_FILES.has(file)) {
+      routes.add(TASKS_CAPTURE_ROUTE);
+      // Product B/C change this shared fixture together with their real UI.
+      if (
+        file ===
+        'apps/web/app/app/(shell)/dashboard/tasks/_lib/screen-cert-fixture.ts'
+      ) {
+        routes.add(RECORDING_TASK_CAPTURE_ROUTE);
+        routes.add(EXTERNAL_TASK_CAPTURE_ROUTE);
+      }
+      continue;
+    }
+    if (RECORDING_TASK_CAPTURE_FILES.has(file)) {
+      routes.add(RECORDING_TASK_CAPTURE_ROUTE);
+      continue;
+    }
+    if (RECORDING_HOST_CAPTURE_FILES.has(file)) {
+      routes.add(RECORDING_HOST_CAPTURE_ROUTE);
+      continue;
+    }
+    if (RECORDING_TAKES_CAPTURE_FILES.has(file)) {
+      routes.add(RECORDING_TAKES_CAPTURE_ROUTE);
+      continue;
+    }
+    if (
+      file ===
+      'apps/web/components/features/dashboard/tasks/task-presentation.ts'
+    ) {
+      routes.add(EXTERNAL_TASK_CAPTURE_ROUTE);
+      continue;
+    }
+    if (RELEASE_ASSIGNEE_CAPTURE_FILES.has(file)) {
+      routes.add(RELEASE_ASSIGNEE_CAPTURE_ROUTE);
+      continue;
+    }
     const requiredState = CHAT_PRESENTATION_STATES.get(file);
     if (requiredState) {
       routes.add(AUTHENTICATED_CHAT_CAPTURE_ROUTE);

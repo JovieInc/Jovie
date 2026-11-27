@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { load as loadYaml } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
+import { prepareLaunchCapture } from '../../../.github/scripts/pr-visual-capture-launch.mjs';
 import {
   prepareContactsCapture,
   routeChangedFiles,
@@ -294,4 +295,183 @@ it('admits Mac-only PRs, routes before Chromium, and preserves unavailable evide
       await rm(dir, { recursive: true, force: true });
     }
   }
+});
+
+describe('launch presentation producers', () => {
+  function pageFixture({
+    missing = '',
+    document = '/app/library?document=00000000-0000-4000-8000-000000000203',
+    uncertain = 'mixed',
+  } = {}) {
+    const events = [];
+    const check = path => {
+      if (missing && path.includes(missing))
+        throw new Error(`Missing ${missing}`);
+    };
+    const locator = path => ({
+      filter: () => locator(path),
+      first: () => locator(path),
+      locator: selector => locator(`${path}/${selector}`),
+      getByTestId: id => locator(`${path}/${id}`),
+      getByRole: (role, options) =>
+        locator(`${path}/${role}:${options?.name ?? ''}`),
+      getByText: text => locator(`${path}/${text}`),
+      getByLabel: text => locator(`${path}/${text}`),
+      waitFor: async () => check(path),
+      click: async () => {
+        check(path);
+        events.push(path);
+      },
+      scrollIntoViewIfNeeded: async () => {},
+      isEnabled: async () => !/Saving…|Checking…/.test(path),
+      getAttribute: async name => (name === 'href' ? document : uncertain),
+    });
+    return { page: locator('page'), events };
+  }
+
+  it('opens the actual key disclosure and requires a populated read-only list', async () => {
+    const { page, events } = pageFixture();
+    expect(await prepareLaunchCapture(page, '/app/settings/account')).toEqual({
+      state: 'account-api-keys-loaded',
+      selectedKey: 'Release planning agent',
+      presentationOnly: true,
+    });
+    expect(events).toEqual(['page/summary']);
+    await expect(
+      prepareLaunchCapture(
+        pageFixture({ missing: 'listitem' }).page,
+        '/app/settings/account'
+      )
+    ).rejects.toThrow('Missing listitem');
+  });
+
+  it('selects the actual task and requires an enabled action and current document link', async () => {
+    const { page, events } = pageFixture();
+    expect(
+      await prepareLaunchCapture(page, '/app/tasks?capture=recording-prepared')
+    ).toMatchObject({
+      state: 'task-recording-prepared',
+      selectedTask: 'Record my release announcement',
+      presentationOnly: true,
+    });
+    expect(events).toEqual([
+      'page/tasks-workspace/Record my release announcement',
+    ]);
+    await expect(
+      prepareLaunchCapture(
+        pageFixture({ missing: 'Recording Action' }).page,
+        '/app/tasks?capture=recording-prepared'
+      )
+    ).rejects.toThrow('Missing Recording Action');
+    await expect(
+      prepareLaunchCapture(
+        pageFixture({
+          document:
+            'https://other.example/app/library?document=00000000-0000-4000-8000-000000000203',
+        }).page,
+        '/app/tasks?capture=recording-prepared'
+      )
+    ).rejects.toThrow('document link');
+  });
+
+  it('requires all takes decision states and never shows uncertainty as settled', async () => {
+    const route = '/renders/surfaces/task-recording-takes';
+    const { page, events } = pageFixture();
+    expect(await prepareLaunchCapture(page, route)).toEqual({
+      state: 'recording-takes-decision-states',
+      decisionStates: ['saved', 'saving', 'checking', 'unknown'],
+      presentationOnly: true,
+    });
+    expect(events).toEqual([]);
+    await expect(
+      prepareLaunchCapture(pageFixture({ uncertain: 'true' }).page, route)
+    ).rejects.toThrow('Unknown recording choice was shown as settled');
+    await expect(
+      prepareLaunchCapture(pageFixture({ missing: 'Retry Keep' }).page, route)
+    ).rejects.toThrow('Missing Retry Keep');
+  });
+
+  it('does not substitute these fixtures for unrelated routes', async () => {
+    const { page, events } = pageFixture();
+    expect(await prepareLaunchCapture(page, '/app/chat')).toBeNull();
+    expect(events).toEqual([]);
+  });
+
+  it('routes only the named account/task/studio inputs to their actual producers', () => {
+    expect(
+      routeChangedFiles([
+        'apps/web/components/features/dashboard/organisms/account-settings/ApiKeysCard.tsx',
+        'apps/web/lib/queries/task-readback.ts',
+        'apps/web/components/features/teleprompter-studio/StudioTakesSheet.tsx',
+      ])
+    ).toMatchObject({
+      routes: [
+        '/app/settings/account',
+        '/app/tasks',
+        '/renders/surfaces/task-recording-takes',
+      ],
+      review_status: 'advisory',
+    });
+    const unknown = 'apps/web/lib/tasks/new-recording-presentation.ts';
+    expect(routeChangedFiles([unknown])).toMatchObject({
+      review_status: 'unavailable',
+      missingCoverage: [{ file: unknown, reason: 'unsupported-surface' }],
+    });
+  });
+
+  it('skips reviewed server adapters but keeps neighboring client and unknown routes visible', () => {
+    expect(
+      routeChangedFiles([
+        'apps/web/lib/auth/agent-api-key.ts',
+        'apps/web/lib/actions/owner/dispatcher.ts',
+        'apps/web/lib/tasks/recording-workflow.server.ts',
+        'apps/web/lib/tasks/recording-attention.server.ts',
+        'apps/web/lib/tasks/playbooks/materialize-release-plan.server.ts',
+        'apps/web/lib/db/schema/api-keys.ts',
+      ])
+    ).toMatchObject({ shouldReview: false, review_status: 'skipped' });
+    for (const file of [
+      'apps/web/lib/auth/client.ts',
+      'apps/web/lib/auth/api-key-policy.ts',
+    ]) {
+      expect(routeChangedFiles([file]).routes).toEqual([
+        '/app/settings/account',
+      ]);
+    }
+    const unknown = 'apps/web/app/api/auth/unreviewed/route.ts';
+    expect(routeChangedFiles([unknown])).toMatchObject({
+      review_status: 'unavailable',
+      missingCoverage: [{ file: unknown, reason: 'unsupported-surface' }],
+    });
+  });
+
+  it.each([
+    '/app/settings/account',
+    '/app/tasks?capture=recording-prepared',
+    '/renders/surfaces/task-recording-takes',
+  ])(
+    'rejects an empty shell PNG for %s and accepts only its observed presentation state',
+    async route => {
+      const manifest = {
+        routes: [route],
+        viewports: { desktop: {} },
+        captures: [
+          {
+            route,
+            viewport: 'desktop',
+            status: 'captured',
+            path: 'actual.png',
+          },
+        ],
+      };
+      expect(validateCaptureManifest(manifest).ok).toBe(false);
+      manifest.captures[0].observed = await prepareLaunchCapture(
+        pageFixture().page,
+        route
+      );
+      expect(validateCaptureManifest(manifest).ok).toBe(true);
+      manifest.captures[0].observed.presentationOnly = false;
+      expect(validateCaptureManifest(manifest).ok).toBe(false);
+    }
+  );
 });
