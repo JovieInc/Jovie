@@ -142,6 +142,8 @@ export interface ChatError {
   readonly errorCode?: string;
   readonly requestId?: string;
   readonly failedMessage?: string;
+  /** Uploaded file parts retained for retry, including attachment-only turns. */
+  readonly failedFiles?: FileUIPart[];
   /** Summer turn id to resend unchanged; set only when nothing was recorded. */
   readonly retryClientTurnId?: string;
   /** Tool-only failures stay inline in the thread and should not pause the composer. */

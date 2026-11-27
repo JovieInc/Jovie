@@ -1,7 +1,30 @@
 import type { UIMessage } from 'ai';
-import { extractUIMessageText } from '@/lib/chat/request-validation';
 
 type MessagePart = { type: string; text?: string };
+
+/** Keep model-step boundaries in rendered, copied, and persisted replies. */
+export function extractUIMessageText(parts: readonly MessagePart[]): string {
+  let text = '';
+  let separated = false;
+
+  for (const part of parts) {
+    if (part.type !== 'text') {
+      separated = true;
+      continue;
+    }
+    if (typeof part.text !== 'string' || part.text.length === 0) continue;
+
+    if (separated && text.length > 0) {
+      const trailingBreaks = text.match(/\n*$/)?.[0].length ?? 0;
+      const leadingBreaks = part.text.match(/^\n*/)?.[0].length ?? 0;
+      text += '\n'.repeat(Math.max(0, 2 - trailingBreaks - leadingBreaks));
+    }
+    text += part.text;
+    separated = false;
+  }
+
+  return text;
+}
 
 /**
  * Returns trimmed text from the most recent user message in a UIMessage thread.

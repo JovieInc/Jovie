@@ -16,7 +16,10 @@ import {
   bioImportFromUrlLimiter,
 } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
-import { extractBioCandidate } from './extract-bio-candidate';
+import {
+  BIO_MAX_LENGTH,
+  extractBioCandidateDetails,
+} from './extract-bio-candidate';
 import {
   type SafeFetchError,
   safeFetchPublicHtml,
@@ -93,7 +96,7 @@ export function createImportBioFromUrlTool(context: ImportBioContext) {
         };
       }
 
-      const candidate = extractBioCandidate(fetched.html);
+      const candidate = extractBioCandidateDetails(fetched.html);
       if (!candidate) {
         return {
           ok: false as const,
@@ -107,12 +110,17 @@ export function createImportBioFromUrlTool(context: ImportBioContext) {
       logger.info('Bio import succeeded', {
         userId: context.userId,
         sourceUrl: fetched.finalUrl,
-        bioLength: candidate.length,
+        bioLength: candidate.bio.length,
       });
 
       return {
         ok: true as const,
-        candidateBio: wrapUntrustedSourceContent(candidate, fetched.finalUrl),
+        candidateBio: wrapUntrustedSourceContent(
+          candidate.bio,
+          fetched.finalUrl
+        ),
+        candidateBioTruncated: candidate.truncated,
+        candidateBioMaxLength: BIO_MAX_LENGTH,
         sourceUrl: fetched.finalUrl,
         sourceTitle: fetched.sourceTitle,
         nextAllowedTool: 'proposeProfileEdit' as const,

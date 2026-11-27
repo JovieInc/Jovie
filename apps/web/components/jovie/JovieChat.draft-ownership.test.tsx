@@ -163,7 +163,10 @@ describe('composer draft ownership', () => {
       }
     );
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
 
   it('publishes draft safety before a sibling committed layout reads it', async () => {
     const observed: (boolean | undefined)[] = [];

@@ -78,8 +78,9 @@ describe('chat transient surface geometry (JOV-5413)', () => {
     expect(hook).toContain("addEventListener('dragend'");
     expect(hook).toContain('setIsDragOver(false)');
     expect(hook).toContain('resetKey');
+    expect(hook).toContain('clearFiles()');
     expect(hook).toMatch(
-      /useEffect\(\s*\(\)\s*=>\s*\{[\s\S]*setIsDragOver\(false\)[\s\S]*\}, \[resetKey\]\)/
+      /useEffect\(\s*\(\)\s*=>\s*\{[\s\S]*setIsDragOver\(false\)[\s\S]*\}, \[resetKey, clearFiles\]\)/
     );
   });
 });

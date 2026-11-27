@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { EnforcedArtistRule } from '@/lib/artist-rules/gate';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
+import { PROFILE_BIO_MAX_LENGTH } from '@/lib/validation/schemas/dashboard/profile';
 
 /**
  * Zod schema for validating client-provided artist context.
@@ -11,7 +12,7 @@ import type { CanvasStatus } from '@/lib/services/canvas/types';
 export const artistContextSchema = z.object({
   displayName: z.string().max(100),
   username: z.string().max(50),
-  bio: z.string().max(500).nullable(),
+  bio: z.string().max(PROFILE_BIO_MAX_LENGTH).nullable(),
   genres: z.array(z.string().max(50)).max(10),
   spotifyFollowers: z.number().int().nonnegative().nullable(),
   spotifyPopularity: z.number().int().min(0).max(100).nullable(),

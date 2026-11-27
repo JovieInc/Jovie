@@ -298,6 +298,27 @@ describe('POST /api/chat/confirm-edit', () => {
     expect(hoisted.updateMock).not.toHaveBeenCalled();
   });
 
+  it('persists the same readable text shown for a legacy imported bio', async () => {
+    const res = await POST(
+      makeRequest({
+        profileId: '550e8400-e29b-41d4-a716-446655440000',
+        field: 'bio',
+        newValue:
+          '<untrusted-source url="https://example.com" encoding="entities-v1">&amp;lt;p&amp;gt;An artist.&amp;lt;/p&amp;gt;&amp;lt;p&amp;gt;New music.&amp;lt;/p&amp;gt;</untrusted-source>',
+      })
+    );
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      newValue: 'An artist.\n\nNew music.',
+    });
+    expect(hoisted.updateSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updates: { bio: 'An artist.\n\nNew music.' },
+      })
+    );
+  });
+
   it('creates an audit log entry', async () => {
     await POST(
       makeRequest({

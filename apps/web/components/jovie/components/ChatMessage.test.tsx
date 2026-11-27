@@ -5,6 +5,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type { MessagePart } from '../types';
+import { getMessageText } from '../utils';
 import { ChatMessage } from './ChatMessage';
 
 const copyMarkdownToClipboard = vi.hoisted(() => vi.fn());
@@ -87,6 +88,29 @@ describe('ChatMessage', () => {
     expect(screen.queryByTestId('chat-message-reply')).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
     await expectNoA11yViolations(container);
+  });
+
+  it('renders and copies separate paragraphs across a tool step', async () => {
+    copyMarkdownToClipboard.mockResolvedValue(true);
+    const user = userEvent.setup();
+    renderMessage({
+      renderTools: false,
+      parts: [
+        { type: 'text', text: 'I will check the source.' },
+        { type: 'step-start' },
+        { type: 'text', text: 'Your draft is ready to review.' },
+      ],
+    });
+    await settledMarkdown();
+
+    expect(screen.getByText('I will check the source.').tagName).toBe('P');
+    expect(screen.getByText('Your draft is ready to review.').tagName).toBe(
+      'P'
+    );
+    await user.click(screen.getByRole('button', { name: 'Copy message' }));
+    expect(copyMarkdownToClipboard).toHaveBeenCalledWith(
+      'I will check the source.\n\nYour draft is ready to review.'
+    );
   });
 
   it('hides the copy action while a reply is still streaming', async () => {
@@ -277,5 +301,69 @@ describe('ChatMessage', () => {
         'pill'
       );
     });
+  });
+});
+
+describe('text boundaries in rendered and copied replies', () => {
+  it('separates text before and after a tool step', () => {
+    expect(
+      getMessageText([
+        { type: 'step-start' },
+        { type: 'text', text: 'I will check the source.' },
+        {
+          type: 'dynamic-tool',
+          toolName: 'importBio',
+          toolCallId: 'bio-draft',
+          state: 'output-available',
+          input: {},
+          output: { success: true },
+        },
+        { type: 'step-start' },
+        { type: 'text', text: '' },
+        { type: 'text', text: 'Your draft is ready to review.' },
+      ])
+    ).toBe('I will check the source.\n\nYour draft is ready to review.');
+  });
+
+  it('keeps adjacent streamed fragments intact', () => {
+    expect(
+      getMessageText([
+        { type: 'text', text: 'Your **pro' },
+        { type: 'text', text: 'file** is ready.' },
+      ])
+    ).toBe('Your **profile** is ready.');
+  });
+
+  it.each([
+    ['First paragraph.\n\n', 'Second paragraph.'],
+    ['First paragraph.', '\n\nSecond paragraph.'],
+    ['First paragraph.\n', '\nSecond paragraph.'],
+  ])('preserves existing paragraph spacing', (before, after) => {
+    expect(
+      getMessageText([
+        { type: 'text', text: before },
+        { type: 'step-start' },
+        { type: 'text', text: after },
+      ])
+    ).toBe('First paragraph.\n\nSecond paragraph.');
+  });
+
+  it('does not add leading or trailing text for tool-only steps', () => {
+    expect(
+      getMessageText([
+        { type: 'step-start' },
+        {
+          type: 'dynamic-tool',
+          toolName: 'importBio',
+          toolCallId: 'bio-draft',
+          state: 'output-available',
+          input: {},
+          output: { success: true },
+        },
+        { type: 'text', text: '    Indented code stays indented.' },
+        { type: 'step-start' },
+      ])
+    ).toBe('    Indented code stays indented.');
+    expect(getMessageText([{ type: 'step-start' }])).toBe('');
   });
 });

@@ -4,6 +4,8 @@ import {
   extractBioCandidate,
   sanitizeBioText,
 } from '@/lib/ai/tools/extract-bio-candidate';
+import { artistContextSchema } from '@/lib/chat/types';
+import { profileUpdateSchema } from '@/lib/validation/schemas/dashboard/profile';
 
 describe('sanitizeBioText', () => {
   it('returns plain text unchanged', () => {
@@ -23,10 +25,18 @@ describe('sanitizeBioText', () => {
     ).toBe('Find me on and for more.');
   });
 
-  it('collapses runs of whitespace', () => {
+  it('collapses horizontal whitespace and preserves paragraphs', () => {
     expect(sanitizeBioText('Lots\n\nof    space\there.')).toBe(
-      'Lots of space here.'
+      'Lots\n\nof space here.'
     );
+  });
+
+  it('cleans encoded source markup before applying the bio length limit', () => {
+    expect(
+      sanitizeBioText(
+        '&amp;lt;p&amp;gt;An &amp;amp; artist.&amp;lt;/p&amp;gt;&amp;lt;p&amp;gt;New music.&amp;lt;/p&amp;gt;'
+      )
+    ).toBe('An & artist.\n\nNew music.');
   });
 
   it('strips zero-width characters used for hidden payloads', () => {
@@ -37,13 +47,46 @@ describe('sanitizeBioText', () => {
   it('caps at the configured max length with a word-boundary truncation', () => {
     const long = 'word '.repeat(200);
     const result = sanitizeBioText(long);
-    expect(result.length).toBeLessThanOrEqual(BIO_MAX_LENGTH + 1); // includes ellipsis
+    expect(result.length).toBeLessThanOrEqual(BIO_MAX_LENGTH);
     expect(result.endsWith('…')).toBe(true);
     expect(result).not.toMatch(/word w$/); // truncation should not split a word
+  });
+
+  it('keeps imported bios within the real profile and next-turn context limits', () => {
+    const imported = sanitizeBioText('word '.repeat(200));
+    expect(profileUpdateSchema.safeParse({ bio: imported }).success).toBe(true);
+    expect(artistContextSchema.shape.bio.safeParse(imported).success).toBe(
+      true
+    );
+    const maximumBio = 'a'.repeat(BIO_MAX_LENGTH);
+    expect(profileUpdateSchema.safeParse({ bio: maximumBio }).success).toBe(
+      true
+    );
+    expect(artistContextSchema.shape.bio.safeParse(maximumBio).success).toBe(
+      true
+    );
+    expect(
+      profileUpdateSchema.safeParse({ bio: `${maximumBio}a` }).success
+    ).toBe(false);
+    expect(
+      artistContextSchema.shape.bio.safeParse(`${maximumBio}a`).success
+    ).toBe(false);
   });
 });
 
 describe('extractBioCandidate', () => {
+  it('imports readable paragraphs from an HTML-formatted JSON-LD bio', () => {
+    const html = `<script type="application/ld+json">${JSON.stringify({
+      '@type': 'MusicGroup',
+      description:
+        '&lt;p&gt;&lt;b&gt;An artist.&lt;/b&gt;&lt;/p&gt;&lt;p&gt;An independent release.&lt;/p&gt;',
+    })}</script>`;
+
+    expect(extractBioCandidate(html)).toBe(
+      'An artist.\n\nAn independent release.'
+    );
+  });
+
   it('prefers JSON-LD Person.description over og:description', () => {
     const html = `
       <html>
@@ -127,7 +170,7 @@ describe('extractBioCandidate', () => {
     expect(result).not.toContain('evil.example');
     // The instruction text itself is preserved as data — the user-confirm
     // gate is responsible for catching it. We assert the residual is bounded.
-    expect(result?.length ?? 0).toBeLessThanOrEqual(BIO_MAX_LENGTH + 1);
+    expect(result?.length ?? 0).toBeLessThanOrEqual(BIO_MAX_LENGTH);
   });
 
   it('ignores invalid JSON-LD blocks and continues', () => {

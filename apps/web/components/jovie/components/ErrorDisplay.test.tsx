@@ -35,6 +35,27 @@ describe('ErrorDisplay', () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
+  it('offers retry for a failed attachment without a text caption', () => {
+    const onRetry = vi.fn();
+    renderError(
+      {
+        type: 'network',
+        message: 'The connection was interrupted.',
+        failedMessage: '',
+        failedFiles: [
+          {
+            type: 'file',
+            mediaType: 'application/pdf',
+            url: 'https://files.example.test/notes.pdf',
+          },
+        ],
+      },
+      { onRetry }
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Retry Message' }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
   it('renders recoverable tool failures without the message paused headline', () => {
     fastRender(
       <ErrorDisplay

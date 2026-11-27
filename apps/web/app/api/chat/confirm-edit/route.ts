@@ -2,10 +2,8 @@ import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import {
-  isMalformedUntrustedSourceFence,
-  stripUntrustedSourceFence,
-} from '@/lib/ai/tools/untrusted-source-fence';
+import { resolveBioText } from '@/lib/ai/tools/bio-text';
+import { isMalformedUntrustedSourceFence } from '@/lib/ai/tools/untrusted-source-fence';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { db } from '@/lib/db';
@@ -99,7 +97,7 @@ export async function POST(req: Request) {
     }
 
     const sanitizedValue =
-      field === 'bio' ? stripUntrustedSourceFence(newValue) : newValue;
+      field === 'bio' ? resolveBioText(newValue) : newValue;
 
     // Get the old value for audit logging
     const oldValue = profile[field];

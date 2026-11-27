@@ -109,7 +109,8 @@ export function ErrorDisplay({
           )}
 
           {!isToolScopedFailure &&
-            chatError.failedMessage &&
+            (chatError.failedMessage ||
+              Boolean(chatError.failedFiles?.length)) &&
             !chatError.retryAfter && (
               <Button
                 type='button'

@@ -6,6 +6,7 @@ import {
   isGatewayBudgetExceededError,
   isGatewayInsufficientFundsError,
 } from '@/lib/ai/gateway-errors';
+import { extractUIMessageText } from '@/lib/chat/message-text';
 import {
   isRecoverableToolErrorCode,
   isRecoverableToolStreamError,
@@ -56,13 +57,7 @@ export function getPartsChangeFingerprint(parts: UIMessage['parts']): string {
  * Extract text content from message parts
  */
 export function getMessageText(parts: readonly MessagePart[]): string {
-  return parts
-    .filter(
-      (part): part is { type: 'text'; text: string } =>
-        part.type === 'text' && typeof part.text === 'string'
-    )
-    .map(part => part.text)
-    .join('');
+  return extractUIMessageText(parts);
 }
 
 /**

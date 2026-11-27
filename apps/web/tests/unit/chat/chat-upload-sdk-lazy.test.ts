@@ -19,24 +19,34 @@ vi.mock('@vercel/blob/client', () => ({
 const webRoot = path.resolve(__dirname, '../../..');
 // Every upload path the chat page reaches: attachments, and the teleprompter
 // recording card that tool-ui renders.
-const HOOKS = [
-  'components/jovie/hooks/useChatAudioAttachments.ts',
-  'components/jovie/hooks/useChatFileAttachments.ts',
-  'lib/capture/upload-account-video.ts',
-];
+const UPLOAD_PATHS = [
+  [
+    'components/jovie/hooks/useChatAudioAttachments.ts',
+    '@/lib/blob/upload-presigned-lazy',
+  ],
+  ['components/jovie/hooks/useChatFileAttachments.ts', './chat-file-uploads'],
+  [
+    'components/jovie/hooks/chat-file-uploads.ts',
+    '@/lib/blob/upload-presigned-lazy',
+  ],
+  ['lib/capture/upload-account-video.ts', '@/lib/blob/upload-presigned-lazy'],
+] as const;
 
 describe('chat upload SDK stays out of the chat entry bundle', () => {
   beforeEach(() => {
     uploadPresignedMock.mockReset();
   });
 
-  it.each(HOOKS)('%s has no static import of @vercel/blob/client', file => {
-    const source = readFileSync(path.join(webRoot, file), 'utf8');
-    expect(source).not.toMatch(
-      /import\s+(?!type\b)[^;]*from\s+'@vercel\/blob\/client'/
-    );
-    expect(source).toContain("from '@/lib/blob/upload-presigned-lazy'");
-  });
+  it.each(UPLOAD_PATHS)(
+    '%s has no static import of @vercel/blob/client',
+    (file, dependency) => {
+      const source = readFileSync(path.join(webRoot, file), 'utf8');
+      expect(source).not.toMatch(
+        /import\s+(?!type\b)[^;]*from\s+'@vercel\/blob\/client'/
+      );
+      expect(source).toContain(`from '${dependency}'`);
+    }
+  );
 
   it('passes every argument through and returns the upload result', async () => {
     const { uploadPresignedLazy } = await import(
