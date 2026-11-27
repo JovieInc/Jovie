@@ -9,12 +9,12 @@ export function markdownSummary(report) {
   const lines = [
     '## Shipping SLO — rolling 7d',
     '',
-    '| Metric | p50 | p95 |',
-    '| --- | --- | --- |',
+    '| Metric | p50 | p95 | Samples |',
+    '| --- | --- | --- | --- |',
   ];
   const rows = [
-    ['CI wall time (pull_request)', report.metrics.ci?.pull_request],
-    ['CI wall time (merge_group)', report.metrics.ci?.merge_group],
+    ['Source PR Ready (bounded sample)', report.metrics.ci?.pull_request],
+    ['Combined-tree PR Ready (bounded sample)', report.metrics.ci?.merge_group],
     ['Merge-queue wait', report.metrics.mergeQueue?.wait],
     ['Lead time · devin', report.metrics.leadTime?.devin],
     ['Lead time · codex', report.metrics.leadTime?.codex],
@@ -31,6 +31,15 @@ export function markdownSummary(report) {
     lines.push(
       `| ${label} | ${fmtSeconds(stat?.p50)} | ${fmtSeconds(stat?.p95)} | (n=${stat?.n ?? 0}) |`
     );
+  if (Object.keys(report.metrics.ci ?? {}).length) lines.push('');
+  for (const cohort of Object.values(report.metrics.ci ?? {})) {
+    const outcomes = Object.entries(cohort.outcomes ?? {})
+      .map(([outcome, count]) => `${outcome}: ${count}`)
+      .join(', ');
+    lines.push(
+      `- **${cohort.label} evidence:** ${cohort.coverage} · sampled ${cohort.sampled}/${cohort.availableRuns} recent listed runs · ${outcomes || 'no observations'}`
+    );
+  }
   const t = report.metrics.throughput ?? {};
   lines.push(
     '',
