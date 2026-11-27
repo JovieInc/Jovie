@@ -152,6 +152,12 @@ export function validateRegistry(registry) {
       errors.push(`${at}: github-workflow receipts need repo and workflow`);
     }
     if (
+      receipt.job !== undefined &&
+      (receipt.kind !== 'github-workflow' || !nonEmpty(receipt.job))
+    ) {
+      errors.push(`${at}: receipt.job needs an exact github-workflow job name`);
+    }
+    if (
       receipt.kind === 'workflow-failure-streak' &&
       (!nonEmpty(receipt.repo) || !nonEmpty(receipt.workflow))
     ) {
@@ -498,26 +504,30 @@ export function evaluateLiveness(registry, observations, nowMs) {
     results.push(evaluateEntry(entry, observations.get(entry.id), nowMs));
   }
   const red = results.filter(r => !['fresh', 'deferred'].includes(r.status));
+  const unmeasured = (registry?.entries ?? [])
+    .filter(
+      entry =>
+        entry?.status === 'live' &&
+        !HOSTED_RECEIPT_KINDS.includes(entry.receipt?.kind)
+    )
+    .map(entry => ({
+      id: entry.id,
+      owner: entry.owner,
+      status: entry.receipt?.kind === 'none' ? 'unknown' : 'host-local',
+      receipt: entry.receipt?.kind,
+      gap: entry.gap ?? null,
+      purpose: entry.purpose ?? null,
+    }));
   return {
     schema: LIVENESS_SCHEMA,
     observedAt: new Date(nowMs).toISOString(),
     status: red.some(row => row.critical)
       ? 'critical'
-      : red.length
+      : red.length || unmeasured.some(row => row.status === 'unknown')
         ? 'degraded'
         : 'healthy',
     results,
-    unmeasured: (registry?.entries ?? [])
-      .filter(
-        entry =>
-          entry?.status === 'live' &&
-          !HOSTED_RECEIPT_KINDS.includes(entry.receipt?.kind)
-      )
-      .map(entry => ({
-        id: entry.id,
-        receipt: entry.receipt?.kind,
-        gap: entry.gap ?? null,
-      })),
+    unmeasured,
   };
 }
 
