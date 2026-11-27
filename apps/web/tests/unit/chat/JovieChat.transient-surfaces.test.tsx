@@ -20,6 +20,7 @@ const { mockChatState, mockFileState, useChatFileAttachmentsSpy } = vi.hoisted(
       conversationTitle: null,
       status: 'ready' as 'ready' | 'streaming',
       activeConversationId: null as string | null,
+      conversationResetKey: 0,
       inputRef: { current: null },
       handleSubmit: vi.fn(),
       handleRetry: vi.fn(),
@@ -201,6 +202,7 @@ describe('JovieChat transient surfaces (JOV-5413)', () => {
     mockChatState.hasMessages = true;
     mockChatState.status = 'ready';
     mockChatState.activeConversationId = null;
+    mockChatState.conversationResetKey = 0;
     mockFileState.isDragOver = false;
   });
 
@@ -237,7 +239,24 @@ describe('JovieChat transient surfaces (JOV-5413)', () => {
         Node.DOCUMENT_POSITION_PRECEDING
     ).toBe(Node.DOCUMENT_POSITION_PRECEDING);
     expect(useChatFileAttachmentsSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ resetKey: 'thread-1' })
+      expect.objectContaining({ resetKey: '0' })
+    );
+  });
+
+  it('resets attachments for an intentional thread change while retaining a reserved conversation', () => {
+    const view = renderWithQueryClient(<JovieChat profileId='profile-1' />);
+    mockChatState.activeConversationId = 'reserved-thread';
+    view.rerender(<JovieChat profileId='profile-1' />);
+    expect(useChatFileAttachmentsSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ resetKey: '0' })
+    );
+
+    mockChatState.conversationResetKey = 1;
+    view.rerender(
+      <JovieChat profileId='profile-1' conversationId='other-thread' />
+    );
+    expect(useChatFileAttachmentsSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ resetKey: '1' })
     );
   });
 

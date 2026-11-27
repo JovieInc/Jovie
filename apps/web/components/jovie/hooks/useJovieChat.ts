@@ -3,7 +3,7 @@
 import { useChat } from '@ai-sdk/react';
 import { useAsyncRateLimiter } from '@tanstack/react-pacer';
 import { useQueryClient } from '@tanstack/react-query';
-import { DefaultChatTransport, isToolUIPart, type UIMessage } from 'ai';
+import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useRouter } from 'next/navigation';
 import {
   type SetStateAction,
@@ -39,7 +39,6 @@ import {
   consumePendingChatPrompt,
 } from '@/lib/chat/open-chat-with-prompt';
 import { trimMessagesForChatRequest } from '@/lib/chat/request-validation';
-import { buildChatThreadRoute } from '@/lib/chat/sync-chat-thread-url';
 import { splitLeadingEntityMentions } from '@/lib/chat/tokens';
 import { isRecoverableToolErrorCode } from '@/lib/chat/tool-errors';
 import { CHAT_TRANSCRIPT_WINDOW_VARIANT_IDENTITY } from '@/lib/chat/transcript-window';
@@ -80,7 +79,10 @@ import {
 } from '../utils';
 import {
   extractChatTurnMetadata,
+  getLastAssistantMessage,
+  getMessageParts,
   getTitlePollIntervalMs,
+  hasAssistantOutput,
   inferToolIntentFromPrompt,
   inferToolIntentFromSkill,
   isRecord,
@@ -158,28 +160,6 @@ interface ActiveChatLatency {
 
 function uxLatencyNowMs(): number {
   return globalThis.performance?.now?.() ?? Date.now();
-}
-
-function getMessageParts(message: UIMessage | undefined): UIMessage['parts'] {
-  return Array.isArray(message?.parts) ? message.parts : [];
-}
-
-function hasAssistantOutput(parts: UIMessage['parts']): boolean {
-  return parts.some(
-    part =>
-      (part.type === 'text' && part.text.trim().length > 0) ||
-      part.type === 'file' ||
-      isToolUIPart(part)
-  );
-}
-
-function getLastAssistantMessage(messages: readonly UIMessage[]) {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i]?.role === 'assistant') {
-      return messages[i];
-    }
-  }
-  return undefined;
 }
 
 function summarizeTimelineState(state: ChatTimelineState) {
@@ -278,6 +258,7 @@ export function useJovieChatController({
   const router = useRouter();
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const lastAttemptedMessageRef = useRef<string>('');
+  const lastAttemptedFilesRef = useRef<FileUIPart[] | undefined>(undefined);
   const lastAttemptedDraftScopeRef = useRef<string | undefined>(undefined);
   const activeClientTurnIdRef = useRef<string | null>(null);
   const activeRequestIdRef = useRef<string | null>(null);
@@ -285,6 +266,7 @@ export function useJovieChatController({
   const replacingTurnRef = useRef(false);
   const turnContextEpochRef = useRef(0);
   const mountedRef = useRef(true);
+  const stopChatRef = useRef<(() => void) | null>(null);
   const activeChatLatencyRef = useRef<ActiveChatLatency | null>(null);
   // Assistant SDK message ids that existed BEFORE the active turn started.
   // Between send and stream start, the SDK's "last assistant message" is still
@@ -357,6 +339,7 @@ export function useJovieChatController({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRateLimitHint, setShowRateLimitHint] = useState(false);
+  const [conversationResetKey, setConversationResetKey] = useState(0);
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(conversationId ?? null);
@@ -372,10 +355,12 @@ export function useJovieChatController({
     activeChatLatencyRef.current = null;
     pendingSendRef.current = null;
     pendingSummerFailureRef.current = null;
+    lastAttemptedFilesRef.current = undefined;
     replacingTurnRef.current = false;
   }, []);
   const resetTurnContext = useCallback(() => {
     invalidateTurnContext();
+    setConversationResetKey(key => key + 1);
     setIsSubmitting(false);
     setChatError(readRecoveryError(recoveryContext));
   }, [invalidateTurnContext, recoveryContext, setChatError]);
@@ -384,6 +369,7 @@ export function useJovieChatController({
     return () => {
       mountedRef.current = false;
       invalidateTurnContext();
+      stopChatRef.current?.();
     };
   }, [invalidateTurnContext]);
   useEffect(() => {
@@ -715,6 +701,9 @@ export function useJovieChatController({
         failedMessage: suppressComposerPause
           ? undefined
           : lastAttemptedMessageRef.current,
+        failedFiles: suppressComposerPause
+          ? undefined
+          : lastAttemptedFilesRef.current,
         suppressComposerPause,
         ...(chatMode === 'ov' && !suppressComposerPause
           ? { retryClientTurnId: clientTurnId }
@@ -966,6 +955,10 @@ export function useJovieChatController({
       });
     },
   });
+
+  useEffect(() => {
+    stopChatRef.current = rawStop;
+  }, [rawStop]);
 
   const clearChips = chipTray.clear;
   const clearScopedDraft = useCallback(() => {
@@ -1258,27 +1251,20 @@ export function useJovieChatController({
     };
   }, [activeConversationId, draft]);
 
-  // Sync activeConversationId when parent prop changes
+  const previousRequestedConversationIdRef = useRef(conversationId ?? null);
+  // A server-reserved id may advance while the route still has no id. Only
+  // an actual prop transition back to null is navigation to a fresh chat.
   useEffect(() => {
     const nextConversationId = conversationId ?? null;
+    const routeChanged =
+      previousRequestedConversationIdRef.current !== nextConversationId;
+    previousRequestedConversationIdRef.current = nextConversationId;
     if (activeConversationId === nextConversationId) {
       return;
     }
 
-    if (activeConversationId && nextConversationId === null) {
-      const reservedPath = buildChatThreadRoute(activeConversationId);
-      if (globalThis.location?.pathname === reservedPath) {
-        return;
-      }
-      // The new-chat page does not pass an id until Next notices the reserved
-      // URL. Do not treat that stale prop as "switch back to empty".
-      if (
-        timelineStateRef.current.conversationId === activeConversationId ||
-        timelineStateRef.current.messages.length > 0
-      ) {
-        return;
-      }
-    }
+    if (activeConversationId && nextConversationId === null && !routeChanged)
+      return;
 
     // The parent route catching up to the already-acknowledged server id is
     // not a thread switch. Wiping here drops the in-flight transcript.
@@ -1303,6 +1289,8 @@ export function useJovieChatController({
 
     setActiveConversationId(nextConversationId);
     resetTurnContext();
+    rawStop();
+    clearChips();
     streamRevisionRef.current = 0;
     lastAssistantPartsSignatureRef.current = null;
     dispatchTimelineEvent({
@@ -1315,9 +1303,11 @@ export function useJovieChatController({
   }, [
     activeConversationId,
     conversationId,
+    clearChips,
     dispatchTimelineEvent,
     draft,
     resetTurnContext,
+    rawStop,
     setInput,
   ]);
 
@@ -1410,6 +1400,7 @@ export function useJovieChatController({
 
       // Store the message before sending (in case of error)
       lastAttemptedMessageRef.current = trimmedText;
+      lastAttemptedFilesRef.current = hasFiles ? files : undefined;
       lastAttemptedDraftScopeRef.current =
         chatError?.failedMessage === trimmedText
           ? lastAttemptedDraftScopeRef.current
@@ -1524,15 +1515,16 @@ export function useJovieChatController({
   );
 
   // Retry the last failed message
-  const handleRetry = useCallback(() => {
-    if (chatError?.failedMessage) {
-      doSubmit(chatError.failedMessage, undefined, {
+  const handleRetry = useCallback(async () => {
+    if (chatError?.failedMessage || chatError?.failedFiles?.length) {
+      return doSubmit(chatError.failedMessage ?? '', chatError.failedFiles, {
         clientTurnId: chatError.retryClientTurnId,
         preserveComposerDraft:
           Boolean(draft.getSnapshot()) &&
           draft.getSnapshot().trim() !== chatError.failedMessage,
       });
     }
+    return false;
   }, [chatError, doSubmit, draft]);
 
   const rateLimitedSubmitter = useAsyncRateLimiter(
@@ -1551,17 +1543,20 @@ export function useJovieChatController({
       if (submitted && !preserveComposerDraft) {
         chipTray.clear();
       }
+      return submitted;
     },
     {
       limit: 1,
       window: PACER_TIMING.CHAT_RATE_LIMIT_MS,
-      onReject: () => {
+      onReject: args => {
+        const submission = args?.[0];
         setShowRateLimitHint(true);
         setChatError({
           type: 'rate_limit',
           message:
             'You’re sending messages too quickly. Please wait a moment and try again.',
-          failedMessage: draft.getSnapshot(),
+          failedMessage: submission?.text ?? draft.getSnapshot(),
+          failedFiles: submission?.files,
         });
       },
     }
@@ -1580,16 +1575,17 @@ export function useJovieChatController({
   const isRateLimited = showRateLimitHint;
 
   const handleSubmit = useCallback(
-    (e?: React.FormEvent, files?: FileUIPart[]) => {
+    async (e?: React.FormEvent, files?: FileUIPart[]): Promise<boolean> => {
       e?.preventDefault();
       const composed = composeMessage(chipTray.chips, draft.getSnapshot());
       const skillChip = chipTray.chips.find(chip => chip.type === 'skill');
-      rateLimitedSubmitter.maybeExecute({
+      const submitted = await rateLimitedSubmitter.maybeExecute({
         text: composed,
         files,
         source: skillChip ? 'slash_command' : 'typed',
         toolIntent: skillChip ? inferToolIntentFromSkill(skillChip.id) : null,
       });
+      return submitted === true;
     },
     [chipTray.chips, draft, rateLimitedSubmitter]
   );
@@ -1607,15 +1603,20 @@ export function useJovieChatController({
     [rateLimitedSubmitter]
   );
 
-  const handleInterruptAndSubmit = useCallback(() => {
-    const composed = composeMessage(chipTray.chips, draft.getSnapshot());
-    const skillChip = chipTray.chips.find(chip => chip.type === 'skill');
-    void doSubmit(composed, undefined, {
-      source: skillChip ? 'slash_command' : 'typed',
-      toolIntent: skillChip ? inferToolIntentFromSkill(skillChip.id) : null,
-      interrupt: true,
-    });
-  }, [chipTray.chips, doSubmit, draft]);
+  const handleInterruptAndSubmit = useCallback(
+    async (files?: FileUIPart[]) => {
+      const composed = composeMessage(chipTray.chips, draft.getSnapshot());
+      const skillChip = chipTray.chips.find(chip => chip.type === 'skill');
+      const submitted = await doSubmit(composed, files, {
+        source: skillChip ? 'slash_command' : 'typed',
+        toolIntent: skillChip ? inferToolIntentFromSkill(skillChip.id) : null,
+        interrupt: true,
+      });
+      if (submitted) clearChips();
+      return submitted;
+    },
+    [chipTray.chips, clearChips, doSubmit, draft]
+  );
 
   // Consume a pending prompt set before the chat component mounted
   // (e.g. via "open-chat-with-prompt"). This is programmatic/automated, not
@@ -1736,6 +1737,7 @@ export function useJovieChatController({
     // Refs
     inputRef,
     // Handlers
+    conversationResetKey,
     handleSubmit,
     handleRetry,
     handleSuggestedPrompt,

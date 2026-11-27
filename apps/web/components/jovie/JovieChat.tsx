@@ -117,6 +117,7 @@ export function JovieChat({
     conversationTitle,
     status,
     activeConversationId,
+    conversationResetKey,
     inputRef,
     handleSubmit,
     handleRetry,
@@ -217,7 +218,6 @@ export function JovieChat({
     hasReadyFiles,
     addFiles,
     removeFile,
-    clearFiles,
     toFileUIParts,
     dropZoneRef,
     accept: fileAccept,
@@ -226,7 +226,7 @@ export function JovieChat({
     fileUploadLimit: chatFileUploadLimit,
     onError: handleUploadError,
     onAudioUploaded: handleAudioUploaded,
-    resetKey: activeConversationId ?? conversationId ?? null,
+    resetKey: String(conversationResetKey),
   });
 
   // Manifest collapse state: when uploading and user scrolls/types, show collapsed bar
@@ -271,24 +271,48 @@ export function JovieChat({
   );
 
   const handleSubmitWithFiles = useCallback(
-    (e?: React.FormEvent) => {
-      if (isLoading || isSubmitting) return;
+    async (e?: React.FormEvent, interrupt = false) => {
+      e?.preventDefault();
+      if ((isLoading || isSubmitting) && !interrupt) return;
       const files = toFileUIParts();
+      const sentFileIds = pendingFiles
+        .filter(file => file.status === 'ready' && file.blobUrl)
+        .map(file => file.id);
       notifyJankSend();
-      handleSubmit(e, files.length > 0 ? files : undefined);
-      clearFiles();
-      setManifestCollapsed(false);
+      const submitted = interrupt
+        ? await handleInterruptAndSubmit(files.length > 0 ? files : undefined)
+        : await handleSubmit(e, files.length > 0 ? files : undefined);
+      if (submitted) {
+        // A rejected send keeps its attachments. Remove only the accepted files,
+        // so files added or uploaded while submission settles stay in the draft.
+        sentFileIds.forEach(removeFile);
+        setManifestCollapsed(false);
+      }
     },
     [
       handleSubmit,
+      handleInterruptAndSubmit,
       toFileUIParts,
-      clearFiles,
+      pendingFiles,
+      removeFile,
       setManifestCollapsed,
       isLoading,
       isSubmitting,
       notifyJankSend,
     ]
   );
+
+  const handleInterruptWithFiles = useCallback(() => {
+    void handleSubmitWithFiles(undefined, true);
+  }, [handleSubmitWithFiles]);
+
+  const handleRetryWithFiles = useCallback(async () => {
+    const failedUrls = new Set(chatError?.failedFiles?.map(file => file.url));
+    const retryFileIds = pendingFiles
+      .filter(file => file.blobUrl && failedUrls.has(file.blobUrl))
+      .map(file => file.id);
+    if (await handleRetry()) retryFileIds.forEach(removeFile);
+  }, [chatError?.failedFiles, pendingFiles, handleRetry, removeFile]);
 
   // Notify parent when the conversation title changes
   const prevTitleRef = useRef<string | null>(null);
@@ -678,7 +702,7 @@ export function JovieChat({
       ref: inputRef,
       onChange: setInput,
       onSubmit: handleSubmitWithFiles,
-      onInterruptAndSend: handleInterruptAndSubmit,
+      onInterruptAndSend: handleInterruptWithFiles,
       isLoading,
       isSubmitting,
       isStreaming,
@@ -702,7 +726,7 @@ export function JovieChat({
       inputRef,
       setInput,
       handleSubmitWithFiles,
-      handleInterruptAndSubmit,
+      handleInterruptWithFiles,
       isLoading,
       isSubmitting,
       isStreaming,
@@ -779,7 +803,7 @@ export function JovieChat({
     !isWeeklyPlanLimitError(chatError) ? (
       <ChatInlineError
         chatError={chatError}
-        onRetry={handleRetry}
+        onRetry={handleRetryWithFiles}
         isLoading={isLoading}
         isSubmitting={isSubmitting}
         chatMode={chatMode}

@@ -1,7 +1,10 @@
 import type { UIMessage } from 'ai';
 import { NextResponse } from 'next/server';
 import { validateChatMessageParts } from '@/lib/chat/attachment-policy';
+import { extractUIMessageText } from '@/lib/chat/message-text';
 import { parseJsonBody } from '@/lib/http/parse-json';
+
+export { extractUIMessageText } from '@/lib/chat/message-text';
 
 /** Maximum allowed chat POST body size (bytes). */
 export const MAX_CHAT_BODY_SIZE = 256 * 1024;
@@ -35,16 +38,6 @@ export type ChatRequestBody = {
 };
 
 type MessagePart = { type: string; text?: string };
-
-export function extractUIMessageText(parts: MessagePart[]): string {
-  return parts
-    .filter(
-      (p): p is { type: 'text'; text: string } =>
-        p.type === 'text' && typeof p.text === 'string'
-    )
-    .map(p => p.text)
-    .join('');
-}
 
 function measurePartsSerializedBytes(parts: unknown[]): number {
   try {

@@ -11,12 +11,14 @@
  * bio, paste it" is a better fallback than picking a random paragraph.
  *
  * The result is sanitized before any model sees it: URLs stripped, control
- * chars stripped, length capped at 600 chars at a word boundary.
+ * chars stripped, length capped to the profile field limit at a word boundary.
  */
 
 import { extractMetaContent } from '@/lib/ingestion/strategies/base/parsing';
+import { PROFILE_BIO_MAX_LENGTH } from '@/lib/validation/schemas/dashboard/profile';
+import { normalizeImportedBioText, stripInvisibleCharacters } from './bio-text';
 
-export const BIO_MAX_LENGTH = 600;
+export const BIO_MAX_LENGTH = PROFILE_BIO_MAX_LENGTH;
 
 const BIO_PRIORITY_TYPES = new Set(['Person', 'MusicGroup', 'ProfilePage']);
 
@@ -103,36 +105,25 @@ const URL_PATTERN =
 // intentionally normalized for readable bios.
 const CONTROL_PATTERN = /[\x00-\x1f\x7f-\x9f]/g;
 
-// Zero-width and bidi-control chars commonly used to hide payloads in scraped
-// text or pull off "trojan source" tricks. Built via `new RegExp(string)` with
-// `\\u` escapes so this source file itself contains no bidi chars (the very
-// thing we strip at runtime). Biome's regex-literal formatter rewrites `\u`
-// escapes inside character classes back to literal chars, which is exactly
-// the situation we are trying to avoid here.
-//   U+200B-U+200F  zero-width space, ZWNJ, ZWJ, LRM, RLM
-//   U+202A-U+202E  bidi embedding/override controls
-//   U+2060-U+206F  word joiner + invisible math/format chars
-//   U+FEFF         BOM / zero-width no-break space
-const ZERO_WIDTH_PATTERN = new RegExp(
-  '[\\u200B-\\u200F\\u202A-\\u202E\\u2060-\\u206F\\uFEFF]',
-  'g'
-);
-
 /**
  * Strip URLs, control chars, and zero-width chars; collapse whitespace; cap at
  * `maxLength` at a word boundary. Shared by bio extraction and title sanitation
  * so external metadata hits the same defense pipeline before reaching the user.
  */
 export function sanitizeText(input: string, maxLength: number): string {
-  let cleaned = input
-    .replaceAll(CONTROL_PATTERN, ' ')
-    .replaceAll(ZERO_WIDTH_PATTERN, '');
+  let cleaned = stripInvisibleCharacters(
+    input.replaceAll(CONTROL_PATTERN, ' ')
+  );
   cleaned = cleaned.replaceAll(URL_PATTERN, ' ');
   cleaned = cleaned.replaceAll(/\s+/g, ' ').trim();
 
-  if (cleaned.length <= maxLength) return cleaned;
+  return truncateText(cleaned, maxLength);
+}
 
-  const slice = cleaned.slice(0, maxLength);
+function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+
+  const slice = text.slice(0, Math.max(0, maxLength - 1));
   const lastBoundary = slice.lastIndexOf(' ');
   const cutoff =
     lastBoundary >= Math.floor(maxLength / 2) ? lastBoundary : slice.length;
@@ -140,7 +131,15 @@ export function sanitizeText(input: string, maxLength: number): string {
 }
 
 export function sanitizeBioText(input: string): string {
-  return sanitizeText(input, BIO_MAX_LENGTH);
+  return truncateText(cleanBioText(input), BIO_MAX_LENGTH);
+}
+
+function cleanBioText(input: string): string {
+  return normalizeImportedBioText(input)
+    .split(/\n+/)
+    .map(paragraph => sanitizeText(paragraph, Number.MAX_SAFE_INTEGER))
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 /**
@@ -148,10 +147,21 @@ export function sanitizeBioText(input: string): string {
  * usable bio could be found.
  */
 export function extractBioCandidate(html: string): string | null {
+  return extractBioCandidateDetails(html)?.bio ?? null;
+}
+
+export function extractBioCandidateDetails(
+  html: string
+): { bio: string; truncated: boolean } | null {
   const raw =
     extractJsonLdDescription(html) ?? extractMetaDescription(html) ?? null;
   if (!raw) return null;
 
-  const sanitized = sanitizeBioText(raw);
-  return sanitized.length > 0 ? sanitized : null;
+  const cleaned = cleanBioText(raw);
+  return cleaned.length > 0
+    ? {
+        bio: truncateText(cleaned, BIO_MAX_LENGTH),
+        truncated: cleaned.length > BIO_MAX_LENGTH,
+      }
+    : null;
 }

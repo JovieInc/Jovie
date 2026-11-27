@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChatEntityPanelProvider } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { ChatEntityRightPanelHost } from '@/app/app/(shell)/chat/ChatEntityRightPanelHost';
 import { JovieChat } from '@/app/app/(shell)/chat/DeferredJovieChat';
+import { useChatPageSession } from '@/app/app/(shell)/chat/use-chat-page-session';
 import {
   getWelcomeChatBootstrapAnnouncement,
   resetWelcomeChatBootstrapState,
@@ -40,6 +41,7 @@ import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { RECOVERY_COPY } from '@/features/feedback/recovery-contract';
 import { useClipboard } from '@/hooks/useClipboard';
+import { requestNewChat } from '@/lib/chat/new-chat-intent';
 import {
   buildChatThreadRoute,
   isChatThreadSurfacePath,
@@ -209,15 +211,17 @@ export function ChatPageClient({
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
   const { chatMode } = useFounderDoor();
   const [autoRetryCount, setAutoRetryCount] = useState(0);
-  const [currentThreadTitle, setCurrentThreadTitle] = useState<string | null>(
-    initialConversationTitle
-  );
-  // Reset the thread title when the conversation changes so the previous
-  // thread's title doesn't leak into a fresh conversation while the new
-  // conversation's metadata is loading.
-  useEffect(() => {
-    setCurrentThreadTitle(initialConversationTitle);
-  }, [conversationId, initialConversationTitle]);
+  const {
+    currentThreadTitle,
+    currentConversationId,
+    chatSessionKey,
+    setCurrentConversationId,
+    handleTitleChange,
+  } = useChatPageSession({
+    conversationId,
+    initialConversationTitle,
+    chatMode,
+  });
   const [welcomeChatBootstrapState, setWelcomeChatBootstrapState] =
     useState<WelcomeChatBootstrapState>('idle');
   const welcomeChatBootstrapStateRef =
@@ -368,24 +372,27 @@ export function ChatPageClient({
   const deleteConversation = useDeleteConversationMutation();
 
   const handleCopyConversationId = useCallback(async () => {
-    if (!conversationId) {
+    if (!currentConversationId) {
       notifications.error(
         'Session ID is only available after your first message.'
       );
       return;
     }
-    copySessionId(conversationId);
-  }, [conversationId, notifications, copySessionId]);
+    copySessionId(currentConversationId);
+  }, [currentConversationId, notifications, copySessionId]);
 
   const handleArchive = useCallback(async () => {
-    if (!conversationId) return;
-    await deleteConversation.mutateAsync({ conversationId });
+    if (!currentConversationId) return;
+    await deleteConversation.mutateAsync({
+      conversationId: currentConversationId,
+    });
+    requestNewChat();
     router.push(APP_ROUTES.CHAT);
     notifications.success('Thread archived');
-  }, [conversationId, deleteConversation, router, notifications]);
+  }, [currentConversationId, deleteConversation, router, notifications]);
 
   const headerActions = useMemo(() => {
-    if (!conversationId) {
+    if (!currentConversationId) {
       return null;
     }
 
@@ -420,7 +427,7 @@ export function ChatPageClient({
       </div>
     );
   }, [
-    conversationId,
+    currentConversationId,
     sessionIdCopied,
     handleCopyConversationId,
     handleArchive,
@@ -431,6 +438,7 @@ export function ChatPageClient({
       newConversationId: string,
       phase: 'reserved' | 'completed' = 'completed'
     ) => {
+      setCurrentConversationId(newConversationId);
       const nextRoute = buildChatThreadRoute(newConversationId);
       const currentPath = globalThis.location?.pathname;
 
@@ -448,18 +456,7 @@ export function ChatPageClient({
         });
       }
     },
-    [router]
-  );
-
-  // Update the header badge when the conversation title changes
-  const handleTitleChange = useCallback(
-    (title: string | null) => {
-      setCurrentThreadTitle(currentTitle => {
-        if (title) return title;
-        return conversationId ? currentTitle : null;
-      });
-    },
-    [conversationId]
+    [router, setCurrentConversationId]
   );
 
   useEffect(() => {
@@ -468,14 +465,14 @@ export function ChatPageClient({
     setHeaderBadge(
       <ChatHistorySwitcher
         title={currentThreadTitle}
-        activeConversationId={conversationId ?? null}
+        activeConversationId={currentConversationId}
       />
     );
 
     return () => {
       setHeaderBadge(null);
     };
-  }, [conversationId, currentThreadTitle, setHeaderBadge]);
+  }, [currentConversationId, currentThreadTitle, setHeaderBadge]);
 
   useEffect(() => {
     setHeaderActions(headerActions);
@@ -842,6 +839,7 @@ export function ChatPageClient({
           <NavigationDestinationReady destination='chat' />
           <WelcomeChatBootstrapAnnouncer state={welcomeChatBootstrapState} />
           <JovieChat
+            key={chatSessionKey}
             profileId={activeProfile.id}
             conversationId={conversationId}
             onConversationCreate={handleConversationCreate}
