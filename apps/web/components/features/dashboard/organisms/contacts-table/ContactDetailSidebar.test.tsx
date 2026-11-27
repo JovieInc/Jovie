@@ -115,12 +115,18 @@ describe('ContactDetailSidebar', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('shows the empty selection message', async () => {
-    const { container } = renderSidebar(null);
+  it('keeps an empty contact rail dismissible without saving', async () => {
+    const user = userEvent.setup();
+    const { container, onClose, onSave } = renderSidebar(null);
     expect(
       screen.getByText('Select a contact to view details')
     ).toBeInTheDocument();
     await expectNoA11yViolations(container);
+
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onSave).not.toHaveBeenCalled();
   });
 
   it('announces saving and save errors', async () => {
