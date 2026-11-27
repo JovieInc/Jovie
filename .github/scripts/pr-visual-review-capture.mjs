@@ -9,6 +9,7 @@ import {
   buildCaptureArtifactPaths,
   CRITICAL_JOURNEY_CAPTURE_SCHEMA,
   MAX_CAPTURE_WORKERS,
+  prepareContactsCapture,
   resolveCaptureJourneyId,
   resolveCaptureWorkerCount,
   runCapturePool,
@@ -161,6 +162,7 @@ try {
     const actions = [];
     const runtimeFailures = [];
     const observed = {
+      coverage: 'missing',
       finalUrl: '',
       title: '',
       statusCode: null,
@@ -278,6 +280,13 @@ try {
           );
       }
       await waitForAuthenticatedShell(page, route);
+      if (route === '/app/contacts') {
+        observed.requiredState = 'contacts-selected-detail';
+        actions.push('await-populated-contacts-and-select-detail');
+        Object.assign(observed, await prepareContactsCapture(page));
+        result.assertion.expectedOutcome =
+          'Populated Contacts table and selected contact detail rail render together.';
+      }
       const pageText = (await page.locator('body').innerText()).trim();
       observed.text = sanitizeCaptureText(pageText);
       actions.push('assert-original-route-outcome');
@@ -303,6 +312,7 @@ try {
       actions.push('capture-screenshot');
       await page.screenshot({ path: outputPath, fullPage: true });
       result.status = 'captured';
+      observed.coverage = 'captured';
     } catch (error) {
       result.status = 'failed';
       result.error = sanitizeCaptureText(error?.message ?? error);

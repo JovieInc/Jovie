@@ -37,66 +37,6 @@ import {
 } from '../sonar-check-selection.mjs';
 
 describe('bounded PR visual review contract', () => {
-  it.each([
-    'apps/web/app/(marketing)/card/JovieCardLanding.tsx',
-    'apps/web/app/(marketing)/card/page.tsx',
-    'apps/web/app/(marketing)/card/JovieCardInterestCapture.tsx',
-    'apps/web/data/jovieCardCopy.ts',
-  ])('captures the actual Card route for %s', file => {
-    expect(routeChangedFiles([file])).toEqual({
-      shouldReview: true,
-      routes: ['/card'],
-      reason: 'ui-change',
-      review_status: 'advisory',
-    });
-  });
-
-  it('does not confuse unrelated card components with the Card route', () => {
-    expect(
-      routeChangedFiles([
-        'apps/web/components/molecules/ContentSurfaceCard.tsx',
-      ]).routes
-    ).toEqual(['/']);
-    expect(
-      routeChangedFiles(['apps/web/data/jovieCardCopy.ts.backup']).shouldReview
-    ).toBe(false);
-  });
-
-  it('routes UI changes only to deterministic public surfaces', () => {
-    expect(
-      routeChangedFiles([
-        'apps/web/app/(home)/page.tsx',
-        'packages/ui/src/button.tsx',
-        'docs/README.md',
-      ])
-    ).toEqual({
-      shouldReview: true,
-      routes: ['/'],
-      reason: 'ui-change',
-      review_status: 'advisory',
-    });
-  });
-
-  it('routes known profiles to the real fixture and never invents demo routes', () => {
-    expect(
-      routeChangedFiles(['apps/web/app/(dynamic)/[username]/page.tsx'])
-    ).toEqual({
-      shouldReview: true,
-      routes: ['/demo/showcase/public-profile'],
-      reason: 'ui-change',
-      review_status: 'advisory',
-    });
-    expect(routeChangedFiles(['apps/web/app/(admin)/page.tsx']).routes).toEqual(
-      ['/']
-    );
-    expect(routeChangedFiles(['scripts/format.mjs'])).toEqual({
-      shouldReview: false,
-      routes: [],
-      reason: 'no-ui-change',
-      review_status: 'skipped',
-    });
-  });
-
   it('classifies unavailable evidence and model output as successful advisory states', () => {
     expect(classifyReviewOutcome({ shouldReview: false })).toBe('skipped');
     expect(
@@ -139,18 +79,18 @@ describe('bounded PR visual review contract', () => {
         'apps/web/components/features/onboarding/onboardingChatHelpers.ts',
         'apps/web/components/jovie/utils.ts',
       ])
-    ).toEqual({
+    ).toMatchObject({
       shouldReview: true,
       routes: ['/'],
       reason: 'ui-change',
-      review_status: 'advisory',
+      review_status: 'unavailable',
     });
   });
 
   it('does not treat App Router (shell) catalog pages as chat chrome', () => {
     expect(
-      routeChangedFiles(['apps/web/app/app/(shell)/library/page.tsx']).routes
-    ).toEqual(['/']);
+      routeChangedFiles(['apps/web/app/app/(shell)/library/page.tsx'])
+    ).toMatchObject({ routes: [], review_status: 'unavailable' });
   });
 
   it('routes the authenticated session boundary through chat instead of masking it with a public capture', () => {

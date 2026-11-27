@@ -45,6 +45,11 @@ export function evaluateVisualEvidence({
     try {
       const routing = JSON.parse(readFileSync(routingPath, 'utf8'));
       shouldReview = Boolean(routing.shouldReview);
+      for (const missing of Array.isArray(routing.missingCoverage)
+        ? routing.missingCoverage
+        : []) {
+        missingEvidence.push(`unsupported-surface:${missing.file}`);
+      }
       if (
         bindHead &&
         EXACT_SHA.test(String(expectedHeadSha)) &&
