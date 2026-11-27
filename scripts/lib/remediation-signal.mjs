@@ -3,7 +3,6 @@ import { stripVTControlCharacters } from 'node:util';
 import {
   attachEvidenceToOpenIssue,
   findLinearLabelId,
-  noteFingerprintedIssueGreen,
   remediationKey,
   upsertLinearIssueByTitleFingerprint,
 } from './linear-issue-intake.mjs';
@@ -442,6 +441,7 @@ export async function fileRemediationSignal({
   source,
   runUrl,
   detail,
+  redBinding = '',
   apiKey,
   fetchImpl,
 }) {
@@ -462,6 +462,7 @@ export async function fileRemediationSignal({
         '',
         '## Evidence',
         detail?.trim() || 'Red run. See the linked workflow for logs.',
+        redBinding,
         '',
         `Run: ${runUrl || '(run url unavailable)'}`,
       ].join('\n'),
@@ -474,6 +475,7 @@ export async function fileRemediationSignal({
       fingerprint: group.canonical,
       source: group.canonicalSource,
       runUrl,
+      redBinding,
       detail: `First observed by ${fingerprint} (${source}): ${detail?.trim() || 'see run'}`,
       apiKey,
       fetchImpl,
@@ -486,50 +488,29 @@ export async function fileRemediationSignal({
   return upsertLinearIssueByTitleFingerprint({
     fingerprint,
     title: remediationTitle(fingerprint),
-    description: describeRemediation({ fingerprint, source, runUrl, detail }),
+    description: describeRemediation({
+      fingerprint,
+      source,
+      runUrl,
+      detail: [detail, redBinding].filter(Boolean).join('\n\n'),
+    }),
     priority: fingerprint === POSTDEPLOY_QUOTA_FINGERPRINT ? 3 : 1,
     createStateName: 'Todo',
     keepLabelIds: ready.ok && ready.id ? [ready.id] : [],
     reopenTerminal: true,
+    preserveOpenState: Boolean(redBinding),
     apiKey,
     fetchImpl,
   });
 }
 
-export async function resolveRemediationSignal({
-  fingerprint,
-  source,
-  runUrl,
-  apiKey,
-  fetchImpl,
-}) {
-  // A member going green does not prove the shared incident is over, unless it
-  // measures the condition itself (production current vs main). Other members
-  // leave the owner's issue open; the canonical owner's green resolves it.
-  const group = incidentFor(fingerprint);
-  if (group && group.canonical !== fingerprint) {
-    if (!group.resolvers?.includes(fingerprint)) {
-      return { ok: true, action: 'none', reason: 'shared_incident_member' };
-    }
-    return noteFingerprintedIssueGreen({
-      fingerprint: group.canonical,
-      source: group.canonicalSource,
-      commentMarker: GREEN_MARKER,
-      comment: `${GREEN_MARKER}\n\`${fingerprint}\` (${source}) verified the condition is gone.\nRun: ${runUrl || '(run url unavailable)'}`,
-      apiKey,
-      fetchImpl,
-    });
-  }
-  const sourceLine = `Source-workflow: ${source}`;
-  return noteFingerprintedIssueGreen({
-    fingerprint,
-    source,
-    commentMarker: GREEN_MARKER,
-    comment: `${GREEN_MARKER}\n${sourceLine} is green.\nRun: ${runUrl || '(run url unavailable)'}`,
-    apiKey,
-    fetchImpl,
-  });
-}
+export const resolveRemediationSignal = async input => {
+  // Older Linear Sync checkouts read the marker without running resolution.
+  const { resolveRemediationEvidence } = await import(
+    './remediation-resolution.mjs'
+  );
+  return resolveRemediationEvidence(input, incidentFor, GREEN_MARKER);
+};
 
 const TRANSIENT_FAILURE_RE = /_(transport|5\d\d)$/;
 
@@ -543,7 +524,16 @@ export function isTransientRemediationFailure(result) {
 
 /** @param {any} decision @param {any} [context] */
 export async function applyRemediationDecision(decision = {}, context = {}) {
-  const { fingerprint, source, runUrl, detail, apiKey, fetchImpl } = context;
+  const {
+    fingerprint,
+    source,
+    runUrl,
+    detail,
+    apiKey,
+    fetchImpl,
+    redBinding,
+    recoveryProof,
+  } = context;
   if (!decision || decision.action === 'skip') {
     return { ok: true, action: 'skip' };
   }
@@ -557,6 +547,7 @@ export async function applyRemediationDecision(decision = {}, context = {}) {
       source,
       runUrl,
       detail: decision.detail || detail,
+      redBinding,
       apiKey,
       fetchImpl,
     });
@@ -571,7 +562,12 @@ export async function applyRemediationDecision(decision = {}, context = {}) {
       runUrl,
       apiKey,
       fetchImpl,
+      redBinding,
+      recoveryProof,
     });
+    if (resolved.ok && resolved.action === 'hold') {
+      return { ok: true, action: 'hold', reason: resolved.reason };
+    }
     results.push({ ...resolved, fingerprint: key });
     if (!resolved.ok) return { ok: false, action: 'green', results };
   }

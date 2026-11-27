@@ -3,8 +3,8 @@ description: >-
   Turn a finished run into a repair or a success (Tim 2026-11-22: "nothing
   should be able to fail without a repair or a sucess"). A red run opens or
   updates one remediation issue (label remediation:<fingerprint>, P1, Todo,
-  agent-ready) that the lanes remediation loop picks up; the first green after
-  a red resolves it; steady green spends no Linear calls. A red after a repair
+  agent-ready) that the lanes remediation loop picks up; fresh successes from the
+  jobs that failed resolve it; steady green spends no Linear calls. A red after a repair
   marked it Done reopens it and records the recurrence. Run it last, with
   `if: always()`, in a job that needs every job of the workflow, guarded to
   main (`github.ref == 'refs/heads/main'`, not workflow_dispatch). A chained
@@ -13,7 +13,9 @@ description: >-
 
 inputs:
   results:
-    description: toJSON(needs) from the calling job; any failure is red, all success or skipped is green
+    description: >-
+      toJSON(needs) from the calling job. Skipped jobs never establish recovery.
+      A probe declaring a remediation_qualified output must emit 'true' to qualify success.
     required: false
     default: ''
   conclusion:
@@ -118,6 +120,8 @@ runs:
         LINEAR_API_KEY: ${{ inputs.linear-api-key }}
         REMEDIATION_INTAKE_DISABLED: ${{ inputs.intake-disabled }}
         REMEDIATION_MODE: monitor
+        REMEDIATION_WORKFLOW_PROOF: '1'
+        REMEDIATION_WORKFLOW_RESULTS: ${{ inputs.results }}
         REMEDIATION_CONCLUSION: ${{ steps.decide.outputs.conclusion }}
         REMEDIATION_FINGERPRINT: ${{ steps.decide.outputs.fingerprint }}
         REMEDIATION_SOURCE: ${{ steps.decide.outputs.source }}
