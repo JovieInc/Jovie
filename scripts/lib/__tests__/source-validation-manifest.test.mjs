@@ -58,6 +58,9 @@ describe('Source Validation manifest parity', () => {
     expect(guards.find(g => g.id === 'web-eslint')?.command).toBe(
       'LINT_CHANGED_WORKTREE=1 ESLINT_CHANGED_BASE=origin/release/test pnpm --filter @jovie/web run lint:eslint:changed'
     );
+    expect(guards.find(g => g.id === 'dead-ends')?.command).toBe(
+      'node --import tsx packages/copy/dead-ends.ts check'
+    );
     expect(guards.map(g => g.id)).toEqual(
       expect.arrayContaining([
         'projected-tree-budget',
