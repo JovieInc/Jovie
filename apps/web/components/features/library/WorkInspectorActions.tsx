@@ -135,6 +135,7 @@ export function WorkInspectorActions({
   onAskJovie,
   onRetryLaunchKit,
   preview = null,
+  showSharingActions = true,
 }: {
   readonly asset: LibraryReleaseAsset;
   /** Canonical launches for any work; only entries scoped to `asset.id` render. */
@@ -148,6 +149,8 @@ export function WorkInspectorActions({
   readonly onRetryLaunchKit?: (launch: WorkLaunchSummary) => void;
   /** Preview playback control; rendered in the same button style as the rest. */
   readonly preview?: ReactNode;
+  /** Hide duplicate sharing controls when the inspector's link row owns them. */
+  readonly showSharingActions?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const action = useMemo(
@@ -181,7 +184,7 @@ export function WorkInspectorActions({
   return (
     <div className='space-y-2' data-testid={`work-actions-${asset.id}`}>
       <div className='flex flex-wrap items-center gap-x-1.5 gap-y-2'>
-        {action.kind === 'share_page' ? (
+        {showSharingActions && action.kind === 'share_page' ? (
           <Button
             type='button'
             variant='secondary'
@@ -214,7 +217,7 @@ export function WorkInspectorActions({
           </Button>
         ) : null}
 
-        {action.kind === 'share_privately' ? (
+        {showSharingActions && action.kind === 'share_privately' ? (
           <Button
             type='button'
             variant='secondary'
@@ -228,7 +231,7 @@ export function WorkInspectorActions({
         ) : null}
 
         <div className='flex max-w-full shrink-0 flex-wrap items-center gap-1.5'>
-          {action.kind === 'share_page' && pageUrl ? (
+          {showSharingActions && action.kind === 'share_page' && pageUrl ? (
             <Button
               asChild
               variant='secondary'

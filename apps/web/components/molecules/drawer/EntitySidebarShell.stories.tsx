@@ -24,7 +24,13 @@ export const Default: Story = {};
 export const Minimal: Story = {
   args: {
     headerMode: 'minimal',
-    entityHeaderSurface: 'flat',
+  },
+};
+
+export const WithFooter: Story = {
+  args: {
+    headerMode: 'minimal',
+    footer: <span className='text-xs text-secondary-token'>Saved</span>,
   },
 };
 

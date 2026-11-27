@@ -27,7 +27,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Plain: Story = {};
+export const Plain: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByRole('heading', { name: 'Metadata' })
+    ).toBeVisible();
+    await expect(canvas.queryByRole('button', { name: 'Metadata' })).toBeNull();
+    await expect(canvas.getByText('Section content goes here.')).toBeVisible();
+  },
+};
 
 export const Card: Story = {
   args: {
@@ -37,6 +46,7 @@ export const Card: Story = {
 
 export const Collapsed: Story = {
   args: {
+    collapsible: true,
     defaultOpen: false,
   },
   play: async ({ canvasElement }) => {

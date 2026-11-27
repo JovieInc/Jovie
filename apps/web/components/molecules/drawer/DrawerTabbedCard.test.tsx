@@ -9,11 +9,12 @@ const ACTIVITY_ROWS = Array.from(
 );
 
 describe('DrawerTabbedCard', () => {
-  it('renders tabs, controls and the internal scroll region', async () => {
+  it('preserves an explicit card with tabs, controls and internal scrolling', async () => {
     const onRefresh = vi.fn();
     const { container } = render(
       <DrawerTabbedCard
         sectionKind='details'
+        surfaceVariant='card'
         testId='tabbed'
         tabs={<p>Details · Activity</p>}
         controls={
@@ -40,13 +41,9 @@ describe('DrawerTabbedCard', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('renders an empty tab body and the flat surface', async () => {
+  it('keeps tab content flat by default', async () => {
     const { container } = render(
-      <DrawerTabbedCard
-        testId='tabbed'
-        surfaceVariant='flat'
-        tabs={<p>Details · Activity</p>}
-      >
+      <DrawerTabbedCard testId='tabbed' tabs={<p>Details · Activity</p>}>
         <p>No activity yet.</p>
       </DrawerTabbedCard>
     );
