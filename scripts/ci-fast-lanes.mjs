@@ -1387,6 +1387,8 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/remediation-detector-plans.test.mjs',
   'scripts/lib/__tests__/workflow-outcome-proof.test.mjs',
   'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+  'scripts/lib/__tests__/automation-liveness-outcome-sweep.test.mjs',
+  'scripts/lib/__tests__/outcome-sweep-proof.test.mjs',
   'scripts/lib/__tests__/docs-deploy-intake-quota.test.mjs',
   'scripts/lib/__tests__/linear-rate-limit-retry.test.mjs',
   'scripts/lib/__tests__/mac-runner-route-contract.test.mjs',
