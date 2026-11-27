@@ -17,6 +17,7 @@ import {
   COPY_INVENTORY_TEST,
   copyInventoryScanPath,
   forcesScriptContractFullRun,
+  localContractWorkerArgs,
   SHELL_IA_SCAN_ROOTS,
   SHELL_IA_TEST,
   selectScriptContracts,
@@ -25,6 +26,43 @@ import {
 import { testsAffectedBy } from '../test-file-dependencies.mjs';
 
 const ROOT = join(import.meta.dirname, '../../..');
+
+test('local caps preserve contract operands and coverage while defaults and CI stay unchanged', () => {
+  const args = ['--test', '--experimental-test-coverage', 'selected.test.mjs'];
+  /** @type {Array<['node' | 'vitest', string]>} */
+  const runners = [
+    ['node', '--test-concurrency'],
+    ['vitest', '--maxWorkers'],
+  ];
+  for (const [runner, flag] of runners) {
+    const bounded = { VITEST_LOCAL_MAX_WORKERS: '1' };
+    assert.deepEqual(localContractWorkerArgs(runner, args, bounded), [
+      `${flag}=1`,
+      ...args,
+    ]);
+    assert.deepEqual(
+      localContractWorkerArgs(runner, args, {
+        VITEST_LOCAL_MAX_WORKERS: '99',
+      }),
+      [`${flag}=4`, ...args]
+    );
+    assert.equal(
+      localContractWorkerArgs(runner, args, { ...bounded, CI: 'true' }),
+      args
+    );
+    assert.equal(localContractWorkerArgs(runner, args, {}), args);
+    const explicit = [`${flag}=2`, ...args];
+    assert.equal(localContractWorkerArgs(runner, explicit, bounded), explicit);
+    for (const value of ['', '0', '-1', '1.5', '1junk', 'invalid']) {
+      assert.equal(
+        localContractWorkerArgs(runner, args, {
+          VITEST_LOCAL_MAX_WORKERS: value,
+        }),
+        args
+      );
+    }
+  }
+});
 
 test('package source changes select sparse checkout closure in CI and local scope', () => {
   const closure =
