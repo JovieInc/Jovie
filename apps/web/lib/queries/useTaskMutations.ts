@@ -1,6 +1,11 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  hashKey,
+  notifyManager,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import {
   bulkUpdateTasks,
   createTask,
@@ -8,366 +13,202 @@ import {
   moveTask,
   updateTask,
 } from '@/app/app/(shell)/dashboard/tasks/task-actions';
-import {
-  applyTaskBoardMove,
-  applyTaskListMove,
-  compareTasksByBoardOrder,
-} from '@/lib/tasks/task-board';
 import type {
   CreateTaskInput,
   MoveTaskInput,
-  TaskBoardResult,
-  TaskListResult,
-  TaskStats,
-  TaskView,
   UpdateTaskInput,
 } from '@/lib/tasks/types';
 import { queryKeys } from './keys';
+import {
+  applySavedTask,
+  getCachedTaskFromSnapshot,
+  getCachedTasks,
+  getTaskCacheSnapshot,
+  optimisticallyDeleteTask,
+  optimisticallyMoveTask,
+  optimisticallyUpdateTask,
+  restoreTaskCacheSnapshot,
+  type TaskCacheSnapshot,
+} from './task-mutation-cache';
 
-type TaskStatsStatusKey = Exclude<
-  keyof TaskStats,
-  'activeTodoCount' | 'newActiveTodoCount'
->;
-type TaskListCacheEntry = readonly [
-  readonly unknown[],
-  TaskListResult | undefined,
-];
-type TaskBoardCacheEntry = readonly [
-  readonly unknown[],
-  TaskBoardResult | undefined,
-];
-type TaskDetailCacheEntry = readonly [readonly unknown[], TaskView | undefined];
-type TaskStatsCacheEntry = readonly [readonly unknown[], TaskStats | undefined];
 type TaskQueryClient = ReturnType<typeof useQueryClient>;
 
-const taskUpdateTail = new Map<string, Promise<unknown>>();
-const taskUpdateVersion = new Map<string, number>();
+let optimisticTaskBatches = new WeakMap<TaskQueryClient, OptimisticTaskBatch>();
 
-/** Test isolation. The queue is module state so overlapping writes share a version. */
+function hasPendingTaskMutations(queryClient: TaskQueryClient): boolean {
+  return optimisticTaskBatches.has(queryClient);
+}
+
+function getCommittedTaskMutationVersion(
+  queryClient: TaskQueryClient,
+  taskId: string
+): number | undefined {
+  const snapshot =
+    optimisticTaskBatches.get(queryClient)?.base ??
+    getTaskCacheSnapshot(queryClient);
+  return getCachedTaskFromSnapshot(snapshot, taskId)?.mutationVersion;
+}
+
+interface OptimisticTaskBatch {
+  base: TaskCacheSnapshot;
+  readonly pending: Array<() => void>;
+}
+
+interface OptimisticTaskContext {
+  readonly batch: OptimisticTaskBatch;
+  readonly apply: () => void;
+}
+
+function mergeCacheEntries<T>(
+  previous: Array<readonly [readonly unknown[], T | undefined]>,
+  current: Array<readonly [readonly unknown[], T | undefined]>
+): Array<readonly [readonly unknown[], T | undefined]> {
+  const known = new Set(previous.map(([key]) => hashKey(key)));
+  return [...previous, ...current.filter(([key]) => !known.has(hashKey(key)))];
+}
+
+function includeNewTaskCaches(
+  base: TaskCacheSnapshot,
+  current: TaskCacheSnapshot
+): TaskCacheSnapshot {
+  return {
+    previousLists: mergeCacheEntries(base.previousLists, current.previousLists),
+    previousBoards: mergeCacheEntries(
+      base.previousBoards,
+      current.previousBoards
+    ),
+    previousDetails: mergeCacheEntries(
+      base.previousDetails,
+      current.previousDetails
+    ),
+    previousStatsEntries: mergeCacheEntries(
+      base.previousStatsEntries,
+      current.previousStatsEntries
+    ),
+  };
+}
+
+function beginOptimisticTaskMutation(
+  queryClient: TaskQueryClient,
+  apply: () => void
+): OptimisticTaskContext {
+  const current = getTaskCacheSnapshot(queryClient);
+  const batch = optimisticTaskBatches.get(queryClient) ?? {
+    base: current,
+    pending: [],
+  };
+  batch.base = includeNewTaskCaches(batch.base, current);
+  batch.pending.push(apply);
+  optimisticTaskBatches.set(queryClient, batch);
+  apply();
+  return { batch, apply };
+}
+
+/** Rebase remaining contributions instead of restoring another edit's old cache. */
+function finishOptimisticTaskMutation(
+  queryClient: TaskQueryClient,
+  context: OptimisticTaskContext | undefined,
+  commit?: () => void
+): void {
+  if (!context) return;
+  const { batch, apply } = context;
+  const current = getTaskCacheSnapshot(queryClient);
+  const newerRows = getCachedTasks(current).filter(task => {
+    const previous = getCachedTaskFromSnapshot(batch.base, task.id);
+    return (
+      previous && (task.mutationVersion ?? 0) > (previous.mutationVersion ?? 0)
+    );
+  });
+  const index = batch.pending.indexOf(apply);
+  if (index === -1) return;
+  batch.base = includeNewTaskCaches(batch.base, current);
+  batch.pending.splice(index, 1);
+  notifyManager.batch(() => {
+    restoreTaskCacheSnapshot(queryClient, batch.base);
+    for (const task of newerRows) applySavedTask(queryClient, task);
+    commit?.();
+    batch.base = getTaskCacheSnapshot(queryClient);
+    for (const pending of batch.pending) pending();
+  });
+  if (batch.pending.length === 0) optimisticTaskBatches.delete(queryClient);
+}
+
+interface TaskMutationQueue {
+  readonly tails: Map<string, Promise<unknown>>;
+  readonly versions: Map<string, number>;
+}
+
+let taskMutationQueues = new WeakMap<TaskQueryClient, TaskMutationQueue>();
+
+/** Test isolation for the shared, client-scoped in-flight mutations. */
 export function resetQueuedTaskUpdatesForTests(): void {
-  taskUpdateTail.clear();
-  taskUpdateVersion.clear();
+  taskMutationQueues = new WeakMap();
+  optimisticTaskBatches = new WeakMap();
+}
+
+function getTaskMutationQueue(queryClient: TaskQueryClient): TaskMutationQueue {
+  let queue = taskMutationQueues.get(queryClient);
+  if (!queue) {
+    queue = { tails: new Map(), versions: new Map() };
+    taskMutationQueues.set(queryClient, queue);
+  }
+  return queue;
 }
 
 function queuedTaskMutationVersion(
+  queryClient: TaskQueryClient,
   taskId: string,
-  requested: number | undefined
+  requested?: number
 ): number | undefined {
-  const remembered = taskUpdateVersion.get(taskId);
-  if (remembered === undefined) return requested;
-  if (requested === undefined) return remembered;
-  return Math.max(remembered, requested);
+  const cached = getCommittedTaskMutationVersion(queryClient, taskId);
+  const expected = requested ?? cached;
+  const remembered = getTaskMutationQueue(queryClient).versions.get(taskId);
+  if (remembered === undefined) return expected;
+  return expected === undefined ? remembered : Math.max(remembered, expected);
 }
 
 function rememberTaskMutationVersion(
+  queryClient: TaskQueryClient,
   taskId: string,
   version: number | undefined
 ): void {
   if (version === undefined) return;
-  const remembered = taskUpdateVersion.get(taskId);
-  taskUpdateVersion.set(
-    taskId,
-    remembered === undefined ? version : Math.max(remembered, version)
-  );
+  const { tails, versions } = getTaskMutationQueue(queryClient);
+  if (!tails.has(taskId)) return;
+  versions.set(taskId, Math.max(versions.get(taskId) ?? version, version));
 }
 
-/**
- * Same-task edits read `expectedMutationVersion` when they are scheduled.
- * A burst (title debounce plus priority, assignee, and status) therefore
- * sends one version several times, and every write after the first is
- * rejected. Run them in order and stamp each write with the version the
- * previous write committed.
- */
-function enqueueTaskUpdate<T>(
-  taskId: string,
+/** Reserve every affected ID together so bulk writes cannot overtake edits. */
+function enqueueTaskMutation<T>(
+  queryClient: TaskQueryClient,
+  taskIds: readonly string[],
   run: () => Promise<T>
 ): Promise<T> {
-  const previous = taskUpdateTail.get(taskId) ?? Promise.resolve();
-  const next = previous.then(run, run);
-  taskUpdateTail.set(taskId, next);
+  const queue = getTaskMutationQueue(queryClient);
+  const ids = [...new Set(taskIds)];
+  const previous = ids.flatMap(id => {
+    const tail = queue.tails.get(id);
+    return tail ? [tail] : [];
+  });
+  const next = Promise.allSettled(previous).then(run);
+  for (const id of ids) queue.tails.set(id, next);
   const settle = () => {
-    if (taskUpdateTail.get(taskId) === next) {
-      taskUpdateTail.delete(taskId);
-      taskUpdateVersion.delete(taskId);
+    for (const id of ids) {
+      if (queue.tails.get(id) === next) {
+        queue.tails.delete(id);
+        queue.versions.delete(id);
+      }
     }
   };
   void next.then(settle, settle);
   return next;
 }
 
-interface TaskCacheSnapshot {
-  readonly previousLists: TaskListCacheEntry[];
-  readonly previousBoards: TaskBoardCacheEntry[];
-  readonly previousDetails: TaskDetailCacheEntry[];
-  readonly previousStatsEntries: TaskStatsCacheEntry[];
-}
-
-function toTaskStatsStatusKey(status: TaskView['status']): TaskStatsStatusKey {
-  return status === 'in_progress' ? 'inProgress' : status;
-}
-
-function updateTaskInList(
-  list: TaskListResult | undefined,
-  taskId: string,
-  patch: Partial<TaskView>,
-  options: Readonly<{ sort?: boolean }> = {}
-): TaskListResult | undefined {
-  if (!list) {
-    return list;
-  }
-
-  const tasks = list.tasks.map(task =>
-    task.id === taskId ? { ...task, ...patch } : task
-  );
-
-  return {
-    ...list,
-    tasks: options.sort ? tasks.toSorted(compareTasksByBoardOrder) : tasks,
-  };
-}
-
-function updateTaskInBoard(
-  board: TaskBoardResult | undefined,
-  taskId: string,
-  patch: Partial<TaskView>
-): TaskBoardResult | undefined {
-  if (!board) {
-    return board;
-  }
-
-  return {
-    ...board,
-    columns: board.columns.map(column => ({
-      ...column,
-      tasks: column.tasks.map(task =>
-        task.id === taskId ? { ...task, ...patch } : task
-      ),
-    })),
-  };
-}
-
-function getCachedTask(
-  previousLists: ReadonlyArray<TaskListCacheEntry>,
-  previousBoards: ReadonlyArray<TaskBoardCacheEntry>,
-  previousDetails: ReadonlyArray<TaskDetailCacheEntry>,
-  taskId: string
-): TaskView | undefined {
-  for (const [, detail] of previousDetails) {
-    if (detail) {
-      return detail;
-    }
-  }
-
-  for (const [, list] of previousLists) {
-    const task = list?.tasks.find(candidate => candidate.id === taskId);
-    if (task) {
-      return task;
-    }
-  }
-
-  for (const [, board] of previousBoards) {
-    for (const column of board?.columns ?? []) {
-      const task = column.tasks.find(candidate => candidate.id === taskId);
-      if (task) {
-        return task;
-      }
-    }
-  }
-
-  return undefined;
-}
-
-function getTaskCacheSnapshot(
-  queryClient: TaskQueryClient,
-  taskId: string
-): TaskCacheSnapshot {
-  return {
-    previousLists: queryClient.getQueriesData<TaskListResult>({
-      queryKey: queryKeys.tasks.list(),
-    }),
-    previousBoards: queryClient.getQueriesData<TaskBoardResult>({
-      queryKey: queryKeys.tasks.board(),
-    }),
-    previousDetails: queryClient.getQueriesData<TaskView>({
-      queryKey: queryKeys.tasks.detail(taskId),
-    }),
-    previousStatsEntries: queryClient.getQueriesData<TaskStats>({
-      queryKey: queryKeys.tasks.stats(),
-    }),
-  };
-}
-
-function restoreTaskCacheSnapshot(
-  queryClient: TaskQueryClient,
-  snapshot: TaskCacheSnapshot
-) {
-  for (const [queryKey, list] of snapshot.previousLists) {
-    queryClient.setQueryData(queryKey, list);
-  }
-
-  for (const [queryKey, board] of snapshot.previousBoards) {
-    queryClient.setQueryData(queryKey, board);
-  }
-
-  for (const [queryKey, detail] of snapshot.previousDetails) {
-    if (detail) {
-      queryClient.setQueryData(queryKey, detail);
-    }
-  }
-
-  for (const [queryKey, stats] of snapshot.previousStatsEntries) {
-    if (stats) {
-      queryClient.setQueryData(queryKey, stats);
-    }
-  }
-}
-
-async function invalidateTaskQueries(
-  queryClient: TaskQueryClient,
-  options: Readonly<{ includeStats?: boolean }> = {}
-) {
+async function invalidateTaskQueries(queryClient: TaskQueryClient) {
+  // A refetch while another contribution is pending would erase its feedback.
+  if (hasPendingTaskMutations(queryClient)) return;
   await queryClient.invalidateQueries({ queryKey: queryKeys.tasks.all });
-  await queryClient.invalidateQueries({
-    queryKey: queryKeys.releaseTasks.all,
-  });
-
-  if (options.includeStats) {
-    await queryClient.invalidateQueries({
-      queryKey: queryKeys.tasks.stats(),
-    });
-  }
-}
-
-function getOptimisticCompletedAt(
-  task: TaskView | undefined,
-  nextStatus: TaskView['status'] | undefined
-): Date | null | undefined {
-  if (!nextStatus) {
-    return undefined;
-  }
-
-  return nextStatus === 'done' ? (task?.completedAt ?? new Date()) : null;
-}
-
-function updateTaskStatsForStatusChange(
-  stats: TaskStats,
-  previousStatus: TaskView['status'],
-  nextStatus: TaskView['status']
-): TaskStats {
-  const previousStatusKey = toTaskStatsStatusKey(previousStatus);
-  const nextStatusKey = toTaskStatsStatusKey(nextStatus);
-
-  const previousStatusCount = Math.max(0, stats[previousStatusKey] - 1);
-  const nextStatusCount =
-    previousStatusKey === nextStatusKey
-      ? previousStatusCount + 1
-      : stats[nextStatusKey] + 1;
-
-  const resolveCount = (key: keyof TaskStats): number => {
-    if (previousStatusKey === key) return previousStatusCount;
-    if (nextStatusKey === key) return nextStatusCount;
-    return stats[key];
-  };
-
-  return {
-    ...stats,
-    [previousStatusKey]: previousStatusCount,
-    [nextStatusKey]: nextStatusCount,
-    activeTodoCount:
-      resolveCount('backlog') +
-      resolveCount('todo') +
-      resolveCount('inProgress'),
-  };
-}
-
-function updateTaskStatsForDeletion(
-  stats: TaskStats,
-  previousStatus: TaskView['status']
-): TaskStats {
-  const previousStatusKey = toTaskStatsStatusKey(previousStatus);
-  const previousStatusCount = Math.max(0, stats[previousStatusKey] - 1);
-
-  return {
-    ...stats,
-    [previousStatusKey]: previousStatusCount,
-    activeTodoCount:
-      (previousStatusKey === 'backlog' ? previousStatusCount : stats.backlog) +
-      (previousStatusKey === 'todo' ? previousStatusCount : stats.todo) +
-      (previousStatusKey === 'inProgress'
-        ? previousStatusCount
-        : stats.inProgress),
-  };
-}
-
-function patchMovedTaskBoards(
-  queryClient: TaskQueryClient,
-  previousBoards: ReadonlyArray<TaskBoardCacheEntry>,
-  input: MoveTaskInput
-) {
-  for (const [queryKey, board] of previousBoards) {
-    queryClient.setQueryData(queryKey, applyTaskBoardMove(board, input));
-  }
-}
-
-function patchMovedTaskLists(
-  queryClient: TaskQueryClient,
-  previousLists: ReadonlyArray<TaskListCacheEntry>,
-  input: MoveTaskInput
-) {
-  for (const [queryKey, list] of previousLists) {
-    queryClient.setQueryData(queryKey, applyTaskListMove(list, input));
-  }
-}
-
-function getOptimisticMoveCompletedAt(
-  detail: TaskView,
-  nextStatus: TaskView['status']
-): Date | null {
-  if (nextStatus === 'done') {
-    return detail.completedAt ?? new Date();
-  }
-
-  return nextStatus !== detail.status ? null : detail.completedAt;
-}
-
-function patchMovedTaskDetails(
-  queryClient: TaskQueryClient,
-  previousDetails: ReadonlyArray<TaskDetailCacheEntry>,
-  input: MoveTaskInput
-) {
-  for (const [queryKey, detail] of previousDetails) {
-    if (!detail) {
-      continue;
-    }
-
-    queryClient.setQueryData(queryKey, {
-      ...detail,
-      status: input.toStatus,
-      completedAt: getOptimisticMoveCompletedAt(detail, input.toStatus),
-    });
-  }
-}
-
-function patchMovedTaskStatsIfNeeded(
-  queryClient: TaskQueryClient,
-  previousStatsEntries: ReadonlyArray<TaskStatsCacheEntry>,
-  previousTask: TaskView | undefined,
-  nextStatus: TaskView['status']
-) {
-  if (!previousTask || previousTask.status === nextStatus) {
-    return;
-  }
-
-  for (const [queryKey, stats] of previousStatsEntries) {
-    if (!stats) {
-      continue;
-    }
-
-    queryClient.setQueryData(
-      queryKey,
-      updateTaskStatsForStatusChange(stats, previousTask.status, nextStatus)
-    );
-  }
+  await queryClient.invalidateQueries({ queryKey: queryKeys.releaseTasks.all });
 }
 
 export function useCreateTaskMutation() {
@@ -383,7 +224,6 @@ export function useCreateTaskMutation() {
 
 export function useUpdateTaskMutation() {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: ({
       taskId,
@@ -392,115 +232,38 @@ export function useUpdateTaskMutation() {
       readonly taskId: string;
       readonly data: UpdateTaskInput;
     }) =>
-      enqueueTaskUpdate(taskId, () => {
-        const expectedMutationVersion = queuedTaskMutationVersion(
-          taskId,
-          data.expectedMutationVersion
-        );
-        const nextData =
-          expectedMutationVersion === data.expectedMutationVersion
-            ? data
-            : { ...data, expectedMutationVersion };
-        return updateTask(taskId, nextData).then(saved => {
-          rememberTaskMutationVersion(taskId, saved.mutationVersion);
-          return saved;
+      enqueueTaskMutation(queryClient, [taskId], async () => {
+        const saved = await updateTask(taskId, {
+          ...data,
+          expectedMutationVersion: queuedTaskMutationVersion(
+            queryClient,
+            taskId,
+            data.expectedMutationVersion
+          ),
         });
+        rememberTaskMutationVersion(queryClient, taskId, saved.mutationVersion);
+        return saved;
       }),
     onMutate: async ({ taskId, data }) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.tasks.all });
-
-      const snapshot = getTaskCacheSnapshot(queryClient, taskId);
-      const previousTask = getCachedTask(
-        snapshot.previousLists,
-        snapshot.previousBoards,
-        snapshot.previousDetails,
-        taskId
+      const now = new Date();
+      return beginOptimisticTaskMutation(queryClient, () =>
+        optimisticallyUpdateTask(queryClient, taskId, data, now)
       );
-      const optimisticCompletedAt =
-        data.completedAt === undefined
-          ? getOptimisticCompletedAt(previousTask, data.status)
-          : data.completedAt;
-      const {
-        descriptionContent: _descriptionContent,
-        expectedMutationVersion: _expectedMutationVersion,
-        ...optimisticData
-      } = data;
-      const optimisticPatch: Partial<TaskView> = {
-        ...optimisticData,
-        ...(optimisticCompletedAt === undefined
-          ? {}
-          : { completedAt: optimisticCompletedAt }),
-      };
-
-      for (const [queryKey, list] of snapshot.previousLists) {
-        queryClient.setQueryData(
-          queryKey,
-          updateTaskInList(list, taskId, optimisticPatch, {
-            sort: data.status !== undefined,
-          })
-        );
-      }
-
-      for (const [queryKey, board] of snapshot.previousBoards) {
-        const boardWithStatusUpdate = data.status
-          ? applyTaskBoardMove(board, {
-              taskId,
-              toStatus: data.status,
-            })
-          : board;
-
-        queryClient.setQueryData(
-          queryKey,
-          updateTaskInBoard(boardWithStatusUpdate, taskId, optimisticPatch)
-        );
-      }
-
-      for (const [queryKey, detail] of snapshot.previousDetails) {
-        if (!detail) {
-          continue;
-        }
-
-        queryClient.setQueryData(queryKey, {
-          ...detail,
-          ...optimisticPatch,
-        });
-      }
-
-      if (previousTask && data.status) {
-        for (const [queryKey, stats] of snapshot.previousStatsEntries) {
-          if (!stats) {
-            continue;
-          }
-
-          queryClient.setQueryData(
-            queryKey,
-            updateTaskStatsForStatusChange(
-              stats,
-              previousTask.status,
-              data.status
-            )
-          );
-        }
-      }
-
-      return snapshot;
     },
-    onError: (_error, { taskId }, context) => {
-      if (!context) {
-        return;
-      }
-
-      restoreTaskCacheSnapshot(queryClient, context);
+    onSuccess: (saved, _variables, context) => {
+      finishOptimisticTaskMutation(queryClient, context, () =>
+        applySavedTask(queryClient, saved)
+      );
     },
-    onSettled: async () => {
-      await invalidateTaskQueries(queryClient);
-    },
+    onError: (_error, _variables, context) =>
+      finishOptimisticTaskMutation(queryClient, context),
+    onSettled: () => invalidateTaskQueries(queryClient),
   });
 }
 
 export function useBulkUpdateTasksMutation() {
   const queryClient = useQueryClient();
-
   return useMutation({
     mutationFn: ({
       taskIds,
@@ -508,134 +271,111 @@ export function useBulkUpdateTasksMutation() {
     }: {
       readonly taskIds: string[];
       readonly data: UpdateTaskInput;
-    }) => bulkUpdateTasks(taskIds, data),
-    onSuccess: async () => {
-      await invalidateTaskQueries(queryClient);
+    }) =>
+      enqueueTaskMutation(queryClient, taskIds, async () => {
+        const expectedMutationVersions: Record<string, number> = {};
+        for (const id of taskIds) {
+          const version = queuedTaskMutationVersion(
+            queryClient,
+            id,
+            data.expectedMutationVersion
+          );
+          if (version !== undefined) expectedMutationVersions[id] = version;
+        }
+        const saved = await bulkUpdateTasks(
+          taskIds,
+          data,
+          expectedMutationVersions
+        );
+        for (const task of saved.affectedTasks)
+          rememberTaskMutationVersion(
+            queryClient,
+            task.id,
+            task.mutationVersion
+          );
+        return saved;
+      }),
+    onMutate: async ({ taskIds, data }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.tasks.all });
+      const now = new Date();
+      return beginOptimisticTaskMutation(queryClient, () => {
+        for (const id of new Set(taskIds))
+          optimisticallyUpdateTask(queryClient, id, data, now);
+      });
     },
+    onSuccess: (saved, _variables, context) =>
+      finishOptimisticTaskMutation(queryClient, context, () => {
+        for (const task of saved.affectedTasks)
+          applySavedTask(queryClient, task);
+      }),
+    onError: (_error, _variables, context) =>
+      finishOptimisticTaskMutation(queryClient, context),
+    onSettled: () => invalidateTaskQueries(queryClient),
   });
 }
 
 export function useMoveTaskMutation() {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (input: MoveTaskInput) => moveTask(input),
+    mutationFn: (input: MoveTaskInput) =>
+      enqueueTaskMutation(queryClient, [input.taskId], async () => {
+        const saved = await moveTask({
+          ...input,
+          expectedMutationVersion: queuedTaskMutationVersion(
+            queryClient,
+            input.taskId,
+            input.expectedMutationVersion
+          ),
+        });
+        const movingTask = saved.affectedTasks.find(
+          task => task.id === input.taskId
+        );
+        // A sibling may include intervening remote edits. Its new revision
+        // updates the cache, but cannot authorize an already queued stale edit.
+        rememberTaskMutationVersion(
+          queryClient,
+          input.taskId,
+          movingTask?.mutationVersion
+        );
+        return saved;
+      }),
     onMutate: async input => {
       await queryClient.cancelQueries({ queryKey: queryKeys.tasks.all });
-
-      const snapshot = getTaskCacheSnapshot(queryClient, input.taskId);
-      const previousTask = getCachedTask(
-        snapshot.previousLists,
-        snapshot.previousBoards,
-        snapshot.previousDetails,
-        input.taskId
+      const now = new Date();
+      return beginOptimisticTaskMutation(queryClient, () =>
+        optimisticallyMoveTask(queryClient, input, now)
       );
-
-      patchMovedTaskBoards(queryClient, snapshot.previousBoards, input);
-      patchMovedTaskLists(queryClient, snapshot.previousLists, input);
-      patchMovedTaskDetails(queryClient, snapshot.previousDetails, input);
-      patchMovedTaskStatsIfNeeded(
-        queryClient,
-        snapshot.previousStatsEntries,
-        previousTask,
-        input.toStatus
-      );
-
-      return snapshot;
     },
-    onError: (_error, _input, context) => {
-      if (!context) {
-        return;
-      }
-
-      restoreTaskCacheSnapshot(queryClient, context);
-    },
-    onSettled: async () => {
-      await invalidateTaskQueries(queryClient, {
-        includeStats: true,
-      });
-    },
+    onSuccess: (saved, _input, context) =>
+      finishOptimisticTaskMutation(queryClient, context, () => {
+        for (const task of saved.affectedTasks)
+          applySavedTask(queryClient, task);
+      }),
+    onError: (_error, _input, context) =>
+      finishOptimisticTaskMutation(queryClient, context),
+    onSettled: () => invalidateTaskQueries(queryClient),
   });
 }
 
 export function useDeleteTaskMutation() {
   const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: (taskId: string) => deleteTask(taskId),
+    mutationFn: (taskId: string) =>
+      enqueueTaskMutation(queryClient, [taskId], () =>
+        deleteTask(taskId, queuedTaskMutationVersion(queryClient, taskId))
+      ),
     onMutate: async taskId => {
       await queryClient.cancelQueries({ queryKey: queryKeys.tasks.all });
-
-      const snapshot = getTaskCacheSnapshot(queryClient, taskId);
-      const previousTask = getCachedTask(
-        snapshot.previousLists,
-        snapshot.previousBoards,
-        snapshot.previousDetails,
-        taskId
+      return beginOptimisticTaskMutation(queryClient, () =>
+        optimisticallyDeleteTask(queryClient, taskId)
       );
-
-      for (const [queryKey, list] of snapshot.previousLists) {
-        if (!list) {
-          continue;
-        }
-
-        queryClient.setQueryData(queryKey, {
-          ...list,
-          tasks: list.tasks.filter(task => task.id !== taskId),
-        });
-      }
-
-      for (const [queryKey, board] of snapshot.previousBoards) {
-        if (!board) {
-          continue;
-        }
-
-        const removedFromBoard = board.columns.some(column =>
-          column.tasks.some(task => task.id === taskId)
-        );
-
-        queryClient.setQueryData(queryKey, {
-          ...board,
-          columns: board.columns.map(column => {
-            const removed = column.tasks.some(task => task.id === taskId);
-            return {
-              ...column,
-              tasks: column.tasks.filter(task => task.id !== taskId),
-              totalCount: removed
-                ? Math.max(0, column.totalCount - 1)
-                : column.totalCount,
-            };
-          }),
-          totalCount: removedFromBoard
-            ? Math.max(0, board.totalCount - 1)
-            : board.totalCount,
-        });
-      }
-
-      if (previousTask) {
-        for (const [queryKey, stats] of snapshot.previousStatsEntries) {
-          if (!stats) {
-            continue;
-          }
-
-          queryClient.setQueryData(
-            queryKey,
-            updateTaskStatsForDeletion(stats, previousTask.status)
-          );
-        }
-      }
-
-      return snapshot;
     },
-    onError: (_error, taskId, context) => {
-      if (!context) {
-        return;
-      }
-
-      restoreTaskCacheSnapshot(queryClient, context);
-    },
-    onSettled: async () => {
-      await invalidateTaskQueries(queryClient, { includeStats: true });
-    },
+    onSuccess: (_saved, taskId, context) =>
+      finishOptimisticTaskMutation(queryClient, context, () =>
+        optimisticallyDeleteTask(queryClient, taskId)
+      ),
+    onError: (_error, _taskId, context) =>
+      finishOptimisticTaskMutation(queryClient, context),
+    onSettled: () => invalidateTaskQueries(queryClient),
   });
 }
