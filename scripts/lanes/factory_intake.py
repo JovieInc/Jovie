@@ -29,6 +29,7 @@ import sys
 from pathlib import Path
 from datetime import datetime, timezone
 
+import factory_visibility
 from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-factory-signal/v1"
@@ -117,14 +118,17 @@ def plan(signals: list[dict]) -> list[dict]:
     return [{"fingerprint": row["fingerprint"], "title": str(row["title"]).strip()[:200], "description": body(row),
              "labels": [FACTORY_LABEL, WORKSTREAM_LABEL, *extra_labels(row), label(row["fingerprint"])],
              "legacyEvidence": "evidence" not in row, "observedAt": row.get("_observedAt"),
+             "producer": {"source": row.get("source"), "metric": row["metric"]["name"],
+                          "baseline": row["metric"].get("baseline"), "target": row["metric"]["target"],
+                          "observedAt": row.get("_observedAt")},
              "receiptKeys": receipt_keys(row), "receiptHistory": receipt_history(row)} for row in signals]
 
 
 EXISTING = ('query($l:String!){issues(first:1,filter:{team:{key:{eq:"JOV"}},labels:{name:{eq:$l}},'
-            'state:{type:{nin:["completed","canceled"]}}}){nodes{id identifier}}}')
+            'state:{type:{nin:["completed","canceled"]}}}){nodes{id identifier state{name type}}}}')
 HISTORY = ('query($l:String!,$after:String){issues(first:50,after:$after,includeArchived:true,filter:{team:{key:{eq:"JOV"}},'
            'labels:{name:{eq:$l}},state:{type:{in:["completed","canceled"]}}})'
-           '{nodes{id identifier description completedAt canceledAt} pageInfo{hasNextPage endCursor}}}')
+           '{nodes{id identifier description completedAt canceledAt state{name type}} pageInfo{hasNextPage endCursor}}}')
 EVIDENCE = re.compile(r"\n\n<!-- factory-evidence:([a-f0-9]{64}) -->\s*$")
 RECEIPTS = re.compile(r"\n\n<!-- factory-receipts:(\[[^\n]*\]) -->(?=\n\n<!-- factory-evidence:[a-f0-9]{64} -->\s*$)")
 
@@ -211,7 +215,7 @@ CREATE = 'mutation($i:IssueCreateInput!){issueCreate(input:$i){success issue{id 
 LABEL_CREATE = 'mutation($i:IssueLabelCreateInput!){issueLabelCreate(input:$i){success issueLabel{id name}}}'
 
 
-def apply(linear, items: list[dict], limit: int = MAX_PER_PASS, *, covered=None, save=None) -> list[dict]:
+def apply(linear, items: list[dict], limit: int = MAX_PER_PASS, *, covered=None, save=None, observe=None) -> list[dict]:
     """Keep open work; file only evidence episodes not already handled under the fingerprint label."""
     covered = covered if covered is not None else {}
 
@@ -258,6 +262,8 @@ def apply(linear, items: list[dict], limit: int = MAX_PER_PASS, *, covered=None,
         if prior:
             # New observations while unresolved belong to that work, even after it closes.
             remember(item, digest, prior["identifier"])
+            if observe is not None:
+                observe(item, prior, "open" if found else "cached-no-open" if receipt else "terminal")
             results.append({"fingerprint": item["fingerprint"], "action": "exists", "issue": prior["identifier"]})
             continue
         waste = "waste" in item["labels"]
@@ -278,11 +284,13 @@ def apply(linear, items: list[dict], limit: int = MAX_PER_PASS, *, covered=None,
         filed_waste += waste
         filed += not waste
         remember(item, digest, created["issue"]["identifier"])
+        if observe is not None:
+            observe(item, created["issue"], "open")
         results.append({"fingerprint": item["fingerprint"], "action": "filed", "issue": created["issue"]["identifier"]})
     return results
 
 
-def run_pass(state: Path, linear) -> dict:
+def run_pass(state: Path, linear, *, previous_adoption=(), now=None) -> dict:
     """Doctor hook: file pending signals (bounded), never raising into the doctor."""
     try:
         signals, bad = read_signals(state / "factory-signals")
@@ -295,9 +303,18 @@ def run_pass(state: Path, linear) -> dict:
                 any(not isinstance(issue, str) or not issue for issue in episodes.values())
                 for episodes in covered.values()):
             raise ValueError("invalid factory intake receipts")
-        results = apply(linear, plan(signals), covered=covered,
+        adoption = factory_visibility.Adoption(state, linear, now, previous_adoption)
+        results = apply(linear, plan(signals), covered=covered, observe=adoption.observe,
                         save=lambda receipts: atomic_write_text(path, json.dumps(receipts))) if signals else []
-        return {"signals": len(signals), "invalid": bad[:5], "results": results}
+        adoption.retained()
+        adoption.refresh()
+        for result in results:
+            if result["action"] == "deferred":
+                adoption.record_omission(result["fingerprint"])
+        rows = adoption.report()
+        return {"signals": len(signals), "invalid": bad[:5], "results": results,
+                "adoption": rows, "adoptionOmitted": adoption.omitted_count(),
+                "adoptionRetainedOverflow": bool(adoption.persistent_omitted)}
     except Exception as error:  # Linear down or a malformed reply: the next pass retries
         return {"error": f"{type(error).__name__}: {error}"[:200]}
 
