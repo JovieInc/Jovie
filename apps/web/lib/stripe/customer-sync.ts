@@ -57,6 +57,7 @@ export {
   // Billing info functions
   getBillingAuditLog,
   getUserBillingInfo,
+  getUserBillingInfoByAppId,
   getUserBillingInfoByClerkId,
   LEGACY_FIELDS,
   type UpdateBillingStatusOptions,

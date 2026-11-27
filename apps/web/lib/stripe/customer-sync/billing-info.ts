@@ -5,8 +5,12 @@
  */
 
 import 'server-only';
-import { fetchUserBillingData, fetchUserBillingDataWithAuth } from './queries';
-import { BILLING_FIELDS_FULL } from './types';
+import {
+  fetchUserBillingData,
+  fetchUserBillingDataByAppId,
+  fetchUserBillingDataWithAuth,
+} from './queries';
+import { BILLING_FIELDS_FULL, type FetchUserBillingDataResult } from './types';
 
 /**
  * Get the current user's billing information.
@@ -39,11 +43,24 @@ export async function getUserBillingInfo(): Promise<{
   };
   error?: string;
 }> {
-  // Delegate to the consolidated query function with full fields
-  const result = await fetchUserBillingDataWithAuth({
-    fields: BILLING_FIELDS_FULL,
-  });
+  return normalizeBillingInfo(
+    await fetchUserBillingDataWithAuth({ fields: BILLING_FIELDS_FULL })
+  );
+}
 
+/** Trusted server identity, without an ambient browser session. */
+export async function getUserBillingInfoByAppId(appUserId: string) {
+  return normalizeBillingInfo(
+    await fetchUserBillingDataByAppId({
+      appUserId,
+      fields: BILLING_FIELDS_FULL,
+    })
+  );
+}
+
+function normalizeBillingInfo(
+  result: FetchUserBillingDataResult<typeof BILLING_FIELDS_FULL>
+): Awaited<ReturnType<typeof getUserBillingInfo>> {
   if (!result.success && result.error === 'User not found') {
     return {
       success: true,
