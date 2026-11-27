@@ -6,10 +6,29 @@ import { DrawerButton } from './DrawerButton';
 import { DrawerSection } from './DrawerSection';
 
 describe('DrawerSection states', () => {
+  it('keeps ordinary fields visible without a disclosure, including lazy closed defaults', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <DrawerSection title='Properties' defaultOpen={false} lazyMount>
+        <input aria-label='Label' defaultValue='The Bubblegum Factory' />
+        <p>UPC 5056495393290</p>
+      </DrawerSection>
+    );
+
+    expect(screen.getByRole('heading', { name: 'Properties' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Properties' })).toBeNull();
+    expect(screen.getByText('UPC 5056495393290')).toBeVisible();
+    const label = screen.getByRole('textbox', { name: 'Label' });
+    await user.clear(label);
+    await user.type(label, 'Updated label');
+    expect(label).toHaveValue('Updated label');
+    await expectNoA11yViolations(container);
+  });
+
   it('collapses and reopens a titled section', async () => {
     const user = userEvent.setup();
     const { container } = render(
-      <DrawerSection title='Metadata' sectionKind='details'>
+      <DrawerSection title='Metadata' sectionKind='details' collapsible>
         <p>Section content goes here.</p>
       </DrawerSection>
     );
@@ -33,6 +52,7 @@ describe('DrawerSection states', () => {
       <DrawerSection
         title='Links'
         surface='card'
+        collapsible
         defaultOpen={false}
         lazyMount
         testId='links'
@@ -67,6 +87,7 @@ describe('DrawerSection states', () => {
     const { container } = render(
       <DrawerSection
         title={title}
+        collapsible
         actions={
           <DrawerButton tone='ghost' size='sm'>
             Edit
@@ -90,7 +111,7 @@ describe('DrawerSection states', () => {
     const user = userEvent.setup();
     const { container } = render(
       <div dir='rtl' lang='ar'>
-        <DrawerSection title='البيانات الوصفية'>
+        <DrawerSection title='البيانات الوصفية' collapsible>
           <p>يظهر محتوى القسم هنا.</p>
         </DrawerSection>
       </div>

@@ -63,7 +63,7 @@ describe('OutboundRail', () => {
       certification: null,
     });
     expect(
-      screen.queryByRole('button', { name: 'Certification details' })
+      screen.queryByRole('heading', { name: 'Certification Details' })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByText('Message', { exact: true })
@@ -96,7 +96,7 @@ describe('OutboundRail', () => {
       'Current facts are loading.'
     );
     expect(
-      screen.queryByRole('button', { name: 'Certification details' })
+      screen.queryByRole('heading', { name: 'Certification Details' })
     ).not.toBeInTheDocument();
     rerender({
       certificationLoading: false,
@@ -112,11 +112,9 @@ describe('OutboundRail', () => {
       certification: certification('certified_for_outreach'),
     });
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    const details = screen.getByRole('button', {
-      name: 'Certification details',
-    });
-    expect(details).toHaveAttribute('aria-expanded', 'false');
-    fireEvent.click(details);
+    expect(
+      screen.getByRole('heading', { name: 'Certification Details' })
+    ).toBeVisible();
     expect(
       screen.getByText('3 confirmed · 0 rejected · 0 unresolved · 0 stale')
     ).toBeVisible();
@@ -126,7 +124,7 @@ describe('OutboundRail', () => {
       'Current certification is unknown.'
     );
     expect(
-      screen.queryByRole('button', { name: 'Certification details' })
+      screen.queryByRole('heading', { name: 'Certification Details' })
     ).not.toBeInTheDocument();
     expect(screen.getByTestId('outbound-rail')).toBeVisible();
     expect(currentDraft()).toHaveValue('Keep this local draft');
@@ -176,14 +174,11 @@ describe('OutboundRail', () => {
     ).toHaveFocus();
   });
 
-  it('resets local edits, open details and rejection confirmation when the person changes', () => {
+  it('resets local edits and rejection confirmation when the person changes', () => {
     const props = renderRail();
     fireEvent.change(screen.getByLabelText('Message Body'), {
       target: { value: 'Unsaved Ada edit' },
     });
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Certification details' })
-    );
     act(() => sendOutboundRailCommand('reject'));
     expect(screen.getByRole('alertdialog')).toBeVisible();
     const next = outboundFixtureRow({
@@ -200,8 +195,8 @@ describe('OutboundRail', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Message Body')).toHaveValue('Bea draft');
     expect(
-      screen.getByRole('button', { name: 'Certification details' })
-    ).toHaveAttribute('aria-expanded', 'false');
+      screen.getByRole('heading', { name: 'Certification Details' })
+    ).toBeVisible();
     act(() => sendOutboundRailCommand('approve'));
     expect(props.onApprove).toHaveBeenLastCalledWith({
       channel: 'email',
@@ -210,7 +205,7 @@ describe('OutboundRail', () => {
     });
   });
 
-  it('keeps readiness blockers and a truthful next action above closed details', () => {
+  it('keeps readiness blockers and a truthful next action above certification details', () => {
     renderRail({ certification: certification('needs_review') });
     const summary = screen.getByTestId('outbound-readiness');
     expect(summary).toHaveTextContent('2 unresolved facts');
@@ -220,8 +215,8 @@ describe('OutboundRail', () => {
       within(summary).getByRole('button', { name: 'Refresh Evidence' })
     ).toBeEnabled();
     expect(
-      screen.getByRole('button', { name: 'Certification details' })
-    ).toHaveAttribute('aria-expanded', 'false');
+      screen.getByRole('heading', { name: 'Certification Details' })
+    ).toBeVisible();
   });
 
   it('shows judge and reachability blockers together without inventing a dispatch action', () => {

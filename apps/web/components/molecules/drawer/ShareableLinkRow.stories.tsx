@@ -49,9 +49,11 @@ export const Table: Story = {
   },
 };
 
-export const FlatSurface: Story = {
+export const FlatSurface: Story = {};
+
+export const BoxedSurface: Story = {
   args: {
-    surface: 'flat',
+    surface: 'boxed',
   },
 };
 

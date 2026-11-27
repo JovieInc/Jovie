@@ -61,7 +61,7 @@ export function ShareableLinkRow({
   url,
   displayValue,
   density = 'rail',
-  surface = 'boxed',
+  surface = density === 'rail' ? 'flat' : 'boxed',
   actionsVisibility = 'always',
   showOpen = true,
   onCopy,

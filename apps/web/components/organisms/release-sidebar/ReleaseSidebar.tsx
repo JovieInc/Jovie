@@ -484,7 +484,6 @@ export function ReleaseSidebar({
           <DrawerSection
             title='Audio'
             surface='plain'
-            defaultOpen
             testId='release-audio-card'
             contentClassName='space-y-3 p-3'
           >
@@ -503,8 +502,6 @@ export function ReleaseSidebar({
             <DrawerSection
               title='Artwork'
               surface='plain'
-              defaultOpen={false}
-              lazyMount
               testId='release-artwork-settings-card'
               contentClassName='space-y-3 p-3'
             >
@@ -517,6 +514,7 @@ export function ReleaseSidebar({
           <DrawerSection
             title='Lyrics'
             surface='plain'
+            collapsible
             defaultOpen={false}
             lazyMount
             testId='release-lyrics-card'
@@ -536,6 +534,7 @@ export function ReleaseSidebar({
             <DrawerSection
               title='Tracks'
               surface='plain'
+              collapsible
               defaultOpen={false}
               lazyMount
               testId='release-tracks-card'

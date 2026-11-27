@@ -59,21 +59,6 @@ describe('EntitySidebarShell', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('keeps the raised workspace flat so RightDrawer owns inspector elevation', () => {
-    render(
-      <EntitySidebarShell isOpen ariaLabel='Details drawer' title='Details'>
-        <p>Body content</p>
-      </EntitySidebarShell>
-    );
-
-    const workspace = screen
-      .getByTestId('right-drawer')
-      .querySelector('[data-right-rail-workspace]');
-    expect(workspace).toHaveAttribute('data-surface-variant', 'raised');
-    expect(workspace).toHaveClass('bg-transparent', 'shadow-none');
-    expect(workspace).not.toHaveClass('rounded-(--linear-app-shell-radius)');
-  });
-
   it('keeps header, identity area, and tabs together in a sticky top rail', () => {
     render(
       <EntitySidebarShell
@@ -87,17 +72,19 @@ describe('EntitySidebarShell', () => {
       </EntitySidebarShell>
     );
 
-    // The first DrawerSurfaceCard with variant='card' is the sticky header rail
-    const stickyRailCard = screen
+    // The shared flat header keeps identity and tabs pinned together.
+    const stickyRailHeader = screen
       .getByTestId('right-drawer')
-      .querySelector('[data-variant="card"]');
-    expect(stickyRailCard).toBeInTheDocument();
-    expect(stickyRailCard).toContainElement(
+      .querySelector('[data-variant="flat"]');
+    expect(stickyRailHeader).toBeInTheDocument();
+    expect(stickyRailHeader).toContainElement(
       screen.getByText('Release details')
     );
-    expect(stickyRailCard).toContainElement(screen.getByText('Header content'));
-    expect(stickyRailCard).toContainElement(screen.getByText('Tab controls'));
-    expect(stickyRailCard).not.toContainElement(
+    expect(stickyRailHeader).toContainElement(
+      screen.getByText('Header content')
+    );
+    expect(stickyRailHeader).toContainElement(screen.getByText('Tab controls'));
+    expect(stickyRailHeader).not.toContainElement(
       screen.getByText('Body content')
     );
     expect(screen.getByText('Body content')).toBeInTheDocument();

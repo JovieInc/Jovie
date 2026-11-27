@@ -28,13 +28,13 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Card: Story = {};
-
-export const Flat: Story = {
+export const Card: Story = {
   args: {
-    surfaceVariant: 'flat',
+    surfaceVariant: 'card',
   },
 };
+
+export const Flat: Story = {};
 
 /** The active tab has nothing to show yet. */
 export const EmptyTab: Story = {

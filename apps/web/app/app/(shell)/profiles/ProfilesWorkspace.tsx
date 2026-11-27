@@ -60,8 +60,10 @@ import {
 import { toast } from '@/components/feedback';
 import {
   DrawerAnalyticsSummaryCard,
+  DrawerPropertyRow,
   DrawerSection,
   EntityHeader,
+  EntityHeaderThumbnail,
   EntitySidebarShell,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
@@ -87,8 +89,11 @@ import type { SourceIdentity } from '@/lib/profile-surfaces/presence-identity';
 import {
   getPresenceEntityName,
   getPresenceHandle,
+  getPresenceIdentityPhoto,
   getPresencePlatformLabel,
   getPresenceRowTitle,
+  identityPhotoAlt,
+  identityPhotoSourceLabel,
 } from '@/lib/profile-surfaces/presence-identity';
 import { derivePresenceInspector } from '@/lib/profile-surfaces/presence-inspector';
 import {
@@ -474,6 +479,16 @@ function ConnectionRail({
     : null;
   const primaryAction = inspector?.primaryAction ?? null;
   const status = inspector?.status ?? null;
+  const entityName = row ? getPresenceEntityName(row, data.artist.name) : '';
+  const platformLabel = row ? getPresencePlatformLabel(row) : '';
+  const identityPhoto =
+    row?.rowType === 'surface' ? getPresenceIdentityPhoto(row) : null;
+  const monitoringFact = row ? (
+    <DrawerPropertyRow
+      label='Monitoring'
+      value={MONITORING_LABELS[row.monitoringState]}
+    />
+  ) : null;
   const rankChange =
     row?.rowType === 'surface'
       ? formatProfileRankChange(row.rank, row.previousRank)
@@ -485,7 +500,8 @@ function ConnectionRail({
       onClose={onClose}
       contextMenuItems={contextMenuItems}
       scrollStrategy='shell'
-      workspaceSurface='raised'
+      workspaceSurface='flat'
+      entityHeaderSurface='flat'
       headerMode='minimal'
       hideMinimalHeaderBar
       isEmpty={!row}
@@ -493,26 +509,53 @@ function ConnectionRail({
       entityHeader={
         row ? (
           <EntityHeader
+            layout='grid'
             thumbnail={
               row.rowType === 'connector' ? (
-                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0'>
-                  <ConnectionBrandIcon
-                    row={row}
-                    className='h-6 w-6'
-                    emphasized
-                  />
-                </div>
-              ) : (
-                <PresenceIdentityPhoto
-                  subject={row}
-                  artistName={data.artist.name}
-                  size='lg'
-                  showSource
+                <EntityHeaderThumbnail
+                  variant='connection'
+                  name={entityName}
+                  icon={
+                    <ConnectionBrandIcon
+                      row={row}
+                      className='h-6 w-6'
+                      emphasized
+                    />
+                  }
+                  data-testid='profiles-rail-identity-thumbnail'
                 />
+              ) : (
+                <>
+                  <EntityHeaderThumbnail
+                    variant={
+                      identityPhoto?.kind === 'generic' ? 'artwork' : 'person'
+                    }
+                    src={identityPhoto?.url}
+                    name={entityName}
+                    alt={
+                      identityPhoto
+                        ? identityPhotoAlt(
+                            entityName,
+                            platformLabel,
+                            identityPhoto
+                          )
+                        : undefined
+                    }
+                    data-testid='profiles-rail-identity-thumbnail'
+                  />
+                  {identityPhoto ? (
+                    <span className='sr-only'>
+                      {identityPhotoSourceLabel(identityPhoto)}
+                      {identityPhoto.observedAt
+                        ? ` · Observed ${identityPhoto.observedAt}`
+                        : ''}
+                    </span>
+                  ) : null}
+                </>
               )
             }
-            title={getPresenceEntityName(row, data.artist.name)}
-            subtitle={[getPresencePlatformLabel(row), getPresenceHandle(row)]
+            title={entityName}
+            subtitle={[platformLabel, getPresenceHandle(row)]
               .filter(Boolean)
               .join(' · ')}
             meta={
@@ -523,6 +566,7 @@ function ConnectionRail({
                     : row.url
                 }
                 density='rail'
+                surface='flat'
                 className='w-full min-w-0'
                 testId='profiles-rail-shareable-link'
               />
@@ -541,7 +585,7 @@ function ConnectionRail({
                 onClose={onClose}
               />
             }
-            bodyClassName='pr-8'
+            className='px-3 pt-3'
             data-testid='profiles-rail-entity-header'
           />
         ) : undefined
@@ -604,11 +648,8 @@ function ConnectionRail({
                     sectionKind='facts'
                   >
                     <div className='space-y-2'>
-                      <RailMetric label='Type' value={kindLabel(row)} />
-                      <RailMetric
-                        label='Monitoring'
-                        value={MONITORING_LABELS[row.monitoringState]}
-                      />
+                      <DrawerPropertyRow label='Type' value={kindLabel(row)} />
+                      {monitoringFact}
                     </div>
                   </DrawerSection>
                 );
@@ -735,21 +776,16 @@ function ConnectionRail({
                 return status ? (
                   <DrawerSection
                     key={section.key}
-                    title='Monitoring details'
+                    title='Monitoring Details'
                     sectionKind='status'
-                    defaultOpen={false}
-                    lazyMount
                     testId='profiles-monitoring-details'
                   >
                     <div className='space-y-2 text-xs text-secondary-token'>
                       <p>
                         {status.label}. {status.nextAction}
                       </p>
-                      <RailMetric
-                        label='Monitoring'
-                        value={MONITORING_LABELS[row.monitoringState]}
-                      />
-                      <RailMetric label='Search Rank' value='—' />
+                      {monitoringFact}
+                      <DrawerPropertyRow label='Search Rank' value='—' />
                     </div>
                   </DrawerSection>
                 ) : null;
@@ -760,18 +796,6 @@ function ConnectionRail({
         </div>
       ) : null}
     </EntitySidebarShell>
-  );
-}
-
-function RailMetric({
-  label,
-  value,
-}: Readonly<{ label: string; value: string }>) {
-  return (
-    <div className='flex items-center justify-between text-xs'>
-      <span className='text-tertiary-token'>{label}</span>
-      <span className='max-w-36 truncate text-primary-token'>{value}</span>
-    </div>
   );
 }
 

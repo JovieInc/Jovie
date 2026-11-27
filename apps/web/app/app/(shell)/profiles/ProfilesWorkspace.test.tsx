@@ -177,6 +177,12 @@ function renderWorkspace(workspaceData: ProfilesWorkspaceData | null) {
   );
 }
 
+function renderRegisteredRail() {
+  const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+  expect(panel).not.toBeNull();
+  return render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+}
+
 function RegisteredHeaderActions() {
   const { headerActions } = useHeaderActions();
   return <div data-testid='registered-header-actions'>{headerActions}</div>;
@@ -238,10 +244,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
         ).props.sourceLoading
       ).toBe(false)
     );
-    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
-    const rail = render(
-      <TooltipProvider>{panel as ReactElement}</TooltipProvider>
-    );
+    const rail = renderRegisteredRail();
     await user.click(screen.getByRole('button', { name: 'Retry Source' }));
     expect(
       await within(screen.getByRole('table')).findByText('Observed Artist Name')
@@ -341,10 +344,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(within(table).getAllByRole('row')).toHaveLength(4);
     expect(within(table).getByText('Known Page')).toBeInTheDocument();
     await user.click(screen.getByText('Ambiguous A'));
-    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
-    const rail = render(
-      <TooltipProvider>{panel as ReactElement}</TooltipProvider>
-    );
+    const rail = renderRegisteredRail();
     expect(
       screen.getByRole('link', { name: 'Inspect Source' })
     ).toHaveAttribute('href', base.url);
@@ -419,9 +419,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(
       (panel as ReactElement<{ row: ProfileWorkspaceSurfaceRow }>).props.row.id
     ).toBe(pendingRows[0].id);
-    const rail = render(
-      <TooltipProvider>{panel as ReactElement}</TooltipProvider>
-    );
+    const rail = renderRegisteredRail();
     expect(screen.getByText('Is this you?')).toBeVisible();
     expect(
       screen.getByText('1 live source · public identity link · 70% match')
@@ -512,10 +510,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
         null
       )
     );
-    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
-    const rail = render(
-      <TooltipProvider>{panel as ReactElement}</TooltipProvider>
-    );
+    const rail = renderRegisteredRail();
     await user.click(screen.getByRole('button', { name: 'No' }));
 
     await waitFor(() => expect(navigationMock.refresh).toHaveBeenCalled());
@@ -666,10 +661,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     });
 
     await userEvent.setup().click(screen.getByText('Fan Wiki'));
-    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
-    expect(panel).not.toBeNull();
-
-    render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+    renderRegisteredRail();
     const signalList = screen.getByTestId('presence-signal-list');
     // Suggested qualification: recommendation primitive at its own weight.
     expect(
@@ -685,8 +677,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     renderWorkspace(dataWithConnector);
 
     await user.click(screen.getByText('Spotify'));
-    const dspPanel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
-    render(<TooltipProvider>{dspPanel as ReactElement}</TooltipProvider>);
+    renderRegisteredRail();
 
     const dspSignals = screen.getByTestId('presence-signal-list');
     expect(
@@ -771,10 +762,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
         { name: 'Add Profile Or Site' }
       )
     );
-    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
-    expect(panel).not.toBeNull();
-
-    render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+    renderRegisteredRail();
     expect(await screen.findByText('Review Suggestions')).toBeInTheDocument();
     expect(
       screen.getByText('2 suggested profiles to review.')
@@ -946,8 +934,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(screen.getByText('Jovie Profile')).toBeInTheDocument();
   });
 
-  it('keeps a connected identity Connected during a search outage, with diagnostics reachable by keyboard (JOV-9021)', async () => {
-    const user = userEvent.setup();
+  it('keeps a connected identity Connected during a search outage, with diagnostics visible without a disclosure (JOV-9021)', () => {
     const instagram = data.rows.find(row => row.id === 'instagram');
     if (!instagram) throw new Error('Missing profile fixture');
     renderWorkspace({ ...data, providerAvailable: false, rows: [instagram] });
@@ -956,8 +943,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
     expect(screen.getAllByText('Connected').length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole('row', { name: /Instagram/ }));
-    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
-    render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+    renderRegisteredRail();
     expect(screen.getByTestId('profiles-rail-content')).toHaveClass(
       'px-3',
       'py-3'
@@ -969,14 +955,12 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       'href',
       instagram.url
     );
-    const details = screen.getByRole('button', { name: 'Monitoring details' });
-    expect(details).toHaveAttribute('aria-expanded', 'false');
     expect(
-      screen.queryByText(/Search checks are unavailable/)
+      screen.queryByRole('button', { name: 'Monitoring Details' })
     ).not.toBeInTheDocument();
-    details.focus();
-    await user.keyboard('{Enter}');
-    expect(details).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      screen.getByRole('heading', { name: 'Monitoring Details' })
+    ).toBeVisible();
     expect(screen.getByText(/Search checks are unavailable/)).toHaveTextContent(
       'Connected. Search checks are unavailable; this connection is unaffected.'
     );
@@ -1063,17 +1047,35 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
 
     await user.click(action);
     await user.click(screen.getByRole('menuitem', { name: /View Details/i }));
-    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
-    expect(panel).not.toBeNull();
-
-    render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+    renderRegisteredRail();
     expect(
       screen.getByRole('complementary', { name: 'Presence details' })
     ).toBeInTheDocument();
-    expect(screen.getByTestId('profiles-rail-entity-header')).toHaveClass(
-      'relative',
-      'flex'
+    expect(screen.getByTestId('profiles-rail-entity-header')).toHaveAttribute(
+      'data-layout',
+      'grid'
     );
+    const rail = screen.getByRole('complementary', {
+      name: 'Presence details',
+    });
+    const thumbnail = within(rail).getByTestId(
+      'profiles-rail-identity-thumbnail'
+    );
+    expect(thumbnail).toHaveAttribute(
+      'data-entity-header-thumbnail-variant',
+      'person'
+    );
+    expect(thumbnail).toHaveClass('size-14');
+    expect(
+      within(thumbnail).getByRole('img', { name: 'Tim White on Spotify' })
+    ).toBeVisible();
+    expect(rail.querySelector('[data-surface-variant="card"]')).toBeNull();
+    expect(
+      within(rail).queryByRole('button', { name: 'Profile / Page' })
+    ).toBeNull();
+    expect(
+      within(rail).getByRole('heading', { name: 'Profile / Page' })
+    ).toBeVisible();
     // Spotify is locked: status already leads Signals, so no stat card that
     // would only read "Limit Reached / — / No change yet".
     expect(
@@ -1105,8 +1107,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       screen.getByRole('button', { name: 'Actions for Spotify' })
     );
     await user.click(screen.getByRole('menuitem', { name: /View Details/i }));
-    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
-    render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+    renderRegisteredRail();
 
     const content = screen.getByTestId('profiles-rail-content');
     const ordered = [
@@ -1138,10 +1139,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       screen.getByRole('button', { name: 'Actions for Instagram' })
     );
     await user.click(screen.getByRole('menuitem', { name: /View Details/i }));
-    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
-    expect(panel).not.toBeNull();
-
-    render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+    renderRegisteredRail();
     expect(
       screen.getByTestId('profiles-rail-shareable-link')
     ).toHaveTextContent('jov.ie/tim/s/instagram');
@@ -1223,10 +1221,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     await user.click(
       screen.getByRole('button', { name: 'Add Profile Or Site' })
     );
-    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
-    expect(panel).not.toBeNull();
-
-    render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+    renderRegisteredRail();
     expect(
       await screen.findByRole('complementary', { name: 'Add Profile Or Site' })
     ).toBeInTheDocument();
@@ -1251,8 +1246,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     await user.click(
       screen.getByRole('button', { name: 'Add Profile Or Site' })
     );
-    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
-    render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+    renderRegisteredRail();
 
     await user.click(
       await screen.findByRole('button', { name: /Add public profile/i })

@@ -162,7 +162,7 @@ describe('EntitySidebarShell', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('defaults entity workspaces to the shared raised surface', () => {
+  it('keeps entity workspaces flat by default', () => {
     render(
       <EntitySidebarShell isOpen ariaLabel='Entity details'>
         <div>Body content</div>
@@ -173,12 +173,8 @@ describe('EntitySidebarShell', () => {
       .getByTestId('right-drawer')
       .querySelector('[data-right-rail-workspace]');
 
-    expect(workspace).toHaveAttribute('data-surface-variant', 'raised');
-    expect(workspace).toHaveClass(
-      'overflow-hidden',
-      'bg-transparent',
-      'shadow-none'
-    );
+    expect(workspace).toHaveAttribute('data-surface-variant', 'flat');
+    expect(workspace?.querySelector('[data-variant="card"]')).toBeNull();
     expect(workspace).not.toHaveClass('rounded-(--linear-app-shell-radius)');
   });
 
@@ -255,32 +251,13 @@ describe('EntitySidebarShell', () => {
     expect(screen.getByText('Drawer tabs')).toBeInTheDocument();
   });
 
-  it('wraps the minimal-mode entity header in a card surface by default', () => {
+  it('keeps the minimal-mode entity header flat by default', () => {
     render(
       <EntitySidebarShell
         isOpen
         ariaLabel='Release details'
         headerMode='minimal'
         hideMinimalHeaderBar
-        entityHeader={<div>Entity header content</div>}
-      >
-        <div>Body content</div>
-      </EntitySidebarShell>
-    );
-
-    const headerSurface = screen.getByTestId('entity-sidebar-entity-header');
-    expect(headerSurface).toHaveAttribute('data-surface-variant', 'card');
-    expect(headerSurface).toHaveAttribute('data-variant', 'card');
-  });
-
-  it('renders the minimal-mode entity header without an outer card surface when entityHeaderSurface is flat', () => {
-    render(
-      <EntitySidebarShell
-        isOpen
-        ariaLabel='Release details'
-        headerMode='minimal'
-        hideMinimalHeaderBar
-        entityHeaderSurface='flat'
         entityHeader={<div>Entity header content</div>}
       >
         <div>Body content</div>
@@ -290,6 +267,25 @@ describe('EntitySidebarShell', () => {
     const headerSurface = screen.getByTestId('entity-sidebar-entity-header');
     expect(headerSurface).toHaveAttribute('data-surface-variant', 'flat');
     expect(headerSurface).not.toHaveAttribute('data-variant', 'card');
+  });
+
+  it('preserves an explicitly requested entity header card', () => {
+    render(
+      <EntitySidebarShell
+        isOpen
+        ariaLabel='Release details'
+        headerMode='minimal'
+        hideMinimalHeaderBar
+        entityHeaderSurface='card'
+        entityHeader={<div>Entity header content</div>}
+      >
+        <div>Body content</div>
+      </EntitySidebarShell>
+    );
+
+    const headerSurface = screen.getByTestId('entity-sidebar-entity-header');
+    expect(headerSurface).toHaveAttribute('data-surface-variant', 'card');
+    expect(headerSurface).toHaveAttribute('data-variant', 'card');
     expect(headerSurface).toHaveTextContent('Entity header content');
   });
 
@@ -345,14 +341,13 @@ describe('EntitySidebarShell', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('can render a flat pinned footer without card chrome', () => {
+  it('keeps pinned footers flat by default', () => {
     render(
       <EntitySidebarShell
         isOpen
         ariaLabel='Add release'
         headerMode='minimal'
         hideMinimalHeaderBar
-        footerSurface='flat'
         footer={<button type='button'>Create Release</button>}
       >
         <div>Body content</div>

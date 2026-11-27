@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { ComponentProps, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DspPresenceSidebar } from '@/components/features/dashboard/organisms/dsp-presence/DspPresenceSidebar';
 
@@ -14,18 +14,6 @@ vi.mock('next/image', () => ({
     <img alt={alt} {...props} />
   ),
 }));
-
-vi.mock('@jovie/ui', async () => {
-  const actual = await vi.importActual<object>('@jovie/ui');
-  return {
-    ...actual,
-    Button: ({ children, ...props }: ComponentProps<'button'>) => (
-      <button type='button' {...props}>
-        {children}
-      </button>
-    ),
-  };
-});
 
 vi.mock('next/navigation', () => ({}));
 
@@ -141,9 +129,9 @@ describe('DspPresenceSidebar', () => {
     expect(
       screen.getByRole('button', { name: 'Confirm Match' })
     ).toBeInTheDocument();
-    expect(screen.getByTestId('dsp-presence-entity-header')).toHaveClass(
-      'relative',
-      'flex'
+    expect(screen.getByTestId('dsp-presence-entity-header')).toHaveAttribute(
+      'data-layout',
+      'grid'
     );
     expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument();
     expect(screen.getByText('View On Spotify')).toBeInTheDocument();

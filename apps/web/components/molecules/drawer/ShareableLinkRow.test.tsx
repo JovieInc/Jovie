@@ -78,11 +78,17 @@ describe('ShareableLinkRow', () => {
     expect(copy.className).toContain('[&_svg]:h-3.5');
   });
 
-  it('locks rail density to the 32px desktop control contract', () => {
+  it('keeps rail links flat with visible copy and open actions', () => {
     render(
       <ShareableLinkRow url='https://jov.ie/tim' density='rail' testId='row' />
     );
-    expect(screen.getByTestId('row')).toHaveClass('h-8');
+    expect(screen.getByTestId('row')).toHaveClass(
+      'h-8',
+      'px-0',
+      'bg-transparent'
+    );
+    expect(screen.getByRole('button', { name: 'Copy link' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Open link' })).toBeVisible();
   });
 
   it('flat surface adds no horizontal inset and uses body text size', async () => {

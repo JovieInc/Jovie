@@ -141,6 +141,32 @@ describe('WorkInspectorActions', () => {
     expect(screen.queryByTestId('work-action-review-publish')).toBeNull();
   });
 
+  it('leaves sharing to the link row while keeping the selected-work action', () => {
+    renderActions({ showSharingActions: false });
+    expect(
+      screen.queryByTestId('work-action-share-page')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('work-action-preview-page')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('work-action-share-privately')
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('work-action-ask-jovie'));
+    expect(onAskJovieMock).toHaveBeenCalledOnce();
+  });
+
+  it('retains review and publish when sharing is owned by the link row', () => {
+    renderActions({
+      asset: buildAsset({ status: 'scheduled', smartLinkPath: '' }),
+      showSharingActions: false,
+    });
+    expect(
+      screen.getByTestId('work-action-review-publish')
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('work-action-ask-jovie')).toBeInTheDocument();
+  });
+
   it('renders every action as one secondary button style, preview included', () => {
     renderActions({ preview: <button type='button'>Play Preview</button> });
     const share = screen.getByTestId('work-action-share-page');

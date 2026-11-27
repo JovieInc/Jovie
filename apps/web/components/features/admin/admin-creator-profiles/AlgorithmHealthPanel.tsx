@@ -111,6 +111,7 @@ export function AlgorithmHealthPanel({
         <DrawerSection
           title='Compared Artists'
           surface='card'
+          collapsible
           defaultOpen={false}
         >
           <div className='space-y-3' data-testid='algorithm-health-neighbours'>

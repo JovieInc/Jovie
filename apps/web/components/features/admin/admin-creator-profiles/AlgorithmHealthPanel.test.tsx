@@ -87,13 +87,24 @@ describe('AlgorithmHealthPanel', () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
       `/api/spotify/fal-analysis?artistId=${SPOTIFY_ARTIST_ID}`
     );
+    expect(summary).toBeVisible();
     expect(summary).toHaveTextContent(readyReport.verdict.label);
     expect(summary).toHaveTextContent(readyReport.verdict.headline);
     expect(summary).toHaveTextContent('4/4');
     if (readyReport.status !== 'ready') throw new Error('expected ready');
     expect(summary).toHaveTextContent(`${readyReport.healthScore}%`);
     for (const action of readyReport.nextActions) {
-      expect(screen.getByText(action)).toBeInTheDocument();
+      expect(screen.getByText(action)).toBeVisible();
+    }
+    for (const title of [
+      'Algorithm Health',
+      'What This Means',
+      'Next Actions',
+    ]) {
+      expect(screen.getByRole('heading', { name: title })).toBeVisible();
+      expect(
+        screen.queryByRole('button', { name: title })
+      ).not.toBeInTheDocument();
     }
     expect(screen.queryByText('Warnings')).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
@@ -108,6 +119,14 @@ describe('AlgorithmHealthPanel', () => {
     expect(within(neighbours).getByText('Harbor Lights')).toBeInTheDocument();
     expect(within(neighbours).getByText('Quiet Arcade')).toBeInTheDocument();
     await expectNoA11yViolations(container);
+
+    await user.keyboard('{Enter}');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(neighbours).not.toBeVisible();
+    expect(summary).toBeVisible();
+    for (const action of readyReport.nextActions) {
+      expect(screen.getByText(action)).toBeVisible();
+    }
   });
 
   it('shows partial resolution with its warnings', async () => {

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fn } from 'storybook/test';
+import { expect, fn, within } from 'storybook/test';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { TourDateSidebar } from './TourDateSidebar';
 
@@ -60,7 +60,20 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Selected: Story = {};
+export const Selected: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement.ownerDocument.body);
+    await expect(canvas.getByTestId('tour-date-entity-header')).toHaveAttribute(
+      'data-layout',
+      'grid'
+    );
+    await expect(canvas.getByLabelText('Venue')).toBeVisible();
+    await expect(canvas.getByLabelText('Ticket URL')).toBeVisible();
+    await expect(
+      canvas.queryByRole('button', { name: 'Analytics' })
+    ).not.toBeInTheDocument();
+  },
+};
 
 export const Empty: Story = {
   args: {
