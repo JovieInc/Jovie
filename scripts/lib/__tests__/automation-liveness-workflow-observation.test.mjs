@@ -59,6 +59,7 @@ function response(body) {
 function fetchFixtures(runs, jobsByRun, total = runs.length) {
   const urls = [];
   return {
+    token: 'fixture-token',
     urls,
     fetchImpl: async url => {
       urls.push(url);
