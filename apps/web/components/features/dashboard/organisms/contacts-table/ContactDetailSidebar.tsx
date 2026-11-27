@@ -326,8 +326,18 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                 labelWidth={96}
                 labelClassName='normal-case tracking-normal text-xs'
               />
-              {renderEditableField('email', 'Email', contact.email, 'Add Email')}
-              {renderEditableField('phone', 'Phone', contact.phone, 'Add Phone')}
+              {renderEditableField(
+                'email',
+                'Email',
+                contact.email,
+                'Add Email'
+              )}
+              {renderEditableField(
+                'phone',
+                'Phone',
+                contact.phone,
+                'Add Phone'
+              )}
               {hasEmailAndPhone && (
                 <DrawerPropertyRow
                   label='Preferred'
