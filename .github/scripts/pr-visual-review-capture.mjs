@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
+import { prepareLaunchCapture } from './pr-visual-capture-launch.mjs';
 import {
   blockingCaptureRuntimeFailures,
   buildCaptureArtifactPaths,
@@ -202,6 +203,7 @@ try {
         viewport,
         colorScheme: 'dark',
         deviceScaleFactor: 1,
+        serviceWorkers: 'block',
       });
       actions.push('create-isolated-browser-context');
       await context.tracing.start({
@@ -286,6 +288,14 @@ try {
         Object.assign(observed, await prepareContactsCapture(page));
         result.assertion.expectedOutcome =
           'Populated Contacts table and selected contact detail rail render together.';
+      }
+      const launchState = await prepareLaunchCapture(page, route);
+      if (launchState) {
+        actions.push('assert-populated-launch-presentation');
+        Object.assign(observed, launchState, {
+          requiredState: launchState.state,
+        });
+        result.assertion.expectedOutcome = `Actual source presentation: ${launchState.state}. No mutation or runtime execution is certified.`;
       }
       const pageText = (await page.locator('body').innerText()).trim();
       observed.text = sanitizeCaptureText(pageText);

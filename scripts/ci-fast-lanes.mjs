@@ -1019,6 +1019,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/next-telemetry.test.mjs',
   'scripts/lib/__tests__/orphan-screenshot-guard.test.mjs',
   'scripts/lib/__tests__/pr-visual-routing-boundaries.test.mjs',
+  'scripts/lib/__tests__/pr-visual-capture-task-states.test.mjs',
   'scripts/lib/__tests__/spend-guard.test.mjs',
   'scripts/lib/__tests__/wins-ledger.test.mjs scripts/lib/__tests__/usage-ledger.test.mjs',
   'scripts/lib/__tests__/wins-measure.test.mjs',

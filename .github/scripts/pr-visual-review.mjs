@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFile, realpath, stat, writeFile } from 'node:fs/promises';
 import { basename, join, relative, resolve } from 'node:path';
+import { hasLaunchCaptureState } from './pr-visual-capture-launch.mjs';
 import {
   AUTHENTICATED_CHAT_CAPTURE_ROUTE,
   CONTACTS_CAPTURE_ROUTE,
@@ -192,6 +193,8 @@ export function validateCaptureManifest(manifest, expected = {}) {
           !String(capture.observed?.selectedContact ?? '').trim())
       )
         failures.push(`missing selected Contacts detail ${key}`);
+      if (!hasLaunchCaptureState(route, capture.observed))
+        failures.push(`missing populated launch presentation ${key}`);
       if (typeof capture.path !== 'string' || capture.path.length === 0)
         failures.push(`missing artifact path ${key}`);
     }
