@@ -77,3 +77,23 @@ Key contract points the fixtures demonstrate:
 - Pass a `schema` decoder at the fetch boundary for validated responses.
 - Mutations invalidate the matching `queryKeys.*` scope in `onSuccess`;
   autosave scopes invalidation to the entity it writes.
+
+## Shared operation behavior
+
+Apply the [shared capability behavior standard](../../../../canon/ENGINEERING.md#shared-capability-behavior)
+to the actual read/write job. These query fixtures demonstrate transport and
+cache wiring; they do not certify durable command receipts, concurrent-write
+protection, external publication or background recovery.
+
+Durable mutations call the registered domain owner shared by UI and authorized
+agents. Pending feedback remains pending until the authoritative write commits;
+retries preserve logical command identity and stale changes cannot erase newer
+decisions. Add behavioral proof at that owner, then link it from the existing
+QualityContract's optional `operationEvidence`. Long-running work additionally
+proves restart/missed-event recovery; external effects prove settlement before
+replay; human handoffs preserve the real completion boundary.
+
+The executable [quality evidence fixtures](../../../../scripts/invariants/quality-ratchet.test.mjs)
+show scoped applicability and distinguish unknown, source proof and independently
+verified runtime evidence. Their shadow diagnostic preserves current gates and
+does not certify unassessed consumers or make this README a runtime receipt.

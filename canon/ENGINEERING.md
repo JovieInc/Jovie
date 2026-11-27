@@ -255,6 +255,120 @@ behavior, not agent compliance, hosted CI, shadow qualification or product runti
 
 ---
 
+## Shared capability behavior
+
+EVENT: Founder direction, 2026-11-26; implementation scope JOV-11840. The
+launch/task standards apply to every relevant product capability. JOV-5943's
+quality contract, JOV-5946's completeness contract, JOV-6190's executable
+examples and JOV-7985's adoption loop remain the owners. This standard does not
+certify existing consumers, select a new data vendor, or create another registry,
+scheduler, ledger or operation framework.
+
+### Canonical outcomes and authority
+
+Meaningful durable actions and authoritative reads belong to one typed,
+versioned domain contract. Web/native UI, conversation, authorized agents, API,
+CLI and MCP are adapters over its state and audit trail. Cover inspection,
+creation, change, movement, assignment, completion, reversal and recovery where
+applicable. Use the existing Action manifest/completeness overlay and domain
+write registry. An agent inherits the actual principal's current scope,
+entitlements, confirmation rules, quotas and budgets. Required human, device and
+provider ceremonies remain explicit prepare/start/resume handoffs.
+
+A successful write receipt means the stated result committed. Persist the
+logical command identity, actor/resource scope, payload binding and resulting
+revision. An identical replay returns the original semantic result; changed
+intent under that identity conflicts. Accepted or pending work is distinct from
+committed work. A later refetch cannot repair an earlier false-success claim.
+Concurrent changes use revisions or documented intent-preserving conflict
+semantics. Coupled state, durable result and pending event commit atomically
+when partial application would violate the job. Stale clients and delayed
+agents cannot overwrite newer decisions or complete obsolete work.
+
+### Apply the requirements to the actual operation
+
+| Operation class | Required behavior and evidence |
+| --- | --- |
+| `local-transient` | Immediate local feedback, accessibility and coherent pending state. A local filter does not need a durable job or provider settlement. |
+| `durable-write` | Canonical authority, truthful committed receipt, replay/conflict handling, revision/concurrency protection and authoritative recovery/readback. |
+| `external-effect` | All applicable durable-write requirements plus persisted effect intent, current dispatch authority and provider settlement. Record both classes. |
+| `continuation` | Durable accepted attempts with real owners, leases/fencing and continuation state; bounded retries/deadlines; restart and missed-event recovery independent of the missing event; output evidence and useful attention. |
+| `human-handoff` | Evidence of the required human/provider completion boundary, recoverable resumption and useful attention. Preparation or silence cannot stand in for the person's action. |
+
+Classes compose. Apply them to the scoped job rather than imposing durable
+machinery on every interaction. Media/streaming distinguishes acknowledgement,
+first useful output and completion. Preserve the existing responsiveness
+defaults in `JOV-INV-027` and stricter route contracts. Local pending feedback
+must not claim payment, publication, authorization or external completion.
+Scoped reads, targeted invalidation and incremental updates must converge after
+permission changes and deletion; stale/partial data cannot prove current health
+or absence. Safe offline persistence needs its own qualified evidence.
+
+At external dispatch, recheck current authority, scope, revision, budget and
+attempt. Use provider idempotency and destination readback where available.
+Reconcile a lost acknowledgement before replay. Without reliable lookup or
+idempotency, leave an ambiguous effect unresolved rather than reissue it.
+Internal fencing cannot recall a provider request already sent.
+
+Jovie stewards every commitment, including tasks a person assigns to themselves.
+Prepare useful human actions, advance eligible work, reconcile evidenced
+completion/duplicates/obsolete state and route technical recovery. Reminders
+are useful and deduplicated. Age, inactivity or an unanswered reminder cannot
+erase a valid commitment or prove completion. Bring consequential unresolved
+choices to the appropriate person with evidence and a recommendation. An empty
+interface is not evidence of healthy progress.
+
+Reusable methods/templates use accepted versions, scoped inheritance and
+preserved active-run overrides; authority resolves for the actual run. Use
+deterministic upkeep for known cases, coalesce unchanged reads/events and measure
+full cost per useful outcome. Waiting alone must not trigger repeated model or
+network work.
+
+### Evidence and adoption
+
+The existing `QualityContract` may carry `operationEvidence` rows naming the
+canonical `operationId`, matching contract `surface`, applicable `classes`,
+exact `sourceRevision`, and requirement-keyed `evidence` references. The
+requirement vocabulary lives in `JOV-INV-027.policy.value.operationEvidence`.
+Compiled, adversarial examples are in
+[`quality-ratchet.test.mjs`](../scripts/invariants/quality-ratchet.test.mjs).
+
+The existing validator reports **unknown**, **source-proven** and
+**runtime-verified** separately. References and author assertions alone remain
+unknown. A trusted adapter from the existing evidence/certification owner must
+independently resolve each reference, validate authenticity/freshness and match
+the operation, surface, requirement and exact source. Runtime evidence also
+binds the environment and deployment: one such context must cover every
+applicable requirement, and the report names that context. Passing proofs from
+different contexts cannot be combined into runtime verification. The evaluator
+does not run or replace that verifier; its default performs no network reads and
+verifies no references.
+Missing applicable receipt, recovery, effect or human-boundary evidence cannot
+produce runtime verification. Source proof is not deployment or publication
+proof, and this diagnostic never grants product certification.
+
+Responsiveness-only contracts retain their existing scope and checks. Absent
+operation metadata is **unassessed**, not inapplicable or certified. The report
+explicitly covers declared contracts only and never claims the app-wide
+inventory is complete. JOV-7985 reconciles the affected-consumer denominator
+through the existing canonical identities and records verified, needs migration,
+valid scoped exception, legitimately inapplicable or unknown coverage. Preserve
+incumbent owners and deduplicate bounded repairs.
+
+**Ship now:** this normative standard, optional evidence metadata and
+failure-isolated shadow reporting in the existing invariant validator. Existing
+quality floors, required gates and legacy protection remain enforced; new
+diagnostic findings do not block otherwise qualified delivery.
+
+**Re-evaluate when:** affected consumers have exact source/deployment outcomes,
+deliberate-red and neighboring-green proof, and representative actual-ship
+measurements of correctness, qualification duration, throughput, cost and failure
+isolation. **Then:** existing governance may promote qualified narrow checks for
+changed consumers and affected shared primitives, with rollback. Documentation,
+fixture success or agent assignment alone never establishes adoption.
+
+---
+
 ## Shipping Rules
 
 - Smallest correct change.
