@@ -1,3 +1,8 @@
+import { fileRemediationPlans } from './remediation-plan-intake.mjs';
+
+export { fileRemediationPlans } from './remediation-plan-intake.mjs';
+
+import { collectFindingRecovery } from './bot-finding-recovery.mjs';
 import { planDomainExpiry } from './domain-expiry.mjs';
 import { HOLD_LABELS } from './merge-group-member-policy.mjs';
 
@@ -34,6 +39,7 @@ const MODES = new Set([
   'exhausted',
   'holds',
   'proof',
+  'bot-findings',
   'summer',
   'summer-config',
   'swift-arch',
@@ -491,36 +497,6 @@ export function readVercelReadonlyToken(env = process.env) {
   return null;
 }
 
-export async function fileRemediationPlans(plans, { dryRun, upsert, apiKey }) {
-  if (dryRun) return plans.map(plan => ({ ...plan, action: 'dry-run' }));
-  const filed = [];
-  for (const plan of plans) {
-    const result = await upsert({
-      fingerprint: plan.fingerprint,
-      title: plan.title,
-      description: plan.description,
-      priority: plan.priority,
-      createStateName: 'Todo',
-      reopenTerminal: true,
-      apiKey,
-    });
-    if (!result?.ok) {
-      throw new Error(
-        `${plan.fingerprint}: ${result?.reason || 'linear_upsert_failed'}`
-      );
-    }
-    filed.push({
-      fingerprint: plan.fingerprint,
-      title: plan.title,
-      action: result.action,
-      reopened: result.reopened === true,
-      identifier: result.identifier ?? null,
-      url: result.url ?? null,
-    });
-  }
-  return filed;
-}
-
 /**
  * @param {object} options
  * @param {string} [options.mode]
@@ -535,6 +511,7 @@ export async function fileRemediationPlans(plans, { dryRun, upsert, apiKey }) {
  * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadDrift]
  * @param {() => { generatedAt: string, total: number, byRule: Record<string, number>, topFiles: { rule: string, file: string, count: number }[] } | Promise<{ generatedAt: string, total: number, byRule: Record<string, number>, topFiles: { rule: string, file: string, count: number }[] }>} [options.loadSwiftArch]
  * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadProof]
+ * @param {() => Promise<{ issues: any[], warnings: string[] }>} [options.recoverFindings]
  * @param {boolean} [options.vercelTokenPresent]
  * @param {(args: any) => Promise<any>} [options.upsert]
  * @param {string} [options.apiKey]
@@ -552,6 +529,7 @@ export async function runRemediationSweep({
   loadDrift,
   loadSwiftArch,
   loadProof,
+  recoverFindings,
   vercelTokenPresent = false,
   upsert,
   apiKey,
@@ -639,5 +617,18 @@ export async function runRemediationSweep({
   }
   await collect('proof', loadProof, 'Proof-stat loop');
   const issues = await fileRemediationPlans(plans, { dryRun, upsert, apiKey });
-  return { mode, dryRun, warnings, issues };
+  let botFindings;
+  if (includesMode(mode, 'bot-findings')) {
+    const recovered = await collectFindingRecovery(recoverFindings);
+    warnings.push(...recovered.warnings);
+    issues.push(...recovered.issues);
+    botFindings = recovered.botFindings;
+  }
+  return {
+    mode,
+    dryRun,
+    warnings,
+    issues,
+    ...(botFindings ? { botFindings } : {}),
+  };
 }

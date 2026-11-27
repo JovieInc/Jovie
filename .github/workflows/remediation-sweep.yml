@@ -61,6 +61,7 @@ jobs:
             Jovie
             summer-config
             Ops
+          permission-actions: read
           permission-contents: read
           permission-checks: read
           permission-issues: read
@@ -86,6 +87,13 @@ jobs:
       - name: Install whois
         run: command -v whois >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq whois)
 
+      # Pagination only: findings remain in original GitHub threads and Linear.
+      - name: Restore bot finding pagination checkpoint
+        env:
+          GH_TOKEN: ${{ steps.github-read-token.outputs.token }}
+        run: |
+          node scripts/lib/bot-finding-recovery.mjs "${{ runner.temp }}"
+
       - name: File returning conditions
         env:
           GH_TOKEN: ${{ steps.github-read-token.outputs.token }}
@@ -104,6 +112,7 @@ jobs:
           # Proof-stat loop: production feed (content writer secret; absent, the feed-based stages are skipped with a warning).
           CONTENT_PUBLISH_SECRET: ${{ secrets.CONTENT_PUBLISH_SECRET }}
           PROOF_LOOP_RUN_RECEIPT: ${{ runner.temp }}/proof-loop-run.json
+          BOT_FINDINGS_CURSOR: ${{ runner.temp }}/bot-findings-cursor.json
           DRY_RUN: ${{ steps.mode.outputs.dry_run }}
           EVENT_NAME: ${{ github.event_name }}
           SCHEDULE: ${{ github.event.schedule }}
@@ -122,6 +131,7 @@ jobs:
             run_mode swift-arch
           fi
           if [ "$daily" = true ]; then
+            run_mode bot-findings
             run_mode exhausted
             run_mode holds
             run_mode summer
@@ -132,6 +142,15 @@ jobs:
             run_mode drift
             run_mode proof
           fi
+
+      - name: Save bot finding pagination checkpoint
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bot-findings-cursor
+          path: ${{ runner.temp }}/bot-findings-cursor.json
+          if-no-files-found: ignore
+          retention-days: 90
 
       # Measure-everything: each credentials/spend run's stage timestamps.
       - name: Upload credentials run record

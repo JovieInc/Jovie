@@ -115,33 +115,13 @@ export async function listLinearIssueComments({
 }) {
   if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
   if (!issueId) return { ok: false, reason: 'missing_issue_id' };
-  const result = await linearGraphql(
-    {
-      query: `
-        query ListLinearIssueComments($id: String!) {
-          issue(id: $id) {
-            comments(first: 100) {
-              nodes { id body createdAt }
-            }
-          }
-        }
-      `,
-      variables: { id: issueId },
-      apiKey,
-      fetchImpl,
-    },
-    'linear_comment_list'
+  const { readLinearEvidenceComments } = await import(
+    './linear-issue-evidence.mjs'
   );
-  if (!result.ok) return result;
-  const nodes = result.data?.issue?.comments?.nodes ?? [];
-  return {
-    ok: true,
-    comments: nodes.map(node => ({
-      id: node?.id ?? null,
-      body: String(node?.body ?? ''),
-      createdAt: node?.createdAt ?? null,
-    })),
-  };
+  return readLinearEvidenceComments(
+    { issueId, apiKey, fetchImpl },
+    linearGraphql
+  );
 }
 
 const REMEDIATION_KEY_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -348,6 +328,9 @@ export async function upsertLinearIssueByTitleFingerprint({
   title,
   description,
   priority = 1,
+  // Opt-in: preserve the owning workpad, assignment, labels and disposition.
+  preserveExisting = false,
+  evidenceMarker = null,
   // Optional state name resolved from the team's workflow (JOV-5966). 'Todo'
   // files into Backlog: admission is the only Backlog -> Todo writer.
   createStateName = null,
@@ -462,6 +445,21 @@ export async function upsertLinearIssueByTitleFingerprint({
       fingerprint,
       labelSource
     );
+  }
+
+  if (match && preserveExisting) {
+    const { preserveLinearFindingEvidence } = await import(
+      './linear-issue-evidence.mjs'
+    );
+    return preserveLinearFindingEvidence({
+      match,
+      evidenceMarker,
+      descriptionBody,
+      apiKey,
+      fetchImpl,
+      listComments: listLinearIssueComments,
+      addComment: addLinearIssueComment,
+    });
   }
 
   let labelId = null;

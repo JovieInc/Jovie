@@ -42,7 +42,11 @@ function stub({ open = true, comments = [] } = {}) {
       });
     }
     if (q.includes('ListLinearIssueComments'))
-      return reply({ issue: { comments: { nodes: comments } } });
+      return reply({
+        issue: {
+          comments: { nodes: comments, pageInfo: { hasNextPage: false } },
+        },
+      });
     if (q.includes('AddLinearIssueComment'))
       return reply({ commentCreate: { success: true, comment: { id: 'c' } } });
     if (q.includes('FindTeamLabel'))

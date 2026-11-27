@@ -152,7 +152,11 @@ describe('noteRecurrence', () => {
       const body = JSON.parse(String(init?.body ?? '{}'));
       calls.push(body);
       const data = body.query.includes('ListLinearIssueComments')
-        ? { issue: { comments: { nodes: existing } } }
+        ? {
+            issue: {
+              comments: { nodes: existing, pageInfo: { hasNextPage: false } },
+            },
+          }
         : body.query.includes('issueAddLabel')
           ? { issueAddLabel: { success: true } }
           : { commentCreate: { success: true, comment: { id: 'c-new' } } };
