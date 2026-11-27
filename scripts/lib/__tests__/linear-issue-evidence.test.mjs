@@ -1,3 +1,8 @@
+import { spawnSync } from 'node:child_process';
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import {
   closeLinearIssueByFingerprint,
@@ -280,4 +285,61 @@ describe('closeLinearIssueByFingerprint', () => {
       )
     ).toHaveLength(1);
   });
+});
+
+it('keeps legacy sparse upserts working but rejects missing evidence operations', () => {
+  const root = mkdtempSync(join(tmpdir(), 'linear-evidence-old-sparse-'));
+  try {
+    mkdirSync(join(root, 'scripts/lib'), { recursive: true });
+    for (const file of ['linear-issue-intake.mjs', 'linear-cooldown.mjs'])
+      copyFileSync(
+        resolve(import.meta.dirname, '..', file),
+        join(root, 'scripts/lib', file)
+      );
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        `
+      import assert from 'node:assert/strict';
+      globalThis.fetch = () => { throw new Error('unexpected network call'); };
+      const intake = await import(process.argv[1]);
+      let existing;
+      let updates = 0;
+      const fetchImpl = async (_url, init) => {
+        const { query } = JSON.parse(init.body);
+        let data;
+        if (query.includes('FindIssueByFingerprint')) data = { team: null, issues: { nodes: existing ? [existing] : [] } };
+        else if (query.includes('issueCreate')) {
+          existing = { id: 'legacy', identifier: 'JOV-1', title: 'legacy-finding', state: { type: 'started' } };
+          data = { issueCreate: { success: true, issue: existing } };
+        } else if (query.includes('issueUpdate')) {
+          updates++;
+          data = { issueUpdate: { success: true, issue: existing } };
+        } else throw new Error('unexpected evidence mutation');
+        return new Response(JSON.stringify({ data }));
+      };
+      const options = { fingerprint: 'legacy-finding', title: 'legacy-finding', description: 'legacy evidence', apiKey: 'legacy-sparse-fixture', fetchImpl };
+      assert.equal((await intake.upsertLinearIssueByTitleFingerprint(options)).action, 'created');
+      assert.equal((await intake.upsertLinearIssueByTitleFingerprint(options)).action, 'updated');
+      const missingHelper = error => error.code === 'ERR_MODULE_NOT_FOUND' && error.message.includes('linear-issue-evidence.mjs');
+      await assert.rejects(() => intake.listLinearIssueComments({ issueId: 'legacy', apiKey: options.apiKey, fetchImpl }), missingHelper);
+      await assert.rejects(() => intake.upsertLinearIssueByTitleFingerprint({ ...options, preserveExisting: true, evidenceMarker: 'new-observation' }), missingHelper);
+      assert.equal(updates, 1);
+    `,
+        pathToFileURL(join(root, 'scripts/lib/linear-issue-intake.mjs')).href,
+      ],
+      {
+        cwd: root,
+        encoding: 'utf8',
+        env: { LINEAR_COOLDOWN_STATE_DIR: join(root, 'cooldown') },
+        timeout: 10000,
+      }
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

@@ -1,9 +1,5 @@
 import { createHash } from 'node:crypto';
 import { linearRequest } from './linear-cooldown.mjs';
-import {
-  preserveLinearFindingEvidence,
-  readLinearEvidenceComments,
-} from './linear-issue-evidence.mjs';
 
 export const JOVIE_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
 
@@ -117,6 +113,11 @@ export async function listLinearIssueComments({
   apiKey = process.env.LINEAR_API_KEY,
   fetchImpl = fetch,
 }) {
+  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
+  if (!issueId) return { ok: false, reason: 'missing_issue_id' };
+  const { readLinearEvidenceComments } = await import(
+    './linear-issue-evidence.mjs'
+  );
   return readLinearEvidenceComments(
     { issueId, apiKey, fetchImpl },
     linearGraphql
@@ -446,7 +447,10 @@ export async function upsertLinearIssueByTitleFingerprint({
     );
   }
 
-  if (match && preserveExisting)
+  if (match && preserveExisting) {
+    const { preserveLinearFindingEvidence } = await import(
+      './linear-issue-evidence.mjs'
+    );
     return preserveLinearFindingEvidence({
       match,
       evidenceMarker,
@@ -456,6 +460,7 @@ export async function upsertLinearIssueByTitleFingerprint({
       listComments: listLinearIssueComments,
       addComment: addLinearIssueComment,
     });
+  }
 
   let labelId = null;
   if (manageLabels) {
