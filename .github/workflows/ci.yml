@@ -6743,7 +6743,31 @@ jobs:
       - name: Review golden-path keyframes (visual verdict)
         id: visual_review
         if: ${{ !cancelled() && steps.canonical_journey.outcome == 'success' && needs.ci-path-changes.outputs.golden_path_no_ui_diff != 'true' }}
-        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/review-golden-path-keyframes.sh"
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          # JOV-5489: recorded visual review of the golden-path keyframes. A
+          # suspected blocker is re-reviewed once; only a reproduced blocker fails.
+          # The gateway key is mapped in for the reviewer only, never the server.
+          KEYFRAMES="$GITHUB_WORKSPACE/apps/web/test-results/golden-path-keyframes"
+          # The review runs as its own guarded producer scoped to the keyframes
+          # only, so the staged evidence includes verdict.json and only these
+          # journey keyframes are declared public (failure captures never are).
+          review() {
+            AI_GATEWAY_API_KEY="$GOLDEN_PATH_REVIEW_GATEWAY_KEY" \
+              WORKERS_AI_TOKEN="$GOLDEN_PATH_REVIEW_WORKERS_AI_TOKEN" \
+              PLAYWRIGHT_ARTIFACT_PATHS=apps/web/test-results/golden-path-keyframes \
+              PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES=true \
+              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+              pnpm --filter @jovie/web exec tsx scripts/golden-path-visual-review.ts "$@"
+          }
+          review --dir "$KEYFRAMES/first" --out "$KEYFRAMES/first/verdict.json"
+          if [ "$(jq '.suspected | length' "$KEYFRAMES/first/verdict.json")" -gt 0 ]; then
+            echo "::warning::Golden path visual review suspects a blocker; re-reviewing to confirm."
+            # ponytail: independent second review of the same keyframes, not a
+            # journey replay: the journey claims a protected fixture once per DB.
+            # Ceiling: a capture-timing flake is judged twice on one frame.
+            review --dir "$KEYFRAMES/first" --out "$KEYFRAMES/first/confirm.json" --confirm-against "$KEYFRAMES/first/verdict.json"
+          fi
         env:
           GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.GOLDEN_PATH_REVIEW_GATEWAY_KEY }}
           # Workers AI (Cloudflare credits) is tried first by the reviewer; unset = Gateway only.
@@ -7483,7 +7507,34 @@ jobs:
       - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
         timeout-minutes: 30
-        run: exec bash -e "$GITHUB_WORKSPACE/.github/scripts/ci/deploy-pr-preview.sh"
+        run: |
+          # For fast preview PRs: use main secrets (no Neon dependency)
+          # Fallback hierarchy for maximum compatibility
+          POOLED_URL=""
+          if [ -n "$DATABASE_URL_MAIN" ]; then
+            POOLED_URL="$DATABASE_URL_MAIN"
+            echo "Using main database URL"
+          elif [ -n "$DATABASE_URL" ]; then
+            POOLED_URL="$DATABASE_URL"
+            echo "Using fallback database URL"
+          else
+            # Provide cheap stub for UI-only deployments that might not need DB
+            POOLED_URL="postgresql://stub:***@localhost:5432/main_stub"
+            echo "Using stub database URL for UI-only deployment"
+          fi
+          export DATABASE_URL="$POOLED_URL"
+          export GIT_BRANCH
+
+          for i in {1..3}; do
+            if bash .github/scripts/vercel-prebuilt-deploy.sh deployment_url \
+              --env DATABASE_URL \
+              --env GIT_BRANCH; then
+              break
+            fi
+            echo "Vercel deploy attempt $i failed, retrying in 10s..."
+            sleep 10
+            if [ "$i" -eq 3 ]; then exit 1; fi
+          done
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
