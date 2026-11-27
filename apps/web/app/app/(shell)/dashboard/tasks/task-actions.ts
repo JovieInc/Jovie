@@ -6,19 +6,7 @@
  * in chrome hooks so inner nav (tasks <-> releases) does not retrigger /api/version etc.
  */
 
-import {
-  and,
-  asc,
-  count,
-  sql as drizzleSql,
-  eq,
-  gt,
-  ilike,
-  inArray,
-  isNull,
-  or,
-  type SQL,
-} from 'drizzle-orm';
+import { and, asc, count, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { runAtomicDbOperation } from '@/lib/db/legacy-transaction';
@@ -26,7 +14,6 @@ import { discogReleases } from '@/lib/db/schema/content';
 import { tasks } from '@/lib/db/schema/tasks';
 import { requireTasksWorkspaceAccess } from '@/lib/entitlements/tasks-gate';
 import { isScreenCertAppShellFixtureProfile } from '@/lib/screen-cert/app-shell-fixture-gate';
-import { dedupeReleaseTasks } from '@/lib/tasks/dedupe-release-tasks';
 import {
   bulkUpdateTasksInTransaction,
   createTaskInTransaction,
@@ -34,6 +21,15 @@ import {
   moveTaskInTransaction,
   updateTaskInTransaction,
 } from '@/lib/tasks/mutations.server';
+import {
+  clampLimit,
+  getNextCursor,
+  getPageRows,
+  getTaskListWhereClause,
+  mapAndDedupeTaskRows,
+  readTask,
+  readTaskList,
+} from '@/lib/tasks/readers.server';
 import { TASK_BOARD_STATUSES } from '@/lib/tasks/task-board';
 import { mapTaskRow } from '@/lib/tasks/task-view';
 import type {
@@ -42,7 +38,6 @@ import type {
   MoveTaskInput,
   MoveTaskResult,
   TaskBoardResult,
-  TaskCursor,
   TaskFilters,
   TaskListResult,
   TaskStats,
@@ -54,60 +49,6 @@ import {
   getScreenCertTaskById,
   getScreenCertTasksFixture,
 } from './_lib/screen-cert-fixture';
-
-const DEFAULT_TASK_LIMIT = 50;
-const MAX_TASK_LIMIT = 100;
-
-function clampLimit(limit?: number): number {
-  if (!limit) return DEFAULT_TASK_LIMIT;
-  return Math.max(1, Math.min(limit, MAX_TASK_LIMIT));
-}
-
-function getTaskListWhereClause(profileId: string, filters?: TaskFilters) {
-  const conditions: (SQL<unknown> | undefined)[] = [
-    eq(tasks.creatorProfileId, profileId),
-    isNull(tasks.deletedAt),
-    isNull(tasks.archivedAt),
-  ];
-
-  if (filters?.status) {
-    conditions.push(eq(tasks.status, filters.status));
-  }
-
-  if (filters?.priority) {
-    conditions.push(eq(tasks.priority, filters.priority));
-  }
-
-  if (filters?.assigneeKind) {
-    conditions.push(eq(tasks.assigneeKind, filters.assigneeKind));
-  }
-
-  if (filters?.releaseId === null) {
-    conditions.push(isNull(tasks.releaseId));
-  } else if (filters?.releaseId) {
-    conditions.push(eq(tasks.releaseId, filters.releaseId));
-  }
-
-  const search = filters?.search?.trim();
-  if (search) {
-    conditions.push(ilike(tasks.title, `%${search}%`));
-  }
-
-  const cursor = filters?.cursor;
-  if (cursor) {
-    conditions.push(
-      or(
-        drizzleSql`${tasks.position} > ${cursor.position}`,
-        and(
-          eq(tasks.position, cursor.position),
-          drizzleSql`${tasks.id} > ${cursor.id}`
-        )
-      )
-    );
-  }
-
-  return and(...conditions);
-}
 
 function formatTaskStats(
   rows: Array<{ status: string; count: number }>
@@ -152,40 +93,6 @@ function formatTaskStats(
   };
 }
 
-function mapAndDedupeTaskRows(
-  rows: ReadonlyArray<
-    Omit<TaskView, 'releaseTitle'> & { releaseTitle?: string | null }
-  >
-): TaskView[] {
-  return dedupeReleaseTasks(rows.map(mapTaskRow));
-}
-
-// Every task read uses TanStack Query. Mutations return the authoritative
-// records; their client hooks invalidate the affected queries without a route
-// re-render or Router Cache purge.
-function getNextCursor(
-  rows: Array<Pick<TaskView, 'id' | 'position'>>,
-  limit: number
-): TaskCursor | null {
-  const hasNextPage = rows.length > limit;
-  if (!hasNextPage) {
-    return null;
-  }
-
-  const pageRows = rows.slice(0, limit);
-  const nextCursorRow = pageRows.at(-1);
-  return nextCursorRow
-    ? {
-        position: nextCursorRow.position,
-        id: nextCursorRow.id,
-      }
-    : null;
-}
-
-function getPageRows<T>(rows: T[], limit: number): T[] {
-  return rows.length > limit ? rows.slice(0, limit) : rows;
-}
-
 export async function getTasks(filters?: TaskFilters): Promise<TaskListResult> {
   // Screen-cert fixture (tasks producer): resolve profileId first so the
   // reserved-fixture check can run before requireTasksWorkspaceAccess()'s
@@ -200,51 +107,7 @@ export async function getTasks(filters?: TaskFilters): Promise<TaskListResult> {
     return getScreenCertTasksFixture();
   }
   await requireTasksWorkspaceAccess();
-  const limit = clampLimit(filters?.limit);
-
-  const rows = await db
-    .select({
-      id: tasks.id,
-      taskNumber: tasks.taskNumber,
-      creatorProfileId: tasks.creatorProfileId,
-      title: tasks.title,
-      description: tasks.description,
-      status: tasks.status,
-      priority: tasks.priority,
-      assigneeKind: tasks.assigneeKind,
-      assigneeUserId: tasks.assigneeUserId,
-      agentType: tasks.agentType,
-      agentStatus: tasks.agentStatus,
-      agentInput: tasks.agentInput,
-      agentOutput: tasks.agentOutput,
-      agentError: tasks.agentError,
-      releaseId: tasks.releaseId,
-      releaseTitle: discogReleases.title,
-      parentTaskId: tasks.parentTaskId,
-      category: tasks.category,
-      dueAt: tasks.dueAt,
-      scheduledFor: tasks.scheduledFor,
-      startedAt: tasks.startedAt,
-      completedAt: tasks.completedAt,
-      position: tasks.position,
-      sourceTemplateId: tasks.sourceTemplateId,
-      metadata: tasks.metadata,
-      mutationVersion: tasks.mutationVersion,
-      createdAt: tasks.createdAt,
-      updatedAt: tasks.updatedAt,
-    })
-    .from(tasks)
-    .leftJoin(discogReleases, eq(tasks.releaseId, discogReleases.id))
-    .where(getTaskListWhereClause(profileId, filters))
-    .orderBy(asc(tasks.position), asc(tasks.id))
-    .limit(limit + 1);
-
-  const pageRows = getPageRows(rows, limit);
-
-  return {
-    tasks: mapAndDedupeTaskRows(pageRows),
-    nextCursor: getNextCursor(rows, limit),
-  };
+  return readTaskList(db, profileId, filters);
 }
 
 export async function getTaskBoard(
@@ -330,53 +193,9 @@ export async function getTask(taskId: string): Promise<TaskView> {
   }
   await requireTasksWorkspaceAccess();
 
-  const [row] = await db
-    .select({
-      id: tasks.id,
-      taskNumber: tasks.taskNumber,
-      creatorProfileId: tasks.creatorProfileId,
-      title: tasks.title,
-      description: tasks.description,
-      status: tasks.status,
-      priority: tasks.priority,
-      assigneeKind: tasks.assigneeKind,
-      assigneeUserId: tasks.assigneeUserId,
-      agentType: tasks.agentType,
-      agentStatus: tasks.agentStatus,
-      agentInput: tasks.agentInput,
-      agentOutput: tasks.agentOutput,
-      agentError: tasks.agentError,
-      releaseId: tasks.releaseId,
-      releaseTitle: discogReleases.title,
-      parentTaskId: tasks.parentTaskId,
-      category: tasks.category,
-      dueAt: tasks.dueAt,
-      scheduledFor: tasks.scheduledFor,
-      startedAt: tasks.startedAt,
-      completedAt: tasks.completedAt,
-      position: tasks.position,
-      sourceTemplateId: tasks.sourceTemplateId,
-      metadata: tasks.metadata,
-      mutationVersion: tasks.mutationVersion,
-      createdAt: tasks.createdAt,
-      updatedAt: tasks.updatedAt,
-    })
-    .from(tasks)
-    .leftJoin(discogReleases, eq(tasks.releaseId, discogReleases.id))
-    .where(
-      and(
-        eq(tasks.id, taskId),
-        eq(tasks.creatorProfileId, profileId),
-        isNull(tasks.deletedAt)
-      )
-    )
-    .limit(1);
-
-  if (!row) {
-    throw new Error('Task not found or access denied');
-  }
-
-  return mapTaskRow(row);
+  const task = await readTask(db, profileId, taskId);
+  if (!task) throw new Error('Task not found or access denied');
+  return task;
 }
 
 export async function createTask(data: CreateTaskInput): Promise<TaskView> {

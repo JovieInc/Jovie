@@ -13,7 +13,10 @@ import {
 } from '@/lib/entitlements/registry';
 import { captureRevenueSpineFailure } from '@/lib/observability/revenue-spine';
 import { isLegacyFanSendPrice } from '@/lib/stripe/config';
-import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
+import {
+  getUserBillingInfo,
+  getUserBillingInfoByAppId,
+} from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 import type {
   BillingPlanMismatch,
@@ -197,6 +200,27 @@ export async function getCurrentUserEntitlements(options?: {
   const adminStatus =
     hasAdminRole && (await hasRecentAdminMfaReverification(authResult));
 
+  return resolveBillingEntitlements(userId, userEmail, adminStatus, billing);
+}
+
+/** API keys prove an app user, never a recent administrator MFA session. */
+export async function getAppUserEntitlements(
+  appUserId: string
+): Promise<UserEntitlements> {
+  return resolveBillingEntitlements(
+    appUserId,
+    null,
+    false,
+    await getUserBillingInfoByAppId(appUserId)
+  );
+}
+
+function resolveBillingEntitlements(
+  userId: string,
+  userEmail: string | null,
+  adminStatus: boolean,
+  billing: Awaited<ReturnType<typeof getUserBillingInfo>>
+): UserEntitlements {
   if (!billing.success) {
     captureRevenueSpineFailure({
       stage: 'entitlement_readback',
