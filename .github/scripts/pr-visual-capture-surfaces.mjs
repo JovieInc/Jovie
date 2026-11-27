@@ -18,6 +18,47 @@ const NATIVE_UI_FILE =
 const AUTHENTICATED_SHELL_CAPTURE_FILE =
   /^(?:apps\/web\/(?:proxy|middleware)\.[cm]?[jt]s|apps\/web\/lib\/auth\/(?:gate|session|auth-session-cookies)\.[cm]?[jt]sx?|apps\/web\/app\/app(?:\/\(shell\))?\/layout\.[cm]?[jt]sx?)$/i;
 
+// Ordinary colocated tests are not a rendered surface. Stories and visual-QA
+// specs remain candidates; this does not remove their actual component source.
+const UNIT_TEST_FILE =
+  /^(?:apps\/web\/(?:app|components|features|lib)\/|packages\/ui\/).*\.(?:test|spec)\.[cm]?[jt]sx?$/;
+
+// Reviewed non-rendering modules from the exact JOV-15384/JOV-8731 failures.
+// Keep this explicit: a library neighbor can contain presentation logic.
+// These HTTP/SQL/tool operations still require their functional source checks;
+// a homepage or an empty chat screenshot cannot certify their behavior.
+const NON_RENDERING_FILES = new Set([
+  'apps/web/app/api/chat/confirm-edit/route.ts',
+  'apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts',
+  'apps/web/lib/ai/tools/bio-text.ts',
+  'apps/web/lib/ai/tools/extract-bio-candidate.ts',
+  'apps/web/lib/ai/tools/import-bio-from-url.ts',
+  'apps/web/lib/chat/request-validation.ts',
+  'apps/web/lib/chat/system-prompt.ts',
+  'apps/web/lib/chat/tool-schemas.ts',
+  'apps/web/lib/chat/tools/tasks.ts',
+  'apps/web/lib/chat/types.ts',
+  'apps/web/lib/db/client/connection.ts',
+  'apps/web/lib/db/client/schema-db.ts',
+  'apps/web/lib/tasks/errors.ts',
+  'apps/web/lib/tasks/mutation-validation.server.ts',
+  'apps/web/lib/tasks/mutations.server.ts',
+  'apps/web/lib/tasks/task-view.ts',
+  'apps/web/lib/tasks/types.ts',
+]);
+
+// DashboardNav chrome is visible in the existing loaded /app/chat shell.
+const DASHBOARD_NAV_FILE =
+  'apps/web/components/features/dashboard/dashboard-nav/DashboardNav.tsx';
+// These client dependencies affect states the empty-shell producer cannot
+// prove. Select the real route, but retain an explicit missing-state failure
+// until a stateful producer exists; a generic screenshot must not clear it.
+const CHAT_PRESENTATION_STATES = new Map([
+  ['apps/web/lib/chat/message-text.ts', 'chat-populated-thread'],
+  ['apps/web/lib/chat/new-chat-intent.ts', 'chat-conversation-reset'],
+  ['apps/web/lib/chat/tool-ui-registry.ts', 'chat-tool-result'],
+]);
+
 /**
  * Authenticated `/app/chat` capture is for visual chat/shell surfaces.
  * API handlers, server turn execution, and onboarding helpers share the
@@ -36,11 +77,13 @@ function isAuthenticatedChatUiChange(file) {
 export function routeChangedFiles(files) {
   const changed = files.filter(
     file =>
-      UI_FILE.test(file) ||
-      NATIVE_UI_FILE.test(file) ||
-      PUBLIC_CARD_CAPTURE_FILE.test(file) ||
-      AUTHENTICATED_SHELL_CAPTURE_FILE.test(file) ||
-      /(^|\/)DESIGN\.md$/.test(file)
+      !UNIT_TEST_FILE.test(file) &&
+      !NON_RENDERING_FILES.has(file) &&
+      (UI_FILE.test(file) ||
+        NATIVE_UI_FILE.test(file) ||
+        PUBLIC_CARD_CAPTURE_FILE.test(file) ||
+        AUTHENTICATED_SHELL_CAPTURE_FILE.test(file) ||
+        /(^|\/)DESIGN\.md$/.test(file))
   );
   if (changed.length === 0)
     return {
@@ -52,7 +95,17 @@ export function routeChangedFiles(files) {
   const routes = new Set();
   const missingCoverage = [];
   for (const file of changed) {
-    if (PUBLIC_CARD_CAPTURE_FILE.test(file))
+    const requiredState = CHAT_PRESENTATION_STATES.get(file);
+    if (requiredState) {
+      routes.add(AUTHENTICATED_CHAT_CAPTURE_ROUTE);
+      missingCoverage.push({
+        file,
+        reason: 'missing-state-producer',
+        requiredState,
+      });
+    } else if (file === DASHBOARD_NAV_FILE)
+      routes.add(AUTHENTICATED_CHAT_CAPTURE_ROUTE);
+    else if (PUBLIC_CARD_CAPTURE_FILE.test(file))
       routes.add(PUBLIC_CARD_CAPTURE_ROUTE);
     else if (CONTACTS_CAPTURE_FILE.test(file))
       routes.add(CONTACTS_CAPTURE_ROUTE);

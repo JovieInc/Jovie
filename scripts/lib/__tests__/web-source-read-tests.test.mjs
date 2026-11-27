@@ -20,6 +20,38 @@ test('publication source-read uses the CI test budget', () => {
   assert.equal(args.at(-1), 'tests/unit/ci/deploy-workflow.test.ts');
 });
 
+test('a local worker cap changes only concurrency, preserving every test and budget', () => {
+  const selected = ['tests/unit/first.test.ts', 'tests/unit/second.test.ts'];
+  const normal = sourceReadRunnerArgs(selected, {});
+  const bounded = sourceReadRunnerArgs(selected, {
+    VITEST_LOCAL_MAX_WORKERS: '1',
+  });
+  assert.deepEqual(
+    bounded,
+    normal.map(arg => (arg === '--maxWorkers=4' ? '--maxWorkers=1' : arg))
+  );
+});
+
+test('CI retains four workers and invalid local limits retain the default', () => {
+  const selected = ['tests/unit/first.test.ts'];
+  const normal = sourceReadRunnerArgs(selected, {});
+  assert.ok(normal.includes('--maxWorkers=4'));
+  assert.deepEqual(
+    sourceReadRunnerArgs(selected, {
+      CI: 'true',
+      VITEST_LOCAL_MAX_WORKERS: '1',
+    }),
+    normal
+  );
+  for (const limit of ['', '0', '-1', '1.5', '1junk', 'invalid', '99']) {
+    assert.deepEqual(
+      sourceReadRunnerArgs(selected, { VITEST_LOCAL_MAX_WORKERS: limit }),
+      normal,
+      `local limit ${JSON.stringify(limit)}`
+    );
+  }
+});
+
 test('path keys keep path literals, join runs, file names and route groups', () => {
   const keys = pathKeys(`
     import { readFileSync } from 'node:fs';

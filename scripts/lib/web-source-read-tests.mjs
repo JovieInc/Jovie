@@ -189,8 +189,15 @@ export function selectSourceReadTests(changed, options = {}) {
  * production-config reads at 5s; git-heavy iOS TestFlight selection timed
  * out at 12s when preflight ran this suite alongside script-contracts.
  * @param {readonly string[]} selected web-relative test paths
+ * @param {Record<string, string | undefined>} [env]
  */
-export function sourceReadRunnerArgs(selected) {
+export function sourceReadRunnerArgs(selected, env = process.env) {
+  // Honor the existing local resource cap without changing hosted CI policy.
+  const localLimit = Number(env.VITEST_LOCAL_MAX_WORKERS);
+  const maxWorkers =
+    env.CI !== 'true' && Number.isInteger(localLimit) && localLimit >= 1
+      ? Math.min(localLimit, 4)
+      : 4;
   return [
     '--filter',
     '@jovie/web',
@@ -198,7 +205,7 @@ export function sourceReadRunnerArgs(selected) {
     'test:fast',
     '--',
     '--pool=forks',
-    '--maxWorkers=4',
+    `--maxWorkers=${maxWorkers}`,
     '--fileParallelism',
     '--retry=1',
     '--testTimeout=30000',
