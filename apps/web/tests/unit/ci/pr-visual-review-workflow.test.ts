@@ -73,14 +73,27 @@ describe('PR visual review workflow', () => {
     );
     expect(capture).toContain('name: Enforce visual evidence (fail-closed)');
     expect(capture).not.toContain('does not block merging');
-    expect(capture).toMatch(
-      /id: build\n        if: steps\.route\.outputs\.should_review == 'true'\n        continue-on-error: true/
+    // Unsupported native UI still requires evidence (should_review), while
+    // only supported routes admit browser work (has_routes).
+    expect(capture).toContain('should_review=${route.shouldReview}');
+    expect(capture).toContain('has_routes=${route.routes.length > 0}');
+    expect(capture.indexOf('name: Route changed files')).toBeLessThan(
+      capture.indexOf('name: Setup Playwright Chromium')
     );
     expect(capture).toMatch(
-      /id: server\n        if: steps\.route\.outputs\.should_review == 'true' && steps\.build\.outcome == 'success'\n        continue-on-error: true/
+      /name: Setup Playwright Chromium\n        if: steps\.route\.outputs\.has_routes == 'true'\n/
     );
     expect(capture).toMatch(
-      /id: routed_capture\n        if: steps\.route\.outputs\.should_review == 'true' && steps\.build\.outcome == 'success' && steps\.server\.outcome == 'success'\n        continue-on-error: true/
+      /name: Enforce visual evidence \(fail-closed\)\n        if: always\(\)\n        env:/
+    );
+    expect(capture).toMatch(
+      /id: build\n        if: steps\.route\.outputs\.has_routes == 'true'\n        continue-on-error: true/
+    );
+    expect(capture).toMatch(
+      /id: server\n        if: steps\.route\.outputs\.has_routes == 'true' && steps\.build\.outcome == 'success'\n        continue-on-error: true/
+    );
+    expect(capture).toMatch(
+      /id: routed_capture\n        if: steps\.route\.outputs\.has_routes == 'true' && steps\.build\.outcome == 'success' && steps\.server\.outcome == 'success'\n        continue-on-error: true/
     );
     expect(capture).toContain('name: Upload visual evidence');
     expect(capture).toMatch(
