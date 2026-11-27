@@ -127,7 +127,7 @@ describe('bounded PR visual review contract', () => {
     expect(capture).toContain("waitUntil: route.startsWith('/app/')");
     expect(capture).toContain("'domcontentloaded'");
     expect(capture).toContain('waitForAuthenticatedShell');
-    expect(capture).toContain('/Inbox|Library|New Chat/');
+    expect(capture).toContain('assertAuthenticatedShell(page, route)');
   });
 
   it('skips postgres on the secretless visual-capture shell path', () => {
@@ -537,25 +537,21 @@ describe('bounded PR visual review contract', () => {
   });
 
   it('waits for the loaded authenticated New Chat shell instead of the streaming fallback', () => {
-    const capture = readFileSync(
-      '.github/scripts/pr-visual-review-capture.mjs',
+    const shell = readFileSync(
+      '.github/scripts/pr-visual-capture-shell.mjs',
       'utf8'
     );
-    expect(capture).toContain('waitForAuthenticatedShell');
-    expect(capture).toContain('[data-testid="dashboard-header"]');
-    expect(capture).toContain('[data-testid="dashboard-error"]');
-    expect(capture).toContain('filter({ visible: true })');
-    expect(capture).toContain('.first().waitFor');
-    expect(capture).not.toContain('.or(visibleDashboardError)');
-    expect(capture).toContain(
+    expect(shell).toContain('waitForAuthenticatedShell');
+    expect(shell).toContain('[data-testid="dashboard-header"]');
+    expect(shell).toContain('[data-testid="dashboard-error"]');
+    expect(shell).toContain('filter({ visible: true })');
+    expect(shell).not.toContain('.or(visibleDashboardError)');
+    expect(shell).toContain(
       'Captured app route rendered dashboard error UI instead of authenticated shell'
     );
-    expect(capture).toContain(
-      "getByRole('heading', { name: 'New Chat', level: 1 })"
-    );
-    expect(capture).toContain("getByRole('heading', { level: 2 })");
-    expect(capture).toContain("getByTestId('chat-empty-state-greeting-text')");
-    expect(capture).toContain("'domcontentloaded'");
+    expect(shell).toContain('[data-app-shell-frame="true"]');
+    expect(shell).toContain('nav[aria-label="Dashboard Tabs"]');
+    expect(shell).toContain('h2[data-testid="chat-empty-state-greeting-text"]');
   });
 });
 
