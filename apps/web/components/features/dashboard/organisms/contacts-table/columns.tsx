@@ -23,14 +23,9 @@ const contactColumnHelper = createColumnHelper<EditableContact>();
 function ContactIdentityCell({
   contact,
 }: Readonly<{ contact: EditableContact }>) {
-  const name = contact.personName || contact.companyName;
+  const name = contact.personName?.trim() || contact.companyName?.trim();
   if (!name) return <span className='text-tertiary-token'>—</span>;
-  return (
-    <PersonCell
-      name={name}
-      secondary={contact.personName ? contact.companyName : null}
-    />
-  );
+  return <PersonCell name={name} />;
 }
 
 function copyToClipboard(text: string, label: string) {
@@ -62,7 +57,7 @@ export function createContactColumns(
   callbacks: ContactColumnCallbacks
 ): ContactColumnDef[] {
   return [
-    // Identity column: the shared people row (face, name, company)
+    // Identity column: one clear name; company details stay in the rail.
     contactColumnHelper.display({
       id: 'nameCompany',
       header: 'Name',
