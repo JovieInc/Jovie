@@ -19,28 +19,33 @@ import {
   or,
   type SQL,
 } from 'drizzle-orm';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
+import { runAtomicDbOperation } from '@/lib/db/legacy-transaction';
 import { discogReleases } from '@/lib/db/schema/content';
 import { tasks } from '@/lib/db/schema/tasks';
 import { requireTasksWorkspaceAccess } from '@/lib/entitlements/tasks-gate';
 import { isScreenCertAppShellFixtureProfile } from '@/lib/screen-cert/app-shell-fixture-gate';
 import { dedupeReleaseTasks } from '@/lib/tasks/dedupe-release-tasks';
-import { isTaskStatus, TASK_BOARD_STATUSES } from '@/lib/tasks/task-board';
-import { sanitizeTaskDueAt } from '@/lib/tasks/task-due-date';
 import {
-  getNextTaskPosition,
-  reserveTaskNumber,
-} from '@/lib/tasks/task-reservation';
-import { buildTaskUpdateFieldPatch } from '@/lib/tasks/task-update';
+  bulkUpdateTasksInTransaction,
+  createTaskInTransaction,
+  deleteTaskInTransaction,
+  moveTaskInTransaction,
+  updateTaskInTransaction,
+} from '@/lib/tasks/mutations.server';
+import { TASK_BOARD_STATUSES } from '@/lib/tasks/task-board';
+import { mapTaskRow } from '@/lib/tasks/task-view';
 import type {
+  BulkTaskUpdateResult,
   CreateTaskInput,
   MoveTaskInput,
+  MoveTaskResult,
   TaskBoardResult,
   TaskCursor,
   TaskFilters,
   TaskListResult,
   TaskStats,
-  TaskStatus,
   TaskView,
   UpdateTaskInput,
 } from '@/lib/tasks/types';
@@ -52,7 +57,6 @@ import {
 
 const DEFAULT_TASK_LIMIT = 50;
 const MAX_TASK_LIMIT = 100;
-const TASK_POSITION_STEP = 1024;
 
 function clampLimit(limit?: number): number {
   if (!limit) return DEFAULT_TASK_LIMIT;
@@ -148,42 +152,6 @@ function formatTaskStats(
   };
 }
 
-function mapTaskRow(
-  row: Omit<TaskView, 'releaseTitle'> & { releaseTitle?: string | null }
-): TaskView {
-  return {
-    id: row.id,
-    taskNumber: row.taskNumber,
-    creatorProfileId: row.creatorProfileId,
-    title: row.title,
-    description: row.description ?? null,
-    status: row.status,
-    priority: row.priority,
-    assigneeKind: row.assigneeKind,
-    assigneeUserId: row.assigneeUserId ?? null,
-    agentType: row.agentType ?? null,
-    agentStatus: row.agentStatus,
-    agentInput: row.agentInput ?? null,
-    agentOutput: row.agentOutput ?? null,
-    agentError: row.agentError ?? null,
-    releaseId: row.releaseId ?? null,
-    releaseTitle: row.releaseTitle ?? null,
-    parentTaskId: row.parentTaskId ?? null,
-    category: row.category ?? null,
-    // Drop epoch / multi-year historical dues so the list never paints "12Y ago".
-    dueAt: sanitizeTaskDueAt(row.dueAt ?? null),
-    scheduledFor: row.scheduledFor ?? null,
-    startedAt: row.startedAt ?? null,
-    completedAt: row.completedAt ?? null,
-    position: row.position,
-    sourceTemplateId: row.sourceTemplateId ?? null,
-    metadata: row.metadata ?? null,
-    mutationVersion: row.mutationVersion ?? 1,
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  };
-}
-
 function mapAndDedupeTaskRows(
   rows: ReadonlyArray<
     Omit<TaskView, 'releaseTitle'> & { releaseTitle?: string | null }
@@ -192,121 +160,9 @@ function mapAndDedupeTaskRows(
   return dedupeReleaseTasks(rows.map(mapTaskRow));
 }
 
-async function assertReleaseAccess(
-  profileId: string,
-  releaseId: string | null | undefined
-): Promise<void> {
-  if (!releaseId) {
-    return;
-  }
-
-  const [release] = await db
-    .select({ id: discogReleases.id })
-    .from(discogReleases)
-    .where(
-      and(
-        eq(discogReleases.id, releaseId),
-        eq(discogReleases.creatorProfileId, profileId)
-      )
-    )
-    .limit(1);
-
-  if (!release) {
-    throw new Error('Release not found or access denied');
-  }
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    error.code === '23505'
-  );
-}
-
-// Task mutations in this file do not call `revalidatePath`: every task read
-// (list, board, detail, stats, release tasks) goes through TanStack Query, and
-// the mutation hooks in lib/queries/useTaskMutations.ts and
-// useReleaseTaskMutations.ts invalidate those queries themselves. A path
-// revalidation would only add a full route re-render to each action response
-// and purge the client Router Cache.
-async function createTaskForProfile(
-  profileId: string,
-  data: CreateTaskInput,
-  attempt = 0
-): Promise<TaskView> {
-  await assertReleaseAccess(profileId, data.releaseId);
-
-  const [taskNumber, position] = await Promise.all([
-    reserveTaskNumber(profileId),
-    getNextTaskPosition(profileId),
-  ]);
-
-  try {
-    const [created] = await db
-      .insert(tasks)
-      .values({
-        taskNumber,
-        creatorProfileId: profileId,
-        title: data.title,
-        description: data.description ?? null,
-        status: data.status ?? 'todo',
-        priority: data.priority ?? 'medium',
-        assigneeKind: data.assigneeKind ?? 'human',
-        assigneeUserId: data.assigneeUserId ?? null,
-        agentType: data.agentType ?? null,
-        agentStatus: data.agentStatus ?? 'idle',
-        agentInput: data.agentInput ?? {},
-        agentOutput: data.agentOutput ?? {},
-        agentError: data.agentError ?? null,
-        releaseId: data.releaseId ?? null,
-        parentTaskId: data.parentTaskId ?? null,
-        category: data.category ?? null,
-        dueAt: data.dueAt ?? null,
-        scheduledFor: data.scheduledFor ?? null,
-        startedAt: data.startedAt ?? null,
-        completedAt:
-          data.completedAt ?? (data.status === 'done' ? new Date() : null),
-        position,
-        sourceTemplateId: data.sourceTemplateId ?? null,
-        metadata: data.metadata ?? {},
-      })
-      .returning();
-
-    return mapTaskRow(created);
-  } catch (error) {
-    if (attempt === 0 && isUniqueViolation(error)) {
-      return createTaskForProfile(profileId, data, 1);
-    }
-
-    throw error;
-  }
-}
-
-async function getOwnedTaskOrThrow(
-  profileId: string,
-  taskId: string
-): Promise<typeof tasks.$inferSelect> {
-  const [task] = await db
-    .select()
-    .from(tasks)
-    .where(
-      and(
-        eq(tasks.id, taskId),
-        eq(tasks.creatorProfileId, profileId),
-        isNull(tasks.deletedAt)
-      )
-    )
-    .limit(1);
-
-  if (!task) {
-    throw new Error('Task not found or access denied');
-  }
-
-  return task;
-}
-
+// Every task read uses TanStack Query. Mutations return the authoritative
+// records; their client hooks invalidate the affected queries without a route
+// re-render or Router Cache purge.
 function getNextCursor(
   rows: Array<Pick<TaskView, 'id' | 'position'>>,
   limit: number
@@ -328,109 +184,6 @@ function getNextCursor(
 
 function getPageRows<T>(rows: T[], limit: number): T[] {
   return rows.length > limit ? rows.slice(0, limit) : rows;
-}
-
-function assertMoveTaskInput(
-  input: MoveTaskInput
-): asserts input is MoveTaskInput {
-  if (!input.taskId || typeof input.taskId !== 'string') {
-    throw new Error('Task not found or access denied');
-  }
-
-  if (!isTaskStatus(input.toStatus)) {
-    throw new Error('Invalid task status');
-  }
-
-  if (input.beforeTaskId && input.afterTaskId) {
-    throw new Error('Provide only one task order anchor');
-  }
-
-  const adjacentIds = [input.beforeTaskId, input.afterTaskId].filter(Boolean);
-  if (adjacentIds.includes(input.taskId)) {
-    throw new Error('Task cannot be moved next to itself');
-  }
-}
-
-function resolveInsertIndex(
-  destinationRows: Array<typeof tasks.$inferSelect>,
-  input: MoveTaskInput
-): number {
-  if (input.beforeTaskId) {
-    const beforeIndex = destinationRows.findIndex(
-      row => row.id === input.beforeTaskId
-    );
-    if (beforeIndex === -1) {
-      throw new Error('Task order changed. Reload and try again.');
-    }
-    return beforeIndex;
-  }
-
-  if (input.afterTaskId) {
-    const afterIndex = destinationRows.findIndex(
-      row => row.id === input.afterTaskId
-    );
-    if (afterIndex === -1) {
-      throw new Error('Task order changed. Reload and try again.');
-    }
-    return afterIndex + 1;
-  }
-
-  return destinationRows.length;
-}
-
-function getTaskMoveUpdates({
-  rows,
-  movingTask,
-  input,
-}: Readonly<{
-  rows: Array<typeof tasks.$inferSelect>;
-  movingTask: typeof tasks.$inferSelect;
-  input: MoveTaskInput;
-}>): Array<{
-  readonly id: string;
-  readonly status: TaskStatus;
-  readonly position: number;
-}> {
-  const statuses = new Set<TaskStatus>([movingTask.status, input.toStatus]);
-  const groups = new Map<TaskStatus, Array<typeof tasks.$inferSelect>>();
-
-  for (const status of statuses) {
-    groups.set(
-      status,
-      rows
-        .filter(row => row.status === status && row.id !== movingTask.id)
-        .sort(
-          (left, right) =>
-            left.position - right.position || left.id.localeCompare(right.id)
-        )
-    );
-  }
-
-  const destinationRows = groups.get(input.toStatus) ?? [];
-  const insertIndex = resolveInsertIndex(destinationRows, input);
-  destinationRows.splice(insertIndex, 0, {
-    ...movingTask,
-    status: input.toStatus,
-  });
-  groups.set(input.toStatus, destinationRows);
-
-  const updates: Array<{
-    readonly id: string;
-    readonly status: TaskStatus;
-    readonly position: number;
-  }> = [];
-
-  for (const [status, groupRows] of groups) {
-    groupRows.forEach((row, index) => {
-      updates.push({
-        id: row.id,
-        status,
-        position: (index + 1) * TASK_POSITION_STEP,
-      });
-    });
-  }
-
-  return updates;
 }
 
 export async function getTasks(filters?: TaskFilters): Promise<TaskListResult> {
@@ -627,277 +380,74 @@ export async function getTask(taskId: string): Promise<TaskView> {
 }
 
 export async function createTask(data: CreateTaskInput): Promise<TaskView> {
+  const { actorId, profileId } = await requireTaskMutationScope();
+  const created = await runAtomicDbOperation(
+    tx => createTaskInTransaction(tx, profileId, data),
+    { actorId, retry: 'serialization' }
+  );
+  return mapTaskRow(created);
+}
+
+async function requireTaskMutationScope() {
   await requireTasksWorkspaceAccess();
+  const { userId } = await getCachedAuth({ session: 'fresh' });
+  if (!userId) throw new Error('Authentication required');
   const profileId = await requireProfileId();
-  return createTaskForProfile(profileId, data);
+  return { actorId: userId, profileId };
 }
 
 export async function updateTask(
   taskId: string,
   data: UpdateTaskInput
 ): Promise<TaskView> {
-  await requireTasksWorkspaceAccess();
-  const profileId = await requireProfileId();
-  const existingTask = await getOwnedTaskOrThrow(profileId, taskId);
-  const expectedMutationVersion = data.expectedMutationVersion;
-
-  await assertReleaseAccess(profileId, data.releaseId);
-
-  const [updated] = await db
-    .update(tasks)
-    .set({
-      ...buildTaskUpdateFieldPatch(data, existingTask),
-      mutationVersion: drizzleSql`${tasks.mutationVersion} + 1`,
-    })
-    .where(
-      and(
-        eq(tasks.id, taskId),
-        eq(tasks.creatorProfileId, profileId),
-        isNull(tasks.deletedAt),
-        expectedMutationVersion === undefined
-          ? undefined
-          : eq(tasks.mutationVersion, expectedMutationVersion)
-      )
-    )
-    .returning();
-
-  if (!updated) {
-    throw new Error('Task changed in another session');
-  }
-
+  const { actorId, profileId } = await requireTaskMutationScope();
+  const updated = await runAtomicDbOperation(
+    tx => updateTaskInTransaction(tx, profileId, taskId, data),
+    { actorId, retry: 'serialization' }
+  );
   return mapTaskRow(updated);
 }
 
-const MAX_MOVE_ATTEMPTS = 3;
-
-async function attemptMoveTask(
-  profileId: string,
-  movingTask: typeof tasks.$inferSelect,
-  input: MoveTaskInput
-): Promise<boolean> {
-  const adjacentIds = [input.beforeTaskId, input.afterTaskId].filter(
-    (id): id is string => Boolean(id)
+export async function moveTask(input: MoveTaskInput): Promise<MoveTaskResult> {
+  const { actorId, profileId } = await requireTaskMutationScope();
+  return runAtomicDbOperation(
+    tx => moveTaskInTransaction(tx, profileId, input),
+    { actorId, retry: 'serialization' }
   );
-
-  if (adjacentIds.length > 0) {
-    const adjacentRows = await db
-      .select({
-        id: tasks.id,
-        status: tasks.status,
-      })
-      .from(tasks)
-      .where(
-        and(
-          eq(tasks.creatorProfileId, profileId),
-          isNull(tasks.deletedAt),
-          inArray(tasks.id, adjacentIds)
-        )
-      );
-
-    if (
-      adjacentRows.length !== adjacentIds.length ||
-      adjacentRows.some(row => row.status !== input.toStatus)
-    ) {
-      // Adjacent anchor task moved or changed status — treat as a retry-able conflict.
-      return false;
-    }
-  }
-
-  const affectedStatuses = Array.from(
-    new Set<TaskStatus>([movingTask.status, input.toStatus])
-  );
-  const affectedRows = await db
-    .select()
-    .from(tasks)
-    .where(
-      and(
-        eq(tasks.creatorProfileId, profileId),
-        isNull(tasks.deletedAt),
-        inArray(tasks.status, affectedStatuses)
-      )
-    )
-    .orderBy(asc(tasks.position), asc(tasks.id));
-
-  let updates: ReturnType<typeof getTaskMoveUpdates>;
-  try {
-    updates = getTaskMoveUpdates({
-      rows: affectedRows,
-      movingTask,
-      input,
-    });
-  } catch {
-    // resolveInsertIndex throws when a before/after anchor is not found in the
-    // destination column — the adjacent-status check above should have already
-    // caught this, but guard here too so it triggers a retry rather than
-    // surfacing the raw error to the user.
-    return false;
-  }
-
-  if (updates.length === 0) {
-    return true;
-  }
-
-  const originalUpdatedAtByTaskId = new Map(
-    affectedRows.map(row => [row.id, row.updatedAt] as const)
-  );
-
-  // Build per-row preconditions with AND so we only update rows whose
-  // timestamps still match what we read. Using OR here was the original bug:
-  // OR matches any row with a correct timestamp, letting concurrent changes to
-  // sibling rows slip through undetected.
-  const updatePreconditions: SQL<unknown>[] = [];
-
-  for (const update of updates) {
-    const originalUpdatedAt = originalUpdatedAtByTaskId.get(update.id);
-    if (!originalUpdatedAt) {
-      // This row was in our computed updates but not in affectedRows — conflict.
-      return false;
-    }
-
-    const precondition = and(
-      eq(tasks.id, update.id),
-      eq(tasks.updatedAt, originalUpdatedAt)
-    );
-
-    if (!precondition) {
-      return false;
-    }
-
-    updatePreconditions.push(precondition);
-  }
-
-  // OR the per-row preconditions so the WHERE matches each row individually.
-  // Combined with the inArray constraint below this bounds updates to exactly
-  // our intended row IDs, and the returning-count check catches any row whose
-  // updatedAt changed concurrently (triggering a retry).
-  const guardedUpdateCondition =
-    updatePreconditions.length === 1
-      ? updatePreconditions[0]
-      : or(...updatePreconditions);
-
-  if (!guardedUpdateCondition) {
-    return false;
-  }
-
-  const statusCase = drizzleSql<typeof tasks.status>`case ${drizzleSql.join(
-    updates.map(
-      update =>
-        drizzleSql`when ${tasks.id} = ${update.id} then ${update.status}::release_task_status`
-    ),
-    drizzleSql` `
-  )} else ${tasks.status} end`;
-  const positionCase = drizzleSql<number>`case ${drizzleSql.join(
-    updates.map(
-      update =>
-        drizzleSql`when ${tasks.id} = ${update.id} then ${update.position}`
-    ),
-    drizzleSql` `
-  )} else ${tasks.position} end`;
-  const nextCompletedAt =
-    input.toStatus === 'done'
-      ? (movingTask.completedAt ?? new Date())
-      : input.toStatus !== movingTask.status
-        ? null
-        : movingTask.completedAt;
-  const completedAtCase = drizzleSql<Date | null>`case when ${tasks.id} = ${input.taskId} then ${nextCompletedAt} else ${tasks.completedAt} end`;
-
-  const updated = await db
-    .update(tasks)
-    .set({
-      status: statusCase,
-      position: positionCase,
-      completedAt: completedAtCase,
-      updatedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(tasks.creatorProfileId, profileId),
-        isNull(tasks.deletedAt),
-        inArray(
-          tasks.id,
-          updates.map(u => u.id)
-        ),
-        guardedUpdateCondition
-      )
-    )
-    .returning({ id: tasks.id });
-
-  // If the updated count differs, a concurrent change raced us. Signal retry.
-  return updated.length === updates.length;
-}
-
-export async function moveTask(
-  input: MoveTaskInput
-): Promise<{ readonly success: true }> {
-  await requireTasksWorkspaceAccess();
-  assertMoveTaskInput(input);
-
-  const profileId = await requireProfileId();
-
-  for (let attempt = 0; attempt < MAX_MOVE_ATTEMPTS; attempt++) {
-    // Re-read the moving task on each attempt so we have fresh timestamps.
-    const movingTask = await getOwnedTaskOrThrow(profileId, input.taskId);
-    const succeeded = await attemptMoveTask(profileId, movingTask, input);
-
-    if (succeeded) {
-      return { success: true };
-    }
-  }
-
-  // All retries exhausted — still succeed from the client's perspective.
-  // The onSettled invalidateQueries in useMoveTaskMutation will re-sync state.
-  return { success: true };
 }
 
 export async function deleteTask(
-  taskId: string
+  taskId: string,
+  expectedMutationVersion?: number
 ): Promise<{ readonly success: true }> {
-  await requireTasksWorkspaceAccess();
-  const profileId = await requireProfileId();
-  await getOwnedTaskOrThrow(profileId, taskId);
-
-  await db
-    .update(tasks)
-    .set({
-      deletedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(eq(tasks.id, taskId));
-
+  const { actorId, profileId } = await requireTaskMutationScope();
+  await runAtomicDbOperation(
+    tx =>
+      deleteTaskInTransaction(tx, profileId, taskId, expectedMutationVersion),
+    { actorId, retry: 'serialization' }
+  );
   return { success: true };
 }
 
 export async function bulkUpdateTasks(
   taskIds: string[],
-  data: UpdateTaskInput
-): Promise<{ readonly success: true }> {
-  await requireTasksWorkspaceAccess();
-  if (taskIds.length === 0) {
-    return { success: true };
-  }
-
-  const profileId = await requireProfileId();
-
-  const ownedTasks = await db
-    .select({ id: tasks.id })
-    .from(tasks)
-    .where(
-      and(
-        eq(tasks.creatorProfileId, profileId),
-        isNull(tasks.deletedAt),
-        inArray(tasks.id, taskIds)
-      )
-    );
-
-  if (ownedTasks.length !== taskIds.length) {
-    throw new Error('One or more tasks were not found or are not accessible');
-  }
-
-  for (const taskId of taskIds) {
-    await updateTask(taskId, data);
-  }
-
-  return { success: true };
+  data: UpdateTaskInput,
+  expectedMutationVersions?: Readonly<Record<string, number>>
+): Promise<BulkTaskUpdateResult> {
+  const { actorId, profileId } = await requireTaskMutationScope();
+  if (taskIds.length === 0) return { success: true, affectedTasks: [] };
+  const updated = await runAtomicDbOperation(
+    tx =>
+      bulkUpdateTasksInTransaction(
+        tx,
+        profileId,
+        taskIds,
+        data,
+        expectedMutationVersions
+      ),
+    { actorId, retry: 'serialization' }
+  );
+  return { success: true, affectedTasks: updated.map(mapTaskRow) };
 }
 
 export async function getTaskStats(

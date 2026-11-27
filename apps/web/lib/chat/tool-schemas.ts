@@ -6,6 +6,11 @@
  * The route attaches execute closures; the eval runner uses no-op stubs.
  */
 
+import {
+  TASK_ASSIGNEE_KINDS,
+  TASK_PRIORITIES,
+  TASK_STATUSES,
+} from '@jovie/action-contracts';
 import { z } from 'zod';
 import { PITCH_GRILL_PROCEDURE } from '@/lib/services/pitch/curator-checklist';
 import {
@@ -74,24 +79,45 @@ export const TOOL_SCHEMAS = {
    */
   manageTasks: {
     description:
-      'Create, list, or open the Tasks workspace for release and general work. Use when the artist asks to create tasks, list tasks, open Tasks, set up a release plan checklist, or manage their to-do list.',
+      'Create, inspect, update, assign, and move tasks in the artist’s Tasks workspace, or set up a release plan. Read a task before changing it and pass its mutationVersion as expectedMutationVersion. Use update to change title, description, priority, assignee, due date, or status (including completion, cancellation, and reopening); use move to change board status or ordering. Mark work done only when its outcome is verified or the artist explicitly directs it. Age, nonresponse, or a prepared draft does not prove completion. Assignment to Jovie records responsibility, not a running or completed agent execution.',
     inputSchema: chatToolSchema({
       intent: z
-        .enum(['create', 'list', 'open', 'release_plan'])
+        .enum([
+          'create',
+          'list',
+          'get',
+          'update',
+          'move',
+          'open',
+          'release_plan',
+        ])
         .optional()
         .describe(
-          'What the artist wants: create a task, list tasks, open the Tasks workspace, or set up a release plan checklist.'
+          'The task operation. get returns authoritative task state and revision before an update or move.'
         ),
+      taskId: z.uuid().optional(),
+      expectedMutationVersion: z.number().int().positive().optional(),
       title: z
         .string()
+        .trim()
+        .min(1)
         .max(200)
         .optional()
-        .describe('Optional task title when creating a task'),
+        .describe('Task title when creating or updating a task'),
+      description: z.string().max(2000).nullish(),
+      status: z.enum(TASK_STATUSES).optional(),
+      priority: z.enum(TASK_PRIORITIES).optional(),
+      assigneeKind: z.enum(TASK_ASSIGNEE_KINDS).optional(),
+      dueAt: z.iso.datetime().nullish(),
+      beforeTaskId: z.uuid().nullish(),
+      afterTaskId: z.uuid().nullish(),
       releaseId: z
         .string()
         .uuid()
         .optional()
-        .describe('Release ID when setting up a release plan checklist'),
+        .describe(
+          'An owned release when creating a task or setting up its release plan'
+        ),
     }),
   },
 

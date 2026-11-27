@@ -8,53 +8,22 @@ const {
   mockRequireTasksWorkspaceAccess: vi.fn(),
 }));
 
-vi.mock('drizzle-orm', () => ({
-  and: vi.fn(),
-  asc: vi.fn(),
-  count: vi.fn(),
-  eq: vi.fn(),
-  ilike: vi.fn(),
-  inArray: vi.fn(),
-  isNull: vi.fn(),
-  max: vi.fn(),
-  or: vi.fn(),
-  sql: vi.fn(),
-}));
-
 vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
 }));
 
-vi.mock('@/constants/routes', () => ({
-  APP_ROUTES: {
-    DASHBOARD_TASKS: '/app/dashboard/tasks',
-    DASHBOARD_RELEASES: '/app/dashboard/releases',
-  },
+// These gate/fixture reads never enter mutation authentication.
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {},
 }));
 
-vi.mock('@/lib/db/schema/content', () => ({
-  discogReleases: {},
-}));
-
-vi.mock('@/lib/db/schema/profiles', () => ({
-  creatorProfiles: {},
-}));
-
-vi.mock('@/lib/db/schema/tasks', () => ({
-  tasks: {},
-}));
-
 vi.mock('@/lib/entitlements/tasks-gate', () => ({
   requireReleasePlanGenerationAccess: mockRequireReleasePlanGenerationAccess,
   requireTasksWorkspaceAccess: mockRequireTasksWorkspaceAccess,
-}));
-
-vi.mock('@/lib/release-tasks/default-template', () => ({
-  DEFAULT_RELEASE_TASK_TEMPLATE: [],
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/requireProfileId', () => ({
