@@ -17,6 +17,7 @@ describe('AccountMenuShortcut', () => {
       expect(cap.tagName).toBe('KBD');
       expect(cap).toHaveAttribute('data-slot', 'kbd');
       expect(cap).toHaveAttribute('data-variant', 'default');
+      expect(cap).toHaveAttribute('data-size', 'sm');
     }
   });
 

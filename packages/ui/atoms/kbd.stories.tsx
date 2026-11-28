@@ -161,3 +161,22 @@ export const Rtl: Story = {
     },
   },
 };
+
+/**
+ * Small keycaps in a menu row's trailing slot: a partial chord hint that stays
+ * secondary to the row label (the account menu's G S and Option Shift Q).
+ */
+export const PartialSmallChord: Story = {
+  render: function PartialSmallChordStory() {
+    return (
+      <div className='flex w-64 items-center justify-between text-sm text-secondary-token'>
+        <span>Sign Out</span>
+        <span className='inline-flex items-center gap-0.5'>
+          <Kbd size='sm'>⌥</Kbd>
+          <Kbd size='sm'>⇧</Kbd>
+          <Kbd size='sm'>Q</Kbd>
+        </span>
+      </div>
+    );
+  },
+};

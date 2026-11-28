@@ -459,11 +459,11 @@ describe('UserButton account surface layout', () => {
       expect(separator).not.toHaveClass('h-2');
     }
 
-    // Version reads as a muted section label on the same gutter.
+    // Version is a small, quiet diagnostics line on the same gutter.
     expect(within(menu).getByTestId('app-build-diagnostics')).toHaveClass(
-      'h-8',
+      'h-6',
       'px-(--space-2-5)',
-      'text-tertiary-token'
+      'text-3xs text-quaternary-token'
     );
 
     // Usage is a normal row: concentric radius, not a square strip.

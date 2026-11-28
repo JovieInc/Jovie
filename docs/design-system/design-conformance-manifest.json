@@ -103,14 +103,14 @@
     {
       "id": "atom.kbd",
       "state": "source-bound",
-      "revision": 2,
+      "revision": 3,
       "platforms": ["web"],
       "source": "packages/ui/atoms/kbd.tsx",
       "tokenSources": ["packages/ui/theme/tokens.ts"],
       "storySources": ["packages/ui/atoms/kbd.stories.tsx"],
       "testSources": ["packages/ui/atoms/kbd.test.tsx"],
       "penRootId": null,
-      "sourceDigest": "655ac0cfaefd1214f9ac7bddeb7277a6d3508c16ade7018e60fda93d6ef5aab3"
+      "sourceDigest": "dc5392c4e6b44fa28b25dbb895ce1a026a1c994af93e008a5a02714c6424bcfb"
     },
     {
       "id": "atom.icon-button",

@@ -11,6 +11,12 @@ export interface KbdProps extends React.HTMLAttributes<HTMLElement> {
    * @default 'default'
    */
   readonly variant?: 'default' | 'tooltip';
+  /**
+   * Keycap size. 'sm' is the quiet 16px chip for menu-row hints, where the
+   * shortcut is secondary to the row's label.
+   * @default 'default'
+   */
+  readonly size?: 'default' | 'sm';
 }
 
 // Modifier glyphs are read as raw symbols (or skipped) by screen readers, so
@@ -31,7 +37,10 @@ function spokenKeyNames(children: React.ReactNode): string | null {
 }
 
 const Kbd = React.forwardRef<HTMLElement, KbdProps>(
-  ({ className, variant = 'default', children, ...props }, ref) => {
+  (
+    { className, variant = 'default', size = 'default', children, ...props },
+    ref
+  ) => {
     // The text glyph is retained for the accessibility tree while the visible
     // mark uses the existing icon system. This keeps Shift legible at the
     // compact keycap size without introducing a bespoke glyph asset.
@@ -44,15 +53,22 @@ const Kbd = React.forwardRef<HTMLElement, KbdProps>(
         ref={ref}
         data-slot='kbd'
         data-variant={variant}
+        data-size={size}
         data-key={isShiftGlyph ? 'shift' : undefined}
         className={cn(
-          'inline-flex min-h-6 min-w-6 max-w-full items-center justify-center rounded-(--app-shell-radius-item) border border-(--linear-border-default) px-2 py-0.5 text-center font-sans text-xs leading-4 tracking-tight font-medium shadow-sm',
+          'inline-flex max-w-full items-center justify-center border text-center font-sans tracking-tight font-medium',
+          size === 'sm'
+            ? 'min-h-4 min-w-4 rounded-(--radius-default) border-subtle px-1 text-3xs leading-3'
+            : 'min-h-6 min-w-6 rounded-(--app-shell-radius-item) border-(--linear-border-default) px-2 py-0.5 text-xs leading-4 shadow-sm',
           variant === 'tooltip'
             ? // Tooltip variant: the existing 8px radius token matches the
               // canonical overlay's 16px radius after its 8px `space-2` inset.
               'rounded-(--radius-sm) border-strong bg-surface-tooltip text-tooltip-foreground'
-            : // Default variant: for use outside tooltips
-              'bg-(--linear-bg-surface-1) text-(--linear-text-secondary)',
+            : size === 'sm'
+              ? // Small chips stay quiet: no fill, muted glyphs.
+                'bg-transparent text-tertiary-token'
+              : // Default variant: for use outside tooltips
+                'bg-(--linear-bg-surface-1) text-(--linear-text-secondary)',
           className
         )}
         {...props}
@@ -63,7 +79,10 @@ const Kbd = React.forwardRef<HTMLElement, KbdProps>(
             <ArrowBigUp
               aria-hidden='true'
               data-kbd-shift-icon='true'
-              className='h-3 w-3 shrink-0'
+              className={cn(
+                'shrink-0',
+                size === 'sm' ? 'h-2.5 w-2.5' : 'h-3 w-3'
+              )}
               strokeWidth={1.75}
             />
           </>

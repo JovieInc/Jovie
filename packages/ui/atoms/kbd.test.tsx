@@ -90,6 +90,21 @@ describe('Kbd', () => {
       expect(kbd.className).toContain('shadow-sm');
     });
 
+    it('renders the small size as a quiet 16px chip', () => {
+      render(
+        <Kbd size='sm' data-testid='kbd'>
+          G
+        </Kbd>
+      );
+      const kbd = screen.getByTestId('kbd');
+      expect(kbd).toHaveAttribute('data-size', 'sm');
+      expect(kbd.className).toContain('min-h-4');
+      expect(kbd.className).toContain('text-3xs');
+      expect(kbd.className).toContain('bg-transparent');
+      expect(kbd.className).not.toContain('min-h-6');
+      expect(kbd.className).not.toContain('shadow-sm');
+    });
+
     it('merges custom className', () => {
       render(
         <Kbd className='custom-class' data-testid='kbd'>
