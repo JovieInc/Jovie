@@ -27,7 +27,7 @@
     "ci-duration-ratchet.yml": {"runsPerMergedPr":0.1,"triggers":["push","schedule","workflow_dispatch"]},
     "ci-shard-contract-canary.yml": {"runsPerMergedPr":0,"triggers":["pull_request"]},
     "ci.yml": {"runsPerMergedPr":3.4,"triggers":["merge_group:checks_requested","push","workflow_dispatch"]},
-    "claim-checkout-dogfood.yml": {"runsPerMergedPr":0.9,"triggers":["workflow_dispatch","workflow_run:Golden Path Nightly","workflow_run:Staging Controller"]},
+    "claim-checkout-dogfood.yml": {"runsPerMergedPr":5.3,"triggers":["pull_request","workflow_dispatch","workflow_run:Golden Path Nightly","workflow_run:Staging Controller"]},
     "cli-chaos-nightly.yml": {"runsPerMergedPr":0,"triggers":["schedule","workflow_dispatch"]},
     "cli-chaos.yml": {"runsPerMergedPr":0,"triggers":["workflow_call"]},
     "codeowners-drift.yml": {"runsPerMergedPr":4.4,"triggers":["pull_request","push"]},

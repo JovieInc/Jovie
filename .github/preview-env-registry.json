@@ -159,7 +159,7 @@
       "ephemeral": true,
       "admission": {
         "policy": "event-driven (Staging Controller completion) or manual-dispatch",
-        "reason": "Isolated Postgres for the $12 claim browser dogfood: Stripe test checkout, signed webhook and operator decisions write billing and claim state that must never touch staging or production data.",
+        "reason": "Isolated Postgres for the $12 claim browser dogfood, including golden-path PR merge revisions. Runs serialize access to shared Stripe test personas; Stripe test checkout, signed webhook and operator decisions write billing and claim state that must never touch staging or production data.",
         "evidencePurpose": "Live claim/checkout journey proof for the exact staged SHA, which normal CI does not run.",
         "owner": "revenue path / checkout-dogfood",
         "surface": "ephemeral Neon branch claim-dogfood-<run_id>-<attempt> (isolated database only)",

@@ -252,10 +252,11 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - pull_request
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:layout-budget
-    jobCount: 2
+    jobCount: 3
   - name: CLI Chaos Nightly
     path: .github/workflows/cli-chaos-nightly.yml
     active: true
