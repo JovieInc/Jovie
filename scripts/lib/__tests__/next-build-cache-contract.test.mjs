@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { readCiWorkflowShellSource } from './ci-workflow-shell-source.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
-const CI_WORKFLOW = readFileSync(
-  resolve(REPO_ROOT, '.github/workflows/ci.yml'),
-  'utf8'
+const CI_WORKFLOW = readCiWorkflowShellSource(
+  resolve(REPO_ROOT, '.github/workflows/ci.yml')
 );
 const NEXT_BUILD_CACHE_WARM_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/next-build-cache-warm.yml'),

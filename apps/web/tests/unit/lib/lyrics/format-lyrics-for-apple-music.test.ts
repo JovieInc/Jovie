@@ -12,6 +12,13 @@ describe('formatLyricsForAppleMusic', () => {
     expect(result.changesSummary).toContain('Removed 1 timestamp marker(s)');
   });
 
+  it('drops the indent a removed timestamp leaves behind', () => {
+    const result = formatLyricsForAppleMusic('  [0:42] almost there\n');
+
+    expect(result.formatted).toBe('almost there\n');
+    expect(result.changesSummary).toContain('Trimmed leading whitespace');
+  });
+
   it('reports cleanup when extra blank lines are present', () => {
     const input = 'Perfectly formatted line\n\n';
 

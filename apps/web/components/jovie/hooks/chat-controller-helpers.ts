@@ -1,3 +1,4 @@
+import { isToolUIPart, type UIMessage } from 'ai';
 import {
   type ComposerRecoveryContext,
   readSummerTurnRecovery,
@@ -123,4 +124,28 @@ export function readRecoveryError(
       ? { retryClientTurnId: recovery.clientTurnId }
       : {}),
   };
+}
+
+export function getMessageParts(
+  message: UIMessage | undefined
+): UIMessage['parts'] {
+  return Array.isArray(message?.parts) ? message.parts : [];
+}
+
+export function hasAssistantOutput(parts: UIMessage['parts']): boolean {
+  return parts.some(
+    part =>
+      (part.type === 'text' && part.text.trim().length > 0) ||
+      part.type === 'file' ||
+      isToolUIPart(part)
+  );
+}
+
+export function getLastAssistantMessage(messages: readonly UIMessage[]) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.role === 'assistant') {
+      return messages[i];
+    }
+  }
+  return undefined;
 }

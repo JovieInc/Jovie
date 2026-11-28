@@ -59,13 +59,25 @@ build to that collector run; report any sign-in, navigation, or manual focus
 delay with the sample. The collector retains its explicit operator attestation;
 a receipt does not silently upgrade that attestation into measured latency.
 
-**Ship now:** this instrumentation plus deterministic frame, bridge, recorder,
-and real composer component tests. **Re-evaluate when:**
+Score the receipt against the JOV-7463 charter contract (cold usable UI maps to
+`composerVisibleEditableAfterPaintOpportunityMs`):
+
+```bash
+pnpm desktop:performance:cert -- --mode evaluate \
+  --readiness "$HOME/Library/Application Support/Jovie/desktop-launch-readiness.json"
+```
+
+`evaluate` / `live` exit nonzero on regressions. Off-Mac and incomplete
+measurement sets keep `LIVE_CERT=blocked`. See
+[PERFORMANCE.md](../hardening/PERFORMANCE.md#installed-mac-performance-certification-jov-7463).
+
+**Ship now:** this instrumentation plus the executable performance contract
+harness and CI-safe contract-check. **Re-evaluate when:**
 [JOV-7463](https://linear.app/jovie/issue/JOV-7463) has real packaged Mac receipts
 for 20, 200, and 2,000-message conversations with tool results and attachments.
-**Then:** establish comparable launch, typing, conversation-switch, sleep/wake,
-and resource budgets. The native Mac workload matrix remains unmeasured here;
-this Linux source validation does not certify installed-app performance.
+**Then:** complete LIVE_CERT with warm launch, typing, navigation, palette,
+layout-shift, and draft probes on the same installed runtime. Linux source
+validation still does not certify installed-app performance.
 
 ## Initial automatic maintenance (JOV-7511)
 

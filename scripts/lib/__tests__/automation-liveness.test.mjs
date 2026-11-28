@@ -8,11 +8,11 @@ import { createApiClient } from '../../../packages/api-client/client.ts';
 import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
 import {
   lsRemoteMain,
-  observeWorkflowFailureStreak,
   runLiveness as runLivenessImpl,
   main as runMain,
 } from '../../automation-liveness.mjs';
 import { ADMISSION_BLOCKING_LABELS } from '../admission-hold-labels.mjs';
+import * as automationRegistry from '../automation-registry.mjs';
 import {
   livenessDecisions,
   livenessFingerprint,
@@ -1725,6 +1725,41 @@ describe('alert state preservation (JOV-8843)', () => {
     vi.mocked(applyRemediationDecisionWithRetry).mockClear();
   });
 
+  it.each([
+    ['no receipt', 'vercel:jovie-web:frequent', 'degraded', false],
+    ['host-local receipt', 'gem:lanes-doctor', 'healthy', true],
+    ['hosted receipt', null, 'healthy', true],
+  ])(
+    'exports coverage separately from heartbeat evidence with %s',
+    async (_label, id, status, complete) => {
+      const fixture = only(
+        ...(id ? ['summer:model-turns', id] : ['summer:model-turns'])
+      );
+      const load = vi
+        .spyOn(automationRegistry, 'loadRegistry')
+        .mockReturnValue(fixture);
+      const heartbeat = persistState({});
+      const reportPath = `${heartbeat}.report`;
+      const output = `${heartbeat}.output`;
+      try {
+        await runMain({
+          argv: ['--output', reportPath],
+          env: { GITHUB_OUTPUT: output },
+          fetchImpl: recoveredFetch,
+        });
+        expect(JSON.parse(readFileSync(reportPath, 'utf8'))).toMatchObject({
+          status,
+          results: [{ status: 'fresh' }],
+        });
+        expect(readFileSync(output, 'utf8')).toBe(
+          `receipt_coverage_complete=${complete}\n`
+        );
+      } finally {
+        load.mockRestore();
+      }
+    }
+  );
+
   it('keeps filed alert state on a diagnostic run without --file', async () => {
     const path = persistState({ [FINGERPRINT]: 'red' });
     const result = await runMain({
@@ -1839,50 +1874,5 @@ describe('budget diagnostics failure isolation', () => {
     expect(alert.if).toContain(
       "steps.installation-budget.outputs.ci_app_low == 'true'"
     );
-  });
-});
-
-describe('workflow failure streak (production controller alarm)', () => {
-  const nowMs = Date.parse('2026-10-29T23:00:00Z');
-  const receipt = {
-    repo: 'JovieInc/Jovie',
-    workflow: 'production-controller.yml',
-    streak: 3,
-  };
-  const runsFetch = conclusions => async () => ({
-    status: 200,
-    json: async () => ({
-      workflow_runs: conclusions.map((conclusion, index) => ({
-        id: 100 - index,
-        conclusion,
-        created_at: new Date(nowMs - index * 60_000).toISOString(),
-        updated_at: new Date(nowMs - index * 60_000).toISOString(),
-      })),
-    }),
-  });
-
-  it('goes silent after 3 consecutive failures, ignoring skipped runs', async () => {
-    const observed = await observeWorkflowFailureStreak(receipt, {
-      fetchImpl: runsFetch([
-        'failure',
-        'skipped',
-        'failure',
-        'failure',
-        'cancelled',
-      ]),
-      token: 'test-token',
-      nowMs,
-    });
-    expect(observed.reason).toContain('3-consecutive-failures');
-    expect(Date.parse(observed.lastProofAt)).toBeLessThan(nowMs - 60 * 60_000);
-  });
-
-  it('stays healthy when a success interrupts the failures', async () => {
-    const observed = await observeWorkflowFailureStreak(receipt, {
-      fetchImpl: runsFetch(['failure', 'failure', 'success', 'failure']),
-      token: 'test-token',
-      nowMs,
-    });
-    expect(observed.lastProofAt).toBe(new Date(nowMs).toISOString());
   });
 });

@@ -38,7 +38,7 @@ export interface EntitySidebarShellProps {
   readonly onClose?: () => void;
   /** Action buttons rendered in the header (before close button) */
   readonly headerActions?: ReactNode;
-  /** Minimal mode keeps top chrome utility-only and moves entity header into scrollable content. */
+  /** Minimal mode keeps top chrome utility-only with the entity header pinned below. */
   readonly headerMode?: 'standard' | 'minimal';
   /** Hide the utility bar in minimal mode; callers retain dismissal ownership. */
   readonly hideMinimalHeaderBar?: boolean;
@@ -64,8 +64,8 @@ export interface EntitySidebarShellProps {
   readonly entityHeader?: ReactNode;
   /**
    * Controls whether the minimal-mode entity header is wrapped in a card surface.
-   * Defaults to `card` to preserve legacy visuals. Pass `flat` when the caller
-   * already provides its own card chrome to avoid nested card-on-card stacking.
+   * Defaults to `flat` so the outer RightDrawer owns the inspector surface.
+   * A separate card surface requires an explicit opt-in.
    * Only applies when `headerMode='minimal'`.
    */
   readonly entityHeaderSurface?: 'card' | 'flat';
@@ -103,7 +103,7 @@ export interface EntitySidebarShellProps {
  *
  * Standard layout rule: persistent content → tabs → tab content.
  * In minimal mode, the entity header stays pinned above the scrollable region,
- * while callers compose tab controls into the main content card.
+ * while callers compose tab controls into the main content.
  * Child-owned scroll is the default so tabbed cards can own their own scroll
  * region. Use shell scroll only for stacked inspector content.
  *
@@ -137,9 +137,9 @@ export function EntitySidebarShell({
   hideMinimalHeaderBar = false,
   showMobileDismissal = false,
   contentBleed = false,
-  workspaceSurface = 'raised',
+  workspaceSurface = 'flat',
   entityHeader,
-  entityHeaderSurface = 'card',
+  entityHeaderSurface = 'flat',
   actionsInEntityHeader = false,
   tabs,
   minimalTabsPlacement = 'card',
@@ -147,7 +147,7 @@ export function EntitySidebarShell({
   children,
   scrollStrategy = 'child',
   footer,
-  footerSurface = 'card',
+  footerSurface = 'flat',
   isEmpty = false,
   emptyMessage = 'Select an item to view details.',
 }: EntitySidebarShellProps) {
@@ -272,9 +272,8 @@ export function EntitySidebarShell({
                 variant={workspaceContentSurface}
                 className='overflow-hidden'
               >
-                {/* The 1px bottom seam is padding, not a transparent border:
-                    same border-box geometry, and the card stays the only
-                    bordered surface around the title bar and tabs. */}
+                {/* Keep the 1px seam geometry without adding a border
+                    between the title bar and its surrounding surface. */}
                 <div
                   data-entity-sidebar-header-band=''
                   className='bg-transparent pb-px backdrop-blur-[12px]'
@@ -305,7 +304,7 @@ export function EntitySidebarShell({
                   {!isMinimalHeader && tabs ? (
                     <div
                       className={cn(
-                        // Preserve the 1px geometry; the card owns the seam.
+                        // Preserve the 1px geometry without another visible seam.
                         'overflow-visible border-t border-transparent px-3 py-2.5 [&>*]:w-full',
                         tabsContainerClassName
                       )}

@@ -1,5 +1,10 @@
 /** The @jovie/ui stand-ins CommandPalette.test.tsx mocks the package with. */
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import type {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  ReactNode,
+  Ref,
+} from 'react';
 
 const ui = {
   Dialog: ({ children, open }: { children: ReactNode; open: boolean }) =>
@@ -28,6 +33,15 @@ const ui = {
       {children}
     </button>
   ),
+  // CmdKMainPlaneSearchInput draws through HostDrawnInput; keep a real
+  // <input> so focus and aria-label queries match production.
+  HostDrawnInput: ({
+    ref,
+    ...props
+  }: InputHTMLAttributes<HTMLInputElement> & {
+    ref?: Ref<HTMLInputElement>;
+  }) => <input ref={ref} data-host-drawn='' {...props} />,
 };
 
-export const { Dialog, DialogContent, Button, PlainButton } = ui;
+export const { Dialog, DialogContent, Button, PlainButton, HostDrawnInput } =
+  ui;

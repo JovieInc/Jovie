@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { ARTIST_PROFILE_SECTION_SCREENSHOT_ORDER } from '@/data/artistProfilePageOrder';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { CANONICAL_SURFACES } from '@/lib/canonical-surfaces';
+import { DESKTOP_PROFILE_READY_SELECTOR } from '../../../lib/screenshots/profile-ready';
 import {
   SCREENSHOT_MOBILE_SAFE_AREA,
   SCREENSHOT_SCENARIOS,
@@ -147,7 +148,22 @@ describe('screenshot registry', () => {
     }
   });
 
-  it('waits for compact profile shell on desktop captures (stable post-shell-migration selector)', () => {
+  it('waits for the single-state preview on Tim White state captures', () => {
+    // With ?state=, the showcase renders only the single-state preview; the
+    // full-profile wrapper testid never appears, so waiting for it times out.
+    const stateScenarios = SCREENSHOT_SCENARIOS.filter(scenario =>
+      scenario.route.startsWith('/demo/showcase/tim-white-profile?state=')
+    );
+
+    expect(stateScenarios.length).toBeGreaterThan(0);
+    for (const scenario of stateScenarios) {
+      expect(scenario.waitFor, scenario.id).not.toBe(
+        '[data-testid="demo-showcase-tim-white-profile"]'
+      );
+    }
+  });
+
+  it('waits for the visible profile surface on desktop captures', () => {
     const desktopProfileIds = [
       'tim-white-profile-live-desktop',
       'tim-white-profile-mainstream-desktop',
@@ -159,7 +175,7 @@ describe('screenshot registry', () => {
         currentScenario => currentScenario.id === id
       );
 
-      expect(scenario?.waitFor).toBe('[data-testid="profile-compact-shell"]');
+      expect(scenario?.waitFor).toBe(DESKTOP_PROFILE_READY_SELECTOR);
     }
   });
 
@@ -208,8 +224,9 @@ describe('screenshot registry', () => {
   });
 
   it('waits for the empty Events card on the events-empty capture', () => {
-    // The tour list only mounts when dates exist, so the capture must wait
-    // for the empty branch that ProfileEventsCard actually renders.
+    // ProfileEventsCard renders nothing when empty, so the capture waits for
+    // the single-state preview that ?state=events-empty mounts. The bare
+    // demo-showcase-tim-white-profile wrapper only exists without ?state=.
     const waitTargets = new Map(
       SCREENSHOT_SCENARIOS.map(({ id, waitFor }) => [id, waitFor])
     );
@@ -223,7 +240,7 @@ describe('screenshot registry', () => {
 
     expect(cardSource).toContain('return null');
     expect(waitTargets.get('tim-white-profile-events-empty-mobile')).toBe(
-      '[data-testid="demo-showcase-tim-white-profile"]'
+      '[data-testid="demo-showcase-tim-white-profile-state"]'
     );
   });
 

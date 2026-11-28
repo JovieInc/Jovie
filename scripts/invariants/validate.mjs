@@ -21,7 +21,11 @@ import { validateLatencySensitiveExecution } from './latency-sensitive-execution
 import { validateOverlayLayerContract } from './overlay-layer-contract.mjs';
 import { validatePerformanceFactory } from './performance-factory.mjs';
 import { validatePrLifecycleContract } from './pr-lifecycle-contract.mjs';
-import { validateQualityRatchet } from './quality-ratchet.mjs';
+import {
+  evaluateQualityOperationEvidence,
+  readQualityContractRegistry,
+  validateQualityRatchet,
+} from './quality-ratchet.mjs';
 import { validateSonarRepairContract } from './sonar-repair-contract.mjs';
 import {
   readWritingSurfacesRegistry,
@@ -108,6 +112,16 @@ for (const warning of harness.warnings) {
 }
 const performanceErrors = validatePerformanceFactory(undefined, { registry });
 const qualityErrors = validateQualityRatchet(registry);
+// JOV-5943/11840: new operation evidence qualifies in shadow; existing gates stay enforced.
+try {
+  process.stdout.write(
+    `quality-operation-evidence: ${JSON.stringify(evaluateQualityOperationEvidence(readQualityContractRegistry(), registry))}\n`
+  );
+} catch {
+  process.stdout.write(
+    'quality-operation-evidence: unavailable (nonblocking; coverage unknown)\n'
+  );
+}
 const lifecycleErrors = validatePrLifecycleContract(registry);
 const latencyErrors = validateLatencySensitiveExecution(undefined, {
   registry,

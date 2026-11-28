@@ -243,6 +243,7 @@ describe('AdminReleasesTableUnified artist identity rows', () => {
 
     expect(source).toContain("'@/lib/tanstack-table'");
     expect(source).not.toContain("'@tanstack/react-table'");
+    expect(source).toContain("rowMode='dense'");
   });
 
   it('renders issue/provider-count flags with the error token, not raw red-* (JOV-6773)', () => {

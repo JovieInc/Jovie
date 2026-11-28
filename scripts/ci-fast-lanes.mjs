@@ -441,7 +441,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command:
       'node --test --experimental-test-coverage --test-coverage-include=scripts/installation-budget-sentinel.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 scripts/installation-budget-sentinel.test.mjs && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/automation-registry.test.mjs scripts/lib/__tests__/automation-liveness*.test.mjs lib/__tests__/red-monitor-owner-gate.test.mjs lib/__tests__/workers-inventory.test.mjs',
     inputs:
-      /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:apps\/[^/]+\/)?vercel\.json|workers\/[^/]+\/wrangler[\w.-]*\.(?:toml|jsonc?)|scripts\/lanes\/continuity_clock\.py|\.github\/actions\/report-outcome\/|canon\/(?:automation-registry\.jsonl|monitor-incidents\.jsonl|deployed-workers\.json|schedulers\.json|outcome-coverage-baseline\.json)|scripts\/(?:automation-liveness\.mjs|installation-budget-sentinel(?:\.test)?\.mjs|remediation-signal-intake\.mjs)|scripts\/lib\/(?:automation-registry\.mjs|github-json-read\.mjs|red-monitor-owner-gate\.mjs|workers-inventory\.mjs|outcome-coverage\.mjs|remediation-recurrence\.mjs|outcome-sweep\.mjs|remediation-signal\.mjs|ci-trigger-registry\.mjs|__tests__\/(?:automation-(?:registry|liveness[\w-]*)|red-monitor-owner-gate|workers-inventory)\.test\.mjs))/u,
+      /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:apps\/[^/]+\/)?vercel\.json|workers\/[^/]+\/wrangler[\w.-]*\.(?:toml|jsonc?)|scripts\/lanes\/continuity_clock\.py|\.github\/actions\/report-outcome\/|canon\/(?:automation-registry\.jsonl|monitor-incidents\.jsonl|deployed-workers\.json|schedulers\.json|outcome-coverage-baseline\.json)|scripts\/(?:automation-liveness\.mjs|installation-budget-sentinel(?:\.test)?\.mjs|remediation-signal-intake\.mjs)|scripts\/lib\/(?:automation-registry\.mjs|automation-workflow-observation\.mjs|github-json-read\.mjs|red-monitor-owner-gate\.mjs|workers-inventory\.mjs|outcome-coverage\.mjs|remediation-recurrence\.mjs|outcome-sweep\.mjs|remediation-signal\.mjs|ci-trigger-registry\.mjs|__tests__\/(?:automation-(?:registry|liveness[\w-]*)|red-monitor-owner-gate|workers-inventory)\.test\.mjs))/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -517,7 +517,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command:
       'node scripts/invariants/art-direction/run.mjs && node --test scripts/invariants/art-direction/*.test.mjs',
     inputs:
-      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/|apps\/web\/public\/assets\/generated\/|docs\/design-system\/taste-labels\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|docs\/design-system\/motion-effects\.json$|scripts\/invariants\/art-direction\/)/u,
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/|apps\/web\/public\/assets\/generated\/|docs\/design-system\/taste-labels\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|docs\/design-system\/motion-effects\.json$|apps\/web\/styles\/|packages\/ui\/|scripts\/invariants\/art-direction\/)/u,
     prOnly: true,
   }),
   Object.freeze({
@@ -536,7 +536,7 @@ export const SOURCE_GUARDS = Object.freeze([
     // Registry integrity, prose drift and whole-repository spelling share this
     // existing guard; policy is docs/design-system/anti-slop-rules.json.
     id: 'anti-slop',
-    command: `node scripts/anti-slop/run.mjs validate && node scripts/anti-slop/brand-name.mjs && node --test --test-concurrency=1 --test-isolation=none scripts/anti-slop/anti-slop.test.mjs`,
+    command: `node scripts/anti-slop/run.mjs validate && node scripts/anti-slop/brand-name.mjs && node --test --test-concurrency=1 --test-isolation=none scripts/anti-slop/anti-slop.test.mjs scripts/anti-slop/rsi-prevention/contract.test.mjs`,
     inputs: /./u,
     prOnly: false,
   }),
@@ -995,6 +995,8 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
   ...STRUCTURAL_PYTEST_PARTS,
 ]);
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  // RSI ASR-042..046 fixtures run once via the anti-slop lane command above —
+  // do not also list the file here or the suite double-runs per PR.
   'scripts/lib/__tests__/source-docs-scope.test.mjs',
   'scripts/ios-certification-config.test.mjs',
   'scripts/schedule-trigger-guard.test.mjs', // JOV-12720 event-driven guard.
@@ -1016,8 +1018,9 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/sentry-build-config.test.mjs',
   'scripts/next-telemetry.test.mjs',
   'scripts/lib/__tests__/orphan-screenshot-guard.test.mjs',
+  'scripts/lib/__tests__/pr-visual-routing-boundaries.test.mjs scripts/lib/__tests__/pr-visual-capture-task-states.test.mjs scripts/lib/__tests__/pr-visual-capture-shell.test.mjs',
   'scripts/lib/__tests__/spend-guard.test.mjs',
-  'scripts/lib/__tests__/wins-ledger.test.mjs',
+  'scripts/lib/__tests__/wins-ledger.test.mjs scripts/lib/__tests__/usage-ledger.test.mjs',
   'scripts/lib/__tests__/wins-measure.test.mjs',
   'scripts/lib/__tests__/wins-store.test.mjs scripts/lib/__tests__/wins-summer-loop.test.mjs',
   'scripts/pr-open.test.mjs',
@@ -1087,6 +1090,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/capability-benchmark/capability-benchmark.test.mjs',
   'scripts/capability-benchmark/computer-use-decision.test.mjs',
   'scripts/capability-benchmark/capability-reconciliation.test.mjs',
+  'scripts/capability-benchmark/review-benchmark.test.mjs',
   'scripts/ci-cache-policy.test.mjs',
   'scripts/db/lint-changed-migrations.test.mjs',
   'scripts/ci-release-incident-contract.test.mjs',
@@ -1130,8 +1134,11 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/hooks/pr-size-local.test.mjs',
   'scripts/hooks/company-size.test.mjs',
   'scripts/hooks/warden-local-review.test.mjs',
+  'scripts/hooks/warden-observation.test.mjs',
+  'scripts/hooks/warden-triage.test.mjs',
   'scripts/node-runtime-bump.test.mjs',
   'scripts/invariants/art-direction/hero-scroll.test.mjs',
+  'scripts/invariants/art-direction/press-state.test.mjs',
   'scripts/idea-radar/idea-radar.test.mjs',
   'scripts/apple-change-ingest/apple-change-ingest.test.mjs',
   'scripts/invariants/art-direction/images.test.mjs',
@@ -1379,6 +1386,10 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/m2-revenue-path-canary-intake.test.mjs',
   'scripts/lib/__tests__/synthetic-monitoring-plan.test.mjs',
   'scripts/lib/__tests__/remediation-detector-plans.test.mjs',
+  'scripts/lib/__tests__/workflow-outcome-proof.test.mjs',
+  'scripts/lib/__tests__/linear-sync-on-merge.test.mjs',
+  'scripts/lib/__tests__/automation-liveness-outcome-sweep.test.mjs',
+  'scripts/lib/__tests__/outcome-sweep-proof.test.mjs',
   'scripts/lib/__tests__/docs-deploy-intake-quota.test.mjs',
   'scripts/lib/__tests__/linear-rate-limit-retry.test.mjs',
   'scripts/lib/__tests__/mac-runner-route-contract.test.mjs',
@@ -1386,13 +1397,14 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/main-release-readiness.test.mjs',
   'scripts/lib/__tests__/pr-comment-analysis.test.mjs',
   'scripts/lib/__tests__/bot-review-findings.test.mjs',
+  'scripts/lib/__tests__/bot-review-recovery.test.mjs',
   'scripts/lib/__tests__/pr-liveness.test.mjs',
   'scripts/lib/__tests__/postdeploy-probes-workflow.test.mjs',
   'scripts/lib/__tests__/postdeploy-probe-admission.test.mjs',
   'scripts/lib/__tests__/postdeploy-probe-transport.test.mjs',
   'scripts/lib/__tests__/postdeploy-probe-workflow-admission.test.mjs',
   'scripts/lib/__tests__/postdeploy-crawl-receipt.test.mjs',
-  'scripts/lib/__tests__/golden-path-cert-reuse.test.mjs scripts/lib/__tests__/golden-path-step-scope.test.mjs',
+  'scripts/lib/__tests__/golden-path-cert-reuse.test.mjs scripts/lib/__tests__/golden-path-step-scope.test.mjs scripts/lib/__tests__/golden-path-release-hold.test.mjs',
   'scripts/lib/__tests__/postdeploy-cert-after-pen.test.mjs',
   'scripts/lib/__tests__/pr-preparation-safety.test.mjs',
   'scripts/lib/__tests__/production-environment-secrets.test.mjs',
@@ -1424,6 +1436,9 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/capacity-registry.test.mjs',
   'scripts/lib/__tests__/fleet-registry.test.mjs',
   'scripts/lib/__tests__/remediation-sweep.test.mjs',
+  'scripts/lib/__tests__/bot-finding-recovery.test.mjs',
+  'scripts/lib/__tests__/bot-finding-cursor-restore.test.mjs',
+  'scripts/lib/__tests__/linear-issue-evidence.test.mjs',
   'scripts/lib/__tests__/remediation-sweep-workflow-contract.test.mjs',
   'scripts/lib/__tests__/repository-docs-ratchet.test.mjs',
   'scripts/lib/__tests__/remediation-reopen.test.mjs',
@@ -2961,7 +2976,7 @@ export async function runStructural(opts = {}) {
     MESH_RUNTIME_BUNDLE_COVERAGE_COMMAND,
     MESH_CURRENT_WIRE_COVERAGE_COMMAND,
     'pnpm ci:control:test',
-    'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/pr-visual-review.test.mjs lib/__tests__/pr-visual-capture-path.test.mjs --maxWorkers=1 --coverage --coverage.allowExternal --coverage.include="$PWD/.github/scripts/pr-visual-evidence-gate.mjs" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-pr-visual-policy-coverage"',
+    'pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/pr-visual-review.test.mjs lib/__tests__/pr-visual-capture-surfaces.test.mjs lib/__tests__/pr-visual-capture-path.test.mjs --maxWorkers=1 --coverage --coverage.allowExternal --coverage.include="$PWD/.github/scripts/pr-visual-evidence-gate.mjs" --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-pr-visual-policy-coverage"',
     // merge-group-workflow-contract runs in ci:control:test's Vitest run.
     RELEASE_LINEAGE_CONTRACT_COMMAND,
     "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/production-marker-state.test.ts --coverage --coverage.include='**/production-marker-state.mjs' --coverage.allowExternal=true --coverage.thresholds.lines=82 --coverage.thresholds.branches=79 --coverage.thresholds.functions=97",

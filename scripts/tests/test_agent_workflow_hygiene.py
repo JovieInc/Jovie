@@ -1096,7 +1096,8 @@ def test_nightly_bypass_server_is_seeded_built_and_shared() -> None:
     for consumer in (start, chaos, nightly):
         assert "BASE_URL: http://127.0.0.1:3100" in consumer
     assert "dev:local:playwright" not in job
-    assert job.index(start) < job.index(chaos) < job.index(nightly) < job.index(stop)
+    # Required nightly E2E verdict must complete before advisory chaos (Astra 6.2).
+    assert job.index(start) < job.index(nightly) < job.index(chaos) < job.index(stop)
     assert "if: always()" in stop
     assert 'cat "$RUNNER_TEMP/nightly-qa-web.pid"' in stop
     assert 'kill "$pid"' in stop

@@ -52,7 +52,7 @@ const ICON_BUTTON_VARIANT_TO_BUTTON_VARIANT: Record<
 // Shared chrome for the circular surface family (profile chrome, auth back
 // buttons): soft-material layering plus the legacy circular transition.
 const CIRCLE_CHROME_CLASSNAME =
-  'relative isolate cursor-pointer overflow-visible transition-colors duration-subtle ease-subtle';
+  'relative isolate cursor-pointer overflow-visible';
 
 // Applied after variant chrome so quiet/ghost token colors cannot override
 // the shared Button destructive state.
@@ -62,7 +62,7 @@ const ICON_BUTTON_DESTRUCTIVE_CLASSNAME =
 const iconButtonVariants = cva(
   // Shared base: uniform reduced-motion + touch behavior. Focus ring and
   // hit target come from the base Button so they cannot drift.
-  'touch-manipulation select-none [-webkit-tap-highlight-color:transparent] motion-reduce:transition-none',
+  'touch-manipulation select-none [-webkit-tap-highlight-color:transparent]',
   {
     variants: {
       variant: {
@@ -116,10 +116,10 @@ const iconButtonVariants = cva(
         ),
         // Control - app shell toolbar chrome (28px control height)
         control:
-          'shrink-0 border border-subtle bg-surface-1 text-secondary-token shadow-none transition-[background-color,color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-0 hover:text-primary-token hover:shadow-none active:border-default active:bg-surface-1 active:shadow-none',
+          'shrink-0 border border-subtle bg-surface-1 text-secondary-token shadow-none hover:border-default hover:bg-surface-0 hover:text-primary-token hover:shadow-none active:border-default active:bg-surface-1 active:shadow-none',
         // Inline - transparent drawer/edit affordance
         inline:
-          'shrink-0 p-0.5 text-secondary-token leading-none shadow-none transition-[opacity,background-color,color,box-shadow,transform] duration-subtle ease-subtle hover:bg-surface-1 focus-visible:bg-surface-1 [&_svg]:block',
+          'shrink-0 p-0.5 text-secondary-token leading-none shadow-none hover:bg-surface-1 focus-visible:bg-surface-1 [&_svg]:block',
       },
       size: {
         // Glyph sizing is only enforced for the compact control/header

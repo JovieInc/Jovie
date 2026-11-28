@@ -1,14 +1,28 @@
 'use client';
 
 // @coverage-via apps/web/tests/components/features/onboarding/ChatProposeNextStepCard.test.tsx
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { useEffect, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthShell } from '@/features/auth';
 import { useAuthSafe, useCanRenderClerkUi } from '@/hooks/useClerkSafe';
+import { useOnboardingClaimHandoffStatus } from '@/hooks/useOnboardingClaimHandoff';
 import { track } from '@/lib/analytics';
 import type { AudienceBand } from '@/lib/chat/tools/onboarding-signals';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
+import {
+  isAllowedEnrichmentSocialUrl,
+  type PostKeepSocialPlatform,
+  writePostKeepEnrichmentNotes,
+} from '@/lib/onboarding/post-keep-enrichment-notes';
+import {
+  AUDIENCE_BAND_OPTIONS,
+  type EnrichmentPanel,
+  initialEnrichmentChipState,
+  isTerminalClaimHandoff,
+  type SocialPlatformNote,
+  signedInHandoffCopy,
+} from './chatProposeNextStepCardModel';
 
 /**
  * Renders the `proposeNextStep` tool result inside the onboarding chat
@@ -30,9 +44,11 @@ import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
  *    ask another sharp question; this card just acknowledges the tool was
  *    called.
  *
- * Optional post-Keep enrichment chips (ONB-21 / Keep This Draft Phase 5) sit
- * under AuthShell as subordinate, local-only controls. They never emit
- * SOCIAL_ATTACHED or restore required pre-auth social→audience.
+ * Optional post-Keep enrichment chips (ONB-21 / ONB-26 / ONB-30) sit above
+ * AuthShell (still ghost + “Optional”) so the default Keep pin viewport shows
+ * them without scrolling past the tall auth form. Notes persist via
+ * sessionStorage into waitlist claim; they never emit SOCIAL_ATTACHED or
+ * restore required social→audience.
  */
 
 export interface NextStepCardPayload {
@@ -55,31 +71,89 @@ interface ChatProposeNextStepCardProps {
   readonly claimHandle?: string | null;
 }
 
-type EnrichmentPanel = 'social' | 'audience' | null;
-type SocialPlatformNote = 'instagram' | 'tiktok';
-
-const AUDIENCE_BAND_OPTIONS: ReadonlyArray<{
-  readonly band: AudienceBand;
-  readonly caption: string;
-}> = [
-  { band: 'under_500', caption: 'Under 500' },
-  { band: '500_to_5k', caption: '500 To 5k' },
-  { band: '5k_to_50k', caption: '5k To 50k' },
-  { band: '50k_to_500k', caption: '50k To 500k' },
-  { band: 'over_500k', caption: '500k+' },
-];
-
 /**
- * Subordinate optional chips under Sign up to keep. Local session state only —
- * never advances the guarded onboarding rail. Kept in this module so Phase 5
- * does not introduce a new certificate-tracked component surface.
+ * Subordinate optional chips above AuthShell (ONB-30). Local session state
+ * only — never advances the guarded onboarding rail. Kept in this module so
+ * Phase 5 does not introduce a new certificate-tracked component surface.
  */
 function PostKeepEnrichmentChips() {
   const [openPanel, setOpenPanel] = useState<EnrichmentPanel>(null);
+  // One storage read on mount (ONB-34); claim path uses the same key.
+  const [initial] = useState(initialEnrichmentChipState);
   const [savedPlatform, setSavedPlatform] = useState<SocialPlatformNote | null>(
-    null
+    initial.platform
   );
-  const [savedBand, setSavedBand] = useState<AudienceBand | null>(null);
+  const [savedBand, setSavedBand] = useState<AudienceBand | null>(
+    initial.audienceBand
+  );
+  const [savedSocialUrl, setSavedSocialUrl] = useState<string | null>(
+    initial.socialUrl
+  );
+  const [urlDraft, setUrlDraft] = useState(initial.urlDraft);
+  // Allowlist hint only — Input invalid face via validationState.
+  const [urlInvalidHint, setUrlInvalidHint] = useState<string | null>(null);
+
+  const notePlatform = (platform: PostKeepSocialPlatform) => {
+    const platformChanged =
+      savedPlatform !== null && savedPlatform !== platform;
+    setSavedPlatform(platform);
+    // Drop a saved URL that no longer matches the selected platform so
+    // chip label + claim primarySocialUrl stay honest.
+    const keepUrl =
+      savedSocialUrl && isAllowedEnrichmentSocialUrl(savedSocialUrl, platform)
+        ? savedSocialUrl
+        : null;
+    if (!keepUrl && savedSocialUrl) {
+      setSavedSocialUrl(null);
+    }
+    if (!keepUrl && (savedSocialUrl || platformChanged)) {
+      setUrlDraft('');
+    }
+    writePostKeepEnrichmentNotes(
+      keepUrl
+        ? { platform, socialUrl: keepUrl }
+        : savedSocialUrl
+          ? { platform, socialUrl: null }
+          : { platform }
+    );
+    // ONB-32: keep panel open so optional URL can be collected without
+    // restoring required social→audience. Platform-only remains valid.
+    setUrlInvalidHint(null);
+    setOpenPanel('social');
+  };
+
+  const noteAudience = (band: AudienceBand) => {
+    setSavedBand(band);
+    writePostKeepEnrichmentNotes({ audienceBand: band });
+    setOpenPanel(null);
+  };
+
+  const saveSocialUrl = () => {
+    if (!savedPlatform) return;
+    const trimmed = urlDraft.trim();
+    if (!trimmed) {
+      setUrlInvalidHint(null);
+      setOpenPanel(null);
+      return;
+    }
+    if (!isAllowedEnrichmentSocialUrl(trimmed, savedPlatform)) {
+      setUrlInvalidHint('Use an Instagram or TikTok profile link.');
+      return;
+    }
+    setSavedSocialUrl(trimmed);
+    writePostKeepEnrichmentNotes({
+      platform: savedPlatform,
+      socialUrl: trimmed,
+    });
+    setUrlInvalidHint(null);
+    setOpenPanel(null);
+  };
+
+  const socialChipLabel = savedSocialUrl
+    ? 'Instagram / TikTok Link Noted'
+    : savedPlatform
+      ? 'Instagram / TikTok Noted'
+      : 'Add Instagram / TikTok';
 
   return (
     <div
@@ -101,9 +175,7 @@ function PostKeepEnrichmentChips() {
             setOpenPanel(current => (current === 'social' ? null : 'social'))
           }
         >
-          {savedPlatform
-            ? 'Instagram / TikTok Noted'
-            : 'Add Instagram / TikTok'}
+          {socialChipLabel}
         </Button>
         <Button
           type='button'
@@ -128,7 +200,7 @@ function PostKeepEnrichmentChips() {
           data-testid='onboarding-enrichment-social-panel'
         >
           <legend className='text-xs leading-5 text-secondary-token'>
-            We will ask for the link after you sign up.
+            Optional link — we will use this after you sign up.
           </legend>
           <div className='flex flex-wrap gap-2'>
             <Button
@@ -137,10 +209,7 @@ function PostKeepEnrichmentChips() {
               size='sm'
               data-testid='onboarding-enrichment-social-instagram'
               aria-pressed={savedPlatform === 'instagram'}
-              onClick={() => {
-                setSavedPlatform('instagram');
-                setOpenPanel(null);
-              }}
+              onClick={() => notePlatform('instagram')}
             >
               Instagram
             </Button>
@@ -150,14 +219,60 @@ function PostKeepEnrichmentChips() {
               size='sm'
               data-testid='onboarding-enrichment-social-tiktok'
               aria-pressed={savedPlatform === 'tiktok'}
-              onClick={() => {
-                setSavedPlatform('tiktok');
-                setOpenPanel(null);
-              }}
+              onClick={() => notePlatform('tiktok')}
             >
               TikTok
             </Button>
           </div>
+          {savedPlatform ? (
+            <div className='space-y-2 pt-1'>
+              <Input
+                inputSize='sm'
+                type='url'
+                inputMode='url'
+                autoComplete='url'
+                name='onboarding-enrichment-social-url'
+                label='Profile Link (Optional)'
+                placeholder={
+                  savedPlatform === 'tiktok'
+                    ? 'https://www.tiktok.com/@you'
+                    : 'https://www.instagram.com/you'
+                }
+                value={urlDraft}
+                // Allowlist reject uses the certified Input invalid face
+                // (atom-owned), not a card-level failure branch.
+                {...(urlInvalidHint
+                  ? {
+                      validationState: 'invalid' as const,
+                      helpText: urlInvalidHint,
+                    }
+                  : {})}
+                data-testid='onboarding-enrichment-social-url'
+                data-1p-ignore
+                onChange={event => {
+                  setUrlDraft(event.target.value);
+                  if (urlInvalidHint) setUrlInvalidHint(null);
+                }}
+                onKeyDown={event => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    saveSocialUrl();
+                  }
+                }}
+              />
+              <div className='flex flex-wrap gap-2'>
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='sm'
+                  data-testid='onboarding-enrichment-social-url-save'
+                  onClick={saveSocialUrl}
+                >
+                  {urlDraft.trim() ? 'Save link' : 'Continue without link'}
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </fieldset>
       ) : null}
 
@@ -178,10 +293,7 @@ function PostKeepEnrichmentChips() {
                 size='sm'
                 data-testid={`onboarding-enrichment-audience-${option.band}`}
                 aria-pressed={savedBand === option.band}
-                onClick={() => {
-                  setSavedBand(option.band);
-                  setOpenPanel(null);
-                }}
+                onClick={() => noteAudience(option.band)}
               >
                 {option.caption}
               </Button>
@@ -199,6 +311,8 @@ export function ChatProposeNextStepCard({
 }: ChatProposeNextStepCardProps) {
   const { isSignedIn } = useAuthSafe();
   const canRenderClerkUi = useCanRenderClerkUi();
+  const claimHandoffStatus = useOnboardingClaimHandoffStatus();
+  const handoffIsTerminal = isTerminalClaimHandoff(claimHandoffStatus);
   const kind = payload.decision.kind;
   const decisionTrackedRef = useRef(false);
   const saveStartedTrackedRef = useRef(false);
@@ -243,9 +357,13 @@ export function ChatProposeNextStepCard({
     if (isSignedIn) {
       return (
         <div className='min-h-72 px-1 py-1'>
-          <p className='text-mid leading-7 text-primary-token'>
-            Saving your request and reserving your name and profile now. Keep
-            this page open until the receipt appears.
+          <p
+            className='text-mid leading-7 text-primary-token'
+            data-testid='onboarding-claim-handoff-copy'
+            data-claim-status={claimHandoffStatus}
+            {...(handoffIsTerminal ? { role: 'alert' as const } : {})}
+          >
+            {signedInHandoffCopy('waitlist', claimHandoffStatus)}
           </p>
         </div>
       );
@@ -270,6 +388,13 @@ export function ChatProposeNextStepCard({
           your name and profile. You are not on the list until the confirmation
           appears.
         </p>
+        {/*
+         * ONB-30: chips above AuthShell so the default Keep pin viewport
+         * (ONB-27) shows optional enrichment without scrolling past the tall
+         * auth form. Ghost + “Optional” keep AuthShell primary; carry (ONB-26)
+         * and Reserve paint (ONB-28) unchanged.
+         */}
+        <PostKeepEnrichmentChips />
         <AuthShell
           mode='sign-up'
           compact
@@ -277,7 +402,6 @@ export function ChatProposeNextStepCard({
           accessKind='waitlist'
           fallbackRedirectUrl={APP_ROUTES.START}
         />
-        <PostKeepEnrichmentChips />
       </div>
     );
   }
@@ -286,11 +410,17 @@ export function ChatProposeNextStepCard({
   if (isSignedIn) {
     // Already authenticated mid-conversation (rare but possible if the user
     // had a Clerk session already). Skip the form; the claim hook on the
-    // shell will fire and bounce them to checkout.
+    // shell will fire and bounce them to checkout. ONB-36: copy tracks
+    // claim status so a failed handoff does not keep saying "Linking…".
     return (
       <div className='px-1 py-1'>
-        <p className='text-mid leading-7 text-primary-token'>
-          {`You're already signed in. Linking this conversation to your account.`}
+        <p
+          className='text-mid leading-7 text-primary-token'
+          data-testid='onboarding-claim-handoff-copy'
+          data-claim-status={claimHandoffStatus}
+          {...(handoffIsTerminal ? { role: 'alert' as const } : {})}
+        >
+          {signedInHandoffCopy('instant_access', claimHandoffStatus)}
         </p>
       </div>
     );
@@ -311,13 +441,18 @@ export function ChatProposeNextStepCard({
       <p className='mb-3 text-mid leading-7 text-primary-token'>
         {`You're in. Add an email to save your profile and this conversation.`}
       </p>
+      {/*
+       * ONB-30: same chip-above-AuthShell order for Claim as for Reserve.
+       * Instant-access copy stays Claim `@handle`; pin/top-fade clearance
+       * stays on this auth-anchor (ONB-27).
+       */}
+      <PostKeepEnrichmentChips />
       <AuthShell
         mode='sign-up'
         compact
         claimHandle={claimHandle ?? undefined}
         fallbackRedirectUrl={APP_ROUTES.START}
       />
-      <PostKeepEnrichmentChips />
     </div>
   );
 }

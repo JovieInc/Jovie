@@ -24,7 +24,7 @@ const QUOTA_A_WITHOUT_FAN_DUPES = QUOTA_CASES_A.filter(
   c => !FAN_REPLY_FROM_MAIN.has(c.id)
 );
 
-export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = ([] = [
+export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = [
   {
     id: 'week-plan',
     fixture: 'established',
@@ -454,4 +454,4 @@ export const HELPFULNESS_CASES: readonly HelpfulnessCase[] = ([] = [
   ...QUOTA_A_WITHOUT_FAN_DUPES,
   ...QUOTA_CASES_B,
   ...FAN_REPLY_QUOTA_CASES,
-]);
+];

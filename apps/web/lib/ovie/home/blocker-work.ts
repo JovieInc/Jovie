@@ -10,7 +10,7 @@ import type { StoryFirstStageHighlight } from './story-first';
 
 const CHECKOUT_WORK =
   /checkout|billing|payment|stripe|pricing|entitlement|paywall/i;
-const ENTRY_WORK = /homepage|landing|entry/i;
+const ENTRY_WORK = /\b(?:homepage|landing|entry)\b/i;
 const ONBOARDING_WORK = /onboarding|sign.?up|sign.?in|\bauth|claim/i;
 const ACTIVATION_WORK = /activation|dashboard|first.?use/i;
 

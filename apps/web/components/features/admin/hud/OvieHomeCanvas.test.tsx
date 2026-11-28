@@ -94,6 +94,17 @@ describe('OvieHomeCanvas Story First flat', () => {
       await screen.findByTestId('story-first-glance-revenue')
     ).toBeVisible();
     expect(await screen.findByTestId('story-first-glance-users')).toBeVisible();
+    await vi.waitFor(() => {
+      expect(
+        screen.getByTestId('story-first-glance-shipping').closest('a')
+      ).toHaveAttribute(
+        'href',
+        `${APP_ROUTES.ADMIN_SHIPPING}#shipping-velocity`
+      );
+      expect(
+        screen.getByTestId('story-first-glance-revenue').closest('a')
+      ).toHaveAttribute('href', `${APP_ROUTES.ADMIN_OPS}#company-now`);
+    });
 
     expect(screen.getByTestId('story-first-stages')).toBeVisible();
     expect(screen.getByTestId('story-first-stage-investigating')).toBeVisible();

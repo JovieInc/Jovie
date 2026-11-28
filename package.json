@@ -166,6 +166,7 @@
     "factory:run": "pnpm --filter @jovie/web exec tsx scripts/marketing-factory/run.ts",
     "factory:verify": "pnpm --filter @jovie/web exec tsx scripts/marketing-factory/verify.ts",
     "brand:generate": "tsx scripts/generate-brand-assets.ts",
+    "lint:pen": "node scripts/pen-review/lint.mjs",
     "design:pen-bindings": "node scripts/design/pen-bindings.mjs validate",
     "design:pen-export": "node scripts/design/pen-export.mjs",
     "design:pen-ship:check": "node scripts/design/pen-data-backed-ship.mjs check",
@@ -321,7 +322,7 @@
     "design:exception-registry:check": "node scripts/design-exception-registry.mjs",
     "design:shared-ui-visual-arbitrary:check": "node scripts/shared-ui-visual-arbitrary-audit.mjs",
     "design:shared-ui-visual-arbitrary:update": "node scripts/shared-ui-visual-arbitrary-audit.mjs --update-baseline",
-    "design:no-dead-ends:check": "tsx packages/copy/dead-ends.ts check",
+    "design:no-dead-ends:check": "node --import tsx packages/copy/dead-ends.ts check",
     "design:tooltip-copy:check": "tsx packages/copy/tooltip-copy-audit.ts check",
     "design:tooltip-copy:update": "tsx packages/copy/tooltip-copy-audit.ts update",
     "pen:review": "node scripts/pen-review/run.mjs",
@@ -386,7 +387,8 @@
     "copy:landing": "tsx apps/web/scripts/copy-landing.ts",
     "copy:judge": "doppler run --project jovie-web --config dev -- tsx packages/copy/cli.ts judge",
     "test:certification-inventory": "node --test scripts/certification-inventory/inventory.test.mjs",
-    "desktop:performance": "pnpm --filter @jovie/desktop run performance"
+    "desktop:performance": "pnpm --filter @jovie/desktop run performance",
+    "desktop:performance:cert": "pnpm --filter @jovie/desktop run performance:cert"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

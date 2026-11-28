@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { load } from 'js-yaml';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -11,6 +10,7 @@ import {
   runStructural,
   selectStructuralShard,
 } from '../../ci-fast-lanes.mjs';
+import { readCiWorkflowShellSource } from './ci-workflow-shell-source.mjs';
 
 describe('structural core matrix shards', () => {
   afterEach(() => vi.unstubAllEnvs());
@@ -38,9 +38,8 @@ describe('structural core matrix shards', () => {
 
   const workflow = /** @type {{ jobs: Record<string, any> }} */ (
     load(
-      readFileSync(
-        new URL('../../../.github/workflows/ci.yml', import.meta.url),
-        'utf8'
+      readCiWorkflowShellSource(
+        new URL('../../../.github/workflows/ci.yml', import.meta.url)
       )
     )
   );
@@ -94,9 +93,8 @@ describe('lanes coverage matrix legs', () => {
   it('runs exactly one leg command for only:<group>', async () => {
     const job = /** @type {{ jobs: Record<string, any> }} */ (
       load(
-        readFileSync(
-          new URL('../../../.github/workflows/ci.yml', import.meta.url),
-          'utf8'
+        readCiWorkflowShellSource(
+          new URL('../../../.github/workflows/ci.yml', import.meta.url)
         )
       )
     ).jobs['ci-fast-structural-lanes-shards'];
@@ -136,16 +134,18 @@ describe('lanes coverage matrix legs', () => {
     expect([...grouped].sort()).toEqual(
       LANES_PYTEST_SHARDS.map(shard => shard.id).sort()
     );
-    for (const command of Object.values(LANES_COVERAGE_GROUP_COMMANDS)) {
-      expect(command).toContain('coverage combine');
+    for (const [group, ids] of Object.entries(LANES_COVERAGE_GROUP_SHARDS)) {
+      const command = LANES_COVERAGE_GROUP_COMMANDS[group];
+      expect(command).toContain(`jovie-lanes-${group}.coverage`);
       expect(command).not.toContain('--fail-under');
+      // Single-shard groups whose key equals the shard id must not combine the
+      // shard data file onto itself (coverage.py: "No usable data files").
+      if (ids.length === 1 && ids[0] === group) {
+        expect(command).not.toContain('coverage combine');
+      } else {
+        expect(command).toContain('coverage combine');
+      }
     }
-    expect(LANES_COVERAGE_GROUP_COMMANDS.ab).toContain(
-      'jovie-lanes-ab.coverage'
-    );
-    expect(LANES_COVERAGE_GROUP_COMMANDS.cd).toContain(
-      'jovie-lanes-cd.coverage'
-    );
   });
 
   it('keeps the shared export as the single source for the combined report', () => {
@@ -162,7 +162,7 @@ describe('lanes coverage matrix legs', () => {
     vi.stubEnv('GITHUB_EVENT_NAME', 'pull_request');
     vi.stubEnv('CI_PRODUCT_LANES', 'web');
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
-    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:ab');
+    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:a');
     const started = [];
     const result = await runStructural({
       changedFileList: ['apps/web/components/features/profile/Foo.tsx'],
@@ -180,7 +180,7 @@ describe('lanes coverage matrix legs', () => {
       vi.stubEnv('GITHUB_EVENT_NAME', 'pull_request');
       vi.stubEnv('CI_PRODUCT_LANES', productLanes);
       vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
-      vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:cd');
+      vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:c');
       const started = [];
       const result = await runStructural({
         changedFileList: ['apps/web/components/features/profile/Foo.tsx'],
@@ -189,7 +189,7 @@ describe('lanes coverage matrix legs', () => {
           return { code: 0, output: '' };
         },
       });
-      expect(started).toEqual([LANES_COVERAGE_GROUP_COMMANDS.cd]);
+      expect(started).toEqual([LANES_COVERAGE_GROUP_COMMANDS.c]);
       expect(result.skipped).not.toBe(true);
       vi.unstubAllEnvs();
     }
@@ -199,7 +199,7 @@ describe('lanes coverage matrix legs', () => {
     vi.stubEnv('GITHUB_EVENT_NAME', 'merge_group');
     vi.stubEnv('CI_PRODUCT_LANES', 'none');
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
-    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:ab');
+    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:a');
     const started = [];
     const skipped = await runStructural({
       changedFileList: [],
@@ -221,7 +221,7 @@ describe('lanes coverage matrix legs', () => {
     // green). Same pin every sibling test in this file uses.
     vi.stubEnv('CI_PRODUCT_LANES', 'operations');
     vi.stubEnv('CI_FAST_SKIP_STRUCTURAL', 'false');
-    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:ab');
+    vi.stubEnv('CI_FAST_STRUCTURAL_LANES', 'only:a');
     const dispatched = [];
     await runStructural({
       execute: command => {
@@ -229,7 +229,7 @@ describe('lanes coverage matrix legs', () => {
         return { code: 0, output: '' };
       },
     });
-    expect(dispatched).toEqual([LANES_COVERAGE_GROUP_COMMANDS.ab]);
+    expect(dispatched).toEqual([LANES_COVERAGE_GROUP_COMMANDS.a]);
   });
 
   it('gates evidence on the runner receipt, never a recomputed selection', () => {

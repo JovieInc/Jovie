@@ -284,6 +284,11 @@ export const APP_ROUTES = {
 
 export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];
 
+export const OVIE_METRIC_ANCHORS = {
+  shippingVelocity: 'shipping-velocity',
+  companyNow: 'company-now',
+} as const;
+
 /**
  * Where public CTAs send a new, anonymous visitor. There is one flow, not a
  * separate waitlist and onboarding: the /start chat admits or holds them.

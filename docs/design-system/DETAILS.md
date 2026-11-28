@@ -1004,6 +1004,8 @@ only, no workspace subtitle line.
 | Hover | `oklch(96.2% 0.003 260)` | `rgba(255,255,255,0.022)` |
 | Selected | `oklch(94.8% 0.006 260)` | `rgba(255,255,255,0.048)` |
 
+**Geometry (Drift DRI-21 / taste #7, 2026-11-21):** one table row height and one header treatment. Rows use `VirtualizedTableRow` / `presets.tableRow` at **`rowMode='dense'` (32px row / 24px cell content)**. Headers use `UnifiedTableHeader` / `TableHeaderRow` at **`presets.tableHeaderRow` (`h-8` / 32px)** with `presets.tableHeaderCell`. Do not add parallel densities, pixel `rowHeight={N}` callsites, or one-off header row height classes. Owner: `apps/web/components/organisms/table` (not `@jovie/ui`).
+
 ### Chat Agent Activity (Tool-Call Rows)
 
 Quiet tool-call / streaming activity in the chat transcript is a first-class System B pattern (GH #13897). It must stay visually subordinate to assistant prose — not a second card chrome family.

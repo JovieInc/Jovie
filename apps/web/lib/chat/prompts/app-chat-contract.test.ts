@@ -44,12 +44,19 @@ describe('deterministic /app/chat prompt contract (ASS-9 + ASS-16)', () => {
     ['forbidsInventedAccountStats', 'Never invent account stats'],
     ['forbidsInventedAccountFacts', 'Never invent Spotify algorithm'],
     ['forbidsInventedCapabilities', 'smart link is live or will live'],
+    ['forbidsInventedCapabilities', "I'll add it"],
+    ['forbidsInventedCapabilities', 'Spotify follower DM'],
+    ['forbidsInventedCapabilities', "you're the first to ask"],
+    ['forbidsInventedCapabilities', 'wherever you stream'],
     ['requiresDraftHoldOutbound', 'Draft every outbound artifact'],
     ['requiresDraftClearAskNow', 'Never reply with only a promise to draft'],
+    ['requiresDraftClearAskNow', 'even when the promise names the release'],
     [
       'requiresRefuseDraftHoldOnlyForUnasked',
       'That refuse→draft-hold line is only for unasked',
     ],
+    ['requiresRefuseConcreteNextMove', 'A named promise alone'],
+    ['requiresRefuseConcreteNextMove', 'one concrete next move this turn'],
     [
       'keepsGroundingToPromptOrTools',
       'must come from this prompt or from a tool result in this turn',
@@ -62,6 +69,10 @@ describe('deterministic /app/chat prompt contract (ASS-9 + ASS-16)', () => {
     [
       'requiresVisibleCatalogFacts',
       'Never invent popularity, streams, peer benchmarks',
+    ],
+    [
+      'requiresEmptyProfileSetupNow',
+      'Never leave blank artist-facing text on where-to-start',
     ],
     [
       'requiresArtistFacingTextAfterTools',
@@ -77,8 +88,16 @@ describe('deterministic /app/chat prompt contract (ASS-9 + ASS-16)', () => {
       'name the release or artifact from the ask',
     ],
     [
+      'requiresRefuseThenDraftHold',
+      'Never leave blank artist-facing text on these refuses',
+    ],
+    [
       'requiresRefusePrivateDataTrain',
       'train on private DMs, demos, or other private data',
+    ],
+    [
+      'requiresRefusePrivateDataTrain',
+      'Do not call release-launch, proposeProfileEdit',
     ],
     ['requiresStreamCountNotCatalogDeny', 'cannot see stream counts or saves'],
   ] as const)('fails when %s needle is removed (%s)', (fact, needle) => {

@@ -1,6 +1,66 @@
 import type { UIMessage } from 'ai';
 import { describe, expect, it } from 'vitest';
 import { extractLastUserImageUrl } from './message-text';
+import { extractUIMessageText } from './request-validation';
+
+const importedBioToolPart: UIMessage['parts'][number] = {
+  type: 'dynamic-tool',
+  toolName: 'importBio',
+  toolCallId: 'bio-draft',
+  state: 'output-available',
+  input: {},
+  output: { success: true },
+};
+
+describe('text boundaries in persisted replies', () => {
+  it('separates text before and after a tool step', () => {
+    expect(
+      extractUIMessageText([
+        { type: 'step-start' },
+        { type: 'text', text: 'I will check the source.' },
+        importedBioToolPart,
+        { type: 'step-start' },
+        { type: 'text', text: '' },
+        { type: 'text', text: 'Your draft is ready to review.' },
+      ])
+    ).toBe('I will check the source.\n\nYour draft is ready to review.');
+  });
+
+  it('keeps adjacent streamed fragments intact', () => {
+    expect(
+      extractUIMessageText([
+        { type: 'text', text: 'Your **pro' },
+        { type: 'text', text: 'file** is ready.' },
+      ])
+    ).toBe('Your **profile** is ready.');
+  });
+
+  it.each([
+    ['First paragraph.\n\n', 'Second paragraph.'],
+    ['First paragraph.', '\n\nSecond paragraph.'],
+    ['First paragraph.\n', '\nSecond paragraph.'],
+  ])('preserves existing paragraph spacing', (before, after) => {
+    expect(
+      extractUIMessageText([
+        { type: 'text', text: before },
+        { type: 'step-start' },
+        { type: 'text', text: after },
+      ])
+    ).toBe('First paragraph.\n\nSecond paragraph.');
+  });
+
+  it('does not add leading or trailing text for tool-only steps', () => {
+    expect(
+      extractUIMessageText([
+        { type: 'step-start' },
+        importedBioToolPart,
+        { type: 'text', text: '    Indented code stays indented.' },
+        { type: 'step-start' },
+      ])
+    ).toBe('    Indented code stays indented.');
+    expect(extractUIMessageText([{ type: 'step-start' }])).toBe('');
+  });
+});
 
 function userMessage(parts: unknown[]): UIMessage {
   return { id: 'm1', role: 'user', parts } as unknown as UIMessage;

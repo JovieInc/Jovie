@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 import {
   OPTIONAL_LAYOUT_GUARD_SPECS,
@@ -63,21 +64,48 @@ describe('Layout Guard workflow contract', () => {
       ).not.toThrow();
     }
 
-    expect(workflow).toContain(
-      'node ../../.github/scripts/layout-guard-manifest.mjs'
-    );
-    expect(workflow).toContain(
-      'pnpm exec playwright test "${LAYOUT_GUARD_SPECS[@]}"'
-    );
-    expect(workflow).toContain(
-      'PORT=3100 node .next/standalone/apps/web/server.js'
-    );
-    expect(workflow).toContain(
-      '::error::Layout Guard standalone server failed to start within 30s.'
-    );
-    expect(workflow).toContain('--config=playwright.config.noauth.ts');
-    expect(workflow).not.toContain('pnpm --filter=@jovie/web exec next start');
-    expect(workflow).not.toContain('layout-overlap-guard.spec.ts');
-    expect(workflow).not.toContain('not found — skipping');
+    const ci = load(workflow);
+    const commands = [
+      [
+        'ci-build-layout',
+        'verify-layout-build.sh',
+        'Combined-head standalone server failed to start',
+      ],
+      [
+        'ci-layout-guard',
+        'verify-layout-evidence.sh',
+        'Layout Guard standalone server failed to start within 30s.',
+      ],
+    ];
+    for (const [job, file, startupError] of commands) {
+      const path = `.github/scripts/ci/${file}`;
+      const step = ci.jobs[job].steps.find(
+        candidate =>
+          candidate.name === 'Run deterministic layout behavior guard'
+      );
+      expect(step?.run).toBe(`exec bash -e "$GITHUB_WORKSPACE/${path}"`);
+      const program = readFileSync(resolve(repoRoot, path), 'utf8');
+      expect(program).toContain(
+        'node ../../.github/scripts/layout-guard-manifest.mjs'
+      );
+      expect(program).toContain(
+        'pnpm exec playwright test "${LAYOUT_GUARD_SPECS[@]}"'
+      );
+      expect(program).toContain('--config=playwright.config.noauth.ts');
+      const baseUrl = new URL(step.env.BASE_URL);
+      expect(baseUrl.hostname).toBe('localhost');
+      expect(program).toContain(
+        `PORT=${baseUrl.port} node .next/standalone/apps/web/server.js`
+      );
+      expect(program).toContain(`::error::${startupError}`);
+      for (const fallback of [
+        'pnpm --filter=@jovie/web exec next start',
+        'layout-overlap-guard.spec.ts',
+        'not found — skipping',
+      ]) {
+        expect(workflow).not.toContain(fallback);
+        expect(program).not.toContain(fallback);
+      }
+    }
   });
 });

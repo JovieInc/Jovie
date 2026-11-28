@@ -38,6 +38,7 @@ export { getBillingAuditLog } from './audit-log';
 // Billing info functions
 export {
   getUserBillingInfo,
+  getUserBillingInfoByAppId,
   getUserBillingInfoByClerkId,
   userHasProFeatures,
 } from './billing-info';

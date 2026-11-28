@@ -39,11 +39,6 @@ import {
 } from './header-nav-variants';
 import { useMarketingNativePopover } from './use-marketing-native-popover';
 
-// Linear header structure: full-width header with centered ~1000px content
-// Linear uses ~224px margins on 1440px viewport = ~984px content width
-// maxWidth 1032px - 48px (24px padding each side) = 984px content
-// See globals.css for .nav-link-linear styles
-
 export interface HeaderNavProps {
   readonly sticky?: boolean;
   readonly className?: string;
@@ -66,6 +61,7 @@ export interface HeaderNavProps {
   readonly hidePublicCta?: boolean;
   readonly presentation?: 'default' | 'homepage-embedded' | 'marketing-glass';
   readonly flyoutMenus?: readonly HeaderFlyoutMenu[];
+  readonly marketingPathname?: string | null;
   readonly showContactLink?: boolean;
   readonly penContractId?: MarketingPenContractId;
   /**
@@ -240,17 +236,23 @@ function GlassAuthActions({
 }
 
 function HeaderNavLink({
+  current,
   className,
   href,
   label,
 }: Readonly<{
   className: string;
+  current?: boolean;
   href: string;
   label: string;
 }>) {
   if (href.startsWith('/') && !href.startsWith('#')) {
     return (
-      <Link href={href} className={className}>
+      <Link
+        href={href}
+        className={className}
+        aria-current={current ? 'page' : undefined}
+      >
         {label}
       </Link>
     );
@@ -267,8 +269,10 @@ function HeaderNavLink({
 function MarketingGlassFlyout({
   menu,
   open,
+  pathname,
 }: Readonly<{
   menu: HeaderFlyoutMultiMenu;
+  pathname?: string | null;
   open: boolean;
 }>) {
   const { panelRef, nativePopover } = useMarketingNativePopover(open);
@@ -299,6 +303,7 @@ function MarketingGlassFlyout({
           {menu.links.map((link, index) => (
             <Link
               href={link.href}
+              aria-current={pathname === link.href ? 'page' : undefined}
               key={`${menu.id}-${link.label}`}
               className='marketing-glass-header__flyout-link focus-ring-themed'
             >
@@ -357,6 +362,7 @@ export function HeaderNav({
   hidePublicCta = false,
   presentation = 'default',
   flyoutMenus,
+  marketingPathname,
   showContactLink = true,
   penContractId,
   logoReveal = false,
@@ -516,6 +522,7 @@ export function HeaderNav({
       <HeaderNavLink
         key={`${link.href}:${link.label}`}
         href={link.href}
+        current={marketingPathname === link.href}
         label={link.label}
         className={cn(
           navLinkClass,
@@ -540,7 +547,11 @@ export function HeaderNav({
                   type='button'
                   className={cn(
                     navLinkClass,
-                    open && 'marketing-glass-header__nav-link--active'
+                    (open ||
+                      menu.links.some(
+                        link => link.href === marketingPathname
+                      )) &&
+                      'marketing-glass-header__nav-link--active'
                   )}
                   style={
                     {
@@ -562,7 +573,11 @@ export function HeaderNav({
                   {menu.label}
                   <ChevronDown aria-hidden='true' size={13} strokeWidth={1.8} />
                 </PlainButton>
-                <MarketingGlassFlyout menu={menu} open={open} />
+                <MarketingGlassFlyout
+                  menu={menu}
+                  open={open}
+                  pathname={marketingPathname}
+                />
               </div>
             );
           })
@@ -705,6 +720,9 @@ export function HeaderNav({
                 <div className='flex lg:hidden items-center'>
                   <MobileNav
                     navLinks={mobileLinks}
+                    groups={
+                      marketingPathname === undefined ? undefined : flyoutMenus
+                    }
                     includePublicLogin={includePublicLoginInMobileNav}
                     publicCtaHref={publicCta?.href}
                     publicCtaLabel={publicCta?.label}

@@ -138,7 +138,7 @@ const ZERO_BASELINE_SOURCE_CONTRACT = {
   'packages/ui/atoms/button.tsx': [
     'bg-btn-destructive',
     'text-btn-destructive-foreground',
-    'active:scale-press',
+    ' press ',
     'bg-icon-button-frosted',
     'hover:bg-icon-button-frosted-hover',
   ],

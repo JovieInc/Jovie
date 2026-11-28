@@ -191,12 +191,12 @@ export function generate(
         dimension(v),
       ])
     ),
-    // Grid tokens for the DataGrid. row-default and row-comfortable reuse the
-    // existing size.row.compact (40) and size.row.list (44) row modes by alias.
+    // Grid tokens for the DataGrid. Literals (not UnifiedTable aliases): table
+    // rows are dense-only (32), while DataGrid keeps its own 36/40/44 ladder.
     grid: {
       'row-compact': dimension(36),
-      'row-default': { $value: '{size.row.compact}', $type: 'dimension' },
-      'row-comfortable': { $value: '{size.row.list}', $type: 'dimension' },
+      'row-default': dimension(40),
+      'row-comfortable': dimension(44),
       'cell-padding-x': dimension(12),
       avatar: dimension(24),
       'status-dot': dimension(8),

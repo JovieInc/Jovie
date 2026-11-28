@@ -2,8 +2,9 @@
 
 import { Input } from '@jovie/ui';
 import { AlertCircle } from 'lucide-react';
-import { type CSSProperties, useEffect, useRef } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useRef } from 'react';
 import { toast } from '@/components/feedback';
+import { DrawerSection } from '@/components/molecules/drawer';
 import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { BASE_URL } from '@/constants/app';
@@ -28,10 +29,15 @@ const PROFILE_LAYOUT_VARS = {
 export function SettingsProfileSection({
   artist,
   avatarQuality,
+  presentation = 'page',
   onArtistUpdate,
   onRefresh,
 }: SettingsProfileSectionProps) {
   const profileDomain = BASE_URL.replace(/^https?:\/\//, '');
+  const inDrawer = presentation === 'drawer';
+  const rowClassName = inDrawer
+    ? 'grid min-w-0 gap-1.5 py-2'
+    : PROFILE_ROW_CLASS;
 
   const {
     formData,
@@ -53,6 +59,7 @@ export function SettingsProfileSection({
     field:
       | 'username'
       | 'displayName'
+      | 'bio'
       | 'location'
       | 'hometown'
       | 'careerHighlights'
@@ -73,23 +80,24 @@ export function SettingsProfileSection({
     saveProfile({
       displayName: formData.displayName,
       username: formData.username,
+      ...(inDrawer ? { bio: formData.bio } : {}),
       location: formData.location,
       hometown: formData.hometown,
       careerHighlights: formData.careerHighlights,
       targetPlaylists: formData.targetPlaylists,
     });
-  }, [formData, saveProfile, setProfileSaveStatus]);
+  }, [formData, inDrawer, saveProfile, setProfileSaveStatus]);
 
   return (
-    <SettingsPanel
-      // The page section is already titled Profile; this panel keeps the
-      // name its loading skeleton shows, so nothing renames on load.
-      title='Identity'
-      description='Display name, username, image, and place details fans see.'
-      actions={<SettingsStatusPill status={profileSaveStatus} />}
+    <ProfileEditorSurface
+      inDrawer={inDrawer}
+      status={<SettingsStatusPill status={profileSaveStatus} />}
     >
-      <div className='space-y-0 px-4 py-4 sm:px-5' style={PROFILE_LAYOUT_VARS}>
-        <div className={PROFILE_ROW_CLASS}>
+      <div
+        className={inDrawer ? 'space-y-0' : 'space-y-0 px-4 py-4 sm:px-5'}
+        style={PROFILE_LAYOUT_VARS}
+      >
+        <div className={rowClassName}>
           <span className='pt-1 text-app text-primary-token'>
             Profile picture
           </span>
@@ -125,7 +133,7 @@ export function SettingsProfileSection({
           </div>
         ) : null}
 
-        <div className={PROFILE_ROW_CLASS}>
+        <div className={rowClassName}>
           <label
             htmlFor='displayName'
             className='pt-2 text-app text-primary-token'
@@ -144,7 +152,7 @@ export function SettingsProfileSection({
           />
         </div>
 
-        <div className={PROFILE_ROW_CLASS}>
+        <div className={rowClassName}>
           <div>
             <label htmlFor='username' className='text-app text-primary-token'>
               Username
@@ -172,7 +180,27 @@ export function SettingsProfileSection({
           </div>
         </div>
 
-        <div className={PROFILE_ROW_CLASS}>
+        {inDrawer ? (
+          <div className={rowClassName}>
+            <label
+              htmlFor='identity-bio'
+              className='text-app text-primary-token'
+            >
+              Bio
+            </label>
+            <textarea
+              id='identity-bio'
+              value={formData.bio}
+              onChange={event => handleFieldChange('bio', event.target.value)}
+              onBlur={() => flushSave()}
+              rows={3}
+              maxLength={512}
+              className={`min-h-20 resize-y ${PROFILE_INPUT_CLASS}`}
+            />
+          </div>
+        ) : null}
+
+        <div className={rowClassName}>
           <div>
             <label htmlFor='location' className='text-app text-primary-token'>
               Current location
@@ -193,7 +221,7 @@ export function SettingsProfileSection({
           />
         </div>
 
-        <div className={PROFILE_ROW_CLASS}>
+        <div className={rowClassName}>
           <div>
             <label htmlFor='hometown' className='text-app text-primary-token'>
               Hometown
@@ -214,40 +242,67 @@ export function SettingsProfileSection({
           />
         </div>
 
-        <div className={PROFILE_ROW_CLASS}>
-          <div>
-            <label
-              htmlFor='careerHighlights'
-              className='text-app text-primary-token'
-            >
-              Career highlights
-            </label>
-            <p className='mt-0.5 text-app text-secondary-token'>
-              Share your streaming milestones, press coverage, radio play,
-              playlist history, and anything that makes your story unique. This
-              helps Jovie write better pitches and recommendations.
-            </p>
+        {!inDrawer ? (
+          <div className={rowClassName}>
+            <div>
+              <label
+                htmlFor='careerHighlights'
+                className='text-app text-primary-token'
+              >
+                Career highlights
+              </label>
+              <p className='mt-0.5 text-app text-secondary-token'>
+                Share your streaming milestones, press coverage, radio play,
+                playlist history, and anything that makes your story unique.
+                This helps Jovie write better pitches and recommendations.
+              </p>
+            </div>
+            <div className={`relative ${PROFILE_FIELD_COLUMN_CLASS}`}>
+              <textarea
+                name='careerHighlights'
+                id='careerHighlights'
+                value={formData.careerHighlights}
+                onChange={e =>
+                  handleFieldChange('careerHighlights', e.target.value)
+                }
+                onBlur={() => flushSave()}
+                placeholder='E.g. 500K+ monthly listeners on Spotify, featured on New Music Friday twice, recent radio play on KCRW...' // ui-casing-allow: example placeholder with E.g.
+                rows={4}
+                maxLength={2000}
+                className={`w-full resize-y ${PROFILE_INPUT_CLASS}`}
+              />
+              <span className='absolute bottom-2 right-3 text-2xs text-tertiary-token'>
+                {formData.careerHighlights.length}/2000
+              </span>
+            </div>
           </div>
-          <div className={`relative ${PROFILE_FIELD_COLUMN_CLASS}`}>
-            <textarea
-              name='careerHighlights'
-              id='careerHighlights'
-              value={formData.careerHighlights}
-              onChange={e =>
-                handleFieldChange('careerHighlights', e.target.value)
-              }
-              onBlur={() => flushSave()}
-              placeholder='E.g. 500K+ monthly listeners on Spotify, featured on New Music Friday twice, recent radio play on KCRW...' // ui-casing-allow: example placeholder with E.g.
-              rows={4}
-              maxLength={2000}
-              className={`w-full resize-y ${PROFILE_INPUT_CLASS}`}
-            />
-            <span className='absolute bottom-2 right-3 text-2xs text-tertiary-token'>
-              {formData.careerHighlights.length}/2000
-            </span>
-          </div>
-        </div>
+        ) : null}
       </div>
+    </ProfileEditorSurface>
+  );
+}
+
+function ProfileEditorSurface({
+  children,
+  inDrawer,
+  status,
+}: Readonly<{ children: ReactNode; inDrawer: boolean; status: ReactNode }>) {
+  return inDrawer ? (
+    <DrawerSection
+      title='Profile Details'
+      sectionKind='facts'
+      collapsible={false}
+      actions={status}
+    >
+      {children}
+    </DrawerSection>
+  ) : (
+    <SettingsPanel
+      title='Identity'
+      description='Display name, username, image, and place details fans see.'
+      actions={status}
+    >
+      {children}
     </SettingsPanel>
   );
 }

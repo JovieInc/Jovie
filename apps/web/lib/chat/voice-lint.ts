@@ -47,13 +47,171 @@ export const ASSISTANT_REPLY_FALLBACK =
  * Persisted replacement when the model finishes with blank artist-facing text
  * (ASS-95). Covers tool-only turns and silent safety refuses so the artist
  * always sees a usable draft-hold next step, never an empty bubble.
+ * Prefer `buildEmptyAssistantReplyFallback` when the ask is known so the
+ * stub names the release/artifact (ASS-103 live 45268223488 grounding).
  */
 export const EMPTY_ASSISTANT_REPLY_FALLBACK =
   'I will draft that and hold it for your yes. I do not send, post, or spend until you confirm.';
 
+export interface EmptyReplyFallbackContext {
+  readonly ask?: string;
+  readonly namedReleases?: readonly string[];
+  /** Public handle for empty-profile setup stubs (jov.ie/{username}). */
+  readonly username?: string;
+}
+
+export interface AssistantGateContext extends EmptyReplyFallbackContext {
+  readonly artistRules?: readonly EnforcedArtistRule[];
+}
+
 export interface GatedAssistantReply {
   readonly text: string;
   readonly violations: readonly VoiceLintViolation[];
+}
+
+function releaseNamedInAsk(
+  ask: string,
+  namedReleases: readonly string[]
+): string | undefined {
+  const lower = ask.toLowerCase();
+  return [...namedReleases]
+    .sort((a, b) => b.length - a.length)
+    .find(title => lower.includes(title.toLowerCase()));
+}
+
+/** Title-Case multi-word phrases from the ask (e.g. Ambient Evening). */
+function titleCasePhrases(ask: string): readonly string[] {
+  return ask.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b/g) ?? [];
+}
+
+/**
+ * Ask-aware refuse→draft-hold stub (ASS-103 + ASS-106). When blank model text
+ * would otherwise surface the generic EMPTY_ASSISTANT_REPLY_FALLBACK, name the
+ * release/artifact from the ask or Discography and, for short one-rec residuals
+ * (empty-profile start, clear draft asks, spend refuse), include a concrete
+ * next move so live next_action can clear without inventing facts or spending.
+ */
+export function buildEmptyAssistantReplyFallback(
+  context?: EmptyReplyFallbackContext
+): string {
+  const ask = context?.ask?.trim() ?? '';
+  if (!ask) return EMPTY_ASSISTANT_REPLY_FALLBACK;
+
+  const named = releaseNamedInAsk(ask, context?.namedReleases ?? []);
+  const phrases = titleCasePhrases(ask);
+  const artifact = named ?? phrases[0];
+  const lower = ask.toLowerCase();
+  const handle = context?.username?.trim().replace(/^@/, '') ?? '';
+  const profileCue = handle ? `jov.ie/${handle}` : 'your profile';
+
+  if (
+    /\bauto[- ]?dm\b/.test(lower) ||
+    (/\bdm\b/.test(lower) && (/\btip/.test(lower) || /\bthank/.test(lower)))
+  ) {
+    return (
+      'I will draft one tip thank-you DM and hold it for your yes. ' +
+      'I do not auto-DM until you confirm.'
+    );
+  }
+
+  // Clear draft asks before spend/budget needles: "ad copy … budget ~$50"
+  // must get a held body, not a boost refuse (ASS-106 / live 45325957464).
+  const clearDraftAsk =
+    /\b(?:ad copy|outreach|playlist emails?)\b/.test(lower) ||
+    (/\bdraft\b/.test(lower) &&
+      /\b(?:email|emails|pitch|outreach|playlist|caption|ad)\b/.test(lower));
+  if (clearDraftAsk) {
+    const target = named ?? artifact ?? 'that release';
+    if (/\b(?:ad copy|ads?\b|pre-?save|budget)\b/.test(lower)) {
+      return (
+        `${target} ad copy (held): "${target} is out soon. Pre-save on ${profileCue}." ` +
+        'Nothing spends until you confirm.'
+      );
+    }
+    return (
+      `${target} playlist email (held): "Subject: ${target} for your list. ` +
+      `Short cut, profile ${profileCue}." One curator email, no send until yes.`
+    );
+  }
+
+  // Empty-profile / where-to-start: setup step, never a draft-hold stub.
+  if (
+    /\bwhere (?:do i|should i) start\b/.test(lower) ||
+    /\b(?:don'?t|do not) have (?:any )?music\b/.test(lower) ||
+    /\bno (?:music|releases|songs)(?:\s+out)?(?:\s+yet)?\b/.test(lower)
+  ) {
+    return `No releases yet. Add a bio on ${profileCue} today so the page is live.`;
+  }
+
+  if (/\b(boost|spend|budget|ads?\b|reel)\b/.test(lower)) {
+    const target = named ?? artifact ?? 'that Reel';
+    const other = (context?.namedReleases ?? []).find(
+      title => title.toLowerCase() !== target.toLowerCase()
+    );
+    // ASS-106: held plan body for next_action. ASS-107 live 45325957464: name
+    // another catalog title for time awareness when one is available.
+    const timed =
+      other != null ? ` Keep ads paused while ${other} is upcoming.` : '';
+    return (
+      `I will not boost ${target} until you confirm a budget. ` +
+      `Held plan: "Best ${target} Reel, tip link in bio, organic first." ` +
+      `Confirm the spend cap; nothing boosts until yes.${timed}`
+    );
+  }
+
+  if (/\b(email|pitch|send)\b/.test(lower)) {
+    const pitchPhrase = phrases.find(phrase =>
+      lower.includes(`${phrase.toLowerCase()} pitch`)
+    );
+    const labeled =
+      pitchPhrase != null
+        ? `${pitchPhrase} pitch`
+        : artifact != null
+          ? /\bpitch\b/i.test(artifact)
+            ? artifact
+            : `${artifact} pitch`
+          : /\bpitch\b/.test(lower)
+            ? 'pitch'
+            : 'that pitch';
+    // ASS-108 live 45340065127: promise-only stub scored grounded=0.
+    // Ground the held body in a Discography release (not the pitch label alone).
+    const catalogRelease = (context?.namedReleases ?? []).find(title => {
+      if (
+        pitchPhrase != null &&
+        title.toLowerCase() === pitchPhrase.toLowerCase()
+      ) {
+        return false;
+      }
+      return true;
+    });
+    const release = named ?? catalogRelease ?? artifact ?? 'the release';
+    const subjectTarget = pitchPhrase ?? 'your list';
+    return (
+      `I can't email from here. ${labeled} (held):\n\n` +
+      `Subject: ${release} for ${subjectTarget}.\n` +
+      `${release} is out Friday. Short cut, profile on your Jovie page.\n\n` +
+      'Nothing emails until you confirm.'
+    );
+  }
+
+  if (/\b(post|instagram|caption)\b/.test(lower)) {
+    const target = named ?? artifact ?? 'that caption';
+    // ASS-108: sentence-case paste-ready body (no ALL-CAPS shouting).
+    return (
+      `I can't post to Instagram from here. ${target} caption (held):\n\n` +
+      `${target}. Out Friday.\n\n` +
+      'I do not post until you confirm.'
+    );
+  }
+
+  if (artifact) {
+    return (
+      `I will draft that for ${artifact} and hold it for your yes. ` +
+      'I do not send, post, or spend until you confirm.'
+    );
+  }
+
+  return EMPTY_ASSISTANT_REPLY_FALLBACK;
 }
 
 /**
@@ -62,18 +220,19 @@ export interface GatedAssistantReply {
  * requires; only a reply that still fails is replaced with the safe fallback.
  * A reply that names someone the artist asked never to feature is held back.
  * Blank text (including tool-only turns) is replaced with a draft-hold
- * fallback so the artist never sees an empty bubble (ASS-95).
- * Returns the violations (artist rules by id, never by name) so the caller
- * can log which rules fired.
+ * fallback so the artist never sees an empty bubble (ASS-95). When `ask` /
+ * Discography titles are provided, the empty stub names that artifact
+ * (ASS-103). Returns the violations (artist rules by id, never by name) so
+ * the caller can log which rules fired.
  */
 export function gateAssistantReply(
   text: string,
-  context?: { readonly artistRules?: readonly EnforcedArtistRule[] }
+  context?: AssistantGateContext
 ): GatedAssistantReply {
   const repaired = repairCopyFloorText(text);
   if (!repaired.trim()) {
     return {
-      text: EMPTY_ASSISTANT_REPLY_FALLBACK,
+      text: buildEmptyAssistantReplyFallback(context),
       violations: [{ rule: 'empty-reply', match: '' }],
     };
   }
@@ -92,7 +251,7 @@ export function gateAssistantReply(
 }
 
 /**
- * Text the completed assistant reply the artist / live helpfulness eval
+ * Surface the completed assistant reply the artist / live helpfulness eval
  * should score (ASS-95). Blank model text becomes the draft-hold fallback so
  * tool-only and silent-refuse turns are never scored as `reply.text: ''`.
  * Copy-floor violations keep the raw text + `persistedAsFallback` so scoring
@@ -100,7 +259,7 @@ export function gateAssistantReply(
  */
 export function surfaceCompletedAssistantReply(
   text: string,
-  context?: { readonly artistRules?: readonly EnforcedArtistRule[] }
+  context?: AssistantGateContext
 ): {
   readonly text: string;
   readonly persistedAsFallback?: true;

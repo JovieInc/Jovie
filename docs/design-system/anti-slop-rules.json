@@ -971,6 +971,176 @@
         ],
         "coverageNote": "Whole-repo scan (no baseline; exact historical text, identifiers and one intentional negative assertion excepted) on every PR, plus the PR title, body and commit messages in Source Validation using the trusted base copy. Pen files are encrypted: scan their HTML/CSS export with run.mjs check --files."
       }
+    },
+    {
+      "id": "ASR-042",
+      "title": "No intentional waits on the response or first-paint path",
+      "statement": "Do not insert artificial delays (smoothStream pacing, sleep, setTimeout gates) on the success response or first-readable-paint path. Documented bounded retry, backoff, and debounce off the success path remain allowed. Verify first readable paint and full output, not headers alone.",
+      "rationale": "Word-level stream pacing and paint sleeps make the product feel slower than the model. Repeatable AI slop: agents reintroduce delays because they look polished in demos.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-11-24",
+        "ref": "RSI AI-slop follow-up; production smoothStream delayInMs:15 at 82b7ce56 / apps/web/lib/chat/run.ts (JOV-3525); claimed delayInMs:5 not present at tip (AI SDK default is 10ms) \u2014 unverifiable, see ASR-046"
+      },
+      "scope": ["app"],
+      "severity": "warn",
+      "enforcement": {
+        "kind": "static",
+        "status": "shadow",
+        "check": "scripts/anti-slop/rsi-prevention/contract.test.mjs + review-findings RF-0003",
+        "evidence": [
+          "scripts/anti-slop/rsi-prevention/contract.test.mjs",
+          "apps/web/tests/unit/chat/run.stream-smoothing.test.ts"
+        ],
+        "matchers": [
+          {
+            "pattern": "smoothStream\\s*\\(\\s*\\{[^\\}]*delayInMs\\s*:",
+            "flags": "u",
+            "files": "\\.(?:ts|tsx|js|mjs)$",
+            "fixtures": {
+              "fail": ["smoothStream({ delayInMs: 15, chunking: 'word' })"],
+              "pass": ["experimental_throttle: 50", "retry({ backoffMs: 100 })"]
+            }
+          },
+          {
+            "pattern": "await\\s+new\\s+Promise\\s*\\(\\s*(?:resolve|r)\\s*=>\\s*setTimeout\\s*\\(",
+            "flags": "u",
+            "files": "(?:chat|stream|paint|response).*",
+            "fixtures": {
+              "fail": ["await new Promise(resolve => setTimeout(resolve, 15))"],
+              "pass": [
+                "const timer = setTimeout(run, ms)",
+                "scheduleRetry(attempt)"
+              ]
+            }
+          }
+        ],
+        "coverageNote": "Shadow only \u2014 production still ships delayInMs:15 (known debt; do not change pacing owners in this lane). Contract fixtures prove bad/good triggers. Retry/backoff/debounce fixtures are the legitimate counterexample."
+      }
+    },
+    {
+      "id": "ASR-043",
+      "title": "Prefetch and warm keys must match canonical consumers",
+      "statement": "Nav hover and panel warm queries must use the same TanStack query key shape and request params the destination consumer reads, or must not warm at all. Dead warms that write unused keys are forbidden. Stock/SSR-only wins ties: do not keep a hover warm that can block newer SSR initialData without a matched authenticated hover\u2192navigate A/B proving faster first usable rows, no request-budget regression, and correct freshness. Never speculatively render a route that can write.",
+      "rationale": "Mismatched warm keys burn the request budget and leave the clicked route cold \u2014 classic AI 'helpful prefetch' that helps nothing. A matched-key warm can still lose to SSR when hover cache blocks fresher initialData.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-11-24",
+        "ref": "RSI AI-slop follow-up + native-first audit on #26806; Audience/Identity warms removed (SSR-only); JOV-12668"
+      },
+      "scope": ["app"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "shadow",
+        "check": "apps/web/tests/unit/queries/prefetch-dashboard.test.ts + scripts/anti-slop/rsi-prevention/contract.test.mjs",
+        "evidence": [
+          "apps/web/lib/queries/prefetch-dashboard.ts",
+          "apps/web/tests/unit/queries/prefetch-dashboard.test.ts",
+          "scripts/anti-slop/rsi-prevention/contract.test.mjs"
+        ],
+        "matchers": [
+          {
+            "pattern": "queryKeys\\.audience\\.members\\(\\s*[A-Za-z_][\\w.]*\\s*\\)",
+            "flags": "u",
+            "files": "prefetch.*\\.(?:ts|tsx)$",
+            "fixtures": {
+              "fail": ["queryKeys.audience.members(profileId)"],
+              "pass": ["case 'audience': break; // SSR-only"]
+            }
+          },
+          {
+            "pattern": "queryKeys\\.dspEnrichment\\.presence\\(",
+            "flags": "u",
+            "files": "prefetch.*\\.(?:ts|tsx)$",
+            "fixtures": {
+              "fail": ["queryKeys.dspEnrichment.presence(profileId)"],
+              "pass": ["case 'presence': break; // SSR-only"]
+            }
+          }
+        ],
+        "coverageNote": "Shadow matchers catch regressions in prefetch modules. Product fix: Audience and Identity nav warms removed (SSR-only wins ties); Identity dspEnrichment.presence warm deleted; no Audience replacement warm without A/B proof."
+      }
+    },
+    {
+      "id": "ASR-044",
+      "title": "Optional and stale loads must not become zero or period spikes",
+      "statement": "Optional data may hold first usable rows; keep prior valid values during refresh; scope loaders; invalidate the correct keys. Never report missing or stale as zero, and never report lifetime totals as a period spike. Test stale, failure, and recovery; avoid double-counting and misleading advice.",
+      "rationale": "Zeros and spikes from absent data teach users the wrong story and trigger bad agent advice.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-11-24",
+        "ref": "RSI AI-slop follow-up; JOV-1262 null counts; keepPreviousData on audience-infinite"
+      },
+      "scope": ["app", "admin"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "shadow",
+        "check": "scripts/anti-slop/rsi-prevention/contract.test.mjs + review-findings RF-0005",
+        "evidence": [
+          "scripts/anti-slop/rsi-prevention/contract.test.mjs",
+          "apps/web/lib/queries/audience-infinite.ts"
+        ],
+        "matchers": [
+          {
+            "pattern": "(?:total|count|subscribers?)\\s*(?:\\?\\?|\\|\\|)\\s*0\\b",
+            "flags": "iu",
+            "files": "(?:analytics|audience|earnings|metrics|dashboard).*",
+            "fixtures": {
+              "fail": ["const shown = total ?? 0", "count || 0"],
+              "pass": ["const shownTotal = total", "rows = priorRows"]
+            }
+          }
+        ],
+        "coverageNote": "Shadow heuristic \u2014 legitimate `?? 0` for non-metric UI (pagination indexes) must stay out of scanned paths or be called out as false positives before promoting."
+      }
+    },
+    {
+      "id": "ASR-045",
+      "title": "Shared UI contracts over per-screen patches",
+      "statement": "Popover lifecycle must detach cleanly; blue focus rings are keyboard-only (not hover); nested radius equals outer minus padding and must not clip; drawer resize must not trigger column-reorder animation; composer focus must not activate Attach. Encode regressions on shared primitives and browser fixtures, not one-off screen fixes.",
+      "rationale": "Per-screen patches reintroduce the same jank on the next surface that shares the primitive.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-11-24",
+        "ref": "RSI AI-slop follow-up; shared composer/popover/drawer contracts"
+      },
+      "scope": ["app"],
+      "severity": "warn",
+      "enforcement": {
+        "kind": "human+vision",
+        "status": "shadow",
+        "check": "review-findings RF-0006 + scripts/anti-slop/rsi-prevention/contract.test.mjs (review-only signals)",
+        "evidence": [
+          "scripts/anti-slop/rsi-prevention/contract.test.mjs",
+          "apps/web/components/jovie/components/ChatComposerToolbar.test.tsx"
+        ],
+        "coverageNote": "Fuzzy visual/critical-path judgments stay review-only; no model-only merge gate. Existing ComposerAttachButton tests pin click/open; focus-must-not-activate-Attach is a fixture contract for future browser coverage."
+      }
+    },
+    {
+      "id": "ASR-046",
+      "title": "Skipped or unverifiable evidence is never PASS",
+      "statement": "Skipped, missing, or unverifiable checks cannot count as PASS and cannot support a shipped claim. Aggregate pass requires every mandatory item verified with empty residual; unverifiable holds closure.",
+      "rationale": "Treating gaps as green is how slop merges. Honest verification is the floor for RSI claims.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-11-24",
+        "ref": "RSI AI-slop follow-up; scripts/lib/outcome-residual-policy.mjs; claimed delayInMs:5 unverifiable at tip"
+      },
+      "scope": ["app", "artifact"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "shadow",
+        "check": "scripts/lib/outcome-residual-policy.mjs (already enforced via INV-TERMINAL-RECEIPT) + scripts/anti-slop/rsi-prevention/contract.test.mjs",
+        "evidence": [
+          "scripts/lib/outcome-residual-policy.mjs",
+          "scripts/anti-slop/rsi-prevention/contract.test.mjs"
+        ],
+        "coverageNote": "Does not add a merge gate. Pins the RSI contract that skipped/unverifiable evidence cannot be labeled PASS; outcome-residual-policy remains the executable hold semantics."
+      }
     }
   ],
   "judges": [

@@ -149,7 +149,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:synthetic-canary-catchup
-    jobCount: 4
+    jobCount: 5
   - name: Buyer Eval Gate
     path: .github/workflows/buyer-eval-gate.yml
     active: true
@@ -243,7 +243,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
-    jobCount: 74
+    jobCount: 75
   - name: Claim Checkout Dogfood
     path: .github/workflows/claim-checkout-dogfood.yml
     active: true
@@ -839,8 +839,8 @@ nodes:
       - Mac Lane Route
     triggeringStateTransition:
       - workflow_call
-    terminalReceipt: job:startup-budget
-    jobCount: 3
+    terminalReceipt: job:performance-cert
+    jobCount: 4
   - name: Main Health
     path: .github/workflows/main-health.yml
     active: true

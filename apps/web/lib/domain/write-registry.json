@@ -151,6 +151,13 @@
       "tables": ["waitlistEntries"]
     },
     {
+      "id": "waitlist.post-keep-enrichment",
+      "entity": "waitlist/post-keep-enrichment",
+      "module": "apps/web/lib/waitlist/post-keep-enrichment.ts",
+      "exports": ["mergePostKeepEnrichmentOntoWaitlistEntry"],
+      "tables": ["waitlistEntries"]
+    },
+    {
       "id": "synthetic.admitted-canary",
       "entity": "admitted production canary fixture",
       "module": "apps/web/lib/synthetic/admitted-canary.server.ts",

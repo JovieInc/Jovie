@@ -4,11 +4,17 @@ import { readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
+import { prepareLaunchCapture } from './pr-visual-capture-launch.mjs';
+import {
+  assertAuthenticatedShell,
+  waitForAuthenticatedShell,
+} from './pr-visual-capture-shell.mjs';
 import {
   blockingCaptureRuntimeFailures,
   buildCaptureArtifactPaths,
   CRITICAL_JOURNEY_CAPTURE_SCHEMA,
   MAX_CAPTURE_WORKERS,
+  prepareContactsCapture,
   resolveCaptureJourneyId,
   resolveCaptureWorkerCount,
   runCapturePool,
@@ -44,74 +50,12 @@ const viewports = {
   desktop: { width: 1440, height: 900 },
   mobile: { width: 390, height: 844 },
 };
-const AUTHENTICATED_SHELL_WAIT_MS = 30_000;
-const NEW_CHAT_EMPTY_WAIT_MS = 15_000;
 const CAPTURE_TIMEOUT_MS = 45_000;
 const CIRCUIT_BREAKER_FAILURES = 2;
 if (!Array.isArray(routes) || routes.length === 0)
   throw new Error('No routes supplied');
 if (!exactHead)
   throw new Error('Critical-journey capture requires an exact source SHA');
-
-/**
- * Next production streaming can paint the app-shell Suspense fallback
- * (unlabeled skeleton + aria-hidden greeting region) before
- * DashboardShellContent resolves. Capture must wait for the live
- * authenticated chrome, not the first HTML chunk. JOV-5387 New Chat evidence
- * also requires the loaded empty-state greeting, which is not aria-hidden.
- */
-async function waitForAuthenticatedShell(page, route) {
-  if (!route.startsWith('/app/')) return;
-
-  // A second dashboard-header can stay hidden in the DOM; wait until any
-  // match is visible so Playwright strict mode cannot fail closed.
-  const visibleShellChrome = page
-    .locator(
-      '[data-testid="dashboard-header"], [data-testid="dashboard-error"]'
-    )
-    .filter({ visible: true });
-  await visibleShellChrome.first().waitFor({
-    state: 'visible',
-    timeout: AUTHENTICATED_SHELL_WAIT_MS,
-  });
-  if (
-    (await page
-      .getByTestId('dashboard-error')
-      .filter({ visible: true })
-      .count()) > 0
-  ) {
-    throw new Error(
-      'Captured app route rendered dashboard error UI instead of authenticated shell'
-    );
-  }
-
-  const shellMarker = page
-    .getByRole('heading', { name: 'New Chat', level: 1 })
-    .or(page.getByRole('link', { name: 'New Chat' }))
-    .or(page.getByRole('link', { name: 'Inbox' }))
-    .or(page.getByRole('link', { name: 'Library' }));
-
-  await shellMarker.filter({ visible: true }).first().waitFor({
-    state: 'visible',
-    timeout: AUTHENTICATED_SHELL_WAIT_MS,
-  });
-
-  if (route === '/app/chat' || route.startsWith('/app/chat/')) {
-    // JOV-7150: the loaded empty state is one greeting sentence rendered as
-    // chat-empty-state-greeting-text. The loading still-frame only renders an
-    // aria-hidden skeleton inside chat-empty-state-greeting-region, so the
-    // -text testid is unique to the loaded state.
-    await page
-      .getByRole('heading', { level: 2 })
-      .and(page.getByTestId('chat-empty-state-greeting-text'))
-      .filter({ visible: true })
-      .first()
-      .waitFor({
-        state: 'visible',
-        timeout: NEW_CHAT_EMPTY_WAIT_MS,
-      });
-  }
-}
 
 function sanitizeRuntimeFailures(failures) {
   return failures.map(failure => ({
@@ -161,6 +105,7 @@ try {
     const actions = [];
     const runtimeFailures = [];
     const observed = {
+      coverage: 'missing',
       finalUrl: '',
       title: '',
       statusCode: null,
@@ -200,6 +145,7 @@ try {
         viewport,
         colorScheme: 'dark',
         deviceScaleFactor: 1,
+        serviceWorkers: 'block',
       });
       actions.push('create-isolated-browser-context');
       await context.tracing.start({
@@ -278,15 +224,27 @@ try {
           );
       }
       await waitForAuthenticatedShell(page, route);
+      if (route === '/app/contacts') {
+        observed.requiredState = 'contacts-selected-detail';
+        actions.push('await-populated-contacts-and-select-detail');
+        Object.assign(observed, await prepareContactsCapture(page));
+        result.assertion.expectedOutcome =
+          'Populated Contacts table and selected contact detail rail render together.';
+      }
+      const launchState = await prepareLaunchCapture(page, route);
+      if (launchState) {
+        actions.push('assert-populated-launch-presentation');
+        Object.assign(observed, launchState, {
+          requiredState: launchState.state,
+        });
+        result.assertion.expectedOutcome = `Actual source presentation: ${launchState.state}. No mutation or runtime execution is certified.`;
+      }
       const pageText = (await page.locator('body').innerText()).trim();
       observed.text = sanitizeCaptureText(pageText);
       actions.push('assert-original-route-outcome');
       if (!pageText || /\b404\b|content not found/i.test(pageText))
         throw new Error('Captured route did not render a meaningful surface');
-      if (route.startsWith('/app/') && !/Inbox|Library|New Chat/.test(pageText))
-        throw new Error(
-          'Captured app route did not render authenticated shell'
-        );
+      await assertAuthenticatedShell(page, route);
       if (
         route.startsWith('/app/') &&
         /Welcome back|Continue with Google/.test(pageText)
@@ -303,6 +261,7 @@ try {
       actions.push('capture-screenshot');
       await page.screenshot({ path: outputPath, fullPage: true });
       result.status = 'captured';
+      observed.coverage = 'captured';
     } catch (error) {
       result.status = 'failed';
       result.error = sanitizeCaptureText(error?.message ?? error);

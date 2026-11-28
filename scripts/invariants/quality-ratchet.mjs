@@ -9,6 +9,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  evaluateOperationEvidence,
+  validateObserved,
+} from './quality-operation-evidence.mjs';
 
 export * from './quality-saturation.mjs';
 
@@ -142,14 +146,6 @@ const REQUIRED_APPLICABILITY_FIELDS = Object.freeze([
   'region',
   'dependencyEnvelope',
   'riskTier',
-]);
-
-const REQUIRED_OBSERVED_FIELDS = Object.freeze([
-  'value',
-  'percentile',
-  'window',
-  'sampleSize',
-  'confidence',
 ]);
 
 const REQUIRED_EXCEPTION_FIELDS = Object.freeze([
@@ -330,26 +326,6 @@ export function validateQualityRatchetPolicy(registry) {
     );
   }
   return errors;
-}
-
-function validateObserved(contract, dimension, observed, errors) {
-  const label = `${contract?.id || '<unknown>'}.${dimension}`;
-  for (const field of REQUIRED_OBSERVED_FIELDS) {
-    if (observed?.[field] === undefined) {
-      errors.push(`${label}: observed missing ${field}`);
-    }
-  }
-  if (typeof observed?.sampleSize !== 'number' || observed.sampleSize < 0) {
-    errors.push(`${label}: observed.sampleSize must be a non-negative number`);
-  }
-  if (observed?.value === null && observed?.sampleSize !== 0) {
-    errors.push(
-      `${label}: an unmeasured value requires sampleSize 0 (uncalibrated seed)`
-    );
-  }
-  if (typeof observed?.value === 'number' && observed?.sampleSize === 0) {
-    errors.push(`${label}: a measured value requires a non-zero sampleSize`);
-  }
 }
 
 function validateException(contract, now, errors) {
@@ -559,6 +535,19 @@ export function validateQualityRatchet(registry, options = {}) {
   ];
 }
 
+/** Shadow only: never joins validateQualityRatchet's required errors. */
+export function evaluateQualityOperationEvidence(
+  contracts,
+  registry,
+  options = {}
+) {
+  return evaluateOperationEvidence(
+    contracts,
+    qualityRatchetInvariant(registry)?.policy?.value?.operationEvidence,
+    options
+  );
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { readInvariantRegistry } = await import('./registry.mjs');
   const registry = readInvariantRegistry();
@@ -570,6 +559,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { contracts } = readQualityContractRegistry();
   console.log(
     `${QUALITY_RATCHET_INVARIANT_ID} quality ratchet OK: ${contracts.length} contracts`
+  );
+  console.log(
+    `quality-operation-evidence: ${JSON.stringify(evaluateQualityOperationEvidence({ contracts }, registry))}`
   );
 }
 

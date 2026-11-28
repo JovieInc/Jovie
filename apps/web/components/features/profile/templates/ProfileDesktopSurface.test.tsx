@@ -1093,7 +1093,9 @@ describe('ProfileDesktopSurface', () => {
       'href',
       `/?utm_source=profile&utm_artist=${artist.handle}`
     );
-    expect(branding).toHaveClass('mt-auto'); // JOV-11623
+    // Follows the content instead of pinning to the fold, so short tabs
+    // like About leave no empty band above it (viewport sweep).
+    expect(branding).not.toHaveClass('mt-auto');
   });
 
   it('omits Jovie footer branding when hideJovieBranding is set (JOV-8777)', () => {
@@ -1157,7 +1159,7 @@ describe('ProfileDesktopSurface', () => {
       '[@media(min-width:1180px)]:grid-cols-[minmax(420px,520px)_minmax(0,1fr)_320px]'
     );
     expect(screen.getByTestId('profile-desktop-side-rail')).toHaveClass(
-      '[@media(min-width:1180px)]:col-start-3'
+      '[@media(min-width:1180px)]:col-start-3 content-start' // rows not stretched
     );
 
     const secondary = screen.getByTestId('profile-desktop-secondary-grid');

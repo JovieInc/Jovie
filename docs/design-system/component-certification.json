@@ -2050,6 +2050,9 @@
       "offline": "It fetches nothing; Continue is a client route link to the checkout page, which owns its own network states.",
       "permission-denied": "It has no gated mode: the onboarding chat shows it only to the person in that chat, and the checkout page decides access."
     },
+    "apps/web/components/features/onboarding/ChatProposeNextStepCard.tsx": {
+      "permission-denied": "The detector matched role='alert' on terminal claim-handoff copy (ONB-36). The card has no permission, role, or entitlement gate; identity-conflict is a claim ownership conflict shown as the same alert surface, covered by ChatProposeNextStepCard.test.tsx."
+    },
     "apps/web/components/features/onboarding/OnboardingSecurityCheckRecovery.tsx": {
       "empty": "OnboardingSecurityCheckRecovery always renders one fixed heading, one status line and the retry button, and never a collection; the detector matched the items-start and items-center classes."
     },
@@ -2089,8 +2092,17 @@
     "apps/web/components/features/profile/ClaimBanner.tsx": {
       "empty": "ClaimBanner renders no collection: it always shows one ownership message and at most one CTA; the detector matched the items-center class. The no-CTA variant is PartialNoClaimAction."
     },
+    "apps/web/components/features/profile/DesktopQrOverlay.tsx": {
+      "empty": "The overlay owns no collection; it draws one QR card or one reopen icon. The detector matched the items-center layout class. Hidden mode returns null.",
+      "error": "The only catch guards location.origin when reopening the card; failure logs and keeps the previous url, so there is no error face to draw."
+    },
     "apps/web/components/features/profile/DesktopQrOverlayClient.tsx": {
       "loading": "The wrapper renders null on the server and on first paint by design (JOV-2273, no CSR bailout), then shows the icon once matchMedia resolves in an effect, so there is no loading chrome to capture; DesktopQrOverlayClient.test.tsx asserts the empty server render."
+    },
+    "apps/web/components/features/profile/ProfileDrawerShell.tsx": {
+      "empty": "The shell owns no collection; it frames title, optional subtitle and children. The detector matched the items-center header grid. Closed presentations return null.",
+      "partial": "Optional subtitle, onBack, floating and anchorRef only change chrome; SecondaryWithSubtitle and DirectClose show the header variants. There is no half-loaded data face.",
+      "permission-denied": "A public drawer chrome with no gated action or permission input; navigationLevel only switches header controls. The detector matched role=dialog on the modal/embedded surfaces."
     },
     "apps/web/components/features/profile/ProfilePrimaryTabPanel.tsx": {
       "offline": "The panel fetches nothing itself: releases, tour dates and the catalog result arrive as props from the server-rendered profile, and a failed catalog read arrives as catalogLoadFailed (ErrorCatalogLoadFailed, whose Try Again reloads the page). The detector matched the word skeleton in the visitorAssignmentResolved doc comment, which LoadingAlertsAssignment shows."
@@ -2271,6 +2283,10 @@
     "apps/web/components/jovie/components/ChatArtifactErrorCard.tsx": {
       "offline": "The card never fetches: Try again only dispatches the jovie-chat-submit-prompt window event, and the chat that receives it owns the request and its network error (ErrorDisplay's NetworkOffline story). A tool that failed for lack of connectivity reaches the card as an ordinary error title and message, which ErrorRecoverableRetry shows."
     },
+    "apps/web/components/jovie/components/ChatAvatarUploadCard.tsx": {
+      "empty": "ChatAvatarUploadCard is a single dropzone for one profile photo and owns no collection that could be empty. The detector matched the items-center layout classes on the dropzone and error rows.",
+      "offline": "Upload network failure is the Error face (ErrorUploadFailed story and the mutation onError path): useAvatarMutation paints the same retry chrome whether the browser is offline or the API rejects. There is no separate offline shell."
+    },
     "apps/web/components/jovie/components/ChatDropZoneOverlay.tsx": {
       "permission-denied": "The drop overlay only mirrors an active file drag and has no gated action or permission input; upload limits are enforced by the attachment hook before files reach it, and the detector matched role='status' on the live region."
     },
@@ -2331,6 +2347,10 @@
     "apps/web/components/jovie/components/SlashCommandMenu.tsx": {
       "error": "The menu has no error branch and submits nothing: a commit calls the composer's onSelectSkill, onSelectEntity or onSelectPrompt. The detector matched the word submit in the IME-composition comment of its key handler.",
       "permission-denied": "The menu draws no denied face: a skill the account cannot use (album art without the capability) is left out of the list, so there is nothing locked to show. The detector matched role='combobox' on the filter field."
+    },
+    "apps/web/components/jovie/components/TeleprompterShowcaseInterstitial.tsx": {
+      "empty": "The interstitial owns no collection; it draws one title, one script and fixed actions. The detector matched the items-center layout classes. Closed shows the null face.",
+      "permission-denied": "The showcase has no gated action or permission input; anyone who sees it can start recording or dismiss. The detector matched role='dialog' on the modal."
     },
     "apps/web/components/jovie/merch-tool-artifacts.tsx": {
       "error": "It never draws its own failure. The only submit signal is the jovie-chat-submit-prompt event it dispatches, and the chat that receives it owns the request and its errors. A failed tool event returns null so the shared failure card draws it. The detector matched submit in that event name.",
@@ -2393,6 +2413,13 @@
     "apps/web/components/molecules/FormStatus.tsx": {
       "permission-denied": "FormStatus shows the loading, error and success lines its owning form passes and gates nothing; the detector matched role='alert' on the error line."
     },
+    "apps/web/components/molecules/GenrePicker.tsx": {
+      "loading": "The picker never fetches; GENRE_TAXONOMY is a static constant and open only filters it. There is no loading chrome.",
+      "error": "Genre search is local string filter over a fixed taxonomy; there is no network or parse failure face.",
+      "partial": "Selected genres are complete strings from the taxonomy; maxGenres only caps adds. AtMaxGenres shows the cap chrome. There is no half-loaded data face.",
+      "offline": "No fetch or mutation; opening the list works offline. The detector matched Search/filter UI only.",
+      "permission-denied": "A public genre multiselect with no gated action or permission input; the detector matched role/button options."
+    },
     "apps/web/components/molecules/InfoBox.tsx": {
       "permission-denied": "InfoBox shows caller copy in a variant tone and has no account, role or gated action of its own. The detector matched role='alert' on the error variant (Error story)."
     },
@@ -2401,6 +2428,13 @@
       "partial": "LoadingSkeleton holds no data; its optional props (rows and columns on TableSkeleton) are placeholder geometry with defaults, so nothing can be partially present.",
       "offline": "LoadingSkeleton never fetches; its owner decides what replaces it when a request cannot be made, and the detector matched the word skeleton.",
       "permission-denied": "LoadingSkeleton has no gated action or permission input; the detector matched role='status' on its loading regions."
+    },
+    "apps/web/components/molecules/LocationPicker.tsx": {
+      "loading": "The picker never fetches; POPULAR_CITIES is a static constant and open only filters it. There is no loading chrome.",
+      "error": "City search is a local string filter over a fixed list; there is no network or parse failure face.",
+      "partial": "A selected city is a complete string (catalog or free-text). There is no half-loaded data face.",
+      "offline": "No fetch or mutation; opening the list works offline. The detector matched Search/filter UI only.",
+      "permission-denied": "A public city picker with no gated action or permission input; the detector matched role/button options."
     },
     "apps/web/components/molecules/MeasuredValue.tsx": {
       "empty": "MeasuredValue renders one reading and owns no collection; a missing reading is its unknown state (the Unknown and NeverSeen stories). The detector matched the items-center class on the unknown branch."
@@ -2754,6 +2788,10 @@
       "offline": "The provider never fetches: whether an update exists comes from useVersionMonitor and the desktop updater, and applying reloads the page or restarts the app, so connectivity has no face of its own here.",
       "permission-denied": "An app update has no account, role or gated action: every signed-in or signed-out viewer gets the same pill and status line. The detector matched the sr-only role='status' line.",
       "rtl-overflow": "Its visible UI is RuntimeUpdatePill, pinned with the logical end-4 offset and a truncating label, so a right-to-left document moves it to the opposite corner without overflow; the status line is sr-only."
+    },
+    "apps/web/components/shell/ScrubGradient.tsx": {
+      "empty": "The scrub bar owns no collection; cues are optional markers drawn as fixed SVG dots. The detector matched the items-center layout class. AwaitingMetadata shows the zero-duration face.",
+      "partial": "Optional cues, loopMode and loopSection only change overlays; ReadOnly omits the seek control and Default shows the full bar. There is no half-loaded data face."
     },
     "apps/web/components/shell/SidebarDock.tsx": {
       "partial": "Every card renders from complete props its owner builds (the updater control, the changelog entry, the install prompt). The one partial input was a track with only a title, and audio no longer renders here: it lives in the sidebar O, whose own test covers a title with no artist."

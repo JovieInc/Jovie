@@ -118,7 +118,7 @@ const renderSurfaces = [
   },
   {
     id: 'costs',
-    name: 'Admin Capacity',
+    name: 'Admin Costs',
     path: APP_ROUTES.ADMIN_COSTS,
     rootTestId: 'admin-costs-page',
     snapshotSlug: 'admin-costs',

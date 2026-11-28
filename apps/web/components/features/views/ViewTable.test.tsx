@@ -19,7 +19,7 @@ describe('ViewTable', () => {
     expect(screen.getByText('120')).toBeInTheDocument();
     // New tables use the shared compact rows; dense is a shrinking legacy set.
     expect(
-      container.querySelector('[data-table-row-mode="compact"]')
+      container.querySelector('[data-table-row-mode="dense"]')
     ).not.toBeNull();
   });
 });

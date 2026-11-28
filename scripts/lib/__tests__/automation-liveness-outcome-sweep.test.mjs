@@ -1,3 +1,6 @@
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 import {
   applySweep,
@@ -8,6 +11,11 @@ import {
   workflowFile,
 } from '../outcome-sweep.mjs';
 
+import {
+  RUNNER_HEALTH_RECOVERY_STEP,
+  readSweepJobs,
+} from '../outcome-sweep-proof.mjs';
+
 const NOW = Date.parse('2026-11-22T10:00:00Z');
 const run = (id, file, conclusion, extra = {}) => ({
   id,
@@ -17,8 +25,36 @@ const run = (id, file, conclusion, extra = {}) => ({
   event: 'schedule',
   created_at: new Date(NOW - id * 60_000).toISOString(),
   html_url: `https://github.com/o/r/actions/runs/${id}`,
-  head_sha: 'abcdef1234',
+  head_sha: 'a'.repeat(40),
+  run_attempt: 1,
+  run_number: id,
   ...extra,
+});
+
+it('loads the hosted outcome sweep without workspace dependencies', () => {
+  const sweepUrl = new URL('../outcome-sweep.mjs', import.meta.url);
+  const output = execFileSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '--eval',
+      `
+      import { registerHooks } from 'node:module';
+      registerHooks({
+        resolve(specifier, context, nextResolve) {
+          if (!/^(?:node:|file:|\\.|\\/)/.test(specifier)) {
+            throw new Error('Hosted checkout has no package: ' + specifier);
+          }
+          return nextResolve(specifier, context);
+        },
+      });
+      const { sweepOutcomes } = await import(${JSON.stringify(sweepUrl.href)});
+      console.log(typeof sweepOutcomes);
+    `,
+    ],
+    { encoding: 'utf8' }
+  );
+  expect(output.trim()).toBe('function');
 });
 
 describe('latestVerdicts', () => {
@@ -48,7 +84,7 @@ describe('latestVerdicts', () => {
 describe('planSweep', () => {
   const verdicts = entries => new Map(entries);
 
-  it('files a new red and resolves the first green after it', () => {
+  it('files a new red and does not resolve from wrapper green alone', () => {
     const red = planSweep({
       verdicts: verdicts([
         ['a.yml', { verdict: 'red', run: run(1, 'a.yml', 'failure') }],
@@ -64,8 +100,8 @@ describe('planSweep', () => {
       state: red.next,
       nowMs: NOW + 1000,
     });
-    expect(green.decisions.map(d => d.action)).toEqual(['green']);
-    expect(green.next['a.yml'].state).toBe('green');
+    expect(green.decisions).toEqual([]);
+    expect(green.next['a.yml'].state).toBe('red');
   });
 
   it('does not refile a steady red inside the refile window, then refiles', () => {
@@ -95,15 +131,13 @@ describe('planSweep', () => {
     expect(planSweep({ verdicts: v, state, nowMs: NOW }).decisions).toEqual([]);
   });
 
-  it('treats lost state as red so a green resolves a stranded issue', () => {
+  it('keeps missing prior scope unknown rather than resolving a stranded issue', () => {
     const v = verdicts([
       ['a.yml', { verdict: 'green', run: run(1, 'a.yml', 'success') }],
     ]);
-    expect(
-      planSweep({ verdicts: v, state: null, nowMs: NOW }).decisions.map(
-        d => d.action
-      )
-    ).toEqual(['green']);
+    const planned = planSweep({ verdicts: v, state: null, nowMs: NOW });
+    expect(planned.decisions).toEqual([]);
+    expect(planned.next['a.yml'].state).toBe('unknown');
   });
 });
 
@@ -158,4 +192,69 @@ describe('applySweep', () => {
     });
     expect(state['a.yml']).toEqual(previous['a.yml']);
   });
+});
+
+describe('substantive swept probe evidence', () => {
+  const fresh = {
+    name: RUNNER_HEALTH_RECOVERY_STEP,
+    status: 'completed',
+    conclusion: 'success',
+  };
+
+  it('publishes the exact runner marker step only for a proven fresh heartbeat', () => {
+    const workflow =
+      /** @type {{jobs: {monitor: {steps: Array<{name: string, if?: string}>}}}} */ (
+        load(
+          readFileSync('.github/workflows/runner-health-monitor.yml', 'utf8')
+        )
+      );
+    const marker = workflow.jobs.monitor.steps.find(
+      step => step.name === RUNNER_HEALTH_RECOVERY_STEP
+    );
+    expect(marker?.if).toBe("\${{ steps.runners.outputs.health == 'up' }}");
+  });
+
+  it.each([
+    ['runner-health-monitor.yml', undefined, 'skipped'],
+    [
+      'runner-health-monitor.yml',
+      [{ ...fresh, conclusion: 'skipped' }],
+      'skipped',
+    ],
+    ['runner-health-monitor.yml', [fresh, fresh], 'skipped'],
+    ['runner-health-monitor.yml', [fresh], 'success'],
+    ['linear-sync-on-merge.yml', [fresh], 'skipped'],
+    ['fleet-gate-refresh.yml', undefined, 'success'],
+  ])(
+    'admits only eligible recovery evidence for %s',
+    async (file, steps, expected) => {
+      const runId = '1';
+      const sha = 'a'.repeat(40);
+      const jobs = [
+        {
+          name: 'Observed probe',
+          run_id: 1,
+          run_attempt: 1,
+          head_sha: sha,
+          status: 'completed',
+          conclusion: 'success',
+          steps,
+        },
+      ];
+      const result = await readSweepJobs({
+        file,
+        repo: 'o/r',
+        token: 'fixture',
+        identity: { id: runId, number: 1, attempt: 1, sha },
+        event: 'schedule',
+        nowMs: NOW,
+        fetchImpl: async () =>
+          new Response(JSON.stringify({ jobs, total_count: jobs.length })),
+      });
+      expect(result.ok).toBe(true);
+      expect(Object.values(JSON.parse(result.results))).toEqual([
+        { result: expected },
+      ]);
+    }
+  );
 });

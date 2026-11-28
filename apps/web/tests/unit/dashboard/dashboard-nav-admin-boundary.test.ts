@@ -101,7 +101,7 @@ describe('exclusive customer vs OV navigation', () => {
       ADMIN_NAV_REGISTRY.filter(item => item.section === 'workspaces').map(
         item => item.label
       )
-    ).toEqual(['Home', 'Operator Inbox', 'Shipping', 'Fleet', 'Capacity']);
+    ).toEqual(['Home', 'Operator Inbox', 'Shipping', 'Fleet', 'Costs']);
     expect(ADMIN_NAV_REGISTRY.map(item => item.id)).not.toContain('needs_you');
     expect(
       ADMIN_NAV_REGISTRY.filter(item => item.section === 'business').map(
@@ -146,9 +146,14 @@ describe('exclusive customer vs OV navigation', () => {
     expect(
       ADMIN_NAV_REGISTRY.find(item => item.id === 'capacity')
     ).toMatchObject({
-      label: 'Agent Plans',
+      label: 'Capacity',
       href: APP_ROUTES.ADMIN_CAPACITY,
       section: 'utilities',
+    });
+    expect(ADMIN_NAV_REGISTRY.find(item => item.id === 'costs')).toMatchObject({
+      label: 'Costs',
+      href: APP_ROUTES.ADMIN_COSTS,
+      section: 'workspaces',
     });
   });
 

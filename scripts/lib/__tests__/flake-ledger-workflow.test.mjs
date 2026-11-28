@@ -100,6 +100,23 @@ test('the workflow calls the HA collector entrypoint and does not reimplement fl
   assert.doesNotMatch(HOOK, /rate = verified flips/);
 });
 
+test('the retry job receives the ledger from the hidden collector directory', () => {
+  const upload = WORKFLOW.split(
+    '      - name: Upload flake ledger artifacts\n'
+  )[1].split('\n      - name:')[0];
+  const download = WORKFLOW.split(
+    '      - name: Restore collected ledger\n'
+  )[1].split('\n      - name:')[0];
+  const artifact = /\bname: (flake-ledger-.*)/;
+
+  assert.match(upload, /\n +\.flake-ledger\/ledger\.json\n/);
+  assert.match(upload, /\n +include-hidden-files: true\n/);
+  assert.match(upload, /\n +if-no-files-found: error\n/);
+  assert.match(download, /\n +path: \.flake-ledger\n/);
+  assert.match(upload, artifact);
+  assert.equal(upload.match(artifact)?.[1], download.match(artifact)?.[1]);
+});
+
 test('permissions stay minimal and the runner is already-pinned ubuntu-24.04', () => {
   assert.match(WORKFLOW, /\npermissions: \{\}\n/);
   assert.match(WORKFLOW, /runs-on: ubuntu-24\.04/);

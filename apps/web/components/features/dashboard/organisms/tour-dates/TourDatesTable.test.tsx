@@ -40,11 +40,11 @@ function renderTable(tourDates: TourDateViewModel[]) {
 }
 
 describe('TourDatesTable', () => {
-  it('gives the stacked date and time the two-line row budget', () => {
+  it('keeps stacked date and time on the canonical dense row', () => {
     renderTable([baseTourDate]);
 
     const table = screen.getByRole('table');
-    expect(table).toHaveAttribute('data-table-row-mode', 'two-line');
+    expect(table).toHaveAttribute('data-table-row-mode', 'dense');
     const row = within(table).getAllByRole('row')[1];
     expect(within(row).getByText('8:00 PM')).toBeInTheDocument();
   });

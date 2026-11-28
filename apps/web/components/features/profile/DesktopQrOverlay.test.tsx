@@ -1,7 +1,7 @@
-// Drift T2.1: IconButton alias retirement — callsite migration coverage.
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DesktopQrOverlay } from '@/features/profile/DesktopQrOverlay';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { DesktopQrOverlay } from './DesktopQrOverlay';
 
 const { DATA_URL, getQrCodeDataUrl } = vi.hoisted(() => ({
   DATA_URL: 'data:image/png;base64,QRPNG',
@@ -64,6 +64,37 @@ describe('DesktopQrOverlay', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it.each([
+    { state: 'icon', open: false },
+    { state: 'open', open: true },
+  ])('has no axe violations when $state', async ({ open }) => {
+    const { container } = render(<DesktopQrOverlay handle='tim' />);
+    if (open) {
+      fireEvent.click(screen.getByLabelText('Open On Phone'));
+      await screen.findByAltText('Scan To Open This Profile On Your Phone');
+    }
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no axe violations in an RTL overflow frame', async () => {
+    const { container } = render(
+      <div dir='rtl'>
+        <DesktopQrOverlay handle='فنان' />
+      </div>
+    );
+    fireEvent.click(screen.getByLabelText('Open On Phone'));
+    await screen.findByAltText('Scan To Open This Profile On Your Phone');
+    await expectNoA11yViolations(container);
+  });
+
+  it('uses PlainButton for the close control', async () => {
+    render(<DesktopQrOverlay handle='tim' />);
+    fireEvent.click(screen.getByLabelText('Open On Phone'));
+    const close = await screen.findByLabelText('Close');
+    expect(close.getAttribute('data-slot')).toBe('plain-button');
+    expect(close).toHaveClass('h-11', 'w-11');
   });
 
   it('starts as icon on desktop (hidden by default)', () => {

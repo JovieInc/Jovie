@@ -406,7 +406,7 @@ function OutboundRailContent({
             </a>
           </div>
           {certification ? (
-            <DrawerSection title='Certification details' defaultOpen={false}>
+            <DrawerSection title='Certification Details'>
               <div className='space-y-2 px-1 pb-2'>
                 <p className='text-xs tabular-nums text-secondary-token'>
                   {(['confirmed', 'rejected', 'unresolved', 'stale'] as const)

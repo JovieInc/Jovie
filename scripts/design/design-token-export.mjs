@@ -329,7 +329,7 @@ export function loadDimensions(tokens = readJson(TOKENS_PATH)) {
   return dims;
 }
 
-/** `{size.row.compact}` -> its px string in design.tokens.json; other values pass through. */
+/** `{size.row.dense}` (or any `{group.key}`) -> its px string; other values pass through. */
 export function resolveDimension(value, tokens = readJson(TOKENS_PATH)) {
   const alias = String(value).match(/^\{([\w-]+)\.(.+)\}$/);
   if (!alias) return value;

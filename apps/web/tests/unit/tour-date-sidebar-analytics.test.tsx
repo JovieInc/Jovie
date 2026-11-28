@@ -128,7 +128,6 @@ vi.mock('@/components/molecules/drawer', () => ({
       <span>{value}</span>
     </div>
   ),
-  DrawerCardActionBar: () => <div data-testid='drawer-card-action-bar' />,
 }));
 
 vi.mock('@/components/molecules/drawer/EntityHeader', () => ({
@@ -268,7 +267,9 @@ describe('TourDateSidebar analytics section', () => {
       'data-stable-layout',
       'true'
     );
-    expect(screen.getByTestId('drawer-card-action-bar')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'More actions' })
+    ).toBeInTheDocument();
   });
 
   it('renders the shared DatePicker wired to the tour start date', () => {
@@ -334,7 +335,7 @@ describe('TourDateSidebar analytics section', () => {
 
     expect(screen.getByTestId('sidebar-shell')).toHaveAttribute(
       'data-workspace-surface',
-      'raised'
+      'flat'
     );
     // Check stat tiles
     const ticketStat = screen.getByTestId('stat-Ticket Clicks');

@@ -5,31 +5,22 @@ import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { buildAudienceMemberColumns } from '@/components/features/dashboard/organisms/dashboard-audience-table/table-config';
 import { UnifiedTable } from '@/components/organisms/table/organisms/UnifiedTable';
-import { TABLE_ROW_MODES } from '@/components/organisms/table/table.styles';
+import {
+  TABLE_CANONICAL_ROW_MODE,
+  TABLE_ROW_MODES,
+} from '@/components/organisms/table/table.styles';
 import type { ColumnDef } from '@/lib/tanstack-table';
 
 /**
- * Table density contract (.claude/rules/ui.md "Tables and lists (Linear parity)").
- * User-facing rows are at least 40px; `dense` (32px) is admin/debug only.
+ * Table density contract (DRI-21 / taste #7).
+ * Every UnifiedTable row is dense 32px — no compact/list forks.
  */
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = join(__dirname, '..', '..', '..');
 
-// Shrink-only baseline (target 0, never raise). Counts `rowMode='dense'`,
-// `rowMode="dense"` and `rowHeight={32}` under apps/web/app and
-// apps/web/components outside the excluded paths below. The 3 remaining sites:
-// ReleaseProviderMatrix and ReleaseTablePendingShell (desktop-list-density
-// test pins them dense) and HomeLoopLatency. A follow-up moves them.
-const DENSE_BASELINE = 3;
-
-/** Admin/dev-only tooling, where 32px rows are allowed. */
-const EXCLUDED = [
-  'components/features/admin/', // founder/admin tools, not user-facing
-  'app/app/(shell)/admin/', // admin routes
-];
-
-const PATTERN = /rowMode=(['"])dense\1|rowHeight=\{32\}/g;
+const RETIRED_MODE_PATTERN =
+  /rowMode=(['"])(compact|list|two-line|description|controls)\1|rowMode=\{[^}]*'(compact|list|two-line|description|controls)'[^}]*\}/g;
 
 function walk(dir: string, out: string[]) {
   for (const name of readdirSync(dir)) {
@@ -46,22 +37,21 @@ function walk(dir: string, out: string[]) {
   }
 }
 
-function denseSites(): string[] {
+function retiredModeSites(): string[] {
   const files: string[] = [];
   walk(join(WEB_ROOT, 'app'), files);
   walk(join(WEB_ROOT, 'components'), files);
   const hits: string[] = [];
   for (const file of files) {
     const rel = relative(WEB_ROOT, file).replaceAll('\\', '/');
-    if (EXCLUDED.some(prefix => rel.startsWith(prefix))) continue;
-    const matches = readFileSync(file, 'utf8').match(PATTERN);
-    if (matches) hits.push(...matches.map(() => rel));
+    const matches = readFileSync(file, 'utf8').match(RETIRED_MODE_PATTERN);
+    if (matches) hits.push(...matches.map(() => `${rel}:${matches.join(',')}`));
   }
   return hits;
 }
 
 describe('table density contract', () => {
-  it('compact rows render at 40px or taller', () => {
+  it('dense rows render at 32px', () => {
     interface Row {
       readonly id: string;
       readonly name: string;
@@ -75,7 +65,7 @@ describe('table density contract', () => {
         columns={columns}
         getRowId={r => r.id}
         isLoading={false}
-        rowMode='compact'
+        rowMode={TABLE_CANONICAL_ROW_MODE}
         enableVirtualization={false}
       />
     );
@@ -84,11 +74,12 @@ describe('table density contract', () => {
       table.style.getPropertyValue('--table-row-height'),
       10
     );
-    expect(px).toBeGreaterThanOrEqual(40);
-    expect(TABLE_ROW_MODES.compact.rowHeight).toBeGreaterThanOrEqual(40);
+    expect(px).toBe(32);
+    expect(TABLE_ROW_MODES.dense.rowHeight).toBe(32);
+    expect(Object.keys(TABLE_ROW_MODES)).toEqual(['dense']);
   });
 
-  it('Audience renders compact, not dense', () => {
+  it('Audience uses dense, not retired modes', () => {
     for (const file of [
       'DashboardAudienceTableUnified.tsx',
       'AudienceTableLoadingShell.tsx',
@@ -101,17 +92,14 @@ describe('table density contract', () => {
         ),
         'utf8'
       );
-      expect(src, file).toMatch(/rowMode=(\{[^}]*'compact'[^}]*\}|'compact')/);
-      expect(src, file).not.toMatch(PATTERN);
+      expect(src, file).toMatch(/rowMode=['"]dense['"]/);
+      expect(src, file).not.toMatch(RETIRED_MODE_PATTERN);
     }
   });
 
-  it('dense / 32px call sites only shrink', () => {
-    const sites = denseSites();
-    expect(
-      sites.length,
-      `dense call sites: ${sites.join(', ')}. Move user-facing tables to 'compact'.`
-    ).toBeLessThanOrEqual(DENSE_BASELINE);
+  it('adds no retired rowMode call sites', () => {
+    const sites = retiredModeSites();
+    expect(sites, sites.join('\n')).toEqual([]);
   });
 
   it('Audience has no row-number column and hides empty Alerts/Action', () => {

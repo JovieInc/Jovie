@@ -279,6 +279,18 @@ describe('waitForAuthenticatedHealth', () => {
     );
   });
 
+  it('verifies the persisted identity without sending bypass headers', async () => {
+    const userId = 'persisted-better-auth-user';
+    const { page, requestGet } = buildHealthPage({ active: true, userId });
+
+    await waitForAuthenticatedHealth(page, userId, { cookieOnly: true });
+
+    expect(requestGet).toHaveBeenCalledWith(
+      'http://localhost:3100/api/dev/test-auth/session',
+      expect.objectContaining({ headers: {} })
+    );
+  });
+
   it('rejects while the session belongs to a different user', async () => {
     const { page } = buildHealthPage({ active: true, userId: 'other-user' });
 

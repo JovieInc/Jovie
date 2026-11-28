@@ -71,7 +71,7 @@ export function DashboardsTable({
         data={data}
         columns={columns}
         caption='Your dashboards'
-        rowMode='compact'
+        rowMode='dense'
         minWidth='0'
         columnSnap={false}
         getRowId={row => row.id}

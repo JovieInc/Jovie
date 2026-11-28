@@ -46,36 +46,27 @@ export interface CompanyBlocker {
   readonly observedAt: string;
 }
 
-/**
- * `why` is what a failing step breaks. `unproven` is what an unmeasured or
- * out-of-date step leaves unconfirmed: unknown evidence is not a failure, so
- * it must not claim the product is broken (Tim, 2026-11-22: checkout read
- * "nobody can pay yet" while its own probes passed).
- */
+/** What an unmeasured or out-of-date certification leaves unconfirmed. */
 const CONE_COPY: Readonly<
   Record<
     Exclude<RevenueConeStep, 'public_profile'>,
-    { readonly name: string; readonly why: string; readonly unproven: string }
+    { readonly name: string; readonly unproven: string }
   >
 > = {
   homepage_entry: {
     name: 'The homepage entry',
-    why: "visitors can't be trusted to reach sign-up",
     unproven: "we can't confirm visitors reach sign-up",
   },
   onboarding_auth_claim: {
     name: 'Sign-up and claim',
-    why: "an artist can't take their profile yet",
     unproven: "we can't confirm an artist can take their profile",
   },
   checkout_payment_entitlement: {
     name: 'Checkout',
-    why: 'nobody can pay yet',
     unproven: "we can't confirm anyone can pay",
   },
   activation_dashboard: {
     name: 'First use after paying',
-    why: 'a new customer may not get what they paid for',
     unproven: "we can't confirm a new customer gets what they paid for",
   },
 };
@@ -99,7 +90,7 @@ function certificationText(
   }
   const copy = CONE_COPY[step];
   if (status === 'red')
-    return `${copy.name} fails certification, so ${copy.why}`;
+    return `The latest available certification report for ${copy.name.toLowerCase()} shows a failed check. See Certifications for details.`;
   if (metric.status === 'green')
     return `${copy.name}'s certification is out of date, so ${copy.unproven}`;
   return `${copy.name} isn't fully measured yet, so ${copy.unproven}`;
@@ -244,6 +235,12 @@ export function companyBlocker(
       tone: status === 'red' ? 'bad' : 'warn',
       text: certificationText(step, metric, status),
       detailsHref: APP_ROUTES.ADMIN_CERTIFICATIONS,
+      nextAction:
+        step !== 'public_profile' &&
+        status === 'red' &&
+        investigation?.cause === 'product_failure'
+          ? 'Review the failed check before assessing impact.'
+          : base.nextAction,
     };
   }
   if (kind === 'funnel' && isFunnelStep(step)) {

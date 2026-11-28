@@ -113,7 +113,7 @@ describe('GET /api/hud/shipping-state', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('measures inline when the cached observation is past the freshness cutoff', async () => {
+  it('serves the aged projection immediately and reconciles in the background when past freshness', async () => {
     mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
     mockReadCached.mockReturnValue({
       schema: 'ovie.shipping-state.v1',
@@ -121,19 +121,19 @@ describe('GET /api/hud/shipping-state', () => {
       publishing: true,
       observationTimestamp: new Date(Date.now() - 120_000).toISOString(),
     });
-    mockPublish.mockResolvedValue({
-      schema: 'ovie.shipping-state.v1',
-      state: 'fresh',
-    });
+    // Background reconcile starts but must not delay the cached response.
+    mockPublish.mockReturnValue(new Promise(() => {}));
     const { GET } = await import('@/app/api/hud/shipping-state/route');
     const response = await GET(
       new NextRequest('http://localhost/api/hud/shipping-state')
     );
-    await expect(response.json()).resolves.toMatchObject({ state: 'fresh' });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ state: 'stale' });
+    expect(mockScheduleAfter).toHaveBeenCalledTimes(1);
     expect(mockPublish).toHaveBeenCalledTimes(1);
   });
 
-  it('serves the aged projection when the inline measurement fails', async () => {
+  it('still serves the aged projection when background reconciliation later fails', async () => {
     mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
     mockReadCached.mockReturnValue({
       schema: 'ovie.shipping-state.v1',
@@ -148,6 +148,8 @@ describe('GET /api/hud/shipping-state', () => {
     );
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ state: 'stale' });
+    expect(mockScheduleAfter).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(mockCaptureError).toHaveBeenCalled());
   });
 
   it('returns the local projection without waiting for reconciliation', async () => {

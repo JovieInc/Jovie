@@ -161,11 +161,12 @@ describe('bot review thread resolution on a green head', () => {
     code: 0,
     stdout: JSON.stringify({
       data: {
+        node: threads[0],
         repository: {
           pullRequest: {
             state: 'OPEN',
             headRefOid: HEAD,
-            reviewThreads: { nodes: threads },
+            reviewThreads: { pageInfo: { hasNextPage: false }, nodes: threads },
           },
         },
       },
@@ -231,7 +232,7 @@ describe('bot review thread resolution on a green head', () => {
     const calls = [];
     const gh = async args => {
       calls.push(args);
-      return calls.length === 1
+      return args.some(arg => arg.startsWith('query=query'))
         ? liveRead([thread('T1', [c(sentry)]), thread('H1', [c(human)])])
         : { code: 0, stdout: '{}' };
     };
@@ -248,9 +249,9 @@ describe('bot review thread resolution on a green head', () => {
       filed: [],
       skip: null,
     });
-    expect(calls).toHaveLength(2);
-    expect(calls[1]).toContain(`query=${RESOLVE_MUTATION}`);
-    expect(calls[1]).toContain('id=T1');
+    expect(calls).toHaveLength(3);
+    expect(calls[2]).toContain(`query=${RESOLVE_MUTATION}`);
+    expect(calls[2]).toContain('id=T1');
   });
 
   it('dry-run and failed reads mutate nothing', async () => {

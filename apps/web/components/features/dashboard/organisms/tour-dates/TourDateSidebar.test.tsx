@@ -80,6 +80,38 @@ describe('TourDateSidebar', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('keeps event properties and audience analytics visible without disclosures', async () => {
+    analytics.mockReturnValue({
+      data: {
+        ticketClicks: 7,
+        topCities: [{ city: 'Pasadena', count: 4 }],
+        topReferrers: [{ referrer: 'instagram.com', count: 3 }],
+      },
+      isLoading: false,
+      isError: false,
+    });
+    render(ui(tourDate));
+
+    for (const label of [
+      'Event Title (Optional)',
+      'Date',
+      'Time',
+      'Timezone (Optional)',
+      'Venue',
+      'City',
+      'State/region',
+      'Country',
+      'Ticket URL',
+    ]) {
+      expect(await screen.findByLabelText(label)).toBeVisible();
+    }
+    expect(screen.getByText('Pasadena')).toBeVisible();
+    expect(screen.getByText('instagram.com')).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Analytics' })
+    ).not.toBeInTheDocument();
+  });
+
   it('changes the ticket status with the segmented buttons', async () => {
     const user = userEvent.setup();
     render(ui(tourDate));

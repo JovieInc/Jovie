@@ -354,7 +354,7 @@ export function AdminReleasesTableUnified({
     >
       {() => (
         <AdminDataTable
-          rowMode='two-line'
+          rowMode='dense'
           data={allReleases}
           columns={columns}
           getRowId={(row: AdminReleaseRow) => row.id}

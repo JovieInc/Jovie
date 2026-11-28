@@ -51,7 +51,6 @@ it('retains a workflow batch containing null PR associations through the real jq
 import {
   buildGistSloBlock,
   capacityUtilization,
-  ciWalltimeByEvent,
   DEFAULT_THRESHOLDS,
   evaluateShippingSlo,
   leadTimeByLane,
@@ -193,25 +192,6 @@ describe('shipping SLO workflow credentials', () => {
       /if \[ "\$snapshot_lines" -gt 1500 \]; then[\s\S]*?label_args\+=\(--label big-pr\)[\s\S]*?gh pr create --repo "\$\{\{ github\.repository \}\}" --base main --head "\$BRANCH"/
     );
     expect(WORKFLOW).not.toContain('git push origin HEAD:main');
-  });
-});
-
-describe('ciWalltimeByEvent', () => {
-  it('computes per-event p95 from successful completed runs in the window', () => {
-    const runs = [
-      run(ago(1), new Date(NOW - DAY + 600_000).toISOString()), // 600s PR
-      run(ago(1), new Date(NOW - DAY + 300_000).toISOString(), {
-        event: 'merge_group',
-      }),
-      run(ago(1), new Date(NOW - DAY + 100_000).toISOString(), {
-        conclusion: 'failure',
-      }), // excluded: not a gate-success duration
-      run(ago(30), new Date(NOW - 30 * DAY + 600_000).toISOString()), // outside window
-    ];
-    const out = ciWalltimeByEvent(runs, NOW - 7 * DAY, NOW);
-    expect(out.pull_request.p95).toBe(600);
-    expect(out.pull_request.n).toBe(1);
-    expect(out.merge_group.p95).toBe(300);
   });
 });
 

@@ -20,5 +20,5 @@ This directory contains the unified onboarding flow for Jovie. The onboarding pr
 
 - **Single Entry Point**: Only one active onboarding path
 - **Clean Architecture**: No feature flags or conditional rendering
-- **Auth Integration**: Seamless integration with Clerk authentication
+- **Auth Integration**: Uses the [web Better Auth session](../../lib/auth/README.md) for signed-in flows
 - **Truthful Blocking**: Import and discovery complete before dashboard handoff

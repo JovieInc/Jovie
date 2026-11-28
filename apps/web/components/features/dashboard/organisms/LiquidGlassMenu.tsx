@@ -218,7 +218,7 @@ function MenuItemLink({
       }}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption transition-[background-color,color] duration-subtle ease-subtle active:bg-surface-2',
+        'flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption press active:bg-surface-2',
         active
           ? 'bg-bg-surface-2 text-primary-token'
           : 'text-secondary-token hover:text-primary-token hover:bg-surface-1'
@@ -421,7 +421,7 @@ export function LiquidGlassMenu({
                     <PlainButton
                       type='button'
                       onClick={onSignOut}
-                      className='flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption text-secondary-token transition-[background-color,color] duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token active:bg-surface-2'
+                      className='flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2.5 text-app font-caption text-secondary-token hover:bg-surface-1 hover:text-primary-token active:bg-surface-2'
                     >
                       <LogOut
                         className='size-5 shrink-0 text-tertiary-token'
@@ -479,7 +479,7 @@ export function LiquidGlassMenu({
                 }}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'relative flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
+                  'relative flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 press active:text-primary-token',
                   active
                     ? 'text-primary-token'
                     : 'text-tertiary-token hover:text-secondary-token'
@@ -518,7 +518,7 @@ export function LiquidGlassMenu({
             aria-expanded={isExpanded}
             aria-controls={expandedDialogId}
             className={cn(
-              'relative flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 transition-colors duration-subtle ease-subtle active:text-primary-token',
+              'relative flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 active:text-primary-token',
               isExpanded
                 ? 'text-primary-token'
                 : 'text-tertiary-token hover:text-secondary-token'
@@ -541,7 +541,7 @@ export function LiquidGlassMenu({
               type='button'
               onClick={onSearchClick}
               aria-label='Search'
-              className='relative flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-tertiary-token transition-colors duration-subtle ease-subtle hover:text-secondary-token active:text-primary-token'
+              className='relative flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg py-1.5 text-tertiary-token hover:text-secondary-token active:text-primary-token'
             >
               <Search className='h-5 w-5' aria-hidden='true' />
               <span className='sr-only'>Search</span>

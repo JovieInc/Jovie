@@ -5,6 +5,7 @@ import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useSidebar } from '@/components/shell/SidebarContext';
 import { APP_ROUTES } from '@/constants/routes';
+import { NEW_CHAT_REQUESTED_EVENT } from '@/lib/chat/new-chat-intent';
 import { NAVIGATION_DROP_OFF_MS } from '@/lib/tracking/navigation-telemetry';
 import {
   mockUsePathname,
@@ -59,6 +60,29 @@ describe('DashboardNav route warming', () => {
     runtimeUpdateState.available = false;
     resetDashboardNavTestMocks();
   });
+
+  it.each([false, true])(
+    'starts a fresh chat only for same-tab activation (header owns inbox: %s)',
+    headerOwnsInbox => {
+      const requested = vi.fn();
+      globalThis.addEventListener(NEW_CHAT_REQUESTED_EVENT, requested);
+      try {
+        renderDashboardNav({ renderFn: render, headerOwnsInbox });
+        const newChat = screen.getByRole('link', { name: 'New Chat' });
+        fireEvent.click(newChat, { metaKey: true });
+        fireEvent.click(newChat, { ctrlKey: true });
+        fireEvent.click(newChat, { shiftKey: true });
+        expect(requested).not.toHaveBeenCalled();
+
+        fireEvent.click(newChat, { detail: 0 });
+        expect(requested).toHaveBeenCalledTimes(1);
+        fireEvent.click(newChat, { detail: 1 });
+        expect(requested).toHaveBeenCalledTimes(2);
+      } finally {
+        globalThis.removeEventListener(NEW_CHAT_REQUESTED_EVENT, requested);
+      }
+    }
+  );
 
   it('keeps history out of Settings while preserving New Chat on Work', () => {
     mockUsePathname.mockReturnValue(APP_ROUTES.SETTINGS);

@@ -84,9 +84,25 @@ export interface TaskBoardResult {
 
 export interface MoveTaskInput {
   readonly taskId: string;
+  readonly expectedMutationVersion?: number;
   readonly toStatus: TaskStatus;
   readonly beforeTaskId?: string | null;
   readonly afterTaskId?: string | null;
+}
+
+/** A revision may only certify the complete task content returned with it. */
+export type TaskMutationSnapshot = TaskView & {
+  readonly mutationVersion: number;
+};
+
+export interface MoveTaskResult {
+  readonly success: true;
+  readonly affectedTasks: readonly TaskMutationSnapshot[];
+}
+
+export interface BulkTaskUpdateResult {
+  readonly success: true;
+  readonly affectedTasks: readonly TaskMutationSnapshot[];
 }
 
 export interface TaskStats {

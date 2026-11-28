@@ -42,6 +42,17 @@ function table(data: CatalogRow[], emptyState?: ReactNode) {
 }
 
 describe('UnifiedTable states', () => {
+  it('defaults to the canonical dense row mode', () => {
+    render(table(RELEASES));
+    expect(screen.getByRole('table')).toHaveAttribute(
+      'data-table-row-mode',
+      'dense'
+    );
+    expect(
+      screen.getByRole('table').style.getPropertyValue('--table-row-height')
+    ).toBe('32px');
+  });
+
   it('opens a row with missing values on click', async () => {
     const user = userEvent.setup();
     const onRowClick = vi.fn();
@@ -140,7 +151,7 @@ describe('UnifiedTable hideWhenEmpty columns', () => {
         columns={hideable}
         enableVirtualization={false}
         getRowId={row => row.id}
-        rowMode='compact'
+        rowMode='dense'
       />
     );
 
@@ -162,11 +173,10 @@ describe('UnifiedTable hideWhenEmpty columns', () => {
     expect(screen.getByRole('columnheader', { name: 'Artist' })).toBeVisible();
   });
 
-  it('applies the compact row mode to the table', () => {
+  it('applies the dense row mode to the table', () => {
     const { container } = render2(RELEASES);
     expect(
-      container.querySelectorAll('[data-table-row-mode="compact"]').length
+      container.querySelectorAll('[data-table-row-mode="dense"]').length
     ).toBeGreaterThan(0);
-    expect(container.querySelector('[data-table-row-mode="dense"]')).toBe(null);
   });
 });

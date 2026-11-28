@@ -16,6 +16,8 @@ export const OVIE_HOME_READY_MEASURE = 'ovie-home:ready';
 export type OvieHomeNavigation = 'hard' | 'soft';
 
 export interface OvieHomeReadySample {
+  readonly startedAt: number;
+  readonly readyAt: number;
   readonly durationMs: number;
   readonly navigation: OvieHomeNavigation;
   readonly budgetMs: number;
@@ -49,6 +51,8 @@ export function ovieHomeReadySample(
 ): OvieHomeReadySample {
   const durationMs = Math.max(0, Math.round(readyAt - startedAt));
   return {
+    startedAt,
+    readyAt,
     durationMs,
     navigation,
     budgetMs: OVIE_HOME_READY_BUDGET_MS,
@@ -71,8 +75,8 @@ export function recordOvieHomeReady(sample: OvieHomeReadySample): void {
   });
   try {
     globalThis.performance?.measure?.(OVIE_HOME_READY_MEASURE, {
-      start: globalThis.performance.now() - sample.durationMs,
-      duration: sample.durationMs,
+      start: sample.startedAt,
+      end: Math.max(sample.startedAt, sample.readyAt),
     });
   } catch {
     // The User Timing measure is a trace convenience; the samples above stand.

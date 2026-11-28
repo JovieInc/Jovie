@@ -133,6 +133,29 @@ describe('ProfileEditPreviewCard', () => {
     );
   });
 
+  it('shows clean text for an older HTML-encoded bio proposal without applying it', () => {
+    const fencedBio =
+      '<untrusted-source url="https://example.com" encoding="entities-v1">&amp;lt;p&amp;gt;&amp;lt;b&amp;gt;An artist.&amp;lt;/b&amp;gt;&amp;lt;/p&amp;gt;&amp;lt;p&amp;gt;New music.&amp;lt;/p&amp;gt;</untrusted-source>';
+    const { container } = renderCard({
+      field: 'bio',
+      fieldLabel: 'Artist bio/description',
+      currentValue: null,
+      newValue: fencedBio,
+      sourceUrl: 'https://example.com',
+    });
+
+    expect(screen.getByText('An artist. New music.')).toHaveTextContent(
+      'An artist. New music.'
+    );
+    expect(container.textContent).not.toContain('&lt;');
+    expect(mockMutate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /apply/i }));
+    expect(mockMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ newValue: fencedBio }),
+      expect.anything()
+    );
+  });
+
   it('transitions to the applied state after a successful mutation', async () => {
     mockMutate.mockImplementation((_input, options) => {
       options?.onSuccess?.();

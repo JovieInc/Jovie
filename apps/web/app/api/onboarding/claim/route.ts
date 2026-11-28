@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { isWaitlistApprovedUserStatus } from '@/lib/auth/canonical-user-state';
 import { getDbUser } from '@/lib/auth/session';
 import { decodeToolEvents } from '@/lib/chat/tool-events';
@@ -11,31 +11,29 @@ import {
   chatMessages,
 } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
+import { parsePostKeepEnrichmentFromBody } from '@/lib/onboarding/apply-post-keep-enrichment';
 import { materializeClaimedOnboardingProfile } from '@/lib/onboarding/claim-profile';
 import {
   isClaimAccessControlled,
   linkClaimReplaysBestEffort,
 } from '@/lib/onboarding/claim-side-effects';
+import {
+  createWaitlistReceiptOrThrow,
+  WaitlistIntakeRequiredError,
+  WaitlistPersistenceError,
+} from '@/lib/onboarding/claim-waitlist-receipt';
 import { deriveClaimedOnboardingStateFromMessageRows } from '@/lib/onboarding/claimed-state';
 import { isOnboardingOwnershipError } from '@/lib/onboarding/ownership-gate';
+import type { PostKeepEnrichmentNotes } from '@/lib/onboarding/post-keep-enrichment-notes';
 import {
   clearOnboardingSessionCookie,
   getCurrentOnboardingSessionId,
 } from '@/lib/onboarding/session';
 import { SpotifyProfileIdentityConflictError } from '@/lib/profile/spotify-profile-identity';
-import { normalizeEmail } from '@/lib/utils/email';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
-import { waitlistRequestSchema } from '@/lib/validation/schemas';
-import {
-  submitWaitlistAccessRequest,
-  type WaitlistAccessRequestResult,
-} from '@/lib/waitlist/access-request';
-import { scoreAdmissionCandidate } from '@/lib/waitlist/admission-score';
-import {
-  decideGoldenPathAdmissionForArtist,
-  requiresProofBeforePublic,
-} from '@/lib/waitlist/golden-path-admission.server';
+import type { WaitlistAccessRequestResult } from '@/lib/waitlist/access-request';
+import { requiresProofBeforePublic } from '@/lib/waitlist/golden-path-admission.server';
 import {
   isWaitlistApprovedStatus,
   isWaitlistPendingStatus,
@@ -47,23 +45,6 @@ type ClaimedProfilePayload = Awaited<
   ReturnType<typeof materializeClaimedOnboardingProfile>
 >;
 
-class WaitlistPersistenceError extends Error {
-  readonly cause: unknown;
-
-  constructor(cause: unknown) {
-    super('Waitlist request could not be saved');
-    this.name = 'WaitlistPersistenceError';
-    this.cause = cause;
-  }
-}
-
-class WaitlistIntakeRequiredError extends Error {
-  constructor() {
-    super('A confirmed artist or social profile is required for waitlist');
-    this.name = 'WaitlistIntakeRequiredError';
-  }
-}
-
 function profilePayload(
   profile: ClaimedProfilePayload | null
 ): { profile: ClaimedProfilePayload } | Record<string, never> {
@@ -72,20 +53,6 @@ function profilePayload(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function deriveFullName(params: {
-  readonly userFullName: string | null | undefined;
-  readonly userUsername: string | null | undefined;
-  readonly email: string;
-}): string {
-  const fromUser = (params.userFullName ?? '').trim();
-  if (fromUser) return fromUser;
-
-  const fromUsername = (params.userUsername ?? '').trim();
-  if (fromUsername) return fromUsername;
-
-  return params.email.split('@')[0]?.trim() || 'Jovie user';
 }
 
 function hasDurablePublicArtistIdentity(
@@ -120,87 +87,12 @@ function deriveTerminalDecisionKind(
   return null;
 }
 
-async function createWaitlistReceipt(params: {
-  readonly appUserId: string;
-  readonly messageRows: readonly { toolCalls: unknown }[];
-}): Promise<WaitlistAccessRequestResult> {
-  const currentUser = await getCachedCurrentUser();
-  const emailRaw = currentUser?.primaryEmailAddress?.emailAddress;
-  if (!emailRaw) throw new Error('Verified email is required for waitlist');
-
-  const state = deriveClaimedOnboardingStateFromMessageRows(params.messageRows);
-  // The scripted flow explicitly permits skipping social attachment after a
-  // Spotify artist is confirmed. Spotify is still a validated public artist
-  // profile, so it is the truthful durable fallback for that supported path.
-  const primarySocialUrl = state.socialLinks[0] ?? state.artist?.url;
-  if (!primarySocialUrl) {
-    throw new WaitlistIntakeRequiredError();
-  }
-
-  // Same pure rule the chat gate used; the access request reserves capacity
-  // and records the reason. Unreadable verdict -> null -> held.
-  const goldenPathAdmission = await decideGoldenPathAdmissionForArtist({
-    spotifyArtistId: state.artist?.id ?? null,
-    reach: state.artist?.followers ?? null,
-  });
-
-  // Best leads first: the score and every input are stored on the entry.
-  const admissionScore = scoreAdmissionCandidate({
-    identityResolved: Boolean(state.artist?.id),
-    followers: state.artist?.followers ?? null,
-    popularity: state.artist?.popularity ?? null,
-    catalogReleases: state.catalogPreview?.total ?? null,
-    latestReleaseAt: state.catalogPreview?.releases[0]?.releaseDate ?? null,
-    releaseStage:
-      state.interviewSignals.findLast(signal => signal.releaseStage)
-        ?.releaseStage ?? null,
-    chatTurns: params.messageRows.length,
-  });
-
-  const email = normalizeEmail(emailRaw);
-  const waitlistData = waitlistRequestSchema.parse({
-    primaryGoal: null,
-    primarySocialUrl,
-    spotifyUrl: state.artist?.url ?? null,
-    spotifyArtistName: state.artist?.name ?? null,
-    heardAbout: 'onboarding_chat',
-    selectedPlan: null,
-  });
-
-  return submitWaitlistAccessRequest({
-    appUserId: params.appUserId,
-    email,
-    emailRaw,
-    fullName: deriveFullName({
-      userFullName: currentUser.fullName,
-      userUsername: currentUser.username,
-      email,
-    }),
-    data: waitlistData,
-    goldenPathAdmission,
-    admissionScore,
-    source: 'onboarding_chat_claim',
-  });
-}
-
 async function loadConversationMessageRows(conversationId: string) {
   return db
     .select({ toolCalls: chatMessages.toolCalls })
     .from(chatMessages)
     .where(eq(chatMessages.conversationId, conversationId))
     .orderBy(chatMessages.createdAt);
-}
-
-async function createWaitlistReceiptOrThrow(params: {
-  readonly appUserId: string;
-  readonly messageRows: readonly { toolCalls: unknown }[];
-}) {
-  try {
-    return await createWaitlistReceipt(params);
-  } catch (error) {
-    if (error instanceof WaitlistIntakeRequiredError) throw error;
-    throw new WaitlistPersistenceError(error);
-  }
 }
 
 interface ClaimHandoff {
@@ -229,6 +121,7 @@ async function resolveClaimHandoff(params: {
   readonly mustWaitlist: boolean;
   readonly ipAddress: string | null;
   readonly userAgent: string | null;
+  readonly enrichment: PostKeepEnrichmentNotes | null;
 }): Promise<ClaimHandoff> {
   if (!params.mustWaitlist) {
     // A retry, a recovered response or an already-approved user must not
@@ -253,6 +146,7 @@ async function resolveClaimHandoff(params: {
     waitlist = await createWaitlistReceiptOrThrow({
       appUserId: params.appUserId,
       messageRows: params.messageRows,
+      enrichment: params.enrichment,
     });
   } catch (error) {
     if (error instanceof WaitlistIntakeRequiredError) {
@@ -394,6 +288,13 @@ export async function POST(req: Request) {
       );
     }
 
+    let enrichment: PostKeepEnrichmentNotes | null = null;
+    try {
+      enrichment = parsePostKeepEnrichmentFromBody(await req.json());
+    } catch {
+      enrichment = null;
+    }
+
     const sessionId = await getCurrentOnboardingSessionId();
     if (!sessionId) {
       // No anonymous session to claim — successful no-op so the client can
@@ -468,6 +369,7 @@ export async function POST(req: Request) {
               mustWaitlist,
               ipAddress,
               userAgent,
+              enrichment,
             })
           : EMPTY_CLAIM_HANDOFF;
         if (
@@ -560,6 +462,7 @@ export async function POST(req: Request) {
               mustWaitlist,
               ipAddress,
               userAgent,
+              enrichment,
             })
           : EMPTY_CLAIM_HANDOFF;
         if (terminalKind && !handoff.profileError)
@@ -587,6 +490,7 @@ export async function POST(req: Request) {
             mustWaitlist,
             ipAddress,
             userAgent,
+            enrichment,
           })
         : EMPTY_CLAIM_HANDOFF;
 

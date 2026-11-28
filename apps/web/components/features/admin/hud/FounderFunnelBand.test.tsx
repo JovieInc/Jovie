@@ -359,9 +359,11 @@ describe('FounderFunnelBand honest labels', () => {
 
   it('reports loss for a downstream stage with a non-empty previous step', () => {
     const stage = zeroTail.stages[2];
-    expect(founderFunnelStageFooter(stage, 2, false)).toBe('−40 lost');
+    expect(founderFunnelStageFooter(stage, 2, false)).toBe(
+      '−40 fewer accounts'
+    );
     expect(founderFunnelStageFooter(stage, 2, true)).toBe(
-      'Biggest drop-off · −40'
+      'Largest count gap · −40'
     );
   });
 });

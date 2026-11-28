@@ -115,33 +115,13 @@ export async function listLinearIssueComments({
 }) {
   if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
   if (!issueId) return { ok: false, reason: 'missing_issue_id' };
-  const result = await linearGraphql(
-    {
-      query: `
-        query ListLinearIssueComments($id: String!) {
-          issue(id: $id) {
-            comments(first: 100) {
-              nodes { id body createdAt }
-            }
-          }
-        }
-      `,
-      variables: { id: issueId },
-      apiKey,
-      fetchImpl,
-    },
-    'linear_comment_list'
+  const { readLinearEvidenceComments } = await import(
+    './linear-issue-evidence.mjs'
   );
-  if (!result.ok) return result;
-  const nodes = result.data?.issue?.comments?.nodes ?? [];
-  return {
-    ok: true,
-    comments: nodes.map(node => ({
-      id: node?.id ?? null,
-      body: String(node?.body ?? ''),
-      createdAt: node?.createdAt ?? null,
-    })),
-  };
+  return readLinearEvidenceComments(
+    { issueId, apiKey, fetchImpl },
+    linearGraphql
+  );
 }
 
 const REMEDIATION_KEY_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -205,7 +185,7 @@ export function clearRemediationLabelCache() {
   labelCache.clear();
 }
 
-const ISSUE_FIELDS = `
+export const ISSUE_FIELDS = `
   id identifier url title description
   state { id name type }
   labels(first: 50) { nodes { id name } }
@@ -348,6 +328,9 @@ export async function upsertLinearIssueByTitleFingerprint({
   title,
   description,
   priority = 1,
+  // Opt-in: preserve the owning workpad, assignment, labels and disposition.
+  preserveExisting = false,
+  evidenceMarker = null,
   // Optional state name resolved from the team's workflow (JOV-5966). 'Todo'
   // files into Backlog: admission is the only Backlog -> Todo writer.
   createStateName = null,
@@ -358,6 +341,7 @@ export async function upsertLinearIssueByTitleFingerprint({
   // undefined distinguishes "omitted" from an explicit false. A stable
   // labelKey reopens unless the caller opts out.
   reopenTerminal = undefined,
+  preserveOpenState = false,
   labelKey = null,
   apiKey = process.env.LINEAR_API_KEY,
   fetchImpl = fetch,
@@ -464,6 +448,21 @@ export async function upsertLinearIssueByTitleFingerprint({
     );
   }
 
+  if (match && preserveExisting) {
+    const { preserveLinearFindingEvidence } = await import(
+      './linear-issue-evidence.mjs'
+    );
+    return preserveLinearFindingEvidence({
+      match,
+      evidenceMarker,
+      descriptionBody,
+      apiKey,
+      fetchImpl,
+      listComments: listLinearIssueComments,
+      addComment: addLinearIssueComment,
+    });
+  }
+
   let labelId = null;
   if (manageLabels) {
     const ensured = await ensureLinearLabel({
@@ -547,10 +546,16 @@ export async function upsertLinearIssueByTitleFingerprint({
   const terminal = ['completed', 'canceled'].includes(match.state?.type);
   if (terminal && shouldReopen && !backlogState)
     return { ok: false, reason: 'linear_backlog_state_missing' };
+  if (preserveOpenState && !terminal && !match.state?.id)
+    return { ok: false, reason: 'linear_open_state_missing' };
   const existingLabelNodes = match.labels?.nodes;
   const input = {
     description: descriptionBody,
-    ...(terminal && shouldReopen ? { stateId: backlogState.id } : {}),
+    ...(terminal && shouldReopen
+      ? { stateId: backlogState.id }
+      : preserveOpenState && !terminal
+        ? { stateId: match.state.id }
+        : {}),
     ...((labelId || keepLabelIds.length > 0) &&
     Array.isArray(existingLabelNodes)
       ? {
@@ -830,105 +835,5 @@ export async function attachEvidenceToOpenIssue({
     id: match.id,
     identifier: match.identifier ?? null,
     url: match.url ?? null,
-  };
-}
-
-export async function noteFingerprintedIssueGreen({
-  fingerprint,
-  source,
-  comment,
-  commentMarker = '<!-- remediation-green -->',
-  apiKey = process.env.LINEAR_API_KEY,
-  fetchImpl = fetch,
-}) {
-  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
-  if (typeof fingerprint !== 'string' || fingerprint.trim().length === 0) {
-    return { ok: false, reason: 'missing_fingerprint' };
-  }
-  const labelName = remediationKey(fingerprint);
-  const found = await linearGraphql(
-    {
-      query: `
-        query FindRemediationForGreen($teamId: String!, $teamFilterId: ID!, $labelName: String!) {
-          team(id: $teamId) { states { nodes { id name type } } }
-          issues(
-            filter: {
-              team: { id: { eq: $teamFilterId } }
-              labels: { some: { name: { eq: $labelName } } }
-            }
-            first: 25
-          ) { nodes { ${ISSUE_FIELDS} } }
-        }
-      `,
-      variables: {
-        teamId: JOVIE_TEAM_ID,
-        teamFilterId: JOVIE_TEAM_ID,
-        labelName,
-      },
-      apiKey,
-      fetchImpl,
-    },
-    'linear_label_search'
-  );
-  if (!found.ok) return found;
-  const match = resolveLinearIssueByFingerprint(
-    found.data?.issues?.nodes,
-    fingerprint
-  );
-  if (!match) return { ok: true, action: 'none' };
-  if (['completed', 'canceled'].includes(match.state?.type)) {
-    return { ok: true, action: 'already_closed', id: match.id };
-  }
-  const sourceLine = source ? `Source-workflow: ${source}` : '';
-  if (sourceLine && !String(match.description ?? '').includes(sourceLine)) {
-    return {
-      ok: true,
-      action: 'source_mismatch',
-      id: match.id,
-      identifier: match.identifier ?? null,
-    };
-  }
-  const posted = await addLinearIssueComment({
-    issueId: match.id,
-    body: comment || `${commentMarker}\n${sourceLine} is green.`,
-    apiKey,
-    fetchImpl,
-  });
-  if (!posted.ok) return posted;
-  const states = found.data?.team?.states?.nodes ?? [];
-  const done =
-    states.find(state => state?.name === 'Done') ??
-    states.find(state => state?.type === 'completed');
-  if (!done?.id) return { ok: false, reason: 'linear_done_state_missing' };
-  const updated = await linearGraphql(
-    {
-      query: `
-        mutation ResolveRemediation($id: String!, $stateId: String!) {
-          issueUpdate(id: $id, input: { stateId: $stateId }) {
-            success
-            issue { id identifier url }
-          }
-        }
-      `,
-      variables: { id: match.id, stateId: done.id },
-      apiKey,
-      fetchImpl,
-    },
-    'linear_update'
-  );
-  if (!updated.ok) return updated;
-  if (!updated.data?.issueUpdate?.success) {
-    return {
-      ok: false,
-      reason: 'linear_update_unsuccessful',
-      body: updated.raw,
-    };
-  }
-  return {
-    ok: true,
-    action: 'resolved',
-    id: match.id,
-    identifier: updated.data.issueUpdate.issue?.identifier ?? match.identifier,
-    url: updated.data.issueUpdate.issue?.url ?? match.url,
   };
 }

@@ -87,6 +87,7 @@
         "scripts/invariants/art-direction/hue.baseline.json",
         "scripts/invariants/art-direction/imagery-provenance.baseline.json",
         "scripts/invariants/art-direction/images.baseline.json",
+        "scripts/invariants/art-direction/press-state.baseline.json",
         "scripts/invariants/art-direction/surface-media.baseline.json"
       ]
     },

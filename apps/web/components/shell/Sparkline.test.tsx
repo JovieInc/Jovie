@@ -99,3 +99,100 @@ describe('Sparkline', () => {
     expect(paths[0]?.getAttribute('fill')).toBe('none');
   });
 });
+
+describe('Sparkline observations', () => {
+  it('keeps missing periods as gaps in both the line and the area', () => {
+    const { container } = render(
+      <Sparkline points={[4, 0, null, 2, 1]} trend='down' hoverIdx={2} />
+    );
+    const paths = container.querySelectorAll('path');
+    expect(paths[1]?.getAttribute('d')?.match(/M/g)).toHaveLength(2);
+    expect(paths[0]?.getAttribute('d')?.match(/Z/g)).toHaveLength(2);
+    expect(container.querySelector('line')).toBeNull();
+    expect(container.querySelector('svg')).toHaveAccessibleDescription(
+      '4 measured, 1 missing. Minimum 0, maximum 4.'
+    );
+  });
+
+  it('marks an isolated observation at its raw period and omits all missing marks', () => {
+    const { container, rerender } = render(
+      <Sparkline points={[null, 0, null]} trend='flat' />
+    );
+    const mark = container.querySelector('[data-sparkline-variant]');
+    expect(mark?.getAttribute('d')).toContain('M 170.0 120.0 l 0 0');
+    rerender(<Sparkline points={[null, Number.NaN, Infinity]} trend='flat' />);
+    expect(container.querySelector('path, circle, line')).toBeNull();
+    expect(container.querySelector('svg')).toHaveAccessibleDescription(
+      'No measurements. 3 missing.'
+    );
+  });
+
+  it('closes signed areas at the zero line with finite SVG coordinates', () => {
+    const { container } = render(
+      <Sparkline points={[-Number.MAX_VALUE, 0, Number.MAX_VALUE]} trend='up' />
+    );
+    const area = container.querySelector('path')?.getAttribute('d');
+    expect(area).toBe(
+      'M 0.0 120.0 L 170.0 60.0 L 340.0 0.0 L 340.0 60.0 L 0.0 60.0 Z'
+    );
+  });
+
+  it('keeps a gap even when it falls within one sampling column', () => {
+    const points = Array<number | null>(10_001).fill(5);
+    points[12] = null;
+    const { container } = render(<Sparkline points={points} trend='flat' />);
+    const path = container
+      .querySelector('[data-sparkline-variant]')
+      ?.getAttribute('d');
+    expect(path).toContain('L 0.4 0.0 M 0.4 0.0');
+    expect(container.querySelector('svg')).toHaveAccessibleDescription(
+      /10000 measured, 1 missing. Minimum 5, maximum 5./
+    );
+  });
+
+  it.each([100_000, 150_001])(
+    'bounds fragmented series with %i raw periods using independent observations',
+    n => {
+      const points: (number | null)[] = Array.from({ length: n }, (_, index) =>
+        index % 2 === 0 ? 0 : null
+      );
+      points[4] = 99;
+      points[6] = -99;
+      const { container } = render(
+        <Sparkline points={points} trend='flat' hoverIdx={8} />
+      );
+      const paths = container.querySelectorAll('path');
+      expect(paths).toHaveLength(1);
+      const marks = paths[0]?.getAttribute('d') ?? '';
+      expect(marks.match(/M/g)?.length).toBeLessThanOrEqual(4 * 341);
+      expect(marks).not.toContain('L');
+      expect(marks).toMatch(/M [\d.]+ 0.0 l 0 0 M [\d.]+ 120.0 l 0 0/);
+      expect(container.querySelector('svg')).toHaveAccessibleDescription(
+        /Dots show/
+      );
+      expect(
+        Number(container.querySelector('circle')?.getAttribute('cy'))
+      ).toBe(60);
+    }
+  );
+
+  it('bounds dense path size and keeps opposite extrema in their original order', () => {
+    const points = Array<number>(150_001).fill(0);
+    points[4] = 99;
+    points[5] = -99;
+    points[6] = 2;
+    const { container } = render(
+      <Sparkline points={points} trend='up' hoverIdx={6} />
+    );
+    const path = container
+      .querySelector('[data-sparkline-variant]')
+      ?.getAttribute('d');
+    expect(path).toBeDefined();
+    expect(path?.match(/[ML]/g)?.length).toBeLessThanOrEqual(4 * 341);
+    expect(path).toMatch(/^M 0\.0 60\.0 L 0\.0 0\.0 L 0\.0 120\.0 /);
+    expect(path).toMatch(/L 340\.0 60\.0$/);
+    // The sample discards index 6, but the playhead reads the original value.
+    const selected = container.querySelector('circle');
+    expect(Number(selected?.getAttribute('cy'))).toBeCloseTo(58.787878);
+  });
+});

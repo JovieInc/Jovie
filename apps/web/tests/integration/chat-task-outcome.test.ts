@@ -16,7 +16,7 @@ import { setupDatabaseBeforeAll } from '../setup-db';
  * workspace gate) is stubbed, because there is no Next request here.
  */
 
-const session = vi.hoisted(() => ({ profileId: '' }));
+const session = vi.hoisted(() => ({ profileId: '', userId: '' }));
 
 vi.mock('server-only', () => ({}));
 vi.mock('next/cache', () => ({
@@ -28,6 +28,9 @@ vi.mock('@/lib/entitlements/tasks-gate', () => ({
 }));
 vi.mock('@/app/app/(shell)/dashboard/requireProfileId', () => ({
   requireProfileId: vi.fn(async () => session.profileId),
+}));
+vi.mock('@/lib/auth/cached', () => ({
+  getCachedAuth: vi.fn(async () => ({ userId: session.userId })),
 }));
 
 setupDatabaseBeforeAll();
@@ -73,6 +76,7 @@ async function createArtist(): Promise<string> {
     })
     .returning({ id: users.id });
   createdUserIds.push(user.id);
+  session.userId = user.id;
   const result = await db.transaction(tx =>
     createProfileForExistingUser(
       tx,

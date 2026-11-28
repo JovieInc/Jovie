@@ -132,7 +132,7 @@ test('metadata reuse skips every unit shard including merged guards on 4/4', () 
             );
             assert.equal(
               expression(unit.if, context),
-              reuse !== 'true' && web === 'true'
+              reuse !== 'true' && web === 'true' && shard !== '4/4'
             );
             const twin = steps.find(
               item => item.name === 'Run typecheck lane parity'

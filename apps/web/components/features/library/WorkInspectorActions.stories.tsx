@@ -66,6 +66,10 @@ type Story = StoryObj<typeof meta>;
 
 export const LivePublicWork: Story = {};
 
+export const SharingInLinkRow: Story = {
+  args: { showSharingActions: false },
+};
+
 export const PreparedUnpublished: Story = {
   args: {
     asset: { ...asset, status: 'scheduled', smartLinkPath: '' },

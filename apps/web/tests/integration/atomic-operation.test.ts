@@ -18,6 +18,7 @@ import {
 } from '@/lib/waitlist/approval';
 import { enqueueWaitlistApprovalInviteEmail } from '@/lib/waitlist/email-jobs';
 import { registerContentPublicationCertification } from './fixtures/content-publication-certification';
+import { registerTaskMutationCertification } from './fixtures/task-mutation-certification';
 
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: vi.fn(),
@@ -250,6 +251,7 @@ describe.skipIf(!target)(
       });
     }, 90_000);
     registerContentPublicationCertification(() => target);
+    registerTaskMutationCertification(() => target);
   }
 );
 

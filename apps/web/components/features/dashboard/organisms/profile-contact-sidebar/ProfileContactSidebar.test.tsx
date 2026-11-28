@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FetchError } from '@/lib/queries/fetch';
 import { queryKeys } from '@/lib/queries/keys';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { ProfileContactSidebar } from './ProfileContactSidebar';
 
 type DeferredMutationCall = {
@@ -396,6 +397,33 @@ async function rejectRemoveCall(index: number) {
     await Promise.resolve();
   });
 }
+
+describe('ProfileContactSidebar a11y', () => {
+  beforeEach(() => {
+    mockState.profileCalls.length = 0;
+    mockState.removeCalls.length = 0;
+    mockState.toastSuccess.mockReset();
+    mockState.toastError.mockReset();
+    mockState.routerReplace.mockReset();
+    mockState.useRealProfileMutation = false;
+    mockState.isFloating = false;
+    mockState.selectedProfileId = 'profile-1';
+    mockState.previewReady = true;
+    mockState.searchParams = new URLSearchParams();
+    vi.unstubAllGlobals();
+  });
+
+  it('has no accessibility violations for the skeleton and hydrated rail', async () => {
+    mockState.previewReady = false;
+    const skeleton = renderSidebar();
+    await expectNoA11yViolations(skeleton.container);
+    skeleton.unmount();
+
+    mockState.previewReady = true;
+    const { container } = renderSidebar();
+    await expectNoA11yViolations(container);
+  });
+});
 
 describe('ProfileContactSidebar optimistic mutation sequencing', () => {
   it.each(['/app/profiles', '/app/settings/profile?tab=music'])(

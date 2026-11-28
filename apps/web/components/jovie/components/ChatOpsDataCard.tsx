@@ -1,6 +1,7 @@
 'use client';
 
 import { Activity } from 'lucide-react';
+import { FunnelTracker } from '@/components/molecules/FunnelTracker';
 import { computeRatePercent } from '@/lib/analytics/metrics';
 import type { SummerOpsCard } from '@/lib/ovie/ops-card';
 import { cn } from '@/lib/utils';
@@ -92,6 +93,12 @@ export function ChatOpsDataCard({ card, summary }: ChatOpsDataCardProps) {
           <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
             {summary ?? card.summary}
           </p>
+        ) : null}
+
+        {card.funnel ? (
+          <div className='mt-3'>
+            <FunnelTracker view={card.funnel} hideTitle />
+          </div>
         ) : null}
 
         {card.facts.length > 0 ? (

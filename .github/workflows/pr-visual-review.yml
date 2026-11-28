@@ -23,6 +23,8 @@ on:
       - 'apps/web/styles/**'
       - 'apps/console/**'
       - 'apps/ios/**'
+      - 'apps/mac/**'
+      - 'apps/macos/**'
       - 'packages/ui/**'
       - '**/*.css'
       - '**/*.scss'
@@ -76,15 +78,6 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
 
-      # This job runs PR-controlled code, so it only restores caches that
-      # main's producers saved and never saves one. system_deps keeps the
-      # fonts the captures need.
-      - name: Setup Playwright Chromium
-        uses: ./.github/actions/setup-playwright
-        with:
-          system_deps: 'true'
-          cache: restore
-
       - name: Route changed files
         id: route
         env:
@@ -130,13 +123,23 @@ jobs:
             files,
           };
           await writeFile(process.env.PR_VISUAL_OUT + '/routing.json', JSON.stringify(output, null, 2));
-          await writeFile(process.env.GITHUB_OUTPUT, `should_review=${route.shouldReview}\nreview_status=${output.review_status}\nroutes<<ROUTES\n${JSON.stringify(route.routes)}\nROUTES\n`, { flag: 'a' });
+          await writeFile(process.env.GITHUB_OUTPUT, `should_review=${route.shouldReview}\nhas_routes=${route.routes.length > 0}\nreview_status=${output.review_status}\nroutes<<ROUTES\n${JSON.stringify(route.routes)}\nROUTES\n`, { flag: 'a' });
           console.log(JSON.stringify(output));
           NODE
 
+      # This job runs PR-controlled code, so it only restores caches that
+      # main's producers saved and never saves one. system_deps keeps the
+      # fonts the captures need.
+      - name: Setup Playwright Chromium
+        if: steps.route.outputs.has_routes == 'true'
+        uses: ./.github/actions/setup-playwright
+        with:
+          system_deps: 'true'
+          cache: restore
+
       - name: Build web app for deterministic capture
         id: build
-        if: steps.route.outputs.should_review == 'true'
+        if: steps.route.outputs.has_routes == 'true'
         continue-on-error: true
         run: pnpm turbo build --filter=@jovie/web
         env:
@@ -156,7 +159,7 @@ jobs:
 
       - name: Start production server
         id: server
-        if: steps.route.outputs.should_review == 'true' && steps.build.outcome == 'success'
+        if: steps.route.outputs.has_routes == 'true' && steps.build.outcome == 'success'
         continue-on-error: true
         run: |
           set -euo pipefail
@@ -168,7 +171,7 @@ jobs:
 
       - name: Capture routed surfaces
         id: routed_capture
-        if: steps.route.outputs.should_review == 'true' && steps.build.outcome == 'success' && steps.server.outcome == 'success'
+        if: steps.route.outputs.has_routes == 'true' && steps.build.outcome == 'success' && steps.server.outcome == 'success'
         continue-on-error: true
         env:
           BASE_URL: http://127.0.0.1:3100
@@ -186,7 +189,7 @@ jobs:
       # kinds are ratcheted by route-dom-marketing-baseline.json.
       - name: Certify marketing route DOM invariants
         id: marketing_dom
-        if: steps.route.outputs.should_review == 'true' && steps.build.outcome == 'success' && steps.server.outcome == 'success'
+        if: steps.route.outputs.has_routes == 'true' && steps.build.outcome == 'success' && steps.server.outcome == 'success'
         working-directory: apps/web
         env:
           BASE_URL: http://127.0.0.1:3100
@@ -225,7 +228,7 @@ jobs:
       # measure precision before any detector is promoted to blocking.
       - name: Marketing visual critic (shadow)
         id: marketing_critic
-        if: ${{ !cancelled() && steps.route.outputs.should_review == 'true' && steps.build.outcome == 'success' && steps.server.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.route.outputs.has_routes == 'true' && steps.build.outcome == 'success' && steps.server.outcome == 'success' }}
         env:
           BASE_URL: http://127.0.0.1:3100
           EXPECTED_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
@@ -244,7 +247,7 @@ jobs:
       # skipped or excluded; the merge queue repeats it in ci.yml.
       - name: Capture exact marketing routes (marketing-routes.spec.ts)
         id: marketing_routes
-        if: steps.route.outputs.should_review == 'true' && steps.build.outcome == 'success' && steps.server.outcome == 'success'
+        if: steps.route.outputs.has_routes == 'true' && steps.build.outcome == 'success' && steps.server.outcome == 'success'
         env:
           BASE_URL: http://127.0.0.1:3100
           SCREENSHOT_BUILD_MODE: pr-premerge

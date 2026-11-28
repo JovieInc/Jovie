@@ -24,6 +24,7 @@ import {
 } from '@/components/shell/SidebarThreadsSection';
 import { useChatThreadContextMenu } from '@/components/shell/useChatThreadContextMenu';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
+import { requestNewChat } from '@/lib/chat/new-chat-intent';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { formatInboxPendingWorkLabel } from '@/lib/inbox/navigation-availability';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
@@ -276,6 +277,7 @@ export function DashboardNav({
     }
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
       return;
+    if (event.button === 0 && item.id === chatNavItem.id) requestNewChat();
     if (event.button === 0 && currentNavigationHref !== item.href) {
       beginPendingNavigation(item.id);
     }
@@ -333,14 +335,16 @@ export function DashboardNav({
           onActivate={
             demoUnavailable
               ? undefined
-              : inputMethod =>
+              : inputMethod => {
+                  if (isNewThreadItem) requestNewChat();
                   startNavigationTelemetry({
                     itemId: isInSettings ? 'settings' : item.id,
                     sourcePathname: currentNavigationHref,
                     destinationHref: item.href,
                     inputMethod,
                     context: telemetryContext,
-                  })
+                  });
+                }
           }
           preventNavigation={demoUnavailable}
           renderAsButton={false}

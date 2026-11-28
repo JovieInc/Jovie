@@ -76,6 +76,67 @@ describe('selectRedisStore', () => {
     expect(decision.warning).toContain(ALLOW_PRODUCTION_UPSTASH_ENV);
   });
 
+  it('selects a preview-scoped non-production Upstash instance on Vercel preview (JOV-9826)', () => {
+    const decision = selectRedisStore({
+      NODE_ENV: 'production',
+      VERCEL_ENV: 'preview',
+      UPSTASH_REDIS_REST_URL: 'https://staging-redis.example.upstash.io',
+      UPSTASH_REDIS_REST_TOKEN: 'staging-token',
+    });
+
+    expect(decision.kind).toBe('upstash');
+    expect(decision.blockProductionUpstash).toBe(false);
+    expect(decision.warning).toBeUndefined();
+  });
+
+  it('still refuses the production Upstash host on Vercel preview', () => {
+    const decision = selectRedisStore({
+      NODE_ENV: 'production',
+      VERCEL_ENV: 'preview',
+      UPSTASH_REDIS_REST_URL: PROD_URL,
+      UPSTASH_REDIS_REST_TOKEN: 'token',
+    });
+
+    expect(decision.kind).toBe('memory');
+    expect(decision.blockProductionUpstash).toBe(true);
+    expect(decision.warning).toContain(ALLOW_PRODUCTION_UPSTASH_ENV);
+  });
+
+  it('keeps the in-memory store on Vercel preview without preview Redis credentials', () => {
+    expect(
+      selectRedisStore({ NODE_ENV: 'production', VERCEL_ENV: 'preview' }).kind
+    ).toBe('memory');
+    expect(
+      selectRedisStore({
+        NODE_ENV: 'production',
+        VERCEL_ENV: 'preview',
+        UPSTASH_REDIS_REST_URL: 'https://staging-redis.example.upstash.io',
+      }).kind
+    ).toBe('memory');
+    expect(
+      selectRedisStore({
+        NODE_ENV: 'production',
+        VERCEL_ENV: 'preview',
+        UPSTASH_REDIS_REST_URL: 'http://staging-redis.example.upstash.io',
+        UPSTASH_REDIS_REST_TOKEN: 'staging-token',
+      }).kind
+    ).toBe('memory');
+    // CI, tests and local runtimes never select the preview instance.
+    for (const env of [
+      { NODE_ENV: 'test', VITEST: 'true' },
+      { NODE_ENV: 'test', CI: 'true' },
+      { NODE_ENV: 'development' },
+    ]) {
+      expect(
+        selectRedisStore({
+          ...env,
+          UPSTASH_REDIS_REST_URL: 'https://staging-redis.example.upstash.io',
+          UPSTASH_REDIS_REST_TOKEN: 'staging-token',
+        }).kind
+      ).toBe('memory');
+    }
+  });
+
   it('uses local Redis when REDIS_URL is loopback and still refuses the prod host', () => {
     const decision = selectRedisStore({
       NODE_ENV: 'development',

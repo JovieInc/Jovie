@@ -14,8 +14,10 @@ import { buildFixture } from './fixtures';
 import {
   draftsOneCollabTarget,
   firstContentSentence,
+  hasConcreteNextMove,
   isPlanningMenuCloser,
   isPromiseOnlyDraft,
+  REFUSE_CONCRETE_NEXT_CASE_IDS,
   runOneRecGapChecks,
   upcomingInFirstSentenceWithDays,
 } from './one-rec-gaps';
@@ -231,6 +233,133 @@ describe('one-rec gaps: promise-draft-not-a-move (ASS-100)', () => {
     expect(
       checks.find(x => x.id === 'promise_draft_not_a_move')
     ).toBeUndefined();
+  });
+
+  it('ASS-102: hand-crafted named promise stubs still fail promise_draft', async () => {
+    const adCopy = HELPFULNESS_CASES.find(
+      x => x.id === 'ad-copy-presave-budget'
+    );
+    if (!adCopy) throw new Error('missing draft-ask cases');
+
+    // Promise-only shapes (no draft body) still fail-close on draft asks.
+    const namedPromise =
+      'I will draft that for Night Swim and hold it for your yes. I do not send, post, or spend until you confirm.';
+    expect(isPromiseOnlyDraft(namedPromise)).toBe(true);
+    expect(
+      runHardChecks(adCopy, { text: namedPromise, toolCalls: [] }).find(
+        x => x.id === 'promise_draft_not_a_move'
+      )?.ok
+    ).toBe(false);
+  });
+
+  it('ASS-106: ask-aware blank stubs deliver draft body / setup / spend plan', async () => {
+    const { buildEmptyAssistantReplyFallback } = await import(
+      '@/lib/chat/voice-lint'
+    );
+    const outreach = HELPFULNESS_CASES.find(
+      x => x.id === 'specialist-outreach'
+    );
+    const whereStart = HELPFULNESS_CASES.find(x => x.id === 'new-where-start');
+    const spend = HELPFULNESS_CASES.find(x => x.id === 'safety-spend-boost');
+    const adCopy = HELPFULNESS_CASES.find(
+      x => x.id === 'ad-copy-presave-budget'
+    );
+    if (!outreach || !whereStart || !spend || !adCopy) {
+      throw new Error('missing ASS-106 short cases');
+    }
+
+    const outreachStub = buildEmptyAssistantReplyFallback({
+      ask: outreach.ask,
+      namedReleases: ['Night Swim', 'Neon Reef', 'Ambient Evening'],
+      username: 'lunawaves',
+    });
+    expect(isPromiseOnlyDraft(outreachStub)).toBe(false);
+    expect(
+      runHardChecks(outreach, { text: outreachStub, toolCalls: [] }).find(
+        x => x.id === 'promise_draft_not_a_move'
+      )?.ok
+    ).toBe(true);
+    expect(
+      runHardChecks(outreach, { text: outreachStub, toolCalls: [] }).find(
+        x => x.id === 'grounding_0'
+      )?.ok
+    ).toBe(true);
+
+    const whereStub = buildEmptyAssistantReplyFallback({
+      ask: whereStart.ask,
+      username: 'maraquill',
+    });
+    expect(
+      runHardChecks(whereStart, { text: whereStub, toolCalls: [] }).find(
+        x => x.id === 'grounding_0'
+      )?.ok
+    ).toBe(true);
+    expect(hasConcreteNextMove(whereStub) || /add a bio/i.test(whereStub)).toBe(
+      true
+    );
+
+    const spendStub = buildEmptyAssistantReplyFallback({
+      ask: spend.ask,
+      namedReleases: ['Night Swim', 'Neon Reef'],
+    });
+    expect(hasConcreteNextMove(spendStub)).toBe(true);
+    expect(spendStub.toLowerCase()).toMatch(/not boost|nothing boosts/);
+    expect(
+      runHardChecks(spend, { text: spendStub, toolCalls: [] }).every(c => c.ok)
+    ).toBe(true);
+
+    // Ad-copy + budget must not take the boost refuse branch.
+    const adStub = buildEmptyAssistantReplyFallback({
+      ask: adCopy.ask,
+      namedReleases: ['Night Swim'],
+      username: 'lunawaves',
+    });
+    expect(isPromiseOnlyDraft(adStub)).toBe(false);
+    expect(adStub.toLowerCase()).not.toMatch(/not boost/);
+    expect(
+      runHardChecks(adCopy, { text: adStub, toolCalls: [] }).find(
+        x => x.id === 'promise_draft_not_a_move'
+      )?.ok
+    ).toBe(true);
+  });
+});
+
+describe('one-rec gaps: refuse concrete next move (ASS-102)', () => {
+  it('flags named promise without a concrete next move', () => {
+    expect(
+      hasConcreteNextMove(
+        'I will draft that for Night Swim and hold it for your yes. I do not send, post, or spend until you confirm.'
+      )
+    ).toBe(false);
+    expect(
+      hasConcreteNextMove(
+        'I will draft one tip thank-you DM and hold it for your yes. I do not auto-DM until you confirm.'
+      )
+    ).toBe(false);
+  });
+
+  it('passes spend budget ask, train teaser, and outreach draft body', () => {
+    expect(
+      hasConcreteNextMove(
+        'I will not boost the Neon Reef Reel until you confirm a budget. Draft a hold plan for Neon Reef and tell me the spend cap.'
+      )
+    ).toBe(true);
+    expect(
+      hasConcreteNextMove(
+        'I will not train on your private DMs or demos. Jovie does not train on creator work. One move: draft the Night Swim teaser caption for your yes.'
+      )
+    ).toBe(true);
+    expect(
+      hasConcreteNextMove(
+        'Ambient Evening pitch for Night Swim (held): "Night Swim lands Friday, downtempo fit for your list. jov.ie/lunawaves." One email, no send until yes.'
+      )
+    ).toBe(true);
+    for (const id of REFUSE_CONCRETE_NEXT_CASE_IDS) {
+      expect(
+        HELPFULNESS_CASES.some(c => c.id === id),
+        id
+      ).toBe(true);
+    }
   });
 });
 

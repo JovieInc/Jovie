@@ -6,7 +6,7 @@
  * bottleneck story, stage buckets with a single highlight.
  */
 
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, OVIE_METRIC_ANCHORS } from '@/constants/routes';
 import {
   HOME_LOOP_NOT_MEASURED,
   type HomeLoopConstraint,
@@ -258,7 +258,7 @@ export function buildStoryFirstGlance(input: {
       hasPriorSeries: priorMerges !== null,
       delta: shippingDelta,
     }),
-    href: merges?.href ?? APP_ROUTES.ADMIN_SHIPPING,
+    href: `${APP_ROUTES.ADMIN_SHIPPING}#${OVIE_METRIC_ANCHORS.shippingVelocity}`,
   };
 
   const revenueTone = mrr?.tone ?? 'neutral';
@@ -277,7 +277,8 @@ export function buildStoryFirstGlance(input: {
       hasPriorSeries: mrrWas !== null,
       delta: revenueDelta,
     }),
-    href: mrr?.href ?? APP_ROUTES.ADMIN_OPERATIONS,
+    href:
+      mrr?.href ?? `${APP_ROUTES.ADMIN_OPS}#${OVIE_METRIC_ANCHORS.companyNow}`,
   };
 
   const usersTone = users?.tone ?? 'neutral';
@@ -351,9 +352,8 @@ export function buildStoryFirstBottleneck(input: {
       tone: input.revenue.tone === 'bad' ? 'bad' : 'unknown',
       eyebrow:
         input.revenue.tone === 'bad'
-          ? input.revenue.kind === 'certification' &&
-            input.revenue.step === 'public_profile'
-            ? 'Certification · Profile'
+          ? input.revenue.kind === 'certification'
+            ? `Certification · ${stepLabel(input.revenue.step)}`
             : `Bottleneck · ${stepLabel(input.revenue.step)}`
           : `Not measured · ${stepLabel(input.revenue.step)}`,
       title: shortTitle(input.revenue),

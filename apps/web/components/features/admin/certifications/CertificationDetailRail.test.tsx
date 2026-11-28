@@ -107,16 +107,15 @@ describe('CertificationDetailRail', () => {
     expect(screen.getByText(`Owner: ${owner ?? 'Unassigned'}`)).toBeVisible();
   });
 
-  it('keeps history and source available behind collapsed sections', () => {
+  it('keeps source metadata visible and history available on demand', () => {
     renderRail();
     expect(screen.getByRole('button', { name: 'History' })).toHaveAttribute(
       'aria-expanded',
       'false'
     );
-    expect(screen.getByRole('button', { name: 'Source' })).toHaveAttribute(
-      'aria-expanded',
-      'false'
-    );
+    expect(screen.getByRole('heading', { name: 'Source' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Source' })).toBeNull();
+    expect(screen.getByText('JovieInc/Jovie@abcdef0')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'History' }));
     expect(screen.getByRole('button', { name: 'History' })).toHaveAttribute(
       'aria-expanded',

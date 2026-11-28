@@ -67,6 +67,17 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
 
+export const IdentityDrawer: Story = {
+  args: { presentation: 'drawer' },
+  decorators: [
+    StoryComponent => (
+      <div className='w-80 max-w-full'>
+        <StoryComponent />
+      </div>
+    ),
+  ],
+};
+
 export const LowQualityAvatar: Story = {
   args: {
     avatarQuality: { status: 'low', width: 96, height: 96 },

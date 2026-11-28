@@ -818,7 +818,7 @@ body {
   }
   /* Tactile press — transform only; never transition:all (DESIGN.md / JOV-3368) */
   .interactive-press {
-    @apply transition-transform duration-subtle ease-subtle active:scale-press motion-reduce:active:scale-100;
+    @apply press;
   }
   /* Button component styles */
   .btn {
@@ -2338,7 +2338,7 @@ body {
     );
   }
   .btn-press {
-    @apply transition-transform duration-subtle ease-subtle active:scale-press motion-reduce:active:scale-100;
+    @apply press;
   }
   /* Chat empty state — refined depth & motion */
   .chat-logo-mark {

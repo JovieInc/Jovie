@@ -239,7 +239,7 @@ describe('DashboardAudienceTableUnified', () => {
     );
 
     expect(
-      document.querySelector('table[data-table-row-mode="compact"]')
+      document.querySelector('table[data-table-row-mode="dense"]')
     ).not.toBeNull();
     const person = document.querySelector('table [data-table-person-cell]');
     expect(person).toHaveTextContent('Maya Okaformaya@example.com');

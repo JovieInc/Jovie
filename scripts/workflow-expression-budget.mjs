@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Workflow expression budget (queue-stall incident 2026-10-20).
+ * Workflow load budgets (queue-stall incident 2026-10-20).
  *
  * GitHub evaluates any workflow string that contains `${{ }}` (most often a
  * step's `run:` script) as one `format('…', arg0, …)` expression, and refuses
@@ -17,7 +17,9 @@
  * without interpolation (desktop-release.yml has a 37,243-character one) are
  * not expressions and load at any length.
  *
- * This guard fails at EXPRESSION_LIMIT and warns at EXPRESSION_WARNING. It
+ * GitHub also documents a 500 KB cap on each workflow YAML file:
+ * https://docs.github.com/en/actions/reference/limits#workflow-file-size
+ * This guard checks both limits. It
  * checks the exact PR head and, with --merge-with <ref>, the tree the queue
  * builds by merging that head into the current base: a stale branch can be
  * under the limit alone and over it once merged.
@@ -53,6 +55,8 @@ function loadYaml(text) {
 /** GitHub's limit is 21,000; keep a margin for estimate drift. */
 export const EXPRESSION_LIMIT = 20_950;
 export const EXPRESSION_WARNING = 19_500;
+export const WORKFLOW_FILE_BYTE_LIMIT = 500_000;
+export const WORKFLOW_FILE_BYTE_WARNING = 480_000;
 
 const INTERPOLATION = /\$\{\{([\s\S]*?)\}\}/g;
 
@@ -150,17 +154,50 @@ export function mergedTree(head, base, cwd = process.cwd()) {
   }
 }
 
-/** @param {string} treeish */
-export function workflowSizesAt(treeish, cwd = process.cwd()) {
-  const files = git(
-    ['ls-tree', '-r', '--name-only', treeish, '--', '.github/workflows'],
-    cwd
-  )
-    .split('\n')
-    .filter(file => /\.ya?ml$/.test(file));
-  return files.flatMap(file =>
-    runScriptSizes(file, git(['show', `${treeish}:${file}`], cwd))
+/** Git reports raw blob bytes without parsing YAML or decoding file contents. */
+export function workflowFileSizesAt(treeish, cwd = process.cwd()) {
+  return git(['ls-tree', '-rlz', treeish, '--', '.github/workflows'], cwd)
+    .split('\0')
+    .flatMap(row => {
+      const match =
+        /^\d+ blob [\da-f]+ +(?<length>\d+)\t(?<path>.+\.ya?ml)$/su.exec(row);
+      if (!match?.groups) return [];
+      return [{ path: match.groups.path, length: Number(match.groups.length) }];
+    });
+}
+
+function workflowSizesAt(treeish, files, cwd) {
+  return files.flatMap(({ path }) =>
+    runScriptSizes(path, git(['show', `${treeish}:${path}`], cwd))
   );
+}
+
+function reportFileBudget(label, files, baseFiles = []) {
+  const brokenAtBase = new Set(
+    baseFiles
+      .filter(file => file.length > WORKFLOW_FILE_BYTE_LIMIT)
+      .map(file => file.path)
+  );
+  let ok = true;
+  for (const { path, length } of files) {
+    if (length > WORKFLOW_FILE_BYTE_LIMIT) {
+      if (brokenAtBase.has(path)) {
+        console.log(
+          `::notice file=${path}::${label}: workflow file byte budget already exceeded at the group base.`
+        );
+      } else {
+        console.log(
+          `::error file=${path}::${label}: workflow file is ${length} bytes, over the ${WORKFLOW_FILE_BYTE_LIMIT}-byte budget. Move logic into a checked-in script, composite action or reusable workflow.`
+        );
+        ok = false;
+      }
+    } else if (length > WORKFLOW_FILE_BYTE_WARNING) {
+      console.log(
+        `::warning file=${path}::${label}: workflow file is ${length} bytes (warn ${WORKFLOW_FILE_BYTE_WARNING}, limit ${WORKFLOW_FILE_BYTE_LIMIT}).`
+      );
+    }
+  }
+  return ok;
 }
 
 function report(label, result) {
@@ -201,11 +238,15 @@ export function main(argv = process.argv.slice(2), cwd = process.cwd()) {
     : 'HEAD';
   if (argv.includes('--introduced-since')) {
     const base = argv[argv.indexOf('--introduced-since') + 1];
+    const label = `combined head ${head}`;
     let result;
     try {
+      const headFiles = workflowFileSizesAt(head, cwd);
+      const baseFiles = workflowFileSizesAt(base, cwd);
+      if (!reportFileBudget(label, headFiles, baseFiles)) return 1;
       result = introducedOverBudget(
-        workflowSizesAt(head, cwd),
-        workflowSizesAt(base, cwd)
+        workflowSizesAt(head, headFiles, cwd),
+        workflowSizesAt(base, baseFiles, cwd)
       );
     } catch (error) {
       // This mode gates every merge group through a required context. An
@@ -217,13 +258,13 @@ export function main(argv = process.argv.slice(2), cwd = process.cwd()) {
       );
       return 0;
     }
-    report(`combined head ${head}`, result);
+    report(label, result);
     for (const size of result.inherited) {
       console.log(
         `::notice file=${size.path}::"${size.job} / ${size.step}" is already over budget at base ${base}; the group ahead owns it.`
       );
     }
-    if (result.ok || result.over.length === 0) {
+    if (result.over.length === 0) {
       console.log(
         'workflow expression budget: this group introduces no unloadable workflow.'
       );
@@ -246,13 +287,20 @@ export function main(argv = process.argv.slice(2), cwd = process.cwd()) {
   }
   let ok = true;
   for (const [label, treeish] of targets) {
-    const result = evaluateRunScriptBudget(workflowSizesAt(treeish, cwd));
+    const files = workflowFileSizesAt(treeish, cwd);
+    if (!reportFileBudget(label, files)) {
+      ok = false;
+      continue;
+    }
+    const result = evaluateRunScriptBudget(
+      workflowSizesAt(treeish, files, cwd)
+    );
     report(label, result);
     ok &&= result.ok;
   }
   if (ok)
     console.log(
-      'workflow expression budget: every interpolated run script is under the GitHub limit.'
+      'workflow load budgets: every workflow file and interpolated run script is under its limit.'
     );
   return ok ? 0 : 1;
 }

@@ -1,28 +1,28 @@
 {
   "schema": "jovie-merge-queue-speed/v1",
-  "generatedAt": "2026-11-23T19:19:16.064Z",
+  "generatedAt": "2026-11-26T17:48:58.437Z",
   "windowHours": 24,
   "collection": {
     "status": "collected",
-    "collectionId": "45246206626/1",
+    "collectionId": "45869692593/1",
     "prRunsComplete": true,
     "groupRunsComplete": true,
     "mergedPrsComplete": true,
-    "jobsComplete": true,
+    "jobsComplete": false,
     "queueEventsComplete": false
   },
   "criticalPathBasis": "bounded deterministic sample of latest-attempt jobs",
   "timingBasis": "latest-attempt-start-to-workflow-update",
   "runnerMinutesBasis": "latest-attempt-jobs; null unless all completed runs and job pages covered",
   "prCiSeconds": {
-    "n": 13,
-    "p50": 377,
-    "p95": 1032
+    "n": 19,
+    "p50": 284,
+    "p95": 655
   },
   "mergeGroupCiSeconds": {
     "n": 9,
-    "p50": 596,
-    "p95": 1053
+    "p50": 460,
+    "p95": 767
   },
   "groupOutcomes": {
     "2h": {
@@ -43,93 +43,43 @@
     },
     "24h": {
       "success": 9,
-      "failure": 0,
+      "failure": 1,
       "cancelled": 0,
       "other": 0,
-      "successRate": 1,
-      "successRateInclCancelled": 1
+      "successRate": 0.9,
+      "successRateInclCancelled": 0.9
     }
   },
   "unfinishedGroupRuns": 0,
-  "groupSuccessRate": 1,
-  "mergesPerHour": 0.38,
-  "merges": 9,
+  "groupSuccessRate": 0.9,
+  "mergesPerHour": 0.42,
+  "merges": 10,
   "mainFirstAdmission": {
     "basis": "First native ADD through GitHub mergedAt for PRs merged to main during the window. Excludes still-open and closed-unmerged PRs.",
     "firstEntryToMergeSeconds": {
-      "n": 9,
-      "p50": 623,
-      "p95": 80089
+      "n": 10,
+      "p50": 479,
+      "p95": 536
     },
-    "mergedPrs": 9,
+    "mergedPrs": 10,
     "withoutNativeEntry": 0,
-    "reenteredPrs": 9,
+    "reenteredPrs": 10,
     "unknownPrs": 0,
     "duplicateRows": 0,
     "complete": true
   },
   "queueWaitSeconds": {
-    "n": 9,
+    "n": 10,
     "p50": null,
     "p95": null
   },
-  "criticalPath": [
-    {
-      "name": "Lighthouse (dashboard gate)",
-      "n": 5,
-      "p50": 648,
-      "p95": 716,
-      "lastShare": 0
-    },
-    {
-      "name": "Database Certification (isolated Neon)",
-      "n": 1,
-      "p50": 337,
-      "p95": 337,
-      "lastShare": 0
-    },
-    {
-      "name": "ci-fast (structural lanes shard ab)",
-      "n": 9,
-      "p50": 336,
-      "p95": 399,
-      "lastShare": 0
-    },
-    {
-      "name": "ci-fast (structural python)",
-      "n": 9,
-      "p50": 292,
-      "p95": 340,
-      "lastShare": 0
-    },
-    {
-      "name": "ci-fast (remaining shard 1/3)",
-      "n": 9,
-      "p50": 287,
-      "p95": 463,
-      "lastShare": 0
-    },
-    {
-      "name": "Unit Tests (5/14)",
-      "n": 7,
-      "p50": 262,
-      "p95": 323,
-      "lastShare": 0
-    },
-    {
-      "name": "Merge Suite Scope / full_web_units",
-      "n": 9,
-      "p50": 4,
-      "p95": 6,
-      "lastShare": 1
-    }
-  ],
-  "mergeGroupRunnerMinutesPerMerge": 114.4,
+  "criticalPath": [],
+  "mergeGroupRunnerMinutesPerMerge": null,
   "sampled": {
-    "prRuns": 49,
-    "groupRuns": 9,
-    "groupRunsWithJobs": 9,
-    "mergedPrs": 9
+    "prRuns": 36,
+    "groupRuns": 10,
+    "groupRunsWithJobs": 10,
+    "mergedPrs": 10
   },
   "batchSizeGate": {
     "target": 0.85,

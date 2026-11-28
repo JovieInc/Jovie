@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   chmodSync,
   mkdirSync,
@@ -8,6 +9,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -23,6 +25,40 @@ const installerPath = resolve(
   '.github/scripts/install-doppler-keyring.sh'
 );
 const dopplerFingerprint = 'BD8F51EC1320748CED4E6E3BDE2A7741A397C129';
+const fixtureDir = resolve(testDir, '../../fixtures/doppler-keyring');
+const archiveKey = {
+  name: 'debian-archive-bookworm-automatic.asc',
+  sha256: 'c2a9a16fde95e037bafd0fa6b7e31f41b4ff1e85851de5558f19a2a2f0e955e2',
+  primary: 'B8B80B5B623EAB6AD8775C45B7C5D7D6350947F8',
+  signingSubkey: '4CB50190207B4758A3F73A796ED0E7B82643E131',
+};
+const securityKey = {
+  name: 'debian-archive-bookworm-security-automatic.asc',
+  sha256: '74f81645b4e3156d1e9a88c8dd9259271b89c7099d64af89a2a6996b592faa1f',
+  primary: '05AB90340C0C5E797F44A8C8254CF3B5AEC0A8F0',
+  signingSubkey: 'B0CAB9266E8C3929798B3EEEBDE6D2B9216EC7A8',
+};
+
+function publicFixture(key: typeof archiveKey): string {
+  const armored = readFileSync(resolve(fixtureDir, key.name), 'utf8');
+  expect(createHash('sha256').update(armored).digest('hex')).toBe(key.sha256);
+  expect(armored).toContain('-----BEGIN PGP PUBLIC KEY BLOCK-----');
+  return armored;
+}
+
+function inspectKey(keyPath: string, home: string): string[][] {
+  mkdirSync(home, { recursive: true, mode: 0o700 });
+  const inspection = spawnSync(
+    'gpg',
+    ['--batch', '--homedir', home, '--show-keys', '--with-colons', keyPath],
+    { encoding: 'utf8' }
+  );
+  expect(inspection.status, inspection.stderr).toBe(0);
+  return inspection.stdout
+    .trim()
+    .split('\n')
+    .map(line => line.split(':'));
+}
 
 function writeCurlStub(binDir: string): void {
   const stubPath = resolve(binDir, 'curl');
@@ -129,7 +165,7 @@ describe('Doppler keyring installer', () => {
   });
 
   it('preserves an existing keyring when a successful HTTP response is not a key', () => {
-    const root = mkdtempSync('/tmp/doppler-invalid-');
+    const root = mkdtempSync(resolve(tmpdir(), 'doppler-invalid-'));
     try {
       const binDir = resolve(root, 'bin');
       const keyringDir = resolve(root, 'keyrings');
@@ -161,7 +197,7 @@ describe('Doppler keyring installer', () => {
   });
 
   it('atomically installs a complete key with the configured fingerprint', () => {
-    const root = mkdtempSync('/tmp/doppler-valid-');
+    const root = mkdtempSync(resolve(tmpdir(), 'doppler-valid-'));
     try {
       const binDir = resolve(root, 'bin');
       const keyringDir = resolve(root, 'keyrings');
@@ -174,73 +210,10 @@ describe('Doppler keyring installer', () => {
       writeCurlStub(binDir);
       writeFileSync(target, 'previous-valid-keyring');
 
-      const generated = spawnSync(
-        'gpg',
-        [
-          '--batch',
-          '--homedir',
-          gpgHome,
-          '--passphrase',
-          '',
-          '--quick-generate-key',
-          'Doppler Installer Fixture <fixture@jov.ie>',
-          'ed25519',
-          'sign',
-          '1d',
-        ],
-        { encoding: 'utf8' }
-      );
-      expect(generated.status, generated.stderr).toBe(0);
-
-      const exported = spawnSync(
-        'gpg',
-        ['--batch', '--homedir', gpgHome, '--armor', '--export'],
-        { encoding: 'utf8' }
-      );
-      expect(exported.status, exported.stderr).toBe(0);
-      writeFileSync(armoredSource, exported.stdout);
-
-      const fingerprintResult = spawnSync(
-        'gpg',
-        ['--batch', '--homedir', gpgHome, '--with-colons', '--fingerprint'],
-        { encoding: 'utf8' }
-      );
-      expect(fingerprintResult.status, fingerprintResult.stderr).toBe(0);
-      const fingerprint = fingerprintResult.stdout
-        .split('\n')
-        .find(line => line.startsWith('fpr:'))
-        ?.split(':')[9];
-      expect(fingerprint).toMatch(/^[0-9A-F]{40}$/);
-
-      const addedSubkey = spawnSync(
-        'gpg',
-        [
-          '--batch',
-          '--homedir',
-          gpgHome,
-          '--passphrase',
-          '',
-          '--quick-add-key',
-          fingerprint!,
-          'ed25519',
-          'sign',
-          '1d',
-        ],
-        { encoding: 'utf8' }
-      );
-      expect(addedSubkey.status, addedSubkey.stderr).toBe(0);
-
-      const exportWithSubkey = spawnSync(
-        'gpg',
-        ['--batch', '--homedir', gpgHome, '--armor', '--export'],
-        { encoding: 'utf8' }
-      );
-      expect(exportWithSubkey.status, exportWithSubkey.stderr).toBe(0);
-      writeFileSync(armoredSource, exportWithSubkey.stdout);
-
+      writeFileSync(armoredSource, publicFixture(archiveKey));
       const result = runInstaller({
         source: armoredSource,
-        fingerprint: fingerprint!,
+        fingerprint: archiveKey.primary,
         target,
         runnerTemp: root,
         binDir,
@@ -253,29 +226,21 @@ describe('Doppler keyring installer', () => {
       expect(result.stderr).toContain('install -m 0644');
       expect(result.stderr).toContain('mv -f --');
 
-      const installedFingerprint = spawnSync(
-        'gpg',
-        [
-          '--batch',
-          '--homedir',
-          resolve(root, 'verification-gnupg'),
-          '--show-keys',
-          '--with-colons',
-          target,
-        ],
-        { encoding: 'utf8' }
-      )
-        .stdout.split('\n')
-        .find(line => line.startsWith('fpr:'))
-        ?.split(':')[9];
-      expect(installedFingerprint).toBe(fingerprint);
+      const installed = inspectKey(target, gpgHome);
+      expect(installed.filter(row => row[0] === 'pub')).toHaveLength(1);
+      const subkeys = installed.filter(row => row[0] === 'sub');
+      expect(subkeys).toHaveLength(1);
+      expect(subkeys[0]![11]).toContain('s');
+      expect(
+        installed.filter(row => row[0] === 'fpr').map(row => row[9])
+      ).toEqual([archiveKey.primary, archiveKey.signingSubkey]);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 
   it('rejects multiple primary keys and preserves the existing keyring', () => {
-    const root = mkdtempSync('/tmp/doppler-multi-');
+    const root = mkdtempSync(resolve(tmpdir(), 'doppler-multi-'));
     try {
       const binDir = resolve(root, 'bin');
       const keyringDir = resolve(root, 'keyrings');
@@ -288,50 +253,24 @@ describe('Doppler keyring installer', () => {
       writeCurlStub(binDir);
       writeFileSync(target, 'previous-valid-keyring');
 
-      for (const identity of [
-        'Expected Fixture <expected@jov.ie>',
-        'Unrelated Fixture <unrelated@jov.ie>',
-      ]) {
-        const generated = spawnSync(
-          'gpg',
-          [
-            '--batch',
-            '--homedir',
-            gpgHome,
-            '--passphrase',
-            '',
-            '--quick-generate-key',
-            identity,
-            'ed25519',
-            'sign',
-            '1d',
-          ],
-          { encoding: 'utf8' }
-        );
-        expect(generated.status, generated.stderr).toBe(0);
-      }
-
-      const fingerprints = spawnSync(
-        'gpg',
-        ['--batch', '--homedir', gpgHome, '--with-colons', '--fingerprint'],
-        { encoding: 'utf8' }
-      )
-        .stdout.split('\n')
-        .filter(line => line.startsWith('fpr:'))
-        .map(line => line.split(':')[9]!);
-      expect(fingerprints).toHaveLength(2);
-
-      const exported = spawnSync(
-        'gpg',
-        ['--batch', '--homedir', gpgHome, '--armor', '--export'],
-        { encoding: 'utf8' }
+      writeFileSync(
+        armoredSource,
+        publicFixture(archiveKey) + publicFixture(securityKey)
       );
-      expect(exported.status, exported.stderr).toBe(0);
-      writeFileSync(armoredSource, exported.stdout);
-
+      const bundle = inspectKey(armoredSource, gpgHome);
+      expect(bundle.filter(row => row[0] === 'pub')).toHaveLength(2);
+      expect(bundle.filter(row => row[0] === 'sub')).toHaveLength(2);
+      expect(bundle.filter(row => row[0] === 'fpr').map(row => row[9])).toEqual(
+        [
+          archiveKey.primary,
+          archiveKey.signingSubkey,
+          securityKey.primary,
+          securityKey.signingSubkey,
+        ]
+      );
       const result = runInstaller({
         source: armoredSource,
-        fingerprint: fingerprints[0]!,
+        fingerprint: archiveKey.primary,
         target,
         runnerTemp: root,
         binDir,
@@ -341,6 +280,36 @@ describe('Doppler keyring installer', () => {
       expect(result.stderr).toContain(
         'must contain exactly one well-formed primary key'
       );
+      expect(result.stderr).toContain('gpg --batch --show-keys');
+      expect(result.stderr).not.toContain('gpg --batch --yes --dearmor');
+      expect(result.stderr).not.toContain('mv -f --');
+      expect(readFileSync(target, 'utf8')).toBe('previous-valid-keyring');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a signing subkey fingerprint and preserves the existing keyring', () => {
+    const root = mkdtempSync(resolve(tmpdir(), 'doppler-subkey-'));
+    try {
+      const binDir = resolve(root, 'bin');
+      const keyringDir = resolve(root, 'keyrings');
+      const source = resolve(root, 'fixture.asc');
+      const target = resolve(keyringDir, 'doppler.gpg');
+      mkdirSync(binDir);
+      mkdirSync(keyringDir);
+      writeCurlStub(binDir);
+      writeFileSync(source, publicFixture(archiveKey));
+      writeFileSync(target, 'previous-valid-keyring');
+      const result = runInstaller({
+        source,
+        fingerprint: archiveKey.signingSubkey,
+        target,
+        runnerTemp: root,
+        binDir,
+      });
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('fingerprint validation failed');
       expect(result.stderr).toContain('gpg --batch --show-keys');
       expect(result.stderr).not.toContain('gpg --batch --yes --dearmor');
       expect(result.stderr).not.toContain('mv -f --');

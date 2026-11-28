@@ -33,6 +33,7 @@ import {
   redactSecretValues,
   resolveArtifactFiles,
 } from '../../../../../.github/scripts/guard-playwright-artifacts.mjs';
+import { readCiWorkflowShellSource } from '../../../../../scripts/lib/__tests__/ci-workflow-shell-source.mjs';
 import {
   MAX_PLAYWRIGHT_PNG_HEIGHT,
   MAX_PLAYWRIGHT_PNG_PIXEL_BYTES,
@@ -116,7 +117,7 @@ const producerStageExempt = new Set([
 ]);
 // Jobs that must keep the receipt even if their uploads move elsewhere.
 const producerStageRequired = [
-  ...'ci-fast-remaining-shards ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-lighthouse-dashboard-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-admin-smoke ci-e2e-tests ci-smoke-required'
+  ...'ci-fast-remaining-shards ci-visual-snapshot-homepage ci-visual-marketing-dom ci-visual-marketing-routes ci-build-layout ci-storybook-surfaces ci-layout-guard ci-mobile-overflow ci-lighthouse-pr ci-lighthouse-dashboard-pr ci-a11y ci-a11y-authed ci-e2e-smoke ci-golden-path ci-profile-viewport-sweep ci-admin-smoke ci-e2e-tests ci-smoke-required'
     .split(' ')
     .map(job => `ci.yml:${job}`),
   'e2e-full-matrix.yml:e2e-full-matrix',
@@ -134,6 +135,8 @@ const imageAllowedJobs = new Set([
   'ci.yml:ci-fast-remaining-shards',
   'ci.yml:ci-golden-path',
   'ci.yml:ci-lighthouse-pr',
+  // Failing-width screenshots of the public profile fixture renders.
+  'ci.yml:ci-profile-viewport-sweep',
   'ci.yml:ci-storybook-surfaces',
   'ci.yml:ci-visual-snapshot-homepage',
   'ci.yml:ci-visual-marketing-dom',
@@ -177,7 +180,9 @@ const inheritedSecretAllowlist = new Set([
   'CF_TURBO_SIGNATURE_KEY',
 ]);
 const policyWorkflow = (file: string) =>
-  parseYaml(readFileSync(join(workflowsRoot, file), 'utf8')) as PolicyWorkflow;
+  parseYaml(
+    readCiWorkflowShellSource(join(workflowsRoot, file))
+  ) as PolicyWorkflow;
 const policyJob = (source: string): PolicyJob =>
   Object.values((parseYaml(source) as PolicyWorkflow).jobs ?? {})[0] ?? {};
 let parsedWorkflowJobs:
@@ -937,16 +942,16 @@ describe('Playwright artifact secret boundary', () => {
   }, 120_000);
 
   it.each([0, 37])(
-    'keeps Storybook base-fetch auth scoped and propagates exit %i',
+    'keeps structural base-fetch auth scoped and propagates exit %i',
     fetchExit => {
-      const workflow = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
-      const job = jobBlock(workflow, 'ci-fast-remaining-shards');
+      const workflow = readCiWorkflowShellSource(join(workflowsRoot, 'ci.yml'));
+      const job = jobBlock(workflow, 'ci-path-changes');
       const step = stepBlock(job, 'Decide structural lane');
       expect(step).toContain('GH_TOKEN: ${{ github.token }}');
-      const command = step
-        .split(/ {8}run: (?:&[\w-]+ )?\|\n/)[1]
-        .replaceAll('${{ github.event_name }}', 'pull_request')
-        .replaceAll('${{ github.base_ref }}', 'main');
+      const command = readFileSync(
+        join(repoRoot, '.github/scripts/select-ci-structural-lane.sh'),
+        'utf8'
+      );
       const directory = fixture();
       const calls = join(directory, 'calls');
       const result = spawnSync(
@@ -971,6 +976,8 @@ describe('Playwright artifact secret boundary', () => {
           encoding: 'utf8',
           env: {
             ...process.env,
+            GITHUB_EVENT_NAME: 'pull_request',
+            GITHUB_BASE_REF: 'main',
             GH_TOKEN: 'fixture-token',
             FETCH_EXIT: String(fetchExit),
             FETCH_CALLS: calls,
@@ -1000,7 +1007,7 @@ describe('Playwright artifact secret boundary', () => {
   );
 
   it('keeps every combined Storybook run on manual Axe with scanned Markdown evidence', () => {
-    const source = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
+    const source = readCiWorkflowShellSource(join(workflowsRoot, 'ci.yml'));
     const job = jobBlock(source, 'ci-storybook-surfaces');
     const steps = workflowStepBlocks(job);
     const surface = steps.find(step =>
@@ -1029,7 +1036,7 @@ describe('Playwright artifact secret boundary', () => {
   });
 
   it('redacts smoke and full E2E error context and keeps golden-path keyframes off the failure upload', () => {
-    const source = readFileSync(join(workflowsRoot, 'ci.yml'), 'utf8');
+    const source = readCiWorkflowShellSource(join(workflowsRoot, 'ci.yml'));
     for (const [jobId, stepName] of [
       ['ci-e2e-smoke', 'Run E2E Smoke (Chromium)'],
       ['ci-smoke-required', 'Run Required Smoke Tests'],
@@ -1133,7 +1140,7 @@ describe('Playwright artifact secret boundary', () => {
     const safeUploadJobs = readdirSync(workflowsRoot)
       .filter(name => /\.ya?ml$/.test(name))
       .flatMap(file =>
-        workflowJobBlocks(readFileSync(join(workflowsRoot, file), 'utf8'))
+        workflowJobBlocks(readCiWorkflowShellSource(join(workflowsRoot, file)))
           .filter(job => job.source.includes(safeUploadAction))
           .map(job => ({ ...job, file }))
       );
@@ -1512,53 +1519,45 @@ ${fixtureCheckout}
     });
   });
 
-  it.each([
-    [3, true],
-    [0, false],
-  ])(
-    'keeps the chaos sweep exit %i and copies its report when present',
-    (producerExit, writesResults) => {
-      const sweep = policyWorkflow('nightly-tests.yml').jobs?.[
-        'e2e-tests'
-      ]?.steps?.find(step => step.name === 'Run full surface chaos sweep');
-      expect(String(sweep?.run)).toContain(guardScriptName);
-      expect(sweep?.['continue-on-error']).toBe(true);
-      const root = fixture('jovie-chaos-sweep-');
-      const bin = join(root, 'bin');
-      write(
-        join(bin, 'node'),
-        '#!/bin/sh\nwhile [ "$1" != "--" ]; do shift; done\nshift\nexec "$@"\n'
-      );
-      write(
-        join(bin, 'pnpm'),
-        `#!/bin/sh\n${writesResults ? 'mkdir -p test-results && echo {} > test-results/nightly-results.json\n' : ''}exit ${producerExit}\n`
-      );
-      spawnSync('chmod', ['+x', join(bin, 'node'), join(bin, 'pnpm')]);
-      mkdirSync(join(root, 'apps/web'), { recursive: true });
-      const result = spawnSync('bash', ['-c', String(sweep?.run)], {
-        cwd: root,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          GITHUB_WORKSPACE: root,
-          PATH: `${bin}:${process.env.PATH ?? ''}`,
-        },
-      });
-      expect(result.status, result.stderr).toBe(producerExit);
-      expect(
-        existsSync(
-          join(root, 'apps/web/test-results/full-surface-chaos-report.json')
-        )
-      ).toBe(writesResults);
-    }
-  );
+  it('keeps advisory chaos continue-on-error and isolated JSON/output paths (JOV-14767)', () => {
+    const e2e = policyWorkflow('nightly-tests.yml').jobs?.['e2e-tests'];
+    const sweep = e2e?.steps?.find(
+      step => step.name === 'Run full surface chaos sweep'
+    );
+    const required = e2e?.steps?.find(
+      step => step.name === 'Run nightly E2E tests'
+    );
+    expect(String(sweep?.run)).toContain(guardScriptName);
+    expect(String(sweep?.run)).toContain(
+      'tests/e2e/nightly/full-surface-chaos.spec.ts'
+    );
+    // Chaos no longer copies over nightly-results.json; it writes its own file.
+    expect(String(sweep?.run)).not.toContain(
+      'cp test-results/nightly-results.json test-results/full-surface-chaos-report.json'
+    );
+    expect(sweep?.['continue-on-error']).toBe(true);
+    expect(String(sweep?.if ?? '')).toContain('always()');
+    expect(sweep?.env).toMatchObject({
+      PLAYWRIGHT_JSON_OUTPUT_FILE:
+        'test-results/full-surface-chaos-report.json',
+      PLAYWRIGHT_OUTPUT_DIR: 'test-results/chaos-playwright-output',
+    });
+    expect(required?.env).toMatchObject({
+      PLAYWRIGHT_JSON_OUTPUT_FILE: 'test-results/nightly-results.json',
+      PLAYWRIGHT_OUTPUT_DIR: 'test-results/required-playwright-output',
+    });
+    const names = (e2e?.steps ?? []).map(step => step.name);
+    expect(names.indexOf('Run nightly E2E tests')).toBeLessThan(
+      names.indexOf('Run full surface chaos sweep')
+    );
+  });
 
   it('requires step-scoped Markdown allowance for every production smoke producer', () => {
     const expected = productionSmokeProducers;
     const discovered = readdirSync(workflowsRoot)
       .filter(name => /\.ya?ml$/.test(name))
       .flatMap(file => {
-        const source = readFileSync(join(workflowsRoot, file), 'utf8');
+        const source = readCiWorkflowShellSource(join(workflowsRoot, file));
         return workflowJobBlocks(source).flatMap(job =>
           workflowStepBlocks(job.source)
             .filter(
@@ -1583,7 +1582,7 @@ ${fixtureCheckout}
 
     for (const item of expected) {
       const [file, jobId, stepName] = item.split(':');
-      const source = readFileSync(join(workflowsRoot, file!), 'utf8');
+      const source = readCiWorkflowShellSource(join(workflowsRoot, file!));
       const job = workflowJobBlocks(source).find(({ id }) => id === jobId);
       expect(job, item).toBeDefined();
       if (!job) continue;

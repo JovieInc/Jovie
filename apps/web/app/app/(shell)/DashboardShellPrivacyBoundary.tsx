@@ -64,6 +64,7 @@ export function DashboardShellPrivacyBoundary({
   previewPanelDefaultOpen,
   persistSidebarCollapsed,
   unlockedShellChrome,
+  framePlaceholder = false,
   children,
 }: {
   mode: AppShellMode;
@@ -76,6 +77,8 @@ export function DashboardShellPrivacyBoundary({
   previewPanelDefaultOpen: boolean;
   persistSidebarCollapsed: (collapsed: boolean) => Promise<void>;
   unlockedShellChrome?: React.ReactNode;
+  /** Streamed fallback: keep the live frame landmark off the placeholder shell. */
+  framePlaceholder?: boolean;
   children: React.ReactNode;
 }) {
   // The (shell) layout computes the rail default once, from the first
@@ -296,6 +299,7 @@ export function DashboardShellPrivacyBoundary({
         persistSidebarCollapsed={persistSidebarCollapsed}
         sidebarDefaultOpen={sidebarDefaultOpen}
         previewPanelDefaultOpen={livePreviewPanelDefaultOpen}
+        framePlaceholder={framePlaceholder}
       >
         {effectiveLock ? (
           recovery ? (

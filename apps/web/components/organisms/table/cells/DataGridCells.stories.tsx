@@ -38,7 +38,7 @@ function Panel({ theme }: Readonly<{ theme: 'light' | 'dark' }>) {
         <div
           key={`${row.name}-${row.secondary ?? 'none'}`}
           style={{
-            ...tableRowModeStyle('compact'),
+            ...tableRowModeStyle('dense'),
             gridTemplateColumns: 'minmax(0,1fr) 7rem 6rem 4rem',
           }}
           className='grid h-(--table-row-height) items-center gap-3 border-b border-subtle px-3'
@@ -70,7 +70,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Every kit cell in a compact (40px) row, light and dark. */
+/** Every kit cell in a dense (32px) row, light and dark. */
 export const AllCells: Story = {
   render: () => (
     <div className='grid gap-0 md:grid-cols-2'>

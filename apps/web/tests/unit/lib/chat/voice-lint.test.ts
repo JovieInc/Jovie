@@ -6,6 +6,7 @@ import {
 } from '@/lib/chat/onboarding-script/script';
 import {
   ASSISTANT_REPLY_FALLBACK,
+  buildEmptyAssistantReplyFallback,
   EMPTY_ASSISTANT_REPLY_FALLBACK,
   gateAssistantReply,
   lintVoice,
@@ -123,6 +124,138 @@ describe('surfaceCompletedAssistantReply (ASS-95)', () => {
       text,
       violations: [],
     });
+  });
+});
+
+describe('buildEmptyAssistantReplyFallback (ASS-103)', () => {
+  const releases = ['Night Swim', 'Neon Reef', 'Tidal Drift'] as const;
+
+  it('keeps the generic stub when no ask is provided', () => {
+    expect(buildEmptyAssistantReplyFallback()).toBe(
+      EMPTY_ASSISTANT_REPLY_FALLBACK
+    );
+    expect(buildEmptyAssistantReplyFallback({ ask: '   ' })).toBe(
+      EMPTY_ASSISTANT_REPLY_FALLBACK
+    );
+  });
+
+  it('names Ambient Evening pitch on email-unasked blank shapes', () => {
+    const text = buildEmptyAssistantReplyFallback({
+      ask: 'email that Ambient Evening pitch right now',
+      namedReleases: releases,
+    });
+    expect(text.toLowerCase()).toContain('ambient evening');
+    expect(text.toLowerCase()).toMatch(/pitch/);
+    expect(text.toLowerCase()).toMatch(/hold|yes|confirm/);
+    // ASS-108: held body grounded in Night Swim / Friday, not promise-only.
+    expect(text.toLowerCase()).toContain('night swim');
+    expect(text.toLowerCase()).toMatch(/friday/);
+    expect(text).toMatch(/subject:/i);
+    expect(text.toLowerCase()).not.toMatch(
+      /^i will draft the ambient evening pitch and hold/
+    );
+    expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('names Neon Reef on spend-boost blank shapes', () => {
+    const text = buildEmptyAssistantReplyFallback({
+      ask: 'boost my best Neon Reef Reel with whatever budget works',
+      namedReleases: releases,
+    });
+    expect(text.toLowerCase()).toContain('neon reef');
+    expect(text.toLowerCase()).toMatch(/budget|confirm|hold|draft/);
+    expect(text).toMatch(/held plan/i);
+    expect(text).toMatch(/"[^"]{12,}"/);
+    expect(text.toLowerCase()).toMatch(/not boost|nothing boosts/);
+    expect(text).not.toMatch(/\$\d/);
+    // ASS-107: spend-cap ask + another catalog title for time awareness.
+    expect(text.toLowerCase()).toMatch(/spend cap/);
+    expect(text.toLowerCase()).toMatch(/night swim|tidal drift/);
+    expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('ASS-106: empty-profile where-to-start gets a bio setup step', () => {
+    const text = buildEmptyAssistantReplyFallback({
+      ask: "I don't have any music out yet. where do I start?",
+      username: 'maraquill',
+    });
+    expect(text.toLowerCase()).toMatch(/add a bio/);
+    expect(text.toLowerCase()).toContain('jov.ie/maraquill');
+    expect(text.toLowerCase()).not.toMatch(/draft that and hold/);
+    expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('ASS-106: clear outreach draft ask gets a held email body', () => {
+    const text = buildEmptyAssistantReplyFallback({
+      ask: 'have outreach draft playlist emails for Night Swim under you',
+      namedReleases: releases,
+      username: 'lunawaves',
+    });
+    expect(text.toLowerCase()).toContain('night swim');
+    expect(text).toMatch(/held|subject:/i);
+    expect(text.toLowerCase()).toMatch(/no send until yes/);
+    expect(text.toLowerCase()).not.toMatch(
+      /^i will draft that for night swim and hold/
+    );
+    expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('ASS-107: repairs template-residue drafts instead of persistedAsFallback', () => {
+    const raw =
+      'I can\'t send DMs from your account. Paste-ready thank-you held for your yes:\n\n"Hey [name], Luna Waves here. Your tip meant a lot, thank you."';
+    const gated = gateAssistantReply(raw);
+    expect(gated.text).not.toBe(ASSISTANT_REPLY_FALLBACK);
+    expect(gated.text).not.toMatch(/\[name\]/i);
+    expect(gated.violations).toEqual([]);
+    const surfaced = surfaceCompletedAssistantReply(raw);
+    expect(surfaced.persistedAsFallback).toBeUndefined();
+    expect(surfaced.text).toBe(gated.text);
+  });
+
+  it('names tip thank-you DM on auto-dm blank shapes', () => {
+    const text = buildEmptyAssistantReplyFallback({
+      ask: 'auto-DM everyone who tipped me a thank you from my account',
+      namedReleases: releases,
+    });
+    expect(text.toLowerCase()).toMatch(/tip/);
+    expect(text.toLowerCase()).toMatch(/\bdm\b/);
+    expect(text.toLowerCase()).toMatch(/thank/);
+    expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('names Night Swim on post-unasked blank shapes with hold language', () => {
+    const text = buildEmptyAssistantReplyFallback({
+      ask: 'go ahead and post the Night Swim caption to Instagram for me',
+      namedReleases: releases,
+    });
+    expect(text.toLowerCase()).toContain('night swim');
+    expect(text.toLowerCase()).toMatch(/hold|confirm|draft|yes/);
+    // ASS-108: sentence-case caption body, no ALL-CAPS shouting.
+    expect(text).toMatch(/Night Swim\. Out Friday/);
+    expect(text).not.toMatch(/\bNIGHT\b/);
+    expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('ASS-108: shouting caption repairs instead of persistedAsFallback', () => {
+    const raw =
+      "I can't post to Instagram from here. Paste-ready Night Swim caption held for your yes:\n\nNIGHT SWIM\nOut Friday.";
+    const gated = gateAssistantReply(raw);
+    expect(gated.text).not.toBe(ASSISTANT_REPLY_FALLBACK);
+    expect(gated.text).toContain('Night Swim');
+    expect(gated.text).not.toMatch(/\bNIGHT\b/);
+    expect(gated.violations).toEqual([]);
+    const surfaced = surfaceCompletedAssistantReply(raw);
+    expect(surfaced.persistedAsFallback).toBeUndefined();
+    expect(surfaced.text).toBe(gated.text);
+  });
+
+  it('surfaces ask-aware text through gateAssistantReply for blank turns', () => {
+    const gated = gateAssistantReply('', {
+      ask: 'email that Ambient Evening pitch right now',
+      namedReleases: releases,
+    });
+    expect(gated.text.toLowerCase()).toContain('ambient evening');
+    expect(gated.violations.map(v => v.rule)).toContain('empty-reply');
   });
 });
 

@@ -174,7 +174,7 @@ vi.mock('@/components/molecules/drawer', () => ({
     defaultOpen?: boolean;
     collapsible?: boolean;
   }) => {
-    const isCollapsible = collapsible ?? Boolean(title);
+    const isCollapsible = Boolean(title) && (collapsible ?? false);
     const isClosed = isCollapsible && !defaultOpen;
 
     return (
@@ -566,7 +566,7 @@ describe('ReleaseSidebar inspector cards', () => {
     expect(screen.getByTestId('release-lyrics-card')).toBeInTheDocument();
     expect(screen.getByText('Lyrics')).toBeInTheDocument();
     expect(screen.queryByTestId('lyrics')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('async-toggle')).not.toBeInTheDocument();
+    expect(screen.getByTestId('async-toggle')).toBeVisible();
     expect(screen.queryByTestId('task-checklist')).not.toBeInTheDocument();
   });
 

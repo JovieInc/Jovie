@@ -322,5 +322,6 @@ describe('AdminAssetsTable', () => {
 
     expect(source).not.toMatch(/\bred-\d/);
     expect(source).toContain('TableIssueSummary');
+    expect(source).toContain("rowMode='dense'");
   });
 });

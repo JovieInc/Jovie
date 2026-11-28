@@ -36,6 +36,7 @@ import gh_app_token  # noqa: E402  (canonical GitHub read-budget floor)
 import merge_evidence  # noqa: E402  (shared complete merge-window reader)
 import file_overlap  # noqa: E402
 import fleet_ledger  # noqa: E402  (claim ledger view, ready-work recorder)
+import factory_visibility  # noqa: E402  (factory adoption evidence projection)
 import factory_intake  # noqa: E402  (fleet-improvement signals -> agent-ready issues)
 import factory_signals  # noqa: E402  (recurring-alarm adapter)
 import linear_sync, urgent_sla, work_lane  # noqa: E402  (local Linear mirror and outbox status; Urgent SLA; per-lane measure)
@@ -239,7 +240,6 @@ OUTCOME_OWED_MAX_S = 24 * 3600
 OUTCOME_QUEUE_SILENT_S = 2 * 3600
 AUTOMATION_LIVENESS_WORKFLOW = "automation-liveness.yml"
 AUTOMATION_LIVENESS_MAX_S = 60 * 60
-AUTOMATION_LIVENESS_TTL_S = 600
 
 
 def _iso_epoch(value) -> float | None:
@@ -368,27 +368,6 @@ def automation_watch(rows: list[dict] | None, host_name: str, now: float, home: 
     return {"known": True, "silent": silent}
 
 
-def automation_liveness(lane, now: float) -> dict:
-    """Latest *successful* run of the hosted automation-liveness workflow (Gem watches it back).
-
-    It follows Production Continuity Guard and runs its job only every 5th trigger, so most
-    runs are job-skipped: the latest run of any conclusion would make a dead check look alive."""
-    def fetch():
-        result = lane.sh(["gh", "api", f"repos/{lane.REPO_SLUG}/actions/workflows/{AUTOMATION_LIVENESS_WORKFLOW}"
-                          "/runs?branch=main&status=success&per_page=1",
-                          "--jq", "[.workflow_runs[0].created_at // \"\"]"], timeout=30)
-        if result.returncode != 0:
-            text = f"{result.stdout or ''} {result.stderr or ''}"
-            return {"installed": False} if "404" in text or "Not Found" in text else None
-        try:
-            created = json.loads(result.stdout)[0]
-        except (ValueError, IndexError, TypeError):
-            return None
-        return {"installed": True, "lastRunAt": created or None}
-    found = lane.shared("automation-liveness-success", AUTOMATION_LIVENESS_TTL_S, fetch)
-    return found if isinstance(found, dict) else {"installed": None}
-
-
 def automation_observation(host, lane, now: float) -> dict:
     """Registry watch for observe(); fixtures and self-tests read no registry or GitHub."""
     if os.environ.get("LANES_SELFTEST") or os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
@@ -398,8 +377,20 @@ def automation_observation(host, lane, now: float) -> dict:
         watch = automation_watch(automation_registry(host.repo), lane.HOST, now)
     except Exception as error:  # observability never takes the doctor down
         watch = {"known": False, "silent": {}, "error": type(error).__name__}
+    # gem:waste-loop: capacity SHARE historically omitted waste.py (#23933). Heal from
+    # origin/main into SHARE and re-check so silence clears inside the same observe.
+    if "gem:waste-loop" in (watch.get("silent") or {}):
+        try:
+            import waste_loop_heal
+            heal = waste_loop_heal.heal(host)
+            watch["wasteLoopHeal"] = heal
+            if heal.get("status") == "ok":
+                watch = automation_watch(automation_registry(host.repo), lane.HOST, now)
+                watch["wasteLoopHeal"] = heal
+        except Exception as error:  # noqa: BLE001
+            watch["wasteLoopHeal"] = {"status": "error", "error": type(error).__name__}
     try:
-        liveness = automation_liveness(lane, now)
+        liveness = health_checks.automation_liveness(lane, now)
     except Exception as error:
         liveness = {"installed": None, "error": type(error).__name__}
     try:
@@ -2601,7 +2592,9 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         except Exception:  # an adapter fault never fails the doctor
             pass
     if getattr(tracker, "linear", None) is not None:
-        result["factoryIntake"] = factory_intake.run_pass(host.state, tracker.linear)
+        previous_adoption = (previous.get("factoryIntake") or {}).get("adoption") or ()
+        result["factoryIntake"] = factory_intake.run_pass(
+            host.state, tracker.linear, previous_adoption=previous_adoption, now=obs["now"])
     result["poolEmptySince"] = previous["poolEmptySince"]
     result["admissionRepairSince"] = previous.get("admissionRepairSince")
     for key in ("diskHeldSince", "diskTop", "diskTopAt"):
@@ -2630,6 +2623,7 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
             feed = status_feed(host, lane, obs, alerts, obs.get("tick") or {}, previous, result["conditions"])
             result["idleQualifiedSince"] = feed.pop("_idleQualifiedSince", {})
             result["capacity"] = feed["capacity"]
+            feed["factoryIntake"] = factory_visibility.public_view(result.get("factoryIntake"))
             result["statusFeed"] = publish_status(host, lane, feed)
         except Exception as error:  # a broken feed never blocks the doctor
             result["statusFeedError"] = f"{type(error).__name__}: {error}"[:120]

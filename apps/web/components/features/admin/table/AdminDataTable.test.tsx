@@ -11,7 +11,7 @@ const columns: ColumnDef<Row, unknown>[] = [
 ];
 
 describe('AdminDataTable', () => {
-  it('renders rows with the compact admin density and stays axe-clean', async () => {
+  it('renders rows with the dense admin density and stays axe-clean', async () => {
     const { container } = render(
       <AdminDataTable<Row>
         columns={columns}
@@ -22,6 +22,10 @@ describe('AdminDataTable', () => {
       />
     );
     expect(await screen.findByText('Midnight Signal')).toBeInTheDocument();
+    expect(screen.getByRole('table')).toHaveAttribute(
+      'data-table-row-mode',
+      'dense'
+    );
     const classNames = ADMIN_DATA_TABLE_CLASSNAME.split(' ');
     expect(container.querySelector('.extra-class')).toHaveClass(classNames[0]);
     await expectNoA11yViolations(container);

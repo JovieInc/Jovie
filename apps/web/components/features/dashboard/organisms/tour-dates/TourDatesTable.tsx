@@ -369,9 +369,8 @@ export function TourDatesTable({
         isPastDate(row.startDate, nowMs) ? 'opacity-60' : ''
       }
       enableVirtualization={tourDates.length >= 20}
-      // Date and start time stack in two lines; the two-line mode gives
-      // them a 48px content budget instead of clipping the time at 32px.
-      rowMode='two-line'
+      // Dense 32px only (DRI-21); stacked date/time truncates in-cell.
+      rowMode='dense'
       className='text-app'
       caption='Tour dates'
       emptyState={

@@ -54,7 +54,7 @@ describe('DrawerSection', () => {
     const user = userEvent.setup();
 
     render(
-      <DrawerSection title='Properties'>
+      <DrawerSection title='Properties' collapsible>
         <div data-testid='drawer-section-content'>Body content</div>
       </DrawerSection>
     );
@@ -91,7 +91,7 @@ describe('DrawerSection', () => {
 
   it('keeps plain collapsible headings on the same inset as their body', () => {
     render(
-      <DrawerSection title='Details'>
+      <DrawerSection title='Details' collapsible>
         <div data-testid='drawer-section-content'>Body content</div>
       </DrawerSection>
     );
@@ -104,7 +104,7 @@ describe('DrawerSection', () => {
 
   it('preserves the shared card inset for card headings and bodies', () => {
     render(
-      <DrawerSection title='Details' surface='card'>
+      <DrawerSection title='Details' surface='card' collapsible>
         <div data-testid='drawer-section-content'>Body content</div>
       </DrawerSection>
     );
@@ -132,7 +132,7 @@ describe('DrawerSection', () => {
     const user = userEvent.setup();
 
     render(
-      <DrawerSection title='Notes'>
+      <DrawerSection title='Notes' collapsible>
         <StatefulChild />
       </DrawerSection>
     );

@@ -40,7 +40,7 @@ describe('AdminDetailRail', () => {
         entityHeader={<h2>Customer</h2>}
         footer={<button type='button'>Save</button>}
       >
-        <DrawerSection title='Evidence'>
+        <DrawerSection title='Evidence' collapsible>
           <p>Observed evidence</p>
         </DrawerSection>
       </AdminDetailRail>

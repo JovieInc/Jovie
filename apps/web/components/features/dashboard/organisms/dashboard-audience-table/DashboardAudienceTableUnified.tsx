@@ -639,8 +639,6 @@ export const DashboardAudienceTableUnified = memo(
       }),
       [columnVisibility]
     );
-    const hasMetadataSubtitle =
-      hiddenMetadataColumns.engagement || hiddenMetadataColumns.lastSeen;
     const tableMinWidth = `${audienceTableMinWidthForLayout(columnLayout)}px`;
 
     // Stable context: callbacks that rarely change — consumers won't re-render on selection/menu toggle
@@ -930,7 +928,7 @@ export const DashboardAudienceTableUnified = memo(
                       getRowId={row => row.id}
                       enableVirtualization={true}
                       enableKeyboardNavigation={true}
-                      rowMode={hasMetadataSubtitle ? 'list' : 'compact'}
+                      rowMode='dense'
                       rowSelection={rowSelectionState}
                       onToggleRowSelection={toggleMemberSelection}
                       onSelectRowRange={selectRows}

@@ -1,6 +1,11 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useOnboardingClaim } from '@/components/features/onboarding/useOnboardingClaim';
+import { CLAIM_TIMEOUT_MS } from '@/components/features/onboarding/useOnboardingClaim';
+import {
+  ClaimHarness,
+  jsonResponse,
+  renderClaimHarness,
+} from './useOnboardingClaim.test-harness';
 
 const { replaceMock } = vi.hoisted(() => ({
   replaceMock: vi.fn(),
@@ -19,29 +24,6 @@ vi.mock('@/hooks/useClerkSafe', () => ({
     userId: 'user_dev_creator',
   }),
 }));
-
-function ClaimHarness({
-  trigger,
-  enabled = true,
-}: {
-  readonly trigger: number;
-  readonly enabled?: boolean;
-}) {
-  const status = useOnboardingClaim(trigger, enabled);
-  return <span data-testid='claim-status'>{status}</span>;
-}
-
-function renderClaimHarness(trigger: number) {
-  return <ClaimHarness trigger={trigger} />;
-}
-
-function jsonResponse(body: unknown, init?: ResponseInit) {
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-    ...init,
-  });
-}
 
 describe('useOnboardingClaim', () => {
   it('does not reclaim or redirect a restored account-owned conversation on mount or later turns', async () => {
@@ -177,17 +159,17 @@ describe('useOnboardingClaim', () => {
   });
 
   it.each([
-    [{ claimed: 1 }, 'claimed'],
-    [{ claimed: 0, alreadyClaimed: true }, 'claimed'],
+    [{ claimed: 1 }, 'no-op'],
+    [{ claimed: 0, alreadyClaimed: true }, 'no-op'],
     [
       {
         claimed: 1,
         profile: { profileId: null, handle: null, status: 'skipped' },
       },
-      'claimed',
+      'no-op',
     ],
   ] as const)(
-    'stays on /start when the claim returns ownership without a terminal handoff (JOV-8068): %j',
+    'stays on /start when the claim returns ownership without a terminal handoff (JOV-8068 / ONB-38): %j',
     async (body, expectedStatus) => {
       const fetchMock = vi.fn().mockResolvedValue(jsonResponse(body));
       vi.stubGlobal('fetch', fetchMock);
@@ -212,8 +194,9 @@ describe('useOnboardingClaim', () => {
     const { rerender } = render(renderClaimHarness(0));
 
     // The founder-reported mount claim must not redirect to checkout.
+    // ONB-38: ownership-without-handoff is labeled no-op (stalled honesty).
     await waitFor(() =>
-      expect(screen.getByTestId('claim-status')).toHaveTextContent('claimed')
+      expect(screen.getByTestId('claim-status')).toHaveTextContent('no-op')
     );
     expect(replaceMock).not.toHaveBeenCalled();
 
@@ -257,11 +240,11 @@ describe('useOnboardingClaim', () => {
     rerender(renderClaimHarness(0));
     rerender(renderClaimHarness(0));
 
-    // Resolve the pending fetch.
+    // Resolve the pending fetch (ownership without handoff → no-op / ONB-38).
     resolveFetch(jsonResponse({ claimed: 1 }));
 
     await waitFor(() =>
-      expect(screen.getByTestId('claim-status')).toHaveTextContent('claimed')
+      expect(screen.getByTestId('claim-status')).toHaveTextContent('no-op')
     );
 
     // Only one fetch must have been dispatched for trigger=0.
@@ -313,7 +296,7 @@ describe('useOnboardingClaim', () => {
     expect(replaceMock).not.toHaveBeenCalledWith('/onboarding/checkout');
   });
 
-  it('keeps missing durable artist data in the same /start conversation', async () => {
+  it('keeps missing durable artist data in the same /start conversation as intake-required (ONB-40)', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({
         claimed: 0,
@@ -325,7 +308,9 @@ describe('useOnboardingClaim', () => {
     render(renderClaimHarness(0));
 
     await waitFor(() =>
-      expect(screen.getByTestId('claim-status')).toHaveTextContent('no-op')
+      expect(screen.getByTestId('claim-status')).toHaveTextContent(
+        'intake-required'
+      )
     );
     expect(replaceMock).not.toHaveBeenCalled();
   });
@@ -342,7 +327,9 @@ describe('useOnboardingClaim', () => {
     const { rerender } = render(renderClaimHarness(0));
 
     await waitFor(() =>
-      expect(screen.getByTestId('claim-status')).toHaveTextContent('no-op')
+      expect(screen.getByTestId('claim-status')).toHaveTextContent(
+        'intake-required'
+      )
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
@@ -385,6 +372,46 @@ describe('useOnboardingClaim', () => {
     expect(replaceMock).not.toHaveBeenCalled();
   });
 
+  it('settles to error when claim fetch hangs past timeout (ONB-42)', async () => {
+    const fetchMock = vi.fn(
+      (_url: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          const signal = init?.signal;
+          if (!signal) {
+            reject(new Error('expected AbortSignal on claim fetch'));
+            return;
+          }
+          if (signal.aborted) {
+            reject(new DOMException('Aborted', 'AbortError'));
+            return;
+          }
+          signal.addEventListener(
+            'abort',
+            () => reject(new DOMException('Aborted', 'AbortError')),
+            { once: true }
+          );
+        })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const timeoutSpy = vi
+      .spyOn(AbortSignal, 'timeout')
+      .mockImplementation((ms: number) => {
+        expect(ms).toBe(CLAIM_TIMEOUT_MS);
+        const controller = new AbortController();
+        queueMicrotask(() => controller.abort());
+        return controller.signal;
+      });
+
+    render(renderClaimHarness(0));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('claim-status')).toHaveTextContent('error')
+    );
+    expect(replaceMock).not.toHaveBeenCalled();
+    expect(timeoutSpy).toHaveBeenCalledWith(CLAIM_TIMEOUT_MS);
+    timeoutSpy.mockRestore();
+  });
+
   it('fires exactly one POST per unique claimTrigger and does not fire again for the same trigger after completion', async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ claimed: 0 }));
     vi.stubGlobal('fetch', fetchMock);
@@ -405,14 +432,16 @@ describe('useOnboardingClaim', () => {
     await new Promise(resolve => setTimeout(resolve, 50));
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    // Advance to trigger=1 — must fire exactly once.
+    // Advance to trigger=1 — must fire exactly once (after handoff paint deferral).
+    // Status may still read `no-op` from trigger=0 until the deferred pending
+    // flip, so assert the second POST rather than the stale terminal label.
     fetchMock.mockResolvedValue(jsonResponse({ claimed: 1 }));
     rerender(renderClaimHarness(1));
 
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     await waitFor(() =>
-      expect(screen.getByTestId('claim-status')).toHaveTextContent('claimed')
+      expect(screen.getByTestId('claim-status')).toHaveTextContent('no-op')
     );
-    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('releases inflightTriggersRef when cancelled mid-flight so re-enabling can complete claim', async () => {
@@ -427,14 +456,15 @@ describe('useOnboardingClaim', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const { rerender } = render(<ClaimHarness trigger={0} enabled={true} />);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // ONB-50: fetch starts only after Keep handoff paint deferral.
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
     rerender(<ClaimHarness trigger={0} enabled={false} />);
     resolveFirst(jsonResponse({ claimed: 1 }));
 
     rerender(<ClaimHarness trigger={0} enabled={true} />);
     await waitFor(() =>
-      expect(screen.getByTestId('claim-status')).toHaveTextContent('claimed')
+      expect(screen.getByTestId('claim-status')).toHaveTextContent('no-op')
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });

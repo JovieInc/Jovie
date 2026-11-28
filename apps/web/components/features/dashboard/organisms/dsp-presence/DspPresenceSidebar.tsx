@@ -4,23 +4,26 @@
 
 import { Button, ConfirmDialog } from '@jovie/ui';
 
-import Image from 'next/image';
 import { useCallback, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import type { DspPresenceItem } from '@/app/app/(shell)/dashboard/presence/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { toast } from '@/components/feedback';
+import { DrawerPropertyRow } from '@/components/molecules/drawer/DrawerPropertyRow';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
-import { EntityHeader } from '@/components/molecules/drawer/EntityHeader';
+import {
+  EntityHeader,
+  EntityHeaderThumbnail,
+} from '@/components/molecules/drawer/EntityHeader';
 import { EntitySidebarShell } from '@/components/molecules/drawer/EntitySidebarShell';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { DspQuietRow } from '@/components/molecules/inspector/DspQuietRow';
 import {
   DspProviderIcon,
   PROVIDER_LABELS,
 } from '@/features/dashboard/atoms/DspProviderIcon';
 import { MatchStatusBadge } from '@/features/dashboard/atoms/MatchStatusBadge';
 import { useDspMatchActions } from '@/features/dashboard/organisms/dsp-matches/hooks';
-import { isExternalDspImage } from '@/lib/utils/dsp-images';
 
 interface DspPresenceSidebarProps {
   readonly item: DspPresenceItem | null;
@@ -45,7 +48,8 @@ export function DspPresenceSidebar({ item, onClose }: DspPresenceSidebarProps) {
       isOpen={isOpen}
       ariaLabel={`${label} profile details`}
       scrollStrategy='shell'
-      workspaceSurface='raised'
+      workspaceSurface='flat'
+      entityHeaderSurface='flat'
       onClose={onClose}
       headerMode='minimal'
       hideMinimalHeaderBar
@@ -71,30 +75,14 @@ function SidebarEntityHeader({
 
   return (
     <EntityHeader
+      layout='grid'
+      className='px-3 pb-2 pt-3'
       thumbnail={
-        item.externalArtistImageUrl ? (
-          <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-subtle bg-surface-0'>
-            <Image
-              src={item.externalArtistImageUrl}
-              alt={item.externalArtistName ?? label}
-              fill
-              sizes='40px'
-              className='object-cover'
-              unoptimized={isExternalDspImage(item.externalArtistImageUrl)}
-            />
-          </div>
-        ) : (
-          <div className='relative flex h-10 w-10 items-center justify-center rounded-full border border-subtle bg-surface-0'>
-            <DspProviderIcon provider={item.providerId} size='lg' />
-            <div
-              className='absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-warning-subtle'
-              role='img'
-              aria-label='Profile Image Missing'
-            >
-              <Icon name='Camera' className='h-4 w-4 text-warning' />
-            </div>
-          </div>
-        )
+        <EntityHeaderThumbnail
+          variant='person'
+          name={item.externalArtistName ?? label}
+          src={item.externalArtistImageUrl}
+        />
       }
       title={item.externalArtistName ?? 'Unknown Artist'}
       subtitle={
@@ -107,7 +95,7 @@ function SidebarEntityHeader({
       titleLineClamp={1}
       subtitleLineClamp={1}
       reserveSubtitleSlot
-      reserveMetaSlot
+      reserveMetaSlot={false}
       metaOverflow='scroll'
       actions={
         <DrawerHeaderActions
@@ -116,7 +104,6 @@ function SidebarEntityHeader({
           onClose={onClose}
         />
       }
-      bodyClassName='pr-8'
       data-testid='dsp-presence-entity-header'
     />
   );
@@ -148,83 +135,69 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
   const label = PROVIDER_LABELS[item.providerId];
 
   return (
-    <div className='space-y-2'>
-      <DrawerSection
-        title='Match Status'
-        sectionKind='facts'
-        className='space-y-1.5'
-      >
-        <div className='space-y-2'>
-          <div className='flex items-center justify-between'>
-            <span className='text-xs text-tertiary-token'>Status</span>
-            <MatchStatusBadge status={item.status} size='sm' />
-          </div>
-          <div className='flex items-center justify-between'>
-            <span className='text-xs text-tertiary-token'>Source</span>
-            <span className='text-xs text-primary-token'>
-              {getMatchSourceLabel(item.matchSource)}
-            </span>
-          </div>
-          {item.matchingIsrcCount > 0 && (
-            <div className='flex items-center justify-between'>
-              <span className='text-xs text-tertiary-token'>
-                Tracks Verified
-              </span>
-              <span className='text-xs text-primary-token'>
-                {item.matchingIsrcCount}
-              </span>
-            </div>
-          )}
-          {item.confirmedAt && (
-            <div className='flex items-center justify-between'>
-              <span className='text-xs text-tertiary-token'>Confirmed</span>
-              <span className='text-xs text-primary-token'>
-                {formatDate(item.confirmedAt)}
-              </span>
-            </div>
-          )}
-        </div>
-      </DrawerSection>
-
+    <div className='space-y-3 px-3 pb-3'>
       {item.externalArtistUrl ? (
-        <DrawerSection
-          title='Links'
-          sectionKind='links'
-          className='space-y-1.5'
-        >
-          <a
+        <DrawerSection sectionKind='links'>
+          <DspQuietRow
+            label={`View On ${label}`}
             href={item.externalArtistUrl}
-            target='_blank'
-            rel='noopener noreferrer'
-            className='flex w-full'
-          >
-            <Button
-              variant='ghost'
-              size='sm'
-              className='h-8 w-full justify-start rounded-full border-subtle bg-surface-0 px-3 text-xs font-caption'
-            >
-              <Icon name='ExternalLink' className='mr-1.5 h-3.5 w-3.5' />
-              View On {label}
-            </Button>
-          </a>
+            icon={<DspProviderIcon provider={item.providerId} size='sm' />}
+          />
         </DrawerSection>
       ) : null}
       <DrawerSection
-        title='Actions'
-        sectionKind='details'
-        className='space-y-1.5 pt-2.5'
+        title='Match Status'
+        sectionKind='facts'
+        collapsible={false}
       >
-        <div className='space-y-2'>
-          {isSuggested && <SuggestedMatchActions matchId={item.matchId} />}
-          {isLinked && !isSuggested && profileId ? (
+        <dl>
+          <DrawerPropertyRow
+            definitionList
+            label='Status'
+            value={<MatchStatusBadge status={item.status} size='sm' />}
+          />
+          <DrawerPropertyRow
+            definitionList
+            label='Source'
+            value={getMatchSourceLabel(item.matchSource)}
+          />
+          {item.matchingIsrcCount > 0 ? (
+            <DrawerPropertyRow
+              definitionList
+              label='Tracks Verified'
+              value={item.matchingIsrcCount}
+            />
+          ) : null}
+          {item.confirmedAt ? (
+            <DrawerPropertyRow
+              definitionList
+              label='Confirmed'
+              value={formatDate(item.confirmedAt)}
+            />
+          ) : null}
+          {!item.externalArtistImageUrl ? (
+            <DrawerPropertyRow
+              definitionList
+              label='Profile Image'
+              value='Missing'
+            />
+          ) : null}
+        </dl>
+      </DrawerSection>
+
+      {profileId && (isSuggested || isLinked) ? (
+        <DrawerSection sectionKind='details'>
+          {isSuggested ? (
+            <SuggestedMatchActions matchId={item.matchId} />
+          ) : (
             <RemovePlatformAction
               matchId={item.matchId}
               providerLabel={label}
               profileId={profileId}
             />
-          ) : null}
-        </div>
-      </DrawerSection>
+          )}
+        </DrawerSection>
+      ) : null}
     </div>
   );
 }
@@ -249,7 +222,7 @@ function SuggestedMatchActions({ matchId }: { readonly matchId: string }) {
         size='sm'
         onClick={() => rejectMatch(matchId)}
         disabled={isLoading}
-        className='h-8 flex-1 rounded-full border border-subtle bg-surface-0 text-xs font-caption'
+        className='flex-1'
       >
         {isRejecting ? 'Rejecting...' : 'Reject'}
       </Button>
@@ -258,7 +231,7 @@ function SuggestedMatchActions({ matchId }: { readonly matchId: string }) {
         size='sm'
         onClick={() => confirmMatch(matchId)}
         disabled={isLoading}
-        className='h-8 flex-1 rounded-full text-xs font-caption'
+        className='flex-1'
       >
         {isConfirming ? 'Confirming...' : 'Confirm Match'}
       </Button>
@@ -305,9 +278,10 @@ function RemovePlatformAction({
       <Button
         variant='ghost'
         size='sm'
+        destructive
         onClick={() => setConfirmOpen(true)}
         disabled={isRejecting}
-        className='h-8 w-full justify-start rounded-full border border-subtle bg-surface-0 px-3 text-xs font-caption text-error-token'
+        className='w-full justify-start'
         data-testid='presence-remove-platform'
       >
         <Icon name='Trash2' className='mr-1.5 h-3.5 w-3.5' />

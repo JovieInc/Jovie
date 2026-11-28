@@ -25,7 +25,7 @@ export function DrawerTabbedCard({
   tabsContainerClassName,
   contentClassName,
   testId,
-  surfaceVariant = 'card',
+  surfaceVariant = 'flat',
 }: DrawerTabbedCardProps) {
   return (
     <DrawerSurfaceCard

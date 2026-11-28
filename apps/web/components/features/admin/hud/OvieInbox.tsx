@@ -47,12 +47,27 @@ function useNowMinute(): number {
   return now;
 }
 
-export function OvieInbox({ caseId }: { readonly caseId?: string }) {
+export function OvieInbox({
+  caseId,
+  showHeading = true,
+}: {
+  readonly caseId?: string;
+  readonly showHeading?: boolean;
+}) {
   const [captureOpen, setCaptureOpen] = useState(false);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const now = useNowMinute();
   const { query, submitting, error, receipt, failure, decide, decideNow } =
     useOvieInboxDecisions();
+  // Only a refresh the operator asked for disables controls. Background polls
+  // must not toggle disabled ink every interval: axe samples buttons mid-fade
+  // (JOV-8068) and the HUD screenshot gate failed on Refresh at 2.92:1.
+  const [refreshing, setRefreshing] = useState(false);
+  const busy = submitting || refreshing;
+  function refresh() {
+    setRefreshing(true);
+    void query.refetch().finally(() => setRefreshing(false));
+  }
   // A requested case stays bound to the current source response. Never
   // substitute a different actionable card when it disappears or is stale.
   const item =
@@ -76,14 +91,17 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
         className='flex h-64 flex-col overflow-hidden p-4'
       >
         <div className='flex shrink-0 items-center justify-between gap-3'>
-          <h2 className='whitespace-nowrap text-sm font-semibold text-primary-token'>
-            Inbox
-          </h2>
+          {showHeading ? (
+            <h2 className='whitespace-nowrap text-sm font-semibold text-primary-token'>
+              Inbox
+            </h2>
+          ) : null}
           <DrawerButton
             type='button'
             tone='secondary'
-            disabled={submitting || query.isFetching}
-            onClick={() => void query.refetch()}
+            className='ml-auto'
+            disabled={busy}
+            onClick={refresh}
           >
             Refresh
           </DrawerButton>
@@ -109,11 +127,7 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
             ) : query.isError ? (
               <div role='alert'>
                 <p>{query.error.message}</p>
-                <DrawerButton
-                  type='button'
-                  tone='secondary'
-                  onClick={() => void query.refetch()}
-                >
+                <DrawerButton type='button' tone='secondary' onClick={refresh}>
                   Retry
                 </DrawerButton>
               </div>
@@ -194,7 +208,7 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
                       <DrawerButton
                         type='button'
                         tone='primary'
-                        disabled={submitting || query.isFetching}
+                        disabled={busy}
                         onClick={() => void submitDecision('approve')}
                       >
                         {item.decisionTarget.kind === 'linear'
@@ -206,7 +220,7 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
                       <DrawerButton
                         type='button'
                         tone='secondary'
-                        disabled={submitting || query.isFetching}
+                        disabled={busy}
                         onClick={() => void submitDecision('reject')}
                         hidden={item.decisionTarget.kind === 'linear'}
                       >
@@ -216,7 +230,7 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
                         <DrawerButton
                           type='button'
                           tone='secondary'
-                          disabled={submitting || query.isFetching}
+                          disabled={busy}
                           onClick={() => void submitDecision('modify')}
                         >
                           Request changes
@@ -237,7 +251,7 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
                 heading='This decision is not in the current inbox. Refresh to check its status.'
                 action={{
                   label: 'Refresh',
-                  onClick: () => void query.refetch(),
+                  onClick: refresh,
                 }}
               />
             ) : (

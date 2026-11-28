@@ -1,12 +1,11 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/DesktopQrOverlay.test.tsx
-
-import { IconButton } from '@jovie/ui';
+import { IconButton, PlainButton } from '@jovie/ui';
 import { Smartphone, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { getQrCodeDataUrl, QRCode } from '@/components/molecules/QRCode';
 import { PROFILE_Z } from '@/lib/profile/z-index-constants';
+import './DesktopQrOverlay.glow.css';
 
 interface DesktopQrOverlayProps {
   readonly handle: string;
@@ -155,20 +154,20 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
           className={`group fixed bottom-4 right-4 m-0 w-fit border-0 ${PROFILE_Z.DRAWER_CONTENT} flex flex-col items-center overflow-hidden rounded-xl bg-surface-0 p-3 shadow-xl ring-1 ring-(--color-border-subtle) backdrop-blur-md animate-in fade-in slide-in-from-bottom-4 zoom-in-95 duration-cinematic ease-out motion-reduce:animate-none`}
         >
           <div className='pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-slower group-hover:opacity-100'>
-            <div className='absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,255,255,0.35),transparent_60%)]' />
+            <div className='desktop-qr-overlay-glow absolute inset-0' />
           </div>
           <div className='relative mb-1 flex w-full items-center justify-between gap-2'>
             <p className='pl-1 text-xs font-medium text-secondary-token'>
               Open On Phone
             </p>
-            <button
+            <PlainButton
               type='button'
               onClick={close}
               aria-label='Close'
               className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-tertiary-token transition-colors duration-subtle hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus'
             >
               <X className='h-4 w-4' aria-hidden='true' />
-            </button>
+            </PlainButton>
           </div>
           {url && pageLoaded ? (
             <QRCode

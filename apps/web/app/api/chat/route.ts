@@ -1,4 +1,3 @@
-import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 /**
  * AI Chat Route — POST /api/chat
  *
@@ -60,6 +59,11 @@ import { createImportBioFromUrlTool } from '@/lib/ai/tools/import-bio-from-url';
 import { createInspectPressSourceTool } from '@/lib/ai/tools/inspect-press-source';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
 import { createVoicePromoTool } from '@/lib/ai/tools/voice-promo';
+import { readAuthorizedDashboardAnalytics } from '@/lib/analytics/authorized-read';
+import {
+  asksForAudienceFunnel,
+  audienceFunnelView,
+} from '@/lib/analytics/funnel-view';
 import { getOptionalAuth } from '@/lib/auth/cached';
 import { getSessionContext } from '@/lib/auth/session';
 import { resolveChatAccountContext } from '@/lib/chat/account-context';
@@ -68,9 +72,7 @@ import {
   buildAlbumArtUnavailableAssistantMessage,
   detectAlbumArtGenerationIntent,
 } from '@/lib/chat/album-art-capability';
-import { resolveAlbumArtReleaseTarget } from '@/lib/chat/album-art-release-target';
 import { fetchArtistContext } from '@/lib/chat/artist-context.server';
-import { resolveChatRelease } from '@/lib/chat/catalog-query';
 import { fetchCatalogTrackTitlesForChat } from '@/lib/chat/catalog-titles';
 import { assertChatToolsRegistered } from '@/lib/chat/chat-tool-inventory';
 import {
@@ -84,10 +86,6 @@ import {
 } from '@/lib/chat/message-text';
 import { canUseOvChatMode, parseChatMode } from '@/lib/chat/ov-mode';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
-import {
-  updateOwnedReleaseGeneratedPitches,
-  updateOwnedReleaseMetadata,
-} from '@/lib/chat/release-writes';
 import { fetchReleaseCatalogForChat } from '@/lib/chat/releases';
 import {
   extractUIMessageText,
@@ -115,7 +113,12 @@ import {
   preparePersistedToolEventsForTurnFinish,
   resolvePersistedToolEventsForDisplay,
 } from '@/lib/chat/tool-events';
-import { createCheckCanvasStatusTool } from '@/lib/chat/tools/canvas-status';
+import { createGenerateAlbumArtTool } from '@/lib/chat/tools/album-art';
+import {
+  createCheckCanvasStatusTool,
+  createMarkCanvasUploadedTool,
+} from '@/lib/chat/tools/canvas-status';
+import { createFormatLyricsTool } from '@/lib/chat/tools/format-lyrics';
 import { proposeMerchAction } from '@/lib/chat/tools/merch-propose';
 import {
   createMerchAlternativeTool,
@@ -125,6 +128,7 @@ import {
   createMerchSourceTool,
 } from '@/lib/chat/tools/merch-tools';
 import { createProposeVideoRecordingTool } from '@/lib/chat/tools/propose-video-recording';
+import { createGenerateReleasePitchTool } from '@/lib/chat/tools/release-pitch';
 import { createRetouchImageTool } from '@/lib/chat/tools/retouch-image';
 import { createManageTasksTool } from '@/lib/chat/tools/tasks';
 import {
@@ -146,10 +150,8 @@ import {
 } from '@/lib/chat/types';
 import { gateAssistantReply } from '@/lib/chat/voice-lint';
 import { wrapToolSetFailSoft } from '@/lib/chat/wrap-tool-execute';
-import { isArtistRuleViolation } from '@/lib/copy/outbound-floor';
 import { db } from '@/lib/db';
 import { socialLinks } from '@/lib/db/schema/links';
-import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import {
@@ -163,7 +165,6 @@ import {
   isDeterministicIntent,
   routeIntent,
 } from '@/lib/intent-detection';
-import { formatLyricsForAppleMusic } from '@/lib/lyrics/format-lyrics-for-apple-music';
 import { formatMerchMoney } from '@/lib/merch/pricing';
 import {
   optimizeMerchCards,
@@ -178,7 +179,9 @@ import {
   prefetchSummerSession,
 } from '@/lib/ovie/chat-route-helpers';
 import { createOvieTurnTiming, ovieServerTiming } from '@/lib/ovie/chat-timing';
+import { loadRequestedOpsFunnel } from '@/lib/ovie/funnel-card.server';
 import { getOvieOperatingStore } from '@/lib/ovie/mcp/runtime-store';
+import { buildFunnelOpsCard, type SummerOpsCard } from '@/lib/ovie/ops-card';
 import {
   assertModelMustNotSelfIdentifyAsOvie,
   assertOvieDoorDoesNotUseArtistJovieGeneration,
@@ -198,41 +201,10 @@ import {
   runOvieSummerTurn,
 } from '@/lib/ovie/summer-transport';
 import {
-  albumArtGenerationBurstLimiter,
-  albumArtGenerationLimiter,
   checkAiChatRateLimitForPlan,
   createRateLimitHeaders,
 } from '@/lib/rate-limit';
-import {
-  AlbumArtGatewayUnconfiguredError,
-  buildAlbumArtBackgroundPrompt,
-  generateAlbumArtBackgrounds,
-  isAlbumArtGatewayConfigured,
-} from '@/lib/services/album-art/provider-xai';
-import { renderAlbumArtCandidate } from '@/lib/services/album-art/render';
-import {
-  uploadAlbumArtCandidate,
-  uploadAlbumArtManifest,
-} from '@/lib/services/album-art/storage';
-import {
-  ALBUM_ART_STYLES,
-  getAlbumArtStyle,
-} from '@/lib/services/album-art/styles';
-import type {
-  AlbumArtCandidate,
-  AlbumArtStyleId,
-} from '@/lib/services/album-art/types';
-import { buildCanvasMetadata } from '@/lib/services/canvas/service';
 import { getInsightsSummary } from '@/lib/services/insights/lifecycle';
-import {
-  buildPitchInput,
-  generatePitchDraft,
-  PITCH_GRILL_PROCEDURE,
-  PITCH_PLATFORMS,
-  PITCH_TARGET_OPTIONS_TEXT,
-  PITCH_TARGETS,
-  resolvePitchDestination,
-} from '@/lib/services/pitch';
 import { isWeeklyQuotaExemptCanaryEmail } from '@/lib/synthetic/prodcert-identities';
 import { logger } from '@/lib/utils/logger';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
@@ -259,14 +231,6 @@ const CHAT_KILL_SWITCH_GATES = {
   DISABLED: 'ai_chat_disabled',
   FORCE_LIGHT: 'ai_chat_force_light',
 } as const;
-
-/** Format available release titles for error messages. */
-function formatAvailableReleases(releases: ReleaseContext[]): string {
-  return releases
-    .slice(0, 10)
-    .map(r => r.title)
-    .join(', ');
-}
 
 /**
  * Resolves artist context from profileId (server-side) or client-provided data.
@@ -370,6 +334,7 @@ function createAssistantTextStreamResponse(input: {
   readonly corsHeaders: Record<string, string>;
   readonly headers?: Record<string, string>;
   readonly metadata?: Record<string, unknown>;
+  readonly funnelCard?: SummerOpsCard;
 }) {
   const messageId = randomUUID();
   const textId = randomUUID();
@@ -384,6 +349,22 @@ function createAssistantTextStreamResponse(input: {
       writer.write({ type: 'text-start', id: textId });
       writer.write({ type: 'text-delta', id: textId, delta: input.text });
       writer.write({ type: 'text-end', id: textId });
+      if (input.funnelCard) {
+        const toolCallId = randomUUID();
+        writer.write({
+          type: 'tool-input-available',
+          toolCallId,
+          toolName: 'showFunnel',
+          input: {},
+          dynamic: true,
+        });
+        writer.write({
+          type: 'tool-output-available',
+          toolCallId,
+          output: { success: true, card: input.funnelCard },
+          dynamic: true,
+        });
+      }
       writer.write({ type: 'finish-step' });
       writer.write({
         type: 'finish',
@@ -657,253 +638,6 @@ function createSocialLinkRemovalTool(profileId: string | null) {
   });
 }
 
-function createGenerateAlbumArtTool(params: {
-  readonly profileId: string | null;
-  readonly clerkUserId: string;
-  readonly artistName: string;
-  readonly canGenerateAlbumArt: boolean;
-  readonly releases: ReleaseContext[];
-}) {
-  return tool({
-    description:
-      'Generate three album art options for a release. Use this when the artist asks to generate, create, or design album artwork or cover art. If no matching release exists, return a target-selection result so the client can ask whether to create a release or attach the art to an existing release.',
-    inputSchema: chatToolSchema({
-      releaseTitle: z
-        .string()
-        .max(200)
-        .optional()
-        .describe('Release title to generate album art for, if known.'),
-      releaseId: z
-        .string()
-        .uuid()
-        .optional()
-        .describe(
-          'Exact release ID when the request came from a release menu.'
-        ),
-      styleId: z
-        .enum([
-          'neo_pop_collage',
-          'chrome_noir',
-          'analog_dream',
-          'minimal_icon',
-        ])
-        .optional()
-        .describe('Visual style preset for the generated cover.'),
-      prompt: z
-        .string()
-        .max(500)
-        .optional()
-        .describe('Optional extra visual direction from the artist.'),
-      createRelease: z
-        .boolean()
-        .optional()
-        .describe(
-          'Set true when the artist wants to generate candidates for a new release that does not exist yet.'
-        ),
-    }),
-    execute: async ({
-      releaseTitle,
-      releaseId,
-      styleId,
-      prompt,
-      createRelease,
-    }) => {
-      if (!params.profileId) {
-        return {
-          success: false as const,
-          retryable: false,
-          errorCode: 'PROFILE_REQUIRED' as const,
-          error: 'Profile ID required',
-        };
-      }
-      if (!params.canGenerateAlbumArt) {
-        return {
-          success: false as const,
-          retryable: false,
-          errorCode: 'PLAN_UNAVAILABLE' as const,
-          error: `Album art generation requires the ${getPlanDisplayName('pro')} plan.`,
-        };
-      }
-
-      if (!isAlbumArtGatewayConfigured()) {
-        return {
-          success: false as const,
-          retryable: false,
-          errorCode: 'PROVIDER_UNAVAILABLE' as const,
-          error: 'Album art generation is temporarily unavailable.',
-        };
-      }
-
-      const target = await resolveAlbumArtReleaseTarget(
-        params.profileId,
-        params.releases,
-        {
-          releaseId,
-          releaseTitle,
-        }
-      );
-
-      if (target.status === 'needs_target' && !createRelease) {
-        return {
-          success: true as const,
-          state: 'needs_release_target' as const,
-          releaseTitle: releaseTitle ?? null,
-          artistName: params.artistName,
-          suggestedReleases: target.suggestedReleases,
-        };
-      }
-
-      if (createRelease && !releaseTitle?.trim()) {
-        return {
-          success: true as const,
-          state: 'needs_release_target' as const,
-          releaseTitle: null,
-          artistName: params.artistName,
-          suggestedReleases:
-            target.status === 'needs_target' ? target.suggestedReleases : [],
-        };
-      }
-
-      const burstLimit = await albumArtGenerationBurstLimiter.limit(
-        params.clerkUserId
-      );
-      if (!burstLimit.success) {
-        return {
-          success: false as const,
-          retryable: true,
-          errorCode: 'RATE_LIMITED' as const,
-          error:
-            burstLimit.reason ??
-            'Album art generation limit reached. Please try again later.',
-        };
-      }
-
-      const dailyLimit = await albumArtGenerationLimiter.limit(
-        params.clerkUserId
-      );
-      if (!dailyLimit.success) {
-        return {
-          success: false as const,
-          retryable: true,
-          errorCode: 'RATE_LIMITED' as const,
-          error:
-            dailyLimit.reason ??
-            'Album art generation limit reached. Please try again later.',
-        };
-      }
-
-      try {
-        const style = getAlbumArtStyle(styleId as AlbumArtStyleId | undefined);
-        const generationId = randomUUID();
-        const targetRelease =
-          target.status === 'resolved'
-            ? target.release
-            : {
-                id: null,
-                title: releaseTitle?.trim() || COPY_FALLBACKS.release,
-                artworkUrl: null,
-              };
-        const providerPrompt = buildAlbumArtBackgroundPrompt({
-          releaseTitle: targetRelease.title,
-          artistName: params.artistName,
-          style,
-          prompt,
-        });
-        const generated = await generateAlbumArtBackgrounds({
-          prompt: providerPrompt,
-        });
-        const now = new Date().toISOString();
-        const candidates: AlbumArtCandidate[] = [];
-
-        for (const [index, background] of generated.images.entries()) {
-          const candidateId = randomUUID();
-          const rendered = await renderAlbumArtCandidate({
-            background,
-            releaseTitle: targetRelease.title,
-            artistName: params.artistName,
-            style,
-          });
-          const urls = await uploadAlbumArtCandidate({
-            profileId: params.profileId,
-            generationId,
-            candidateId,
-            fullRes: rendered.fullRes,
-            preview: rendered.preview,
-          });
-
-          candidates.push({
-            id: candidateId,
-            generationId,
-            styleId: style.id,
-            styleLabel: style.label,
-            previewUrl: urls.previewUrl,
-            fullResUrl: urls.fullResUrl,
-            generatedAt: now,
-            provider: 'xai',
-            model: generated.model,
-            releaseTitle: targetRelease.title,
-            artistName: params.artistName,
-            prompt: providerPrompt,
-          });
-
-          if (index >= 2) break;
-        }
-
-        await uploadAlbumArtManifest({
-          generationId,
-          profileId: params.profileId,
-          releaseId: targetRelease.id,
-          releaseTitle: targetRelease.title,
-          artistName: params.artistName,
-          provider: 'xai',
-          model: generated.model,
-          styleId: style.id,
-          prompt: providerPrompt,
-          candidates,
-          createdAt: now,
-        });
-
-        return {
-          success: true as const,
-          state: 'generated' as const,
-          generationId,
-          releaseId: targetRelease.id,
-          releaseTitle: targetRelease.title,
-          artistName: params.artistName,
-          hasExistingArtwork: Boolean(targetRelease.artworkUrl),
-          candidates,
-          styles: Object.values(ALBUM_ART_STYLES).map(item => ({
-            id: item.id,
-            label: item.label,
-            description: item.description,
-          })),
-        };
-      } catch (error) {
-        if (error instanceof AlbumArtGatewayUnconfiguredError) {
-          // Gateway auth may be missing between the early check and the call
-          // (e.g. env reload). Treat as feature_disabled, do not capture.
-          return {
-            success: false as const,
-            retryable: false,
-            errorCode: 'PROVIDER_UNAVAILABLE' as const,
-            error: 'Album art generation is temporarily unavailable.',
-          };
-        }
-        Sentry.captureException(error, {
-          tags: { feature: 'album-art-generation' },
-          extra: { profileId: params.profileId, releaseId, releaseTitle },
-        });
-        return {
-          success: false as const,
-          retryable: true,
-          errorCode: 'TOOL_EXECUTION_FAILED' as const,
-          error: 'Unable to generate album art. Please try again.',
-        };
-      }
-    },
-  });
-}
-
 // JOV-4743: the legacy `_createMerchGenerationTool` / `_createSelectMerchDesignTool`
 // factories were removed — chat merch generation converges on the canonical
 // tools in `@/lib/chat/tools/merch-tools` (createMerchGenerateTool &
@@ -1028,7 +762,8 @@ function createMerchPayoutsTool(profileId: string | null) {
 
 function createShowTopInsightsTool(
   profileId: string | null,
-  lastUserText: string
+  lastUserText: string,
+  userId: string
 ) {
   return tool({
     description:
@@ -1042,6 +777,25 @@ function createShowTopInsightsTool(
           totalActive: 0,
           insights: [],
         };
+      }
+
+      if (asksForAudienceFunnel(lastUserText)) {
+        const requestedRange = /\b(?:7d|7 days|last week)\b/i.test(lastUserText)
+          ? '7d'
+          : '30d';
+        const read = await readAuthorizedDashboardAnalytics({
+          userId,
+          range: requestedRange,
+        }).catch(() => null);
+        const funnel = audienceFunnelView(
+          read?.analytics,
+          read?.range ?? 'Analytics unavailable'
+        );
+        const card = buildFunnelOpsCard(
+          funnel,
+          read ? undefined : 'unavailable'
+        );
+        return { success: true, card };
       }
 
       if (!isShowTopInsightsTurnRelevant(lastUserText)) {
@@ -1062,68 +816,6 @@ function createShowTopInsightsTool(
         totalActive: summary.totalActive,
         insights: summary.insights,
         relevant: true,
-      };
-    },
-  });
-}
-
-/**
- * Creates the markCanvasUploaded tool.
- * Lets artists self-report that they've uploaded a canvas to Spotify for Artists.
- * Since Spotify has no public API for canvas status, this is the only reliable way to track it.
- */
-function createMarkCanvasUploadedTool(
-  profileId: string | null,
-  releases: ReleaseContext[]
-) {
-  return tool({
-    description:
-      "Mark a release as having a Spotify Canvas video uploaded. Use this when the artist confirms they've already set a canvas for a track/release in Spotify for Artists, or when they tell you a canvas is already uploaded.",
-    inputSchema: chatToolSchema({
-      releaseTitle: z
-        .string()
-        .describe('The title of the release that has a canvas uploaded'),
-    }),
-    execute: async ({ releaseTitle }) => {
-      if (!profileId) {
-        return { success: false, error: 'Profile ID required' };
-      }
-
-      const release = await resolveChatRelease(profileId, releases, {
-        releaseTitle,
-      });
-
-      if (!release) {
-        return {
-          success: false,
-          error: `Release "${releaseTitle}" not found. Available releases: ${formatAvailableReleases(releases)}`,
-        };
-      }
-
-      const updated = await updateOwnedReleaseMetadata({
-        releaseId: release.id,
-        creatorProfileId: profileId,
-        metadata: {
-          ...release.metadata,
-          ...buildCanvasMetadata('uploaded'),
-        },
-      });
-
-      if (!updated) {
-        return {
-          success: false,
-          error: 'Release not found or unauthorized',
-        };
-      }
-
-      return {
-        success: true,
-        release: {
-          title: release.title,
-          previousStatus: release.canvasStatus,
-          newStatus: 'uploaded',
-        },
-        message: `Marked "${release.title}" as having a Spotify Canvas uploaded.`,
       };
     },
   });
@@ -1209,37 +901,6 @@ function createWorldClassBioTool(
 }
 
 /**
- * Creates the formatLyrics tool.
- * Applies deterministic Apple Music formatting rules to raw lyrics text.
- */
-function createLyricsFormatTool() {
-  return tool({
-    description:
-      'Format lyrics to Apple Music guidelines. Applies deterministic rules: removes section labels like [Verse]/[Chorus], straightens curly quotes, normalizes punctuation, collapses blank lines, and trims whitespace. Use when an artist asks to clean up or format lyrics.',
-    inputSchema: chatToolSchema({
-      lyrics: z
-        .string()
-        .min(1)
-        .max(10000)
-        .describe('Raw lyrics text to format for Apple Music'),
-    }),
-    execute: async ({ lyrics }) => {
-      const originalLineCount = lyrics.split('\n').length;
-      const { formatted, changesSummary } = formatLyricsForAppleMusic(lyrics);
-      const formattedLineCount = formatted.split('\n').length;
-
-      return {
-        success: true,
-        formatted,
-        changesSummary,
-        originalLineCount,
-        formattedLineCount,
-      };
-    },
-  });
-}
-
-/**
  * OPTIONS - CORS preflight handler
  */
 export async function OPTIONS(req: Request) {
@@ -1279,168 +940,6 @@ function createSubmitFeedbackTool(clerkUserId: string) {
         clerkUserId,
         message,
       });
-    },
-  });
-}
-
-/**
- * Creates the generateReleasePitch tool for chat-first release pitching.
- * Saves the latest generated draft to the release's generatedPitches field.
- */
-function createGenerateReleasePitchTool(
-  resolvedProfileId: string,
-  identity: { clerkUserId: string; conversationId: string | null },
-  releases: ReleaseContext[],
-  artistRules?: ArtistContext['artistRules'],
-  releaseCatalog?: ReleaseCatalogMeta
-) {
-  return tool({
-    description: `Generate one copy-paste-ready release pitch for a specific destination. Use for playlist, radio, Sirius XM, install, playback/music supervisor, editorial post, record label, or collaborator pitching. Ask the artist where they want to pitch it before calling this tool unless a task or user message clearly maps to one of these destinations: ${PITCH_TARGET_OPTIONS_TEXT}. Ask which release they want to pitch if unclear. If the artist provides custom guidance, pass it via instructions. ${PITCH_GRILL_PROCEDURE}`,
-    inputSchema: chatToolSchema({
-      releaseTitle: z
-        .string()
-        .max(200)
-        .optional()
-        .describe('The title of the release to generate a pitch for'),
-      releaseId: z
-        .string()
-        .uuid()
-        .optional()
-        .describe('The release ID to generate a pitch for'),
-      target: z
-        .enum(PITCH_TARGETS)
-        .optional()
-        .describe(
-          `Where the artist wants to pitch the release: ${PITCH_TARGET_OPTIONS_TEXT}`
-        ),
-      platform: z
-        .enum(PITCH_PLATFORMS)
-        .optional()
-        .describe('Optional platform or buyer context, such as Spotify'),
-      taskTitle: z
-        .string()
-        .max(200)
-        .optional()
-        .describe('Release task title to infer the pitch destination from'),
-      taskCategory: z
-        .string()
-        .max(100)
-        .optional()
-        .describe('Release task category to infer the pitch destination from'),
-      instructions: z
-        .string()
-        .max(700)
-        .optional()
-        .describe(
-          'Optional instructions to guide pitch generation, e.g. "mention my Nashville show" or "make it less formal"'
-        ),
-    }),
-    execute: async ({
-      releaseTitle,
-      releaseId,
-      target,
-      platform,
-      taskTitle,
-      taskCategory,
-      instructions,
-    }) => {
-      try {
-        if (releases.length === 0) {
-          // A failed catalog read must not masquerade as "no releases" (dogfood
-          // 2026-11-10): tell the model the catalog is unreadable instead.
-          if (releaseCatalog?.status === 'unavailable') {
-            return {
-              success: false as const,
-              error:
-                'The release catalog is temporarily unavailable. Try the pitch again in a moment.',
-            };
-          }
-          return {
-            success: false as const,
-            error: "You don't have any releases yet. Add a release first.",
-          };
-        }
-
-        const release = await resolveChatRelease(resolvedProfileId, releases, {
-          releaseId,
-          releaseTitle,
-        });
-
-        if (!release) {
-          return {
-            success: false as const,
-            error: releaseTitle
-              ? `Release "${releaseTitle}" not found. Available releases: ${formatAvailableReleases(releases)}`
-              : `Which release should I pitch? Available releases: ${formatAvailableReleases(releases)}`,
-          };
-        }
-
-        const destination = resolvePitchDestination({
-          target,
-          platform,
-          taskTitle,
-          taskCategory,
-          instructions,
-        });
-
-        if (!destination) {
-          return {
-            success: false as const,
-            needsTarget: true as const,
-            error: `Where do you want to pitch it? Choose: ${PITCH_TARGET_OPTIONS_TEXT}.`,
-            targetOptions: PITCH_TARGETS,
-          };
-        }
-
-        const pitchInput = await buildPitchInput(resolvedProfileId, release.id);
-
-        const result = await generatePitchDraft({
-          input: pitchInput,
-          destination,
-          instructions,
-          identity: {
-            userId: identity.clerkUserId,
-            sessionId: identity.conversationId,
-          },
-          artistRules,
-        });
-
-        const updated = await updateOwnedReleaseGeneratedPitches({
-          releaseId: release.id,
-          creatorProfileId: resolvedProfileId,
-          generatedPitches: result.pitch,
-        });
-
-        if (!updated) {
-          return {
-            success: false as const,
-            error: 'Release not found or unauthorized',
-          };
-        }
-
-        return {
-          success: true as const,
-          releaseTitle: release.title,
-          destinationLabel: destination.label,
-          target: destination.target,
-          pitch: result.pitch,
-          copyText: result.pitch.subjectLine
-            ? `Subject: ${result.pitch.subjectLine}\n\n${result.pitch.body}`
-            : result.pitch.body,
-        };
-      } catch (error) {
-        Sentry.captureException(error, {
-          tags: { feature: 'chat-pitch-generation' },
-          extra: { releaseTitle, releaseId, profileId: resolvedProfileId },
-        });
-
-        return {
-          success: false as const,
-          error: isArtistRuleViolation(error)
-            ? 'That pitch broke one of your artist rules, so I held it back.'
-            : 'Failed to generate pitches. Please try again.',
-        };
-      }
     },
   });
 }
@@ -1507,7 +1006,8 @@ function buildChatTools(
       ? {
           showTopInsights: createShowTopInsightsTool(
             resolvedProfileId,
-            lastUserText
+            lastUserText,
+            clerkUserId
           ),
         }
       : {}),
@@ -1557,7 +1057,7 @@ function buildChatTools(
       resolvedProfileId,
       releases
     ),
-    formatLyrics: createLyricsFormatTool(),
+    formatLyrics: createFormatLyricsTool(),
     ...(resolvedProfileId
       ? { manageTasks: createManageTasksTool(resolvedProfileId) }
       : {}),
@@ -2259,6 +1759,37 @@ export async function POST(req: Request) {
       destination: receipt.destination,
       ack: receipt.ack,
     }));
+    const funnelCard = userText
+      ? await loadRequestedOpsFunnel(userText).catch(error => {
+          logger.warn('Operational funnel unavailable', { requestId, error });
+          return null;
+        })
+      : null;
+    if (funnelCard) {
+      const bottleneck = funnelCard.funnel?.stages.find(
+        stage => stage.id === funnelCard.funnel?.bottleneckId
+      );
+      return createAssistantTextStreamResponse({
+        text: bottleneck
+          ? `Current certification bottleneck: ${bottleneck.label}.`
+          : funnelCard.state === 'unknown'
+            ? 'The latest evidence is unavailable.'
+            : 'Here’s the latest tracked evidence.',
+        funnelCard,
+        requestId,
+        corsHeaders,
+        headers: {
+          'x-ovie-door': '1',
+          'server-timing': ovieServerTiming(timing.snapshot()),
+        },
+        metadata: {
+          requestId,
+          chatMode: 'ov',
+          eveIdentity: eveTurn.pack.id,
+          ovieIngest: ingestMeta,
+        },
+      });
+    }
     const eveSpeaker = getBoundSummerSpeaker();
     // Interactive turns stream from Summer's fast chat endpoint; durable work
     // and any fast-path outage fall back to the Eve conversation (still Summer).
@@ -2732,7 +2263,12 @@ export async function POST(req: Request) {
         // Copy floor (canon/VOICE.md) and artist rules: a streamed reply can't
         // be blocked mid-flight, so gate the completed text before it persists.
         // A violation swaps in a safe fallback and logs the rules that fired.
-        const gatedReply = gateAssistantReply(assistantText, artistContext);
+        const gatedReply = gateAssistantReply(assistantText, {
+          artistRules: artistContext.artistRules,
+          ask: userText,
+          namedReleases: releases.map(release => release.title),
+          username: artistContext.username,
+        });
         if (gatedReply.violations.length > 0) {
           const emptyReply = gatedReply.violations.some(
             violation => violation.rule === 'empty-reply'

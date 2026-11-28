@@ -1046,6 +1046,7 @@ describe('golden-path autofix executor contract (JOV-6827)', () => {
               data: {
                 issue: {
                   comments: {
+                    pageInfo: { hasNextPage: false },
                     nodes: state.linearComments.map((body, index) => ({
                       id: `c-${index}`,
                       body,
@@ -1207,6 +1208,7 @@ describe('golden-path autofix executor contract (JOV-6827)', () => {
             data: {
               issue: {
                 comments: {
+                  pageInfo: { hasNextPage: false },
                   nodes: state.linearComments.map((body, index) => ({
                     id: `c-${index}`,
                     body,

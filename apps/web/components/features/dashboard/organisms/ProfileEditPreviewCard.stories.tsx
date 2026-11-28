@@ -47,6 +47,31 @@ export const WithSourceProvenance: Story = {
   },
 };
 
+export const LegacyImportedBio: Story = {
+  args: {
+    preview: {
+      field: 'bio',
+      fieldLabel: 'Artist bio/description',
+      currentValue: null,
+      newValue:
+        '<untrusted-source url="https://example.com/artist" encoding="entities-v1">&amp;lt;p&amp;gt;&amp;lt;b&amp;gt;An independent artist.&amp;lt;/b&amp;gt;&amp;lt;/p&amp;gt;&amp;lt;p&amp;gt;A new release arrives this spring.&amp;lt;/p&amp;gt;</untrusted-source>',
+      sourceUrl: 'https://example.com/artist',
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(
+      canvas.getByText(
+        'An independent artist. A new release arrives this spring.'
+      )
+    ).toBeVisible();
+    await expect(
+      canvas.getByRole('button', { name: /^apply$/i })
+    ).toBeEnabled();
+    await expect(canvas.queryByText('Applied')).not.toBeInTheDocument();
+  },
+};
+
 export const UnsetCurrentValue: Story = {
   args: {
     preview: {

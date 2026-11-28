@@ -24,7 +24,10 @@ export function sourceValidationWorkflow() {
  * @param {boolean} [options.ghFails]
  * @param {string} [options.sha]
  * @param {string} [options.quota]
- * @param {string} [options.guardJobConclusion]
+ * @param {string} [options.unitJobConclusion]
+ * @param {string} [options.proofBase]
+ * @param {string} [options.proofStepConclusion]
+ * @param {string} [options.liveBase]
  * @param {boolean} [options.jobsFail]
  */
 export function runProofReuse({
@@ -32,7 +35,10 @@ export function runProofReuse({
   ghFails = false,
   sha = 'a'.repeat(40),
   quota = '5000',
-  guardJobConclusion = 'success',
+  unitJobConclusion = 'success',
+  proofBase = 'b'.repeat(40),
+  proofStepConclusion = 'success',
+  liveBase,
   jobsFail = false,
 }) {
   const step = sourceValidationWorkflow().jobs.deterministic.steps.find(
@@ -50,6 +56,7 @@ export function runProofReuse({
     writeFileSync(join(root, 'quota'), quota);
     for (const [name, script] of Object.entries({
       sleep: `printf '%s\\n' "$*" >> "${root}/sleep.log"`,
+      git: 'test -n "$TEST_LIVE_BASE" && printf "%s\\trefs/heads/main\\n" "$TEST_LIVE_BASE"',
     }))
       writeFileSync(join(bin, name), `#!/bin/sh\n${script}\n`, { mode: 0o755 });
     writeFileSync(
@@ -62,7 +69,13 @@ export function runProofReuse({
         jobs: [
           {
             name: 'Affected Unit Tests (4/4)',
-            conclusion: guardJobConclusion,
+            conclusion: unitJobConclusion,
+            steps: [
+              {
+                name: `Bind merged guard proof to base ${proofBase}`,
+                conclusion: proofStepConclusion,
+              },
+            ],
           },
         ],
       })
@@ -77,12 +90,7 @@ ${
     : `case "$*" in
   *rate_limit*) cat "${root}/quota" ;;
   */jobs*)
-    ${
-      jobsFail
-        ? 'exit 1'
-        : `# Mirror the workflow --jq filter; the real gh applies it server-side.
-    jq -r '[.jobs[] | select(.name == "Affected Unit Tests (4/4)")] | first | .conclusion // empty' "${root}/jobs.json"`
-    }
+    ${jobsFail ? 'exit 1' : `cat "${root}/jobs.json"`}
     ;;
   *) cat "${root}/runs.json" ;;
 esac`
@@ -101,10 +109,14 @@ esac`
         GITHUB_STEP_SUMMARY: join(root, 'summary'),
         JOVIE_API_STATE_DIR: join(root, 'state'),
         GH_TOKEN: 'test',
+        BASE_REF: 'main',
+        BASE_SHA: 'b'.repeat(40),
         HEAD_SHA: sha,
         HEAD_REF: 'agent/jov-1',
         REPOSITORY: 'JovieInc/Jovie',
+        REQUIRE_LIVE_BASE: String(liveBase !== undefined),
         RUN_ID: '500',
+        TEST_LIVE_BASE: liveBase ?? '',
       },
     });
     let ghLog = '';

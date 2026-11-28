@@ -1,10 +1,21 @@
 #!/usr/bin/env node
 import { readFile, realpath, stat, writeFile } from 'node:fs/promises';
 import { basename, join, relative, resolve } from 'node:path';
+import { hasLaunchCaptureState } from './pr-visual-capture-launch.mjs';
+import {
+  AUTHENTICATED_CHAT_CAPTURE_ROUTE,
+  CONTACTS_CAPTURE_ROUTE,
+  PUBLIC_HOME_CAPTURE_ROUTE,
+  PUBLIC_PROFILE_CAPTURE_ROUTE,
+  routeChangedFiles,
+} from './pr-visual-capture-surfaces.mjs';
+
+export {
+  prepareContactsCapture,
+  routeChangedFiles,
+} from './pr-visual-capture-surfaces.mjs';
 
 const MAX_DIFF = 18_000;
-const UI_FILE =
-  /^(apps\/web\/(app|components|features|lib|public|styles|tests\/visual-qa)|packages\/ui|apps\/console\/.*screenshot|apps\/ios\/.*(View|Screen|Snapshot)|.*\.(css|scss|tsx|jsx))\//;
 const SECRET =
   /(api[_-]?key|secret|password|token|private[_-]?key|database[_-]?url|authorization)\s*[:=]\s*[^\s,;]+/gi;
 const GROK_MODEL = /grok[-_ ]?4(?:[._ -]?5)?/i;
@@ -29,39 +40,11 @@ export const MAX_CAPTURE_WORKERS = 4;
 export const DEFAULT_CAPTURE_WORKERS = 2;
 export const CRITICAL_JOURNEY_CAPTURE_SCHEMA =
   'jovie.critical-journey-capture/v1';
-const PUBLIC_HOME_CAPTURE_ROUTE = '/';
-const PUBLIC_CARD_CAPTURE_ROUTE = '/card';
-const PUBLIC_CARD_CAPTURE_FILE =
-  /^(?:apps\/web\/app\/\(marketing\)\/card\/|apps\/web\/data\/jovieCardCopy\.ts$)/;
-const PUBLIC_PROFILE_CAPTURE_ROUTE = '/demo/showcase/public-profile';
-const AUTHENTICATED_CHAT_CAPTURE_ROUTE = '/app/chat';
-// Changes to the session boundary can leave a public route perfectly healthy
-// while making every authenticated surface unusable. Keep this deliberately
-// narrow: these are the files that establish the app-shell session and route
-// guard, not every page under the auth route group.
-const AUTHENTICATED_SHELL_CAPTURE_FILE =
-  /^(?:apps\/web\/(?:proxy|middleware)\.[cm]?[jt]s|apps\/web\/lib\/auth\/(?:gate|session|auth-session-cookies)\.[cm]?[jt]sx?|apps\/web\/app\/app(?:\/\(shell\))?\/layout\.[cm]?[jt]sx?)$/i;
-
 const CAPTURE_JOURNEYS = new Map([
   [PUBLIC_HOME_CAPTURE_ROUTE, 'marketing-home-render'],
   [PUBLIC_PROFILE_CAPTURE_ROUTE, 'artist-profile-public'],
   [AUTHENTICATED_CHAT_CAPTURE_ROUTE, 'chat-agent-turn'],
 ]);
-
-/**
- * Authenticated `/app/chat` capture is for visual chat/shell surfaces.
- * API handlers, server turn execution, and onboarding helpers share the
- * "chat" path token but are not the workspace chrome the fixture proves.
- * App Router `(shell)` is a route group, not chat chrome; real chat pages
- * under that group still match `/chat/i`.
- */
-function isAuthenticatedChatUiChange(file) {
-  if (!/chat|shell/i.test(file)) return false;
-  if (/onboarding/i.test(file)) return false;
-  if (/^apps\/web\/(app\/api\/|lib\/)/.test(file)) return false;
-  if (/\(shell\)/.test(file) && !/chat/i.test(file)) return false;
-  return true;
-}
 
 /** @typedef {{ apiKey?: string, baseUrl?: string, model?: string }} ReviewBackend */
 
@@ -161,47 +144,6 @@ export function summarizeScriptedCaptures(captures) {
   return summary;
 }
 
-export function routeChangedFiles(files) {
-  const changed = files.filter(
-    file =>
-      UI_FILE.test(file) ||
-      PUBLIC_CARD_CAPTURE_FILE.test(file) ||
-      AUTHENTICATED_SHELL_CAPTURE_FILE.test(file) ||
-      /(^|\/)DESIGN\.md$/.test(file)
-  );
-  if (changed.length === 0)
-    return {
-      shouldReview: false,
-      routes: [],
-      reason: 'no-ui-change',
-      review_status: 'skipped',
-    };
-  const routes = new Set();
-  for (const file of changed) {
-    // Route only to fixtures that are present in the production build. Generic
-    // UI changes belong on the public home surface; `/demo` and `/demo/admin`
-    // require data/authentication that the capture runner intentionally does
-    // not invent.
-    if (PUBLIC_CARD_CAPTURE_FILE.test(file))
-      routes.add(PUBLIC_CARD_CAPTURE_ROUTE);
-    else if (AUTHENTICATED_SHELL_CAPTURE_FILE.test(file))
-      routes.add(AUTHENTICATED_CHAT_CAPTURE_ROUTE);
-    else if (/admin|console|ops/i.test(file))
-      routes.add(PUBLIC_HOME_CAPTURE_ROUTE);
-    else if (/dynamic|profile|username|artist/i.test(file))
-      routes.add(PUBLIC_PROFILE_CAPTURE_ROUTE);
-    else if (isAuthenticatedChatUiChange(file))
-      routes.add(AUTHENTICATED_CHAT_CAPTURE_ROUTE);
-    else routes.add(PUBLIC_HOME_CAPTURE_ROUTE);
-  }
-  return {
-    shouldReview: true,
-    routes: [...routes].sort((a, b) => a.localeCompare(b)),
-    reason: 'ui-change',
-    review_status: 'advisory',
-  };
-}
-
 /**
  * Validate that a capture manifest proves every requested route at every
  * required viewport. A partial manifest is evidence of a failed capture, not
@@ -245,6 +187,14 @@ export function validateCaptureManifest(manifest, expected = {}) {
       }
       if (capture.status !== 'captured')
         failures.push(`failed capture ${key}: ${capture.error ?? 'unknown'}`);
+      if (
+        route === CONTACTS_CAPTURE_ROUTE &&
+        (capture.observed?.state !== 'contacts-selected-detail' ||
+          !String(capture.observed?.selectedContact ?? '').trim())
+      )
+        failures.push(`missing selected Contacts detail ${key}`);
+      if (!hasLaunchCaptureState(route, capture.observed))
+        failures.push(`missing populated launch presentation ${key}`);
       if (typeof capture.path !== 'string' || capture.path.length === 0)
         failures.push(`missing artifact path ${key}`);
     }

@@ -5,6 +5,11 @@ import {
   resetChatTimelineStateCacheForTests,
   useJovieChat,
 } from '@/components/jovie/hooks/useJovieChat';
+import {
+  completedChatTurn,
+  conversationRouteProps,
+  type FinishedChatTurn,
+} from './chat-turn.test-fixtures';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -21,18 +26,7 @@ const mutateAsyncMock = vi.fn();
 const addMessagesMutateMock = vi.fn();
 const setMessagesMock = vi.fn();
 let onRejectHandler: (() => void) | undefined;
-let onFinishHandler:
-  | ((options: {
-      message: {
-        metadata?: unknown;
-        parts?: Array<Record<string, unknown>>;
-      };
-      messages: unknown[];
-      isAbort: boolean;
-      isDisconnect: boolean;
-      isError: boolean;
-    }) => void)
-  | undefined;
+let onFinishHandler: ((options: FinishedChatTurn) => void) | undefined;
 let onErrorHandler: ((error: Error) => void) | undefined;
 let mockStatus: 'error' | 'ready' | 'streaming' = 'ready';
 let currentChatId = 'new-chat';
@@ -404,20 +398,7 @@ describe('useJovieChat', () => {
     expect(result.current.isSubmitting).toBe(true);
 
     act(() => {
-      onFinishHandler?.({
-        message: {
-          metadata: {
-            conversationId: 'conv_server',
-            turnId: 'turn_server',
-            requestId: 'req_1',
-          },
-          parts: [{ type: 'text', text: 'Hello back' }],
-        },
-        messages: [],
-        isAbort: false,
-        isDisconnect: false,
-        isError: false,
-      });
+      onFinishHandler?.(completedChatTurn());
     });
 
     expect(result.current.isSubmitting).toBe(false);
@@ -654,20 +635,7 @@ describe('useJovieChat', () => {
     expect(result.current.isSubmitting).toBe(true);
 
     act(() => {
-      onFinishHandler?.({
-        message: {
-          metadata: {
-            conversationId: 'conv_server',
-            turnId: 'turn_server',
-            requestId: 'req_1',
-          },
-          parts: [{ type: 'text', text: 'Hello back' }],
-        },
-        messages: [],
-        isAbort: false,
-        isDisconnect: false,
-        isError: false,
-      });
+      onFinishHandler?.(completedChatTurn());
     });
 
     expect(onConversationCreate).toHaveBeenCalledWith(
@@ -677,11 +645,50 @@ describe('useJovieChat', () => {
     expect(result.current.isSubmitting).toBe(false);
   });
 
+  it('starts an empty conversation when New Chat replaces a populated thread', () => {
+    mockConversationData = {
+      conversation: { id: 'thread-a', title: 'Existing conversation' },
+      messages: [
+        {
+          id: 'previous-reply',
+          role: 'assistant',
+          content: 'Previous conversation reply',
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    };
+    const { result, rerender } = renderHook(
+      ({ conversationId }: { conversationId: string | undefined }) =>
+        useJovieChat({ profileId: 'profile_1', conversationId }),
+      { initialProps: conversationRouteProps('thread-a') }
+    );
+    expect(result.current.messages).toHaveLength(1);
+    act(() => {
+      result.current.setInput('Keep this draft in the previous thread');
+      result.current.chipTray.addEntity({
+        kind: 'artist',
+        id: 'previous-artist',
+        label: 'Previous artist',
+      });
+    });
+
+    mockConversationData = undefined;
+    rerender({ conversationId: undefined });
+
+    expect(result.current.activeConversationId).toBeNull();
+    expect(result.current.messages).toEqual([]);
+    expect(result.current.input).toBe('');
+    expect(result.current.chipTray.chips).toEqual([]);
+
+    rerender({ conversationId: 'thread-a' });
+    expect(result.current.input).toBe('Keep this draft in the previous thread');
+  });
+
   it('does not wipe an in-flight transcript when the route adopts the reserved id', async () => {
     const { result, rerender } = renderHook(
-      ({ conversationId }: { conversationId?: string }) =>
+      ({ conversationId }: { conversationId: string | undefined }) =>
         useJovieChat({ profileId: 'profile_1', conversationId }),
-      { initialProps: { conversationId: undefined } }
+      { initialProps: conversationRouteProps(undefined) }
     );
 
     await act(async () => {
@@ -691,20 +698,13 @@ describe('useJovieChat', () => {
     expect(result.current.messages.length).toBeGreaterThan(0);
 
     act(() => {
-      onFinishHandler?.({
-        message: {
-          metadata: {
-            conversationId: 'conv_reserved',
-            turnId: 'turn_reserved',
-            requestId: 'req_reserved',
-          },
-          parts: [{ type: 'text', text: 'Hello back' }],
-        },
-        messages: [],
-        isAbort: false,
-        isDisconnect: false,
-        isError: false,
-      });
+      onFinishHandler?.(
+        completedChatTurn({
+          conversationId: 'conv_reserved',
+          turnId: 'turn_reserved',
+          requestId: 'req_reserved',
+        })
+      );
     });
 
     const messageCountAfterFinish = result.current.messages.length;

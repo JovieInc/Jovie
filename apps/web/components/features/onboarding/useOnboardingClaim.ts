@@ -10,6 +10,10 @@ import {
   trackFunnelStep,
 } from '@/lib/analytics/signup-funnel-client';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
+import {
+  clearPostKeepEnrichmentNotes,
+  readPostKeepEnrichmentNotes,
+} from '@/lib/onboarding/post-keep-enrichment-notes';
 
 /**
  * Auto-claim the anonymous onboarding conversation when the visitor
@@ -38,11 +42,13 @@ import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
  * `claimTrigger` value while one is already in-flight.
  */
 
-type ClaimStatus =
+export type ClaimStatus =
   | 'idle'
   | 'pending'
   | 'claimed'
   | 'no-op'
+  /** Missing durable public artist identity — stay on /start; name identity next action. */
+  | 'intake-required'
   | 'retry-after-webhook'
   | 'identity-conflict'
   | 'error';
@@ -75,6 +81,29 @@ interface ClaimResponse {
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 1_500;
+/** Bound hung claim fetches so Keep card can settle to error recovery (ONB-42). */
+export const CLAIM_TIMEOUT_MS = 20_000;
+
+/**
+ * Wait until the next paint(s) so Keep handoff can commit idle preparing
+ * before claim flips to `pending` (ONB-50 / JOV-14952).
+ *
+ * Double-rAF is the smallest reversible signal that the browser has had a
+ * chance to paint the idle Keep card; setting `pending` in the same turn as
+ * sign-in made handoff born-pending (ONB-49).
+ */
+export function waitForClaimHandoffPaint(): Promise<void> {
+  return new Promise(resolve => {
+    const raf = globalThis.requestAnimationFrame;
+    if (typeof raf !== 'function') {
+      queueMicrotask(resolve);
+      return;
+    }
+    raf.call(globalThis, () => {
+      raf.call(globalThis, () => resolve());
+    });
+  });
+}
 
 export function useOnboardingClaim(
   claimTrigger = 0,
@@ -108,6 +137,13 @@ export function useOnboardingClaim(
     };
 
     const attemptClaim = async (attempt: number): Promise<void> => {
+      // ONB-50: first attempt stays `idle` until Keep handoff can paint
+      // preparing. Retries already left idle (retry-after-webhook / later
+      // trigger) and must not re-open an idle window.
+      if (attempt === 1) {
+        await waitForClaimHandoffPaint();
+        if (cancelled) return;
+      }
       // Keep an unresolved ownership conflict visible while a later turn is
       // checked; an in-flight retry is not evidence the conflict cleared.
       setStatus(current =>
@@ -116,10 +152,14 @@ export function useOnboardingClaim(
       const startedAt = Date.now();
       let response: Response;
       try {
+        const enrichment = readPostKeepEnrichmentNotes();
         response = await fetch('/api/onboarding/claim', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: '{}',
+          body: JSON.stringify(enrichment ? { enrichment } : {}),
+          // ONB-42: hung claim must not leave forever-receipt / Linking with
+          // no recovery. Abort settles to existing error Keep-card copy.
+          signal: AbortSignal.timeout(CLAIM_TIMEOUT_MS),
         });
       } catch {
         if (!cancelled) {
@@ -216,6 +256,7 @@ export function useOnboardingClaim(
             outcome: body.waitlist.outcome,
             duration_ms: Date.now() - startedAt,
           });
+          clearPostKeepEnrichmentNotes();
           router.replace(APP_ROUTES.WAITLIST);
           return;
         }
@@ -236,12 +277,14 @@ export function useOnboardingClaim(
       if (body.waitlistIntakeRequired) {
         // Missing durable artist/social identity. Stay in this /start
         // conversation and retry after the next natural-language turn.
+        // ONB-40: distinct from generic `no-op` so the Keep card can name
+        // artist/Spotify recovery instead of a vague "Reply below…".
         track(ONBOARDING_FUNNEL_EVENTS.WAITLIST_INTAKE_REQUIRED, {
           surface: 'start_chat',
           duration_ms: Date.now() - startedAt,
         });
         markTriggerCompleted();
-        setStatus('no-op');
+        setStatus('intake-required');
         return;
       }
 
@@ -250,12 +293,14 @@ export function useOnboardingClaim(
         // the interview finished. Only a durable waitlist receipt or a
         // server-verified readyForCheckout may navigate off /start; anything
         // less stays in the conversation and retries after the next turn.
+        // ONB-38: label that stall `no-op` so the Keep card stops promising a
+        // receipt/link while nothing is in flight.
         if (body.waitlist?.entryId || body.readyForCheckout) {
           completeClaim();
           return;
         }
         markTriggerCompleted();
-        setStatus('claimed');
+        setStatus('no-op');
         return;
       }
 

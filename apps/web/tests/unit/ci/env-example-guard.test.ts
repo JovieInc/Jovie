@@ -9,6 +9,7 @@ const workflow = readFileSync(
   resolve(repoRoot, '.github/workflows/ci.yml'),
   'utf8'
 );
+const guardScript = '.github/scripts/ci/verify-env-example.sh';
 const envExample = readFileSync(resolve(repoRoot, '.env.example'), 'utf8');
 
 /**
@@ -24,14 +25,16 @@ function guardPatterns(): RegExp[] {
     nextJob === -1
       ? workflow.slice(jobStart)
       : workflow.slice(jobStart, jobStart + 1 + nextJob);
-  const patterns = [...job.matchAll(/grep -nE '([^']+)' \.env\.example/g)].map(
-    match => new RegExp(match[1], 'm')
-  );
+  expect(job).toContain(guardScript);
+  const program = readFileSync(resolve(repoRoot, guardScript), 'utf8');
+  const patterns = [
+    ...program.matchAll(/grep -nE '([^']+)' \.env\.example/g),
+  ].map(match => new RegExp(match[1], 'm'));
   return patterns;
 }
 
 describe('.env.example guard', () => {
-  it('extracts the secret and Stripe price patterns from the workflow', () => {
+  it('extracts the secret and Stripe price patterns from the workflow step program', () => {
     const patterns = guardPatterns();
     expect(patterns).toHaveLength(2);
     expect(

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { SignupFunnelBeacon } from '@/components/features/tracking/SignupFunnelBeacon';
 import { HomepageSpecSections } from '@/components/homepage/HomepageSpecSections';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
+import { ABOUT_FACTS } from '@/data/aboutCopy';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
@@ -158,6 +159,7 @@ const SOFTWARE_SCHEMA = buildSoftwareSchema(
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: LEGAL_ENTITY_NAME,
   description: COMPANY_IDENTITY.seoDescription,
+  sameAs: [...ABOUT_FACTS.organizationSameAs],
 });
 
 function HomePageShell({ children }: { readonly children: React.ReactNode }) {

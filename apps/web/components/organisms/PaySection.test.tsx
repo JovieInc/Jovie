@@ -38,6 +38,8 @@ describe('PaySection', () => {
     await user.click(screen.getByRole('button', { name: 'Custom Amount' }));
     const input = screen.getByRole('textbox', { name: 'Custom Amount' });
     expect(input).toHaveFocus();
+    // HostDrawnInput marks the field so app chrome can style host-drawn padding.
+    expect(input).toHaveAttribute('data-host-drawn', '');
     await user.clear(input);
     await user.type(input, '25');
     rerender(<PaySection handle='artist' onStripePayment={onStripePayment} />);

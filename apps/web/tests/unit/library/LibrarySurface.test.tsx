@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   fireEvent,
   render,
@@ -17,21 +16,11 @@ import {
   PRESETS,
   workPrimaryActionLabel,
 } from '@/app/app/(shell)/library/LibrarySurface';
-import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import { LIBRARY_VIEW_MODE_STORAGE_KEY } from '@/app/app/(shell)/library/library-grid-preferences';
 import { LIBRARY_SAVED_VIEW_STORAGE_KEY } from '@/app/app/(shell)/library/library-saved-views';
 import { buildLibraryTakeAssets } from '@/app/app/(shell)/library/library-take-assets';
-import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import { APP_ROUTES } from '@/constants/routes';
-import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
-import {
-  RightPanelProvider,
-  useRightPanel,
-} from '@/contexts/RightPanelContext';
-import {
-  ShellSidebarOverrideProvider,
-  useShellSidebarOverride,
-} from '@/contexts/ShellSidebarOverrideContext';
+import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import {
   consumePendingChatDraft,
   consumePendingChatPrompt,
@@ -46,6 +35,12 @@ import {
 } from '@/lib/queries/cache-isolation';
 import { expectDesktop28Control } from './library-control-assertions';
 import { buildAsset } from './library-surface-fixtures';
+import {
+  RightPanelOutlet,
+  renderLibrary,
+  renderLibraryWithHeader,
+  renderLibraryWithSidebarProbe,
+} from './library-surface-render';
 
 Element.prototype.scrollIntoView = vi.fn();
 
@@ -183,70 +178,6 @@ vi.mock('next/image', () => ({
     return <img alt='' {...imgProps} />;
   },
 }));
-
-function RightPanelOutlet() {
-  return useRightPanel();
-}
-
-function renderLibraryWithHeader(assets: readonly LibraryReleaseAsset[]) {
-  return render(
-    <TooltipProvider>
-      <RightPanelProvider>
-        <HeaderActionsProvider>
-          <HeaderSearchSurfaceFromContext />
-          <LibrarySurface assets={assets} />
-          <RightPanelOutlet />
-        </HeaderActionsProvider>
-      </RightPanelProvider>
-    </TooltipProvider>
-  );
-}
-
-function renderLibrary(
-  assets: readonly LibraryReleaseAsset[],
-  props: Partial<ComponentProps<typeof LibrarySurface>> = {}
-) {
-  return render(
-    <QueryClientProvider client={new QueryClient()}>
-      <TooltipProvider>
-        <RightPanelProvider>
-          <LibrarySurface assets={assets} {...props} />
-          <RightPanelOutlet />
-        </RightPanelProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
-  );
-}
-
-function SidebarOverrideProbe() {
-  const override = useShellSidebarOverride();
-
-  return (
-    <output
-      aria-label='Sidebar override contract'
-      data-testid='library-sidebar-override'
-      data-back-href={override?.backHref}
-      data-back-label={override?.backLabel}
-      data-key={override?.key}
-    >
-      {override?.content ? 'registered' : 'missing'}
-    </output>
-  );
-}
-
-function renderLibraryWithSidebarProbe(assets: readonly LibraryReleaseAsset[]) {
-  return render(
-    <TooltipProvider>
-      <RightPanelProvider>
-        <ShellSidebarOverrideProvider>
-          <LibrarySurface assets={assets} />
-          <SidebarOverrideProbe />
-          <RightPanelOutlet />
-        </ShellSidebarOverrideProvider>
-      </RightPanelProvider>
-    </TooltipProvider>
-  );
-}
 
 function clickGridView() {
   fireEvent.click(screen.getByRole('radio', { name: 'Grid View' }));
@@ -1009,7 +940,7 @@ describe('LibrarySurface', () => {
       }).length
     ).toBeGreaterThan(0);
     fireEvent.click(drawer.getByRole('tab', { name: 'Overview' }));
-    expect(drawer.getByText('Apr 28')).toHaveAttribute('title', 'Apr 28, 2026');
+    expect(drawer.getByText('Apr 28, 2026')).toBeVisible();
     expect(drawer.queryByText('68/100')).not.toBeInTheDocument();
     expect(drawer.getByText('Progressive House')).toBeDefined();
 
@@ -1059,7 +990,7 @@ describe('LibrarySurface', () => {
       'aria-selected',
       'true'
     );
-    expect(drawer.getByText('Related work')).toBeVisible();
+    expect(drawer.getByText('Related Work')).toBeVisible();
     expect(drawer.getByRole('combobox')).toBeVisible();
     expect(drawer.getByRole('button', { name: 'Tag' })).toBeVisible();
     expect(drawer.getByRole('button', { name: 'Tag' })).toBeDisabled();
@@ -1403,7 +1334,7 @@ describe('LibrarySurface', () => {
     const watch = drawer.getByRole('link', { name: 'Watch Take' });
     expect(watch).toHaveAttribute('href', mediaUrl);
     expect(drawer.queryByTestId('work-action-share-privately')).toBeNull();
-    expect(drawer.queryByText('Review Status')).toBeNull();
+    expect(drawer.queryByText('Approval')).toBeNull();
     fireEvent.click(drawer.getByRole('tab', { name: 'Files' }));
     expect(drawer.getByText('No files for this take.')).toBeInTheDocument();
     expect(drawer.queryByRole('button', { name: /Attach File/u })).toBeNull();
@@ -1423,6 +1354,21 @@ describe('LibrarySurface', () => {
       screen.getByRole('button', { name: 'More actions' })
     );
     expect(within(entityHeader).getByText('Take Me Over')).toBeInTheDocument();
+    expect(
+      within(entityHeader).getByText('Single · 1 track · 3:32')
+    ).toBeVisible();
+    expect(tabs.queryByText('Tracks', { exact: true })).not.toBeInTheDocument();
+    expect(
+      tabs.queryByText('Duration', { exact: true })
+    ).not.toBeInTheDocument();
+    expect(tabs.getByText('Apr 28, 2026')).toBeVisible();
+    expect(tabs.getByText('123456789012')).toBeVisible();
+    expect(
+      tabs.queryByTestId('work-action-share-page')
+    ).not.toBeInTheDocument();
+    expect(
+      tabs.queryByTestId('work-action-preview-page')
+    ).not.toBeInTheDocument();
     const workspace = drawer.querySelector('[data-right-rail-workspace]');
     expect(workspace).toHaveAttribute('data-surface-variant', 'flat');
     expect(tabs.getByRole('tab', { name: 'Overview' })).toBeInTheDocument();
@@ -1438,7 +1384,7 @@ describe('LibrarySurface', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('states what the selected work is and what is public without conflating visibility', () => {
+  it('keeps private link access distinct from release status and profile visibility', () => {
     renderLibrary([
       buildAsset({
         profileVisibility: 'hidden',
@@ -1469,14 +1415,21 @@ describe('LibrarySurface', () => {
       drawer.getByTestId('library-status-glyph-release-1')
     ).toHaveTextContent(/^Released$/);
     expect(presentation.queryByText('Released')).not.toBeInTheDocument();
-    expect(presentation.getByText('Not public')).toBeInTheDocument();
+    expect(presentation.getByText('Link Access')).toBeInTheDocument();
+    expect(presentation.getByText('Private')).toBeInTheDocument();
+    expect(drawer.queryByText('Not public')).not.toBeInTheDocument();
+    expect(
+      drawer.queryByText('Public Page', { exact: true })
+    ).not.toBeInTheDocument();
     expect(presentation.getByText('Hidden from profile')).toBeInTheDocument();
     expect(presentation.getByText('Listen')).toBeInTheDocument();
     // Destinations render once, as their own section, not also as a row.
     expect(presentation.queryByText('Destinations')).not.toBeInTheDocument();
     expect(drawer.getAllByText('Destinations')).toHaveLength(1);
     expect(drawer.getByText('Spotify')).toBeInTheDocument();
-    expect(about.getByText('Single')).toBeInTheDocument();
+    expect(
+      about.queryByText('Single', { exact: true })
+    ).not.toBeInTheDocument();
     expect(about.getByText('Discography')).toBeInTheDocument();
     expect(about.queryByText('68/100')).not.toBeInTheDocument();
   });
@@ -1614,20 +1567,45 @@ describe('LibrarySurface', () => {
     );
   });
 
-  it('opens private file sharing in place from Share Privately (one share concept)', () => {
+  it('keeps one share link across tabs and opens private file sharing from its menu', async () => {
+    const user = userEvent.setup();
     renderLibrary([
       buildAsset({
         id: 'release-a',
         title: 'Release A',
         profileVisibility: 'hidden',
+        share: {
+          assetId: 'release-a',
+          visibility: 'private',
+          shareSlug: 'release-a',
+          accessToken: 'private-a',
+          shareUrl: 'https://jov.ie/p/private-a',
+          tokenRevokedAt: null,
+        },
       }),
     ]);
 
     fireEvent.click(screen.getByTestId('library-release-row-release-a'));
     const drawer = within(screen.getByTestId('library-asset-drawer'));
     expect(drawer.queryByTestId('work-private-share')).toBeNull();
+    expect(
+      drawer.queryByRole('button', { name: 'Share Privately' })
+    ).toBeNull();
+    expect(drawer.getAllByTestId('library-asset-share-release-a')).toHaveLength(
+      1
+    );
 
-    fireEvent.click(drawer.getByRole('button', { name: 'Share Privately' }));
+    await user.click(drawer.getByRole('tab', { name: 'Files' }));
+    drawer.getByRole('tabpanel').scrollTop = 500;
+    expect(
+      drawer.getByTestId('library-asset-share-url-release-a')
+    ).toHaveTextContent('jov.ie/p/private-a');
+    await user.click(
+      drawer.getByRole('button', { name: 'Share link actions for Release A' })
+    );
+    await user.click(
+      screen.getByRole('menuitem', { name: 'Share Files Privately' })
+    );
 
     expect(drawer.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
       'aria-selected',
@@ -1635,6 +1613,9 @@ describe('LibrarySurface', () => {
     );
     expect(drawer.getByTestId('work-private-share')).toHaveTextContent(
       'Share files privately'
+    );
+    expect(vi.mocked(Element.prototype.scrollIntoView).mock.contexts).toContain(
+      drawer.getByTestId('work-private-share')
     );
     fireEvent.click(drawer.getByTestId('library-share-create-cancel'));
     expect(drawer.queryByTestId('work-private-share')).toBeNull();
@@ -2136,14 +2117,14 @@ describe('LibrarySurface', () => {
     expect(next).toHaveFocus();
   });
 
-  it('gives two-line list rows the two-line row budget so the artist line is not clipped', () => {
+  it('keeps list rows on the canonical dense 32px budget', () => {
     renderLibrary([buildAsset()]);
     fireEvent.click(screen.getByRole('radio', { name: 'List View' }));
 
     const table = screen
       .getByTestId('library-release-row-release-1')
       .closest('table');
-    expect(table?.style.getPropertyValue('--table-row-height')).toBe('56px');
+    expect(table?.style.getPropertyValue('--table-row-height')).toBe('32px');
   });
 
   it('gives each tile one meta line: type then year, or type then price', () => {

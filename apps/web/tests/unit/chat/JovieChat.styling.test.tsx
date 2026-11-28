@@ -2,21 +2,15 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render } from '@testing-library/react';
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CHAT_COMPOSER_DOCK_CLASSNAME } from '@/components/jovie/chat-layout';
 import { JovieChat } from '@/components/jovie/JovieChat';
+import type { ChatError } from '@/components/jovie/types';
 import { CHAT_TRANSCRIPT_ROW_ESTIMATE_PX } from '@/lib/chat/transcript-window';
 import { getDesktopWorkState } from '@/lib/desktop/session-work-state';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 import type { InsightResponse } from '@/types/insights';
+import { setupChatViewportMocks } from './chat-viewport-test-mocks';
 import { createMockComposerDraft } from './mock-composer-draft';
 
 const virtualizerSpy = vi.hoisted(() => ({
@@ -101,7 +95,8 @@ const mockChatState = vi.hoisted(() => ({
   isLoading: true,
   isSubmitting: false,
   status: 'streaming' as 'ready' | 'streaming',
-  chatError: null as null | { type: string; message: string },
+  chatError: null as ChatError | null,
+  handleRetry: vi.fn().mockResolvedValue(true),
   collapsedSummerFailureCount: 0,
   showCollapsedSummerFailures: vi.fn(),
   messages: [{ id: 'm1', role: 'user', parts: [{ type: 'text', text: 'Hi' }] }],
@@ -161,7 +156,8 @@ vi.mock('@/components/jovie/hooks', async importOriginal => {
       status: mockChatState.status,
       inputRef: { current: null },
       handleSubmit: vi.fn(),
-      handleRetry: vi.fn(),
+      handleRetry: mockChatState.handleRetry,
+      conversationResetKey: 0,
       handleSuggestedPrompt: vi.fn(),
       submitMessage: vi.fn(),
       setChatError: vi.fn(),
@@ -212,7 +208,6 @@ vi.mock('@/components/jovie/components', async importOriginal => ({
     <div data-testid='chat-conversation-composer-skeleton' />
   ),
   ChatMessageSkeleton: () => <div data-testid='chat-message-skeleton' />,
-  ErrorDisplay: () => <div data-testid='chat-error' />,
   ScrollToBottom: () => null,
   SuggestedProfilesCarousel: () => null,
   SuggestedPrompts: () => null,
@@ -222,27 +217,7 @@ vi.mock('@/components/jovie/components/ChatUsageAlert', () => ({
   ChatUsageAlert: () => <div data-testid='chat-usage' />,
 }));
 
-const originalScrollIntoView = Object.getOwnPropertyDescriptor(
-  globalThis.HTMLElement.prototype,
-  'scrollIntoView'
-);
-const originalResizeObserver = globalThis.ResizeObserver;
-
-beforeAll(() => {
-  Object.defineProperty(globalThis.HTMLElement.prototype, 'scrollIntoView', {
-    configurable: true,
-    value: vi.fn(),
-  });
-  globalThis.ResizeObserver = vi.fn().mockImplementation(function (
-    this: ResizeObserver,
-    callback: ResizeObserverCallback
-  ) {
-    resizeObserverCallbacks.push(callback);
-    this.observe = vi.fn();
-    this.unobserve = vi.fn();
-    this.disconnect = vi.fn();
-  }) as unknown as typeof ResizeObserver;
-});
+setupChatViewportMocks(resizeObserverCallbacks);
 
 afterEach(() => {
   vi.useRealTimers();
@@ -253,6 +228,8 @@ afterEach(() => {
   virtualizerSpy.options = null;
   virtualizerSpy.measure.mockClear();
   virtualizerSpy.scrollToIndex.mockClear();
+  mockChatState.chatError = null;
+  mockChatState.handleRetry.mockClear();
   mockChatState.isLoadingConversation = false;
   mockChatState.hasMessages = true;
   mockChatState.isLoading = true;
@@ -265,24 +242,6 @@ afterEach(() => {
   ];
   mockComposerDraft.set('');
   mockInsightsSummary.data = undefined;
-});
-
-afterAll(() => {
-  if (originalScrollIntoView) {
-    Object.defineProperty(
-      globalThis.HTMLElement.prototype,
-      'scrollIntoView',
-      originalScrollIntoView
-    );
-  } else {
-    delete (globalThis.HTMLElement.prototype as { scrollIntoView?: unknown })
-      .scrollIntoView;
-  }
-  if (originalResizeObserver) {
-    globalThis.ResizeObserver = originalResizeObserver;
-  } else {
-    delete (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
-  }
 });
 
 describe('JovieChat styling regressions', () => {
@@ -366,11 +325,35 @@ describe('JovieChat styling regressions', () => {
     };
     try {
       const view = renderWithQueryClient(<JovieChat profileId='profile-1' />);
-      expect(view.queryByTestId('chat-error')).toBeNull();
+      expect(view.queryByRole('alert')).toBeNull();
       expect(view.getAllByTestId('chat-usage').length).toBeGreaterThan(0);
     } finally {
       mockChatState.chatError = null;
     }
+  });
+
+  it('keeps attachment-only retry actionable beside the transcript', async () => {
+    mockChatState.isLoading = false;
+    mockChatState.status = 'ready';
+    mockChatState.chatError = {
+      type: 'network',
+      message: 'The upload message could not finish.',
+      failedFiles: [
+        {
+          type: 'file',
+          mediaType: 'image/png',
+          url: 'https://blob.example.com/draft.png',
+        },
+      ],
+    };
+    const view = renderWithQueryClient(<JovieChat profileId='profile-1' />);
+    const retry = view.getByRole('button', { name: 'Retry Message' });
+    expect(retry).toBeEnabled();
+    expect(view.getByTestId('chat-input')).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(retry);
+    });
+    expect(mockChatState.handleRetry).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the composer dock padded above mobile shell navigation', () => {

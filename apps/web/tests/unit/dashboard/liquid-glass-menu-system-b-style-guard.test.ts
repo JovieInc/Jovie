@@ -23,8 +23,8 @@ describe('dashboard LiquidGlassMenu System B guard', () => {
     expect(offenders, `${sourcePath} leaked ${offenders.join(', ')}`).toEqual(
       []
     );
-    expect(source).toContain('transition-[background-color,color]');
-    expect(source).toContain('transition-colors');
+    expect(source).toContain('press');
+    expect(source).not.toMatch(/\btransition-(?:colors|\[)/);
     expect(source).toContain('active:bg-surface-2');
     expect(source).toContain('active:text-primary-token');
     expect(source).toContain('min-w-11');

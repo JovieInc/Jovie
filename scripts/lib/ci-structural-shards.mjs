@@ -1,12 +1,14 @@
 /**
- * ci-fast (structural lanes) runs as two matrix legs on separate runners: leg
- * ab runs shards a+b, leg cd runs c+d, and each combines its pair into
- * jovie-lanes-<group>.coverage for the lanes-coverage report job, which merges
- * both and enforces the unchanged per-module floors on the full suite.
+ * ci-fast (structural lanes) runs as four matrix legs on separate runners
+ * (Wave 2): each leg runs one pytest shard a|b|c|d into
+ * jovie-lanes-<group>.coverage; the lanes-coverage report job merges all four
+ * and enforces the unchanged per-module floors on the full suite.
  */
 export const LANES_COVERAGE_GROUP_SHARDS = Object.freeze({
-  ab: Object.freeze(['a', 'b']),
-  cd: Object.freeze(['c', 'd']),
+  a: Object.freeze(['a']),
+  b: Object.freeze(['b']),
+  c: Object.freeze(['c']),
+  d: Object.freeze(['d']),
 });
 export const lanesCoverageGroupCommands = (allShards, run, wrap) =>
   Object.freeze(
@@ -231,7 +233,15 @@ const lanesCoverageShard = ({ id, files, keyword }) =>
 export const lanesCoverageRun = (shards, combinedName) => {
   const background = shards.slice(0, -1);
   const last = shards[shards.length - 1];
-  return `{ ${LANES_RETRY_FUNCTION}${background.map(shard => `${lanesCoverageShard(shard)} & lanes_${shard.id}=$!;`).join(' ')} ${lanesCoverageShard(last)}; lanes_status=$?; ${background.map(shard => `wait "$lanes_${shard.id}"; lanes_shard=$?; [ "$lanes_status" -ne 0 ] || lanes_status=$lanes_shard;`).join(' ')} (exit "$lanes_status"); } && COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/${combinedName}.coverage" python3 -m coverage combine ${shards.map(shard => `"\${RUNNER_TEMP:-/tmp}/jovie-lanes-${shard.id}.coverage"`).join(' ')}`;
+  const runShards = `{ ${LANES_RETRY_FUNCTION}${background.map(shard => `${lanesCoverageShard(shard)} & lanes_${shard.id}=$!;`).join(' ')} ${lanesCoverageShard(last)}; lanes_status=$?; ${background.map(shard => `wait "$lanes_${shard.id}"; lanes_shard=$?; [ "$lanes_status" -ne 0 ] || lanes_status=$lanes_shard;`).join(' ')} (exit "$lanes_status"); }`;
+  // Wave 2 single-shard groups reuse the shard id as the group key
+  // (`a`→`jovie-lanes-a.coverage`). Combining that path onto itself makes
+  // coverage.py exit 1 with "No usable data files" after a green pytest —
+  // the shard file is already the group artifact, so skip combine.
+  if (shards.length === 1 && `jovie-lanes-${shards[0].id}` === combinedName) {
+    return runShards;
+  }
+  return `${runShards} && COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/${combinedName}.coverage" python3 -m coverage combine ${shards.map(shard => `"\${RUNNER_TEMP:-/tmp}/jovie-lanes-${shard.id}.coverage"`).join(' ')}`;
 };
 
 /** Files of the lanes coverage suite (one coverage map, sharded below). */

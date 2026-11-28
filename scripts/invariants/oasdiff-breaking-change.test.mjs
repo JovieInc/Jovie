@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
@@ -10,6 +10,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
@@ -403,13 +404,6 @@ function specRepository(t) {
     join(root, 'apps/web/node_modules'),
     'dir'
   );
-  // pnpm's .bin/tsx shim resolves tsx through <root>/node_modules/.pnpm.
-  if (existsSync(join(REPO_ROOT, 'node_modules')))
-    symlinkSync(
-      join(REPO_ROOT, 'node_modules'),
-      join(root, 'node_modules'),
-      'dir'
-    );
   writeFileSync(join(root, '.gitignore'), 'node_modules\n');
   writeFileSync(join(root, 'package.json'), '{"type":"module"}\n');
   writeFileSync(
@@ -479,10 +473,20 @@ for (const mode of ['dirty', 'merged']) {
   });
 }
 
-test('the renderer produces stable, schema-bearing JSON from the real tree', {
-  skip: !existsSync(join(REPO_ROOT, 'apps/web/node_modules/.bin/tsx')),
-}, () => {
-  const first = renderSpecAt(REPO_ROOT, REPO_ROOT);
+test('the renderer produces stable, schema-bearing JSON from the real tree', () => {
+  /** @type {Array<[string, string[], import('node:child_process').SpawnSyncOptionsWithStringEncoding]>} */
+  const calls = [];
+  const first = renderSpecAt(REPO_ROOT, REPO_ROOT, (command, args, options) => {
+    calls.push([command, args, options]);
+    return spawnSync(command, args, options);
+  });
+  assert.equal(calls[0]?.[0], process.execPath);
+  assert.equal(calls[0]?.[1][0], '--import');
+  assert.equal(
+    fileURLToPath(calls[0]?.[1][1]),
+    createRequire(join(REPO_ROOT, 'apps/web/package.json')).resolve('tsx')
+  );
+  assert.equal(calls[0]?.[2].cwd, join(REPO_ROOT, 'apps/web'));
   const second = renderSpecAt(REPO_ROOT, REPO_ROOT);
   assert.equal(first.code, 0, first.error);
   assert.equal(second.code, 0, second.error);

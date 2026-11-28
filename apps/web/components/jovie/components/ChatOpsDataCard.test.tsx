@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { ToolPartsRenderer } from '@/components/jovie/tool-ui';
 import type { SummerOpsCard } from '@/lib/ovie/ops-card';
 import { ChatOpsDataCard } from './ChatOpsDataCard';
 
@@ -67,5 +68,53 @@ describe('ChatOpsDataCard kind label casing', () => {
     render(<ChatOpsDataCard card={{ ...card, kind: 'shipping' }} />);
     const label = screen.getByText('Shipping');
     expect(label.className).not.toContain('uppercase');
+  });
+});
+
+describe('funnel replies in chat', () => {
+  it('renders a streamed tool card with its evidence-backed bottleneck', () => {
+    render(
+      <ToolPartsRenderer
+        variant='chat'
+        parts={[
+          {
+            type: 'dynamic-tool',
+            toolName: 'showFunnel',
+            toolCallId: 'funnel-1',
+            state: 'output-available',
+            input: {},
+            output: {
+              success: true,
+              card: {
+                ...card,
+                kind: 'funnel',
+                title: 'Golden Path',
+                facts: [],
+                series: null,
+                funnel: {
+                  title: 'Golden Path',
+                  bottleneckId: 'profile',
+                  stages: [
+                    {
+                      id: 'profile',
+                      label: 'Public profile',
+                      status: 'failed',
+                    },
+                    {
+                      id: 'signup',
+                      label: 'Signup and sign-in',
+                      status: 'verified',
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText('Failed · Bottleneck')).toBeVisible();
+    expect(screen.getByText('Verified')).toBeVisible();
   });
 });

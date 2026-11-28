@@ -90,8 +90,19 @@ describe('ChatProposeNextStepCard states', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('keeps enrichment chips subordinate and local-only under auth', async () => {
+  it('keeps enrichment chips subordinate and carries notes under auth', async () => {
     const user = userEvent.setup();
+    const store = new Map<string, string>();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      },
+    });
+
     render(
       <ChatProposeNextStepCard
         payload={payload('instant_access')}
@@ -111,9 +122,28 @@ describe('ChatProposeNextStepCard states', () => {
     await user.click(
       screen.getByTestId('onboarding-enrichment-social-instagram')
     );
+    // ONB-32: panel stays open for optional URL; platform-only already noted.
+    expect(
+      screen.getByTestId('onboarding-enrichment-social-panel')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('onboarding-enrichment-social-url')
+    ).toBeInTheDocument();
     expect(
       screen.getByTestId('onboarding-enrichment-social-chip')
     ).toHaveTextContent('Instagram / TikTok Noted');
+    expect(store.get('jovie:onboarding:enrichment:v1')).toContain('instagram');
+
+    await user.click(
+      screen.getByTestId('onboarding-enrichment-social-url-save')
+    );
+    expect(
+      screen.queryByTestId('onboarding-enrichment-social-panel')
+    ).not.toBeInTheDocument();
+    expect(store.get('jovie:onboarding:enrichment:v1')).toContain('instagram');
+    expect(store.get('jovie:onboarding:enrichment:v1')).not.toContain(
+      'socialUrl'
+    );
 
     await user.click(screen.getByTestId('onboarding-enrichment-audience-chip'));
     await user.click(
@@ -122,9 +152,173 @@ describe('ChatProposeNextStepCard states', () => {
     expect(
       screen.getByTestId('onboarding-enrichment-audience-chip')
     ).toHaveTextContent('Audience Noted');
+    expect(store.get('jovie:onboarding:enrichment:v1')).toContain('5k_to_50k');
 
     // Primary auth surface remains after optional notes.
     expect(screen.getByTestId('signup-surface')).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it('collects an optional enrichment profile URL after platform select (ONB-32)', async () => {
+    const user = userEvent.setup();
+    const store = new Map<string, string>();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      },
+    });
+
+    render(
+      <ChatProposeNextStepCard
+        payload={payload('waitlist')}
+        claimHandle='wattwhite'
+      />
+    );
+
+    await user.click(screen.getByTestId('onboarding-enrichment-social-chip'));
+    await user.click(
+      screen.getByTestId('onboarding-enrichment-social-instagram')
+    );
+
+    const urlInput = screen.getByTestId('onboarding-enrichment-social-url');
+    await user.type(urlInput, 'https://www.instagram.com/wattwhite');
+    // Retention: typed value survives while panel stays open.
+    expect(urlInput).toHaveValue('https://www.instagram.com/wattwhite');
+
+    await user.click(
+      screen.getByTestId('onboarding-enrichment-social-url-save')
+    );
+    expect(
+      screen.queryByTestId('onboarding-enrichment-social-panel')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId('onboarding-enrichment-social-chip')
+    ).toHaveTextContent('Instagram / TikTok Link Noted');
+    const notes = JSON.parse(
+      store.get('jovie:onboarding:enrichment:v1') ?? '{}'
+    ) as { platform?: string; socialUrl?: string };
+    expect(notes.platform).toBe('instagram');
+    expect(notes.socialUrl).toBe('https://www.instagram.com/wattwhite');
+    expect(screen.getByTestId('signup-surface')).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it('rehydrates enrichment chip labels from sessionStorage on remount (ONB-34)', async () => {
+    const user = userEvent.setup();
+    const store = new Map<string, string>();
+    store.set(
+      'jovie:onboarding:enrichment:v1',
+      JSON.stringify({
+        platform: 'instagram',
+        audienceBand: '5k_to_50k',
+        socialUrl: 'https://www.instagram.com/wattwhite',
+        notedAt: new Date().toISOString(),
+      })
+    );
+    vi.stubGlobal('sessionStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      },
+    });
+
+    const { unmount } = render(
+      <ChatProposeNextStepCard
+        payload={payload('waitlist')}
+        claimHandle='wattwhite'
+      />
+    );
+
+    expect(
+      screen.getByTestId('onboarding-enrichment-social-chip')
+    ).toHaveTextContent('Instagram / TikTok Link Noted');
+    expect(
+      screen.getByTestId('onboarding-enrichment-social-chip')
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      screen.getByTestId('onboarding-enrichment-audience-chip')
+    ).toHaveTextContent('Audience Noted');
+    expect(
+      screen.getByTestId('onboarding-enrichment-audience-chip')
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('signup-surface')).toBeInTheDocument();
+
+    unmount();
+    render(
+      <ChatProposeNextStepCard
+        payload={payload('waitlist')}
+        claimHandle='wattwhite'
+      />
+    );
+
+    expect(
+      screen.getByTestId('onboarding-enrichment-social-chip')
+    ).toHaveTextContent('Instagram / TikTok Link Noted');
+    expect(
+      screen.getByTestId('onboarding-enrichment-audience-chip')
+    ).toHaveTextContent('Audience Noted');
+
+    await user.click(screen.getByTestId('onboarding-enrichment-social-chip'));
+    expect(
+      screen.getByTestId('onboarding-enrichment-social-instagram')
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('onboarding-enrichment-social-url')).toHaveValue(
+      'https://www.instagram.com/wattwhite'
+    );
+    expect(screen.getByTestId('signup-surface')).toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+
+  it('rejects a disallowed enrichment URL without writing socialUrl (ONB-32)', async () => {
+    const user = userEvent.setup();
+    const store = new Map<string, string>();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        store.set(k, v);
+      },
+      removeItem: (k: string) => {
+        store.delete(k);
+      },
+    });
+
+    render(
+      <ChatProposeNextStepCard
+        payload={payload('waitlist')}
+        claimHandle='wattwhite'
+      />
+    );
+
+    await user.click(screen.getByTestId('onboarding-enrichment-social-chip'));
+    await user.click(screen.getByTestId('onboarding-enrichment-social-tiktok'));
+    await user.type(
+      screen.getByTestId('onboarding-enrichment-social-url'),
+      'https://evil.example/x'
+    );
+    await user.click(
+      screen.getByTestId('onboarding-enrichment-social-url-save')
+    );
+
+    expect(
+      screen.getByText(/use an instagram or tiktok profile link/i)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('onboarding-enrichment-social-panel')
+    ).toBeInTheDocument();
+    const notes = JSON.parse(
+      store.get('jovie:onboarding:enrichment:v1') ?? '{}'
+    ) as { platform?: string; socialUrl?: string | null };
+    expect(notes.platform).toBe('tiktok');
+    expect(notes.socialUrl == null).toBe(true);
+    expect(screen.getByTestId('signup-surface')).toBeInTheDocument();
+    vi.unstubAllGlobals();
   });
 
   it('keeps the instant-access copy when the auth surface cannot render', async () => {
@@ -140,19 +334,10 @@ describe('ChatProposeNextStepCard states', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('links the conversation for a visitor who is already signed in', async () => {
-    authState.isSignedIn = true;
-    const { container } = render(
-      <ChatProposeNextStepCard payload={payload('instant_access')} />
-    );
-
-    expect(screen.getByText(/already signed in/i)).toBeInTheDocument();
-    expect(screen.queryByTestId('signup-surface')).toBeNull();
-    await expectNoA11yViolations(container);
-  });
-
   it.each([
-    [true, true, /saving your request/i],
+    // ONB-46: without a claim-handoff provider, status stays idle → preparing
+    // copy (not forever-receipt).
+    [true, true, /preparing to save your request/i],
     [false, false, /save your spot/i],
     [false, true, /save your spot/i],
   ])(
@@ -241,5 +426,26 @@ describe('ChatProposeNextStepCard states', () => {
     expect(claimAnchor).toContainElement(
       claim.getByRole('heading', { name: `Claim @${handle}` })
     );
+  });
+
+  it('places enrichment chips above AuthShell in the Keep pin viewport (ONB-30)', () => {
+    const { container } = render(
+      <ChatProposeNextStepCard
+        payload={payload('waitlist')}
+        claimHandle='reservepath'
+      />
+    );
+    const enrichment = screen.getByTestId('onboarding-post-keep-enrichment');
+    const signup = screen.getByTestId('signup-surface');
+    const anchor = container.querySelector('[data-onboarding-auth-anchor]');
+    expect(anchor).toContainElement(enrichment);
+    expect(anchor).toContainElement(signup);
+    // DOM order: chips before signup so the default pin viewport shows them.
+    expect(
+      Boolean(
+        enrichment.compareDocumentPosition(signup) &
+          Node.DOCUMENT_POSITION_FOLLOWING
+      )
+    ).toBe(true);
   });
 });
