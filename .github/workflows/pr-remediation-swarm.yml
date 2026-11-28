@@ -83,6 +83,8 @@ jobs:
           SWARM_API_KEY: ${{ secrets.SWARM_WORKERS_AI_TOKEN }}
           SWARM_BASE_URL: ${{ vars.SWARM_BASE_URL }}
           SWARM_CREDIT_PROBE: ${{ vars.SWARM_CREDIT_PROBE }}
+          # Model kill switch: only the exact value "on" opens model slots. Unset = off (fails closed).
+          SWARM_MODEL_MODE: ${{ vars.SWARM_MODEL_MODE }}
         run: python3 scripts/swarm/pr_remediation_swarm.py select --pr "$PR" --limit "$LIMIT" --daily-cap-usd "$DAILY_CAP" --attempt-cap-usd "$ATTEMPT_CAP" --ledger-issue "$LEDGER_ISSUE" --modes "${MODES:-all}"
 
   remediate:
@@ -130,6 +132,7 @@ jobs:
         id: prep
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
+          SWARM_MODEL_MODE: ${{ vars.SWARM_MODEL_MODE }}
         run: python3 scripts/swarm/pr_remediation_swarm.py prepare --pr "${{ matrix.pr }}" --mode "${{ matrix.mode || 'red' }}" --agent "${{ matrix.agent }}" --plan "$PLAN" --log "$LOG"
       - name: Checkout PR head (no persisted credentials)
         if: steps.prep.outputs.action != 'none'
@@ -166,15 +169,16 @@ jobs:
         if: steps.prep.outputs.action == 'regen'
         run: python3 scripts/swarm/pr_remediation_swarm.py regen --plan "$PLAN" --cwd pr
       - name: Stage provider key outside the checkout (no repo code runs here)
-        if: steps.prep.outputs.action == 'agent'
+        if: steps.prep.outputs.action == 'agent' && vars.SWARM_MODEL_MODE == 'on'
         env:
           SWARM_API_KEY: ${{ secrets.SWARM_WORKERS_AI_TOKEN }}
         run: |
           umask 077
           printf '%s' "$SWARM_API_KEY" > "$RUNNER_TEMP/swarm-key"
       - name: Cheap agent (no shell, no key or GitHub token in env, hard cost stop)
-        if: steps.prep.outputs.action == 'agent'
+        if: steps.prep.outputs.action == 'agent' && vars.SWARM_MODEL_MODE == 'on'
         env:
+          SWARM_MODEL_MODE: ${{ vars.SWARM_MODEL_MODE }}
           SWARM_BASE_URL: ${{ vars.SWARM_BASE_URL }}
           SWARM_MODELS: ${{ vars.SWARM_MODELS || '@cf/zai-org/glm-5.3-flash' }}
           SWARM_ATTEMPT_USD_CAP: ${{ vars.SWARM_ATTEMPT_USD_CAP || '0.10' }}
