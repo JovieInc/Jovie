@@ -309,6 +309,7 @@ no literal `fetch` call for their paths.
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
 | `/api/webhooks/linear` | POST | Linear sig | Linear issue sync |
+| `/api/webhooks/registry-create` | POST | GitHub SHA256 or Vercel SHA1 HMAC | Relay repo/project creation and renames to `repository_dispatch` `resource-created` on JovieInc/ci; `{kind, name}` only |
 | `/api/webhooks/resend` | POST/GET | Resend sig | Email delivery events |
 | `/api/webhooks/sentry` | POST/GET | Sentry sig | Error alert events |
 | `/api/webhooks/stripe-connect` | POST/GET | Stripe sig | Connect account events |

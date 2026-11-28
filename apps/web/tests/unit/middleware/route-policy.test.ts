@@ -19,6 +19,15 @@ import {
 } from '@/lib/routing/proxy-routing';
 
 describe('route-policy (proxy-routing)', () => {
+  it.each(['/api/webhooks/linear', '/api/webhooks/registry-create'])(
+    'leaves signed webhook %s reachable without session auth or profile rewrites',
+    pathname => {
+      expect(categorizePath(pathname).isProtectedPath).toBe(false);
+      expect(categorizePath(pathname).publicProfileCandidate).toBeNull();
+      expect(isProxyRewriteExempt(pathname)).toBe(true);
+    }
+  );
+
   describe('public profile candidate classification (bugfix)', () => {
     it('returns null for dedicated public routes (never enter DB block lookup)', () => {
       expect(getPublicProfileCandidate('/start')).toBeNull();

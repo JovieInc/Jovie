@@ -2,6 +2,12 @@
   "schema": "jovie-external-api-allowlist/v1",
   "entries": [
     {
+      "path": "apps/web/app/api/webhooks/registry-create/route.ts",
+      "rule": "provider-host",
+      "max": 1,
+      "reason": "JOV-13083 requires the existing webhook serverFetch pattern: one 4.5s dispatch POST to fixed JovieInc/ci per verified delivery, no transport retry, 24-hour durable replay lock and separate least-privilege REGISTRY_DISPATCH_TOKEN."
+    },
+    {
       "path": ".github/workflows/merge-queue-green-enroll.yml",
       "rule": "provider-host",
       "max": 2,
