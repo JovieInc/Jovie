@@ -172,3 +172,29 @@ describe('SidebarDock cards on the shared inset panel', () => {
     }
   });
 });
+
+it('selects the Pen launch card and remembers its dismissal', async () => {
+  const { container, rerender } = render(
+    <SidebarDock
+      userId='one'
+      penRail
+      release={{
+        ...release,
+        summary: 'A short companion to the release title',
+      }}
+    />
+  );
+  const link = await screen.findByRole('link', {
+    name: /Read update: Your latest releases/,
+  });
+  expect(link).toHaveTextContent('Read update');
+  expect(
+    screen.getByText('A short companion to the release title')
+  ).toBeVisible();
+  const dock = container.querySelector('[data-sidebar-dock]');
+  fireEvent.click(screen.getByRole('button', { name: "Dismiss What's New" }));
+  expect(link).not.toBeInTheDocument();
+  rerender(<SidebarDock userId='one' penRail release={release} />);
+  expect(container.querySelector('[data-sidebar-dock]')).toBe(dock);
+  expect(screen.queryByRole('link', { name: /Read update/ })).toBeNull();
+});

@@ -82,6 +82,14 @@ export const LoadingChecking: Story = {
   args: { state: { kind: 'checking' } },
 };
 
+/** Download progress stays available when the updater omits the version. */
+export const PartialDownloadMetadata: Story = {
+  args: {
+    editorial: true,
+    state: { kind: 'downloading', version: null, percent: 42 },
+  },
+};
+
 /** Empty: nothing to report. The control renders nothing; the host keeps the slot. */
 export const EmptyHidden: Story = {
   args: { state: DESKTOP_UPDATE_CONTROL_HIDDEN },

@@ -103,3 +103,35 @@ it('shows nothing in a browser tab', async () => {
   await waitFor(() => expect(props.fetchImpl).toHaveBeenCalledOnce());
   expect(container.querySelector('[data-dock-card="update"]')).toBeNull();
 });
+
+it('uses the editorial card for restart and keeps the same action through IPC', async () => {
+  const { bridge } = installDesktopUpdateBridge(READY);
+  render(<SidebarDockBridge {...props} penRail />);
+  const restart = await screen.findByRole('button', {
+    name: 'Restart to update',
+  });
+  expect(restart).toHaveTextContent('Restart to update');
+  expect(screen.getByText(READY.version)).toBeVisible();
+  await act(async () => {
+    fireEvent.click(restart);
+  });
+  expect(bridge.install).toHaveBeenCalledOnce();
+  expect(screen.getByRole('button', { name: 'Restart to update' })).toBe(
+    restart
+  );
+  expect(restart).toHaveAttribute('aria-busy', 'true');
+});
+
+it('dismisses the ready card without starting the update', async () => {
+  const { bridge, emit } = installDesktopUpdateBridge(READY);
+  render(<SidebarDockBridge {...props} penRail />);
+  const dismiss = await screen.findByRole('button', { name: 'Dismiss Update' });
+  fireEvent.click(dismiss);
+  expect(
+    screen.queryByRole('button', { name: 'Restart to update' })
+  ).toBeNull();
+  expect(bridge.install).not.toHaveBeenCalled();
+
+  act(() => emit({ state: 'ready', version: '26.11.13' }));
+  expect(await screen.findByText('26.11.13')).toBeVisible();
+});

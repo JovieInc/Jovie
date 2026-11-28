@@ -296,7 +296,7 @@ export function UnifiedSidebar({
     selectedProfile: dockProfile,
   } = useDashboardData();
   const sidebarOverride = useShellSidebarOverride();
-  const { state: sidebarState } = useSidebar();
+  const { state: sidebarState, isMobile } = useSidebar();
   const pathname = usePathname();
   const isDemoRoute = isDemoRoutePath(pathname);
   const isInSettings = section === 'settings';
@@ -404,6 +404,9 @@ export function UnifiedSidebar({
         <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 py-(--space-1)'>
           <SidebarDockBridge
             userId={user?.id ?? ''}
+            penRail={
+              !isMobile && !isOperatorSection && !isDemoRoute && !isRouteSidebar
+            }
             userState={{ hasClaimedHandle: Boolean(dockProfile?.username) }}
             collapsed={isSidebarCollapsed}
             oHref={section === 'ov' ? APP_ROUTES.ADMIN_CHAT : APP_ROUTES.CHAT}

@@ -263,7 +263,7 @@ for full tokens and sizing when changing this area.
 
 | Token | Light | Dark |
 |-------|-------|------|
-| Width | 224px | 224px |
+| Width | 244px | 244px |
 | Background RGB | `247 248 248` | `7 8 10` |
 
 

@@ -11,11 +11,11 @@ function readSource(relativePath: string): string {
 const TOKEN_DECLARATION = /--app-shell-sidebar-width:\s*(\d+(?:\.\d+)?)px/;
 
 describe('JOV-8108 left-sidebar-width-invariant-v1', () => {
-  it('locks --app-shell-sidebar-width at 224px', () => {
+  it('locks --app-shell-sidebar-width at 244px', () => {
     const css = readSource('styles/design-system.css');
     const match = TOKEN_DECLARATION.exec(css);
     expect(match, '--app-shell-sidebar-width declaration').toBeTruthy();
-    expect(Number(match?.[1])).toBe(224);
+    expect(Number(match?.[1])).toBe(244);
   });
 
   it('never exceeds the 260px hard ceiling', () => {

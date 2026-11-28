@@ -242,3 +242,21 @@ describe('describeDesktopUpdateControl', () => {
     }
   });
 });
+
+it('keeps the ready version and restart action in the editorial presentation', () => {
+  const onRestart = vi.fn();
+  render(
+    <DesktopUpdateControl
+      editorial
+      state={STATES.ready}
+      onDownload={vi.fn()}
+      onRestart={onRestart}
+      onRetry={vi.fn()}
+    />
+  );
+  expect(statusLine()).toHaveTextContent(VERSION);
+  const restart = screen.getByRole('button', { name: 'Restart to update' });
+  expect(restart).toHaveTextContent('Restart to update');
+  fireEvent.click(restart);
+  expect(onRestart).toHaveBeenCalledOnce();
+});
