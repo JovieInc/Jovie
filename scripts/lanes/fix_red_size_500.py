@@ -179,7 +179,7 @@ def bind(sh, failed_logs):
 
 
 def bind_self_growth(sh, failed_logs):
-    """Split every grew test under its baseline. A file that cannot split writes nothing."""
+    """Split every grew test. New siblings stay at or under 500 even when the baseline is higher."""
 
     def fix(host, pr, route, worktree, log, receipt):
         del route
@@ -195,7 +195,9 @@ def bind_self_growth(sh, failed_logs):
             target = _safe(root, rel)
             if target is None or not target.is_file():
                 return None
-            result = split_test(rel, target.read_text(encoding="utf-8"), limit=baseline)
+            result = split_test(
+                rel, target.read_text(encoding="utf-8"), limit=min(baseline, LIMIT)
+            )
             if result is None:
                 return None
             planned.append(result)

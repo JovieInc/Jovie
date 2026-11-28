@@ -4,6 +4,7 @@
  * (ctx.storage.sql) and in node:test (node:sqlite) unchanged.
  * Design: gbrain projects/jovie/agent-mesh-hub-architecture-2026-10-31.
  */
+import { sweepDead as sweepDeadMessages } from './mailbox-admin.ts';
 
 export interface SqlCursor {
   toArray(): Record<string, unknown>[];
@@ -24,9 +25,12 @@ export const LIMITS = {
   pageSize: 100,
   leaseMs: 60_000,
   socketsPerKind: 8,
+  dlqFullFraction: 0.9,
   retentionAfterAckMs: 30 * 86_400_000,
   deadAfterActiveMs: 6 * 3_600_000,
+  autoNoticeTtlMs: 6 * 3_600_000,
   deadAfterDormantMs: 72 * 3_600_000,
+  dlqCoalesceMs: 3_600_000,
 } as const;
 
 export const KIND = /^[a-z][a-z0-9-]{1,31}$/;
@@ -181,7 +185,7 @@ const SCHEMA = [
   'CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)',
 ];
 
-function toDelivered(row: Row): Delivered {
+export function toDelivered(row: Row): Delivered {
   return {
     seq: Number(row.seq),
     id: String(row.id),
@@ -218,10 +222,15 @@ export type EnqueueResult =
  * replays instead of duplicating.
  */
 export class MailboxStore {
-  private readonly sql: Sql;
+  protected readonly sql: Sql;
   constructor(sql: Sql) {
     this.sql = sql;
     for (const statement of SCHEMA) sql.exec(statement);
+    try {
+      sql.exec('ALTER TABLE messages ADD COLUMN ack_reason TEXT');
+    } catch {
+      /* column already present */
+    }
   }
 
   getMeta(key: string): string | null {
@@ -409,15 +418,16 @@ export class MailboxStore {
   }
 
   /** Stage 2: the agent handled these. Idempotent; unknown or acked ids are no-ops. */
-  ack(ids: readonly string[], now: number): { acked: number } {
+  ack(ids: readonly string[], now: number, reason: string | null = null) {
     let acked = 0;
     for (const id of ids) {
       const row = this.sql
         .exec(
-          `UPDATE messages SET acked_at = ?, received_at = COALESCE(received_at, ?),
-             first_delivered_at = COALESCE(first_delivered_at, ?)
+          `UPDATE messages SET acked_at = ?, ack_reason = COALESCE(?, ack_reason),
+             received_at = COALESCE(received_at, ?), first_delivered_at = COALESCE(first_delivered_at, ?)
            WHERE id = ? AND acked_at IS NULL RETURNING seq`,
           now,
+          reason,
           now,
           now,
           id
@@ -455,21 +465,9 @@ export class MailboxStore {
     this.sql.exec('UPDATE messages SET dead_at = NULL WHERE seq = ?', seq);
   }
 
-  /**
-   * Flags messages unhandled past `deadAfterMs` as dead, once. Dead is a flag,
-   * not a deletion: the original stays deliverable. Probes, events and DLQ
-   * wrappers never die (no wrapper-of-wrapper loops).
-   */
+  /** Flags direct mail past deadAfterMs. Automated notices expire instead. */
   sweepDead(now: number, deadAfterMs: number): Delivered[] {
-    return this.sql
-      .exec(
-        `UPDATE messages SET dead_at = ? WHERE acked_at IS NULL AND dead_at IS NULL
-           AND kind = 'message' AND accepted_at <= ? RETURNING *`,
-        now,
-        now - deadAfterMs
-      )
-      .toArray()
-      .map(toDelivered);
+    return sweepDeadMessages(this.sql, now, deadAfterMs);
   }
 
   /** Drops bodies of acked messages past retention; keeps id + digest for replay. */

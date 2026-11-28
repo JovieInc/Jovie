@@ -42,6 +42,7 @@ const ALERTING = new Set([
   'hub.suspect',
   'mail.stale',
   'executor.failed',
+  'dlq.suppressed',
 ]);
 const TOUCH_DEBOUNCE_MS = 15_000;
 const numberOrNull = (value: unknown): number | null =>

@@ -229,6 +229,44 @@ class Size500FixerTest(unittest.TestCase):
             self.assertLessEqual(size500.line_count((root / rel).read_text()), 500)
             self.assertFalse(any(args[:2] == ["node", "--check"] and args[-1].endswith(".ts") for args in calls))
 
+    def test_self_growth_caps_siblings_at_500_when_the_baseline_is_higher(self):
+        """A baseline above 500 must not emit an unbaselined sibling over the hard cap."""
+        lines = ["import { expect, it } from 'vitest';"]
+        for index in range(24):
+            lines.append(f"it('case {index}', () => {{")
+            lines.extend(["  expect(1).toBe(1);"] * 28)
+            lines.append("});")
+        lines.append("")
+        text = "\n".join(lines)
+        self.assertGreater(size500.line_count(text), 582)
+        uncapped = size500.split_test("workers/mesh-hub/src/core.test.mjs", text, limit=582)
+        self.assertIsNotNone(uncapped)
+        self.assertTrue(any(
+            size500.line_count(body) > 500 for _path, body in uncapped["files"]
+        ))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            rel = "workers/mesh-hub/src/core.test.mjs"
+            target = root / rel
+            target.parent.mkdir(parents=True)
+            target.write_text(text)
+
+            def sh(args, cwd=None, log=None, timeout=None):
+                stdout = f"{rel}\n" if args[:3] == ["git", "diff", "--cached"] else ""
+                return SimpleNamespace(returncode=0, stdout=stdout)
+
+            log = (
+                f"##[error]size-500: {rel}: grew 582 -> 1018\n"
+                "##[error]Process completed with exit code 1.\n"
+            )
+            fixer = size500.bind_self_growth(sh, {"Company guards": log})
+            result = fixer(object(), pr("Company guards"), {}, root, None, {})
+            self.assertEqual(result.returncode, 0)
+            written = [target, *target.parent.glob("core.size500-*.test.mjs")]
+            self.assertGreater(len(written), 1)
+            for path in written:
+                self.assertLessEqual(size500.line_count(path.read_text()), 500)
+
     def test_a_production_growth_writes_nothing(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
