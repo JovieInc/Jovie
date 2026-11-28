@@ -23,6 +23,12 @@ import { pathToFileURL } from 'node:url';
 import { deprecationCheckGreen } from './deprecation-observation.mjs';
 import { GREEN_MARKER } from './remediation-signal.mjs';
 import {
+  reportQuotaDeferral,
+  reportSweepDeferral,
+  SWEEP_MIN_BATCH_WINDOW_MS,
+  sweepBudgetRemainingMs,
+} from './sweep-wall-clock.mjs';
+import {
   formatValidationReceipt,
   LIFECYCLE_STATES,
 } from './validation-lifecycle.mjs';
@@ -1617,11 +1623,15 @@ async function runSync(options) {
   const eventPull = sweep ? undefined : { number: Number(env.PR_NUMBER) };
   const cursorDir =
     sweep && !receiptIssue ? env.LINEAR_SYNC_CURSOR_DIR : undefined;
+  const fullSweep = sweep && !receiptIssue;
+  const deadlineAt = fullSweep ? String(env.LINEAR_SYNC_DEADLINE_AT ?? '') : '';
   const results = [];
   const failures = [];
   let deferredNote = '';
   let deferredDetail = '';
   let cursorSaved = false;
+  let budgetDeferred = false;
+  let budgetDeferredCount = 0;
   const deferAt = (lookupId, message) => {
     const source = message.startsWith('Linear')
       ? 'Linear'
@@ -1641,6 +1651,28 @@ async function runSync(options) {
     log(deferredNote);
   };
   for (let index = 0; index < lookups.length; ) {
+    const remainingMs = sweepBudgetRemainingMs(deadlineAt);
+    if (
+      fullSweep &&
+      remainingMs !== null &&
+      remainingMs < SWEEP_MIN_BATCH_WINDOW_MS
+    ) {
+      // JOV-7887: stop under the job's own deadline instead of running into
+      // the runner timeout, whose kill also discarded the cursor save. The
+      // cursor keeps the resume point; this is a pause, not a quota event,
+      // so the quota hold and its retry never run for it.
+      writeSweepCursor(cursorDir, lookups[index]);
+      cursorSaved = true;
+      budgetDeferred = true;
+      budgetDeferredCount = lookups.length - index;
+      log(
+        `Lifecycle evaluation paused before the job wall-clock budget at ${lookups[index]}`
+      );
+      log(
+        `${budgetDeferredCount} issue(s) deferred to the next sweep by the job wall-clock budget; resume at ${lookups[index]}`
+      );
+      break;
+    }
     const slice = lookups.slice(index, index + SWEEP_BATCH_SIZE);
     /** @type {Awaited<ReturnType<typeof fetchLifecycleRaws>> | undefined} */
     let raws;
@@ -1739,11 +1771,19 @@ async function runSync(options) {
   }
   const first = results[0];
   return {
-    action: deferredNote ? 'deferred' : (first?.action ?? 'skip'),
+    action: budgetDeferred
+      ? 'budget_deferred'
+      : deferredNote
+        ? 'deferred'
+        : (first?.action ?? 'skip'),
     comment: first?.comment ?? '',
     identifier: first?.identifier ?? ref.identifier,
     results,
-    deferred: deferredNote ? Number(deferredNote.split(' ')[0]) || 0 : 0,
+    deferred: budgetDeferred
+      ? budgetDeferredCount
+      : deferredNote
+        ? Number(deferredNote.split(' ')[0]) || 0
+        : 0,
     ...(deferredDetail.startsWith('Linear') ? { deferralKind: 'linear' } : {}),
   };
 }
@@ -1804,59 +1844,12 @@ export async function recordValidationReceipt(args, options = {}) {
   return body;
 }
 
-/**
- * Make a quota deferral visible: step output for the workflow's hold-and-retry
- * and a summary line. Exit stays 0 (the 403 is not a verdict on any issue).
- * @param {{ softFailed: boolean }} disposition
- * @param {NodeJS.ProcessEnv} [env]
- */
-export function reportQuotaDeferral(disposition, env = process.env) {
-  if (!disposition?.softFailed) return false;
-  try {
-    if (env.GITHUB_OUTPUT)
-      appendFileSync(env.GITHUB_OUTPUT, 'quota_deferred=true\n');
-    if (env.GITHUB_STEP_SUMMARY)
-      appendFileSync(
-        env.GITHUB_STEP_SUMMARY,
-        '- Linear sync DEFERRED: GitHub installation quota 403; no lifecycle evaluation completed.\n'
-      );
-  } catch {
-    // Visibility must never turn a deferral into a crash.
-  }
-  return true;
-}
-
-/**
- * A resolved deferral must set quota_deferred (exit stays 0). Without the
- * flag the hold skipped and the run went green unfinished (41157880216).
- * deferral_kind=linear skips that GitHub hold (43041615689).
- *
- * @param {{ action?: string, deferred?: number, deferralKind?: string } | null | undefined} result
- * @param {NodeJS.ProcessEnv} [env]
- */
-export function reportSweepDeferral(result, env = process.env) {
-  if (!result || result.action !== 'deferred') return false;
-  const detail =
-    result.deferred && result.deferred > 0
-      ? `${result.deferred} issue(s) deferred to the next sweep by the rate limit; the retry resumes from the cursor`
-      : 'the rate limit stopped the sweep before any lifecycle evaluation';
-  try {
-    if (env.GITHUB_OUTPUT) {
-      const kind = result.deferralKind
-        ? `deferral_kind=${result.deferralKind}\n`
-        : '';
-      appendFileSync(env.GITHUB_OUTPUT, `quota_deferred=true\n${kind}`);
-    }
-    if (env.GITHUB_STEP_SUMMARY)
-      appendFileSync(
-        env.GITHUB_STEP_SUMMARY,
-        `- Linear sync DEFERRED: ${detail}.\n`
-      );
-  } catch {
-    // Visibility must never turn a deferral into a crash.
-  }
-  return true;
-}
+export {
+  reportQuotaDeferral,
+  reportSweepDeferral,
+  SWEEP_MIN_BATCH_WINDOW_MS,
+  sweepBudgetRemainingMs,
+};
 
 const isDirectRun =
   process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
