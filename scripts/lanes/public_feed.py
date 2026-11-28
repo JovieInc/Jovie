@@ -158,7 +158,9 @@ def public_status_projection(feed: dict, full_text: str) -> str:
         "bytes": len(full_text.encode("utf-8")),
         "at": identity(feed.get("at"), 64),
         "host": identity(feed.get("host"), 64),
-        "release": identity(feed.get("release"), 128),
+        # 'release' is the install receipt block since JOV-14764; the digest is the identity.
+        "release": identity(feed.get("release"), 128) if isinstance(feed.get("release"), str)
+                   else identity((feed.get("release") or {}).get("bundleDigest"), 128),
         "binding": "declared-feed-identity",
     }
     public = json.loads(full_text)

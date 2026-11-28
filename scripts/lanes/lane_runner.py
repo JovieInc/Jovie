@@ -53,7 +53,7 @@ import autoscale  # noqa: E402
 import capacity_limit  # noqa: E402
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
-from atomic_state import append_json_object, atomic_write_text  # noqa: E402
+from atomic_state import append_json_object, atomic_write_text, note_update_exception, record_release_refusal, release_activated, release_status  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 import fleet_gate_emitter  # noqa: E402
@@ -166,7 +166,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_fix_red_size_split.py",
               "scripts/tests/test_continuity_clock.py",
               "scripts/tests/test_worktree_sweep.py", "scripts/tests/test_service_census.py",
-              "scripts/tests/test_worktree_pool.py",
+              "scripts/tests/test_worktree_pool.py", "scripts/tests/test_worktree_pool_bootstrap.py", "scripts/tests/test_release_receipt.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
               "scripts/tests/test_remediation.py", "scripts/tests/test_revert_first.py", "scripts/tests/test_repair_order.py", "scripts/tests/test_autoscale.py", "scripts/tests/test_pr_wip.py",
@@ -177,7 +177,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
               "scripts/tests/test_pytest_hook_names.py", "scripts/tests/test_fix_red_missing_contract.py"]
 # Dependencies outside scripts/lanes for source admission and HUD PROMOTION (JOV-6836).
-RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-host-git.sh",
+RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-host-git.sh", "scripts/hooks/configure-git-hooks.sh", "scripts/hooks/verify-git-hooks.sh",
                   "scripts/lib/api-quota-report.mjs", "scripts/lib/api-quota-tally.mjs",
                   # Installed self-tests retain immutable Design evidence and stale-size routing fixtures.
                   "scripts/tests/design_gate_git_evidence.py", "scripts/tests/test_size_500_stale.py",
@@ -10092,7 +10092,7 @@ def record_tick_duration(host: Host, seconds: float) -> None:
 
 
 def _dispatch(host: Host, unclean_previous: dict | None) -> int:
-    tick = {"at": now_iso(), "release": read_marker(host), "unhealthy": [], "quotaBlocked": {},
+    tick = {"at": now_iso(), "release": release_status(host.state, read_marker(host)), "unhealthy": [], "quotaBlocked": {},
             "spawned": [], "error": None, "admissionDenied": None,
             "uncleanPreviousRun": unclean_previous}
     if unclean_previous:
@@ -10646,7 +10646,7 @@ def _update_locked(host: Host) -> int:
         code = install_release(host)
         error = None if code == 0 else "release tests failed"
     except Exception as failure:
-        code, error = 1, f"{type(failure).__name__}: {failure}"[:300]
+        code, error = 1, note_update_exception(host.state, failure, f"{type(failure).__name__}: {failure}"[:300])
     skills = host_maintenance(host, refresh_codex_skills)
     # Keep capacity SHARE waste modules aligned with origin/main (gem:waste-loop receipt).
     waste = host_maintenance(host, lambda h: __import__("waste_loop_heal").heal(h, force_run=False))
@@ -10702,15 +10702,15 @@ def release_paths(repo: Path, revision: str) -> list[str]:
 
 
 def ensure_dependency_pool(host: Host) -> bool:
-    """The mesh runtime compiles against a pool slot restored from a recent lock; slots age out after
-    three days and an aged pool made every release refuse 'mesh runtime dependency closure failed'
-    (Gem, 2026-10-26 to 10-29). Refill before building when no ready slot remains. True when a fill ran."""
+    """Return true only when a refill leaves a ready slot for the release proof."""
     try:
-        if not worktree_pool.enabled() or worktree_pool.ready_slots(worktree_pool.pool_dir(host.repo)):
+        if not worktree_pool.enabled() or worktree_pool.ready_slots(pool := worktree_pool.pool_dir(host.repo)):
             return False
         print("lane update: dependency pool has no ready slot; refilling before the release build", file=sys.stderr)
-        worktree_pool.fill(host.repo, warm=False, log=sys.stderr)
-        return True
+        actions = worktree_pool.fill(host.repo, warm=False, log=sys.stderr)
+        if not (ready := bool(worktree_pool.ready_slots(pool))):
+            print(f"lane update: dependency pool refill left no ready slot; actions={', '.join(actions[-3:])[:450]}", file=sys.stderr)
+        return ready
     except (OSError, subprocess.SubprocessError) as error:
         print(f"lane update: dependency pool refill failed: {error}", file=sys.stderr)
         return False
@@ -11459,7 +11459,7 @@ def install_release(host: Host, *, operator=None) -> int:
                                      cwd=host.repo, capture_output=True, check=True)
             lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
             def refuse(why: str) -> int:
-                atomic_write_text(refused_path, json.dumps({"tree": tree, "at": time.time(), "why": why}))
+                record_release_refusal(host.state, staging, tree, why)
                 return 1
             # The staged tree proves itself with its own installer code. On 2026-10-10 the Mac
             # refused every release for a day because the *installed* installer chose a bare
@@ -11514,7 +11514,7 @@ def install_release(host: Host, *, operator=None) -> int:
         link.unlink()
     link.symlink_to(release / "scripts/lanes")
     os.replace(link, current)
-    refused_path.unlink(missing_ok=True)  # the refusal that marker recorded is resolved by this activation
+    release_activated(host.state, bundle, refused_path)  # resolves the refusal this activation answers
     return 0
 
 

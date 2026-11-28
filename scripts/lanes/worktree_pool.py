@@ -38,6 +38,7 @@ from contextlib import contextmanager
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lifecycle  # noqa: E402
+from worktree_pool_bootstrap import install_pool_dependencies  # noqa: E402
 
 CACHE_ROOT = Path(os.environ.get("JOVIE_CACHE_ROOT", Path.home() / ".cache" / "jovie"))
 POOL_SIZE = int(os.environ.get("JOVIE_WORKTREE_POOL_SIZE", "2"))
@@ -345,13 +346,13 @@ def fill(repo: Path, size: int = POOL_SIZE, base: str = "origin/main", warm: boo
             slot = pool / f"slot-{uuid.uuid4().hex[:8]}"
             try:
                 run(["git", "worktree", "add", "-q", "--detach", str(slot), base], cwd=repo, log=log, timeout=600)
-                run(INSTALL, cwd=slot, log=log)
+                install_pool_dependencies(repo, slot, INSTALL, node_env, run, log)
                 install_git_hooks(slot, log=log)
                 if warm:
                     # A warm tsbuildinfo turns the first web typecheck from ~2 min into ~30s.
                     # tsc writes it even when main has type errors, so a red check is fine.
                     lifecycle.run(WARM, cwd=slot, stdout=log or subprocess.DEVNULL,
-                                   stderr=subprocess.STDOUT, timeout=1800)
+                                   stderr=subprocess.STDOUT, timeout=1800, env=node_env(slot))
                 if not is_clean(slot):
                     raise RuntimeError("install or warm-up left tracked changes")
             except (subprocess.SubprocessError, OSError, RuntimeError) as error:
