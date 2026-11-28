@@ -133,7 +133,7 @@ def write_release_receipt(state, *, bundle=None, refused=None) -> bool:
                     "installedAt": now_iso_utc(), "refused": None}
         else:
             if not data.get("sourceCommit") or not data.get("bundleDigest"):
-                active = _read_json_object(Path(state) / "current" / "scripts" / "lanes" / ".release.json")
+                active = _read_json_object(Path(state) / "current" / ".release.json")
                 data.update(sourceCommit=data.get("sourceCommit") or active.get("sourceCommit"),
                             bundleDigest=data.get("bundleDigest") or active.get("bundleDigest"))
             data.setdefault("installedAt", None)

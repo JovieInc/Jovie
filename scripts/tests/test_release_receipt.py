@@ -92,6 +92,21 @@ class ReleaseReceiptTest(unittest.TestCase):
         self.assertEqual(receipt["refused"]["reason"], "test_refused (a.b.UpdateTest)")
         datetime.strptime(receipt["refused"]["at"], "%Y-%m-%dT%H:%M:%SZ")
 
+    def test_first_refusal_preserves_the_pre_receipt_installed_release(self):
+        self.assertEqual(self._install(self.BUNDLE_1), 0)
+        (self.host.state / "release-receipt.json").unlink()
+        current = self.host.state / "current"
+        self.assertTrue((current / ".release.json").is_file())
+
+        self.assertEqual(self._install(self.BUNDLE_2, proof_rc=1,
+                                       proof_stdout="staging proof failed\n"), 1)
+
+        receipt = self._receipt()
+        self.assertEqual(receipt["sourceCommit"], self.BUNDLE_1["sourceCommit"])
+        self.assertEqual(receipt["bundleDigest"], self.BUNDLE_1["bundleDigest"])
+        self.assertIsNone(receipt["installedAt"])
+        self.assertEqual(receipt["refused"]["reason"], "staging proof failed")
+
     def test_refusal_without_a_diagnostic_names_the_check_that_refused(self):
         self.assertEqual(self._install(self.BUNDLE_1), 0)
         self.assertEqual(self._install(self.BUNDLE_2, proof_rc=1,
@@ -150,5 +165,3 @@ class ReleaseReceiptTest(unittest.TestCase):
         self.assertFalse((self.host.state / "release-receipt.json").exists())
         self.assertEqual(self._install(self.BUNDLE_1), 0, "the install proceeds with no receipt")
         self.assertTrue((self.host.state / "release-receipt.json").exists())
-
-
