@@ -3,8 +3,10 @@
 
 An alert is a stable key plus a one-line cause. New keys open a Linear issue in Triage
 (label `symphony`, title "Symphony doctor: <key>") so Summer routes it; a key that clears
-moves its issue to Done with a comment; a key that fires again within the cool-off reopens
-the same issue instead of spamming a new one. While `LANES_ESCALATION` is on, open, reopen,
+moves its issue to Done with a comment only after it stayed absent 3 ticks and 30 minutes,
+and a key that fires again reopens the same issue — every filed body carries a durable
+`<!-- doctor-key -->` marker (doctor_keys.py, JOV-14452) with flap damping, a per-host
+create cap and a no-impact rollup on top. While `LANES_ESCALATION` is on, open, reopen,
 and close also apply `remediation:<alert-key-slug>` (created on the JOV team when missing,
 color `#E5484D`). `doctor.json` is what the HUD renders.
 """
@@ -61,7 +63,11 @@ import doctor_sweep_hold  # noqa: E402
 import credentials_spend  # noqa: E402  (shared redacted Linear app metadata)
 import integration_probes  # noqa: E402  (synthetic probes of the Gem integrations fleet work depends on)
 import repo_headroom  # noqa: E402  (tracked-bytes headroom of origin/main)
+import doctor_filer  # noqa: E402  (JOV-14452 filer engine: per-family cap, damping, rollup)
+import doctor_keys  # noqa: E402  (JOV-14452 filer guardrails: stable keys, rollup, damping)
+import doctor_release  # noqa: E402  (JOV-14764: Done needs a host install receipt, never merge)
 
+# factory_watchdog borrows this window locally; the filer never refiles past it (marker reopen).
 COOL_OFF_S = 6 * 3600
 # High (P1), not Urgent, though under an Urgent prefix: a stale build is a lag signal, not an outage.
 P1_KEYS = frozenset({"production-deploy:build-stale"})
@@ -1447,7 +1453,9 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     # No design-brief-stale alert: since 2026-10-11 no issue is held for a brief (the
     # claiming run writes it), so a held brief is no longer a condition to watch.
     if hold := doctor_sweep_hold.alert(obs, previous):
-        alerts[doctor_sweep_hold.KEY] = hold
+        breakdown = doctor_keys.hold_breakdown(obs.get("sweepSecretHeld"),
+                                               obs.get("sweepSecretHeldCoverage"))
+        alerts[doctor_sweep_hold.KEY] = f"{hold}; {breakdown}" if breakdown else hold
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
         alerts["disk-critical"] = (f"lanes disk {obs['diskFreePct']}% free ({_lowest_mount(obs)}) even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
@@ -1793,17 +1801,19 @@ def verify_ops_report(prepared: dict, key: str, text: str, condition: dict,
 
 
 class Tracker:
-    """Linear Triage issues, one per alert key, reused within the cool-off."""
-    def __init__(self, linear, host_name: str):
+    """Linear Triage issues, one per normalized alert key, upserted by body marker in
+    any state (JOV-14452); the doctor_filer.Filer engine owns reuse, damping and the rollup."""
+    def __init__(self, linear, host_name: str, ledger: doctor_filer.FilerLedger | None = None):
         self.linear, self.host = linear, host_name
         self._team_node = None
         self.last_writing_report = None
         self.last_error = None  # why the last open() returned no issue id (never swallowed silently)
+        self.filer = doctor_filer.Filer(linear, host_name, ledger)
 
     def title(self, key: str) -> str:
         if key == "bottleneck:merge-queue":
             return "remediation:symphony-bottleneck-merge-queue"
-        return f"Symphony doctor: {key} ({self.host})"
+        return doctor_keys.issue_title(key, self.host)
 
     def _team(self) -> dict:
         if self._team_node is None:
@@ -1866,8 +1876,9 @@ class Tracker:
             return
 
     def existing(self, key: str) -> str | None:
-        """An open issue for this key and host, if a previous tick (or a lost doctor.json)
-        already raised it. Linear is the durable truth; local state is only a cache."""
+        """An issue for this key and host, in ANY state (JOV-14452): the body
+        `<!-- doctor-key -->` marker is the durable identity, so a closed owner is
+        handed back for reopening instead of twinned. Linear is the durable truth."""
         try:
             if key == "bottleneck:merge-queue":
                 data = self.linear.gql(
@@ -1885,11 +1896,9 @@ class Tracker:
                         print(f"doctor: reopened merge-queue owner; notification failed ({type(error).__name__})",
                               file=sys.stderr)
                 return issue["id"]
-            data = self.linear.gql(
-                'query($t:String!){issues(first:5,filter:{team:{key:{eq:"JOV"}},title:{eq:$t},'
-                'state:{type:{nin:["completed","canceled"]}}}){nodes{id}}}', {"t": self.title(key)})
-            nodes = data["issues"]["nodes"]
-            return nodes[0]["id"] if nodes else None
+            found = self.filer.existing(key, reopen=self.reopen)
+            self.existing_error = self.filer.existing_error
+            return found
         except Exception as error:
             self.existing_error = f"{type(error).__name__}: {str(error)[:160]}"
             return None
@@ -1898,12 +1907,18 @@ class Tracker:
         self.last_writing_report = None
         self.last_error = None
         self.existing_error = None
+        stable, impact = doctor_keys.stable_of(key)
+        if impact:  # no-impact class (JOV-14452): one rollup line, never a Triage issue
+            return self.filer.rollup_upsert(impact, stable, text)
         found = self.existing(key)
         if found:
             self.apply_alert_label(found, key)
             return found
         if found is None and getattr(self, "existing_error", None):
             self.last_error = f"lookup-failed:{self.existing_error}"
+        if self.filer.cap_hit(doctor_keys.family_of(key)):  # family cap (P0 2026-11-24)
+            self.filer.note_overflow(doctor_keys.family_of(key))
+            return self.filer.rollup_upsert(stable, stable, text)
         try:
             priority = 1 if (key.startswith(("provider-idle:", "provider-down:", "pr-inventory-unavailable:", "production-deploy:")) or key in (
                 "linear-down", "spawn-exit", "tick-error", "delivery-stalled")) and key not in P1_KEYS else 2
@@ -1919,39 +1934,29 @@ class Tracker:
             description = (f"**{text}**\n\nHost `{self.host}`, {now_iso()}. Raised by `scripts/lanes/doctor.py`; "
                            "it will move this issue to Done when the condition clears.\n\n"
                            "Runbook: `scripts/lanes/README.md`; state under `~/.local/state/jovie-lanes` "
-                           "(`tick.json`, `runs/ledger.jsonl`, `doctor.json`).")
+                           "(`tick.json`, `runs/ledger.jsonl`, `doctor.json`).\n\n"
+                           f"{doctor_keys.marker(key, self.host)}")
             if condition:
                 prepared = prepare_ops_report(key, text, condition, self.host, self.title(key))
                 prepared = verify_ops_report(prepared, key, text, condition, self.host, self.title(key))
-                description = prepared["message"]
+                description = prepared["message"] + f"\n\n{doctor_keys.marker(key, self.host)}"
                 self.last_writing_report = prepared
             data = self.linear.gql(
                 'mutation($i:IssueCreateInput!){issueCreate(input:$i){issue{id identifier}}}',
                 {"i": {"teamId": team["id"], "stateId": triage, "labelIds": labels, "priority": priority,
                        "title": self.title(key),
                        "description": description}})
+            self.filer.record_create(doctor_keys.family_of(key))
             return data["issueCreate"]["issue"]["id"]
         except Exception as error:
             self.last_error = f"create-failed:{type(error).__name__}: {str(error)[:160]}"
             return None
 
+    def flush(self) -> None:
+        self.filer.publish_if_dirty()  # one batched rollup publish per tick (JOV-14452)
+
     def contradict_invariant(self, event: dict) -> None:
-        """Reopen the liveness owner only when a new typed generation contradicts its proof."""
-        try:
-            data = self.linear.gql(
-                'query($n:Float!){issues(filter:{team:{key:{eq:"JOV"}},number:{eq:$n}})'
-                '{nodes{id state{type}}}}', {"n": 6004.0})
-            owner = data["issues"]["nodes"][0]
-            if owner["state"]["type"] == "completed":
-                self.linear.move(owner["id"], "Triage")
-            self.linear.comment(
-                owner["id"],
-                f"🤖 liveness contradiction `{event['idempotencyKey']}`: {event['evidence']}\n\n"
-                f"First observed: {event['firstObservedAt']}; deadline: {event['deadlineAt']}; "
-                f"next: `{event['nextAction']}`.",
-            )
-        except Exception:
-            pass
+        doctor_filer.contradict_liveness(self.linear, event)  # extracted (JOV-14452 size budget)
 
     def _move_acknowledged(self, issue_id: str, target: str) -> bool:
         """The shared client's move is best-effort; only readback proves the state."""
@@ -1973,8 +1978,20 @@ class Tracker:
             return False
 
     def reopen(self, issue_id: str, text: str, key: str | None = None) -> bool:
+        if key:
+            stable, impact = doctor_keys.stable_of(key)
+            if impact or self.filer.is_rollup(issue_id):
+                return self.filer.rollup_upsert(impact or stable, stable, text) is not None
+            if self.filer.damped(stable):  # flapping (JOV-14452): frozen, ≤1 comment/day
+                self.filer.damp(issue_id, stable, text)
+                return True
+            if self.filer.cap_hit(doctor_keys.family_of(key)):  # reopens feed the family cap (P0)
+                self.filer.note_overflow(doctor_keys.family_of(key))
+                return self.filer.rollup_upsert(stable, stable, text) is not None
         if not self._move_acknowledged(issue_id, "Triage"):
             return False
+        if key:
+            self.filer.record_reopen(doctor_keys.normalize(key), family=doctor_keys.family_of(key))
         try:
             self.linear.comment(issue_id, f"🤖 doctor: fired again on `{self.host}` at {now_iso()}: {text}")
         except Exception as error:
@@ -1984,6 +2001,14 @@ class Tracker:
         return True
 
     def close(self, issue_id: str, key: str | None = None) -> bool:
+        if key:
+            stable, impact = doctor_keys.stable_of(key)
+            if impact or self.filer.is_rollup(issue_id):
+                return self.filer.rollup_remove(impact or stable, stable)
+            if self.filer.damped(stable):
+                return True  # frozen (JOV-14452); the local alert lifecycle still completes
+            if doctor_release.awaiting_install(self, issue_id, stable):
+                return False  # not live on the host (JOV-14764): fail closed, one daily note
         if not self._move_acknowledged(issue_id, "Done"):
             return False
         try:
@@ -2017,26 +2042,33 @@ def alert_issue_gaps(alerts: dict, issues: dict, now: float, grace_s: int = ALER
 
 def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, now: float,
               conditions: dict[str, dict] | None = None, *, sweep_delivery=None) -> dict:
-    """Carry issue ids across ticks; acknowledge remote transitions before advancing receipts."""
+    """Carry issue ids across ticks; acknowledge remote transitions before advancing
+    receipts. Issue identity is the normalized key (JOV-14452): variants fold onto one
+    owner, a refire reopens it (no cool-off refile), a close needs 3 absent ticks/30 min."""
     alerts = doctor_sweep_hold.without_legacy(alerts)
     issues = {key: dict(entry) for key, entry in doctor_sweep_hold.without_legacy(previous.get("issues", {})).items()}
     sweep_key = doctor_sweep_hold.KEY
+    hysteresis = {k: dict(v) for k, v in ((previous.get("filer") or {}).get("hysteresis") or {}).items()
+                  if isinstance(v, dict)}
     for key, text in alerts.items():
         if key == sweep_key:
             continue
-        entry = issues.get(key)
+        stable = doctor_keys.normalize(key)
+        hysteresis[stable] = {"absentTicks": 0, "lastSeenAt": now}
+        entry = doctor_keys.owner_entry(key, issues)
         if entry and entry.get("closedAt") is None and entry.get("id") and not entry.get("pendingAction"):
+            issues.setdefault(key, {"id": entry["id"], "closedAt": None})  # variant fold: one owner
             continue  # still open
-        if entry and entry.get("id") and (entry.get("pendingAction") or
-                now - float(entry.get("closedAt") or 0) < COOL_OFF_S):
-            # Retain the original issue across cooldown expiry and uncertain close/refire.
+        if entry and entry.get("id") and (entry.get("pendingAction") or entry.get("closedAt") is not None):
+            # Reuse the owner across every refire (JOV-14452): reopen, never twin or refile.
             if tracker and tracker.reopen(entry["id"], text, key) is True:
                 issues[key] = {"id": entry["id"], "closedAt": None}
                 contradict = getattr(tracker, "contradict_invariant", None)
                 if contradict and conditions and key in conditions:
                     contradict(conditions[key])
             else:
-                entry["pendingAction"] = "reopen"
+                issues.setdefault(key, {"id": entry["id"],
+                                        "closedAt": entry.get("closedAt")})["pendingAction"] = "reopen"
             continue
         issue_id = tracker.open(key, text, (conditions or {}).get(key)) if tracker else None
         writing_report = getattr(tracker, "last_writing_report", None) if tracker else None
@@ -2058,13 +2090,16 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
             contradict = getattr(tracker, "contradict_invariant", None)
             if contradict:
                 contradict(conditions[key])
-    for key, entry in issues.items():
-        if key != sweep_key and key not in alerts and (entry.get("closedAt") is None or entry.get("pendingAction")):
-            if not entry.get("id") or (tracker and tracker.close(entry["id"], key) is True):
-                entry["closedAt"] = now
-                entry.pop("pendingAction", None)
-            else:
-                entry["pendingAction"] = "close"
+    _, closable = doctor_keys.absent_close_plan(issues, alerts, sweep_key, hysteresis, now)
+    for key in closable:
+        entry = issues[key]
+        if not entry.get("id") or (tracker and tracker.close(entry["id"], key) is True):
+            entry["closedAt"] = now
+            entry.pop("pendingAction", None)
+        else:
+            entry["pendingAction"] = "close"
+    if tracker is not None and callable(getattr(tracker, "flush", None)):
+        tracker.flush()
     # Sweep status is informational; never delay ordinary create/reopen/close side effects.
     sweep_entry = doctor_sweep_hold.reconcile(alerts.get(sweep_key), issues.get(sweep_key), now, sweep_delivery)
     if sweep_entry:
@@ -2083,7 +2118,13 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
         else:
             escalation = "requested" if acknowledged and entry.get("id") and entry.get("closedAt") is None else "pending"
         receipts[key] = {**event, "summerEscalation": {"transport": "linear", "outcome": escalation}}
-    return {"at": epoch_iso(now), "alerts": alerts, "issues": issues, "conditions": receipts}
+    filer = dict(previous.get("filer") or {})
+    filer["hysteresis"] = hysteresis
+    engine = getattr(tracker, "filer", None) if tracker is not None else None
+    report = engine.report(now) if engine is not None and callable(getattr(engine, "report", None)) else None
+    if isinstance(report, dict):
+        filer.update(report)  # self-monitor (JOV-14452)
+    return {"at": epoch_iso(now), "alerts": alerts, "issues": issues, "conditions": receipts, "filer": filer}
 
 
 # ---------------------------------------------------------------- status feed
@@ -2574,7 +2615,8 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         tracker = None
     elif tracker is None and not os.environ.get("LANES_SELFTEST"):
         try:
-            tracker = Tracker(lane.Linear(host.linear_env), lane.HOST)
+            tracker = Tracker(lane.Linear(host.linear_env), lane.HOST,
+                              doctor_filer.FilerLedger(host.state / doctor_keys.LEDGER_NAME))
         except Exception:
             tracker = None
     linear = getattr(tracker, "linear", None)

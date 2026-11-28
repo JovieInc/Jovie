@@ -1082,6 +1082,7 @@ class ConditionReceiptTest(unittest.TestCase):
         cleared_alerts = doctor.judge(observed, state)
         self.assertNotIn("provider-idle:devin", cleared_alerts)
         cleared = doctor.condition_receipts(cleared_alerts, state, observed, "gem")
+        state["filer"]["hysteresis"]["provider-idle:devin"] = {"absentTicks": 2, "lastSeenAt": observed["now"] - 1800}
         state = doctor.reconcile(cleared_alerts, state, tracker, observed["now"], cleared)
         self.assertEqual(state["conditions"]["provider-idle:devin"]["terminalOutcome"], "health-proven")
 
@@ -1217,8 +1218,9 @@ class ReconcileTest(unittest.TestCase):
                 observed = obs(designGate=None, **reason)
                 alerts = doctor.judge(observed, state)
                 self.assertNotIn("design-brief-stale", alerts)
-                state = doctor.reconcile(alerts, state, tracker, observed["now"],
-                                         doctor.condition_receipts(alerts, state, observed, "gem"))
+                for at in (0, 60, 1870):  # hysteresis (JOV-14452): 3 absent ticks spanning 30 min
+                    state = doctor.reconcile(alerts, state, tracker, observed["now"] + at,
+                                             doctor.condition_receipts(alerts, state, observed, "gem"))
                 self.assertEqual(tracker.closed.count("id-design-brief-stale"), 1)
                 self.assertEqual(state["conditions"]["design-brief-stale"]["state"], "resolved")
 
@@ -1230,15 +1232,12 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(state["issues"]["disk-low"], {"id": "id-disk-low", "closedAt": None})
         state = doctor.reconcile({"disk-low": "4% free"}, state, tracker, now + 60)
         self.assertEqual(len(tracker.opened), 1, "an open alert is not raised twice")
-        state = doctor.reconcile({}, state, tracker, now + 120)
-        self.assertEqual(tracker.closed, ["id-disk-low"])
-        self.assertEqual(state["issues"]["disk-low"]["closedAt"], now + 120)
-        state = doctor.reconcile({"disk-low": "again"}, state, tracker, now + 600)
-        self.assertEqual(tracker.reopened, [("id-disk-low", "again")])
-        self.assertEqual(len(tracker.opened), 1, "within the cool-off the same issue is reused")
-        state = doctor.reconcile({}, state, tracker, now + 700)
-        state = doctor.reconcile({"disk-low": "much later"}, state, tracker, now + 700 + doctor.COOL_OFF_S + 1)
-        self.assertEqual(len(tracker.opened), 2, "after the cool-off a fresh issue is opened")
+        for at in (now + 1700, now + 1720, now + 1870):  # 3 absent ticks spanning 30 min close it
+            state = doctor.reconcile({}, state, tracker, at)
+        self.assertEqual((tracker.closed, state["issues"]["disk-low"]["closedAt"]), (["id-disk-low"], now + 1870))
+        state = doctor.reconcile({"disk-low": "again"}, state, tracker, now + 2000)
+        self.assertEqual((tracker.reopened, len(tracker.opened)), ([("id-disk-low", "again")], 1), "a refire reuses the same issue")
+        # past-the-cool-off refire reopens the same owner instead of refiling: covered with a real Tracker in test_doctor_keys.py (JOV-14452)
 
     def test_tracker_failure_still_records_the_alert_and_retries_the_open(self):
         state = doctor.reconcile({"hud-stale": "x"}, {}, None, 5.0)
@@ -1256,7 +1255,7 @@ class ReconcileTest(unittest.TestCase):
 
             def gql(self, query, variables):
                 self.calls.append((query, variables))
-                if "title:{eq:$t}" in query:
+                if "description:{contains:$d}" in query:  # JOV-14452 marker lookup, any state
                     return {"issues": {"nodes": [{"id": "existing-1"}]}}
                 if "teams(filter" in query:
                     return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{
@@ -1328,7 +1327,7 @@ class ReconcileTest(unittest.TestCase):
                                      {"disk-low": condition})
             state = doctor.reconcile({"disk-low": "4% free"}, state, tracker, 1_000_060.0,
                                      {"disk-low": condition})
-        self.assertEqual(created[0]["description"], reviewed["message"])
+        self.assertEqual(created[0]["description"], reviewed["message"] + f"\n\n{doctor.doctor_keys.marker('disk-low', 'gem')}")
         self.assertEqual(len(created), 1)
         prepare.assert_called_once()
         verify.assert_called_once_with(reviewed, "disk-low", "4% free", condition, "gem", tracker.title("disk-low"))
@@ -1446,6 +1445,8 @@ class ReconcileTest(unittest.TestCase):
                     return {"issueAddLabel": {"success": True}}
                 if "issue(id:$id){state{type}}" in query:
                     return {"issue": {"state": {"type": "triage" if self.state_of("iss-1") == "Triage" else "completed"}}}
+                if "issue(id:$id){description}" in query:  # JOV-14764 gate reads the body
+                    return {"issue": {"description": ""}}
                 if "issueCreate" in query:
                     return {"issueCreate": {"issue": {"id": "iss-1", "identifier": "JOV-1"}}}
                 raise AssertionError(query)
@@ -1461,8 +1462,7 @@ class ReconcileTest(unittest.TestCase):
 
         tracker = doctor.Tracker(FakeLinear(), "gem")
         self.assertEqual(tracker.open("provider-down:codex", "down"), "iss-1")
-        self.assertEqual(created, [{
-            "teamId": "team", "name": "remediation:provider-down-codex", "color": "#E5484D"}])
+        self.assertEqual(created, [{"teamId": "team", "name": "remediation:provider-down-codex", "color": "#E5484D"}])
         tracker.reopen("iss-1", "again", "provider-down:codex")
         tracker.close("iss-1", "provider-down:codex")
         self.assertEqual([row["l"] for row in added], ["new-label", "new-label"])
@@ -1632,7 +1632,7 @@ class OpsReportDeliveryTest(unittest.TestCase):
 
         class FakeLinear:
             def gql(self, query, variables):
-                if "title:{eq:$t}" in query:
+                if "description:{contains:$d}" in query:  # JOV-14452 marker lookup, any state
                     return {"issues": {"nodes": [{"id": "iss-1"}] if created else []}}
                 if "teams(filter" in query:
                     return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [
@@ -1664,7 +1664,7 @@ class TransitionAcknowledgmentTest(unittest.TestCase):
     def test_failed_close_remains_pending_and_retries_the_same_issue(self):
         for acknowledged in [False, None]:
             with self.subTest(acknowledged=acknowledged):
-                previous = {"issues": {"disk-low": {"id": "same", "closedAt": None}}}
+                previous = {"issues": {"disk-low": {"id": "same", "closedAt": None}}, "filer": {"hysteresis": {"disk-low": {"absentTicks": 2, "lastSeenAt": 10 - 1800}}}}
                 tracker = FakeTracker()
                 tracker.close = mock.Mock(side_effect=[acknowledged, True])
                 conditions = {"disk-low": {"state": "resolved"}}
@@ -1705,7 +1705,7 @@ class TransitionAcknowledgmentTest(unittest.TestCase):
     def test_refire_after_uncertain_close_reopens_the_same_issue(self):
         tracker = FakeTracker()
         tracker.close = mock.Mock(return_value=False)
-        previous = {"issues": {"disk-low": {"id": "same", "closedAt": None}}}
+        previous = {"issues": {"disk-low": {"id": "same", "closedAt": None}}, "filer": {"hysteresis": {"disk-low": {"absentTicks": 2, "lastSeenAt": 10 - 1800}}}}
         failed = doctor.reconcile({}, previous, tracker, 10)
         state = doctor.reconcile({"disk-low": "again"}, failed, tracker, 20)
         self.assertEqual(tracker.reopened, [("same", "again")])

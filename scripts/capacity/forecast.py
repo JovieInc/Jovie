@@ -366,8 +366,11 @@ def main(argv: list[str] | None = None) -> int:
         row = apply_collector_error(row, res)
         if reading is None and not own and kind != "none":
             row["why"] = f"no samples from {res['host']} (install collector, then --remote {res['host']})"
-        rows.append(row)
-        rows += access_gap_rows(res, reading, now)
+        classed = access_gap_rows(res, reading, now)
+        if classed:  # the class row owns the id when gaps exist; the parent row would
+            rows += classed  # otherwise read OK against the class's prior alarm and clear it
+        else:
+            rows.append(row)
     delivery = None
     if args.cmd == "collect":
         with open(samples_path, "a") as f:
@@ -411,14 +414,19 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def access_gap_rows(res: dict, reading: dict | None, now: float) -> list[dict]:
-    """One row (and so one deduped card and issue) per repeated denial, so each gap gets its own owner."""
-    rows = []
-    for gap in (reading or {}).get("gaps", []):
-        sub = dict(res, id=f"{res['id']}:{gap['key']}", label=f"Access gap: {gap['sig']}")
-        row = evaluate(sub, {"value": gap["count"], "limit": res["collector"].get("minRepeats", 2),
-                             "detail": f"seen {gap['count']}x in {gap['sources']} sessions"}, [], now)
-        rows.append(dict(row, res=sub))
-    return rows
+    """One row per access-gap resource CLASS (JOV-14452): the card key — and so the
+    Linear issue — never embeds an error-text hash; per-signature detail rides the
+    card body, so refires upsert one class issue instead of filing a twin per hash."""
+    gaps = (reading or {}).get("gaps") or []
+    if not gaps:
+        return []
+    detail = "; ".join(f"{g['sig']} x{g['count']} in {g['sources']} sessions" for g in gaps[:5])
+    more = f" (+{len(gaps) - 5} more signatures)" if len(gaps) > 5 else ""
+    sub = dict(res, id=res["id"], label=f"Access gaps: {len(gaps)} repeated denial signature(s)")
+    row = evaluate(sub, {"value": sum(g["count"] for g in gaps),
+                         "limit": res["collector"].get("minRepeats", 2),
+                         "detail": f"across {len(gaps)} signature(s): {detail}{more}"}, [], now)
+    return [dict(row, res=sub)]
 
 
 if __name__ == "__main__":
