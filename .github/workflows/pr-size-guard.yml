@@ -5,7 +5,7 @@ name: PR Size Guard
 # stacked-PR discipline (each child retargeted and rebased after its parent
 # lands) or independent sibling PRs. Opt out for
 # approved mechanical codemods (token sweeps, renames, generated output) with
-# the `big-pr` label. Thresholds tunable via repo vars PR_MAX_LINES / PR_MAX_FILES.
+# the `big-pr` label. Thresholds come from .github/pr-size-policy.json when present; repo vars PR_MAX_LINES / PR_MAX_FILES are the fallback.
 # Circular shared-CI repair trains may use `integration-train`, but only with a
 # machine-readable source block naming 2+ component PRs, each pinned as
 # `- https://github.com/JovieInc/Jovie/pull/123 @ <40-character-head-sha>`.
@@ -86,6 +86,7 @@ jobs:
           ref: ${{ github.event.merge_group.base_sha == '7641ffa76d03326542541c62080735c28190a1f0' && '7641ffa76d03326542541c62080735c28190a1f0' || 'main' }}
           persist-credentials: false
           sparse-checkout: |
+            .github/pr-size-policy.json
             scripts/lib/merge-group-local-evidence.mjs
             scripts/lib/merge-group-member-policy.mjs
             scripts/lib/pr-size-exclusions.mjs
@@ -107,8 +108,21 @@ jobs:
           BOOTSTRAP_HEAD: ${{ github.event.merge_group.head_sha }}
           MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}
           MAX_FILES: ${{ vars.PR_MAX_FILES || '40' }}
+          VARS_MAX_LINES: ${{ vars.PR_MAX_LINES }}
+          VARS_MAX_FILES: ${{ vars.PR_MAX_FILES }}
         run: |
           set -euo pipefail
+          # Caps: .github/pr-size-policy.json on the trusted checkout (main or
+          # the reviewed bootstrap base). Repo vars only while that tree
+          # predates the file.
+          if policy_json=$(git show HEAD:.github/pr-size-policy.json 2>/dev/null || cat .github/pr-size-policy.json 2>/dev/null); then
+            MAX_LINES=$(printf '%s' "$policy_json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).maxLines))')
+            MAX_FILES=$(printf '%s' "$policy_json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).maxFiles))')
+            export MAX_LINES MAX_FILES
+            if [[ -n "${VARS_MAX_LINES:-}" && ( "$VARS_MAX_LINES" != "$MAX_LINES" || "$VARS_MAX_FILES" != "$MAX_FILES" ) ]]; then
+              echo "::warning::repo vars PR_MAX_LINES/PR_MAX_FILES ($VARS_MAX_LINES/$VARS_MAX_FILES) differ from .github/pr-size-policy.json ($MAX_LINES/$MAX_FILES); the JSON is authoritative — delete the vars"
+            fi
+          fi
           [[ "$BOOTSTRAP_HEAD" =~ ^[0-9a-f]{40}$ ]] || exit 1
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
           trap 'unset AUTH_HEADER GH_TOKEN' EXIT
@@ -137,6 +151,8 @@ jobs:
           GROUP_HEAD: ${{ github.event.merge_group.head_sha }}
           MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}
           MAX_FILES: ${{ vars.PR_MAX_FILES || '40' }}
+          VARS_MAX_LINES: ${{ vars.PR_MAX_LINES }}
+          VARS_MAX_FILES: ${{ vars.PR_MAX_FILES }}
           MERGE_GROUP_LOCAL_EVIDENCE: ${{ runner.temp }}/merge-group-local-evidence.json
           MERGE_GROUP_POLICY_CACHE_DIR: ${{ runner.temp }}/merge-group-policy-cache
         # Publishes fork_verdict before any size failure, so the Fork PR Gate
@@ -148,6 +164,17 @@ jobs:
         # Unmeasured bytes remain unknown and the final size policy fails closed.
         run: |
           set -euo pipefail
+          # Caps: .github/pr-size-policy.json on the trusted checkout (main or
+          # the reviewed bootstrap base). Repo vars only while that tree
+          # predates the file.
+          if policy_json=$(git show HEAD:.github/pr-size-policy.json 2>/dev/null || cat .github/pr-size-policy.json 2>/dev/null); then
+            MAX_LINES=$(printf '%s' "$policy_json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).maxLines))')
+            MAX_FILES=$(printf '%s' "$policy_json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).maxFiles))')
+            export MAX_LINES MAX_FILES
+            if [[ -n "${VARS_MAX_LINES:-}" && ( "$VARS_MAX_LINES" != "$MAX_LINES" || "$VARS_MAX_FILES" != "$MAX_FILES" ) ]]; then
+              echo "::warning::repo vars PR_MAX_LINES/PR_MAX_FILES ($VARS_MAX_LINES/$VARS_MAX_FILES) differ from .github/pr-size-policy.json ($MAX_LINES/$MAX_FILES); the JSON is authoritative — delete the vars"
+            fi
+          fi
           mkdir -p "$MERGE_GROUP_POLICY_CACHE_DIR"
           if [[ -f scripts/lib/merge-group-local-evidence.mjs && "$GROUP_HEAD" =~ ^[0-9a-f]{40}$ && "$GROUP_BASE" =~ ^[0-9a-f]{40}$ ]]; then
             AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
@@ -448,6 +475,8 @@ jobs:
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
           MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}
           MAX_FILES: ${{ vars.PR_MAX_FILES || '40' }}
+          VARS_MAX_LINES: ${{ vars.PR_MAX_LINES }}
+          VARS_MAX_FILES: ${{ vars.PR_MAX_FILES }}
         run: |
           set -euo pipefail
 
@@ -457,30 +486,48 @@ jobs:
               echo "✅ opt-out label present — PR Size Guard skipped"; exit 0;;
           esac
 
-          # Count from the exact merge base this job already checked out: no
-          # GitHub API call, so the shared GITHUB_TOKEN quota (1,000 REST/h for
-          # every workflow in the repo) can never turn this required check red
-          # (2026-10-11 20:07Z). Same rows as `pulls/<n>/files`: renames count
-          # once under the new path, binary files count zero lines.
-          # shellcheck disable=SC2016 # JavaScript source, not shell expansion.
-          rows=$(node -e '
-            const out = require("node:child_process").execFileSync(
-              "git", ["diff", "--numstat", "-z", "-M", process.argv[1], "HEAD"],
-              { maxBuffer: 256 * 1024 * 1024 });
-            const parts = out.toString("utf8").split("\0");
-            const rows = [];
-            for (let i = 0; i < parts.length; ) {
-              const record = parts[i++];
-              if (!record) continue;
-              const [added, deleted, path] = record.split("\t");
-              let name = path;
-              if (path === "") { i += 1; name = parts[i++]; }
-              const lines = (added === "-" ? 0 : Number(added)) + (deleted === "-" ? 0 : Number(deleted));
-              if (!Number.isSafeInteger(lines) || !name) throw new Error(`unparseable numstat row: ${record}`);
-              rows.push(`${lines}\t${name}`);
-            }
-            process.stdout.write(rows.join("\n"));
-          ' "$PR_DIFF_BASE")
+          # Count with the shared counter (scripts/lib/pr-size-count.mjs), the same
+          # module the pre-push hook runs, taken from the base tip so a PR cannot
+          # change how it is measured. No GitHub API call (2026-10-11 20:07Z).
+          # Fall back to the PR copy, then to the previous inline counter, while
+          # the base predates the module (JOV-13052 hook PR may land first).
+          counter_dir="$RUNNER_TEMP/size-counter"
+          rm -rf "$counter_dir" && mkdir -p "$counter_dir"
+          counter="$counter_dir/scripts/lib/pr-size-count.mjs"
+          if git archive "${SIZE_POLICY_REF}" scripts/lib/pr-size-count.mjs 2>/dev/null | tar -x -C "$counter_dir" && [[ -f "$counter" ]]; then
+            rows=$(node "$counter" "$PR_DIFF_BASE" HEAD)
+          elif [[ -f scripts/lib/pr-size-count.mjs ]]; then
+            rows=$(node scripts/lib/pr-size-count.mjs "$PR_DIFF_BASE" HEAD)
+          else
+            # shellcheck disable=SC2016 # JavaScript source, not shell expansion.
+            rows=$(node -e '
+              const out = require("node:child_process").execFileSync(
+                "git", ["diff", "--numstat", "-z", "-M", process.argv[1], "HEAD"],
+                { maxBuffer: 256 * 1024 * 1024 });
+              const parts = out.toString("utf8").split("\0");
+              const rows = [];
+              for (let i = 0; i < parts.length; ) {
+                const record = parts[i++];
+                if (!record) continue;
+                const [added, deleted, path] = record.split("\t");
+                let name = path;
+                if (path === "") { i += 1; name = parts[i++]; }
+                const lines = (added === "-" ? 0 : Number(added)) + (deleted === "-" ? 0 : Number(deleted));
+                if (!Number.isSafeInteger(lines) || !name) throw new Error(`unparseable numstat row: ${record}`);
+                rows.push(`${lines}\t${name}`);
+              }
+              process.stdout.write(rows.join("\n"));
+            ' "$PR_DIFF_BASE")
+          fi
+          # Caps: .github/pr-size-policy.json at the base tip (what the hook reads);
+          # repo vars only while the base predates the file. A PR cannot raise them.
+          if policy_json=$(git show "${SIZE_POLICY_REF}:.github/pr-size-policy.json" 2>/dev/null); then
+            MAX_LINES=$(printf '%s' "$policy_json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).maxLines))')
+            MAX_FILES=$(printf '%s' "$policy_json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).maxFiles))')
+            if [[ -n "${VARS_MAX_LINES:-}" && ( "$VARS_MAX_LINES" != "$MAX_LINES" || "$VARS_MAX_FILES" != "$MAX_FILES" ) ]]; then
+              echo "::warning::repo vars PR_MAX_LINES/PR_MAX_FILES ($VARS_MAX_LINES/$VARS_MAX_FILES) differ from .github/pr-size-policy.json ($MAX_LINES/$MAX_FILES); the JSON is authoritative — delete the vars"
+            fi
+          fi
           # Exclusions live in scripts/lib/pr-size-exclusions.mjs (tests and
           # fixtures do not count; generated/lock noise does not count). Run it
           # from the base tip so a PR cannot widen the list that judges it; fall

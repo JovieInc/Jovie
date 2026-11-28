@@ -81,10 +81,20 @@ jobs:
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
           MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}
           MAX_FILES: ${{ vars.PR_MAX_FILES || '40' }}
+          VARS_MAX_LINES: ${{ vars.PR_MAX_LINES }}
+          VARS_MAX_FILES: ${{ vars.PR_MAX_FILES }}
           # This job checks out the trusted workflow commit, so HEAD is trusted.
           SIZE_POLICY_REF: HEAD
         run: |
           set -euo pipefail
+          if policy_json=$(git show "${SIZE_POLICY_REF}:.github/pr-size-policy.json" 2>/dev/null); then
+            MAX_LINES=$(printf '%s' "$policy_json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).maxLines))')
+            MAX_FILES=$(printf '%s' "$policy_json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).maxFiles))')
+            export MAX_LINES MAX_FILES
+            if [[ -n "${VARS_MAX_LINES:-}" && ( "$VARS_MAX_LINES" != "$MAX_LINES" || "$VARS_MAX_FILES" != "$MAX_FILES" ) ]]; then
+              echo "::warning::repo vars PR_MAX_LINES/PR_MAX_FILES ($VARS_MAX_LINES/$VARS_MAX_FILES) differ from .github/pr-size-policy.json ($MAX_LINES/$MAX_FILES); the JSON is authoritative — delete the vars"
+            fi
+          fi
           api_error="$RUNNER_TEMP/pr-size-guard-api.err"
           rows=''
           for attempt in 1 2 3; do
