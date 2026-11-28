@@ -158,6 +158,16 @@ export interface GuardSample {
   readonly resolvedPath: string;
   readonly timingValues: Record<PerfTimingMetricName, number>;
   readonly resourceValues: Record<PerfResourceMetricName, number>;
+  /** Heaviest requests per resource type, so a size failure names its cause. */
+  readonly largestResources?: Partial<
+    Record<PerfResourceMetricName, readonly LargestResource[]>
+  >;
+}
+
+export interface LargestResource {
+  /** Origin and path only; query strings and fragments are dropped. */
+  readonly url: string;
+  readonly kb: number;
 }
 
 export interface MetricResult {
@@ -1345,6 +1355,18 @@ export async function collectBrowserMetrics(
       stylesheet: 0,
       total: 0,
     };
+    const typedEntries: Record<
+      'font' | 'image' | 'script' | 'stylesheet',
+      { url: string; size: number }[]
+    > = { font: [], image: [], script: [], stylesheet: [] };
+    const redactedUrl = (raw: string) => {
+      try {
+        const parsed = new URL(raw);
+        return `${parsed.origin}${parsed.pathname}`;
+      } catch {
+        return raw.split(/[?#]/u)[0] ?? '';
+      }
+    };
 
     for (const entry of resourceEntries) {
       const size = entry.transferSize || entry.encodedBodySize || 0;
@@ -1364,6 +1386,7 @@ export async function collectBrowserMetrics(
 
       if (entry.initiatorType === 'script' || resourceName.includes('.js')) {
         resourceValues.script += size;
+        typedEntries.script.push({ url: redactedUrl(entry.name), size });
         continue;
       }
 
@@ -1373,11 +1396,13 @@ export async function collectBrowserMetrics(
         /\.(avif|gif|jpe?g|png|svg|webp)(\?|$)/.test(resourceName)
       ) {
         resourceValues.image += size;
+        typedEntries.image.push({ url: redactedUrl(entry.name), size });
         continue;
       }
 
       if (entry.initiatorType === 'css' || resourceName.includes('.css')) {
         resourceValues.stylesheet += size;
+        typedEntries.stylesheet.push({ url: redactedUrl(entry.name), size });
         continue;
       }
 
@@ -1386,11 +1411,24 @@ export async function collectBrowserMetrics(
         entry.initiatorType === 'font'
       ) {
         resourceValues.font += size;
+        typedEntries.font.push({ url: redactedUrl(entry.name), size });
       }
     }
+    const heaviest = (entries: { url: string; size: number }[]) =>
+      entries
+        .filter(candidate => candidate.size > 0)
+        .sort((left, right) => right.size - left.size)
+        .slice(0, 3)
+        .map(candidate => ({ url: candidate.url, kb: candidate.size / 1024 }));
 
     return {
       finalUrl: window.location.href,
+      largestResources: {
+        font: heaviest(typedEntries.font),
+        image: heaviest(typedEntries.image),
+        script: heaviest(typedEntries.script),
+        stylesheet: heaviest(typedEntries.stylesheet),
+      },
       resourceValues: {
         font: resourceValues.font / 1024,
         image: resourceValues.image / 1024,
@@ -1971,6 +2009,7 @@ async function measureRouteSample(
       aliasPhases,
       controllerObservedAliasResultMs,
       finalUrl: browserMetrics.finalUrl,
+      largestResources: browserMetrics.largestResources,
       resolvedPath,
       resourceValues: browserMetrics.resourceValues,
       timingValues,
@@ -2479,6 +2518,40 @@ async function measureRoutesAgainstBudgets(
   }
 }
 
+/**
+ * Name the heaviest requests behind a failed size budget, from the last sample
+ * that recorded them, so the gate says what to cut instead of only how much.
+ */
+export function formatLargestResources(
+  samples: readonly GuardSample[],
+  metricName: string
+): string[] {
+  if (metricName === 'total') {
+    const merged = samples
+      .map(sample => sample.largestResources)
+      .filter(Boolean)
+      .at(-1);
+    if (!merged) return [];
+    return Object.values(merged)
+      .flatMap(entries => entries ?? [])
+      .sort((left, right) => right.kb - left.kb)
+      .slice(0, 3)
+      .map(entry => `      ${formatMetric(entry.kb, 'KB')} ${entry.url}`);
+  }
+  const entries = samples
+    .map(
+      sample =>
+        sample.largestResources?.[metricName as PerfResourceMetricName] ?? null
+    )
+    .filter((candidate): candidate is readonly LargestResource[] =>
+      Boolean(candidate)
+    )
+    .at(-1);
+  return (entries ?? []).map(
+    entry => `      ${formatMetric(entry.kb, 'KB')} ${entry.url}`
+  );
+}
+
 function printHumanSummary(summary: GuardSummary) {
   console.log(`Performance budgets: ${summary.status.toUpperCase()}`);
 
@@ -2502,6 +2575,11 @@ function printHumanSummary(summary: GuardSummary) {
       console.log(
         `  ${status} ${metric.name}: ${formatMetric(metric.measured, metric.unit)} / ${formatMetric(metric.budget, metric.unit)}`
       );
+      if (status === 'FAIL') {
+        for (const line of formatLargestResources(page.samples, metric.name)) {
+          console.log(line);
+        }
+      }
     }
 
     for (const confirmation of page.timingConfirmations) {
