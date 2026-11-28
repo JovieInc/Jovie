@@ -95,13 +95,13 @@
     {
       "id": "claim-checkout-dogfood-neon",
       "kind": "neon-branch",
-      "policy": "event-driven (Staging Controller completion) or manual-dispatch",
+      "policy": "golden-path PR, Staging Controller or Golden Path Nightly completion, or manual dispatch",
       "owner": "revenue path / checkout-dogfood",
       "surface": "ephemeral Neon branch claim-dogfood-<run_id>-<attempt> (isolated database only)",
-      "evidencePurpose": "Live claim/checkout journey proof for the exact staged SHA, which normal CI does not run.",
+      "evidencePurpose": "Claim/checkout journey proof for the PR merge revision or dogfooded SHA.",
       "ttlHours": 2,
       "cleanupTrigger": "Neon branch TTL (expires_in_hours=2); explicit delete step at job end; on-limit cleanup in neon-create-branch-with-retry",
-      "costBudget": "One Neon branch with at most 2h of endpoint compute per staging deploy or daily dispatch (concurrency cancels superseded runs)"
+      "costBudget": "One Neon branch with at most 2h of endpoint compute per admitted run, with runs serialized"
     },
     {
       "id": "surface-recertify-neon",
