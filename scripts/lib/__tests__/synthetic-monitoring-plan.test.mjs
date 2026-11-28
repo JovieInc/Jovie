@@ -1,5 +1,13 @@
-import { describe, expect, it } from 'vitest';
-import { planSyntheticMonitoringAction } from '../../synthetic-monitoring-intake.mjs';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  planSyntheticMonitoringAction,
+  runSyntheticMonitoringIntake,
+} from '../../synthetic-monitoring-intake.mjs';
+import {
+  captureWarnings,
+  ISSUE,
+  installRetryFixture,
+} from './linear-rate-limit-retry.fixtures.mjs';
 
 describe('planSyntheticMonitoringAction', () => {
   it('treats a passed rerun and flake-only results as flakes', () => {
@@ -48,5 +56,52 @@ describe('planSyntheticMonitoringAction', () => {
         previousConclusion: 'success',
       })
     ).toMatchObject({ action: 'resolve', reason: 'second_green' });
+  });
+});
+
+describe('runSyntheticMonitoringIntake', () => {
+  installRetryFixture();
+
+  it('incomplete recovery evidence leaves Linear open without failing the canary', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({
+          data: {
+            team: {
+              states: { nodes: [{ id: 'done', type: 'completed' }] },
+              labels: ISSUE.labels,
+            },
+            issues: { nodes: [ISSUE] },
+          },
+        })
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          data: {
+            issue: {
+              comments: {
+                nodes: [],
+                pageInfo: { hasNextPage: true, endCursor: null },
+              },
+            },
+          },
+        })
+      );
+
+    const { result, warnings } = await captureWarnings(() =>
+      runSyntheticMonitoringIntake({
+        env: { TEST_STATUS: 'passed', PREVIOUS_CONCLUSION: 'success' },
+        fetchImpl,
+      })
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      action: 'defer',
+      reason: 'linear_comments_incomplete',
+    });
+    expect(warnings.join('\n')).toContain('Synthetic recovery deferred');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 });

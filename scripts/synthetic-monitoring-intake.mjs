@@ -109,8 +109,8 @@ ${runUrl ? `\nRun: ${runUrl}` : ''}`;
 }
 
 /**
- * Linear rate limits defer the signal (visible warning + job summary) instead
- * of failing the probe verdict; every other failure still throws.
+ * Linear rate limits and incomplete recovery evidence defer Linear work
+ * without changing the probe verdict.
  * @param {{ env?: typeof process.env, fetchImpl?: typeof fetch }} [options]
  */
 export async function runSyntheticMonitoringIntake({
@@ -165,6 +165,12 @@ export async function runSyntheticMonitoringIntake({
       { label: 'synthetic monitoring resolve' }
     );
     if (!result.ok) {
+      if (result.reason === 'linear_comments_incomplete') {
+        console.warn(
+          '::warning title=Synthetic recovery deferred::Linear comment history is incomplete. The recovery issue stays open and the next eligible scheduled run retries resolution.'
+        );
+        return { ok: true, action: 'defer', reason: result.reason };
+      }
       throw new Error(`Synthetic Linear resolve failed: ${result.reason}`);
     }
     return result;
