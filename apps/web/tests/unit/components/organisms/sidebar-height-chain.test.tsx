@@ -39,8 +39,9 @@ describe('sidebar full-height flex chain (JOV-3960)', () => {
     expect(unifiedSource).toMatch(
       /<DashboardNav(?:\s[^>]*)?>[\s\S]*?HeaderSearchSurfaceFromContext[\s\S]*?<\/DashboardNav>/
     );
-    expect(unifiedSource).toContain('SidebarFooter');
-    expect(unifiedSource).toMatch(/SidebarFooter className='mt-auto/);
+    expect(unifiedSource).toMatch(
+      /<SidebarFooter\s+className=\{cn\(\s*'mt-auto\b/
+    );
   });
 
   it('uses SheetContent ownership for the mobile sidebar close affordance', () => {

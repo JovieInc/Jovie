@@ -79,3 +79,19 @@ describe('SidebarCollapseButton', () => {
     );
   });
 });
+
+it('uses the outline panel skin for the pinned web rail and a pin in peek', () => {
+  const { rerender } = render(<SidebarCollapseButton outlinePanel />);
+  expect(screen.getByTestId('sidebar-rail-toggle-icon')).toHaveClass(
+    'lucide-panel-left'
+  );
+  try {
+    sidebar.isPreview = true;
+    rerender(<SidebarCollapseButton outlinePanel />);
+    expect(screen.getByTestId('sidebar-rail-toggle-icon')).toHaveClass(
+      'lucide-pin'
+    );
+  } finally {
+    sidebar.isPreview = false;
+  }
+});

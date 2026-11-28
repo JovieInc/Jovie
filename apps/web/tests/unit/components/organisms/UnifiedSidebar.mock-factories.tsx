@@ -56,8 +56,16 @@ export function clerkSafeMock() {
 
 export function dashboardNavMock() {
   return {
-    DashboardNav: ({ children }: { readonly children?: ReactNode }) => (
-      <div data-testid='dashboard-nav'>{children}</div>
+    DashboardNav: ({
+      children,
+      penRail,
+    }: {
+      readonly children?: ReactNode;
+      readonly penRail?: boolean;
+    }) => (
+      <div data-testid='dashboard-nav'>
+        {penRail ? <button type='button'>Search Sidebar</button> : children}
+      </div>
     ),
   };
 }
@@ -70,11 +78,25 @@ export function headerSearchSurfaceMock() {
   };
 }
 
-export function userButtonMock() {
+export async function userButtonMock() {
+  const { BrandLogo } = await import('@/components/atoms/BrandLogo');
   return {
-    UserButton: (props: { readonly showUserInfo?: boolean }) => {
+    UserButton: (props: {
+      readonly showUserInfo?: boolean;
+      readonly footerStatus?: object;
+    }) => {
       userButtonPropsMock(props);
-      return <div data-testid='user-button' />;
+      return props.footerStatus ? (
+        <button
+          type='button'
+          data-testid='user-button'
+          aria-label='Tim White account'
+        >
+          <BrandLogo size='control' aria-hidden />
+        </button>
+      ) : (
+        <div data-testid='user-button' />
+      );
     },
   };
 }
@@ -85,9 +107,13 @@ export async function sidebarDockBridgeMock() {
   const { SidebarOPresence } = await import(
     '@/components/shell/SidebarOPresence'
   );
+  const { UserButton } = await import('@/components/organisms/user-button');
   return {
     SidebarDockBridge: (props: {
       readonly collapsed: boolean;
+      readonly penRail?: boolean;
+      readonly showEditorial?: boolean;
+      readonly profileHref?: string;
       readonly userState?: { readonly hasClaimedHandle: boolean };
       readonly oHref?: string;
       readonly variant?: 'jovie' | 'ov';
@@ -99,14 +125,30 @@ export async function sidebarDockBridgeMock() {
       });
       return (
         <>
-          <div data-sidebar-dock='true' className='shrink-0'>
-            <button type='button' data-testid='update-available-pill'>
-              Update
-            </button>
-            <div data-testid='sidebar-whats-new' />
-            <div data-testid='sidebar-now-playing-bridge' />
-          </div>
-          <SidebarOPresence href={props.oHref} variant={props.variant} />
+          {props.showEditorial === false ? null : (
+            <div data-sidebar-dock='true' className='shrink-0'>
+              <button type='button' data-testid='update-available-pill'>
+                Update
+              </button>
+              <div data-testid='sidebar-whats-new' />
+              <div data-testid='sidebar-now-playing-bridge' />
+            </div>
+          )}
+          <SidebarOPresence
+            href={props.oHref}
+            variant={props.variant}
+            account={
+              props.penRail
+                ? status => (
+                    <UserButton
+                      footerStatus={status}
+                      profileHref={props.profileHref}
+                      showUserInfo
+                    />
+                  )
+                : undefined
+            }
+          />
         </>
       );
     },

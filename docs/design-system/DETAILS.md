@@ -953,8 +953,11 @@ sidebar icons, 44px app header everywhere (single token, no separate
 "compact" variant). Selected nav row uses the neutral Accent active tint
 above with primary-token text — no ion/blue background, no border.
 Today/Earlier day headers are sentence case, no letterspacing, 11px medium,
-quiet color. Account footer is a single compact 32px row: 20px avatar, name
-only, no workspace subtitle line.
+quiet color. The 2026-11-27 lock (`VgcZb/uMNmm`) gives App and Settings the
+same 44px Header, Chat or Back to App, and Search rows. It gives account and playback
+one 60px footer with a single 44px row. The account mark and the 28px artwork
+share x32. The separate editorial slot keeps the footer anchored as eligibility
+changes, and Settings omits that slot.
 
 ### App Shell Frame
 

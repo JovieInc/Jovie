@@ -18,6 +18,7 @@ export interface SidebarCollapsibleGroupProps {
   readonly label: string;
   readonly children: React.ReactNode;
   readonly defaultOpen?: boolean;
+  readonly forceOpen?: boolean;
   readonly className?: string;
   readonly icon?: LucideIcon;
   readonly storageKey?: string;
@@ -55,13 +56,15 @@ export function SidebarCollapsibleGroup({
   label,
   children,
   defaultOpen = true,
+  forceOpen = false,
   className,
   icon: GroupIcon,
   storageKey,
   dismissOnEscape = false,
   unmountWhenClosed = false,
 }: SidebarCollapsibleGroupProps) {
-  const [open, setOpen] = useState<boolean>(defaultOpen);
+  const [preferredOpen, setOpen] = useState(defaultOpen);
+  const open = forceOpen || preferredOpen;
   const hasLoadedStoredStateRef = useRef(false);
   const groupRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -83,11 +86,11 @@ export function SidebarCollapsibleGroup({
 
   useEffect(() => {
     if (!storageKey || !hasLoadedStoredStateRef.current) return;
-    setStoredOpen(storageKey, open);
-  }, [open, storageKey]);
+    setStoredOpen(storageKey, preferredOpen);
+  }, [preferredOpen, storageKey]);
 
   useEffect(() => {
-    if (!dismissOnEscape || !open) return;
+    if (!dismissOnEscape || !open || forceOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (
         event.key !== 'Escape' ||
@@ -102,7 +105,7 @@ export function SidebarCollapsibleGroup({
     };
     globalThis.addEventListener('keydown', onKeyDown, true);
     return () => globalThis.removeEventListener('keydown', onKeyDown, true);
-  }, [dismissOnEscape, open]);
+  }, [dismissOnEscape, forceOpen, open]);
 
   return (
     <SidebarGroup ref={groupRef} className={cn('space-y-0', className)}>
@@ -112,13 +115,16 @@ export function SidebarCollapsibleGroup({
             ref={triggerRef}
             type='button'
             isActive={false}
-            onClick={() => setOpen(value => !value)}
+            onClick={() => {
+              if (!forceOpen) setOpen(value => !value);
+            }}
             tooltip={tooltip}
             className={cn(
               'justify-between',
               'h-(--app-shell-sidebar-row-height) px-(--app-shell-sidebar-inset) text-sidebar-muted hover:bg-transparent hover:text-sidebar-muted'
             )}
             aria-expanded={open}
+            aria-disabled={forceOpen || undefined}
           >
             <span
               data-rail-label='true'

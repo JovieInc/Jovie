@@ -481,7 +481,7 @@ describe('UserButton account surface layout', () => {
 
   it('keeps arrow-key navigation and Escape focus return', async () => {
     const user = userEvent.setup();
-    render(<UserButton showUserInfo />);
+    render(<UserButton showUserInfo footerStatus={{}} />);
     const trigger = screen.getByRole('button', { name: /Adele Adkins/i });
     trigger.focus();
     await user.keyboard('{Enter}');

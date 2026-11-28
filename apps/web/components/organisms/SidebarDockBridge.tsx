@@ -3,12 +3,16 @@
 import dynamic from 'next/dynamic';
 import { type ComponentProps, useEffect, useState } from 'react';
 import { useOUpdates } from '@/components/organisms/o-presence/useOUpdates';
+import { UserButton } from '@/components/organisms/user-button';
 import {
   SidebarDock,
   type SidebarDockUpdateControl,
 } from '@/components/shell/SidebarDock';
 import { SidebarOPresence } from '@/components/shell/SidebarOPresence';
-import { usePublishSidebarDockStatus } from '@/components/shell/sidebar-dock-status';
+import {
+  usePublishSidebarDockStatus,
+  useSidebarDockStatus,
+} from '@/components/shell/sidebar-dock-status';
 import { APP_ROUTES } from '@/constants/routes';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import type { BrandVariant } from '@/lib/brand/tokens';
@@ -75,6 +79,8 @@ function SidebarDockBridgeInner({
   userId,
   collapsed,
   penRail = false,
+  showEditorial = true,
+  profileHref,
   fetchImpl = fetch,
   userState,
   oHref = APP_ROUTES.CHAT,
@@ -85,19 +91,22 @@ function SidebarDockBridgeInner({
   readonly userState?: WhatsNewUserState;
   readonly collapsed: boolean;
   readonly penRail?: boolean;
+  readonly showEditorial?: boolean;
+  readonly profileHref?: string;
   /** Where the O leads: the main chat page of the current workspace. */
   readonly oHref?: string;
   readonly variant?: BrandVariant;
 }) {
   const publishStatus = usePublishSidebarDockStatus();
-  const updateControl = useDesktopUpdateState();
-  const { update: oUpdate, clear: clearOUpdate } = useOUpdates();
-  const updateControlKind = updateControl.state.kind;
+  const dockStatus = useSidebarDockStatus();
   const [dismissedReadyVersion, setDismissedReadyVersion] = useState<string>();
+  const updateControl = useDesktopUpdateState();
   const readyVersion =
     updateControl.state.kind === 'ready'
       ? updateControl.state.version
       : undefined;
+  const { update: oUpdate, clear: clearOUpdate } = useOUpdates();
+  const updateControlKind = updateControl.state.kind;
   const dockUpdateControl: SidebarDockUpdateControl =
     updateControlKind === 'hidden' ||
     (readyVersion !== undefined && readyVersion === dismissedReadyVersion)
@@ -122,12 +131,13 @@ function SidebarDockBridgeInner({
         };
   const pwa = usePWAInstall();
   const { state: oState, nowPlaying } = useOPresence();
-  const { activeTrackId, trackTitle } = useTrackAudioSnapshot(selectNowPlaying);
-  const { toggleTrack } = useTrackAudioActions();
+  const { activeTrackId, trackTitle, artworkUrl } =
+    useTrackAudioSnapshot(selectNowPlaying);
+  const { toggleTrack, stop } = useTrackAudioActions();
   const [release, setRelease] = useState<WhatsNewEntry | null>(null);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !showEditorial) return;
     const controller = new AbortController();
     void fetchImpl(WHATS_NEW_PATH, {
       signal: controller.signal,
@@ -140,7 +150,7 @@ function SidebarDockBridgeInner({
       })
       .catch(() => {});
     return () => controller.abort();
-  }, [userId, fetchImpl]);
+  }, [userId, fetchImpl, showEditorial]);
 
   const updating =
     updateControlKind === 'checking' || updateControlKind === 'downloading';
@@ -150,6 +160,7 @@ function SidebarDockBridgeInner({
         userId={userId}
         collapsed={collapsed}
         penRail={penRail}
+        enabled={showEditorial}
         updateControl={dockUpdateControl}
         release={
           release && userState && isWhatsNewActionComplete(release, userState)
@@ -175,6 +186,20 @@ function SidebarDockBridgeInner({
         updating={updating}
         variant={variant}
         href={oHref}
+        collapsed={collapsed}
+        account={
+          penRail
+            ? status => (
+                <UserButton
+                  showUserInfo
+                  footerStatus={status}
+                  dockStatus={showEditorial ? dockStatus : undefined}
+                  profileHref={profileHref}
+                  settingsHref={APP_ROUTES.SETTINGS}
+                />
+              )
+            : undefined
+        }
         inert={oState.sidebarInert}
         player={
           nowPlaying
@@ -182,6 +207,8 @@ function SidebarDockBridgeInner({
                 title: nowPlaying.title,
                 artist: nowPlaying.artist,
                 isPlaying: nowPlaying.isPlaying,
+                artworkUrl,
+                onDismiss: stop,
                 onToggle: () => {
                   if (activeTrackId && trackTitle)
                     void toggleTrack({

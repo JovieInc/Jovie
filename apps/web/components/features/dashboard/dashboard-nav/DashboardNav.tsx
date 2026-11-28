@@ -14,6 +14,7 @@ import {
   SidebarMenu,
   useSidebar,
 } from '@/components/organisms/sidebar';
+import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
 import { RailStagedContent } from '@/components/shell/RailStagedContent';
 import {
   readThreadReadState,
@@ -50,6 +51,7 @@ import {
   isNavigationItemActive,
   isNavigationItemHighlighted,
 } from './navigation-state';
+import { SidebarChatAction } from './SidebarChatAction';
 import type { DashboardNavProps, NavItem } from './types';
 import { usePendingNavigation } from './use-pending-navigation';
 
@@ -87,11 +89,16 @@ const NEW_CHAT_ROW_ITEM: NavItem = {
 export function DashboardNav({
   children: searchSurface,
   headerOwnsInbox = false,
+  penRail = false,
 }: DashboardNavProps) {
   const { selectedProfile, inboxNavigation } = useDashboardData();
   const sidebarNavigation = useMemo(
-    () => getRailNavigation(canonicalSidebarNavigation, headerOwnsInbox),
-    [headerOwnsInbox]
+    () =>
+      getRailNavigation(
+        canonicalSidebarNavigation,
+        headerOwnsInbox && !penRail
+      ),
+    [headerOwnsInbox, penRail]
   );
   const { isMobile, openMobile, state: sidebarState } = useSidebar();
   const pathname = usePathname();
@@ -187,7 +194,10 @@ export function DashboardNav({
   const artistSettingsLabel = 'Artist';
 
   const navSections: readonly DashboardNavSection[] = [
-    { key: 'primary', items: [...sidebarNavigation] },
+    {
+      key: 'primary',
+      items: [...sidebarNavigation],
+    },
   ];
 
   // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
@@ -451,12 +461,39 @@ export function DashboardNav({
   // Memoize renderSection to prevent creating new functions on every render
   const renderSection = useCallback(
     (items: readonly NavItem[]) => (
-      <SidebarMenu className='gap-1 lg:gap-px'>
+      <SidebarMenu className={penRail ? 'gap-0' : 'gap-1 lg:gap-px'}>
         {items.map((item, index) => renderNavItem(item, index))}
       </SidebarMenu>
     ),
-    [renderNavItem]
+    [penRail, renderNavItem]
   );
+
+  const recentChats =
+    !conversationsLoading &&
+    !conversationsError &&
+    conversations?.length === 0 ? (
+      <p className='px-(--app-shell-sidebar-inset) text-xs text-tertiary-token'>
+        No chats yet
+      </p>
+    ) : (
+      <SidebarThreadsSection
+        threads={sidebarThreads}
+        activeThreadId={activeThreadId}
+        allThreadsActive={normalizeTrailingSlash(pathname) === APP_ROUTES.CHATS}
+        onThreadContextMenu={onThreadContextMenu}
+        newThreadAction={false}
+        state={
+          conversationsError
+            ? 'error'
+            : conversationsLoading
+              ? 'loading'
+              : 'idle'
+        }
+        onRetry={handleRetryThreads}
+        calm
+        collapsed={false}
+      />
+    );
 
   return (
     <>
@@ -482,8 +519,25 @@ export function DashboardNav({
             </SidebarCollapsibleGroup>
           </>
         ) : (
-          <SidebarGroup className='p-0 lg:pt-1'>
-            {newChatOwnsRow ? (
+          <SidebarGroup
+            className={penRail ? 'sidebar-pen-nav p-0' : 'p-0 lg:pt-1'}
+          >
+            {penRail ? (
+              <>
+                <SidebarChatAction
+                  current={
+                    normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT &&
+                    searchParams.get('panel') !== 'profile'
+                  }
+                  recentChats={threadsVisible ? recentChats : null}
+                  pending={pendingNavigation?.itemId === chatNavItem.id}
+                  onActivate={event => handleCommandClick(event, chatNavItem)}
+                />
+                <div className='sidebar-pen-search-row'>
+                  <HeaderSearchSurfaceFromContext penRail />
+                </div>
+              </>
+            ) : newChatOwnsRow ? (
               // Keep creation on the shared navigation row and icon column.
               <div data-nav-section='create' className='[&_a]:after:-inset-y-2'>
                 {renderSection([NEW_CHAT_ROW_ITEM])}
@@ -491,7 +545,9 @@ export function DashboardNav({
             ) : (
               commandSlot
             )}
-            <SidebarGroupContent className='pb-2 pt-5 lg:pt-px'>
+            <SidebarGroupContent
+              className={penRail ? 'pt-2' : 'pb-2 pt-5 lg:pt-px'}
+            >
               {navSections.map(section => (
                 <div key={section.key} data-nav-section={section.key}>
                   {renderSection(section.items)}
@@ -501,7 +557,7 @@ export function DashboardNav({
           </SidebarGroup>
         )}
 
-        {threadsVisible ? (
+        {threadsVisible && !penRail ? (
           <SidebarCollapsibleGroup
             label='Chat History'
             className='pt-5'
@@ -509,33 +565,7 @@ export function DashboardNav({
             dismissOnEscape
             unmountWhenClosed
           >
-            {!conversationsLoading &&
-            !conversationsError &&
-            conversations?.length === 0 ? (
-              <p className='px-(--app-shell-sidebar-inset) text-xs text-tertiary-token'>
-                No chats yet
-              </p>
-            ) : (
-              <SidebarThreadsSection
-                threads={sidebarThreads}
-                activeThreadId={activeThreadId}
-                allThreadsActive={
-                  normalizeTrailingSlash(pathname) === APP_ROUTES.CHATS
-                }
-                onThreadContextMenu={onThreadContextMenu}
-                newThreadAction={false}
-                state={
-                  conversationsError
-                    ? 'error'
-                    : conversationsLoading
-                      ? 'loading'
-                      : 'idle'
-                }
-                onRetry={handleRetryThreads}
-                calm
-                collapsed={false}
-              />
-            )}
+            {recentChats}
           </SidebarCollapsibleGroup>
         ) : null}
       </nav>

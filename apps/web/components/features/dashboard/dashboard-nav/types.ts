@@ -32,6 +32,7 @@ export interface NavItem {
 }
 
 export interface DashboardNavProps {
+  readonly penRail?: boolean;
   /** The brand-row bell owns Inbox discovery in the main customer shell. */
   readonly headerOwnsInbox?: boolean;
   readonly collapsed?: boolean;

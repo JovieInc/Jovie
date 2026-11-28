@@ -144,3 +144,13 @@ describe('SidebarHeaderActions', () => {
     }
   });
 });
+
+it('moves search out of the Pen header while keeping the bell and toggle', () => {
+  electron.value = false;
+  renderActions({ penRail: true });
+  expect(screen.queryByRole('button', { name: 'Search Jovie' })).toBeNull();
+  expect(screen.getByRole('link', { name: /^Home — / })).toBeVisible();
+  expect(
+    screen.getByRole('button', { name: 'Collapse sidebar' })
+  ).toBeVisible();
+});

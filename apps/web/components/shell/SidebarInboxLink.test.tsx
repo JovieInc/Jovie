@@ -270,3 +270,16 @@ describe('central Inbox bell', () => {
     pathname.current = '/app/chat';
   });
 });
+
+it('qualifies the bell alongside Home without marking zero pending items as unread', () => {
+  const { container } = render(
+    <SidebarInboxLink
+      qualified
+      availability={{ state: 'available', pendingCount: 0 }}
+    />
+  );
+  expect(
+    screen.getByRole('link', { name: 'Home — notifications' })
+  ).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
+  expect(container.querySelector('[data-inbox-unread]')).toBeNull();
+});

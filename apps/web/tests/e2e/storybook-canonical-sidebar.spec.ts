@@ -44,17 +44,13 @@ for (const theme of ['dark', 'light']) {
     );
     const nav = page.getByRole('navigation', { name: 'Dashboard Navigation' });
     await expect(nav).toBeVisible({ timeout: 60_000 });
-    await expect(nav.getByText('Today', { exact: true })).toBeVisible();
-    await expect(nav.getByText('Earlier', { exact: true })).toBeVisible();
     const footer = page.locator('[data-sidebar="footer"]');
     const before = await footer.boundingBox();
     expect(before).not.toBeNull();
     expect(before!.y + before!.height).toBeCloseTo(
       page.viewportSize()!.height,
-      0
+      1
     );
-    // The header bell owns `/app`, so the rail has no Inbox row; measure a
-    // canonical destination row instead.
     await expect(nav.locator('[data-navigation-item-id="home"]')).toHaveCount(
       0
     );
@@ -63,25 +59,20 @@ for (const theme of ['dark', 'light']) {
       .and(page.locator('[data-navigation-item-id="library"]'));
     const row = await work.boundingBox();
     expect(row!.height).toBe(28);
-    const create = nav.getByRole('link', { name: 'New Chat' });
+    const create = nav.getByRole('link', { name: 'Chat', exact: true });
     await expect(create).toHaveCount(1);
     await expect(create).toHaveAttribute('href', '/app/chat');
-    await expect(nav.locator('[data-sidebar-history-header]')).toContainText(
-      'Today'
-    );
-    // Header owns bell and search: New Chat is a 28px row, no lone "+".
-    await expect(nav.locator('[data-sidebar-search-slot]')).toHaveCount(0);
-    await expect(
-      nav.getByRole('button', { name: 'Filter Unread Chats' })
-    ).toHaveCount(0);
-    expect((await create.boundingBox())!.height).toBe(28);
+    expect((await create.boundingBox())!.height).toBe(44);
     await create.focus();
     await expect(create).toBeFocused();
+    await create.press('ArrowRight');
+    const history = page.getByRole('dialog', { name: 'Recent Chats' });
+    await expect(
+      history.getByRole('link', { name: 'All chats' })
+    ).toHaveAttribute('href', '/app/chats');
+    await history.press('Escape');
+    await expect(create).toBeFocused();
     expect(await footer.boundingBox()).toEqual(before);
-    await expect(nav.getByRole('link', { name: 'All chats' })).toHaveAttribute(
-      'href',
-      '/app/chats'
-    );
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth > window.innerWidth
     );
@@ -127,11 +118,13 @@ async function readSidebarAnchors(
     }
     const rail = document.querySelector('[data-shell-rail-motion="left"]');
     const brand = rail?.querySelector<HTMLElement>(
-      '[data-sidebar="header"] [data-brand-variant]'
+      '[data-sidebar-o-presence] [data-brand-variant]'
     );
     const header = rail?.querySelector('[data-sidebar="header"]');
-    const footer = rail?.querySelector('[data-sidebar="footer"]');
-    const account = footer?.querySelector('button');
+    const footer = rail?.querySelector(
+      '[data-sidebar-footer-row], [data-sidebar-o-presence]'
+    );
+    const account = footer?.querySelector('button, a');
     if (!rail || !brand || !header || !footer || !account)
       throw new Error('Incomplete composed sidebar');
     let opacity = 1;
@@ -149,7 +142,7 @@ async function readSidebarAnchors(
     }
     const rows = Array.from(
       rail.querySelectorAll<HTMLElement>(
-        '[data-navigation-item-id]:not([data-navigation-item-id="chat"])'
+        'nav [data-navigation-item-id]:not([data-navigation-item-id="chat"])'
       )
     ).map(row => {
       const box = row.getBoundingClientRect();
@@ -403,28 +396,34 @@ for (const history of ['composed-history', 'composed-empty-history']) {
         name: 'Dashboard Navigation',
       });
       await expect(nav).toBeVisible({ timeout: 60_000 });
-      const create = nav.getByRole('link', { name: 'New Chat', exact: true });
+      const create = nav.getByRole('link', { name: 'Chat', exact: true });
       const draft = page.getByRole('textbox', { name: 'Campaign Draft' });
       await draft.fill('Preserve this campaign draft');
       await draft.evaluate(element => {
         element.dataset.mountReceipt = 'original';
       });
       const expanded = await readSidebarAnchors(page);
-      const headingAction = nav.locator(
-        '[data-nav-section="create"] [data-navigation-item-id="chat"]'
-      );
+      const headingAction = nav.locator('[data-navigation-item-id="chat"]');
       await expect(headingAction).toHaveCount(1);
       await expect(create).toHaveCount(1);
-      await expect(create).toContainText('New Chat');
+      await expect(create).toContainText('Chat');
       await expect(nav.locator('[data-sidebar-search-slot]')).toHaveCount(0);
       await expect(
         nav.getByRole('button', { name: 'Filter Unread Chats' })
       ).toHaveCount(0);
-      await expect(nav.getByRole('link', { name: 'All chats' })).toHaveCount(
-        history === 'composed-history' ? 1 : 0
-      );
+      await create.press('ArrowRight');
+      const historyPanel = page.getByRole('dialog', { name: 'Recent Chats' });
+      await expect(historyPanel).toBeVisible();
+      if (history === 'composed-history') {
+        await expect(
+          historyPanel.getByRole('link', { name: 'All chats' })
+        ).toHaveAttribute('href', '/app/chats');
+      } else {
+        await expect(historyPanel.getByText('No chats yet')).toBeVisible();
+      }
+      await historyPanel.press('Escape');
       const box = await create.boundingBox();
-      expect(box!.height).toBe(28);
+      expect(box!.height).toBe(44);
       await page.screenshot({
         path: testInfo.outputPath(`${history}-${theme}-expanded.png`),
       });
@@ -476,26 +475,26 @@ for (const history of ['composed-history', 'composed-empty-history']) {
         .click();
       await draft.focus();
       await page.mouse.move(900, 600);
+      const content = page.locator('[data-app-shell-content-column]');
+      const closedBounds = (await content.boundingBox())!;
       await page
         .getByRole('button', { name: 'Expand sidebar', exact: true })
         .hover();
-      const toggle = page.getByRole('button', {
-        name: 'Expand sidebar',
+      const pin = page.getByRole('button', {
+        name: 'Pin sidebar',
         exact: true,
       });
-      const beforeHover = await toggle.boundingBox();
-      await toggle.hover();
-      await create.hover();
-      await toggle.focus();
-      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
-      await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-      expect(await toggle.boundingBox()).toEqual(beforeHover);
+      await expect(pin).toHaveAttribute('aria-pressed', 'false');
+      await expect.poll(() => content.boundingBox()).toEqual(closedBounds);
       await expect(create).toHaveCount(1);
       await expect(headingAction).toHaveCount(1);
-      await toggle.click();
+      await pin.click();
       await expect(
         page.getByRole('button', { name: 'Collapse sidebar', exact: true })
       ).toHaveAttribute('aria-pressed', 'true');
+      await expect
+        .poll(async () => (await content.boundingBox())!.x)
+        .toBeGreaterThan(closedBounds.x);
       expectStableSidebar(expanded, await readSidebarAnchors(page));
       await page
         .getByRole('button', { name: 'Collapse sidebar', exact: true })

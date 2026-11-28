@@ -93,12 +93,12 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
         await toggle.click();
       await expect
         .poll(async () => (await shellGeometry(page)).rail.width)
-        .toBe(224);
+        .toBe(244);
       const expanded = await shellGeometry(page);
       expect(expanded.rows).toHaveLength(4);
       if (workspace === 'dashboard') {
         await expect(
-          nav.getByRole('link', { name: 'New Chat' })
+          nav.getByRole('link', { name: 'Chat', exact: true })
         ).toHaveAttribute('href', '/app/chat');
       }
       for (let cycle = 0; cycle < 3; cycle++) {
@@ -118,12 +118,9 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
     expect(customer.header).toEqual(operator.header);
     expect(customer.brand).toEqual(operator.brand);
     expect(customer.main).toEqual(operator.main);
-    expect(customer.rows.map(row => row.y)).toEqual(
-      operator.rows.map(row => row.y)
-    );
-    expect(customer.rows.map(row => row.height)).toEqual(
-      operator.rows.map(row => row.height)
-    );
+    expect(customer.rows[0]?.height).toBe(44);
+    expect(customer.rows.slice(1).every(row => row.height === 28)).toBe(true);
+    expect(operator.rows.every(row => row.height === 28)).toBe(true);
     await testInfo.attach('shared-shell-geometry.json', {
       body: JSON.stringify({ reducedMotion, customer, operator }),
       contentType: 'application/json',

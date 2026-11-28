@@ -83,7 +83,7 @@ describe('UnifiedSidebar header', () => {
       'utf8'
     );
 
-    expect(source).toContain("'h-(--app-shell-header-height) py-0.5'");
+    expect(source).toContain("'h-(--app-shell-header-height) shrink-0 py-0.5'");
     expect(source).not.toContain(
       "'h-(--app-shell-header-height-compact) py-0.5'"
     );
@@ -98,10 +98,9 @@ describe('UnifiedSidebar header', () => {
     expect(
       screen.queryByRole('button', { name: 'Ask Jovie' })
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open Chat' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.CHAT
-    );
+    expect(
+      screen.getByRole('button', { name: 'Tim White account' })
+    ).toBeEnabled();
     expect(
       screen.queryByRole('link', { name: 'New Chat' })
     ).not.toBeInTheDocument();
@@ -241,10 +240,9 @@ describe('UnifiedSidebar header', () => {
     expect(
       screen.queryByRole('button', { name: 'Ask Jovie' })
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open Chat' })).toHaveAttribute(
-      'href',
-      APP_ROUTES.CHAT
-    );
+    expect(
+      screen.getByRole('button', { name: 'Tim White account' })
+    ).toBeEnabled();
   });
 
   it('shows OV as the active admin workspace without changing header height', () => {

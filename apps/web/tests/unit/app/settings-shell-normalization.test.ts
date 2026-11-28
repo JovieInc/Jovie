@@ -257,8 +257,8 @@ describe('settings shell normalization', () => {
     expect(sidebarSource).toContain(
       "const isInSettings = section === 'settings';"
     );
-    expect(sidebarSource).toContain(
-      '<SettingsNavigation pathname={pathname} section={section} />'
+    expect(sidebarSource).toMatch(
+      /<SettingsNavigation\s+pathname=\{pathname\}\s+section=\{section\}[^>]*\/>/u
     );
     expect(sidebarSource).toContain("from './SettingsNavGroup'");
     // Keep Settings in the shared shell, with default SSR and a real import

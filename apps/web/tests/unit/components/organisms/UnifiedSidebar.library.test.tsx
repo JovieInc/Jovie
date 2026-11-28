@@ -107,18 +107,11 @@ describe('UnifiedSidebar library route', () => {
     expect(userButtonPropsMock).toHaveBeenCalledWith(
       expect.objectContaining({ showUserInfo: true })
     );
-    const panel = screen.getByTestId('sidebar-user-panel');
-    expect(panel.tagName).toBe('FIELDSET');
-    expect(panel).toHaveAccessibleName('Creator Identity');
-    expect(
-      screen.getAllByRole('group', { name: 'Creator Identity' })
-    ).toHaveLength(1);
-    expect(panel).toContainElement(screen.getByTestId('user-button'));
-    expect(
-      within(panel).queryByRole('link', { name: /Public Profile/i })
-    ).toBeNull();
+    expect(screen.getByTestId('sidebar-o-presence')).toContainElement(
+      screen.getByTestId('user-button')
+    );
     expect(userButtonPropsMock).toHaveBeenCalledWith(
-      expect.objectContaining({ calm: true, profileHref: '/timwhite' })
+      expect.objectContaining({ profileHref: '/timwhite' })
     );
     expect(screen.queryByText('Public Profile')).not.toBeInTheDocument();
     expect(screen.queryByTestId('sidebar-upgrade-banner')).toBeNull();
@@ -134,7 +127,7 @@ describe('UnifiedSidebar library route', () => {
     const row = screen
       .getByRole('link', { name: /^Home/ })
       .closest('[data-sidebar-brand-row]');
-    expect(row).toContainElement(
+    expect(row).not.toContainElement(
       screen.getByRole('button', { name: 'Search Sidebar' })
     );
     expect(screen.getByRole('link', { name: /^Home/ })).toHaveAttribute(

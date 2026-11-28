@@ -2,10 +2,10 @@ import { expect, test } from '@playwright/test';
 
 test.use({ viewport: { width: 1126, height: 798 } });
 
-// One optical column: the brand mark, New Chat and every nav icon share the
-// 12px sidebar inset (Pen shell, docs/design-system/shell-ia.md).
+// One optical column: the account mark, Chat and every nav icon share the
+// x32 sidebar column (Pen shell, docs/design-system/shell-ia.md).
 for (const story of ['dashboard', 'admin-dashboard', 'composed-history']) {
-  test(`${story} keeps the brand, New Chat and nav icons on one column`, async ({
+  test(`${story} keeps the account mark, Chat and nav icons on one column`, async ({
     page,
   }) => {
     await page.goto(
@@ -14,31 +14,30 @@ for (const story of ['dashboard', 'admin-dashboard', 'composed-history']) {
     );
     const nav = page.getByRole('navigation', { name: 'Dashboard Navigation' });
     await expect(nav).toBeVisible({ timeout: 60_000 });
-    // Header owns bell and search, so New Chat is a labeled row.
-    const create = nav.locator(
-      '[data-nav-section="create"] [data-navigation-item-id="chat"]'
-    );
+    const create = nav.getByRole('link', { name: 'Chat', exact: true });
     await expect(create).toHaveCount(1);
-    await expect(create).toContainText('New Chat');
+    await expect(create).toContainText('Chat');
     await expect(nav.locator('[data-sidebar-search-slot]')).toHaveCount(0);
     const column = await page.evaluate(() => {
-      const left = (el: Element | null | undefined) =>
-        el ? Math.round(el.getBoundingClientRect().left) : Number.NaN;
-      const rail = document.querySelector('[data-shell-rail-motion="left"]');
-      const brand = document.querySelector('[data-sidebar-brand-row] svg');
+      const center = (el: Element | null) => {
+        const box = el?.getBoundingClientRect();
+        return box ? Math.round(box.left + box.width / 2) : Number.NaN;
+      };
+      const left =
+        document
+          .querySelector('[data-shell-rail-motion="left"]')
+          ?.getBoundingClientRect().left ?? Number.NaN;
+      const mark = document.querySelector('.sidebar-footer-mark');
       const rows = document.querySelectorAll(
         'nav[aria-label="Dashboard Navigation"] a[data-navigation-item-id]'
       );
       return {
-        brand: left(brand) - left(rail),
-        icons: Array.from(
-          rows,
-          row => left(row.querySelector('svg')) - left(rail)
-        ),
+        mark: center(mark) - left,
+        icons: Array.from(rows, row => center(row.querySelector('svg')) - left),
       };
     });
     expect(column.icons.length).toBeGreaterThan(1);
-    for (const icon of column.icons) expect(icon).toBe(12);
-    expect(column.brand).toBe(12);
+    for (const icon of column.icons) expect(icon).toBe(32);
+    expect(column.mark).toBe(32);
   });
 }

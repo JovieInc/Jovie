@@ -356,3 +356,49 @@ describe('SidebarOPresence', () => {
     });
   });
 });
+
+it('replaces the account row with playback and restores the same footer on dismiss', () => {
+  const onToggle = vi.fn();
+  const onExpand = vi.fn();
+  const onDismiss = vi.fn();
+  const account = () => (
+    <button type='button' data-sidebar-footer-trigger=''>
+      Tim White account
+    </button>
+  );
+  const view = render(<SidebarOPresence account={account} />);
+  const footer = screen.getByTestId(SIDEBAR_O_PRESENCE_TEST_ID);
+  expect(
+    screen.getByRole('button', { name: 'Tim White account' })
+  ).toBeVisible();
+
+  view.rerender(
+    <SidebarOPresence
+      account={account}
+      player={{
+        title: 'Midnight Sketch',
+        artist: 'Demo artist',
+        isPlaying: false,
+        onToggle,
+        onExpand,
+        onDismiss,
+      }}
+    />
+  );
+  expect(screen.getByTestId(SIDEBAR_O_PRESENCE_TEST_ID)).toBe(footer);
+  expect(
+    screen.queryByRole('button', { name: 'Tim White account' })
+  ).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Play Midnight Sketch' }));
+  fireEvent.click(screen.getByRole('button', { name: /Show Player/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Dismiss Player' }));
+  expect(onToggle).toHaveBeenCalledOnce();
+  expect(onExpand).toHaveBeenCalledOnce();
+  expect(onDismiss).toHaveBeenCalledOnce();
+
+  view.rerender(<SidebarOPresence account={account} />);
+  expect(screen.getByTestId(SIDEBAR_O_PRESENCE_TEST_ID)).toBe(footer);
+  expect(
+    screen.getByRole('button', { name: 'Tim White account' })
+  ).toBeVisible();
+});

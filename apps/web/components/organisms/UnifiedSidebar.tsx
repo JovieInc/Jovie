@@ -25,6 +25,10 @@ import {
   SHELL_RAIL_LABEL,
 } from '@/components/shell/rail-motion';
 import { SidebarHeaderActions } from '@/components/shell/SidebarHeaderActions';
+import {
+  getSidebarNavIconClassName,
+  getSidebarNavRowClassName,
+} from '@/components/shell/SidebarNavItem';
 import { SidebarDockStatusProvider } from '@/components/shell/sidebar-dock-status';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useShellSidebarOverride } from '@/contexts/ShellSidebarOverrideContext';
@@ -172,6 +176,7 @@ function OperatorNavigation({ pathname }: { readonly pathname: string }) {
 /** Logo (clean header) or back button for settings/library */
 function SidebarHeaderNav({
   headerOwnsCollapsedToggle,
+  penRail,
   isRouteSidebar,
   isOperatorSection,
   canSwitchWorkspaces,
@@ -182,6 +187,7 @@ function SidebarHeaderNav({
   routeBackLabel = 'Back to App',
 }: Readonly<{
   headerOwnsCollapsedToggle: boolean;
+  penRail: boolean;
   isRouteSidebar: boolean;
   isOperatorSection: boolean;
   canSwitchWorkspaces: boolean;
@@ -203,6 +209,11 @@ function SidebarHeaderNav({
         data-sidebar-brand-slot={isRouteSidebar ? undefined : ''}
       >
         {(() => {
+          if (
+            penRail &&
+            (isRouteSidebar || (!canSwitchWorkspaces && !hasMultipleIdentities))
+          )
+            return null;
           if (isRouteSidebar) {
             return (
               <div className='flex w-full items-center gap-2'>
@@ -269,7 +280,10 @@ function SidebarHeaderNav({
         })()}
       </div>
       <SidebarHeaderActions
-        showActions={!isRouteSidebar && !isOperatorSection && !isDemoRoute}
+        penRail={penRail}
+        showActions={
+          (penRail || !isRouteSidebar) && !isOperatorSection && !isDemoRoute
+        }
         headerOwnsCollapsedToggle={headerOwnsCollapsedToggle}
         inboxNavigation={inboxNavigation}
       />
@@ -303,6 +317,8 @@ export function UnifiedSidebar({
   const isOperatorSection = section === 'admin' || section === 'ov';
   const isRouteSidebar = isInSettings || sidebarOverride !== null;
   const hasMultipleIdentities = identities.length >= 2;
+  const penRail =
+    !isMobile && !isOperatorSection && !isDemoRoute && !sidebarOverride;
 
   const { profileHref } = useProfileData(section !== 'ov');
   const isSidebarCollapsed = sidebarState === 'closed';
@@ -318,6 +334,7 @@ export function UnifiedSidebar({
     <Sidebar
       variant='sidebar'
       data-shell-rail-motion='left'
+      data-pen-sidebar={penRail || undefined}
       collapsible='icon'
       className={cn(
         'bg-base',
@@ -340,11 +357,12 @@ export function UnifiedSidebar({
           // header-height token (founder lock 2026-09-25).
           className={cn(
             'relative justify-center gap-0 px-(--app-shell-sidebar-inset) group-data-[collapsible=icon]:px-0',
-            'h-(--app-shell-header-height) py-0.5'
+            'h-(--app-shell-header-height) shrink-0 py-0.5'
           )}
         >
           <SidebarHeaderNav
             headerOwnsCollapsedToggle={headerOwnsCollapsedToggle}
+            penRail={penRail}
             isRouteSidebar={isRouteSidebar}
             isOperatorSection={isOperatorSection}
             canSwitchWorkspaces={canSwitchWorkspaces}
@@ -355,31 +373,66 @@ export function UnifiedSidebar({
             routeBackLabel={sidebarOverride?.backLabel}
           />
         </SidebarHeader>
-        <div
-          data-sidebar-top-identity=''
-          className='shrink-0 border-b border-subtle [&_[data-slot=common-dropdown-trigger]]:min-h-8'
-        >
-          <SidebarIdentityGroup
-            calm={!isRouteSidebar}
-            profileHref={section === 'ov' ? undefined : profileHref}
-            showAccountMenu={!isInSettings}
-            label={section === 'ov' ? 'Account' : undefined}
-          />
-        </div>
+        {!penRail && (
+          <div
+            data-sidebar-top-identity=''
+            className='shrink-0 border-b border-subtle [&_[data-slot=common-dropdown-trigger]]:min-h-8'
+          >
+            <SidebarIdentityGroup
+              calm={!isRouteSidebar}
+              profileHref={section === 'ov' ? undefined : profileHref}
+              showAccountMenu={!isInSettings}
+              label={section === 'ov' ? 'Account' : undefined}
+            />
+          </div>
+        )}
+        {penRail && isInSettings ? (
+          <div className='shrink-0 px-(--app-shell-sidebar-inset) group-data-[collapsible=icon]:px-0'>
+            <Link
+              href={APP_ROUTES.DASHBOARD}
+              prefetch={false}
+              className={cn(
+                getSidebarNavRowClassName({ calm: true }),
+                'sidebar-pen-entry sidebar-pen-action'
+              )}
+            >
+              <ArrowLeft
+                className={getSidebarNavIconClassName({ calm: true })}
+                aria-hidden='true'
+              />
+              <span className={SHELL_RAIL_LABEL}>Back to App</span>
+            </Link>
+          </div>
+        ) : null}
 
         <SidebarContent className='min-h-0 flex-1 overflow-anchor-none px-0 pb-(--space-2-5) pt-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
-          <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
+          <SidebarGroup
+            className={cn(
+              'flex min-h-0 flex-1 flex-col pb-1',
+              penRail && 'pt-0'
+            )}
+          >
             <SidebarGroupContent className='flex min-h-0 flex-1 flex-col'>
               {section === 'ov' ? (
                 <OperatorNavigation pathname={pathname} />
               ) : isInSettings ? (
-                <div className='flex flex-1 flex-col overflow-y-auto pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
-                  <SettingsNavigation pathname={pathname} section={section} />
+                <div
+                  className={cn(
+                    'flex flex-1 flex-col overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+                    !penRail && 'pt-1'
+                  )}
+                >
+                  <SettingsNavigation
+                    pathname={pathname}
+                    section={section}
+                    penRail={penRail}
+                  />
                 </div>
               ) : sidebarOverride ? (
                 sidebarOverride.content
               ) : (
                 <DashboardNav
+                  penRail={penRail}
                   headerOwnsInbox={!isDemoRoute && !isOperatorSection}
                 >
                   {isDemoRoute ? (
@@ -401,12 +454,17 @@ export function UnifiedSidebar({
           ) : null}
         </SidebarContent>
 
-        <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 py-(--space-1)'>
+        <SidebarFooter
+          className={cn(
+            'mt-auto gap-0 px-0',
+            penRail ? 'py-0' : 'border-t border-subtle py-(--space-1)'
+          )}
+        >
           <SidebarDockBridge
             userId={user?.id ?? ''}
-            penRail={
-              !isMobile && !isOperatorSection && !isDemoRoute && !isRouteSidebar
-            }
+            showEditorial={!isInSettings}
+            penRail={penRail}
+            profileHref={profileHref}
             userState={{ hasClaimedHandle: Boolean(dockProfile?.username) }}
             collapsed={isSidebarCollapsed}
             oHref={section === 'ov' ? APP_ROUTES.ADMIN_CHAT : APP_ROUTES.CHAT}

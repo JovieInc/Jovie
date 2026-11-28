@@ -49,9 +49,11 @@ const dashboardData = {
 function renderNav({
   stripeConnectEnabled = APP_FLAG_DEFAULTS.STRIPE_CONNECT_ENABLED,
   artistName,
+  penRail = false,
 }: {
   stripeConnectEnabled?: boolean;
   artistName?: string;
+  penRail?: boolean;
 } = {}) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -82,6 +84,7 @@ function renderNav({
               <SettingsNavigation
                 pathname={APP_ROUTES.SETTINGS_ACCOUNT}
                 section='settings'
+                penRail={penRail}
               />
             </SidebarProvider>
           </TooltipProvider>
@@ -250,4 +253,24 @@ describe('SettingsNavigation', () => {
     await userEvent.type(search, 'public profile');
     expect(within(nav).getAllByRole('link')).toEqual([originalLink]);
   });
+});
+
+it('keeps the artist group preference when search temporarily reveals a match', async () => {
+  localStorage.removeItem('jovie:sidebar-section:settings.artist');
+  const user = userEvent.setup();
+  renderNav({ penRail: true });
+  const group = screen.getByRole('button', { name: 'Tim White' });
+  await user.click(group);
+  expect(group).toHaveAttribute('aria-expanded', 'false');
+  await user.keyboard('{Control>}k{/Control}');
+  const query = screen.getByRole('searchbox');
+  expect(query).toHaveFocus();
+  await user.type(query, 'Touring');
+  expect(screen.getByRole('link', { name: 'Touring' })).toBeVisible();
+  await user.clear(query);
+  expect(screen.getByRole('button', { name: 'Tim White' })).toHaveAttribute(
+    'aria-expanded',
+    'false'
+  );
+  localStorage.removeItem('jovie:sidebar-section:settings.artist');
 });

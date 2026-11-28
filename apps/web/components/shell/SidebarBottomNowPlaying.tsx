@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, IconButton } from '@jovie/ui';
+import { Button, IconButton, PlainButton } from '@jovie/ui';
 import { AudioLines, Pause, X } from 'lucide-react';
 import Image from 'next/image';
 import React from 'react';
@@ -8,6 +8,7 @@ import {
   ARTWORK_FIT_CLASSNAME,
   ArtworkFrame,
 } from '@/components/atoms/ArtworkFrame';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { PlayIcon } from '@/components/atoms/PlayIcon';
 import { cn } from '@/lib/utils';
 import type { NowPlayingTrack } from './SidebarNowPlaying';
@@ -41,6 +42,7 @@ export const SidebarBottomNowPlaying = React.memo(
     onDismiss,
     onExpand,
     collapsed = false,
+    footer = false,
     className,
   }: {
     readonly track: NowPlayingTrack;
@@ -50,6 +52,7 @@ export const SidebarBottomNowPlaying = React.memo(
     /** Reopen the full docked player (JOV-6680). Tapping the track info expands. */
     readonly onExpand?: () => void;
     readonly collapsed?: boolean;
+    readonly footer?: boolean;
     readonly className?: string;
   }) {
     const trackTitle = track.trackTitle ?? '';
@@ -57,6 +60,76 @@ export const SidebarBottomNowPlaying = React.memo(
     const artworkUrl = track.artworkUrl ?? '';
 
     if (!trackTitle && !artworkUrl) return null;
+
+    if (footer) {
+      const details = (
+        <>
+          <span className='sidebar-footer-track-title truncate'>
+            {trackTitle}
+          </span>
+          {artistName ? (
+            <span className='sidebar-footer-track-artist truncate'>
+              {artistName}
+            </span>
+          ) : null}
+        </>
+      );
+      return (
+        <div className='sidebar-footer-player'>
+          <PlainButton
+            type='button'
+            className='sidebar-footer-play'
+            aria-label={`${isPlaying ? 'Pause' : 'Play'} ${trackTitle}`}
+            onClick={onPlay}
+          >
+            <BrandLogo
+              size='control'
+              className='sidebar-footer-play-mark'
+              aria-hidden
+            />
+            <ArtworkFrame size={28} className='sidebar-footer-artwork'>
+              {artworkUrl ? (
+                <Image
+                  src={artworkUrl}
+                  alt=''
+                  fill
+                  sizes='28px'
+                  className={ARTWORK_FIT_CLASSNAME}
+                  unoptimized
+                />
+              ) : null}
+              <span className='sidebar-footer-play-overlay' aria-hidden='true'>
+                {isPlaying ? <Pause size={16} /> : <PlayIcon size={16} />}
+              </span>
+            </ArtworkFrame>
+          </PlainButton>
+          {onExpand && !collapsed ? (
+            <PlainButton
+              type='button'
+              className='sidebar-footer-track'
+              data-audio-expand-player='true'
+              onClick={onExpand}
+            >
+              {details}
+              <span className='sr-only'>Show Player</span>
+            </PlainButton>
+          ) : null}
+          {!onExpand && !collapsed ? (
+            <div className='sidebar-footer-track'>{details}</div>
+          ) : null}
+          {onDismiss && !collapsed ? (
+            <PlainButton
+              type='button'
+              aria-label='Dismiss Player'
+              onClick={onDismiss}
+              className='sidebar-footer-dismiss'
+            >
+              <X aria-hidden='true' size={16} />
+            </PlainButton>
+          ) : null}
+        </div>
+      );
+    }
 
     if (collapsed) {
       return (

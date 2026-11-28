@@ -4,11 +4,12 @@ import { Button } from '@jovie/ui';
 import type { OStrokeProps } from '@jovie/ui/brand/OStroke';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import type { BrandVariant } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
+import { SidebarBottomNowPlaying } from './SidebarBottomNowPlaying';
 import './SidebarOPresence.css';
 
 // The stroke engine loads only when a track is loaded, so idle shells never pay
@@ -58,9 +59,19 @@ export interface SidebarOPlayer {
   readonly isPlaying: boolean;
   readonly onToggle: () => void;
   readonly onExpand: () => void;
+  readonly artworkUrl?: string | null;
+  readonly onDismiss?: () => void;
+}
+
+export interface SidebarFooterAccountStatus {
+  readonly label?: string;
+  readonly update?: SidebarOUpdate;
+  readonly restoring?: boolean;
 }
 
 export interface SidebarOPresenceProps {
+  readonly account?: (status: SidebarFooterAccountStatus) => ReactNode;
+  readonly collapsed?: boolean;
   /** While audio is loaded the O is the play/pause button, title beside it. */
   readonly player?: SidebarOPlayer;
   /** Another surface (the full player) is the transport: present but inert. */
@@ -84,6 +95,8 @@ export interface SidebarOPresenceProps {
  */
 export function SidebarOPresence({
   player,
+  account,
+  collapsed = false,
   inert = false,
   updating = false,
   href = APP_ROUTES.CHAT,
@@ -126,9 +139,79 @@ export function SidebarOPresence({
   );
   // Rest pose stays today's glyph. Only a loaded track swaps in the stroke,
   // which opens as the circle and morphs to its play or pause pose.
-  const pose: OStrokePose = !player || inert ? 'circle' : playPose(player);
+  const pose: OStrokePose =
+    account || !player || inert ? 'circle' : playPose(player);
   const [drawnPose, setDrawnPose] = useState<OStrokePose>('circle');
   useEffect(() => setDrawnPose(pose), [pose]);
+
+  const footerRef = useRef<HTMLDivElement>(null);
+  const visiblePlayer = account && !inert ? player : undefined;
+  const [hasPaintedPlayback, setHasPaintedPlayback] = useState(false);
+  useEffect(() => {
+    if (visiblePlayer) setHasPaintedPlayback(true);
+  }, [visiblePlayer]);
+
+  if (account) {
+    return (
+      <div
+        ref={footerRef}
+        data-sidebar-o-presence=''
+        data-testid={SIDEBAR_O_PRESENCE_TEST_ID}
+        data-shell-audio-surface={visiblePlayer ? 'sidebar-compact' : undefined}
+        data-sidebar-footer-row=''
+        className='sidebar-identity-footer'
+      >
+        {visiblePlayer ? (
+          <SidebarBottomNowPlaying
+            footer
+            track={{
+              trackTitle: visiblePlayer.title,
+              artistName: visiblePlayer.artist,
+              artworkUrl: visiblePlayer.artworkUrl,
+            }}
+            collapsed={collapsed}
+            isPlaying={visiblePlayer.isPlaying}
+            onPlay={visiblePlayer.onToggle}
+            onExpand={visiblePlayer.onExpand}
+            onDismiss={
+              visiblePlayer.onDismiss &&
+              (() => {
+                const moveFocus = footerRef.current?.contains(
+                  document.activeElement
+                );
+                visiblePlayer.onDismiss?.();
+                if (moveFocus)
+                  requestAnimationFrame(() => {
+                    footerRef.current
+                      ?.querySelector<HTMLElement>(
+                        '[data-sidebar-footer-trigger]'
+                      )
+                      ?.focus();
+                  });
+              })
+            }
+          />
+        ) : (
+          account({
+            label: revealed
+              ? 'Syncing…'
+              : showUpdate
+                ? painted?.label
+                : undefined,
+            update: showUpdate && painted ? painted : undefined,
+            restoring: hasPaintedPlayback,
+          })
+        )}
+        <span role='status' className='sr-only'>
+          {revealed
+            ? 'Syncing'
+            : showUpdate && painted
+              ? `Updated: ${painted.label}`
+              : ''}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div

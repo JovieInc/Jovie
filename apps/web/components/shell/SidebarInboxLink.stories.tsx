@@ -38,6 +38,9 @@ export const StatusUnavailable: Story = {
   args: { availability: { state: 'unknown', pendingCount: null } },
 };
 
+/** The bell stays accessible before the availability response has arrived. */
+export const PartialAvailability: Story = { args: { qualified: true } };
+
 /** Nothing waits in the Inbox: the bell carries no attention dot. */
 export const EmptyInbox: Story = {
   args: { availability: { state: 'empty', pendingCount: 0 } },
