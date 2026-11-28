@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-
+import { DEFAULT_DEV_TEST_AUTH_EMAILS } from '@/lib/auth/dev-test-auth-identity';
+import {
+  newProdcertUserEmail,
+  PRODCERT_ADMIN_READBACK_EMAIL,
+  PRODCERT_CHAT_HEALTH_CANARY_EMAIL,
+  PRODCERT_CLAIM_CANARY_EMAIL,
+  PRODCERT_RETURNING_CANARY_EMAIL,
+} from '@/lib/synthetic/prodcert-identities';
 import {
   getAccountMetricCohort,
   getEmailDomain,
@@ -7,6 +14,7 @@ import {
   INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN,
   isInternalOrTestAccountEmail,
   isReservedTestEmailDomain,
+  isSyntheticCanaryRecipient,
   normalizeEmail,
 } from '@/lib/utils/email';
 
@@ -39,6 +47,18 @@ describe('email utils', () => {
     expect(getEmailSendBlockReason('browse-ready+clerk_test@jov.ie')).toContain(
       'synthetic canary'
     );
+    expect(getEmailSendBlockReason('browse-admin+clerk_test@jov.ie')).toContain(
+      'synthetic canary'
+    );
+    expect(getEmailSendBlockReason('browse+clerk_test@jov.ie')).toContain(
+      'synthetic canary'
+    );
+    // Only the exact fixture tags: other plus-addresses on the same mailboxes
+    // and look-alike domains still send.
+    expect(getEmailSendBlockReason('browse-admin+other@jov.ie')).toBeNull();
+    expect(
+      getEmailSendBlockReason('browse-admin+clerk_test@jov.ie.evil.com')
+    ).toBeNull();
     expect(getEmailSendBlockReason('tim@jov.ie')).toBeNull();
   });
 });
@@ -148,5 +168,24 @@ describe('getAccountMetricCohort', () => {
       'synthetic'
     );
     expect(getAccountMetricCohort(null)).toBe('unattributed');
+  });
+});
+
+describe('isSyntheticCanaryRecipient', () => {
+  // JOVIE-WEB-10N: every identity a production canary signs in as must be on
+  // the no-send list, or each run mails a mailbox with no inbox, hits the
+  // hard-bounce suppression and fails the sign-in.
+  it('never mails any production canary or dev-test fixture identity', () => {
+    const identities = [
+      PRODCERT_RETURNING_CANARY_EMAIL,
+      PRODCERT_ADMIN_READBACK_EMAIL,
+      PRODCERT_CHAT_HEALTH_CANARY_EMAIL,
+      PRODCERT_CLAIM_CANARY_EMAIL,
+      newProdcertUserEmail('run42abcdef'),
+      ...Object.values(DEFAULT_DEV_TEST_AUTH_EMAILS),
+    ];
+    for (const email of identities) {
+      expect(isSyntheticCanaryRecipient(email), email).toBe(true);
+    }
   });
 });
