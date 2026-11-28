@@ -61,3 +61,19 @@ export const LongContent: Story = {
 
 /** The full player is the transport: the O stays, inert and hidden. */
 export const FullPlayerOpen: Story = { args: { player, inert: true } };
+
+export const FooterPlayback: Story = {
+  render: () => (
+    <div style={{ width: 244 }}>
+      <SidebarOPresence
+        account={() => null}
+        player={{
+          ...player,
+          title: 'Midnight Sketch',
+          artist: 'Demo artist',
+          onDismiss: fn(),
+        }}
+      />
+    </div>
+  ),
+};

@@ -270,6 +270,15 @@ describe('SidebarDockBridge accessibility', () => {
   });
 });
 
+it('keeps Settings out of the editorial feed even during an actionable update', () => {
+  installDesktopUpdateBridge({ state: 'ready', version: '26.9.15' });
+  const { container } = render(
+    <SidebarDockBridge {...props} penRail showEditorial={false} />
+  );
+  expect(fetchFeed).not.toHaveBeenCalled();
+  expect(container.querySelector('[data-sidebar-dock]')).toBeNull();
+});
+
 it('keeps existing release eligibility when painting the Pen action', async () => {
   const { rerender } = render(<SidebarDockBridge {...props} penRail />);
   expect(

@@ -115,8 +115,8 @@ describe('UnifiedSidebar identity and dock', () => {
     );
   });
 
-  it('removes only the duplicate Settings account menu while preserving dock and profile access', async () => {
-    renderUnifiedSidebar({
+  it('keeps one account control in the Settings footer with no editorial card', async () => {
+    const { container } = renderUnifiedSidebar({
       pathname: APP_ROUTES.SETTINGS,
       section: 'settings',
     });
@@ -124,31 +124,21 @@ describe('UnifiedSidebar identity and dock', () => {
       await vi.dynamicImportSettled();
     });
 
-    const panel = screen.getByTestId('sidebar-user-panel');
-    expect(screen.queryByTestId('user-button')).not.toBeInTheDocument();
-    expect(screen.getByTestId('sidebar-whats-new')).toBeInTheDocument();
+    expect(screen.queryByTestId('sidebar-user-panel')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-sidebar-dock]')).toBeNull();
+    expect(screen.getByTestId('sidebar-o-presence')).toContainElement(
+      screen.getByTestId('user-button')
+    );
+    expect(screen.getAllByTestId('user-button')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: 'Back to App' })).toHaveAttribute(
+      'href',
+      APP_ROUTES.DASHBOARD
+    );
     expect(
-      screen.getByTestId('sidebar-now-playing-bridge')
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Sign Out' })).toBeEnabled();
-    expect(
-      within(panel).getByRole('link', { name: /Public Profile/i })
-    ).toHaveAttribute('href', '/timwhite');
-    const settingsNav = screen.getByRole('navigation', {
-      name: 'settings navigation',
-    });
-    for (const label of ['Personal', 'Artist']) {
-      const group = within(settingsNav)
-        .getAllByText(label)
-        .find(node => node.className.includes('font-caption'));
-      expect(group?.className).toContain('text-sidebar-muted');
-      expect(group?.className).not.toMatch(/text-sidebar-muted\/\d+/);
-      expect(group).toHaveClass(
-        'ps-(--app-shell-sidebar-label-inset)',
-        'pe-(--app-shell-sidebar-inset)'
-      );
-      expect(group).not.toHaveClass('px-2.5');
-    }
+      within(
+        screen.getByRole('navigation', { name: 'settings navigation' })
+      ).getByRole('searchbox', { name: 'Search Settings' })
+    ).toBeVisible();
   });
 
   it('keeps the unified user panel when a route-owned sidebar override replaces nav', () => {

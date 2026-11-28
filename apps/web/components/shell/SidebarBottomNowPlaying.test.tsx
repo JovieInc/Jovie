@@ -285,3 +285,26 @@ describe('SidebarBottomNowPlaying play glyph', () => {
     expect(source).not.toContain('translate-x-px');
   });
 });
+
+it('routes compact artwork and dismissal through independent footer controls', async () => {
+  const user = userEvent.setup();
+  const onPlay = vi.fn();
+  const onDismiss = vi.fn();
+  render(
+    <SidebarBottomNowPlaying
+      footer
+      track={fullTrack}
+      isPlaying={false}
+      onPlay={onPlay}
+      onDismiss={onDismiss}
+    />
+  );
+  const play = screen.getByRole('button', {
+    name: `Play ${fullTrack.trackTitle}`,
+  });
+  await user.click(play);
+  expect(onPlay).toHaveBeenCalledOnce();
+  expect(onDismiss).not.toHaveBeenCalled();
+  await user.click(screen.getByRole('button', { name: 'Dismiss Player' }));
+  expect(onDismiss).toHaveBeenCalledOnce();
+});

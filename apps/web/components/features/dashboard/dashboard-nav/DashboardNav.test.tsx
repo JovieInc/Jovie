@@ -444,3 +444,18 @@ describe('DashboardNav route warming', () => {
     expect(source).not.toContain(`@/components/organisms/${'Sidebar'}'`);
   });
 });
+
+it('keeps Home alongside the three workspace destinations on the Pen rail', () => {
+  renderDashboardNav({
+    renderFn: render,
+    headerOwnsInbox: true,
+    penRail: true,
+  });
+  expect(
+    screen
+      .getAllByRole('link')
+      .map(link => link.getAttribute('data-navigation-item-id'))
+  ).toEqual(['chat', 'home', 'presence', 'library', 'audience']);
+  expect(screen.getByRole('button', { name: 'Search Jovie' })).toBeVisible();
+  expect(screen.queryByRole('button', { name: 'Chat History' })).toBeNull();
+});

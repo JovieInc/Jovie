@@ -1,6 +1,12 @@
 'use client';
 
-import { INSET_PANEL_ICON_COLUMN, INSET_PANEL_ROW_LAYOUT } from '@jovie/ui';
+import {
+  INSET_PANEL_ICON_COLUMN,
+  INSET_PANEL_ROW_LAYOUT,
+  PlainButton,
+} from '@jovie/ui';
+import { ChevronsUpDown } from 'lucide-react';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import {
   SHELL_RAIL_ICON_BOX,
   SHELL_RAIL_STAGE,
@@ -8,6 +14,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Avatar } from '../../molecules/Avatar/Avatar';
 import { ACCOUNT_LOADING_FILL } from './account-loading-fill';
+import type { UserButtonProps } from './types';
 
 /**
  * The account button's placeholders and trigger avatar.
@@ -37,13 +44,32 @@ export interface UserButtonLoadingPlaceholderProps {
   readonly showUserInfo: boolean;
   /** The compact 32px sidebar row. */
   readonly calm: boolean;
+  readonly footer?: boolean;
 }
 
 /** Stands in for the account button until the session has loaded. */
 export function UserButtonLoadingPlaceholder({
   showUserInfo,
   calm,
+  footer = false,
 }: UserButtonLoadingPlaceholderProps) {
+  if (footer) {
+    return (
+      <div
+        className='sidebar-footer-account'
+        aria-busy='true'
+        data-testid='user-button-loading'
+      >
+        <span className='sidebar-footer-identity'>
+          <BrandLogo
+            size='control'
+            className='sidebar-footer-mark'
+            aria-hidden
+          />
+        </span>
+      </div>
+    );
+  }
   if (!showUserInfo) {
     return (
       <div
@@ -109,5 +135,45 @@ export function UserButtonTriggerAvatar({
     <span data-user-button-icon-column className={INSET_PANEL_ICON_COLUMN}>
       {avatar}
     </span>
+  );
+}
+
+/** Returns the native button directly so CommonDropdown can attach its trigger props. */
+export function renderFooterAccountTrigger({
+  displayName,
+  userInitials,
+  footerStatus,
+  dockStatus,
+}: Readonly<{
+  displayName: string;
+  userInitials: string;
+  footerStatus: NonNullable<UserButtonProps['footerStatus']>;
+  dockStatus: UserButtonProps['dockStatus'];
+}>) {
+  return (
+    <PlainButton
+      type='button'
+      aria-label={[
+        footerStatus.label,
+        `${displayName} account`,
+        dockStatus?.label,
+      ]
+        .filter(Boolean)
+        .join(' · ')}
+      data-sidebar-footer-trigger=''
+      data-communicating={Boolean(footerStatus.label) || undefined}
+      data-restoring={footerStatus.restoring || undefined}
+      className='sidebar-footer-account'
+    >
+      <span className='sidebar-footer-identity' aria-hidden='true'>
+        <BrandLogo size='control' className='sidebar-footer-mark' aria-hidden />
+        <span className='sidebar-footer-initials'>{userInitials}</span>
+        {dockStatus?.badges}
+      </span>
+      <span className='sidebar-footer-name truncate'>
+        {footerStatus.label ?? displayName}
+      </span>
+      <ChevronsUpDown className='sidebar-footer-chevron' aria-hidden='true' />
+    </PlainButton>
   );
 }

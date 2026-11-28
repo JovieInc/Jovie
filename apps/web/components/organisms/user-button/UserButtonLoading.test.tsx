@@ -85,3 +85,14 @@ describe('UserButtonTriggerAvatar', () => {
     ).toBeNull();
   });
 });
+
+it('holds a single bare brand slot while the footer account loads', () => {
+  const { container } = render(
+    <UserButtonLoadingPlaceholder showUserInfo calm={false} footer />
+  );
+  const placeholder = screen.getByTestId('user-button-loading');
+  expect(placeholder).toHaveAttribute('aria-busy', 'true');
+  expect(
+    container.querySelectorAll('[data-brand-mark-size="24"]')
+  ).toHaveLength(1);
+});

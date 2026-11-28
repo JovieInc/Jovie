@@ -29,7 +29,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { SHELL_RAIL_STAGE } from '@/components/shell/rail-motion';
 import { Tooltip } from '@/components/shell/Tooltip';
@@ -68,6 +68,7 @@ import type { UserButtonProps } from './types';
 import { UsageMenuItem } from './UsageMenuItem';
 import {
   BillingLoadingRow,
+  renderFooterAccountTrigger,
   UserButtonLoadingPlaceholder,
   UserButtonTriggerAvatar,
 } from './UserButtonLoading';
@@ -502,8 +503,10 @@ export function UserButton({
   calm = false,
   trigger,
   dockStatus,
+  footerStatus,
 }: UserButtonProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const showWorkspaceLock = getCurrentAppShellWorkspace(pathname).id === 'ov';
   const keyboardShortcuts = useKeyboardShortcutsSafe();
   const isElectronRuntime = useIsElectronRuntime();
@@ -619,7 +622,6 @@ export function UserButton({
     };
   }, [isElectronRuntime, isLoaded, user]);
 
-  // Handle loading state or no user
   if (!isLoaded || !user) {
     if (trigger) {
       return (
@@ -640,7 +642,11 @@ export function UserButton({
     }
 
     return (
-      <UserButtonLoadingPlaceholder showUserInfo={showUserInfo} calm={calm} />
+      <UserButtonLoadingPlaceholder
+        showUserInfo={showUserInfo}
+        calm={calm}
+        footer={Boolean(footerStatus)}
+      />
     );
   }
 
@@ -669,19 +675,37 @@ export function UserButton({
     desktopUpdate,
   });
 
-  // Custom trigger — use provided trigger prop or build default
+  if (footerStatus?.update?.href) {
+    const { label, href } = footerStatus.update;
+    dropdownItems.unshift({
+      type: 'action',
+      id: 'sidebar-presence-update',
+      label,
+      icon: Sparkles,
+      onClick: () => {
+        router.push(href);
+      },
+      className: ACCOUNT_MENU_ROW_CLASS,
+    });
+  }
+
   const triggerElement =
     trigger ??
-    (showUserInfo ? (
+    (footerStatus ? (
+      renderFooterAccountTrigger({
+        displayName,
+        userInitials,
+        footerStatus,
+        dockStatus,
+      })
+    ) : showUserInfo ? (
       <PlainButton
         type='button'
         className={cn(
           'relative group/user-button flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0',
-          // Founder lock 2026-09-25: single compact 32px row — 20px avatar,
           // name only (no workspace subtitle line). The 44px touch target is
           // an invisible hit container, not the visible row height (DS
           // Foundation V1 touch-target rule) — enlarge before:, not h-8.
-          // No inner inset and the nav icon gap, so the avatar centres on the
           // nav icon column and the name starts on the nav label edge.
           calm &&
             'relative h-8 px-0 gap-2 before:absolute before:inset-x-0 before:top-1/2 before:h-11 before:-translate-y-1/2 before:content-[""]'
@@ -752,8 +776,6 @@ export function UserButton({
       items={dropdownItems}
       trigger={triggerElement}
       align={trigger || showUserInfo ? 'start' : 'end'}
-      // The sidebar row sits in the footer, so its menu opens upward; Radix
-      // still flips it if there is no room above.
       side={isSidebarRow ? 'top' : 'bottom'}
       open={isMenuOpen}
       onOpenChange={setIsMenuOpen}

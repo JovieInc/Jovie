@@ -106,7 +106,7 @@ test('OV shell expanded at 1512 certifies rail, nav rows, and screenshot', async
     };
   });
 
-  expect(metrics.tokenWidth).toBe(224);
+  expect(metrics.tokenWidth).toBe(244);
 
   const railBox = await rail.boundingBox();
   expect(railBox).not.toBeNull();

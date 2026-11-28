@@ -1992,6 +1992,9 @@
       "partial": "Its one required provider is its only data and every DSP_PROVIDER_IDS entry has a registry name and colour (DspProviderIcon.test.tsx checks this); a provider without a dedicated logo falls back to SocialIcon, the NonStreamingProvider story.",
       "long-content": "Its only text is the provider's fixed registry name, never caller text; AllProviders shows every name, the longest included."
     },
+    "apps/web/components/features/dashboard/dashboard-nav/DashboardNav.tsx": {
+      "permission-denied": "The navigation renders routes for an already-authorized workspace. It owns no permission-denied action or data; the detector matched role='status' on the empty-history announcement."
+    },
     "apps/web/components/features/dashboard/dashboard-nav/InboxAttentionLink.tsx": {
       "offline": "InboxAttentionLink never fetches or mutates; it renders the pending count its owner passes, and with no connection that count stays unloaded, which the Partial story shows.",
       "permission-denied": "InboxAttentionLink links to the signed-in Inbox that every account can open and has no gated action; a viewer who cannot reach the dashboard never sees the app rail."

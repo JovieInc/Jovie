@@ -129,3 +129,17 @@ describe('HeaderSearchSurfaceFromContext PlainButton', () => {
     expect(screen.getByText('Open')).toBeInTheDocument();
   });
 });
+
+it('opens the shared command surface from the labelled Pen search trigger', async () => {
+  const user = userEvent.setup();
+  render(
+    <HeaderActionsProvider>
+      <HeaderSearchSurfaceFromContext penRail />
+      <Probe />
+    </HeaderActionsProvider>
+  );
+  const trigger = screen.getByRole('button', { name: 'Search Jovie' });
+  expect(trigger).toHaveTextContent('Search');
+  await user.click(trigger);
+  expect(screen.getByText('Open')).toBeVisible();
+});

@@ -7,6 +7,7 @@ import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboar
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { SidebarProvider } from '@/components/organisms/sidebar';
 import { APP_ROUTES } from '@/constants/routes';
+import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS, type AppFlagSnapshot } from '@/lib/flags/contracts';
@@ -185,6 +186,7 @@ export function renderDashboardNav({
   appFlags = {},
   navChildren = null,
   headerOwnsInbox = false,
+  penRail = false,
   children = null,
 }: Readonly<{
   renderFn?: RenderDashboardNavFn;
@@ -193,6 +195,7 @@ export function renderDashboardNav({
   appFlags?: Partial<AppFlagSnapshot>;
   navChildren?: ReactNode;
   headerOwnsInbox?: boolean;
+  penRail?: boolean;
   children?: ReactNode;
 }>) {
   const value: DashboardData = { ...baseDashboardData, ...overrides };
@@ -206,9 +209,11 @@ export function renderDashboardNav({
       <AppFlagProvider initialFlags={{ ...APP_FLAG_DEFAULTS, ...appFlags }}>
         <DashboardDataProvider value={value}>
           <SidebarProvider {...sidebarProps}>
-            <DashboardNav headerOwnsInbox={headerOwnsInbox}>
-              {navChildren}
-            </DashboardNav>
+            <HeaderActionsProvider>
+              <DashboardNav headerOwnsInbox={headerOwnsInbox} penRail={penRail}>
+                {navChildren}
+              </DashboardNav>
+            </HeaderActionsProvider>
             {children}
           </SidebarProvider>
         </DashboardDataProvider>

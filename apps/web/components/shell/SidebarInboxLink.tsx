@@ -50,7 +50,9 @@ function isPlainPrimaryClick(
  */
 export function SidebarInboxLink({
   availability,
+  qualified = false,
 }: {
+  readonly qualified?: boolean;
   readonly availability?: InboxNavigationAvailability;
 }) {
   const pathname = normalizeNavigationPathname(usePathname() ?? '');
@@ -61,12 +63,16 @@ export function SidebarInboxLink({
   const inboxIsCurrent = pathname === APP_ROUTES.DASHBOARD;
   const pendingCount = availability?.pendingCount;
   const pending =
-    availability?.state === 'available' && typeof pendingCount === 'number';
+    availability?.state === 'available' &&
+    typeof pendingCount === 'number' &&
+    pendingCount > 0;
   const label = pending
     ? `Home — ${formatInboxPendingWorkLabel(pendingCount)}`
     : availability?.state === 'empty'
       ? 'Home — all caught up'
-      : 'Home';
+      : qualified
+        ? 'Home — notifications'
+        : 'Home';
 
   const handlePointerDown = (event: PointerEvent<HTMLAnchorElement>) => {
     if (!isPlainPrimaryClick(event) || inboxIsCurrent) return;
@@ -118,7 +124,7 @@ export function SidebarInboxLink({
           <span
             data-inbox-unread='true'
             aria-hidden='true'
-            className='absolute bottom-1 right-1 size-1.5 rounded-full bg-accent'
+            className='sidebar-inbox-dot absolute bottom-1 right-1 size-1.5 rounded-full bg-accent'
           />
         ) : null}
       </Link>

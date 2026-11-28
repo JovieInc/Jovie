@@ -27,10 +27,12 @@ export function HeaderSearchSurfaceFromContext({
   className,
   calm = false,
   compact = false,
+  penRail = false,
 }: {
   readonly className?: string;
   readonly calm?: boolean;
   readonly compact?: boolean;
+  readonly penRail?: boolean;
 }) {
   const { closeCommandPalette, isCommandPaletteOpen, openCommandPalette } =
     useHeaderActions();
@@ -69,6 +71,7 @@ export function HeaderSearchSurfaceFromContext({
           : cn(
               getSidebarNavRowClassName({}),
               'text-left',
+              penRail && 'sidebar-pen-entry sidebar-pen-search',
               calm && 'h-9 min-w-0 flex-1 rounded-full text-(length:--text-app)'
             ),
         className
@@ -86,7 +89,12 @@ export function HeaderSearchSurfaceFromContext({
       />
       {compact ? null : (
         <>
-          <span className='min-w-0 flex-1 truncate'>
+          <span
+            className={cn(
+              'min-w-0 flex-1 truncate',
+              penRail && 'sidebar-pen-label'
+            )}
+          >
             {calm ? 'Search chats' : 'Search'}
           </span>
           {/* The shortcut hint glyph renders as CSS-generated content (see

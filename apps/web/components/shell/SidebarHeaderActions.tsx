@@ -24,6 +24,7 @@ const HEADER_TOGGLE_CLASS = cn(
 
 export interface SidebarHeaderActionsProps {
   /** Bell + search render on customer routes, not route/operator/demo rails. */
+  readonly penRail?: boolean;
   readonly showActions: boolean;
   readonly headerOwnsCollapsedToggle: boolean;
   readonly inboxNavigation?: InboxNavigationAvailability;
@@ -36,6 +37,7 @@ export interface SidebarHeaderActionsProps {
  * clipping their focus rings while expanded (Tim 2026-11-14).
  */
 export function SidebarHeaderActions({
+  penRail = false,
   showActions,
   headerOwnsCollapsedToggle,
   inboxNavigation,
@@ -51,15 +53,19 @@ export function SidebarHeaderActions({
           hidden={chromeHidden}
           className={cn(
             'flex shrink-0 items-center',
-            SIDEBAR_HEADER_ACTIONS_GAP_CLASS
+            SIDEBAR_HEADER_ACTIONS_GAP_CLASS,
+            penRail && 'sidebar-pen-header-bell'
           )}
           data-sidebar-header-actions='true'
         >
-          <SidebarInboxLink availability={inboxNavigation} />
-          <HeaderSearchSurfaceFromContext compact />
+          <SidebarInboxLink
+            availability={inboxNavigation}
+            qualified={penRail}
+          />
+          {penRail ? null : <HeaderSearchSurfaceFromContext compact />}
         </RailStagedContent>
       ) : null}
-      {isDesktop ? null : (
+      {isDesktop && !(penRail && isPreview) ? null : (
         <RailStagedContent
           hidden={
             !pinned && !isPreview && !isMobile && headerOwnsCollapsedToggle
@@ -69,10 +75,13 @@ export function SidebarHeaderActions({
           className={cn(
             'flex shrink-0 items-center',
             SHELL_RAIL_TOGGLE_LEAD,
-            SIDEBAR_HEADER_TOGGLE_LEAD_CLASS
+            penRail
+              ? 'sidebar-pen-header-toggle'
+              : SIDEBAR_HEADER_TOGGLE_LEAD_CLASS
           )}
         >
           <SidebarCollapseButton
+            outlinePanel={penRail}
             className={HEADER_TOGGLE_CLASS}
             iconClassName={SIDEBAR_HEADER_ICON_CLASS}
           />

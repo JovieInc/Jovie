@@ -3,7 +3,7 @@ import { controls } from './utils/shell-rail-controls';
 
 // The Storybook session is a local synthetic identity; no customer account is used.
 for (const reducedMotion of ['no-preference', 'reduce'] as const) {
-  test(`Settings keeps dock/profile content and one accessible logout path (${reducedMotion})`, async ({
+  test(`Settings keeps one accessible account and logout path (${reducedMotion})`, async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion });
@@ -49,18 +49,9 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
       )
       .toBe(reducedMotion === 'reduce');
     await expect(page.locator('[data-sidebar="footer"]')).toHaveCount(1);
-    await expect(
-      page.getByRole('link', { name: /^Public Profile/ })
-    ).toHaveCount(1);
-    await expect(
-      page.locator(
-        '[data-testid="sidebar-user-panel"] [data-slot="common-dropdown-trigger"]'
-      )
-    ).toHaveCount(0);
-    const logout = settings.getByRole('button', {
-      name: 'Sign Out',
-      exact: true,
-    });
+    await expect(page.locator('[data-sidebar-dock]')).toHaveCount(0);
+    const account = page.getByRole('button', { name: 'Tim White account' });
+    await expect(account).toHaveCount(1);
     const toggle = controls(page, 'left');
     await expect(toggle).toHaveCount(1);
     if ((await toggle.getAttribute('aria-pressed')) === 'false')
@@ -69,17 +60,12 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
     for (let cycle = 0; cycle < 3; cycle++) {
       await toggle.click();
       await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-      await expect(logout).toBeVisible();
-      await expect(logout).toBeEnabled();
-      await logout.focus();
-      await expect(logout).toBeFocused();
-      // Focus may reveal the unpinned rail, whose action is then "Pin sidebar".
-      // The canonical control's pinned state is stable across both faces.
+      await expect(account).toBeVisible();
+      await account.focus();
+      await expect(account).toBeFocused();
       await toggle.click();
       await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-      await expect(
-        page.getByRole('link', { name: /^Public Profile/ })
-      ).toBeVisible();
+      await expect(account).toBeVisible();
     }
     const phases = await page.evaluate(
       () =>
@@ -108,6 +94,9 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
           ? Response.json({ success: true })
           : previous?.(request);
     });
+    await account.click();
+    const logout = page.getByRole('menuitem', { name: /^Sign Out/i });
+    await expect(logout).toBeVisible();
     await logout.focus();
     await Promise.all([
       page.waitForURL(url => url.pathname === '/signin'),

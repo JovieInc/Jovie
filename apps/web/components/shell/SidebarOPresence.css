@@ -54,3 +54,278 @@
     animation: none;
   }
 }
+
+.sidebar-identity-footer {
+  box-sizing: border-box;
+  height: 60px;
+  padding: var(--space-2) var(--app-shell-sidebar-inset);
+}
+
+.sidebar-footer-account,
+.sidebar-footer-player,
+.sidebar-footer-play,
+.sidebar-footer-track,
+.sidebar-footer-dismiss {
+  box-sizing: border-box;
+  height: 44px;
+}
+
+.sidebar-footer-account,
+.sidebar-footer-player {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.sidebar-footer-account {
+  gap: var(--space-1-5);
+  padding-inline: var(--space-2);
+  text-align: start;
+  border-radius: var(--app-shell-radius-item);
+  color: rgb(
+    var(--sidebar-rail-secondary, var(--app-shell-sidebar-item-foreground-rgb))
+  );
+  font-size: var(--text-xs);
+}
+
+.sidebar-footer-identity {
+  position: relative;
+  display: grid;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  color: rgb(var(--sidebar-rail-ink, var(--app-shell-sidebar-foreground-rgb)));
+}
+
+.sidebar-footer-mark,
+.sidebar-footer-initials {
+  grid-area: 1 / 1;
+}
+
+.sidebar-footer-mark {
+  opacity: 0.52;
+  transition:
+    opacity var(--duration-subtle) var(--ease-subtle),
+    transform var(--duration-normal) var(--ease-out);
+}
+
+.sidebar-footer-initials {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: rgb(var(--app-shell-sidebar-accent-active-rgb));
+  color: rgb(var(--sidebar-rail-ink, var(--app-shell-sidebar-foreground-rgb)));
+  font-size: var(--text-3xs);
+  font-weight: var(--font-weight-semibold);
+  opacity: 0;
+  transition: opacity var(--duration-subtle) var(--ease-subtle);
+}
+
+.sidebar-footer-account:is(
+  :hover,
+  :focus-visible,
+  [data-state="open"],
+  [data-communicating]
+) {
+  color: rgb(var(--sidebar-rail-ink, var(--app-shell-sidebar-foreground-rgb)));
+}
+
+.sidebar-footer-account:is(
+    :hover,
+    :focus-visible,
+    [data-state="open"],
+    [data-communicating]
+  )
+  .sidebar-footer-mark {
+  opacity: 1;
+}
+
+[data-composer-focus="true"] .sidebar-footer-account .sidebar-footer-mark {
+  opacity: 0;
+  transform: perspective(96px) rotateY(45deg) scale(0.667);
+}
+
+[data-composer-focus="true"] .sidebar-footer-initials {
+  opacity: 1;
+}
+
+.sidebar-footer-account[data-restoring] .sidebar-footer-mark {
+  animation: sidebar-mark-return var(--duration-normal) var(--ease-out)
+    backwards;
+}
+
+.sidebar-footer-name {
+  flex: 1;
+}
+
+.sidebar-footer-chevron {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-inline-end: var(--space-2);
+  color: rgb(var(--sidebar-rail-glyph, var(--app-shell-sidebar-item-icon-rgb)));
+  opacity: 0;
+}
+
+.sidebar-footer-account:is(:hover, :focus-visible, [data-state="open"])
+  .sidebar-footer-chevron {
+  opacity: 1;
+}
+
+.sidebar-footer-play,
+.sidebar-footer-dismiss {
+  position: relative;
+  display: grid;
+  flex: 0 0 44px;
+  width: 44px;
+  place-items: center;
+  border-radius: var(--app-shell-radius-item);
+}
+
+.sidebar-footer-play {
+  margin-inline-start: -2px;
+  margin-inline-end: -4px;
+}
+
+.sidebar-footer-play-mark {
+  position: absolute;
+  color: rgb(var(--sidebar-rail-ink, var(--app-shell-sidebar-foreground-rgb)));
+  animation: sidebar-mark-to-artwork var(--duration-normal) var(--ease-out) both;
+}
+
+.sidebar-footer-artwork {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--app-shell-radius-item);
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 80% 0%, #245d79, transparent 66%), #111418;
+  animation: sidebar-artwork-reveal var(--duration-normal) var(--ease-out) both;
+}
+
+.sidebar-footer-play-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 56%);
+  color: var(--color-on-media);
+}
+
+.sidebar-footer-track {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0;
+  text-align: start;
+  border-radius: var(--app-shell-radius-item);
+}
+
+.sidebar-footer-track-title {
+  color: rgb(var(--sidebar-rail-ink, var(--app-shell-sidebar-foreground-rgb)));
+  font-size: var(--text-xs);
+  line-height: 16px;
+}
+
+.sidebar-footer-track-artist {
+  color: rgb(var(--sidebar-rail-glyph, var(--app-shell-sidebar-item-icon-rgb)));
+  font-size: var(--text-2xs);
+  line-height: 14px;
+}
+
+.sidebar-footer-dismiss {
+  color: rgb(var(--sidebar-rail-glyph, var(--app-shell-sidebar-item-icon-rgb)));
+}
+
+.sidebar-footer-dismiss:hover {
+  color: rgb(var(--sidebar-rail-ink, var(--app-shell-sidebar-foreground-rgb)));
+}
+
+:is(
+  .sidebar-footer-account,
+  .sidebar-footer-play,
+  .sidebar-footer-track,
+  .sidebar-footer-dismiss
+):focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: -2px;
+  box-shadow: none;
+}
+
+.group[data-collapsible="icon"] .sidebar-identity-footer {
+  padding-inline: var(--space-1);
+}
+
+.group[data-collapsible="icon"] .sidebar-footer-account {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.group[data-collapsible="icon"]
+  :is(.sidebar-footer-name, .sidebar-footer-chevron) {
+  display: none;
+}
+
+.group[data-collapsible="icon"] .sidebar-footer-play {
+  margin: 0;
+}
+
+@keyframes sidebar-mark-to-artwork {
+  from {
+    opacity: 0.52;
+    transform: rotate(0) scale(1);
+  }
+  55% {
+    opacity: 0.85;
+    transform: rotate(45deg) scale(0.8);
+  }
+  to {
+    opacity: 0;
+    transform: rotate(45deg) scale(1.167);
+  }
+}
+
+@keyframes sidebar-artwork-reveal {
+  from,
+  45% {
+    opacity: 0;
+    border-radius: var(--radius-full);
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    border-radius: var(--app-shell-radius-item);
+    transform: scale(1);
+  }
+}
+
+@keyframes sidebar-mark-return {
+  from {
+    opacity: 0;
+    transform: perspective(96px) rotateY(45deg) scale(0.667);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-footer-mark,
+  .sidebar-footer-initials {
+    transition: none;
+  }
+
+  .sidebar-footer-account[data-restoring] .sidebar-footer-mark,
+  .sidebar-footer-artwork,
+  .sidebar-footer-play-mark {
+    animation: none;
+  }
+
+  .sidebar-footer-play-mark {
+    display: none;
+  }
+}

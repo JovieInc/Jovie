@@ -123,3 +123,15 @@ describe('SidebarCollapsibleGroup', () => {
     await expectNoA11yViolations(container);
   });
 });
+
+it('temporarily reveals a closed group without losing its stored preference', async () => {
+  localStorage.setItem(STORAGE_KEY, 'closed');
+  const user = userEvent.setup();
+  const { rerender } = render(<Group storageKey='playlists' forceOpen />);
+  const toggle = screen.getByRole('button', { name: 'Playlists' });
+  expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await user.click(toggle);
+  expect(localStorage.getItem(STORAGE_KEY)).toBe('closed');
+  rerender(<Group storageKey='playlists' />);
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+});

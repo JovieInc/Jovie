@@ -744,37 +744,27 @@ test.describe('sidebar attention and Settings header', () => {
     });
   }
   for (const theme of THEMES) {
-    test(`brand bell and search share one row [${theme}]`, async ({ page }) => {
+    test(`the bell aligns with the search shortcut [${theme}]`, async ({
+      page,
+    }) => {
       await openStory(page, 'organisms-unifiedsidebar--dashboard', theme);
       const row = page.locator('[data-sidebar-brand-row]');
-      const inbox = page.getByRole('link', { name: /Home —/ });
+      const inbox = row.getByRole('link', { name: /Home —/ });
       const search = page.getByRole('button', { name: /Search Jovie$/ });
       await expect(inbox).toHaveAttribute('href', '/app');
       await expect(search).toHaveCount(1);
-      await expect(row).toContainText('Jovie');
       const bellBox = (await inbox.boundingBox())!;
       const searchBox = (await search.boundingBox())!;
-      expect(Math.abs(bellBox.y - searchBox.y)).toBeLessThanOrEqual(1);
-      expect(searchBox.x).toBeGreaterThan(bellBox.x);
-      // Bell, search and rail toggle: one 28px box, one rhythm (Tim
-      // 2026-11-14 alignment pass).
-      const toggleBox = (await page
-        .locator('[data-sidebar-brand-row] [data-testid="sidebar-rail-toggle"]')
-        .boundingBox())!;
-      for (const box of [bellBox, searchBox, toggleBox]) {
-        expect(box.width).toBeCloseTo(28, 0);
-        expect(box.height).toBeCloseTo(28, 0);
-        expect(
-          Math.abs(box.y + box.height / 2 - (bellBox.y + bellBox.height / 2))
-        ).toBeLessThanOrEqual(0.5);
-      }
-      const firstGap = searchBox.x - (bellBox.x + bellBox.width);
-      const secondGap = toggleBox.x - (searchBox.x + searchBox.width);
-      expect(Math.abs(firstGap - secondGap)).toBeLessThanOrEqual(0.5);
-      // The bell is the only `/app` entry: the rail's Inbox row is gone.
+      const shortcut = (await search.locator('kbd').boundingBox())!;
+      expect(searchBox.y).toBeGreaterThanOrEqual(bellBox.y + bellBox.height);
+      expect(
+        Math.abs(
+          bellBox.x + bellBox.width / 2 - shortcut.x - shortcut.width / 2
+        )
+      ).toBeLessThanOrEqual(0.5);
       await expect(
         page.getByRole('link', { name: 'Home', exact: true })
-      ).toHaveCount(0);
+      ).toHaveCount(1);
       // Current navigation groups Calendar within Work. Preserve every
       // canonical destination exposed by this default-flags story.
       for (const [name, href] of [

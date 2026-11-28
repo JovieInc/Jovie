@@ -44,7 +44,7 @@ describe('shell UX regressions source contracts (JOV-3958/3959/3960)', () => {
     expect(frame).toMatch(
       /data-testid='app-shell-sidebar-mount'[\s\S]*?h-full min-h-0/
     );
-    expect(unified).toMatch(/SidebarFooter className='mt-auto/);
+    expect(unified).toMatch(/<SidebarFooter\s+className=\{cn\(\s*'mt-auto\b/);
   });
 
   it('contains the live profile preview in a full-height rail host (JOV-3958)', () => {
