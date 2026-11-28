@@ -36,7 +36,6 @@ import {
   createContextOptions,
   discardSharedAliasContextWarmups,
   evaluateTimingConfirmation,
-  formatLargestResources,
   loadGuardManifestRoutes,
   loadPerformanceProtectedOriginCookies,
   measureSameRouteInteraction,
@@ -1417,55 +1416,5 @@ describe('performance budgets guard', () => {
     expect(fixture.events.indexOf('elapsed:12')).toBeLessThan(
       fixture.events.indexOf(`visible:${fixture.contentSelector}`)
     );
-  });
-});
-
-describe('formatLargestResources', () => {
-  const sample = (
-    largestResources: GuardSample['largestResources']
-  ): GuardSample => ({
-    finalUrl: 'https://jov.ie/app/library',
-    largestResources,
-    resolvedPath: '/app/library',
-    resourceValues: { font: 0, image: 0, script: 0, stylesheet: 0, total: 0 },
-    timingValues: {} as GuardSample['timingValues'],
-  });
-
-  it('names the heaviest requests behind a failed size budget', () => {
-    const lines = formatLargestResources(
-      [
-        sample(undefined),
-        sample({
-          image: [
-            { url: 'https://cdn.example/a.webp', kb: 46.3 },
-            { url: 'https://cdn.example/b.jpg', kb: 12 },
-          ],
-          script: [{ url: 'https://jov.ie/_next/x.js', kb: 300 }],
-        }),
-      ],
-      'image'
-    );
-    expect(lines).toEqual([
-      '      46.3KB https://cdn.example/a.webp',
-      '      12.0KB https://cdn.example/b.jpg',
-    ]);
-  });
-
-  it('ranks every resource type for the total budget', () => {
-    const lines = formatLargestResources(
-      [
-        sample({
-          image: [{ url: 'https://cdn.example/a.webp', kb: 46.3 }],
-          script: [{ url: 'https://jov.ie/_next/x.js', kb: 300 }],
-        }),
-      ],
-      'total'
-    );
-    expect(lines[0]).toBe('      300.0KB https://jov.ie/_next/x.js');
-    expect(lines).toHaveLength(2);
-  });
-
-  it('prints nothing when no sample recorded resources', () => {
-    expect(formatLargestResources([sample(undefined)], 'image')).toEqual([]);
   });
 });

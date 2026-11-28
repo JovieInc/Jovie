@@ -14,6 +14,15 @@ import {
 import { PAC_TAB_BAR_RETURN_VISIT_KEY } from '../lib/profile/pac-tab-bar-experiment';
 import { LEGACY_PROFILE_ALIAS_CONTENT_COOKIE } from '../lib/routing/legacy-profile-alias-recovery';
 import {
+  formatLargestResources,
+  formatMetric,
+  type LargestResources,
+  largestResourcesByType,
+  medianNumber,
+  nearestRankPercentile,
+  type SizedResource,
+} from './performance-resource-stats';
+import {
   assertResolvedPerfRoutePath,
   assertValidPerfRouteManifest,
   END_USER_PERF_ROUTE_MANIFEST,
@@ -158,16 +167,8 @@ export interface GuardSample {
   readonly resolvedPath: string;
   readonly timingValues: Record<PerfTimingMetricName, number>;
   readonly resourceValues: Record<PerfResourceMetricName, number>;
-  /** Heaviest requests per resource type, so a size failure names its cause. */
-  readonly largestResources?: Partial<
-    Record<PerfResourceMetricName, readonly LargestResource[]>
-  >;
-}
-
-export interface LargestResource {
-  /** Origin and path only; query strings and fragments are dropped. */
-  readonly url: string;
-  readonly kb: number;
+  /** Heaviest requests per type, so a failed size budget names its cause. */
+  readonly largestResources?: LargestResources;
 }
 
 export interface MetricResult {
@@ -619,10 +620,6 @@ export function loadAuthCookies(_baseUrl: string, authPath?: string) {
 
 function resolveRouteUrl(baseUrl: string, path: string) {
   return new URL(path, baseUrl.replace(/\/$/, '') + '/').toString();
-}
-
-function formatMetric(value: number, unit: '' | 'KB' | 'ms') {
-  return `${value.toFixed(1)}${unit}`;
 }
 
 function calculateOvershootPct(measured: number, budget: number) {
@@ -1355,18 +1352,7 @@ export async function collectBrowserMetrics(
       stylesheet: 0,
       total: 0,
     };
-    const typedEntries: Record<
-      'font' | 'image' | 'script' | 'stylesheet',
-      { url: string; size: number }[]
-    > = { font: [], image: [], script: [], stylesheet: [] };
-    const redactedUrl = (raw: string) => {
-      try {
-        const parsed = new URL(raw);
-        return `${parsed.origin}${parsed.pathname}`;
-      } catch {
-        return raw.split(/[?#]/u)[0] ?? '';
-      }
-    };
+    const sized: SizedResource[] = [];
 
     for (const entry of resourceEntries) {
       const size = entry.transferSize || entry.encodedBodySize || 0;
@@ -1386,7 +1372,7 @@ export async function collectBrowserMetrics(
 
       if (entry.initiatorType === 'script' || resourceName.includes('.js')) {
         resourceValues.script += size;
-        typedEntries.script.push({ url: redactedUrl(entry.name), size });
+        sized.push({ size, type: 'script', url: entry.name });
         continue;
       }
 
@@ -1396,13 +1382,13 @@ export async function collectBrowserMetrics(
         /\.(avif|gif|jpe?g|png|svg|webp)(\?|$)/.test(resourceName)
       ) {
         resourceValues.image += size;
-        typedEntries.image.push({ url: redactedUrl(entry.name), size });
+        sized.push({ size, type: 'image', url: entry.name });
         continue;
       }
 
       if (entry.initiatorType === 'css' || resourceName.includes('.css')) {
         resourceValues.stylesheet += size;
-        typedEntries.stylesheet.push({ url: redactedUrl(entry.name), size });
+        sized.push({ size, type: 'stylesheet', url: entry.name });
         continue;
       }
 
@@ -1411,24 +1397,13 @@ export async function collectBrowserMetrics(
         entry.initiatorType === 'font'
       ) {
         resourceValues.font += size;
-        typedEntries.font.push({ url: redactedUrl(entry.name), size });
+        sized.push({ size, type: 'font', url: entry.name });
       }
     }
-    const heaviest = (entries: { url: string; size: number }[]) =>
-      entries
-        .filter(candidate => candidate.size > 0)
-        .sort((left, right) => right.size - left.size)
-        .slice(0, 3)
-        .map(candidate => ({ url: candidate.url, kb: candidate.size / 1024 }));
 
     return {
       finalUrl: window.location.href,
-      largestResources: {
-        font: heaviest(typedEntries.font),
-        image: heaviest(typedEntries.image),
-        script: heaviest(typedEntries.script),
-        stylesheet: heaviest(typedEntries.stylesheet),
-      },
+      resources: sized,
       resourceValues: {
         font: resourceValues.font / 1024,
         image: resourceValues.image / 1024,
@@ -1463,11 +1438,6 @@ function medianSampleByMetric(
   return ordered[Math.floor(ordered.length / 2)] as GuardSample;
 }
 
-function medianNumber(values: readonly number[]) {
-  const ordered = [...values].sort((left, right) => left - right);
-  return ordered[Math.floor(ordered.length / 2)] ?? 0;
-}
-
 function medianTimingValue(
   samples: readonly GuardSample[],
   metric: PerfTimingMetricName
@@ -1482,25 +1452,7 @@ function medianResourceValue(
   return medianNumber(samples.map(sample => sample.resourceValues[metric]));
 }
 
-/**
- * Nearest-rank percentile (ceil(rank) into the ascending-sorted values),
- * matching the estimator named in
- * docs/performance/public-profile-alias-graduation.json (`p95Estimator:
- * nearest-rank`). At 5 samples the 95th rank is the 5th of 5, i.e. the
- * maximum — one environmental cold-start decides the gate; at 20 samples it
- * is the 19th of 20 and tolerates exactly one such outlier.
- */
-export function nearestRankPercentile(
-  values: readonly number[],
-  percentile: number
-) {
-  if (values.length === 0) {
-    throw new TypeError('Percentile of an empty sample set is undefined.');
-  }
-  const sorted = [...values].sort((a, b) => a - b);
-  const rank = Math.ceil((percentile / 100) * sorted.length);
-  return sorted[Math.min(Math.max(rank, 1), sorted.length) - 1];
-}
+export { nearestRankPercentile };
 
 function assertExactHostCookieScope(
   cookie: PerformanceContextCookie,
@@ -2009,7 +1961,7 @@ async function measureRouteSample(
       aliasPhases,
       controllerObservedAliasResultMs,
       finalUrl: browserMetrics.finalUrl,
-      largestResources: browserMetrics.largestResources,
+      largestResources: largestResourcesByType(browserMetrics.resources),
       resolvedPath,
       resourceValues: browserMetrics.resourceValues,
       timingValues,
@@ -2518,40 +2470,6 @@ async function measureRoutesAgainstBudgets(
   }
 }
 
-/**
- * Name the heaviest requests behind a failed size budget, from the last sample
- * that recorded them, so the gate says what to cut instead of only how much.
- */
-export function formatLargestResources(
-  samples: readonly GuardSample[],
-  metricName: string
-): string[] {
-  if (metricName === 'total') {
-    const merged = samples
-      .map(sample => sample.largestResources)
-      .filter(Boolean)
-      .at(-1);
-    if (!merged) return [];
-    return Object.values(merged)
-      .flatMap(entries => entries ?? [])
-      .sort((left, right) => right.kb - left.kb)
-      .slice(0, 3)
-      .map(entry => `      ${formatMetric(entry.kb, 'KB')} ${entry.url}`);
-  }
-  const entries = samples
-    .map(
-      sample =>
-        sample.largestResources?.[metricName as PerfResourceMetricName] ?? null
-    )
-    .filter((candidate): candidate is readonly LargestResource[] =>
-      Boolean(candidate)
-    )
-    .at(-1);
-  return (entries ?? []).map(
-    entry => `      ${formatMetric(entry.kb, 'KB')} ${entry.url}`
-  );
-}
-
 function printHumanSummary(summary: GuardSummary) {
   console.log(`Performance budgets: ${summary.status.toUpperCase()}`);
 
@@ -2576,9 +2494,8 @@ function printHumanSummary(summary: GuardSummary) {
         `  ${status} ${metric.name}: ${formatMetric(metric.measured, metric.unit)} / ${formatMetric(metric.budget, metric.unit)}`
       );
       if (status === 'FAIL') {
-        for (const line of formatLargestResources(page.samples, metric.name)) {
+        for (const line of formatLargestResources(page.samples, metric.name))
           console.log(line);
-        }
       }
     }
 
