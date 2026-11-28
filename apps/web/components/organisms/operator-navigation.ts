@@ -3,6 +3,7 @@ import {
   BadgeCheck,
   Banknote,
   BatteryCharging,
+  Bot,
   Briefcase,
   Cable,
   Flag,
@@ -40,6 +41,7 @@ const OPERATOR_ICON_BY_ID = {
   outbound: Send,
   product: Flag,
   operations: Gauge,
+  agents: Bot,
   inbox: Inbox,
   ops: Gauge,
   shipping: Truck,
@@ -89,7 +91,7 @@ export const OPERATOR_NAV_GROUP_LABEL =
   'mb-1.5 block ps-(--app-shell-sidebar-label-inset) pe-(--app-shell-sidebar-inset) text-xs font-caption tracking-normal text-sidebar-muted';
 
 /**
- * Ovie has five primary destinations plus collapsed Company and Tools groups.
+ * Ovie has six primary destinations plus collapsed Company and Tools groups.
  * Primary navigation needs no group label; a group opens on demand and stays
  * open while one of its destinations is active.
  */

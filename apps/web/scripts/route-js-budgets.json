@@ -116,7 +116,8 @@
     "/app/tipping": 726,
     "/app/tracks": 726,
     "/app/money": 547,
-    "/app/admin/room": 688
+    "/app/admin/room": 688,
+    "/app/admin/agents": 720
   },
   "raises": {
     "routes./app/admin/room": {

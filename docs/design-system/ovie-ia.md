@@ -17,9 +17,11 @@ the screen inventory it covers is `APP_SCREEN_SOURCES` in the same folder.
      Jovie's Audience uses. The view label equals the page title.
    - `tabs=` for views of the same data inside one destination (People,
      Platform Connections, Playlists). It renders `WorkspaceTabsSurface`.
-   - Agents keeps the Fleet route-views row and passes Roster, Skills,
-     Connectors, Tools, and Memory as `actions` (`AdminQueryTabsSelect`).
-     It does not pass `tabs=`, so Room does not load that client module.
+   - **Agents** (`/app/ov/agents`) is a first-level sidebar destination and a
+     Fleet route view (Health, Agents, Room). The table + right rail shell is
+     roster-backed; persistence and live gates land in later slices.
+   - **System map** (`/app/ov/system`) keeps Roster, Skills, Connectors, Tools,
+     and Memory as `actions` (`AdminQueryTabsSelect`) for diagnostics only.
    - Nothing else. A destination with its own sidebar row needs no
      sub-navigation; a view group with one view is deleted, not rendered.
 3. **Sections.** `ContentSurfaceCard` + `ContentSectionHeader`

@@ -1,5 +1,6 @@
 /** Conservative: a redirecting source is never eligible as a visual reference. */
 export const NON_REFERENCE_SOURCES = new Set<string>([
+  'apps/web/app/app/(shell)/admin/agents/page.tsx',
   'apps/web/app/app/(shell)/admin/algorithm-health/page.tsx',
   'apps/web/app/app/(shell)/admin/campaigns/page.tsx',
   'apps/web/app/app/(shell)/admin/capacity/page.tsx',

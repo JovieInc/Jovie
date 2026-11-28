@@ -27,6 +27,7 @@
       "sources": [
         "apps/web/app/app/(shell)/admin/activity/page.tsx",
         "apps/web/app/app/(shell)/admin/agent-runs/[id]/page.tsx",
+        "apps/web/app/app/(shell)/admin/agents/page.tsx",
         "apps/web/app/app/(shell)/admin/algorithm-health/page.tsx",
         "apps/web/app/app/(shell)/admin/campaigns/page.tsx",
         "apps/web/app/app/(shell)/admin/capacity/page.tsx",
@@ -891,6 +892,13 @@
       "to": "holdout",
       "at": "2026-11-22T08:30:00Z",
       "evidence": "Saved shared views list (shared views save slice, ad-hoc, no Linear issue); source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/app/(shell)/admin/agents/page.tsx",
+      "from": null,
+      "to": "migrating",
+      "at": "2026-11-24T02:50:00Z",
+      "evidence": "AO-12 Ovie Agents first slice: roster table + contact-style rail shell; source registration only, not rendered certification."
     }
   ]
 }

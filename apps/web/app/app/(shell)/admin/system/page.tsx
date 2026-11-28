@@ -8,7 +8,7 @@ import { readOvieFleetRoom } from '@/lib/ovie/fleet-room.server';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const metadata: Metadata = {
-  title: 'Agents | Ovie',
+  title: 'System map | Ovie',
   robots: NOINDEX_ROBOTS,
 };
 
@@ -56,9 +56,8 @@ export default async function AdminSystemPage({ searchParams }: Props) {
 
   return (
     <AdminPage
-      views='operations'
-      title='Agents'
-      description='Who is on the fleet, plus a read-only overview of skills, connectors, tools, and memory — separation of concerns for the platform.'
+      title='System map'
+      description='Read-only overview of skills, connectors, tools, and memory for platform diagnostics.'
       testId='admin-system-page'
       viewTestId='admin-system-content'
       actions={

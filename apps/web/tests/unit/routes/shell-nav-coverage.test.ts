@@ -78,6 +78,8 @@ const INTENTIONAL_INTERNAL_ROUTES: Record<string, string> = {
     'Internal screenshot QA utility retained for direct admin access outside founder navigation',
   [APP_ROUTES.ADMIN_VISIBILITY_AUDIT]:
     'Internal visibility-audit sample retained for direct admin access outside founder navigation',
+  [APP_ROUTES.ADMIN_AGENTS]:
+    'Fleet agents roster and profiles; first-level Ovie sidebar and Fleet Agents view',
   '/app/ov/system':
     'Internal system diagnostics retained for direct admin access outside founder navigation',
   '/app/ov/agent-runs/[id]':

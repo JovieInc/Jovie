@@ -86,7 +86,7 @@ describe('AdminSystemPage', () => {
     expect(mockReadRoom).toHaveBeenCalledOnce();
     expect(screen.getByTestId('admin-system-page')).toHaveAttribute(
       'data-page-title',
-      'Agents'
+      'System map'
     );
     expect(screen.getByTestId('admin-system-page')).toHaveAttribute(
       'data-active-tab',

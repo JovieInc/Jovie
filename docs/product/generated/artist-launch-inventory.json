@@ -5374,6 +5374,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/app/(shell)/admin/agents/page.tsx",
+      "kind": "page",
+      "route": "/app/admin/agents",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/app/(shell)/admin/algorithm-health/page.tsx",
       "kind": "page",
       "route": "/app/admin/algorithm-health",
