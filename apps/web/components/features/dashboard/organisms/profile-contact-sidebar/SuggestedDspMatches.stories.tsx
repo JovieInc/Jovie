@@ -41,18 +41,60 @@ const measuredZero: DspMatch = {
   },
 };
 
+const longNameMatch: DspMatch = {
+  ...unknownMatch,
+  id: 'long-name',
+  providerId: 'spotify',
+  externalArtistName:
+    'The Extremely Long Collaborative Ensemble Featuring Endless Guest Artists And Affiliates',
+  externalArtistUrl: 'https://open.spotify.com/artist/story',
+};
+
+type StoryParams = {
+  readonly matches?: DspMatch[];
+  readonly queryMode?: 'data' | 'loading' | 'error';
+};
+
 const meta = {
   title: 'Dashboard/ProfileContactSidebar/SuggestedDspMatches',
   component: SuggestedDspMatches,
-  parameters: { layout: 'padded', matches: [unknownMatch] },
+  parameters: {
+    layout: 'padded',
+    matches: [unknownMatch],
+    queryMode: 'data',
+  } satisfies StoryParams & { layout: 'padded' },
   args: { profileId: 'story-profile' },
   decorators: [
     (Story, context) => {
       const client = createDashboardQueryClient();
-      client.setQueryData(
-        queryKeys.dspEnrichment.matches(context.args.profileId, 'suggested'),
-        context.parameters.matches as DspMatch[]
+      const key = queryKeys.dspEnrichment.matches(
+        context.args.profileId,
+        'suggested'
       );
+      const mode =
+        (context.parameters.queryMode as StoryParams['queryMode']) ?? 'data';
+
+      if (mode === 'loading') {
+        void client.prefetchQuery({
+          queryKey: key,
+          queryFn: () => new Promise<DspMatch[]>(() => undefined),
+        });
+      } else if (mode === 'error') {
+        client
+          .getQueryCache()
+          .build<DspMatch[], Error>(client, { queryKey: key })
+          .setState({
+            status: 'error',
+            error: new Error('Could not load suggestions'),
+            fetchStatus: 'idle',
+          });
+      } else {
+        client.setQueryData(
+          key,
+          (context.parameters.matches as DspMatch[] | undefined) ?? []
+        );
+      }
+
       return (
         <DashboardStoryProviders queryClient={client}>
           <Story />
@@ -107,6 +149,40 @@ export const MeasuredZeroBeforeVisibleCap: Story = {
       measuredZero,
     ],
   },
+};
+
+/** Zero-footprint loading sentinel (JOV-4159 — no skeleton flash). */
+export const Loading: Story = {
+  parameters: { queryMode: 'loading', matches: undefined },
+};
+
+/** Query failure face with Retry. */
+export const ErrorLoadFailed: Story = {
+  parameters: { queryMode: 'error' },
+};
+
+/** Narrow frame so a long artist name truncates. */
+export const LongContent: Story = {
+  parameters: { matches: [longNameMatch] },
+  decorators: [
+    Story => (
+      <div className='w-48'>
+        <Story />
+      </div>
+    ),
+  ],
+};
+
+/** RTL overflow frame for the match row. */
+export const Rtl: Story = {
+  parameters: { matches: [longNameMatch] },
+  decorators: [
+    Story => (
+      <div dir='rtl' className='w-64'>
+        <Story />
+      </div>
+    ),
+  ],
 };
 
 export const Empty: Story = {

@@ -201,12 +201,10 @@ describe('SuggestedDspMatches', () => {
     }
   );
 
-  it('renders nothing while loading (regression: JOV-4159 / #13821 flash-then-collapse)', () => {
-    // Zero matches is the common resolution, so rendering a skeleton during
-    // `isLoading` that later collapses to `null` shifts sibling sections.
-    // The component must stay collapsed while loading and only occupy space
-    // once resolved with real matches — matching the eventual `null` render
-    // for the empty case exactly, with no intermediate skeleton frame.
+  it('keeps a zero-footprint loading sentinel (regression: JOV-4159 / #13821)', () => {
+    // Zero matches is the common resolution, so a skeleton during `isLoading`
+    // that later collapses shifts sibling sections. Stay at `display: contents`
+    // (not null — certificate layout-shift guard) with no intermediate skeleton.
     mockUseDspMatchesQuery.mockReturnValue({
       data: undefined,
       isLoading: true,
@@ -216,19 +214,16 @@ describe('SuggestedDspMatches', () => {
 
     const { container } = render(<SuggestedDspMatches profileId='profile-1' />);
 
-    expect(container.innerHTML).toBe('');
-    expect(container.firstChild).toBeNull();
+    const root = screen.getByTestId('suggested-dsp-matches');
+    expect(root).toHaveAttribute('data-state', 'loading');
+    expect(root).toHaveClass('contents');
     expect(screen.queryByText('Suggested')).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('suggested-dsp-matches')
-    ).not.toBeInTheDocument();
-    // Guard against reintroducing a skeleton row during the loading frame.
     expect(container.querySelector('.skeleton')).toBeNull();
   });
 
   it('keeps zero footprint across loading → empty transition (JOV-4159 layout guard)', () => {
     // Layout-shift acceptance: the common path is loading then zero matches.
-    // Both frames must render identically empty so siblings never shift.
+    // Loading uses a contents sentinel; empty returns null — both occupy no box.
     mockUseDspMatchesQuery.mockReturnValue({
       data: undefined,
       isLoading: true,
@@ -240,8 +235,8 @@ describe('SuggestedDspMatches', () => {
       <SuggestedDspMatches profileId='profile-1' />
     );
 
-    expect(container.innerHTML).toBe('');
-    expect(container.firstChild).toBeNull();
+    expect(screen.getByTestId('suggested-dsp-matches')).toHaveClass('contents');
+    expect(screen.queryByText('Suggested')).not.toBeInTheDocument();
 
     mockUseDspMatchesQuery.mockReturnValue({
       data: [],
@@ -251,7 +246,6 @@ describe('SuggestedDspMatches', () => {
     });
     rerender(<SuggestedDspMatches profileId='profile-1' />);
 
-    expect(container.innerHTML).toBe('');
     expect(container.firstChild).toBeNull();
     expect(
       screen.queryByTestId('suggested-dsp-matches')
