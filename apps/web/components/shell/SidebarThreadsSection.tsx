@@ -330,7 +330,6 @@ export function formatSidebarThreadTime(
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-// Status dot tones:
 //   running → accent, anim-calm-breath
 //   errored → error
 //   unread  → accent static
@@ -476,6 +475,7 @@ export function SidebarThreadsSection({
               new Date(visible[index - 1].updatedAt).toDateString() ===
                 today ? (
                 <div
+                  data-sidebar-history-header
                   className={cn(
                     'flex h-(--app-shell-sidebar-row-height) items-center text-(length:--text-2xs) font-medium text-sidebar-muted',
                     SIDEBAR_ENTRY_LABEL_INSET_CLASS

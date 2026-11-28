@@ -1,7 +1,7 @@
 'use client';
 
-import { Popover, PopoverAnchor, PopoverContent } from '@jovie/ui';
-import { MessageCircle } from 'lucide-react';
+import { Input, Popover, PopoverAnchor, PopoverContent } from '@jovie/ui';
+import { MessageCircle, Search } from 'lucide-react';
 import Link from 'next/link';
 import {
   type MouseEvent,
@@ -17,38 +17,75 @@ import {
 } from '@/components/shell/SidebarNavItem';
 import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
+import './SidebarChatAction.css';
 
 export function SidebarChatAction({
   current,
   pending,
-  recentChats,
+  renderRecentChats,
   onActivate,
 }: Readonly<{
   current: boolean;
   pending: boolean;
-  recentChats: ReactNode;
+  renderRecentChats?: (query: string) => ReactNode;
   onActivate: (event: MouseEvent<HTMLAnchorElement>) => void;
 }>) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [sideOffset, setSideOffset] = useState(0);
+  const [scrollMore, setScrollMore] = useState(false);
+  const viewport = useRef<HTMLDivElement>(null);
   const keyboard = useRef(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined
   );
   const link = useRef<HTMLAnchorElement>(null);
   const id = useId();
-  const shown = Boolean(recentChats && open);
+  const shown = Boolean(renderRecentChats && open);
 
   function cancelClose() {
     clearTimeout(closeTimer.current);
   }
 
+  function openHistory(anchor: HTMLElement) {
+    const main = anchor
+      .closest('[data-app-shell-frame]')
+      ?.querySelector('[data-app-shell-main-plane]');
+    const railEdge = anchor.getBoundingClientRect().right;
+    setSideOffset(
+      Math.max(0, (main?.getBoundingClientRect().left ?? railEdge) - railEdge)
+    );
+    if (!shown) setQuery('');
+    setOpen(true);
+  }
+
+  function syncScrollFade() {
+    const el = viewport.current;
+    if (el) setScrollMore(el.scrollHeight - el.clientHeight - el.scrollTop > 1);
+  }
+
   function closeAfterLeaving() {
-    if (keyboard.current) return;
+    if (
+      keyboard.current ||
+      viewport.current?.parentElement?.contains(document.activeElement)
+    )
+      return;
     cancelClose();
     closeTimer.current = setTimeout(() => setOpen(false), 180);
   }
 
   useEffect(() => () => clearTimeout(closeTimer.current), []);
+
+  useEffect(() => {
+    const el = viewport.current;
+    if (!shown || !el) return;
+    syncScrollFade();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(syncScrollFade);
+    observer.observe(el);
+    if (el.firstElementChild) observer.observe(el.firstElementChild);
+    return () => observer.disconnect();
+  }, [shown]);
 
   return (
     <Popover open={shown} onOpenChange={setOpen}>
@@ -56,9 +93,9 @@ export function SidebarChatAction({
         <div
           className='sidebar-pen-chat-anchor'
           onPointerEnter={event => {
-            if (event.pointerType !== 'mouse' || !recentChats) return;
+            if (event.pointerType !== 'mouse' || !renderRecentChats) return;
             cancelClose();
-            setOpen(true);
+            openHistory(event.currentTarget);
           }}
           onPointerLeave={closeAfterLeaving}
         >
@@ -66,11 +103,12 @@ export function SidebarChatAction({
             ref={link}
             href={APP_ROUTES.CHAT}
             prefetch={false}
+            aria-label='Chat'
             aria-current={current ? 'page' : undefined}
             aria-busy={pending || undefined}
-            aria-expanded={recentChats ? shown : undefined}
+            aria-expanded={renderRecentChats ? shown : undefined}
             aria-controls={shown ? id : undefined}
-            aria-describedby={recentChats ? `${id}-hint` : undefined}
+            aria-describedby={renderRecentChats ? `${id}-hint` : undefined}
             data-navigation-item-id='chat'
             data-navigation-pending={pending || undefined}
             className={cn(
@@ -86,12 +124,13 @@ export function SidebarChatAction({
               onActivate(event);
             }}
             onKeyDown={event => {
-              if (event.key !== 'ArrowRight' || !recentChats) return;
+              if (event.key !== 'ArrowRight' || !renderRecentChats) return;
               event.preventDefault();
               cancelClose();
               keyboard.current = true;
-              setOpen(true);
               if (shown) document.getElementById(id)?.focus();
+              else if (event.currentTarget.parentElement)
+                openHistory(event.currentTarget.parentElement);
             }}
           >
             <MessageCircle
@@ -105,13 +144,15 @@ export function SidebarChatAction({
           </span>
         </div>
       </PopoverAnchor>
-      {recentChats ? (
+      {renderRecentChats ? (
         <PopoverContent
           id={id}
           aria-label='Recent Chats'
           side='right'
           align='start'
-          sideOffset={0}
+          sideOffset={sideOffset}
+          size='bare'
+          className='w-(--app-shell-sidebar-chat-history-width)'
           tabIndex={-1}
           onPointerEnter={cancelClose}
           onPointerLeave={closeAfterLeaving}
@@ -130,7 +171,30 @@ export function SidebarChatAction({
             link.current?.focus();
           }}
         >
-          {recentChats}
+          <div className='sidebar-recent-chats'>
+            <div className='sidebar-recent-chats-search'>
+              <label htmlFor={`${id}-search`}>
+                <Search size={16} aria-hidden='true' />
+              </label>
+              <Input
+                inputSize='sm'
+                id={`${id}-search`}
+                type='search'
+                aria-label='Search Chats'
+                placeholder='Search chats'
+                value={query}
+                onChange={event => setQuery(event.target.value)}
+              />
+            </div>
+            <div
+              ref={viewport}
+              className='sidebar-recent-chats-list'
+              onScroll={syncScrollFade}
+              data-scroll-more={scrollMore || undefined}
+            >
+              <div>{renderRecentChats(query)}</div>
+            </div>
+          </div>
         </PopoverContent>
       ) : null}
     </Popover>
