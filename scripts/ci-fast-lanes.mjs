@@ -998,7 +998,9 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   // RSI ASR-042..046 fixtures run once via the anti-slop lane command above —
   // do not also list the file here or the suite double-runs per PR.
   'scripts/lib/__tests__/source-docs-scope.test.mjs',
+  'scripts/ios-beta-lanes.test.mjs',
   'scripts/ios-certification-config.test.mjs',
+  'scripts/ios-xcode-pin.test.mjs',
   'scripts/schedule-trigger-guard.test.mjs', // JOV-12720 event-driven guard.
   'scripts/resolve-main-sha.test.mjs', // JOV-12497 SIGPIPE regression.
   'scripts/dogfood-truth-intake.test.mjs', // JOV-7140 dogfood loop intake.
