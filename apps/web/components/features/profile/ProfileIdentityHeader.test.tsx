@@ -232,6 +232,9 @@ describe('ProfileIdentityHeader', () => {
     const row = screen.getByTestId('profile-identity-social-row');
     const links = within(row).getAllByRole('link');
     expect(links).toHaveLength(2);
+    // Icons sit on the row's right edge so they line up with the pill row.
+    expect(row).toHaveClass('justify-end');
+    expect(row).not.toHaveClass('justify-around');
     const tiktok = within(row).getByRole('link', {
       name: 'Follow Tim White on TikTok',
     });
