@@ -59,6 +59,10 @@ describe('sendEmailOtp', () => {
   it.each([
     'browse-ready+synthetic-prodcert-run12345@jov.ie',
     'browse-ready+clerk_test@jov.ie',
+    // The prod smoke's admin readback fixture (Sentry JOVIE-WEB-10N).
+    'browse-admin+clerk_test@jov.ie',
+    'Browse-Admin+Clerk_Test@JOV.IE',
+    'browse+clerk_test@jov.ie',
   ])('never sends mail to the synthetic canary %s', async email => {
     await expect(
       sendEmailOtp({ email, type: 'sign-in', otp: '123456' })
