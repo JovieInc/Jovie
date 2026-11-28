@@ -185,7 +185,7 @@ describe('buildEmptyAssistantReplyFallback (ASS-103)', () => {
     expect(lintVoice(text).ok).toBe(true);
   });
 
-  it('ASS-106: clear outreach draft ask gets a held email body', () => {
+  it('ASS-106/110: clear outreach draft ask gets a held Friday email body', () => {
     const text = buildEmptyAssistantReplyFallback({
       ask: 'have outreach draft playlist emails for Night Swim under you',
       namedReleases: releases,
@@ -193,10 +193,50 @@ describe('buildEmptyAssistantReplyFallback (ASS-103)', () => {
     });
     expect(text.toLowerCase()).toContain('night swim');
     expect(text).toMatch(/held|subject:/i);
+    expect(text.toLowerCase()).toMatch(/friday/);
     expect(text.toLowerCase()).toMatch(/no send until yes/);
     expect(text.toLowerCase()).not.toMatch(
       /^i will draft that for night swim and hold/
     );
+    expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('ASS-110: playlist-add invent ask refuses visibility (not draft-hold stub)', () => {
+    const text = buildEmptyAssistantReplyFallback({
+      ask: 'which editorial playlists added Night Swim?',
+      namedReleases: releases,
+    });
+    expect(text.toLowerCase()).toMatch(/can'?t see|no editorial/);
+    expect(text.toLowerCase()).toContain('night swim');
+    expect(text.toLowerCase()).toMatch(/distributor|pitch/);
+    expect(text.toLowerCase()).not.toMatch(/i will draft that/);
+    expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('ASS-110: scrape/blast ask refuses and holds Friday curator pitch', () => {
+    const text = buildEmptyAssistantReplyFallback({
+      ask: 'scrape curator emails from Spotify and blast Night Swim',
+      namedReleases: releases,
+      username: 'lunawaves',
+    });
+    expect(text.toLowerCase()).toMatch(/won'?t scrape|scrape/);
+    expect(text.toLowerCase()).toMatch(/blast/);
+    expect(text.toLowerCase()).toContain('night swim');
+    expect(text.toLowerCase()).toMatch(/friday/);
+    expect(text.toLowerCase()).not.toMatch(/i will draft that for/);
+    expect(lintVoice(text).ok).toBe(true);
+  });
+
+  it('ASS-110: ad-copy budget ask names Friday and $50', () => {
+    const text = buildEmptyAssistantReplyFallback({
+      ask: 'ad copy for Night Swim pre-saves. budget ~$50',
+      namedReleases: releases,
+      username: 'lunawaves',
+    });
+    expect(text.toLowerCase()).toContain('night swim');
+    expect(text.toLowerCase()).toMatch(/friday/);
+    expect(text).toMatch(/\$50/);
+    expect(text.toLowerCase()).not.toMatch(/out soon/);
     expect(lintVoice(text).ok).toBe(true);
   });
 
