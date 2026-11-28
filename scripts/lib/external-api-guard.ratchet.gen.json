@@ -467,7 +467,7 @@
       "provider-host": 1
     },
     "scripts/lanes/pr_events.py": {
-      "gh-subprocess": 40
+      "gh-subprocess": 39
     },
     "scripts/lanes/shipping_attribution.py": {
       "gh-subprocess": 1
