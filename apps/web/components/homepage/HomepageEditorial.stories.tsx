@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { DEMO_ARTIST_IVO_LINDQVIST } from '@/data/demoArtists';
 import { HOMEPAGE_EDITORIAL_COPY } from '@/data/homepageEditorialCopy';
 import {
   HomepageInviteClose,
@@ -19,7 +20,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Homepage chapters. The hero, header and close enter /start to claim a profile (the invitation form returns only while public signup is closed); product imagery comes from the screenshot registry.',
+          'Homepage chapters. Claiming a profile starts at /start while signup is open. The hero also opens a real release page from the featured catalog.',
       },
     },
   },
@@ -30,6 +31,10 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Hero: Story = {};
+
+export const HeroWithoutPublicRelease: Story = {
+  args: { featuredArtist: DEMO_ARTIST_IVO_LINDQVIST },
+};
 
 export const Profile: Story = {
   render: () => <HomepageProfileChapter />,

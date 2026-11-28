@@ -23,6 +23,7 @@
  *   revenue or other performance claims the artist did not approve.
  */
 
+import type { ProviderKey } from '@/lib/discography/types';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 export interface FeaturedArtistRelease {
@@ -54,6 +55,10 @@ export interface FeaturedArtistProfile {
     readonly genres: readonly string[];
     readonly label: string;
     readonly upc: string;
+    readonly publicPage?: {
+      readonly href: string;
+      readonly providers: readonly ProviderKey[];
+    };
   };
 }
 
@@ -157,6 +162,10 @@ export const FEATURED_ARTIST_TIM_WHITE: FeaturedArtistOptIn = {
       genres: ['Melodic Techno', 'Trance'],
       label: 'The Bubblegum Factory',
       upc: '5054526843813',
+      publicPage: {
+        href: `${TIM_WHITE_PROFILE.publicProfileUrl}/supernova-girl`,
+        providers: ['spotify', 'apple_music', 'deezer'],
+      },
     },
   },
   optIn: {
