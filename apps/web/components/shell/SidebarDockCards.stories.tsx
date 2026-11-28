@@ -67,7 +67,7 @@ export const WhatsNew: Story = {
 export const PartialEditorialCopy: Story = {
   render: () => (
     <DockWhatsNewCard
-      editorial
+      penRail
       title='Your latest releases'
       onOpen={fn()}
       onDismiss={fn()}
