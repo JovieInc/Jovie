@@ -63,6 +63,10 @@ test('1: Done delivery receipts require a merge_group run id or URL', () => {
       event: 'merge_group',
       url: 'https://github.com/other/repo/actions/runs/123',
     },
+    {
+      event: 'merge_group',
+      url: '<https://github.com/JovieInc/Jovie/actions/runs/123>',
+    },
   ])
     assert.equal(validateDoneReceipt({ ...receipt, mergeGroupRun }).length, 1);
   assert.deepEqual(validateDoneReceipt({ stage: 'queued' }), []);
@@ -113,31 +117,27 @@ test('2: fixes and CI repair labels need a command and pre-fix red evidence', ()
   assert.deepEqual(check(pr()).errors, []);
   for (const name of ['lane-fix-red', 'lane-fix-dequeued'])
     assert.deepEqual(check(pr({ labels: [{ name }] })).errors, []);
-  assert.ok(
+  for (const body of [
+    '## Red-before-green\nFailing command: TODO\nBefore fix: FAIL',
+    `## Red-before-green\nFailing command: \`${command}\``,
+  ])
+    assert.ok(check(pr({ title: 'fix: repair', body })).errors.length);
+  const url = 'https://github.com/JovieInc/Jovie/actions/runs/45348735196';
+  const runErrors = run =>
     check(
       pr({
         title: 'fix: repair',
-        body: '## Red-before-green\nFailing command: TODO\nBefore fix: FAIL',
+        body: `${red.split('\nBefore fix:')[0]}\nFailing run (before fix): ${run}\n${proof}`,
       })
-    ).errors.length
-  );
-  assert.ok(
-    check(
-      pr({
-        title: 'fix: repair',
-        body: `## Red-before-green\nFailing command: \`${command}\``,
-      })
-    ).errors.length
-  );
-  assert.deepEqual(
-    check(
-      pr({
-        title: 'fix: repair',
-        body: `## Red-before-green\nFailing command: \`${command}\`\nFailing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/1`,
-      })
-    ).errors,
-    []
-  );
+    ).errors;
+  for (const [run, valid] of [
+    ['https://github.com/JovieInc/Jovie/actions/runs/1', true],
+    [`<${url}>`, true],
+    [`<${url}`, false],
+    [`${url}>`, false],
+    [`<${url}/job/1>`, false],
+  ])
+    assert.equal(runErrors(run).length === 0, valid, `run reference: ${run}`);
 });
 
 test('2: iOS and visual lane exemptions do not exempt mixed path-only changes', () => {

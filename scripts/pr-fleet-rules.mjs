@@ -67,6 +67,12 @@ function runReference(value, repository) {
   );
 }
 
+function redBeforeFixRunUrl(value) {
+  const text = String(value ?? '');
+  const autolink = /^<([^<>]+)>$/.exec(text);
+  return RUN_URL.test(autolink?.[1] ?? text);
+}
+
 /** A hold/external-blocked receipt is terminal but never a Done receipt. */
 export function validateDoneReceipt(receipt) {
   if (
@@ -203,14 +209,14 @@ export function evaluateFleetRules({
         red
       );
     const link = field(red, 'Failing run \\(before fix\\)').replace(/`/g, '');
-    if (!text(command) || (!output && !RUN_URL.test(link)))
+    if (!text(command) || (!output && !redBeforeFixRunUrl(link)))
       errors.push(
         `red-before-green: ${
           red.trim()
             ? 'the "## Red-before-green" section is present but incomplete'
             : 'this repair PR has no "## Red-before-green" section'
         }${text(command) ? '' : '; missing "- Failing command: <cmd>"'}${
-          output || RUN_URL.test(link)
+          output || redBeforeFixRunUrl(link)
             ? ''
             : '; missing "- Failing run (before fix): <https://github.com/JovieInc/Jovie/actions/runs/ID URL>" (or a red-output fence containing FAIL/Error). Exact format: a "## Red-before-green" heading, then the lines "- Failing command: <cmd>" and "- Failing run (before fix): <URL>"'
         }. Not a repair? Use a non-fix title (chore/ci/docs/refactor) and drop the bug-fix checkbox.`
