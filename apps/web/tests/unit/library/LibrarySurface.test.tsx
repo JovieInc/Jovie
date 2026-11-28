@@ -1062,7 +1062,7 @@ describe('LibrarySurface', () => {
       const actions = within(
         screen.getByTestId('library-row-actions-release-1')
       );
-      await user.click(actions.getByRole('button', { name: 'More actions' }));
+      await user.click(actions.getByRole('button', { name: /^Actions for / }));
       if (changedProfile === true) applyCacheScope({ profileId: 'profile-2' });
       await user.click(screen.getByRole('menuitem', { name: 'Ask Jovie' }));
       expect(consumePendingChatPrompt()).toBeNull();
@@ -1101,7 +1101,7 @@ describe('LibrarySurface', () => {
     );
 
     const actions = within(screen.getByTestId('library-row-actions-release-1'));
-    await user.click(actions.getByRole('button', { name: 'More actions' }));
+    await user.click(actions.getByRole('button', { name: /^Actions for / }));
     await user.hover(screen.getByRole('menuitem', { name: 'Visibility' }));
     fireEvent.click(
       await screen.findByRole('menuitem', { name: 'Hidden from Profile' })
@@ -1118,7 +1118,7 @@ describe('LibrarySurface', () => {
       );
     });
 
-    await user.click(actions.getByRole('button', { name: 'More actions' }));
+    await user.click(actions.getByRole('button', { name: /^Actions for / }));
     await user.hover(screen.getByRole('menuitem', { name: 'Visibility' }));
     expect(
       await screen.findByRole('menuitem', { name: 'Hidden from Profile' })
@@ -1141,7 +1141,7 @@ describe('LibrarySurface', () => {
     );
 
     const actions = within(screen.getByTestId('library-row-actions-release-1'));
-    await user.click(actions.getByRole('button', { name: 'More actions' }));
+    await user.click(actions.getByRole('button', { name: /^Actions for / }));
     await user.click(screen.getByRole('menuitem', { name: 'Archive' }));
 
     await waitFor(() => {
@@ -1166,7 +1166,7 @@ describe('LibrarySurface', () => {
     );
 
     let actions = within(screen.getByTestId('library-row-actions-release-1'));
-    await user.click(actions.getByRole('button', { name: 'More actions' }));
+    await user.click(actions.getByRole('button', { name: /^Actions for / }));
     await user.click(screen.getByRole('menuitem', { name: 'Archive' }));
 
     await waitFor(() => {
@@ -1187,7 +1187,7 @@ describe('LibrarySurface', () => {
     );
     await user.keyboard('{Escape}');
     actions = within(screen.getByTestId('library-row-actions-release-1'));
-    await user.click(actions.getByRole('button', { name: 'More actions' }));
+    await user.click(actions.getByRole('button', { name: /^Actions for / }));
     await user.click(screen.getByRole('menuitem', { name: 'Restore' }));
 
     await waitFor(() => {
@@ -1221,7 +1221,7 @@ describe('LibrarySurface', () => {
     let actions = within(
       screen.getByTestId('library-row-actions-merch-card-1')
     );
-    await user.click(actions.getByRole('button', { name: 'More actions' }));
+    await user.click(actions.getByRole('button', { name: /^Actions for / }));
     await user.click(screen.getByRole('menuitem', { name: 'Archive' }));
 
     await waitFor(() => {
@@ -1240,7 +1240,7 @@ describe('LibrarySurface', () => {
     );
     await user.keyboard('{Escape}');
     actions = within(screen.getByTestId('library-row-actions-merch-card-1'));
-    await user.click(actions.getByRole('button', { name: 'More actions' }));
+    await user.click(actions.getByRole('button', { name: /^Actions for / }));
     await user.click(screen.getByRole('menuitem', { name: 'Restore' }));
 
     await waitFor(() => {

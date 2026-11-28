@@ -181,9 +181,9 @@ describe('ShellReleaseRow audio affordance', () => {
     // text-overflow needs a block box: the ellipsis lives on the inner span,
     // never on the inline-flex link, and the artist line gives way first.
     const title = screen.getByText('Lost in the Light');
-    expect(title).toHaveClass('truncate', 'min-w-0');
+    expect(title).toHaveClass('truncate', 'min-w-0', 'leading-none');
     expect(title).not.toHaveClass('inline-flex');
-    expect(title.parentElement).toHaveClass('font-caption', 'leading-[1.2]');
+    expect(title.parentElement).toHaveClass('font-caption', 'leading-none');
     expect(screen.getByText('Bahamas')).toHaveClass('text-2xs', 'shrink-9999');
   });
 
@@ -225,7 +225,7 @@ describe('ShellReleaseRow audio affordance', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('does not reserve a row action slot when the release has no actions', () => {
+  it('reserves an empty action slot when the release has no actions', () => {
     render(
       <ShellReleaseRow
         release={fakeRelease({
@@ -237,9 +237,9 @@ describe('ShellReleaseRow audio affordance', () => {
         onSelect={() => undefined}
       />
     );
-
+    expect(screen.getByTestId('shell-release-row-actions')).toBeInTheDocument();
     expect(
-      screen.queryByTestId('shell-release-row-actions')
+      screen.queryByRole('button', { name: /Release actions/i })
     ).not.toBeInTheDocument();
   });
 

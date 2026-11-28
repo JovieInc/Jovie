@@ -67,9 +67,11 @@ export interface ShellListRowDisclosureIconProps
 
 const shellListRowDensityClassName = {
   none: '',
-  compact: 'min-h-7 py-0.5',
-  dense: 'min-h-8 py-1',
-  standard: 'min-h-11 py-1.5',
+  // Fixed heights + items-center on the row (callers) — no vertical padding
+  // that shrinks the content box and pushes media off the shared center.
+  compact: 'h-7',
+  dense: 'h-8',
+  standard: 'h-11',
   spacious: 'h-14',
 } as const satisfies Record<ShellListRowDensity, string>;
 
@@ -107,7 +109,7 @@ export function getShellListRowFrameClassName({
         : '';
 
   return cn(
-    'relative min-w-0 rounded-md border-y border-transparent outline-none',
+    'relative flex min-w-0 items-center rounded-md border-y border-transparent outline-none',
     rowState.base,
     chrome === 'shell' && 'system-b-table-row-shell',
     shellListRowDensityClassName[density],
@@ -127,6 +129,7 @@ function shellListRowHostAttrs({
 }: ShellListRowFrameSharedProps) {
   return {
     'data-shell-list-row': 'true' as const,
+    'data-app-table-row': 'true' as const,
     'data-selected': isSelected ? ('true' as const) : undefined,
     className: getShellListRowFrameClassName({
       chrome,
@@ -218,6 +221,7 @@ export function ShellListRowButton({
     <PlainButton
       type={type}
       data-shell-list-row='true'
+      data-app-table-row='true'
       data-selected={isSelected ? 'true' : undefined}
       className={getShellListRowFrameClassName({
         chrome,

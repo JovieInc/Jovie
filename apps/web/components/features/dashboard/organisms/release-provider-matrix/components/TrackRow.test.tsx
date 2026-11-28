@@ -74,6 +74,9 @@ describe('TrackRow', () => {
       expect.objectContaining({ id: 'track-1', audioUrl: track.previewUrl })
     );
     expect(onClick).not.toHaveBeenCalled();
+    expect(
+      container.querySelectorAll('[data-app-table-cell="content"]').length
+    ).toBeGreaterThan(0);
     await expectNoA11yViolations(container);
   });
 

@@ -3,6 +3,7 @@
 import {
   ACTION_OVERFLOW_MAX_PRIMARY,
   IconButton,
+  type IconButtonSize,
   partitionRankedActions,
   type RankableAction,
 } from '@jovie/ui';
@@ -53,6 +54,8 @@ export interface TableRowOverflowTriggerProps
   > {
   readonly visibility?: TableRowActionBarVisibility;
   readonly ariaLabel?: string;
+  /** Dense catalog rows use `xs` (24px) so the reserved action slot never shifts. */
+  readonly size?: IconButtonSize;
 }
 
 /**
@@ -69,6 +72,7 @@ export const TableRowOverflowTrigger = forwardRef<
   {
     visibility = 'always',
     ariaLabel = 'More actions',
+    size = 'sm',
     disabled = false,
     onClick,
     onPointerDown,
@@ -82,7 +86,7 @@ export const TableRowOverflowTrigger = forwardRef<
       ref={ref}
       type='button'
       variant='ghost'
-      size='sm'
+      size={size}
       fade={visibility === 'hover' ? 'parent' : undefined}
       ariaLabel={ariaLabel}
       disabled={disabled}

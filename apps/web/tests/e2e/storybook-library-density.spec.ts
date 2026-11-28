@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { assertRowAlignment } from './helpers/assert-row-alignment';
 
 async function geometry(page: Page) {
   return page
@@ -109,6 +110,13 @@ for (const story of ['dense-scan-with-inspector', 'virtualized-dense-scan']) {
       .poll(async () => (await geometry(page)).violations)
       .toEqual([]);
     expect((await geometry(page)).count).toBeGreaterThan(1);
+    // Shared app-table row primitive gate (JOV-14762): vertical centers,
+    // equal heights, no hover shift, numeric right-align.
+    await assertRowAlignment(page, {
+      rows: page.locator('[data-testid^="library-catalog-row-"]'),
+      expectedHeightPx: 32,
+      assertHoverStability: true,
+    });
     await expect(first.getByTestId('table-column-compacts')).toHaveCount(0);
     await expect(
       first.locator('[data-testid^="library-catalog-bpm-"]')

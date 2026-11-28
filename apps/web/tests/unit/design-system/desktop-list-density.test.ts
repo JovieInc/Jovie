@@ -28,10 +28,13 @@ describe('desktop list density', () => {
     const row = source(
       'components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow.tsx'
     );
+    const frame = source(
+      'components/organisms/table/atoms/ShellListRowFrame.tsx'
+    );
 
     expect(row).toContain("density='dense'");
-    expect(row).toContain('h-8');
-    expect(row).toContain('size={20}');
+    expect(frame).toContain("dense: 'h-8'");
+    expect(row).toContain('APP_TABLE_MEDIA_SIZE.dense');
     expect(row).not.toContain("density='spacious'");
     expect(row).not.toContain('size={40}');
   });
