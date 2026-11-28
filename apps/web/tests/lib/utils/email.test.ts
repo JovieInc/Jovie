@@ -169,7 +169,9 @@ describe('getAccountMetricCohort', () => {
     );
     expect(getAccountMetricCohort(null)).toBe('unattributed');
   });
+});
 
+describe('isSyntheticCanaryRecipient', () => {
   // JOVIE-WEB-10N: every identity a production canary signs in as must be on
   // the no-send list, or each run mails a mailbox with no inbox, hits the
   // hard-bounce suppression and fails the sign-in.

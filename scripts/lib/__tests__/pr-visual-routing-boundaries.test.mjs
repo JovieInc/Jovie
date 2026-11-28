@@ -391,3 +391,27 @@ test('native backend entries cannot suppress actual external-assignee renderers'
     );
   }
 });
+
+// Exact unsupported input from PR26995 (JOV-13012): the send-block predicate
+// for synthetic canary mailboxes. Pure string logic, no rendered surface.
+test('email address predicates have no standalone rendered surface', () => {
+  assert.deepEqual(
+    routeChangedFiles([
+      'apps/web/lib/utils/email.ts',
+      'apps/web/lib/auth/email-otp-sender.test.ts',
+      'apps/web/tests/lib/utils/email.test.ts',
+    ]),
+    {
+      shouldReview: false,
+      routes: [],
+      reason: 'no-ui-change',
+      review_status: 'skipped',
+    }
+  );
+  const neighbor = 'apps/web/lib/utils/email-preview.tsx';
+  assert.deepEqual(
+    routeChangedFiles(['apps/web/lib/utils/email.ts', neighbor])
+      .missingCoverage,
+    [{ file: neighbor, reason: 'unsupported-surface' }]
+  );
+});

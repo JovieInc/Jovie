@@ -139,6 +139,9 @@ const NON_RENDERING_FILES = new Set([
   'apps/web/lib/tasks/types.ts',
   'apps/web/lib/teleprompter/takes/route-error.ts',
   'apps/web/lib/teleprompter/takes/server.ts',
+  // Address normalization and send-block predicates; no component, copy or
+  // formatting for display (JOV-13012).
+  'apps/web/lib/utils/email.ts',
 ]);
 
 // Exact shipped components and their state dependencies; unknown neighbors
