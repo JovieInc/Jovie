@@ -707,7 +707,7 @@ class RenderTest(unittest.TestCase):
         value["local"]["doctor"].update(at=hud.utcnow().isoformat(), observed={
             "poolByProvider": {"codex": 0}, "candidatePoolByProvider": {"codex": 27},
             "eligiblePoolByProvider": {"codex": 0}, "rejectedByProvider": {"codex": {"sensitive-text": 16}},
-            "newIssueBudgetByProvider": {"codex": hud.lane.read_new_issue_budget("codex", 3)}})
+            "newIssueBudgetByProvider": {"codex": hud.lane.new_issue_budget("codex", 3, [])}})
         hint = hud.pool_hint("codex", value["local"])
         self.assertEqual(hint, "new issues 0 · eligible 0/27 · PR ceiling none · sensitive-text 16")
         self.assertNotIn("None", hint)
