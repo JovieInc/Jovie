@@ -394,11 +394,11 @@ describe('HeroSpotifySearch', () => {
       const input = getInput();
       await user.type(input, 'Phoebe');
 
-      const staleResult = screen.getByText('Taylor Swift').closest('button');
-      expect(staleResult).toBeDisabled();
+      const staleResult = screen.getByRole('button', { name: /Taylor Swift/ });
+      expect(staleResult).toHaveAttribute('aria-disabled', 'true');
 
       await user.keyboard('{ArrowDown}{Enter}');
-      if (staleResult) fireEvent.click(staleResult);
+      fireEvent.click(staleResult);
 
       expect(mockPush).not.toHaveBeenCalled();
     });

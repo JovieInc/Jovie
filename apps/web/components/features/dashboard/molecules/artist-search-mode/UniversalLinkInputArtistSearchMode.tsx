@@ -151,7 +151,7 @@ export function UniversalLinkInputArtistSearchModeView({
           <PlainButton
             type='button'
             onClick={exitSearchMode}
-            className='relative flex items-center justify-center w-5 h-5 rounded-full before:absolute before:left-1/2 before:top-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 text-tertiary-token hover:bg-surface-2 hover:text-secondary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+            className='relative flex items-center justify-center size-6 rounded-full before:absolute before:left-1/2 before:top-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 text-tertiary-token hover:bg-surface-2 hover:text-secondary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
             aria-label='Exit Search Mode'
           >
             <X className='w-4 h-4' />
@@ -240,11 +240,7 @@ export function UniversalLinkInputArtistSearchModeView({
                   </option>
                 ))}
               </HostDrawnSelect>
-              <div
-                ref={resultsListRef}
-                className='max-h-64 overflow-y-auto'
-                aria-hidden='true'
-              >
+              <div ref={resultsListRef} className='max-h-64 overflow-y-auto'>
                 {results.map((artist, index) => (
                   <PlainButton
                     key={artist.id}

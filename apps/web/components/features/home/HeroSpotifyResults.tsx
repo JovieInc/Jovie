@@ -148,23 +148,21 @@ export function HeroSpotifyResults({
 
       {/* Artist results */}
       {results.length > 0 && (
-        <div
+        <section
           ref={resultsListRef}
           className='max-h-64 overflow-y-auto'
-          aria-hidden='true'
+          aria-label='Artist Result List'
         >
           {results.map((artist, index) => (
             <Button
               key={artist.id}
               type='button'
               variant={index === activeIndex ? 'secondary' : 'ghost'}
-              disabled={isLoading}
-              tabIndex={0}
+              aria-disabled={isLoading || undefined}
               className='w-full justify-start'
-              onClick={() => onSelectArtist(artist)}
-              onKeyDown={event =>
-                handleActivationKeyDown(event, () => onSelectArtist(artist))
-              }
+              onClick={() => {
+                if (!isLoading) onSelectArtist(artist);
+              }}
               onMouseEnter={() => onActiveIndexChange(index)}
             >
               <div className='relative mr-3 h-10 w-10 shrink-0 overflow-hidden rounded-full bg-surface-1'>
@@ -214,7 +212,7 @@ export function HeroSpotifyResults({
               )}
             </Button>
           ))}
-        </div>
+        </section>
       )}
 
       {/* "Paste URL" option */}

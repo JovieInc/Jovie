@@ -143,7 +143,7 @@ describe('FounderFunnelBand', () => {
 
     expect(
       screen.getByRole('link', {
-        name: /^Accounts created 40 .*; inspect underlying entities$/,
+        name: /^Accounts created 40 .*Inspect underlying entities$/,
       })
     ).toHaveAttribute(
       'href',
@@ -206,7 +206,7 @@ describe('FounderFunnelBand', () => {
     expect(screen.getByText('7d customer')).toBeInTheDocument();
     expect(screen.getByText('Updating funnel range…')).toBeInTheDocument();
     const oldLink = screen.getByRole('link', {
-      name: /^Accounts created 7 .*; inspect underlying entities$/,
+      name: /^Accounts created 7 .*Inspect underlying entities$/,
     });
     expect(
       new URL(oldLink.getAttribute('href')!, 'https://jov.ie').searchParams.get(
@@ -227,7 +227,7 @@ describe('FounderFunnelBand', () => {
     expect(screen.getByText('30d customer')).toBeInTheDocument();
     expect(screen.queryByText('7d customer')).not.toBeInTheDocument();
     const stage = screen.getByRole('link', {
-      name: /^Accounts created 30 .*; inspect underlying entities$/,
+      name: /^Accounts created 30 .*Inspect underlying entities$/,
     });
     const href = new URL(stage.getAttribute('href')!, 'https://jov.ie')
       .searchParams;

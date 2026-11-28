@@ -73,7 +73,6 @@ export function ProductDemoCarousel() {
           onClick={handleAdvance}
           onMouseEnter={() => setPaused(true)}
           onMouseLeave={() => setPaused(false)}
-          aria-label='Next Slide'
         >
           <div className='relative aspect-[1440/900] w-full overflow-hidden bg-ink-on-media'>
             <AnimatePresence mode='wait'>
@@ -115,6 +114,7 @@ export function ProductDemoCarousel() {
                 <p className='text-lg font-semibold tracking-tight text-on-media sm:text-xl md:text-2xl'>
                   {slide.caption}
                 </p>
+                <span className='sr-only'>Next Slide</span>
               </motion.div>
             </AnimatePresence>
           </div>
@@ -146,8 +146,8 @@ export function ProductDemoCarousel() {
         {SLIDES.map((s, i) => (
           <PlainButton
             key={s.id}
-            className={`size-2 rounded-full transition-colors ${
-              i === current ? 'bg-on-media' : 'bg-on-media/30'
+            className={`grid size-6 place-items-center rounded-full after:size-2 after:rounded-full after:transition-colors ${
+              i === current ? 'after:bg-on-media' : 'after:bg-on-media/30'
             }`}
             onClick={() => setCurrent(i)}
             aria-label={`Go to slide ${i + 1}`}

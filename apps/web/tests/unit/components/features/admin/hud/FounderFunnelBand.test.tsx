@@ -90,7 +90,7 @@ describe('FounderFunnelBand', () => {
     expect(screen.getByText('Largest count gap · −20')).toBeInTheDocument();
     expect(
       screen.getByRole('link', {
-        name: /^Accounts created 40 .*; inspect underlying entities$/,
+        name: /^Accounts created 40 .*Inspect underlying entities$/,
       })
     ).toHaveAttribute(
       'href',

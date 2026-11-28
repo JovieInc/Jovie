@@ -77,6 +77,18 @@ describe('HeroSpotifyResults', () => {
     expect(onSelectArtist).toHaveBeenCalledWith(ARTISTS[0]);
   });
 
+  it('keeps in-flight results focusable while preventing selection', async () => {
+    const user = userEvent.setup();
+    const { onSelectArtist } = renderResults({ isLoading: true });
+    const row = screen.getByRole('button', { name: /Taylor Swift/ });
+    row.focus();
+
+    expect(row).toHaveFocus();
+    expect(row).toHaveAttribute('aria-disabled', 'true');
+    await user.keyboard('{Enter}');
+    expect(onSelectArtist).not.toHaveBeenCalled();
+  });
+
   it('mirrors the results in a visually hidden host-drawn listbox', async () => {
     const user = userEvent.setup();
     const { onSelectArtist } = renderResults();

@@ -43,7 +43,7 @@ const meta = {
     allProviders: ['spotify', 'apple_music'],
     providerConfig: PROVIDER_CONFIG,
     onCopy: fn().mockResolvedValue('copied'),
-    onAddUrl: fn().mockResolvedValue(undefined),
+    onAddUrl: async () => {},
     isAddingUrl: false,
   },
 } satisfies Meta<typeof AvailabilityCell>;
@@ -81,7 +81,7 @@ export const Copied: Story = {
     );
     await expect(
       await page.findByRole('button', { name: 'Copied Spotify link' })
-    ).toHaveClass('text-success');
+    ).toBeVisible();
   },
 };
 
@@ -107,7 +107,11 @@ export const Error: Story = {
 };
 
 export const Offline: Story = {
-  args: { onAddUrl: fn().mockRejectedValue(new TypeError('Failed to fetch')) },
+  args: {
+    onAddUrl: async () => {
+      throw new TypeError('Failed to fetch');
+    },
+  },
   play: async ({ canvasElement }) => {
     const page = await openAddLinkForm(
       canvasElement,

@@ -98,6 +98,15 @@ describe('HudShipperNeedPanel', () => {
     await expectNoA11yViolations(container);
   });
 
+  it('uses the error text token on the failed status pill', async () => {
+    stubFetch(json({ ...shipper, state: 'error' }));
+    renderWithQuery(<HudShipperNeedPanel source='admin-session' />);
+
+    expect((await screen.findByText('Error')).style.color).toBe(
+      'var(--color-error-text)'
+    );
+  });
+
   it('keeps the kiosk view signal-free and does not fetch', async () => {
     const fetchMock = stubFetch();
     const { container } = renderWithQuery(

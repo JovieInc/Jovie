@@ -24,9 +24,9 @@ describe('TaskDescriptionHelper', () => {
     expect(screen.getAllByText('Add a short summary.')).toHaveLength(2);
     expect(screen.getByText('Release date')).toBeInTheDocument();
     expect(screen.getByText('Edit any time.')).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'Read the guide' })
-    ).toHaveAttribute('target', '_blank');
+    const guide = screen.getByRole('link', { name: 'Read the guide' });
+    expect(guide).toHaveAttribute('target', '_blank');
+    expect(guide).toHaveClass('min-h-6');
     await expectNoA11yViolations(container);
   });
 

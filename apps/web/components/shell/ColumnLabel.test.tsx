@@ -22,6 +22,20 @@ describe('ColumnLabel', () => {
     expect(header.className).not.toMatch(/\buppercase\b/);
   });
 
+  it('names the sort control when the visible label is empty', () => {
+    render(
+      <ColumnLabel<Field>
+        field='title'
+        label=''
+        align='left'
+        sortBy='artist'
+        sortDir='asc'
+        onSort={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Sort column' })).toBeVisible();
+  });
+
   it('fires onSort with the field when clicked', () => {
     const onSort = vi.fn();
     render(

@@ -83,8 +83,6 @@ export const ProofPendingLowReachWithCatalog: Story = {
     await expect(
       canvas.getByTestId('checkout-catalog-preview')
     ).toHaveTextContent('2 releases ready for your page');
-    await expect(
-      canvas.getByTestId('checkout-proof-pending-terms')
-    ).toBeVisible();
+    await expect(canvas.getByTestId('checkout-go-live-terms')).toBeVisible();
   },
 };

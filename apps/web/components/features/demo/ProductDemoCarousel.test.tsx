@@ -31,7 +31,7 @@ describe('ProductDemoCarousel', () => {
     const user = userEvent.setup();
     const { container } = render(<ProductDemoCarousel />);
 
-    await user.click(screen.getByRole('button', { name: 'Next Slide' }));
+    await user.click(screen.getByRole('button', { name: /Next Slide/ }));
 
     expect(
       await screen.findByText('Every release, every platform')
@@ -44,11 +44,11 @@ describe('ProductDemoCarousel', () => {
     const { container } = render(<ProductDemoCarousel />);
 
     const dot = screen.getByRole('button', { name: 'Go to slide 3' });
-    expect(dot.className).toContain('bg-on-media/30');
+    expect(dot.className).toContain('after:bg-on-media/30');
     await user.click(dot);
 
     expect(await screen.findByText('Own your audience')).toBeInTheDocument();
-    expect(dot.className).toContain('bg-on-media');
+    expect(dot.className).toContain('after:bg-on-media');
     expect(dot.className).not.toContain('bg-white');
     await expectNoA11yViolations(container);
   });
@@ -58,7 +58,7 @@ describe('ProductDemoCarousel', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<ProductDemoCarousel />);
 
-    await user.hover(screen.getByRole('button', { name: 'Next Slide' }));
+    await user.hover(screen.getByRole('button', { name: /Next Slide/ }));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(9000);
     });

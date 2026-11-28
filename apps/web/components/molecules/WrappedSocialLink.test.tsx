@@ -36,7 +36,9 @@ describe('WrappedSocialLink', () => {
     );
 
     expect(wrap.mutate).not.toHaveBeenCalled();
-    expect(await screen.findByRole('link')).toHaveAttribute('href', '/listen');
+    expect(
+      await screen.findByRole('link', { name: 'Listen now' })
+    ).toHaveAttribute('href', '/listen');
     expect(screen.getByText('Listen now')).toBeInTheDocument();
     await expectNoA11yViolations(container);
   });

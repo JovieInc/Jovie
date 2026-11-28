@@ -181,9 +181,6 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
     thread.status,
     unread
   );
-  const rowAccessibleName = accessibleStatus
-    ? `${thread.title}, ${accessibleStatus}`
-    : undefined;
   const rowClasses = cn(
     getSidebarNavRowClassName({
       active,
@@ -201,7 +198,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
     <>
       <span className={SIDEBAR_ENTRY_ICON_SLOT_CLASS}>
         {/* JOV-14005 A: keep semantic status micro-dot visible in calm + dense.
-            Accessible status phrase lives on the control name, not inside the
+            Accessible status phrase lives alongside the title, not inside the
             paint-only dot (dot must not be the only decision cue). */}
         <span
           aria-hidden='true'
@@ -229,6 +226,9 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
         )}
       >
         {thread.title}
+        {accessibleStatus ? (
+          <span className='sr-only'>, {accessibleStatus}</span>
+        ) : null}
       </span>
       {calm ? (
         <time
@@ -258,7 +258,6 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
           <Link
             href={thread.href}
             prefetch={false}
-            aria-label={rowAccessibleName}
             aria-current={active ? 'page' : undefined}
             className={rowClasses}
             onContextMenu={e => onThreadContextMenu?.(e, thread)}
@@ -271,7 +270,6 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
             variant='ghost'
             onClick={() => onSelect?.(thread.id)}
             onContextMenu={e => onThreadContextMenu?.(e, thread)}
-            aria-label={rowAccessibleName}
             aria-pressed={active}
             className={rowClasses}
           >

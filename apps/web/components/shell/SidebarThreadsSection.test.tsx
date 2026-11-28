@@ -334,7 +334,7 @@ describe('SidebarThreadsSection', () => {
       name: 'Draft thread, Running',
     });
 
-    expect(threadButton).toHaveAttribute('aria-label', 'Draft thread, Running');
+    expect(threadButton).toHaveAccessibleName('Draft thread, Running');
     expect(threadButton).toHaveAttribute('aria-pressed', 'true');
     expect(threadButton.innerHTML).toContain('bg-accent/85');
     expect(threadButton).toHaveClass(

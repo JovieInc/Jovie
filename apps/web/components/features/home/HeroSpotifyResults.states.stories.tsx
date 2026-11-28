@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { createRef } from 'react';
+import { useRef } from 'react';
 import { HeroSpotifyResults } from './HeroSpotifyResults';
 import { ARTISTS } from './HeroSpotifyResults.stories';
 
@@ -9,7 +9,12 @@ const meta = {
   title: 'Marketing/Sections/HeroSpotifyResults/States',
   component: HeroSpotifyResults,
   parameters: { layout: 'centered' },
+  render: function ResultsStory(args) {
+    const resultsListRef = useRef<HTMLDivElement>(null);
+    return <HeroSpotifyResults {...args} resultsListRef={resultsListRef} />;
+  },
   args: {
+    resultsListRef: { current: null },
     resultsId: 'hero-spotify-results',
     isEditorial: false,
     results: [],
@@ -19,7 +24,6 @@ const meta = {
     activeIndex: -1,
     pasteUrlIndex: 0,
     totalItems: 1,
-    resultsListRef: createRef<HTMLDivElement>(),
     onActiveIndexChange: NOOP,
     onSelectArtist: NOOP,
     onPasteUrl: NOOP,

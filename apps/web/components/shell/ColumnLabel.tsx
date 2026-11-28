@@ -70,6 +70,7 @@ export function ColumnLabel<F extends string>({
   return (
     <PlainButton
       type='button'
+      aria-label={label.trim() ? undefined : 'Sort column'}
       onClick={() => onSort(field)}
       className={cn(
         SHELL_CAPTION_CLASSNAME,

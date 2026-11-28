@@ -224,12 +224,12 @@ function BandsintownConnectionPill({
                 '--tw-ring-color': `${accent}50`,
               } as React.CSSProperties
             }
-            aria-label={`Bandsintown connection: ${artistName || 'Connected'}`}
           >
             <Calendar
               className='h-3.5 w-3.5 shrink-0'
               style={{ color: accent }}
             />
+            <span className='sr-only'>{'Bandsintown connection: '}</span>
             <span className='max-w-40 truncate text-secondary-token'>
               {artistName || 'Connected'}
             </span>

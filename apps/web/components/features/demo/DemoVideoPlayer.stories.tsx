@@ -28,7 +28,7 @@ export const ErrorVideoFailsToLoad: Story = {
     const video = canvasElement.querySelector('video');
     video?.dispatchEvent(new Event('error'));
     await waitFor(() => {
-      within(canvasElement).getByRole('button', { name: 'Next Slide' });
+      within(canvasElement).getByRole('button', { name: /Next Slide/ });
     });
   },
 };

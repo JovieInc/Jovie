@@ -69,7 +69,7 @@ export function TaskDescriptionHelper({
                     href={link.href}
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='pointer-events-auto text-accent hover:underline focus-visible:outline-none focus-visible:underline'
+                    className='pointer-events-auto inline-flex min-h-6 items-center text-accent hover:underline focus-visible:outline-none focus-visible:underline'
                   >
                     {link.label}
                   </a>

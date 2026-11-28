@@ -127,7 +127,7 @@ describe('SettingsTouringSection', () => {
     await expectNoA11yViolations(container);
     await user.click(
       screen.getByRole('button', {
-        name: /Bandsintown connection: Sasha Waves/,
+        name: /Bandsintown connection:\s*Sasha Waves/,
       })
     );
     await user.click(await screen.findByRole('menuitem', { name: /Sync now/ }));

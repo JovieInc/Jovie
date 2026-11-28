@@ -217,7 +217,7 @@ export function VerificationModal({
                 data-testid='verification-error'
               >
                 <AlertCircle className='h-4 w-4 text-error shrink-0 mt-0.5' />
-                <p className='text-app text-error'>{displayError}</p>
+                <p className='text-app text-error-text'>{displayError}</p>
               </ContentSurfaceCard>
             )}
 

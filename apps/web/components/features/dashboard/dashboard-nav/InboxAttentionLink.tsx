@@ -25,13 +25,13 @@ export function InboxAttentionLink({
   navigationPending = false,
   onClick,
 }: InboxAttentionLinkProps) {
+  const visibleCount = Math.min(pendingCount, 99);
   return (
     <Link
       href={APP_ROUTES.DASHBOARD}
       onClick={onClick}
       prefetch={false}
       aria-busy={navigationPending || undefined}
-      aria-label={label}
       data-inbox-attention={attention}
       data-navigation-item-id={itemId}
       data-navigation-pending={navigationPending || undefined}
@@ -40,6 +40,7 @@ export function InboxAttentionLink({
         navigationPending && 'bg-sidebar-accent-active text-primary-token'
       )}
     >
+      <span className='sr-only'>{label}</span>
       <Bell
         className='size-(--app-shell-sidebar-icon-size)'
         aria-hidden='true'
@@ -50,7 +51,7 @@ export function InboxAttentionLink({
           aria-label={`${pendingCount} pending items`}
           className='absolute -right-0.5 -top-0.5 flex min-w-3.5 h-3.5 items-center justify-center rounded-full bg-accent tabular-nums text-(length:--app-shell-sidebar-badge-font-size) font-bold text-(--color-bg-base)'
         >
-          {Math.min(pendingCount, 99)}
+          {visibleCount}
         </span>
       ) : null}
     </Link>

@@ -63,10 +63,10 @@ describe('ProfileEditorSection', () => {
   it('shows values and empty prompts as edit buttons', async () => {
     const { container } = render(<Harness name='' handle='novalane' />);
     expect(
-      screen.getByRole('button', { name: 'Edit display name' })
+      screen.getByRole('button', { name: /Edit display name/ })
     ).toHaveTextContent('Add display name');
     expect(
-      screen.getByRole('button', { name: 'Edit username' })
+      screen.getByRole('button', { name: /Edit username/ })
     ).toHaveTextContent('novalane');
     await expectNoA11yViolations(container);
   });
@@ -75,7 +75,7 @@ describe('ProfileEditorSection', () => {
     const user = userEvent.setup();
     const { container, rerender } = render(<Harness />);
 
-    await user.click(screen.getByRole('button', { name: 'Edit display name' }));
+    await user.click(screen.getByRole('button', { name: /Edit display name/ }));
     const input = screen.getByRole('textbox', { name: 'Display Name' });
     await user.clear(input);
     await user.type(input, 'Sasha Waves');
@@ -96,7 +96,7 @@ describe('ProfileEditorSection', () => {
     const blur = vi.fn();
     render(<Harness spies={{ blur }} />);
 
-    await user.click(screen.getByRole('button', { name: 'Edit username' }));
+    await user.click(screen.getByRole('button', { name: /Edit username/ }));
     const input = screen.getByRole('textbox', { name: 'Username' });
     await user.type(input, 'x');
     expect(input).toHaveValue('novalanex');

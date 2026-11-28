@@ -67,7 +67,7 @@ function ProfileIdentityFieldRow({
               : 'min-h-11 text-app font-caption tracking-tight text-secondary-token'
           )}
           onClick={onEdit}
-          aria-label={ariaLabel}
+          aria-label={`${value || emptyLabel}, ${ariaLabel}`}
           aria-pressed={editing}
           aria-controls={editing ? controlsId : undefined}
         >

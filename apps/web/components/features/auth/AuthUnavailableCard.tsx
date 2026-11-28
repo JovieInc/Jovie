@@ -36,7 +36,7 @@ export function AuthUnavailableCard({
       ? 'Sign up is temporarily unavailable'
       : 'Sign in is temporarily unavailable';
   const actionClassName =
-    'inline-flex h-(--linear-button-height-md) min-h-10 w-full items-center justify-center rounded-full border border-subtle bg-on-media dark:bg-surface-1 px-4 text-(--linear-caption-size) font-(--linear-caption-weight) text-(--color-bg-base) shadow-button transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle ease-out hover:bg-on-media dark:bg-surface-1/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-media/24 disabled:cursor-not-allowed disabled:opacity-70';
+    'inline-flex h-(--linear-button-height-md) min-h-10 w-full items-center justify-center rounded-full border border-subtle bg-on-media px-4 text-(--linear-caption-size) font-(--linear-caption-weight) text-ink-on-media shadow-button transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle ease-out hover:bg-on-media/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-media/24 disabled:cursor-not-allowed disabled:opacity-70';
 
   return (
     <section

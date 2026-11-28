@@ -14,10 +14,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const inCtaLink: Decorator = function InCtaLink(Story) {
+const inCtaLink: Decorator = function InCtaLink(Story, { args }) {
   return (
     <Link
       href='/signup'
+      aria-label={args.children == null ? 'Get started' : undefined}
       className='relative inline-flex min-h-11 items-center rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground'
     >
       <Story />

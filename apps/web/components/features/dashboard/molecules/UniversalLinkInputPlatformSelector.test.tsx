@@ -34,6 +34,9 @@ describe('UniversalLinkInputPlatformSelector', () => {
     expect(await screen.findAllByRole('menuitem')).toHaveLength(
       ARTIST_SEARCH_PLATFORMS.length + PLATFORM_OPTIONS.length
     );
+    expect(screen.getByRole('button', { name: 'Add Link From Platform' })).toBe(
+      trigger
+    );
     await expectNoA11yViolations(container);
   });
 

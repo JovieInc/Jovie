@@ -1,11 +1,24 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { WikiPageArticle } from './WikiPageArticle';
+import { Suspense, use, useMemo } from 'react';
+import { WikiPageArticle as ServerArticle } from './WikiPageArticle';
+
+function Article(props: Parameters<typeof ServerArticle>[0]) {
+  const { page } = props;
+  return use(useMemo(() => ServerArticle({ page }), [page]));
+}
 
 const meta = {
   title: 'Features/Admin/Wiki/WikiPageArticle/States',
-  component: WikiPageArticle,
+  component: Article,
+  decorators: [
+    Story => (
+      <Suspense>
+        <Story />
+      </Suspense>
+    ),
+  ],
   parameters: { layout: 'padded' },
-} satisfies Meta<typeof WikiPageArticle>;
+} satisfies Meta<typeof Article>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

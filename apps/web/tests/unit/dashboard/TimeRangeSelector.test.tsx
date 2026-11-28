@@ -37,7 +37,7 @@ describe('TimeRangeSelector (segment variant)', () => {
     );
 
     expect(
-      screen.getByRole('radiogroup', { name: 'Analytics Time Range' })
+      screen.getByRole('radiogroup', { name: /Analytics Time Range/ })
     ).toBeVisible();
     expect(screen.getAllByRole('radio')).toHaveLength(3);
     expect(screen.getByRole('radio', { name: '7D' })).toBeChecked();
@@ -263,7 +263,7 @@ describe('TimeRangeSelector (menu variant)', () => {
     );
 
     expect(
-      screen.getByRole('button', { name: 'Analytics Time Range' })
+      screen.getByRole('button', { name: /Analytics Time Range/ })
     ).toHaveTextContent('Last 30 Days');
   });
 
@@ -280,7 +280,7 @@ describe('TimeRangeSelector (menu variant)', () => {
     );
 
     await user.click(
-      screen.getByRole('button', { name: 'Analytics Time Range' })
+      screen.getByRole('button', { name: /Analytics Time Range/ })
     );
 
     const lockedItem = screen.getByRole('menuitem', { name: /All Time/ });

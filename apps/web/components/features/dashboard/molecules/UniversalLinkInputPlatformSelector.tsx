@@ -43,7 +43,7 @@ export function UniversalLinkInputPlatformSelector({
   disabled = false,
 }: PlatformSelectorProps) {
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild disabled={disabled}>
         <PlainButton
           disabled={disabled}
