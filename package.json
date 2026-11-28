@@ -166,6 +166,7 @@
     "factory:run": "pnpm --filter @jovie/web exec tsx scripts/marketing-factory/run.ts",
     "factory:verify": "pnpm --filter @jovie/web exec tsx scripts/marketing-factory/verify.ts",
     "brand:generate": "tsx scripts/generate-brand-assets.ts",
+    "lint:pen": "node scripts/pen-review/lint.mjs",
     "design:pen-bindings": "node scripts/design/pen-bindings.mjs validate",
     "design:pen-export": "node scripts/design/pen-export.mjs",
     "design:pen-ship:check": "node scripts/design/pen-data-backed-ship.mjs check",
