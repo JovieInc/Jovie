@@ -40,12 +40,42 @@ def skipped() -> set[int]:
     return {int(x) for x in os.environ.get("LANES_ESCALATION_SKIP", "").replace(" ", "").split(",") if x.isdigit()}
 
 
-def untouched_s(pr: dict, now: float) -> float | None:
+def _ts(value) -> float | None:
     from datetime import datetime
+    if type(value) in (int, float):
+        return float(value)
     try:
-        return now - datetime.fromisoformat(str(pr.get("updatedAt")).replace("Z", "+00:00")).timestamp()
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00")).timestamp()
     except ValueError:
         return None
+
+
+def untouched_s(pr: dict, now: float) -> float | None:
+    """Seconds since GitHub's `updatedAt`. Journal only: labels, relay writes and bot comments bump it."""
+    at = _ts(pr.get("updatedAt"))
+    return None if at is None else now - at
+
+
+def progress_s(pr: dict, record: dict | None, now: float) -> float | None:
+    """Seconds since the last PROGRESS on this head: the head commit, or a rung/pending escalation for it.
+
+    2026-11-19: 17 of 18 `lane-fix-escalating` PRs had `updatedAt` rewritten in one 2-minute burst
+    (~17:07Z) while their heads had not moved for 35-67h, so the `updatedAt` gate kept every one of them
+    "touched within STALE_S" and the reconcile never ran. Bot churn is not progress."""
+    head = pr.get("headRefOid") or ""
+    stamps = []
+    commits = pr.get("commits") or []
+    if commits and isinstance(commits[-1], dict):
+        stamps.append(_ts(commits[-1].get("committedDate")))
+    record = record if isinstance(record, dict) else {}
+    stamps += [_ts(row.get("at")) for row in _rows(record, head)]
+    pending = record.get("pendingEscalation")
+    if isinstance(pending, dict):
+        stamps.append(_ts(pending.get("at")))
+    stamps = [s for s in stamps if s is not None]
+    if not stamps:
+        return untouched_s(pr, now)  # no progress evidence at all: fall back, never skip silently
+    return now - max(stamps)
 
 
 def _rows(record: dict, head: str) -> list[dict]:
@@ -120,9 +150,9 @@ def reconcile(state: Path, prs: list[dict], providers: dict, *, update_attempts,
     for pr in sorted(prs, key=product_rank):
         number = pr.get("number")
         labels = {(l.get("name") if isinstance(l, dict) else str(l)) for l in pr.get("labels") or []}
-        idle_for = untouched_s(pr, now)
+        idle_for = progress_s(pr, attempts.get(str(number)), now)
         if number in skip or labels & HOLD_LABELS or idle_for is None or idle_for < STALE_S:
-            receipt["skipped"].append(number)  # owned elsewhere, held, or touched within STALE_S
+            receipt["skipped"].append(number)  # owned elsewhere, held, or progressed within STALE_S
             continue
         kind = disposition(pr, attempts.get(str(number)), providers, now, slots)
         if kind in ("live", "surfaced"):
@@ -136,7 +166,8 @@ def reconcile(state: Path, prs: list[dict], providers: dict, *, update_attempts,
                 continue
             receipt[kind].append(number)
             _journal(state, {"pr": number, "disposition": kind, "at": now, "head": pr.get("headRefOid"),
-                             "title": (pr.get("title") or "")[:120], "updatedAt": pr.get("updatedAt")})
+                             "title": (pr.get("title") or "")[:120], "updatedAt": pr.get("updatedAt"),
+                             "progressAgeS": idle_for})
         except Exception as error:  # one PR never stops the rest
             receipt["errors"].append(f"{number}:{type(error).__name__}")
     if expire:
@@ -177,7 +208,7 @@ def fetch_labeled(gh=None) -> list[dict] | None:
     if gh is None:
         from gh_budget import gh_call as gh
     result = gh(["pr", "list", "--repo", "JovieInc/Jovie", "--label", LABEL, "--state", "open", "--limit", "300",
-                 "--json", "number,title,headRefOid,updatedAt,files,labels"], priority="repair")
+                 "--json", "number,title,headRefOid,updatedAt,files,labels,commits"], priority="repair")
     if result.returncode != 0:
         return None
     try:
