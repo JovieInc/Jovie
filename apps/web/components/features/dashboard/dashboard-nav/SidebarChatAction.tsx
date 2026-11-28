@@ -16,6 +16,7 @@ import {
   getSidebarNavRowClassName,
 } from '@/components/shell/SidebarNavItem';
 import { APP_ROUTES } from '@/constants/routes';
+import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { cn } from '@/lib/utils';
 import './SidebarChatAction.css';
 
@@ -41,6 +42,7 @@ export function SidebarChatAction({
   );
   const link = useRef<HTMLAnchorElement>(null);
   const id = useId();
+  const compactViewport = useBreakpointDown('sm');
   const shown = Boolean(renderRecentChats && open);
 
   function cancelClose() {
@@ -148,11 +150,11 @@ export function SidebarChatAction({
         <PopoverContent
           id={id}
           aria-label='Recent Chats'
-          side='right'
+          side={compactViewport ? 'bottom' : 'right'}
           align='start'
-          sideOffset={sideOffset}
+          sideOffset={compactViewport ? undefined : sideOffset}
           size='bare'
-          className='w-(--app-shell-sidebar-chat-history-width)'
+          className='w-(--app-shell-sidebar-chat-history-width) min-w-0'
           tabIndex={-1}
           onPointerEnter={cancelClose}
           onPointerLeave={closeAfterLeaving}

@@ -250,7 +250,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--app-shell-sidebar-background-rgb`: 247 248 248
 - `--app-shell-sidebar-badge-font-size`: 0.5rem
 - `--app-shell-sidebar-border-rgb`: 0 0 0 / 0.06
-- `--app-shell-sidebar-chat-history-width`: 420px
+- `--app-shell-sidebar-chat-history-width`: 280px
 - `--app-shell-sidebar-floating-radius`: 14px
 - `--app-shell-sidebar-foreground-rgb`: 18 18 20
 - `--app-shell-sidebar-history-font-size`: 0.78125rem
