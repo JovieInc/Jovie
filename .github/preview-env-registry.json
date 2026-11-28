@@ -158,15 +158,15 @@
       "kind": "neon-branch",
       "ephemeral": true,
       "admission": {
-        "policy": "golden-path PR, Staging Controller or Golden Path Nightly completion, or manual dispatch",
-        "reason": "Isolated Postgres for the $12 claim browser dogfood: Stripe test checkout, signed webhook and operator decisions write billing and claim state that must never touch staging or production data.",
-        "evidencePurpose": "Claim/checkout journey proof for the PR merge revision or dogfooded SHA.",
+        "policy": "event-driven (Staging Controller completion) or manual-dispatch",
+        "reason": "Isolated Postgres for the $12 claim browser dogfood, including golden-path PR merge revisions. Runs serialize access to shared Stripe test personas; Stripe test checkout, signed webhook and operator decisions write billing and claim state that must never touch staging or production data.",
+        "evidencePurpose": "Live claim/checkout journey proof for the exact staged SHA, which normal CI does not run.",
         "owner": "revenue path / checkout-dogfood",
         "surface": "ephemeral Neon branch claim-dogfood-<run_id>-<attempt> (isolated database only)",
         "ttlHours": 2,
         "cleanupTrigger": "Neon branch TTL (expires_in_hours=2); explicit delete step at job end; on-limit cleanup in neon-create-branch-with-retry",
         "cleanupProof": "Branch absent from the Neon project branch inventory",
-        "costBudget": "One Neon branch with at most 2h of endpoint compute per admitted run, with runs serialized"
+        "costBudget": "One Neon branch with at most 2h of endpoint compute per staging deploy or daily dispatch (concurrency cancels superseded runs)"
       }
     },
     {
