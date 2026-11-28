@@ -37,11 +37,15 @@ describe('CreatorActionsMenu', () => {
   it('opens the menu and renders the delete item in the AA error text color', async () => {
     const user = userEvent.setup();
     const props = renderMenu();
-    await user.click(
-      screen.getByRole('button', { name: 'Open creator actions' })
-    );
-    const del = await screen.findByRole('menuitem', { name: /Delete user/ });
-    expect(del).toHaveStyle({ color: 'var(--color-error-text)' });
+    // Shared TableRowOverflowTrigger chrome (DRI-22) — not a one-off IconButton.
+    const trigger = screen.getByRole('button', {
+      name: 'Open Creator Actions',
+    });
+    expect(trigger.querySelector('svg')).not.toBeNull();
+    await user.click(trigger);
+    const del = await screen.findByRole('menuitem', { name: /Delete User/ });
+    // TableActionMenu → CommonDropdown destructive uses the AA error token class.
+    expect(del.className).toMatch(/text-error-text/);
     await user.click(del);
     expect(props.onDelete).toHaveBeenCalledOnce();
   });
@@ -49,7 +53,7 @@ describe('CreatorActionsMenu', () => {
   it('disables the trigger while an action is loading', () => {
     renderMenu({ status: 'loading' });
     expect(
-      screen.getByRole('button', { name: 'Open creator actions' })
+      screen.getByRole('button', { name: 'Open Creator Actions' })
     ).toBeDisabled();
   });
 
@@ -58,5 +62,18 @@ describe('CreatorActionsMenu', () => {
     const trigger = document.querySelector('[inert]');
     expect(trigger).not.toBeNull();
     expect(trigger).toHaveTextContent('Actions');
+  });
+
+  it('draws the featured star from the warning token, not a yellow palette class', async () => {
+    const user = userEvent.setup();
+    renderMenu({ profile: { ...profile, isFeatured: true } });
+    await user.click(
+      screen.getByRole('button', { name: 'Open Creator Actions' })
+    );
+
+    const item = await screen.findByRole('menuitem', { name: 'Unfeature' });
+    const star = item.querySelector('svg');
+    expect(star).toHaveClass('fill-warning', 'text-warning');
+    expect(star?.getAttribute('class')).not.toMatch(/yellow/);
   });
 });

@@ -100,10 +100,12 @@ for (const scenario of cases) {
     await expect(page.getByTestId('onboarding-edit-handle')).toBeVisible();
     // The preview renders the confirmed artist with the real proposed
     // handle, never the fabricated jov.ie/your-handle identity (JOV-10169).
+    // JOV-14243: lg+ keeps the side rail; below lg the peek strip replaces
+    // the old inline phone preview so the composer is never pushed.
     const rail = page.getByTestId(
       scenario.width >= 1024
         ? 'onboarding-profile-rail'
-        : 'onboarding-profile-rail-inline'
+        : 'onboarding-profile-peek-strip'
     );
     await expect(rail).toBeVisible();
     await expect(rail).not.toContainText('your-handle');

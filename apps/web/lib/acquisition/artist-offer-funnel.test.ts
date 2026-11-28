@@ -282,6 +282,26 @@ describe('golden-path funnel', () => {
     expect(report.uninstrumented).toContain('identity-resolved');
   });
 
+  it('uses ordered checkout-to-paid journeys for conversion without losing paid arrivals', () => {
+    const report = buildGoldenPathReport({
+      totalVisits: 5,
+      timelines: [
+        { checkout: at(10), paid: at(16) },
+        { checkout: at(10), paid: at(5) },
+        { paid: at(17) },
+        { paid: at(20) },
+      ],
+    });
+
+    expect(
+      report.cohorts[0]?.stages.find(stage => stage.stage === 'paid')
+    ).toMatchObject({
+      journeys: 4,
+      conversionFromPrevious: 0.5,
+      fromPreviousSeconds: { samples: 1, p50: 6, p95: 6 },
+    });
+  });
+
   it('rides along on the existing revenue report without changing it', () => {
     const report = buildArtistOfferFunnelReport({
       start: t0,

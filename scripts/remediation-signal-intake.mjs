@@ -8,6 +8,7 @@ import {
 } from 'node:fs';
 import { dirname } from 'node:path';
 import { failedOnLinearRateLimit } from './lib/linear-retry.mjs';
+import { noteRecurrence } from './lib/remediation-recurrence.mjs';
 import {
   applyRemediationDecisionWithRetry,
   decideAuthSmokeSignal,
@@ -18,6 +19,11 @@ import {
   readLoginMatrixEvidence,
   remediationIntakeDisabled,
 } from './lib/remediation-signal.mjs';
+import {
+  acknowledgedWorkflowScope,
+  workflowOutcomeProof,
+  workflowRedBinding,
+} from './lib/workflow-outcome-proof.mjs';
 
 function readText(path) {
   if (!path) return '';
@@ -103,13 +109,33 @@ if (remediationIntakeDisabled(env)) {
   process.exit(0);
 }
 
-const chosen = await decision();
+const cached = readText(env.REMEDIATION_PREVIOUS_FILE).trim();
+const scoped =
+  env.REMEDIATION_WORKFLOW_PROOF === '1'
+    ? workflowOutcomeProof({
+        cached,
+        source: env.REMEDIATION_SOURCE,
+        results: env.REMEDIATION_WORKFLOW_RESULTS,
+        conclusion: env.REMEDIATION_CONCLUSION,
+        job: env.GITHUB_JOB,
+        identity: {
+          id: env.GITHUB_RUN_ID,
+          number: env.GITHUB_RUN_NUMBER,
+          attempt: env.GITHUB_RUN_ATTEMPT,
+          sha: env.GITHUB_SHA,
+        },
+      })
+    : null;
+const decided = await decision();
+const chosen = scoped
+  ? { ...decided, action: scoped.action, reason: scoped.reason }
+  : decided;
 if ('reason' in chosen && chosen.reason === 'unknown_mode') {
   console.error('remediation-signal-intake: set REMEDIATION_MODE');
   process.exit(1);
 }
 
-const previous = readText(env.REMEDIATION_PREVIOUS_FILE).trim();
+const previous = scoped?.previous ?? cached;
 const gated = gateSteadyGreen(
   chosen,
   previous,
@@ -121,30 +147,56 @@ const result = await applyRemediationDecisionWithRetry(gated, {
   runUrl: env.REMEDIATION_RUN_URL,
   detail: gated.detail || env.REMEDIATION_DETAIL,
   apiKey: env.LINEAR_API_KEY,
+  ...(scoped
+    ? {
+        redBinding: workflowRedBinding(
+          gated.action === 'red' ? scoped.state?.lastRed : scoped.lastRed
+        ),
+        recoveryProof: scoped.proof,
+      }
+    : {}),
 });
+const recurrence =
+  gated.action === 'red'
+    ? await noteRecurrence(result, {
+        fingerprint: gated.fingerprint || env.REMEDIATION_FINGERPRINT,
+        runUrl: env.REMEDIATION_RUN_URL,
+        apiKey: env.LINEAR_API_KEY,
+      })
+    : { ok: true, action: 'none' };
+if (!recurrence.ok) {
+  console.warn(
+    `::warning title=Recurrence not recorded::${gated.fingerprint || env.REMEDIATION_FINGERPRINT} reopened but the recurrence comment failed (${recurrence.reason}).`
+  );
+}
 console.log(
   JSON.stringify({
     ...result,
     ...(gated.reason ? { reason: gated.reason } : {}),
+    ...(recurrence.action === 'none' ? {} : { recurrence }),
     previous: previous || null,
   })
 );
-if (result.ok && result.action === 'hold') {
+const resultAction = 'action' in result ? result.action : undefined;
+if (result.ok && resultAction === 'hold') {
   // Visible, never silent: an unresolved incident stays open while evidence is unknown.
   console.log(
-    `::warning title=Remediation held::${gated.fingerprint || env.REMEDIATION_FINGERPRINT} not resolved: ${result.reason} (previous state: ${previous || 'none'}). Detail: ${env.REMEDIATION_DETAIL || 'n/a'}`
+    `::warning title=Remediation held::${gated.fingerprint || env.REMEDIATION_FINGERPRINT} not resolved: ${'reason' in result ? result.reason : 'workflow_evidence_unavailable'} (previous state: ${previous || 'none'}). Detail: ${env.REMEDIATION_DETAIL || 'n/a'}`
   );
 }
-if (
-  result.ok &&
-  env.REMEDIATION_STATE_FILE &&
-  (gated.action === 'red' || gated.action === 'green')
-) {
+const recorded =
+  gated.action === 'red' || (result.ok && resultAction === 'green');
+const workflowState = acknowledgedWorkflowScope(scoped, result);
+const nextState = scoped
+  ? workflowState &&
+    (recorded ||
+      gated.action === 'hold' ||
+      (gated.action === 'skip' && scoped.action === 'green')) &&
+    JSON.stringify(workflowState)
+  : result.ok && recorded && gated.action;
+if (env.REMEDIATION_STATE_FILE && nextState) {
   mkdirSync(dirname(env.REMEDIATION_STATE_FILE), { recursive: true });
-  writeFileSync(
-    env.REMEDIATION_STATE_FILE,
-    `${gated.action === 'red' ? 'red' : 'green'}\n`
-  );
+  writeFileSync(env.REMEDIATION_STATE_FILE, `${nextState}\n`);
 }
 const healthy = gated.action !== 'red';
 if (!result.ok && gated.action === 'green' && failedOnLinearRateLimit(result)) {

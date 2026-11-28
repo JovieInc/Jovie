@@ -16,12 +16,11 @@
  */
 
 import { neonConfig, Pool, type PoolClient } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from 'ws';
 import { env, isTestEnv } from '@/lib/env-server';
 import { assertGlobalDbAllowed } from '../atomic-context';
-import * as schema from '../schema';
 import { logDbError, logDbInfo } from './logging';
+import { createSchemaDb } from './schema-db';
 import { preserveTransactionErrors } from './transaction-errors';
 import type { DbType, PoolMetrics } from './types';
 
@@ -337,9 +336,9 @@ export function initializeDb(): DbType {
 
   // Create drizzle instance with WebSocket driver
   const createDbInstance = (client: Pool | PoolClient) =>
-    drizzle(client, {
-      schema,
-      logger: isProduction
+    createSchemaDb(
+      client,
+      isProduction
         ? false
         : {
             logQuery: (query: string, params: unknown[]): void => {
@@ -348,8 +347,8 @@ export function initializeDb(): DbType {
                 paramsLength: params.length,
               });
             },
-          },
-    });
+          }
+    );
   const dbInstance = createDbInstance(pool);
   // Drizzle's pooled transaction awaits BEGIN before entering its own
   // release finally. Own the checkout here so even a failed BEGIN releases

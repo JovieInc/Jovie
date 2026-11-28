@@ -5,6 +5,7 @@ import type { ProviderKey } from '@/lib/discography/types';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 import { ReleaseSidebar } from './ReleaseSidebar';
+import { track } from './releaseTrackList.test-fixtures';
 import type { Release } from './types';
 
 const mockPush = vi.fn();
@@ -80,11 +81,59 @@ describe('ReleaseSidebar', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders the release overview, axe-clean', async () => {
-    const { container } = renderSidebar();
+  it('keeps Audio and Artwork visible while Lyrics and Tracks disclose content, axe-clean', async () => {
+    const user = userEvent.setup();
+    const lyrics = 'City lights are fading into morning';
+    const { container } = renderSidebar({
+      release: { ...release, lyrics, totalTracks: 1 },
+      tracksOverride: [{ ...track, releaseId: release.id }],
+    });
 
     expect(screen.getByTestId('release-sidebar')).toBeInTheDocument();
     expect(screen.getAllByText('Midnight Echo').length).toBeGreaterThan(0);
+    for (const title of ['Audio', 'Artwork']) {
+      expect(screen.getByRole('heading', { name: title })).toBeVisible();
+      expect(
+        screen.queryByRole('button', { name: title })
+      ).not.toBeInTheDocument();
+    }
+    const audioUpload = within(
+      screen.getByTestId('release-audio-card')
+    ).getByRole('button', { name: /Drop audio/ });
+    const artworkDownloads = screen.getByRole('switch', {
+      name: 'Allow artwork downloads on public pages',
+    });
+    expect(audioUpload).toBeVisible();
+    expect(artworkDownloads).toBeVisible();
+
+    const lyricsToggle = screen.getByRole('button', { name: 'Lyrics' });
+    const tracksToggle = screen.getByRole('button', { name: 'Tracks' });
+    expect(lyricsToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(tracksToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      screen.queryByPlaceholderText('Paste your lyrics here')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('tracklist')).not.toBeInTheDocument();
+
+    await user.click(lyricsToggle);
+    const lyricsField = screen.getByPlaceholderText('Paste your lyrics here');
+    expect(lyricsToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(lyricsField).toBeVisible();
+    expect(lyricsField).toHaveValue(lyrics);
+    await user.keyboard('{Enter}');
+    expect(lyricsToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(lyricsField).not.toBeVisible();
+
+    await user.click(tracksToggle);
+    const tracks = screen.getByTestId('tracklist');
+    expect(tracksToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(tracks).toBeVisible();
+    expect(within(tracks).getByText(track.title)).toBeVisible();
+    await user.keyboard('{Enter}');
+    expect(tracksToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(tracks).not.toBeVisible();
+    expect(audioUpload).toBeVisible();
+    expect(artworkDownloads).toBeVisible();
     await expectNoA11yViolations(container);
   });
 

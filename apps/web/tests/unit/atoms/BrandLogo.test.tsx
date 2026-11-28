@@ -60,9 +60,8 @@ describe('BrandLogo', () => {
   it('renders muted tone with muted class on wrapper', () => {
     const { container } = render(<BrandLogo tone='muted' />);
     const wrapper = container.querySelector('span');
-    expect(wrapper?.getAttribute('class')).toContain(
-      'text-muted-foreground/50'
-    );
+    expect(wrapper).toHaveClass('text-logo-muted');
+    expect(wrapper).toHaveClass('dark:text-quaternary-token');
   });
 
   it('applies size to width and height attributes on svg', () => {

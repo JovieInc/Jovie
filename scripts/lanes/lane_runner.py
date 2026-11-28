@@ -53,7 +53,7 @@ import autoscale  # noqa: E402
 import capacity_limit  # noqa: E402
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
-from atomic_state import append_json_object, atomic_write_text  # noqa: E402
+from atomic_state import append_json_object, atomic_write_text, note_update_exception, record_release_refusal, release_activated, release_status  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 import fleet_gate_emitter  # noqa: E402
@@ -154,7 +154,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_queue_unmergeable.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_ui_feel.py", "scripts/tests/test_fix_red_mixed_repairs.py", "scripts/tests/test_fix_red_compose.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_split_helper_import.py", "scripts/tests/test_screen_debt_merge.py", "scripts/tests/test_heading_balance.py", "scripts/tests/test_commit_open_merge.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_fix_red_failure_routing.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py", "scripts/tests/test_detached_native_sync.py", "scripts/tests/test_fix_red_screen_cert.py", "scripts/tests/test_duplicate_clock_pin.py", "scripts/tests/test_fix_red_render_modes.py", "scripts/tests/test_fix_red_size_500.py", "scripts/tests/test_cert_stub_sync.py", "scripts/tests/test_node_import_conflict.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_factory_visibility.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_execution_budget.py", "scripts/tests/test_dispatch_budget.py", "scripts/tests/test_binding_turns.py", "scripts/tests/test_issue_turns.py", "scripts/tests/test_throughput_ghost_runs.py", "scripts/tests/test_queue_unmergeable.py", "scripts/tests/test_ledger_read.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_hyperagent_network.py", "scripts/tests/test_cloud_lane.py", "scripts/tests/test_hyperagent_repair.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_fix_red_ui_feel.py", "scripts/tests/test_fix_red_mixed_repairs.py", "scripts/tests/test_fix_red_compose.py", "scripts/tests/test_sourced_shell_conflict.py", "scripts/tests/test_fix_red_source_edits.py", "scripts/tests/test_split_helper_import.py", "scripts/tests/test_screen_debt_merge.py", "scripts/tests/test_heading_balance.py", "scripts/tests/test_commit_open_merge.py", "scripts/tests/test_fix_red_failure_evidence.py", "scripts/tests/test_fix_red_failure_routing.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_host_git.py", "scripts/tests/test_reviewable_split.py", "scripts/tests/test_quoted_path_list_merge.py", "scripts/tests/test_detached_native_sync.py", "scripts/tests/test_fix_red_screen_cert.py", "scripts/tests/test_duplicate_clock_pin.py", "scripts/tests/test_fix_red_render_modes.py", "scripts/tests/test_fix_red_size_500.py", "scripts/tests/test_cert_stub_sync.py", "scripts/tests/test_node_import_conflict.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_quota_drain.py", "scripts/tests/test_public_feed.py", "scripts/tests/test_pr_events.py", "scripts/tests/test_pr_events_repair_evidence.py", "scripts/tests/test_pr_events_locking_evidence.py", "scripts/tests/test_pr_events_blast_radius.py", "scripts/tests/test_pr_body_markup.py", "scripts/tests/test_repair_win.py", "scripts/tests/test_fix_red_win_envelope.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_reason_publication.py", "scripts/tests/test_reason_dispatch.py", "scripts/tests/test_yc_corpus.py",
@@ -166,7 +166,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_fix_red_size_split.py",
               "scripts/tests/test_continuity_clock.py",
               "scripts/tests/test_worktree_sweep.py", "scripts/tests/test_service_census.py",
-              "scripts/tests/test_worktree_pool.py",
+              "scripts/tests/test_worktree_pool.py", "scripts/tests/test_worktree_pool_bootstrap.py", "scripts/tests/test_release_receipt.py",
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
               "scripts/tests/test_remediation.py", "scripts/tests/test_revert_first.py", "scripts/tests/test_repair_order.py", "scripts/tests/test_autoscale.py", "scripts/tests/test_pr_wip.py",
@@ -177,7 +177,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
               "scripts/tests/test_pytest_hook_names.py", "scripts/tests/test_fix_red_missing_contract.py"]
 # Dependencies outside scripts/lanes for source admission and HUD PROMOTION (JOV-6836).
-RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-host-git.sh",
+RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-host-git.sh", "scripts/hooks/configure-git-hooks.sh", "scripts/hooks/verify-git-hooks.sh",
                   "scripts/lib/api-quota-report.mjs", "scripts/lib/api-quota-tally.mjs",
                   # Installed self-tests retain immutable Design evidence and stale-size routing fixtures.
                   "scripts/tests/design_gate_git_evidence.py", "scripts/tests/test_size_500_stale.py",
@@ -208,7 +208,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-ho
                   "scripts/lib/merge-group-admission.mjs",
                   "scripts/lib/source-admission-policy.mjs", "scripts/pr-fleet-rules.mjs", "scripts/lib/wins-ledger.mjs",
                   "scripts/lib/wins-measure/classify.mjs",
-                  "scripts/tests/repair_customer_decision_cases.py", "scripts/lib/daily-changelog-evidence.mjs", "scripts/lib/daily-changelog-publication.mjs", "scripts/lib/daily-changelog.mjs", "scripts/lib/changelog-filter-rules.mjs", "scripts/lib/merge-group-member-policy.mjs",
+                  "scripts/tests/repair_customer_decision_cases.py", "scripts/lib/daily-changelog-evidence.mjs", "scripts/lib/daily-changelog-publication.mjs", "scripts/lib/daily-changelog-receipts.mjs", "scripts/lib/daily-changelog.mjs", "scripts/lib/changelog-filter-rules.mjs", "scripts/lib/merge-group-member-policy.mjs",
                   "scripts/lib/pr-size-exclusions.mjs",
                   "scripts/lib/product-lane-classifier.mjs",
                   "scripts/lib/pr-size-guard-policy.mjs", "scripts/lib/repo-hygiene-limits.mjs",
@@ -232,7 +232,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-ho
                   "scripts/lib/playwright-png.mjs", "scripts/invariants/screen-proof-final-paths.mjs", "scripts/invariants/screen-proof-attempt-checks.mjs", "scripts/invariants/screen-proof-transport.mjs",
                   # Six-hourly credentials/spend check (credentials_spend.py) reads the reviewed registry.
                   "scripts/credentials-spend-check.mjs", "scripts/lib/credentials-live-reads.mjs",
-                  "scripts/lib/credentials-registry.mjs", "scripts/lib/credentials-registry-rules.mjs", "scripts/lib/linear-issue-intake.mjs",
+                  "scripts/lib/credentials-registry.mjs", "scripts/lib/credentials-registry-rules.mjs", "scripts/lib/linear-issue-intake.mjs", "scripts/lib/linear-issue-evidence.mjs",
                   "scripts/lib/linear-cooldown.mjs", "ops/registry/credentials.json",
                   "ops/registry/spend.json", "ops/registry/capacity.json",
                   "scripts/backlog-orchestrator/config/model-registry.json",
@@ -1146,11 +1146,19 @@ def context_manifest_matches(path: Path) -> bool:
         return False
 
 
+class ContextPreflightError(ValueError):
+    """H-02: a drifted assembly contract or unbound inputs stop the spawn, fail closed."""
+
+
 def write_agent_prompt(path: Path, prompt: str, kind: str, provider: str,
                        inputs: dict[str, str]) -> dict:
-    """Write the required prompt; qualify new context diagnostics without stopping delivery."""
+    """Write the prompt; contract drift blocks the spawn, receipt-write trouble does not (H-02)."""
     content = prompt.encode("utf-8")
     path.write_bytes(content)  # Original prompt persistence remains required before spawn.
+    if not context_manifest_matches(HERE / "context-manifest.json"):
+        raise ContextPreflightError("context-manifest-drift: regenerate the checked-in preflight contract")
+    if kind not in CONTEXT_INPUTS or set(inputs) != set(CONTEXT_INPUTS[kind]):
+        raise ContextPreflightError(f"context-inputs:{kind}")
     started = time.perf_counter()
     qualification = {"schema": "jovie-lane-context-qualification/v1",
                      "mode": "qualification-only", "ok": False, "findings": []}
@@ -1158,10 +1166,6 @@ def write_agent_prompt(path: Path, prompt: str, kind: str, provider: str,
               "promptSha256": hashlib.sha256(content).hexdigest(), "kind": kind}
     try:
         contract = context_manifest_json().encode("utf-8")
-        if not context_manifest_matches(HERE / "context-manifest.json"):
-            raise ValueError("context-manifest-drift: regenerate the checked-in preflight contract")
-        if kind not in CONTEXT_INPUTS or set(inputs) != set(CONTEXT_INPUTS[kind]):
-            raise ValueError(f"context-inputs:{kind}")
 
         def fingerprint(text: str) -> dict:
             value = text.encode("utf-8")
@@ -1557,8 +1561,11 @@ def sensitive_review(host: Host, pr: dict, worktree: Path, log, pass_fds=()) -> 
         "gates run separately. End with exactly `LLM-REVIEW: PASS` only if no blocking finding exists;",
         "otherwise end with `LLM-REVIEW: FAIL — <concise blocking findings>`.",
     ])
-    write_agent_prompt(review_prompt, review_text, "sensitive-review", "codex",
-                       {"pr": json.dumps(pr, sort_keys=True), "review_contract": review_text})
+    try:
+        write_agent_prompt(review_prompt, review_text, "sensitive-review", "codex",
+                           {"pr": json.dumps(pr, sort_keys=True), "review_contract": review_text})
+    except ContextPreflightError as error:  # H-02: never spawn a reviewer on a drifted contract
+        return False, [f"context-preflight:{error}"]
     last = worktree / ".codex-last-message.txt"
     last.unlink(missing_ok=True)
     command = [sys.executable, str(HERE / "codex_lane.py"), "run", "--prompt-file", str(review_prompt),
@@ -10085,7 +10092,7 @@ def record_tick_duration(host: Host, seconds: float) -> None:
 
 
 def _dispatch(host: Host, unclean_previous: dict | None) -> int:
-    tick = {"at": now_iso(), "release": read_marker(host), "unhealthy": [], "quotaBlocked": {},
+    tick = {"at": now_iso(), "release": release_status(host.state, read_marker(host)), "unhealthy": [], "quotaBlocked": {},
             "spawned": [], "error": None, "admissionDenied": None,
             "uncleanPreviousRun": unclean_previous}
     if unclean_previous:
@@ -10639,12 +10646,14 @@ def _update_locked(host: Host) -> int:
         code = install_release(host)
         error = None if code == 0 else "release tests failed"
     except Exception as failure:
-        code, error = 1, f"{type(failure).__name__}: {failure}"[:300]
+        code, error = 1, note_update_exception(host.state, failure, f"{type(failure).__name__}: {failure}"[:300])
     skills = host_maintenance(host, refresh_codex_skills)
+    # Keep capacity SHARE waste modules aligned with origin/main (gem:waste-loop receipt).
+    waste = host_maintenance(host, lambda h: __import__("waste_loop_heal").heal(h, force_run=False))
     lag = host_maintenance(host, lambda h: install_lag(h, before, error))
     update_json(host.state / "update.json", lambda data: (data.clear(), data.update(
         at=now_iso(), ok=code == 0, error=error, current=read_marker(host), mirror=mirror, skills=skills,
-        behindS=lag.get("behindS"), behindCommit=lag.get("behindCommit"))))
+        wasteLoop=waste, behindS=lag.get("behindS"), behindCommit=lag.get("behindCommit"))))
     host_maintenance(host, lambda h: update_drain.finish(h.state, lag.get("behindS")) or {"status": "no-drain"})
     return code
 
@@ -10693,15 +10702,15 @@ def release_paths(repo: Path, revision: str) -> list[str]:
 
 
 def ensure_dependency_pool(host: Host) -> bool:
-    """The mesh runtime compiles against a pool slot restored from a recent lock; slots age out after
-    three days and an aged pool made every release refuse 'mesh runtime dependency closure failed'
-    (Gem, 2026-10-26 to 10-29). Refill before building when no ready slot remains. True when a fill ran."""
+    """Return true only when a refill leaves a ready slot for the release proof."""
     try:
-        if not worktree_pool.enabled() or worktree_pool.ready_slots(worktree_pool.pool_dir(host.repo)):
+        if not worktree_pool.enabled() or worktree_pool.ready_slots(pool := worktree_pool.pool_dir(host.repo)):
             return False
         print("lane update: dependency pool has no ready slot; refilling before the release build", file=sys.stderr)
-        worktree_pool.fill(host.repo, warm=False, log=sys.stderr)
-        return True
+        actions = worktree_pool.fill(host.repo, warm=False, log=sys.stderr)
+        if not (ready := bool(worktree_pool.ready_slots(pool))):
+            print(f"lane update: dependency pool refill left no ready slot; actions={', '.join(actions[-3:])[:450]}", file=sys.stderr)
+        return ready
     except (OSError, subprocess.SubprocessError) as error:
         print(f"lane update: dependency pool refill failed: {error}", file=sys.stderr)
         return False
@@ -11450,7 +11459,7 @@ def install_release(host: Host, *, operator=None) -> int:
                                      cwd=host.repo, capture_output=True, check=True)
             lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
             def refuse(why: str) -> int:
-                atomic_write_text(refused_path, json.dumps({"tree": tree, "at": time.time(), "why": why}))
+                record_release_refusal(host.state, staging, tree, why)
                 return 1
             # The staged tree proves itself with its own installer code. On 2026-10-10 the Mac
             # refused every release for a day because the *installed* installer chose a bare
@@ -11505,7 +11514,7 @@ def install_release(host: Host, *, operator=None) -> int:
         link.unlink()
     link.symlink_to(release / "scripts/lanes")
     os.replace(link, current)
-    refused_path.unlink(missing_ok=True)  # the refusal that marker recorded is resolved by this activation
+    release_activated(host.state, bundle, refused_path)  # resolves the refusal this activation answers
     return 0
 
 

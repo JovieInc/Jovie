@@ -182,4 +182,56 @@ describe('checkScreenshotCatalog', () => {
       ]),
     } satisfies Pick<ScreenshotCatalogIntegrityError, 'violations'>);
   });
+
+  it('accepts byte-identical catalog dedupe symlinks without double-counting bytes', async () => {
+    const paths = await createFixture();
+    const twinScenarios = [
+      scenarios[0],
+      {
+        id: 'homepage-desktop-twin',
+        title: 'Homepage twin',
+        group: 'marketing',
+        groupLabel: 'Marketing',
+        route: '/twin',
+        viewport: 'desktop' as const,
+        theme: 'dark' as const,
+        consumers: ['admin'],
+        publicExportPath: 'homepage-twin.png',
+      },
+    ];
+    await symlink(
+      'homepage-desktop.png',
+      join(paths.catalogDirectory, 'homepage-desktop-twin.png')
+    );
+    await symlink(
+      '../../screenshot-catalog/current/homepage-desktop-twin.png',
+      join(paths.publicExportDirectory, 'homepage-twin.png')
+    );
+    await writeFile(
+      paths.manifestPath,
+      `${JSON.stringify(
+        twinScenarios.map(scenario => ({
+          ...scenario,
+          imagePath:
+            scenario.id === 'homepage-desktop'
+              ? 'homepage-desktop.png'
+              : 'homepage-desktop-twin.png',
+          capturedAt: '2026-07-13T00:00:00.000Z',
+          gitSha: null,
+        })),
+        null,
+        2
+      )}\n`
+    );
+
+    await expect(
+      checkScreenshotCatalog({ paths, scenarios: twinScenarios })
+    ).resolves.toEqual({
+      catalogBytes: 15,
+      catalogFiles: 2,
+      manifestEntries: 2,
+      publicExportBytes: 30,
+      publicExportFiles: 2,
+    });
+  });
 });

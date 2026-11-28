@@ -5,9 +5,8 @@
  * - which jank unit tests must stay green for the CI ratchet
  * - the Assistants first-token target (<1s)
  *
- * Live LLM TTFT is NOT measured here (no Gateway spend). Client UX latency
- * with a mocked stream is gated by chat-performance-ratchet + these budgets.
- * Summer production canary uses a separate, looser TTFT target.
+ * Live TTFT: `./chat-first-token-sample` + `./chat-first-token-live-probe`
+ * (ASS-28/ASS-86); unrun skips latency compare.
  */
 
 export const ASSISTANTS_CHAT_UX_CONTRACT_VERSION =

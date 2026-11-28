@@ -135,7 +135,7 @@ function ResultMessage({
   return (
     <p
       className={
-        result.success ? 'text-xs text-emerald-300' : 'text-xs text-error'
+        result.success ? 'text-xs text-success-text' : 'text-xs text-error'
       }
     >
       {result.message}

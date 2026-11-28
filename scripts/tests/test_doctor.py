@@ -17,7 +17,6 @@ import types
 import time
 import unittest
 from pathlib import Path
-from datetime import datetime
 from types import SimpleNamespace
 from unittest import mock
 
@@ -632,6 +631,32 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("8h ago", alerts["no-landing"])
         self.assertIn("Boom", alerts["tick-error"])
 
+    def test_yc_corpus_refresh_failures_open_a_repair_alert(self):
+        def judged(corpus=None, **tick):
+            return doctor.judge(obs(tick={"at": "x", "unhealthy": [], "error": None, **tick,
+                                          **({"ycCorpus": corpus} if corpus else {})}))
+        healthy = {"status": "current", "lastRun": {"status": "ok", "at": doctor.epoch_iso(1_000_000 - 3600)}}
+        self.assertNotIn("yc-corpus-refresh", judged(healthy))
+        self.assertNotIn("yc-corpus-refresh", judged({"status": "not-owner", "owner": "gem"}))
+        page_miss = {"status": "current", "lastRun": {"status": "failed", "at": doctor.epoch_iso(1_000_000 - 3600),
+                                                      "failures": ["https://example.test/a: URLError: timed out"]}}
+        self.assertNotIn("yc-corpus-refresh", judged(page_miss))  # one page retries next run
+        broken = {"status": "current", "lastRun": {"status": "failed", "at": doctor.epoch_iso(1_000_000 - 3600),
+                                                   "failures": ["discovery: RuntimeError: YC library sitemap returned 503"]}}
+        self.assertIn("sitemap returned 503", judged(broken)["yc-corpus-refresh"])
+        stale = {"status": "current", "lastRun": {"status": "ok", "at": doctor.epoch_iso(1_000_000 - 4 * 86400)}}
+        self.assertIn("last run 96h ago", judged(stale)["yc-corpus-refresh"])
+        self.assertIn("Boom", judged(ycCorpusError="RuntimeError: Boom")["yc-corpus-refresh"])
+
+    def test_a_held_tick_that_never_reaches_the_yc_refresher_still_alerts_from_its_state(self):
+        last = lambda age: {"lastRun": {"status": "ok", "at": doctor.epoch_iso(1_000_000 - age), "failures": []}}
+        held = doctor.judge(obs(ycCorpusState=last(3 * 86400), tick={"at": "x", "error": None, "admissionDenied": "disk-critical"}))
+        self.assertIn("72h ago, skipped while the tick is held (disk-critical)", held["yc-corpus-refresh"])
+        self.assertNotIn("yc-corpus-refresh", doctor.judge(obs(ycCorpusState=last(3600))))
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "yc-corpus.json").write_text(json.dumps({"lastRun": {"at": "t", "failures": list("abcdefg")}}))
+            self.assertEqual(doctor.yc_corpus_observation(Path(tmp))["lastRun"]["failures"], list("abcde"))
+
     def test_repairs_spent_without_work_name_their_infrastructure_causes(self):
         quiet = doctor.judge(obs(noWorkRepairs24h={"target-state-unavailable": doctor.NO_WORK_REPAIR_ALERT - 1}))
         self.assertNotIn("repairs-without-work", quiet)
@@ -948,29 +973,6 @@ class JudgeTest(unittest.TestCase):
                                                 now=now))["automation-liveness-silent"])
         for unknown in ({"installed": False}, {"installed": None}):  # not merged yet, or unreadable
             self.assertNotIn("automation-liveness-silent", doctor.judge(obs(automationLiveness=unknown, now=now)))
-
-    def test_liveness_read_distinguishes_missing_workflow_from_unreadable(self):
-        def fake(code, stdout="", stderr=""):
-            return types.SimpleNamespace(REPO_SLUG="JovieInc/Jovie", shared=lambda key, ttl, fetch: fetch(),
-                                         sh=lambda *a, **k: types.SimpleNamespace(returncode=code, stdout=stdout, stderr=stderr))
-        self.assertEqual(doctor.automation_liveness(fake(0, '["2026-10-20T21:30:00Z"]'), 0),
-                         {"installed": True, "lastRunAt": "2026-10-20T21:30:00Z"})
-        self.assertEqual(doctor.automation_liveness(fake(1, stderr="gh: Not Found (HTTP 404)"), 0), {"installed": False})
-        self.assertEqual(doctor.automation_liveness(fake(1, stderr="timeout"), 0), {"installed": None})
-
-    def test_liveness_counts_only_successful_main_runs(self):
-        # Most runs are job-skipped (every 5th Production Continuity Guard run does work).
-        calls = []
-        lane = types.SimpleNamespace(REPO_SLUG="JovieInc/Jovie", shared=lambda key, ttl, fetch: fetch(),
-                                     sh=lambda args, **k: calls.append(args) or types.SimpleNamespace(
-                                         returncode=0, stdout='[""]', stderr=""))
-        self.assertEqual(doctor.automation_liveness(lane, 0), {"installed": True, "lastRunAt": None})
-        self.assertIn("status=success", calls[0][2])
-        self.assertIn("branch=main", calls[0][2])
-        # Installed but never succeeded reads as silent, not alive.
-        now = doctor.datetime(2026, 10, 20, 22, 0, tzinfo=doctor.timezone.utc).timestamp()
-        self.assertIn("automation-liveness-silent", doctor.judge(obs(
-            automationLiveness={"installed": True, "lastRunAt": None}, now=now)))
 
     def test_a_failed_status_gist_publish_raises_status_feed_stale(self):
         failed = doctor.judge(obs(), {"statusFeedError": "RuntimeError: status-gist-publish-unconfirmed"})
@@ -2699,11 +2701,21 @@ class PublishTest(unittest.TestCase):
         self.assertEqual(events({**row, "gateWaitS": 99999}), [events({**row, "gateWaitS": None})[0]])
         self.assertEqual(events({**row, "pr": None}), [])
 
-    def test_a_held_sweep_snapshot_raises_an_alert_per_checkout(self):
-        alerts = doctor.judge(obs(sweepSecretHeld=[{"name": "94af-Jovie", "path": "/w/Jovie",
-                                                     "reason": "secret-finding:trufflehog"}]))
-        self.assertIn("secret-finding:trufflehog", alerts["sweep-snapshot-secret:94af-Jovie"])
-        self.assertFalse([key for key in doctor.judge(obs()) if key.startswith("sweep-snapshot-secret:")])
+    def test_sweep_holds_coalesce_and_leave_non_sweep_linear_lifecycle_unchanged(self):
+        key, old_key = "sweep-snapshot-secret", "sweep-snapshot-secret:old"
+        rows = [{"name": f"checkout-{i}", "path": "/private/root", "reason": "private-detail"} for i in range(150)]
+        alerts = doctor.judge(obs(sweepSecretHeld=rows))
+        self.assertEqual([k for k in alerts if k.startswith(key)], [key])
+        self.assertNotIn("private", alerts[key])
+        baseline, tracker = FakeTracker(), FakeTracker()
+        clean, mixed = {}, {"issues": {old_key: {"id": "legacy", "closedAt": None}}}
+        for i, ordinary in enumerate(({"z": "first", "a": "second"}, {}, {"z": "again"}), 1):
+            events = {k: {"state": "active", "idempotencyKey": k} for k in ordinary}
+            clean = doctor.reconcile(ordinary, clean, baseline, 1000 + i, events)
+            mixed = doctor.reconcile({**ordinary, key: alerts[key], old_key: "legacy"}, mixed, tracker, 1000 + i, events)
+            self.assertNotIn(old_key, mixed["issues"])
+            self.assertEqual(clean["conditions"], mixed["conditions"])
+        self.assertEqual(vars(baseline), vars(tracker))
 
     def test_outcome_verification_is_the_outcome_receipt_stage(self):
         events = doctor.stage_events.events

@@ -327,6 +327,37 @@ export function projectOvieInbox(
   };
 }
 
+/**
+ * The Inbox shows only what Summer needs from the founder, in the order Summer
+ * sends it: escalated no-default cards first, then `decideBy` ascending
+ * (missing last), then `createdAt` ascending, with the id as a stable tiebreak.
+ */
+export function projectSummerInbox(
+  cards: readonly SummerCard[],
+  now: Date = new Date()
+): OvieInbox {
+  const byId = new Map(cards.map(card => [`summer-card:${card.id}`, card]));
+  const deadline = (id: string) => {
+    const at = Date.parse(byId.get(id)?.decideBy ?? '');
+    return Number.isFinite(at) ? at : Number.POSITIVE_INFINITY;
+  };
+  const projected = projectOvieInbox([], cards, null, [], undefined, now);
+  return {
+    ...projected,
+    cases: projected.cases.toSorted(
+      (a, b) =>
+        (a.priority === 0 ? 0 : 1) - (b.priority === 0 ? 0 : 1) ||
+        (deadline(a.id) === deadline(b.id)
+          ? 0
+          : deadline(a.id) < deadline(b.id)
+            ? -1
+            : 1) ||
+        a.createdAt.localeCompare(b.createdAt) ||
+        a.id.localeCompare(b.id)
+    ),
+  };
+}
+
 /** Build requests only for known adapters; a case never grants action authority. */
 export function inboxDecisionRequest(
   target: InboxDecisionTarget,

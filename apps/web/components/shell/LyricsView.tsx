@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { Mic2, Sparkles } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -146,23 +147,21 @@ export function LyricsView({
             </p>
             <div className='mt-5 flex items-center justify-center gap-2'>
               {onTranscribe && (
-                <button
-                  type='button'
+                <PlainButton
                   onClick={onTranscribe}
                   className='inline-flex items-center gap-1.5 h-8 px-4 rounded-full border border-btn-primary bg-btn-primary text-btn-primary-foreground shadow-button-inset text-xs font-caption transition-colors duration-subtle ease-subtle hover:border-(--color-btn-primary-hover) hover:bg-(--color-btn-primary-hover)'
                 >
                   <Sparkles className='h-3.5 w-3.5' strokeWidth={2.25} />
                   Transcribe with Jovie
-                </button>
+                </PlainButton>
               )}
               {onPaste && (
-                <button
-                  type='button'
+                <PlainButton
                   onClick={onPaste}
                   className='inline-flex items-center h-8 px-4 rounded-full border border-(--app-shell-border) bg-surface-1/60 text-xs font-caption text-secondary-token transition-colors duration-subtle ease-subtle hover:text-primary-token hover:bg-surface-1'
                 >
                   Paste lyrics
-                </button>
+                </PlainButton>
               )}
             </div>
           </div>

@@ -58,6 +58,7 @@ import {
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
 import { buildWebVitestFastArgs } from '../ci-web-vitest-fast-args.mjs';
 import { defineStorybookBrowserSelectionTests } from './ci-storybook-browser-selection.cases.mjs';
+import { readCiWorkflowShellSource } from './ci-workflow-shell-source.mjs';
 import { assertProfileClaimProof } from './profile-claim-proof.support.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -72,8 +73,11 @@ function structuralControlPattern() {
     .filter(line => line && !line.startsWith('#'))
     .join('|');
 }
-const WORKFLOW = readFileSync(
-  resolve(REPO_ROOT, '.github/workflows/ci.yml'),
+const WORKFLOW = readCiWorkflowShellSource(
+  resolve(REPO_ROOT, '.github/workflows/ci.yml')
+);
+const STRUCTURAL_DECISION = readFileSync(
+  resolve(REPO_ROOT, '.github/scripts/select-ci-structural-lane.sh'),
   'utf8'
 );
 const CI_FAST_SOURCE = readFileSync(
@@ -623,11 +627,7 @@ describe('ci-fast bounded parallel workflow', () => {
       DESKTOP_RELEASE_COVERAGE_COMMAND
     );
 
-    const remaining = jobBlock(
-      'ci-fast-remaining-shards',
-      'ci-profile-admission-browser'
-    );
-    const pattern = remaining.match(
+    const pattern = STRUCTURAL_DECISION.match(
       /STRUCTURAL_DESKTOP_PATTERN='([^']+)'/
     )?.[1];
     expect(pattern).toBeTruthy();
@@ -1142,11 +1142,13 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(webParts).not.toContain('--passWithNoTests');
     expect(webParts).toContain('CERTIFICATION_KERNEL_COMMAND');
     expect(LANE_COMMANDS.structural).toContain(CERTIFICATION_KERNEL_COMMAND);
-    const remaining = jobBlock(
+    const _remaining = jobBlock(
       'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
-    const pattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    const pattern = STRUCTURAL_DECISION.match(
+      /STRUCTURAL_UI_PATTERN='([^']+)'/
+    )?.[1];
     expect(pattern).toBeDefined();
     expect(
       spawnSync('grep', ['-qE', pattern], {
@@ -1156,7 +1158,9 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('admits acquisition-only and shared CAS edits to measured structural tests', () => {
-    const pattern = WORKFLOW.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    const pattern = STRUCTURAL_DECISION.match(
+      /STRUCTURAL_UI_PATTERN='([^']+)'/
+    )?.[1];
     expect(pattern).toBeDefined();
     for (const path of [
       'apps/web/lib/acquisition/certification-store.ts',
@@ -1258,17 +1262,21 @@ describe('ci-fast bounded parallel workflow', () => {
     const typecheck = jobBlock('ci-fast-typecheck', 'ci-fast-remaining');
 
     expect(typecheck).toContain('filter: blob:none');
+    // JOV-12618: same-tree reuse can skip hydration on merge_group; otherwise
+    // the path receipt still controls PR hydration.
     expect(typecheck).toMatch(
-      /uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+if: >-\n\s+github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'/
+      /uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+if: >-\n\s+\(github\.event_name != 'merge_group' \|\| steps\.reuse\.outputs\.reuse != 'true'\) &&\n\s+\(github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'\)/
     );
     expect(typecheck).toContain(
       'CI_FAST_RUN_JOVIE_TYPECHECK: ${{ needs.ci-path-changes.outputs.run_jovie_typecheck }}'
     );
-    // The lane runner remains unconditional so the required job still emits a
-    // lane receipt; it consumes the same path receipt that controls hydration.
+    // Lane runner skips when same-tree reuse fires; otherwise it still emits a
+    // lane receipt from the path-gated typecheck group.
     expect(typecheck).toMatch(
-      /- name: Run ci-fast lanes\n\s+id: lanes\n(?!\s+if:)/
+      /- name: Run ci-fast lanes\n\s+id: lanes\n\s+if: >-\n\s+github\.event_name != 'merge_group' \|\| steps\.reuse\.outputs\.reuse != 'true'/
     );
+    expect(typecheck).toContain('Decide typecheck/lint reuse');
+    expect(typecheck).toContain('Record reused typecheck lanes');
     expect(typecheck).not.toContain('CI_FAST_PRESELECTED_SKIP');
     expect(typecheck).toMatch(
       /name: Validate CI\/release incident prevention contract[\s\S]*?run: node scripts\/ci-release-incident-contract\.mjs/
@@ -1609,7 +1617,7 @@ describe('ci-fast bounded parallel workflow', () => {
     // fallback (tsc re-verifies every input hash, so older state is safe).
     expect(restore).toContain('id: web-tsbuildinfo');
     expect(restore).toMatch(
-      /if: >-\n\s+github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'/
+      /if: >-\n\s+\(github\.event_name != 'merge_group' \|\| steps\.reuse\.outputs\.reuse != 'true'\) &&\n\s+\(github\.event_name != 'pull_request' \|\|\n\s+needs\.ci-path-changes\.outputs\.run_jovie_typecheck == 'true'\)/
     );
     expect(restore).toContain(`uses: actions/cache/restore@${cacheSha}`);
     expect(restore).toContain('path: apps/web/.cache/tsbuildinfo*\n');
@@ -1861,7 +1869,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-system-source-ratchet': 'pnpm design:source-count-ratchet',
       'design-exception-registry': 'pnpm design:exception-registry:check',
       'design-governance-enforcement':
-        'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel && pnpm --filter @jovie/web run lint:composite-field && pnpm --filter @jovie/web run lint:design-noise',
+        'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:tokens-export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel && pnpm --filter @jovie/web run lint:composite-field && pnpm --filter @jovie/web run lint:design-noise',
       'ios-fast': 'pnpm run ios:lint && pnpm run ios:app-store:test',
       'merge-group-guards':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
@@ -1892,14 +1900,7 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('keeps the iOS design gate independent from Ubuntu operations', () => {
-    const remaining = jobBlock(
-      'ci-fast-remaining-shards',
-      'ci-profile-admission-browser'
-    );
-    const structuralDecision = remaining.slice(
-      remaining.indexOf('- name: Decide structural lane'),
-      remaining.indexOf('- name: Select Storybook browser proof')
-    );
+    const structuralDecision = STRUCTURAL_DECISION;
 
     expect(LANE_GROUPS.web).toContain('design-conformance');
     expect(LANE_GROUPS.remaining).toContain('design-system-source-ratchet');
@@ -2115,10 +2116,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
-    const structuralDecision = remaining.slice(
-      remaining.indexOf('- name: Decide structural lane'),
-      remaining.indexOf('- name: Select Storybook browser proof')
-    );
+    const structuralDecision = STRUCTURAL_DECISION;
 
     for (const requiredPath of [
       'apps/web/app/.*\\.(tsx|css)$',
@@ -2152,7 +2150,9 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('selects structural CI for marketing registry-only edits and enforces per-file coverage', () => {
-    const pattern = WORKFLOW.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    const pattern = STRUCTURAL_DECISION.match(
+      /STRUCTURAL_UI_PATTERN='([^']+)'/
+    )?.[1];
     expect(pattern).toBeDefined();
     for (const path of [
       'apps/web/data/marketing/componentRegistry.ts',
@@ -2484,7 +2484,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
     expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
     expect(remaining).toContain(
-      "if: ${{ success() && steps.structural.outputs.skip != 'true' }}"
+      "if: ${{ success() && needs.ci-path-changes.outputs.skip_structural != 'true' }}"
     );
   });
 
@@ -2726,8 +2726,9 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     // actionlint reads only checked-out workflows, so it runs unconditionally
     // in the idle wait for the background base-branch fetch.
+    // Wave 1a: actionlint once-work runs on shard 2 (not stacked on shard 1).
     expect(remaining).toMatch(
-      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Set up Go for source-pinned actionlint\n\s+if: \$\{\{ success\(\) && matrix.shard == 1 \}\}\n\s+uses: actions\/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\.0\.0\n\s+with:\n\s+go-version: '1\.26\.10'\n\s+cache: false\n\s+- name: Run actionlint\n\s+if: \$\{\{ success\(\) && matrix.shard == 1 \}\}\n\s+env:\n(?:\s+#.*\n)+\s+RELEASE_DOWNLOAD_TOKEN: \$\{\{ github\.token \}\}\n\s+PINNED_DOWNLOAD_CACHE_DIR: \/tmp\/jovie-pinned-downloads\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
+      /- uses: \.\/\.github\/actions\/setup-node-pnpm\n\s+with:\n\s+reuse_merge_group_workspace: 'true'\n(?:\s+#.*\n)+\s+- name: Set up Go for source-pinned actionlint\n\s+if: \$\{\{ success\(\) && matrix.shard == 2 \}\}\n\s+uses: actions\/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7\.0\.0\n\s+with:\n\s+go-version: '1\.26\.10'\n\s+cache: false\n\s+- name: Run actionlint\n\s+if: \$\{\{ success\(\) && matrix.shard == 2 \}\}\n\s+env:\n(?:\s+#.*\n)+\s+RELEASE_DOWNLOAD_TOKEN: \$\{\{ github\.token \}\}\n\s+PINNED_DOWNLOAD_CACHE_DIR: \/tmp\/jovie-pinned-downloads\n\s+run: bash \.github\/scripts\/run-actionlint\.sh\n\s+- name: Fetch base-branch history\n/
     );
     expect(
       remaining.match(/bash \.github\/scripts\/run-actionlint\.sh/g)
@@ -2738,7 +2739,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(remaining).not.toContain('ci-fast-typecheck');
 
     expect(aggregate).toMatch(
-      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*ci-fast-structural-lanes,\s*\]/s
+      /needs:\s*\[\s*ci-path-changes,\s*ci-merge-group-admission,\s*ci-fast-typecheck,\s*ci-fast-remaining,\s*ci-profile-admission-browser,\s*ci-profile-viewport-sweep,\s*ci-fast-structural-python,\s*ci-fast-structural-web,\s*ci-fast-structural-lanes,\s*\]/s
     );
     expect(aggregate).toMatch(/^  ci-fast:\n    name: ci-fast$/m);
     expect(aggregate).toMatch(/if: >-\s+always\(\)/);
@@ -2757,7 +2758,10 @@ describe('ci-fast bounded parallel workflow', () => {
       /PROFILE_BROWSER_RESULT: \$\{\{ needs\.ci-profile-admission-browser\.result \}\}/
     );
     expect(aggregate).toMatch(
-      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \|\| "\$STRUCTURAL_LANES_RESULT" != "success" \]\]/
+      /PROFILE_VIEWPORT_SWEEP_RESULT: \$\{\{ needs\.ci-profile-viewport-sweep\.result \}\}/
+    );
+    expect(aggregate).toMatch(
+      /\[\[ "\$TYPECHECK_RESULT" != "success" \|\| "\$REMAINING_RESULT" != "success" \|\| "\$PROFILE_BROWSER_RESULT" != "success" \|\| "\$PROFILE_VIEWPORT_SWEEP_RESULT" != "success" \|\| "\$STRUCTURAL_PYTHON_RESULT" != "success" \|\| "\$STRUCTURAL_WEB_RESULT" != "success" \|\| "\$STRUCTURAL_LANES_RESULT" != "success" \]\]/
     );
     expect(aggregate).toMatch(
       /STRUCTURAL_WEB_RESULT: \$\{\{ needs\.ci-fast-structural-web\.result \}\}/
@@ -2776,7 +2780,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'ci-fast-structural-web'
     );
     const aliases = python.match(/(?<= \*)[\w-]+/g);
-    expect(aliases).toHaveLength(10);
+    expect(aliases).toHaveLength(8);
     for (const name of aliases) expect(remaining).toContain(`&${name}`);
     expect(remaining).toContain('CI_FAST_STRUCTURAL_PYTEST: skip');
     expect(python).toContain('CI_FAST_STRUCTURAL_PYTEST: only');
@@ -2793,7 +2797,7 @@ describe('ci-fast bounded parallel workflow', () => {
       /^ {2}ci-fast-structural-lanes-shards:\n {4}name: ci-fast \(structural lanes shard \$\{\{ matrix.group \}\}\)$/m
     );
     const aliases = lanes.match(/(?<= \*)[\w-]+/g);
-    expect(aliases).toHaveLength(10);
+    expect(aliases).toHaveLength(8);
     for (const name of aliases) expect(remaining).toContain(`&${name}`);
     expect(remaining).toContain('CI_FAST_STRUCTURAL_LANES: skip');
     expect(lanes).toContain('CI_FAST_STRUCTURAL_LANES: only');
@@ -2812,7 +2816,7 @@ describe('ci-fast bounded parallel workflow', () => {
       /^ {2}ci-fast-structural-web:\n {4}name: ci-fast \(structural web\)$/m
     );
     const aliases = web.match(/(?<= \*)[\w-]+/g);
-    expect(aliases).toHaveLength(11);
+    expect(aliases).toHaveLength(10);
     for (const name of aliases) expect(remaining).toContain(`&${name}`);
     expect(remaining).toContain('CI_FAST_STRUCTURAL_WEB: skip');
     expect(web).toContain('CI_FAST_STRUCTURAL_WEB: only');
@@ -2986,13 +2990,15 @@ describe('ci-fast bounded parallel workflow', () => {
   });
 
   it('path-selects both workflow contracts and excludes unrelated tests', () => {
-    const remaining = jobBlock(
+    const _remaining = jobBlock(
       'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
     const controlPattern = structuralControlPattern();
     const controlPatternAdditions = [];
-    const uiPattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    const uiPattern = STRUCTURAL_DECISION.match(
+      /STRUCTURAL_UI_PATTERN='([^']+)'/
+    )?.[1];
     expect(controlPattern).toBeDefined();
     expect(uiPattern).toBeDefined();
 
@@ -3155,12 +3161,11 @@ describe('ci-fast bounded parallel workflow', () => {
       'ci-fast-remaining-shards',
       'ci-profile-admission-browser'
     );
-    const structuralDecision = remaining.slice(
-      remaining.indexOf('- name: Decide structural lane'),
-      remaining.indexOf('- name: Select Storybook browser proof')
-    );
+    const structuralDecision = STRUCTURAL_DECISION;
     const controlPattern = structuralControlPattern();
-    const uiPattern = remaining.match(/STRUCTURAL_UI_PATTERN='([^']+)'/)?.[1];
+    const uiPattern = STRUCTURAL_DECISION.match(
+      /STRUCTURAL_UI_PATTERN='([^']+)'/
+    )?.[1];
     expect(controlPattern).toBeDefined();
     expect(uiPattern).toBeDefined();
     const selectsStructural = new RegExp(`${controlPattern}|${uiPattern}`);
@@ -3170,10 +3175,10 @@ describe('ci-fast bounded parallel workflow', () => {
     // only on the trusted docs-only verdict (JOV-12618), and every other
     // event runs it.
     expect(structuralDecision).toContain(
-      'github.event_name }}" == "pull_request"'
+      '${GITHUB_EVENT_NAME}" == "pull_request"'
     );
     expect(structuralDecision).toContain(
-      '"${{ github.event_name }}" == "merge_group" && "${STRUCTURAL_DOCS_ONLY:-}" == "true"'
+      '"${GITHUB_EVENT_NAME}" == "merge_group" && "${STRUCTURAL_DOCS_ONLY:-}" == "true"'
     );
     expect(structuralDecision).toContain('echo "skip=false"');
     expect(remaining).toMatch(/github\.event_name != 'merge_group'/);
@@ -3359,10 +3364,7 @@ describe('invariant-scanned PR structural selection', () => {
   it('selects structural for every invariant-scanned path on source PRs', () => {
     const addition =
       'STRUCTURAL_CONTROL_PATTERN+="|$(node scripts/invariants/scanned-paths.mjs --ere)"';
-    const decision = WORKFLOW.slice(
-      WORKFLOW.indexOf('- name: Decide structural lane'),
-      WORKFLOW.indexOf('- name: Select Storybook browser proof')
-    );
+    const decision = STRUCTURAL_DECISION;
     expect(decision).toContain(addition);
     expect(decision.indexOf(addition)).toBeGreaterThanOrEqual(0);
     expect(decision.indexOf(addition)).toBeLessThan(
@@ -3397,10 +3399,7 @@ describe('new scripts test PR structural selection', () => {
   // #18714 added an unwired scripts test; only the merge queue ran the
   // inventory guard, so the PR passed and the queue group was ejected.
   it('selects structural when a PR adds or renames a scripts test', () => {
-    const decision = WORKFLOW.slice(
-      WORKFLOW.indexOf('- name: Decide structural lane'),
-      WORKFLOW.indexOf('- name: Select Storybook browser proof')
-    );
+    const decision = STRUCTURAL_DECISION;
     const line = decision
       .split('\n')
       .find(l => l.includes('NEW_SCRIPT_TESTS=$('));
@@ -3725,10 +3724,7 @@ it('selects hosted structural coverage for doctor census fixture-only edits', ()
 });
 
 it('reads structural control paths from data, one alternative per line (JOV-6837)', () => {
-  const decision = WORKFLOW.slice(
-    WORKFLOW.indexOf('- name: Decide structural lane'),
-    WORKFLOW.indexOf('- name: Select Storybook browser proof')
-  );
+  const decision = STRUCTURAL_DECISION;
   expect(decision).toContain(
     `STRUCTURAL_CONTROL_PATTERN="$(grep -vE '^[[:space:]]*(#|$)' .github/ci-harness/structural-control-paths.ere | paste -sd'|' -)"`
   );

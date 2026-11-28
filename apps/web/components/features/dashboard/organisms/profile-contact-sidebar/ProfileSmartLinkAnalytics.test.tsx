@@ -2,6 +2,11 @@ import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  buildEvidenceReceiptSet,
+  buildMetricReceipt,
+  resolveEvidenceWindow,
+} from '@/lib/analytics/evidence-receipt';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import type { DashboardAnalyticsResponse } from '@/types/analytics';
 
@@ -84,6 +89,53 @@ describe('ProfileSmartLinkAnalyticsView', () => {
       screen.getByTestId('profile-smart-link-control')
     ).toBeInTheDocument();
   });
+
+  it.each([0, 14])(
+    'preserves unknown profile views alongside %i measured link clicks',
+    clicks => {
+      const rangeEnd = new Date('2026-11-25T00:00:00Z');
+      const context = { rangeEnd, profileId: 'fixture', computedAt: rangeEnd };
+      const window = resolveEvidenceWindow(rangeEnd, null);
+      const evidence = buildEvidenceReceiptSet(
+        [
+          buildMetricReceipt(
+            {
+              metric: 'profile_views',
+              value: 0,
+              grain: 'daily_bucket',
+              availability: 'unavailable',
+            },
+            context,
+            window
+          ),
+          buildMetricReceipt(
+            {
+              metric: 'total_clicks',
+              value: clicks,
+              grain: 'event',
+              availability: clicks === 0 ? 'measured_zero' : 'measured',
+            },
+            context,
+            window
+          ),
+        ],
+        context
+      );
+      useDashboardAnalyticsQueryMock.mockReturnValue({
+        data: { ...loaded, profile_views: 0, total_clicks: clicks, evidence },
+        isPending: false,
+      });
+
+      wrap(<ProfileSmartLinkAnalytics profileUrl={PROFILE_URL} />);
+      expect(
+        screen.getByTestId('drawer-analytics-metric-value-profile-views')
+      ).toHaveTextContent('Not measured');
+      expect(
+        screen.getByTestId('drawer-analytics-metric-value-link-clicks')
+      ).toHaveTextContent(String(clicks));
+      expect(screen.queryByText(/No visits in the/)).toBeNull();
+    }
+  );
 
   it('says plainly when the window had no visits, and keeps the share link', () => {
     wrap(

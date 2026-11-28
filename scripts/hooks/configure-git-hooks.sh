@@ -20,7 +20,11 @@ for hook in "$REPO_ROOT/.husky/pre-commit" "$REPO_ROOT/.husky/pre-push"; do
   fi
 done
 
-git -C "$REPO_ROOT" config core.hooksPath .husky
+# A prepared linked slot may already have its own .husky setting. Do not
+# replace its shared repository's hook policy merely to reapply that value.
+if [[ "$(git -C "$REPO_ROOT" config --get core.hooksPath || true)" != .husky ]]; then
+  git -C "$REPO_ROOT" config core.hooksPath .husky
+fi
 echo "[git-hooks] core.hooksPath=.husky (tracked hooks work in every worktree)"
 
 # Fail closed if the hook still is not armed (wrong hooksPath or missing pre-push).

@@ -15,10 +15,21 @@ const marketingDom = ci.jobs['ci-visual-marketing-dom'];
 const marketingRoutes = ci.jobs['ci-visual-marketing-routes'];
 const ready = ci.jobs['ci-pr-ready'];
 test('real selector covers every rendered marketing input and unrelated API changes stay out', () => {
-  const run = paths.steps.find(s =>
-    s.run?.includes('MARKETING_DOM_PATTERN=')
-  ).run;
-  const pattern = run.match(/MARKETING_DOM_PATTERN='([^']+)'/)[1];
+  const step = paths.steps.find(
+    candidate => candidate.id === 'homepage-visual'
+  );
+  const selector = '.github/scripts/ci/select-marketing-visual-gates.sh';
+  assert.equal(
+    step?.run,
+    `exec bash --noprofile --norc -eo pipefail "$GITHUB_WORKSPACE/${selector}"`
+  );
+  const program = readFileSync(
+    new URL('./ci/select-marketing-visual-gates.sh', import.meta.url),
+    'utf8'
+  );
+  const match = program.match(/MARKETING_DOM_PATTERN='([^']+)'/);
+  assert.ok(match, 'marketing selector must declare the real file pattern');
+  const pattern = match[1];
   for (const file of [
     'apps/web/app/(marketing)/product/page.tsx',
     'apps/web/app/(home)/home.css',

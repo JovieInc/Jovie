@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fn } from 'storybook/test';
+import { expect, fn, within } from 'storybook/test';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { TourDateSidebar } from './TourDateSidebar';
 
@@ -60,10 +60,41 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Selected: Story = {};
+export const Selected: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement.ownerDocument.body);
+    await expect(canvas.getByTestId('tour-date-entity-header')).toHaveAttribute(
+      'data-layout',
+      'grid'
+    );
+    await expect(canvas.getByLabelText('Venue')).toBeVisible();
+    await expect(canvas.getByLabelText('Ticket URL')).toBeVisible();
+    await expect(
+      canvas.queryByRole('button', { name: 'Analytics' })
+    ).not.toBeInTheDocument();
+  },
+};
 
 export const Empty: Story = {
   args: {
     tourDate: null,
+  },
+};
+
+export const LongContentVenue: Story = {
+  args: {
+    tourDate: {
+      ...tourDate,
+      title:
+        'The Extended Anniversary World Tour With Special Guests And Orchestra',
+      venueName:
+        'The Grand Municipal Auditorium And Convention Centre At Riverside',
+    },
+  },
+};
+
+export const PartialNoTicketLink: Story = {
+  args: {
+    tourDate: { ...tourDate, ticketUrl: null, region: null, startTime: null },
   },
 };

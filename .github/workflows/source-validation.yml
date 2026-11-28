@@ -178,9 +178,13 @@ jobs:
         if: ${{ (github.event.action == 'edited' && !github.event.changes.base) || github.event.action == 'labeled' || github.event.action == 'unlabeled' }}
         env:
           GH_TOKEN: ${{ github.token }}
+          BASE_REF: ${{ github.base_ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           REPOSITORY: ${{ github.repository }}
+          # This anchored step also runs in jobs with no matrix dimensions.
+          REQUIRE_LIVE_BASE: ${{ github.job == 'unit' && contains(toJSON(matrix), '"4/4"') }}
           RUN_ID: ${{ github.run_id }}
         run: |
           set -uo pipefail
@@ -193,7 +197,7 @@ jobs:
             echo "::warning::GitHub rate limited (core remaining=$quota). Skipping proof reuse; running full validation."
             echo "GitHub rate limited: proof reuse skipped, full validation runs." >> "$GITHUB_STEP_SUMMARY"
           fi
-          if [[ "$lookup" == true && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
+          if [[ "$lookup" == true && "$BASE_SHA" =~ ^[0-9a-f]{40}$ && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
             runs="$(gh api "repos/$REPOSITORY/actions/workflows/source-validation.yml/runs?head_sha=$HEAD_SHA&event=pull_request&status=completed&per_page=100")"; then
             proof="$(jq -r --arg sha "$HEAD_SHA" --arg ref "$HEAD_REF" --argjson run "$RUN_ID" '
               [.workflow_runs[]
@@ -203,17 +207,31 @@ jobs:
               | select(.conclusion == "success") | .id' <<<"$runs" 2>/dev/null || true)"
           fi
           if [[ "$proof" =~ ^[1-9][0-9]*$ ]]; then
-            # Fail closed: the prior green run must include successful unit 4/4
-            # (merged source guards). An incomplete or unreadable inventory keeps
-            # the expensive shard live instead of synthesizing a skip.
-            guard_job="$(node .source-validation-client/packages/api-client/cli.ts gh --priority default -- api "repos/$REPOSITORY/actions/runs/$proof/jobs?per_page=100" --jq '
-              [.jobs[] | select(.name == "Affected Unit Tests (4/4)")]
-              | first | .conclusion // empty' 2>/dev/null || true)"
-            if [[ "$guard_job" == success ]]; then
-              reuse=true
-              echo "::notice::Metadata-only edit at $HEAD_SHA reuses Source Validation run $proof (including unit 4/4)."
+            # Trust the latest successful exact-head run only if it contains
+            # the existing fourth runner and it proved the same actual base.
+            # Earlier runs lack the marker, so they rerun the guard.
+            if jobs="$(node .source-validation-client/packages/api-client/cli.ts gh --priority default -- api "repos/$REPOSITORY/actions/runs/$proof/jobs?per_page=100" 2>/dev/null)" &&
+              jq -e --arg marker "Bind merged guard proof to base $BASE_SHA" '
+                ([.jobs[] | select(.name == "Affected Unit Tests (4/4)" and .conclusion == "success"
+                  and ([.steps[]? | select(.name == $marker and .conclusion == "success")] | length == 1))]
+                  | length == 1)
+              ' <<<"$jobs" >/dev/null; then
+              # The PR event can queue while base advances. Only the merged
+              # guard compares the live ref, once per run; other jobs ask for
+              # the exact source proof and keep their existing lookup budget.
+              if [[ "$REQUIRE_LIVE_BASE" == true ]]; then
+                live_base="$(git -C .source-validation-client ls-remote --exit-code origin "refs/heads/$BASE_REF" | cut -f1)" || live_base=''
+              else
+                live_base="$BASE_SHA"
+              fi
+              if [[ "$live_base" == "$BASE_SHA" ]]; then
+                reuse=true
+                echo "::notice::Metadata-only edit at $HEAD_SHA reuses Source Validation run $proof for base $BASE_SHA."
+              else
+                echo "::notice::Base $BASE_REF advanced or was unreadable; the merged guard runs again."
+              fi
             else
-              echo "::notice::Exact-head proof $proof lacks a successful unit 4/4 conclusion ($guard_job); running full validation."
+              echo "::notice::Exact-head proof $proof lacks successful merged guards bound to base $BASE_SHA; running full validation."
             fi
           fi
           printf 'reuse=%s\nproof_run=%s\n' "$reuse" "$proof" >> "$GITHUB_OUTPUT"
@@ -950,9 +968,11 @@ jobs:
             else
               # Base predates the tools (or paths were removed). Do not hard-fail
               # the unit job — skip the twin until base carries the policy.
-              echo "::warning::MQ parity tools absent on origin/$BASE_REF; typecheck twin skipped."
+              echo "::warning::MQ parity tools absent on origin/$BASE_REF; MQ parity twins skipped."
               mkdir -p "$tool_root/scripts/ci"
-              printf '%s\n' "console.log('typecheck=false')" \
+              printf '%s\n' \
+                "console.log('typecheck=false')" \
+                "console.log('remaining=false')" \
                 >"$tool_root/scripts/ci/mq-parity-scope.mjs"
             fi
           fi
@@ -983,7 +1003,7 @@ jobs:
           if [[ "$web$ui$ovie" == 'falsefalsefalse' ]]; then
             echo 'No unit-affecting source changed; non-applicable receipt recorded.'
           fi
-      # JOV-13071 slice: reuse required source runners for the typecheck twin.
+      # JOV-13071 slice: reuse required source runners for MQ parity twins.
       # Combined-head jobs stay intact; no second matrix or pre-push hook.
       - name: Select MQ parity scope
         id: mq-parity
@@ -994,11 +1014,44 @@ jobs:
           set -euo pipefail
           node "$MQ_PARITY_TOOLS_ROOT/scripts/ci/mq-parity-scope.mjs" "$BASE_SHA" >> "$GITHUB_OUTPUT"
       - name: Setup Node.js and pnpm
-        if: steps.reuse.outputs.reuse != 'true' && (matrix.shard == '4/4' || steps.scope.outputs.web == 'true' || steps.scope.outputs.ui == 'true' || steps.scope.outputs.ovie == 'true' || steps.mq-parity.outputs.typecheck == 'true')
+        if: steps.reuse.outputs.reuse != 'true' && (matrix.shard == '4/4' || steps.scope.outputs.web == 'true' || steps.scope.outputs.ui == 'true' || steps.scope.outputs.ovie == 'true' || steps.mq-parity.outputs.typecheck == 'true' || steps.mq-parity.outputs.remaining == 'true')
         uses: ./.github/actions/setup-node-pnpm
       - name: Setup Playwright warm path
         if: steps.reuse.outputs.reuse != 'true' && (matrix.shard == '4/4' || steps.scope.outputs.web == 'true')
         uses: ./.github/actions/setup-playwright
+      - name: Run remaining lane parity
+        # Cheap remaining lanes only; structural subsets stay on dedicated
+        # ci-fast-structural-* gaps / deterministic overlaps (Wave 3 slice).
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.remaining == 'true' && matrix.shard == '1/4'
+        env:
+          CI_FAST_LANE_GROUP: remaining
+          CI_FAST_SKIP_STRUCTURAL: 'true'
+          # Runner 4 verifies these against the actual merged tree with trusted
+          # guard code. Repeating them on this raw head can compare an old
+          # workflow fixture with a newer main and fail unrelated source PRs.
+          CI_FAST_SKIP_LANE_IDS: source-guards
+          TURBO_SCM_BASE: ${{ steps.scope.outputs.base }}
+        run: node scripts/ci-fast-lanes.mjs
+      # The parity group overlaps three web tsc programs (~5.6 GB each cold)
+      # on one 16 GB hosted runner. Started cold, runners were stopped
+      # mid-typecheck ("The runner has received a shutdown signal", exit 143),
+      # which fits memory exhaustion. Read the same main-scoped incremental
+      # state the source job restores above (written by tsc-cache-warm.yml):
+      # warm tsc needs far less memory and time. Read-only, so no PR-scoped
+      # cache entries; tsc re-hashes every input, so it cannot replay a pass.
+      - name: Resolve parity tsc cache hour
+        id: parity-tsc-cache-hour
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.typecheck == 'true' && matrix.shard == '2/4'
+        run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
+      - name: Restore web tsc incremental state for typecheck parity
+        if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.typecheck == 'true' && matrix.shard == '2/4'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.cache/tsbuildinfo*
+          key: jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json', 'apps/web/tsconfig.stories.json') }}-h${{ steps.parity-tsc-cache-hour.outputs.hour }}
+          restore-keys: |
+            jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json', 'apps/web/tsconfig.stories.json') }}-
+            jovie-web-tsbuildinfo-v2-${{ runner.os }}-
       - name: Run typecheck lane parity
         if: steps.reuse.outputs.reuse != 'true' && steps.mq-parity.outputs.typecheck == 'true' && matrix.shard == '2/4'
         env:
@@ -1007,13 +1060,14 @@ jobs:
         run: node scripts/ci-fast-lanes.mjs
       - name: Load quarantined unit tests
         id: quarantine
-        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true'
+        if: steps.reuse.outputs.reuse != 'true' && matrix.shard != '4/4' && steps.scope.outputs.web == 'true'
         run: node .github/scripts/quarantine-ledger.mjs emit-github-output
       - name: Run web unit tests related to the exact PR diff
-        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true'
+        if: steps.reuse.outputs.reuse != 'true' && matrix.shard != '4/4' && steps.scope.outputs.web == 'true'
         env:
           NODE_COMPILE_CACHE: ${{ runner.temp }}/node-compile-cache
           BASE_SHA: ${{ steps.scope.outputs.base }}
+          UNIT_RUNNER: ${{ matrix.shard }}
         run: |
           set -euo pipefail
           export NODE_OPTIONS="--max-old-space-size=3072"
@@ -1023,7 +1077,7 @@ jobs:
             --pool=forks --maxWorkers="$(nproc)" --fileParallelism \
             --retry=${{ steps.quarantine.outputs.unit_default_retries }} \
             --changed "$BASE_SHA" --passWithNoTests \
-            --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }}
+            --shard="${UNIT_RUNNER%/*}/3" ${{ steps.quarantine.outputs.unit_excludes }}
       # Retried-then-passed tests (scripts/lib/vitest-retry-reporter.mjs) for
       # the Test Flakiness Report, which reads recent Source Validation runs.
       # vitest.config.fast.mts derives test-report.<shard>.flaky.json from --shard.
@@ -1031,7 +1085,7 @@ jobs:
       # A missing sidecar uploads nothing (if-no-files-found: ignore).
       - name: Preserve retried-then-passed unit tests
         # !cancelled(): a red shard's successful retries are evidence too.
-        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true' && !cancelled()
+        if: steps.reuse.outputs.reuse != 'true' && matrix.shard != '4/4' && steps.scope.outputs.web == 'true' && !cancelled()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unit-flaky-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}
@@ -1051,10 +1105,9 @@ jobs:
       - name: Run Ovie route and private-boundary coverage
         if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ovie == 'true' && matrix.shard == '2/4'
         run: pnpm --filter @jovie/ovie test
-      # Reuse an existing required runner, not an additional check. Source-head
-      # tests finish before this transaction mutates its isolated checkout.
-      # Source guards inspect the merged tree. Its dependency/runtime generation
-      # must travel with it; the later source-head steps keep their original proof.
+      # This proof owns the checkout on runner four while runners one through
+      # three verify the unmodified head. The installed dependency generation
+      # must follow the merged tree and then be restored.
       - name: Prepare merged source guard generation
         if: matrix.shard == '4/4' && steps.reuse.outputs.reuse != 'true'
         id: source_guard_merge
@@ -1231,6 +1284,14 @@ jobs:
             test "$restored_digest" = "$SOURCE_HEAD_DIGEST"
             node "$SOURCE_DEPENDENCY_HELPER" validate
           fi
+      - name: Bind merged guard proof to base ${{ github.event.pull_request.base.sha }}
+        if: matrix.shard == '4/4' && (steps.reuse.outputs.reuse == 'true' || (steps.source_guard_merge.outputs.prepared == 'true' && steps.source_guard_merge.outputs.trusted_ref == github.event.pull_request.base.sha))
+        env:
+          TRUSTED_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$TRUSTED_BASE" =~ ^[0-9a-f]{40}$ ]]
+          echo "Successful exact-head signature for trusted base $TRUSTED_BASE."
   a11y:
     name: A11y (UI paths)
     runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-24.04' || fromJSON(vars.RUNNER_SOURCE_VALIDATION || '"ubuntu-24.04"') }}

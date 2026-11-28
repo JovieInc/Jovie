@@ -282,3 +282,96 @@ export function checkTitleCaseHeadings(root = REPO_ROOT) {
     errors.push(`ASR-040: remove stale baseline: ${hit}`);
   return errors;
 }
+
+/**
+ * ASR-041: dashboard color semantics. Accent marks actions and selection,
+ * status colors mark status, and a delta is colored by sentiment (direction
+ * combined with the metric's polarity) through apps/web/lib/design/metric-tone.ts.
+ * Exact-line, shrink-only baseline in legacy-copies.json (`dashboardColor`).
+ */
+export const DASHBOARD_COLOR_SCOPE =
+  /^apps\/web\/(?:components\/(?:organisms\/home-loop|features\/(?:admin|dashboard|link-analytics|opportunity-inbox)|shell\/(?:Sparkline|PerformanceCard)|molecules\/ContentMetric)|app\/(?:hud|app\/\(shell\)\/(?:admin|dashboard|insights))\/)/u;
+export const DASHBOARD_COLOR_RULES = Object.freeze([
+  {
+    id: 'direction-colored',
+    why: 'color a delta by sentiment via lib/design/metric-tone, not by direction',
+    pattern:
+      /\b(?:up|down|rising|falling|increase|decrease)\s*:\s*['"`][^'"`]*\b(?:success|error|danger|destructive|green|red|emerald|rose)\b/u,
+  },
+  {
+    id: 'direction-selector',
+    why: 'key delta CSS on data-sentiment, not data-direction',
+    pattern: /\[data-direction=["'](?:up|down)["']\]/u,
+  },
+  {
+    id: 'invalid-color-fn',
+    why: 'tokens are full colors; hsl(var(--color-*)) is invalid and paints nothing',
+    pattern: /hsla?\(var\(--color-/u,
+  },
+  {
+    id: 'accent-on-data',
+    why: 'accent is for the primary action, selection, focus and links, not data',
+    pattern: /\b(?:stroke|fill)\s*[=:]\s*['"`{][^'"`}]*--color-accent\b(?!-)/u,
+  },
+  {
+    id: 'decorative-color',
+    why: 'a fixed accent or status color on a metric icon or value is decoration; keep data neutral',
+    pattern:
+      /\b(?:value|icon|metric|stat|number)ClassName=['"`][^'"`]*\btext-(?:accent|success|info|warning|error)\b(?!-)/u,
+  },
+  {
+    id: 'raw-status-palette',
+    why: 'use status tokens (text-success-text, text-warning-text, text-error-text)',
+    pattern:
+      /\b(?:text|bg|border|fill|stroke|ring)-(?:green|red|emerald|rose|amber|yellow|lime|orange)-\d{2,3}\b/u,
+  },
+  {
+    id: 'neon-status-text',
+    why: 'neon status fills fail contrast as text; use the -text tokens',
+    pattern: /\bcolor:\s*var\(--color-accent-(?:green|red|orange)\)/u,
+  },
+]);
+
+function dashboardColorFiles(root) {
+  return execFileSync('git', ['ls-files', '--', 'apps/web'], {
+    maxBuffer: 256 * 1024 * 1024,
+    cwd: root,
+    encoding: 'utf8',
+  })
+    .trim()
+    .split('\n')
+    .filter(file => {
+      if (/\.(?:test|spec|stories)\./u.test(file)) return false;
+      if (file === 'apps/web/lib/design/metric-tone.ts') return false;
+      if (/\.(?:tsx|ts)$/u.test(file)) return DASHBOARD_COLOR_SCOPE.test(file);
+      return file === 'apps/web/styles/system-b-app.css';
+    });
+}
+
+export function findDashboardColorMisuse(root = REPO_ROOT) {
+  const hits = [];
+  for (const file of dashboardColorFiles(root)) {
+    for (const line of readFileSync(join(root, file), 'utf8').split('\n')) {
+      for (const rule of DASHBOARD_COLOR_RULES) {
+        if (rule.pattern.test(line))
+          hits.push(`${rule.id} ${file}: ${line.trim()}`);
+      }
+    }
+  }
+  return hits.sort();
+}
+
+export function checkDashboardColor(root = REPO_ROOT) {
+  const legacy = JSON.parse(readFileSync(join(root, LEGACY_PATH), 'utf8'));
+  const remaining = [...(legacy.dashboardColor ?? [])];
+  const why = Object.fromEntries(DASHBOARD_COLOR_RULES.map(r => [r.id, r.why]));
+  const errors = [];
+  for (const hit of findDashboardColorMisuse(root)) {
+    const index = remaining.indexOf(hit);
+    if (index >= 0) remaining.splice(index, 1);
+    else errors.push(`ASR-041: ${why[hit.split(' ', 1)[0]]}: ${hit}`);
+  }
+  for (const hit of remaining)
+    errors.push(`ASR-041: remove stale baseline: ${hit}`);
+  return errors;
+}

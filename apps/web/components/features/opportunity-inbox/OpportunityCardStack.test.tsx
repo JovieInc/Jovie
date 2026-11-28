@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -327,5 +329,19 @@ describe('OpportunityCardStack', () => {
 
     expect(onAccept).toHaveBeenCalledWith('yt-card-1');
     expect(onReject).toHaveBeenCalledWith('yt-card-1');
+  });
+
+  it('loads the motion engine lazily so it stays out of first-load JS', () => {
+    const source = readFileSync(
+      resolve(__dirname, './OpportunityCardStack.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain("import * as m from 'motion/react-m'");
+    expect(source).toContain('<LazyDomMaxMotion>');
+    expect(source).not.toMatch(
+      /import\s*\{[^}]*\bmotion\b[^}]*\}\s*from\s*'motion\/react'/
+    );
+    expect(source).not.toContain('<motion.');
   });
 });

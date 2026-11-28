@@ -76,6 +76,31 @@ export function merchConceptHash(value: unknown): string {
     .digest('hex');
 }
 
+/**
+ * `eligible`: a stored review cleared this exact plan.
+ * `draft`: no review exists yet and nothing else blocks, so private preview art
+ *   may render. Drafts carry publication blockers and can never sell until the
+ *   exact artwork is approved (see getMerchConceptPublicationBlockers).
+ * `review_required`: something concrete blocks rendering (bad source, stale or
+ *   failed review, disputed rights, unsourced dates).
+ */
+export type MerchConceptDecision = 'eligible' | 'draft' | 'review_required';
+
+function resolveMerchConceptDecision(
+  stored: StoredMerchConceptReview | null,
+  reasons: readonly string[]
+): MerchConceptDecision {
+  if (!reasons.length) return 'eligible';
+  if (!stored && reasons.every(reason => reason === 'concept.review_required'))
+    return 'draft';
+  return 'review_required';
+}
+
+/** Whether the canonical generator may cross the image boundary for this plan. */
+export function canRenderMerchConcept(decision: MerchConceptDecision): boolean {
+  return decision !== 'review_required';
+}
+
 export function evaluateMerchConceptPlan(
   plan: MerchConceptPlan,
   stored: StoredMerchConceptReview | null,
@@ -184,22 +209,20 @@ export function evaluateMerchConceptPlan(
       )
         reasons.push(`concept.ineligible:${candidate.key}`);
     }
-    const dates =
-      `${plan.prompt} ${plan.candidates.map(candidate => candidate.prompt).join(' ')}`.match(
-        /\b(?:19|20)\d{2}(?:-\d{2}-\d{2})?\b/g
-      ) ?? [];
-    if (
-      /\b(tour|festival|gig)\b/i.test(plan.prompt) &&
-      !review.eventRecords.length
-    )
-      reasons.push('concept.unsourced_date');
-    if (
-      dates.some(
-        date => !review.eventRecords.some(event => event.date.startsWith(date))
-      )
-    )
-      reasons.push('concept.unsourced_date');
   }
+  // Dates and tour claims need sourced event records whether or not a stored
+  // review exists: an unreviewed draft never invents a show date.
+  const eventRecords = review?.eventRecords ?? [];
+  const dates =
+    `${plan.prompt} ${plan.candidates.map(candidate => candidate.prompt).join(' ')}`.match(
+      /\b(?:19|20)\d{2}(?:-\d{2}-\d{2})?\b/g
+    ) ?? [];
+  if (/\b(tour|festival|gig)\b/i.test(plan.prompt) && !eventRecords.length)
+    reasons.push('concept.unsourced_date');
+  if (
+    dates.some(date => !eventRecords.some(event => event.date.startsWith(date)))
+  )
+    reasons.push('concept.unsourced_date');
   const rankedKeys = review
     ? [...review.candidates]
         .sort((a, b) =>
@@ -213,9 +236,7 @@ export function evaluateMerchConceptPlan(
   return {
     contractVersion: MERCH_CONCEPT_CONTRACT,
     phase: 'pre_art' as const,
-    decision: reasons.length
-      ? ('review_required' as const)
-      : ('eligible' as const),
+    decision: resolveMerchConceptDecision(stored, reasons),
     planHash,
     feedbackHash,
     reviewId: stored?.id ?? null,

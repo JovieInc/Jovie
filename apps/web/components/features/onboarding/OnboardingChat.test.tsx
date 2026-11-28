@@ -62,6 +62,25 @@ vi.mock('@ai-sdk/react', () => ({
 vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
 vi.mock('@/lib/flags/client', () => ({ useAppFlag: () => false }));
 
+// ONB-27: OnboardingChat re-pins via pinTranscriptToLatest so AuthShell h1
+// clears the chat top-fade. Spy the deep import without replacing stick-to-bottom.
+const pinTranscript = vi.hoisted(() => ({
+  pinTranscriptToLatest: vi.fn(),
+}));
+vi.mock('@/components/jovie/hooks/useStickToBottom', async importOriginal => {
+  const actual =
+    await importOriginal<
+      typeof import('@/components/jovie/hooks/useStickToBottom')
+    >();
+  pinTranscript.pinTranscriptToLatest.mockImplementation(
+    actual.pinTranscriptToLatest
+  );
+  return {
+    ...actual,
+    pinTranscriptToLatest: pinTranscript.pinTranscriptToLatest,
+  };
+});
+
 // The composer reads releases and renders tooltips, as it does inside the app.
 function render(ui: React.ReactElement) {
   const client = new QueryClient({
@@ -109,6 +128,32 @@ describe('OnboardingChat states', () => {
 
     expect(
       await screen.findByRole('heading', { name: ONBOARDING_ENTRY_TITLE })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
+  });
+
+  it('shows the mobile profile peek above the composer without replacing it', async () => {
+    // JOV-14243: 390 peek strip sits above the keyboard; inputs stay put.
+    const { container } = render(
+      <OnboardingChat
+        {...verified}
+        profilePeekState={{
+          artistConfirmed: true,
+          handle: 'testartist',
+          handleConfirmed: false,
+          socialLinks: [],
+          artist: {
+            id: 'a1',
+            name: 'Test Artist',
+            url: 'https://open.spotify.com/artist/a1',
+          },
+        }}
+      />
+    );
+
+    expect(
+      await screen.findByTestId('onboarding-profile-peek-strip')
     ).toBeInTheDocument();
     expect(screen.getByRole('textbox')).toBeInTheDocument();
     await expectNoA11yViolations(container);
@@ -377,6 +422,24 @@ describe('OnboardingChat states', () => {
       expect(chat.sendMessage).toHaveBeenCalledWith({
         text: 'I want to claim jov.ie/neonpulse.',
       })
+    );
+  });
+
+  it('re-pins through pinTranscriptToLatest once the composer docks (ONB-27)', async () => {
+    pinTranscript.pinTranscriptToLatest.mockClear();
+    const turns = [
+      text('u0', 'user', 'First question about my release'),
+      text('a0', 'assistant', 'First answer with the next step'),
+      text('u1', 'user', 'Second question about timing'),
+      text('a1', 'assistant', 'Second answer about the schedule'),
+    ];
+    render(<OnboardingChat {...verified} initialMessages={turns} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('onboarding-composer-dock')).toBeInTheDocument()
+    );
+    await waitFor(() =>
+      expect(pinTranscript.pinTranscriptToLatest).toHaveBeenCalled()
     );
   });
 });

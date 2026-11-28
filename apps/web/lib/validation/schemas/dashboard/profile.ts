@@ -8,6 +8,8 @@ import { z } from 'zod';
 import { isContentClean } from '../../content-filter';
 import { httpUrlSchema, safeHttpUrlSchema } from '../base';
 
+export const PROFILE_BIO_MAX_LENGTH = 512;
+
 /** Shared target playlists validation, used by both profile and release actions */
 export const targetPlaylistsSchema = z
   .array(
@@ -164,7 +166,10 @@ export const profileUpdateSchema = z
     bio: z
       .string()
       .trim()
-      .max(512, 'Bio must be 512 characters or fewer')
+      .max(
+        PROFILE_BIO_MAX_LENGTH,
+        `Bio must be ${PROFILE_BIO_MAX_LENGTH} characters or fewer`
+      )
       .optional(),
     /** Creator category type */
     creatorType: creatorTypeSchema.optional(),

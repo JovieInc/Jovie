@@ -37,6 +37,10 @@
     "ci.yml#ci-fast-typecheck": {
       "pr": "source-validation.yml#unit",
       "command": "node scripts/ci-fast-lanes.mjs"
+    },
+    "ci.yml#ci-fast-remaining-shards": {
+      "pr": "source-validation.yml#unit",
+      "command": "node scripts/ci-fast-lanes.mjs"
     }
   },
   "exemptions": [
@@ -91,15 +95,8 @@
     },
     {
       "job": "ci.yml#ci-fast-remaining",
-      "kind": "gap",
-      "reason": "The queue runs the remaining ci-fast lanes (actionlint, incident contract, storybook, playwright guards); the PR runs only a hand-picked subset of them.",
-      "createdOn": "2026-11-11",
-      "expiresOn": "2027-02-09"
-    },
-    {
-      "job": "ci.yml#ci-fast-remaining-shards",
-      "kind": "gap",
-      "reason": "The queue runs the remaining ci-fast lanes (actionlint, incident contract, storybook, playwright guards); the PR runs only a hand-picked subset of them.",
+      "kind": "combined-head",
+      "reason": "Aggregates the remaining ci-fast shards of the combined head; shard lanes run on Source Validation via parity, so only this fan-in is combined-head-only.",
       "createdOn": "2026-11-11",
       "expiresOn": "2027-02-09"
     },
@@ -108,6 +105,13 @@
       "kind": "gap",
       "reason": "The profile admission browser proof runs only in the queue; no PR job runs the same Playwright spec.",
       "createdOn": "2026-11-11",
+      "expiresOn": "2027-02-09"
+    },
+    {
+      "job": "ci.yml#ci-profile-viewport-sweep",
+      "kind": "gap",
+      "reason": "The profile viewport sweep browser proof runs only in the queue; no PR job runs the same Playwright spec.",
+      "createdOn": "2026-11-22",
       "expiresOn": "2027-02-09"
     },
     {
@@ -247,20 +251,6 @@
       "job": "ci.yml#neon-db",
       "kind": "gap",
       "reason": "Database certification on an isolated Neon branch runs only in the queue, path-gated on DB changes; the PR runs the static migration guard only.",
-      "createdOn": "2026-11-11",
-      "expiresOn": "2027-02-09"
-    },
-    {
-      "job": "ci.yml#ci-lighthouse-dashboard-pr",
-      "kind": "gap",
-      "reason": "The Lighthouse dashboard gate never runs on a PR (about 80 queue failures in 7 days); the Lighthouse lane owns closing it.",
-      "createdOn": "2026-11-11",
-      "expiresOn": "2027-02-09"
-    },
-    {
-      "job": "ci.yml#ci-lighthouse-onboarding-pr",
-      "kind": "gap",
-      "reason": "The Lighthouse onboarding gate never runs on a PR; the Lighthouse lane owns closing it.",
       "createdOn": "2026-11-11",
       "expiresOn": "2027-02-09"
     }

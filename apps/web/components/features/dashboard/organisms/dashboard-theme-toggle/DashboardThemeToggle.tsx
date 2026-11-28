@@ -2,6 +2,7 @@
 
 import {
   IconButton,
+  PlainButton,
   Switch,
   Tooltip,
   TooltipContent,
@@ -89,7 +90,7 @@ function ThemeOptionGrid({
       </span>
       <div className='grid grid-cols-3 gap-2'>
         {THEME_OPTIONS.map(option => (
-          <button
+          <PlainButton
             type='button'
             key={option.value}
             onClick={() => onThemeChange(option.value)}
@@ -111,7 +112,7 @@ function ThemeOptionGrid({
                 ({resolvedTheme})
               </span>
             )}
-          </button>
+          </PlainButton>
         ))}
       </div>
       <p className='text-2xs text-secondary-token'>

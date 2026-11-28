@@ -163,4 +163,14 @@ describe('PersonCell', () => {
     const { container } = render(ui);
     await expectNoA11yViolations(container);
   });
+
+  it('tags the name with the table primary-text typography hook', () => {
+    render(<PersonCell name='Ada Lovelace' />);
+    const nameEl = screen.getByText('Ada Lovelace');
+    expect(nameEl).toHaveClass(
+      'system-b-table-primary-text',
+      'font-medium',
+      'text-primary-token'
+    );
+  });
 });

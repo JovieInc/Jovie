@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   isMarketingRenderRouteSurfaceId,
   MARKETING_RENDER_ROUTE_SURFACES,
@@ -43,12 +44,27 @@ describe('MarketingRenderSurface', () => {
     expect(container.firstElementChild).toHaveClass('marketing-rounded-frame');
   });
 
-  it('renders the compact-glass demo inside the emphasized shell', () => {
+  it('renders the compact-glass demo inside the media shell', () => {
     const { container } = renderSurface('compact-glass');
 
     expect(
       container.querySelector('.compact-glass-module')
     ).toBeInTheDocument();
+  });
+
+  it('draws every surface on the always-dark media token with no raw colour', async () => {
+    const { container } = renderSurface('notification');
+    const shell = container.firstElementChild;
+
+    expect(shell).toHaveClass('bg-ink-on-media');
+    expect(shell?.className).not.toMatch(/rgba|gradient|\[/);
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no accessibility violations on the fans surface', async () => {
+    const { container } = renderSurface('fans');
+    expect(container.querySelector('.bg-on-media\\/3')).toBeInTheDocument();
+    await expectNoA11yViolations(container);
   });
 
   it('binds the storybook receipt to the surface', () => {

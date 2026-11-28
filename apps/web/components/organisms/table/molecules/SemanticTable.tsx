@@ -1,11 +1,16 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { type TableRowMode, tableRowModeStyle } from '../table.styles';
+import {
+  presets,
+  TABLE_CANONICAL_ROW_MODE,
+  type TableRowMode,
+  tableRowModeStyle,
+} from '../table.styles';
 
 export function TableRoot({
   children,
   className,
-  rowMode,
+  rowMode = TABLE_CANONICAL_ROW_MODE,
 }: Readonly<{
   children: ReactNode;
   className?: string;
@@ -49,5 +54,5 @@ export function TableRow({
   children: ReactNode;
   className?: string;
 }>) {
-  return <tr className={cn(className)}>{children}</tr>;
+  return <tr className={cn(presets.tableRow, className)}>{children}</tr>;
 }

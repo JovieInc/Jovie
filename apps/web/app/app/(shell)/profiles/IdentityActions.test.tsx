@@ -2,8 +2,10 @@ import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import {
   consumePendingChatDraft,
   consumePendingChatPrompt,
@@ -12,11 +14,13 @@ import {
   applyCacheScope,
   resetCacheIsolationForTests,
 } from '@/lib/queries/cache-isolation';
+import type { Artist } from '@/types/db';
 import type { ProfilesWorkspaceData, ProfileWorkspaceSurfaceRow } from './data';
 import { ProfilesWorkspace } from './ProfilesWorkspace';
 
 const founderDoor = vi.hoisted(() => ({
   chatMode: undefined as 'ov' | undefined,
+  toggle: vi.fn(),
 }));
 vi.mock('@/contexts/FounderDoorContext', () => ({
   useFounderDoor: () => founderDoor,
@@ -81,7 +85,7 @@ const data: ProfilesWorkspaceData = {
   providerAvailable: true,
 };
 
-function renderIdentity(value = data) {
+function renderIdentity(value = data, editableArtist?: Artist) {
   return render(
     <QueryClientProvider
       client={
@@ -92,6 +96,7 @@ function renderIdentity(value = data) {
         <TooltipProvider>
           <ProfilesWorkspace
             data={value}
+            editableArtist={editableArtist}
             removalPrincipal={{
               appActorId: 'user-one',
               authUserId: 'user-one',
@@ -106,6 +111,15 @@ function renderIdentity(value = data) {
           />
         </TooltipProvider>
       </HeaderActionsProvider>
+    </QueryClientProvider>
+  );
+}
+
+function renderRail() {
+  const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+  return render(
+    <QueryClientProvider client={new QueryClient()}>
+      <TooltipProvider>{panel as ReactElement}</TooltipProvider>
     </QueryClientProvider>
   );
 }
@@ -160,6 +174,68 @@ describe('Identity actions', () => {
     edit.focus();
     await userEvent.setup().keyboard('{Enter}');
     expect(navigation.push).toHaveBeenCalledWith('/app/settings/profile');
+  });
+
+  it('edits the active Jovie profile in place and saves its bio through profile settings', async () => {
+    const user = userEvent.setup();
+    const artist: Artist = {
+      id: data.profileId,
+      owner_user_id: 'user-one',
+      handle: 'tim',
+      name: 'Tim White',
+      tagline: 'Original bio',
+      spotify_id: '',
+      published: true,
+      is_verified: false,
+      is_featured: false,
+      marketing_opt_out: false,
+      created_at: '2026-11-25T00:00:00.000Z',
+    };
+    const save = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      Response.json({ profile: { id: data.profileId, username: 'tim' } })
+    );
+    vi.mocked(fetch).mockImplementation(async (input, init) =>
+      init?.method === 'PUT'
+        ? save(input, init)
+        : Response.json({ success: true, suggestions: [] })
+    );
+    renderIdentity(data, artist);
+    await user.click(
+      screen.getByRole('button', { name: 'Edit Jovie Profile' })
+    );
+    renderRail();
+    expect(screen.getByLabelText('Display name')).toHaveValue(artist.name);
+    expect(screen.getByLabelText('Username')).toHaveValue(artist.handle);
+    expect(screen.getByLabelText('Current location')).toBeEnabled();
+    const bio = screen.getByRole('textbox', { name: 'Bio' });
+    expect(bio).toHaveValue(artist.tagline);
+    await user.clear(bio);
+    await user.type(bio, 'Updated bio');
+    await user.tab();
+    await vi.waitFor(() => expect(navigation.refresh).toHaveBeenCalled());
+    const [endpoint, init] = save.mock.calls[0] ?? [];
+    expect(endpoint).toBe('/api/dashboard/profile');
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      profileId: data.profileId,
+      updates: { bio: 'Updated bio' },
+    });
+    expect(navigation.push).not.toHaveBeenCalled();
+  });
+
+  it('keeps an external contact read-only and drafts a source-specific fix in Jovie', async () => {
+    const user = userEvent.setup();
+    founderDoor.chatMode = 'ov';
+    renderIdentity();
+    await user.click(screen.getByRole('row', { name: /SoundCloud/ }));
+    const rail = renderRail();
+    expect(within(rail.container).queryByRole('textbox')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Fix With Jovie' }));
+    expect(navigation.push).toHaveBeenCalledWith('/app/chat');
+    expect(founderDoor.toggle).toHaveBeenCalledOnce();
+    expect(consumePendingChatDraft(data.profileId)).toMatch(
+      /soundcloud\.com\/tim/
+    );
+    expect(consumePendingChatPrompt()).toBeNull();
   });
 
   it('fails visibly before navigating when the founder selected Ovie', async () => {

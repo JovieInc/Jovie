@@ -86,6 +86,7 @@ describe('SmartLinkShell', () => {
       <SmartLinkShell
         artworkUrl='/art.jpg'
         artworkAlt='Never Say A Word artwork'
+        artworkViewTransitionName='release-cover-never-say-a-word'
         showMenuButton={false}
       >
         Listen
@@ -94,6 +95,8 @@ describe('SmartLinkShell', () => {
     const image = screen.getByRole('img', { name: 'Never Say A Word artwork' });
     expect(image).toHaveClass('object-contain');
     expect(image).not.toHaveClass('object-cover');
+    // Cover stays in tree for shared-element ViewTransition (JOV-14244).
+    expect(screen.getByTestId('smart-link-artwork')).toBeInTheDocument();
   });
 
   it('never renders text inside the art bounds in the below treatment (no text on text)', () => {

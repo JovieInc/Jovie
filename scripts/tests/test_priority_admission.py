@@ -74,12 +74,12 @@ class Selection(unittest.TestCase):
         order = [r["identifier"] for r in pa.displacement_order(todo, {"JOV-5": 1}, NOW)]
         self.assertEqual(order, ["JOV-2", "JOV-3"])
 
-    def test_stale_demotion_only_old_low_priority(self):
+    def test_stale_demotion_only_old_unprotected_p2_to_p4(self):
         old = "2026-10-01T00:00:00.000Z"
         todo = [row(1, "Todo", 3, updated=old), row(2, "Todo", 2, updated=old), row(3, "Todo", 4),
                 row(4, "Todo", 4, updated="2026-09-01T00:00:00.000Z"), row(5, "Todo", 0, updated=old)]
         got = [r["identifier"] for r in pa.stale_demotions(todo, {}, NOW, 10)]
-        self.assertEqual(got, ["JOV-4", "JOV-1"])
+        self.assertEqual(got, ["JOV-4", "JOV-1", "JOV-2"], "P2 is demotable too: most of a deep Todo is P2")
         self.assertEqual(len(pa.stale_demotions(todo, {}, NOW, 1)), 1)
 
 

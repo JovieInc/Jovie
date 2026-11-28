@@ -63,10 +63,10 @@ export function SidebarInboxLink({
   const pending =
     availability?.state === 'available' && typeof pendingCount === 'number';
   const label = pending
-    ? `Inbox — ${formatInboxPendingWorkLabel(pendingCount)}`
+    ? `Home — ${formatInboxPendingWorkLabel(pendingCount)}`
     : availability?.state === 'empty'
-      ? 'Inbox — all caught up'
-      : 'Inbox';
+      ? 'Home — all caught up'
+      : 'Home';
 
   const handlePointerDown = (event: PointerEvent<HTMLAnchorElement>) => {
     if (!isPlainPrimaryClick(event) || inboxIsCurrent) return;

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { BIO_MAX_LENGTH } from '@/lib/ai/tools/extract-bio-candidate';
 
 const { mockSafeFetch, mockMinuteLimit, mockHourLimit } = vi.hoisted(() => ({
   mockSafeFetch: vi.fn(),
@@ -59,6 +60,23 @@ beforeEach(() => {
 });
 
 describe('importBioFromUrl', () => {
+  it('discloses when Jovie truncates an imported bio', async () => {
+    mockSafeFetch.mockResolvedValueOnce({
+      ok: true,
+      html: `<meta name="description" content="${'An artist. '.repeat(100)}">`,
+      finalUrl: 'https://example.com/',
+    });
+
+    await expect(
+      runTool({ url: 'https://example.com/' })
+    ).resolves.toMatchObject({
+      ok: true,
+      candidateBioTruncated: true,
+      candidateBioMaxLength: BIO_MAX_LENGTH,
+      nextAllowedTool: 'proposeProfileEdit',
+    });
+  });
+
   it('returns ok=true with sanitized bio + provenance on success', async () => {
     mockSafeFetch.mockResolvedValueOnce({
       ok: true,

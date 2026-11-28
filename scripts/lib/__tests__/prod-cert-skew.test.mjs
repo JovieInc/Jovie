@@ -87,6 +87,7 @@ describe('JOV-9854 deploy-skew attribution', () => {
     const specFiles = [
       'apps/web/tests/e2e/smoke-prod-auth.spec.ts',
       'apps/web/tests/e2e/prod-cert-start-chat.spec.ts',
+      'apps/web/tests/e2e/canary-claim-checkout.spec.ts',
     ];
     const declaredBySurface = new Map();
     const walkedSteps = new Set();
@@ -189,6 +190,10 @@ describe('JOV-9854 deploy-skew attribution', () => {
       ...PEN_IDS,
       'dashboard-first-value',
       'fresh-user-onboarding-first-value',
+      'cone-activation-immediate-value',
+      'cone-activation-visible-path',
+      'cone-activation-no-dead-end',
+      'cone-activation-continue-without-rescue',
     ]);
   });
 

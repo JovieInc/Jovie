@@ -46,31 +46,14 @@ function stubHome(rest: Answer = unavailable) {
   };
 }
 
-function HomeFrame({
-  dir = 'ltr',
-  melting = false,
-}: {
-  readonly dir?: 'ltr' | 'rtl';
-  readonly melting?: boolean;
-}) {
+function HomeFrame({ dir = 'ltr' }: { readonly dir?: 'ltr' | 'rtl' }) {
   const [client] = useState(
     () => new QueryClient({ defaultOptions: { queries: { retry: false } } })
   );
   return (
     <QueryClientProvider client={client}>
       <div dir={dir} className='min-h-dvh bg-base p-6 text-primary-token'>
-        <OvieHomeCanvas
-          chat={
-            melting
-              ? {
-                  messages: [],
-                  isStreaming: false,
-                  composerHasIntent: true,
-                  onOpenTranscript: () => undefined,
-                }
-              : undefined
-          }
-        />
+        <OvieHomeCanvas />
       </div>
     </QueryClientProvider>
   );
@@ -156,12 +139,6 @@ export const LongContentBottleneck: Story = {
       globalThis.fetch = originalFetch;
     };
   },
-};
-
-/** Melt-to-chat: composer has intent, board fades. */
-export const Melting: Story = {
-  beforeEach: stubHome(),
-  render: () => <HomeFrame melting />,
 };
 
 /** Offline: no request can leave the browser. */

@@ -61,7 +61,7 @@
       "taskSuite": {
         "id": "jovie-code-review-benchmark",
         "version": "2026-09-26.0",
-        "ref": "versioned task set to be materialized from landed-fix history and seeded-bug fixtures before the first run; the suite id and version are pinned here so rerun comparisons stay cohort-stable",
+        "ref": "scripts/capability-benchmark/REVIEW_BENCHMARK.md; materialize original-head snapshots with review-benchmark.mjs; each manifest pins the actual cohort digest, independently of this suite definition",
         "groundTruth": "independent rubric over known injected and historically confirmed defects; marketing claims never count as proof",
         "adversarialCases": [
           "noisy-diff low-signal changes",

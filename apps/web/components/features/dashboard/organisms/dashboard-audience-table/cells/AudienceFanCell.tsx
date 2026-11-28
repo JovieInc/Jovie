@@ -3,9 +3,10 @@
 // @coverage-via apps/web/tests/unit/dashboard/audience-table/AudienceFanCell.test.tsx
 
 import { memo } from 'react';
-import { PersonCell } from '@/components/organisms/table/atoms/PersonCell';
+import { IdentityCell } from '@/components/organisms/table/cells/IdentityCell';
 import type { AudienceMember } from '@/types';
 import {
+  getAudienceDescriptor,
   getAudienceDisplayName,
   getAudienceIdentityChip,
   isAudienceMemberAnonymous,
@@ -23,10 +24,11 @@ export const AudienceFanCell = memo(function AudienceFanCell({
   const displayName = getAudienceDisplayName(member);
 
   return (
-    <PersonCell
+    <IdentityCell
       name={displayName}
       secondary={
-        isAnonymous ? null : getAudienceIdentityChip(member, displayName)
+        (isAnonymous ? null : getAudienceIdentityChip(member, displayName)) ??
+        getAudienceDescriptor(member)
       }
       anonymous={isAnonymous}
     />

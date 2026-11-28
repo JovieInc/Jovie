@@ -18,6 +18,9 @@ Policy specs stay where they are: marketing look in
 contract in [`docs/album-art-generation.md`](../album-art-generation.md).
 Runtime motion/shaders (not pixel gen) stay in
 [`.claude/skills/design-system/guides/motion.md`](../../.claude/skills/design-system/guides/motion.md).
+Reusable media RSI operating contract (coordinate with homepage owner; no
+paid/prod gen from the brief alone):
+[`MEDIA_RSI_CONTRACT.md`](./MEDIA_RSI_CONTRACT.md).
 
 ## Routing table
 

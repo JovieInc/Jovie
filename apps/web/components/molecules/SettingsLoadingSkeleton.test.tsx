@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { expectFlatState } from '@/tests/utils/flat-state';
 import {
   ContactsSectionSkeleton,
   InputSkeleton,
@@ -27,10 +28,8 @@ describe('SettingsLoadingSkeleton', () => {
     );
     expect(title).toHaveClass('h-7', 'w-48');
     expect(description).toHaveClass('h-4', 'w-80');
-    expect(screen.getByText('row').parentElement).toHaveClass(
-      'rounded-2xl',
-      'bg-surface-0'
-    );
+    expect(screen.getByText('row').parentElement).toHaveClass('space-y-4');
+    expectFlatState(container);
     await expectNoA11yViolations(container);
   });
 
@@ -92,7 +91,9 @@ describe('SettingsLoadingSkeleton', () => {
     for (const section of sections)
       expect(section).toHaveAttribute('aria-hidden', 'true');
     // Pixels draws three platform cards.
-    expect(sections[1].querySelectorAll('.rounded-lg.p-4')).toHaveLength(3);
+    expect(sections[1].querySelectorAll('.space-y-3.p-4')).toHaveLength(3);
+    expectFlatState(sections[1]);
+    expectFlatState(sections[2]);
     await expectNoA11yViolations(container);
   });
 

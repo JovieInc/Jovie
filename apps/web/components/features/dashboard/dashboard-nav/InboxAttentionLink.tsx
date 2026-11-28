@@ -16,7 +16,7 @@ export interface InboxAttentionLinkProps {
   readonly onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
 }
 
-/** The rail's Inbox bell, used when the header does not own the inbox. */
+/** The rail's Home bell, used when the header does not own Home. */
 export function InboxAttentionLink({
   label,
   itemId,

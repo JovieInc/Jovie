@@ -56,21 +56,9 @@ interface MarketingRenderSurfaceProps {
   readonly hideChrome?: boolean;
 }
 
-function RenderShell({
-  children,
-  emphasize = false,
-}: Readonly<{
-  children: ReactNode;
-  emphasize?: boolean;
-}>) {
+function RenderShell({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <div
-      className={`marketing-rounded-frame relative flex min-h-[13.25rem] items-center justify-center ${
-        emphasize
-          ? 'bg-[radial-gradient(circle_at_top,rgba(138,180,255,0.14),transparent_50%),linear-gradient(180deg,rgba(13,15,20,0.96),rgba(8,10,14,0.98))]'
-          : 'bg-[linear-gradient(180deg,rgba(13,15,20,0.98),rgba(8,10,14,1))]'
-      } p-3`}
-    >
+    <div className='marketing-rounded-frame relative flex min-h-56 items-center justify-center bg-ink-on-media p-3'>
       {children}
     </div>
   );
@@ -112,7 +100,7 @@ export function MarketingRenderSurface({
   switch (surfaceId) {
     case 'profile':
       return (
-        <RenderShell emphasize>
+        <RenderShell>
           <div className='w-full max-w-96'>
             <ShowcaseCrop stateId='streams-latest' hideChrome={hideChrome} />
           </div>
@@ -120,8 +108,8 @@ export function MarketingRenderSurface({
       );
     case 'notification':
       return (
-        <RenderShell emphasize>
-          <div className='w-full max-w-88'>
+        <RenderShell>
+          <div className='w-full max-w-sm'>
             <HomeNotificationCard />
           </div>
         </RenderShell>
@@ -154,14 +142,14 @@ export function MarketingRenderSurface({
     case 'fans':
       return (
         <RenderShell>
-          <div className='w-full max-w-96 rounded-2xl bg-white/[0.03] p-3'>
+          <div className='w-full max-w-96 rounded-2xl bg-on-media/3 p-3'>
             <HomeRelationshipPanel />
           </div>
         </RenderShell>
       );
     case 'compact-glass':
       return (
-        <RenderShell emphasize>
+        <RenderShell>
           <div className='w-full max-w-96'>
             <CompactGlassCaptureDemo />
           </div>

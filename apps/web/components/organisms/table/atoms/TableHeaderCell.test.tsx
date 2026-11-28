@@ -105,7 +105,7 @@ describe('TableHeaderCell', () => {
     const th = screen.getByRole('columnheader');
     expect(th.className).toMatch(/sticky/);
     expect(th).toHaveClass('system-b-table-sticky-header');
-    expect(th).toHaveClass('py-1.5');
+    expect(th).not.toHaveClass('py-1.5');
     expect(th).toHaveStyle({ top: '0px' });
   });
 

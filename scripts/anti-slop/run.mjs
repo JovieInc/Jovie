@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readScanFile, scanFiles } from './brand-name.mjs';
 import {
+  checkDashboardColor,
   checkDrift,
   checkTitleCaseHeadings,
   findUnregisteredCopies,
@@ -27,7 +28,12 @@ export function runValidate(root = REPO_ROOT) {
   const { errors } = validateRegistry(reg, root);
   const drift = checkDrift(reg, root);
   return {
-    errors: [...errors, ...drift.errors, ...checkTitleCaseHeadings(root)],
+    errors: [
+      ...errors,
+      ...drift.errors,
+      ...checkTitleCaseHeadings(root),
+      ...checkDashboardColor(root),
+    ],
     summary: summarize(reg),
     copies: drift.current.length,
   };

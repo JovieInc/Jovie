@@ -91,7 +91,13 @@ describe('Ovie Presence consumes canonical Presence', () => {
     async identityId => {
       mocks.shell.mockResolvedValue({
         user: { id: 'database-user' },
-        selectedProfile: { id: identityId },
+        selectedProfile: {
+          id: identityId,
+          userId: 'database-user',
+          username: identityId,
+          displayName: 'Active Identity',
+          createdAt: new Date('2026-11-25T00:00:00.000Z'),
+        },
         needsOnboarding: false,
       });
       const data = { profileId: identityId, rows: [] };
@@ -111,6 +117,11 @@ describe('Ovie Presence consumes canonical Presence', () => {
       expect(operator.props).toEqual(customer.props);
       expect(operator.props).toEqual({
         data,
+        editableArtist: expect.objectContaining({
+          id: identityId,
+          name: 'Active Identity',
+          handle: identityId,
+        }),
         scope: { actorId: 'actor', workspaceId: identityId, target: 'creator' },
         removalPrincipal: {
           appActorId: 'actor',

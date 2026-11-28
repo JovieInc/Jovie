@@ -102,7 +102,7 @@ describe('admin investor shell normalization', () => {
 
     // Shell migrate landed on main: row chrome in InvestorLinkRowActions.
     expect(managerSource).toContain('InvestorLinkRowActions');
-    expect(rowActionsSource).toContain('TableActionMenu');
+    expect(rowActionsSource).toContain('TableRowActionBar');
     expect(managerSource).not.toContain('absolute right-0 top-full');
     expect(managerSource).not.toContain('document.addEventListener');
   });

@@ -35,7 +35,6 @@
       "apps/web/tests/e2e/signup-funnel.smoke.spec.ts": 2,
       "apps/web/tests/e2e/smoke-auth.spec.ts": 1,
       "apps/web/tests/e2e/smoke-public.spec.ts": 2,
-      "apps/web/tests/e2e/storybook-ai-crawler.spec.ts": 1,
       "apps/web/tests/e2e/storybook-kbd-motion.spec.ts": 1,
       "apps/web/tests/e2e/storybook-scoped-actions.spec.ts": 1,
       "apps/web/tests/e2e/synthetic-start-chat.spec.ts": 1,

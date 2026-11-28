@@ -2,26 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuthSafe } from '@/hooks/useJovieAuth';
-import { buildAudioBlobPath } from '@/lib/audio/blob-path';
-import {
-  resolveAudioUploadMime,
-  validateAudioUpload,
-} from '@/lib/audio/constants';
-import { uploadPresignedLazy as uploadPresigned } from '@/lib/blob/upload-presigned-lazy';
+import { validateAudioUpload } from '@/lib/audio/constants';
 import type { AudioEntityInference } from '@/lib/chat/infer-audio-entity';
 import {
-  convertHeicToJpeg,
-  isHeicLikeMimeType,
-} from '@/lib/images/heic-conversion';
-import {
-  buildFileBlobPath,
   CHAT_FILE_ACCEPT,
   CHAT_FILE_BATCH_MAX_SIZE_BYTES,
   CHAT_FILE_MAX_FILES_PER_MESSAGE,
   type ChatFileKind,
   detectChatFileKind,
   getCanonicalMimeTypeByFileName,
-  resolveChatFileUploadMime,
   validateChatFileUpload,
 } from '@/lib/media/file-policy';
 import {
@@ -30,6 +19,13 @@ import {
   type MediaLifecycleState,
 } from '@/lib/media/lifecycle';
 import type { FileUIPart } from '../types';
+import {
+  type AudioUploadResult,
+  type UploadFileUpdater,
+  uploadAudioAttachment,
+  uploadGenericAttachment,
+  uploadImageAttachment,
+} from './chat-file-uploads';
 
 // ── Constants ──────────────────────────────────────────────────────────
 // Kinds, MIME aliases, sizes and Blob paths come from the ONE file policy
@@ -77,16 +73,9 @@ interface UseChatFileAttachmentsOptions {
   /** Max files per batch from the user's plan. Null = unlimited. */
   readonly fileUploadLimit?: number | null;
   readonly onError: (message: string) => void;
-  readonly onAudioUploaded?: (result: {
-    readonly fileName: string;
-    readonly previewUrl: string;
-    readonly releaseId: string;
-    readonly releaseTitle: string;
-    readonly inference: import('@/lib/chat/infer-audio-entity').AudioEntityInference;
-    readonly prompt: string;
-  }) => void;
+  readonly onAudioUploaded?: (result: AudioUploadResult) => void;
   readonly disabled?: boolean;
-  /** Clears drag-over when the thread or route identity changes. */
+  /** Clears staged files and cancels uploads when conversation ownership changes. */
   readonly resetKey?: string | null;
 }
 
@@ -250,216 +239,6 @@ function formatAggregateEta(
   return '—';
 }
 
-type UploadFileUpdater = (id: string, patch: Partial<PendingFile>) => void;
-
-/**
- * Verifies a non-audio Blob upload server-side (ownership + magic-byte sniff)
- * before it can be attached to a message. Throws with the server's message on
- * rejection (JOV-5872: chat image/video/document uploads previously skipped
- * this and went straight to `ready`).
- */
-async function confirmChatFileUpload(
-  blobPathname: string,
-  fileName: string,
-  fileMimeType: string
-): Promise<{ blobUrl: string; contentType: string }> {
-  const response = await fetch('/api/chat/files/confirm', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ blobPathname, fileName, fileMimeType }),
-  });
-  const body = (await response.json().catch(() => ({}))) as {
-    readonly blobUrl?: string;
-    readonly contentType?: string;
-    readonly error?: string;
-  };
-  if (!response.ok || !body.blobUrl) {
-    throw new Error(body.error ?? 'File verification failed');
-  }
-  return {
-    blobUrl: body.blobUrl,
-    contentType: body.contentType ?? fileMimeType,
-  };
-}
-
-async function uploadImageAttachment(
-  file: File,
-  id: string,
-  updateFile: UploadFileUpdater,
-  userId: string
-): Promise<void> {
-  updateFile(id, { status: 'uploading', progress: 0 });
-  let previewUrl: string | undefined;
-  try {
-    let processedFile = file;
-    if (isHeicLikeMimeType(file.type)) {
-      try {
-        processedFile = await convertHeicToJpeg(file);
-      } catch {
-        updateFile(id, {
-          status: 'failed',
-          error: 'Could not process HEIC. Try JPEG or PNG.',
-        });
-        return;
-      }
-    }
-
-    const uploadMime = resolveChatFileUploadMime(processedFile);
-    if (!uploadMime) {
-      throw new Error('Unsupported image file type');
-    }
-
-    previewUrl = URL.createObjectURL(processedFile);
-    const blob = await uploadPresigned(
-      buildFileBlobPath('chat', userId, processedFile.name),
-      processedFile,
-      {
-        access: 'public',
-        handleUploadUrl: '/api/chat/files/upload-token',
-        contentType: uploadMime,
-      }
-    );
-    updateFile(id, { status: 'processing' });
-    const confirmed = await confirmChatFileUpload(
-      blob.pathname,
-      processedFile.name,
-      uploadMime
-    );
-    updateFile(id, {
-      status: 'ready',
-      progress: 100,
-      blobUrl: confirmed.blobUrl,
-      previewUrl,
-      mediaType: confirmed.contentType,
-    });
-  } catch (err) {
-    if (previewUrl?.startsWith('blob:')) {
-      URL.revokeObjectURL(previewUrl);
-    }
-    updateFile(id, {
-      status: 'failed',
-      error:
-        err instanceof Error ? err.message : `Failed to upload ${file.name}.`,
-    });
-  }
-}
-
-async function uploadAudioAttachment(
-  file: File,
-  id: string,
-  updateFile: UploadFileUpdater,
-  userId: string,
-  onAudioUploaded?: UseChatFileAttachmentsOptions['onAudioUploaded']
-): Promise<void> {
-  updateFile(id, { status: 'uploading', progress: 0 });
-  try {
-    const uploadMime = resolveAudioUploadMime({
-      name: file.name,
-      type: file.type,
-    });
-    if (!uploadMime) {
-      throw new Error('Unsupported audio file type');
-    }
-
-    const blob = await uploadPresigned(
-      buildAudioBlobPath('chat', userId, file.name),
-      file,
-      {
-        access: 'public',
-        handleUploadUrl: '/api/library/audio/upload-token',
-        contentType: uploadMime,
-      }
-    );
-    updateFile(id, { status: 'processing' });
-    const response = await fetch('/api/chat/audio', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        blobUrl: blob.url,
-        blobPathname: blob.pathname,
-        fileName: file.name,
-        fileMimeType: uploadMime,
-        fileSizeBytes: file.size,
-      }),
-    });
-    const body = (await response.json().catch(() => ({}))) as {
-      readonly previewUrl?: string;
-      readonly releaseId?: string;
-      readonly releaseTitle?: string;
-      readonly prompt?: string;
-      readonly inference?: import('@/lib/chat/infer-audio-entity').AudioEntityInference;
-      readonly error?: string;
-    };
-    if (!response.ok || !body.previewUrl || !body.prompt || !body.inference) {
-      throw new Error(body.error ?? 'Audio upload failed');
-    }
-    onAudioUploaded?.({
-      fileName: file.name,
-      previewUrl: body.previewUrl,
-      releaseId: body.releaseId ?? '',
-      releaseTitle: body.releaseTitle ?? '',
-      inference: body.inference,
-      prompt: body.prompt,
-    });
-    updateFile(id, {
-      status: 'ready',
-      progress: 100,
-      blobUrl: blob.url,
-      previewUrl: body.previewUrl,
-      inference: body.inference,
-      releaseId: body.releaseId,
-      releaseTitle: body.releaseTitle,
-      prompt: body.prompt,
-    });
-  } catch (err) {
-    updateFile(id, {
-      status: 'failed',
-      error: err instanceof Error ? err.message : 'Upload failed',
-    });
-  }
-}
-
-async function uploadGenericAttachment(
-  file: File,
-  id: string,
-  updateFile: UploadFileUpdater,
-  userId: string
-): Promise<void> {
-  updateFile(id, { status: 'uploading', progress: 0 });
-  try {
-    const uploadMime = resolveChatFileUploadMime(file);
-    if (!uploadMime) {
-      throw new Error('Unsupported file type');
-    }
-    const blob = await uploadPresigned(
-      buildFileBlobPath('chat', userId, file.name),
-      file,
-      {
-        access: 'public',
-        handleUploadUrl: '/api/chat/files/upload-token',
-        contentType: uploadMime,
-      }
-    );
-    updateFile(id, { status: 'processing' });
-    const confirmed = await confirmChatFileUpload(
-      blob.pathname,
-      file.name,
-      uploadMime
-    );
-    updateFile(id, {
-      status: 'ready',
-      progress: 100,
-      blobUrl: confirmed.blobUrl,
-      mediaType: confirmed.contentType,
-    });
-  } catch (err) {
-    updateFile(id, {
-      status: 'failed',
-      error: err instanceof Error ? err.message : 'Upload failed',
-    });
-  }
-}
-
 async function expandRawFiles(
   rawFiles: File[],
   onError: (message: string) => void
@@ -584,18 +363,23 @@ export function useChatFileAttachments({
   const { userId } = useAuthSafe();
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
+  const isUploading = pendingFiles.some(file =>
+    ['queued', 'uploading', 'processing'].includes(file.status)
+  );
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
   const addFilesRef = useRef<(files: FileList | File[]) => void>(() => {});
   const pendingFilesRef = useRef(pendingFiles);
-
-  useEffect(() => {
-    pendingFilesRef.current = pendingFiles;
-  }, [pendingFiles]);
+  const generationRef = useRef(0);
+  const uploadControllersRef = useRef(new Map<string, AbortController>());
 
   useEffect(
     () => () => {
+      generationRef.current += 1;
+      for (const controller of uploadControllersRef.current.values()) {
+        controller.abort();
+      }
+      uploadControllersRef.current.clear();
       pendingFilesRef.current.forEach(f => {
         if (f.previewUrl?.startsWith('blob:'))
           URL.revokeObjectURL(f.previewUrl);
@@ -605,46 +389,93 @@ export function useChatFileAttachments({
   );
 
   const updateFile = useCallback((id: string, patch: Partial<PendingFile>) => {
-    setPendingFiles(prev =>
-      prev.map(f => {
-        if (f.id !== id) return f;
-        if (
-          patch.status &&
-          isMediaLifecycleState(f.status) &&
-          isMediaLifecycleState(patch.status) &&
-          !canTransitionMediaLifecycle(f.status, patch.status)
-        ) {
-          return f;
-        }
-        return { ...f, ...patch };
-      })
-    );
+    if (!pendingFilesRef.current.some(file => file.id === id)) {
+      if (patch.previewUrl?.startsWith('blob:'))
+        URL.revokeObjectURL(patch.previewUrl);
+      return;
+    }
+    const next = pendingFilesRef.current.map(file => {
+      if (file.id !== id) return file;
+      if (
+        patch.status &&
+        isMediaLifecycleState(file.status) &&
+        isMediaLifecycleState(patch.status) &&
+        !canTransitionMediaLifecycle(file.status, patch.status)
+      ) {
+        return file;
+      }
+      if (
+        patch.previewUrl &&
+        file.previewUrl?.startsWith('blob:') &&
+        patch.previewUrl !== file.previewUrl
+      ) {
+        URL.revokeObjectURL(file.previewUrl);
+      }
+      return { ...file, ...patch };
+    });
+    pendingFilesRef.current = next;
+    setPendingFiles(next);
   }, []);
 
   const uploadSingleFile = useCallback(
-    async (file: File, id: string, kind: FileKind) => {
-      if (kind === 'image') {
-        await uploadImageAttachment(file, id, updateFile, userId ?? 'unknown');
-        return;
+    async (file: File, id: string, kind: FileKind, generation: number) => {
+      if (generation !== generationRef.current) return;
+      if (!pendingFilesRef.current.some(pending => pending.id === id)) return;
+      const controller = new AbortController();
+      uploadControllersRef.current.set(id, controller);
+      const isCurrent = () =>
+        generation === generationRef.current &&
+        !controller.signal.aborted &&
+        pendingFilesRef.current.some(pending => pending.id === id);
+      const update: UploadFileUpdater = (fileId, patch) => {
+        if (isCurrent()) updateFile(fileId, patch);
+        else if (patch.previewUrl?.startsWith('blob:'))
+          URL.revokeObjectURL(patch.previewUrl);
+      };
+      try {
+        if (kind === 'image') {
+          await uploadImageAttachment(
+            file,
+            id,
+            update,
+            userId ?? 'unknown',
+            controller.signal
+          );
+        } else if (kind === 'audio') {
+          await uploadAudioAttachment(
+            file,
+            id,
+            update,
+            userId ?? 'unknown',
+            controller.signal,
+            result => {
+              if (isCurrent()) onAudioUploaded?.(result);
+            }
+          );
+        } else {
+          await uploadGenericAttachment(
+            file,
+            id,
+            update,
+            userId ?? 'unknown',
+            controller.signal
+          );
+        }
+      } finally {
+        uploadControllersRef.current.delete(id);
       }
-      if (kind === 'audio') {
-        await uploadAudioAttachment(
-          file,
-          id,
-          updateFile,
-          userId ?? 'unknown',
-          onAudioUploaded
-        );
-        return;
-      }
-      await uploadGenericAttachment(file, id, updateFile, userId ?? 'unknown');
     },
     [onAudioUploaded, updateFile, userId]
   );
 
   const processBatch = useCallback(
     async (rawFiles: File[]) => {
-      const expanded = await expandRawFiles(rawFiles, onError);
+      const generation = generationRef.current;
+      const reportError = (message: string) => {
+        if (generation === generationRef.current) onError(message);
+      };
+      const expanded = await expandRawFiles(rawFiles, reportError);
+      if (generation !== generationRef.current) return;
 
       const candidates: PendingFile[] = [];
       const seenHashes = new Map<string, string>();
@@ -653,15 +484,24 @@ export function useChatFileAttachments({
 
       for (const file of expanded) {
         if (batchBytes + file.size > CHAT_BATCH_MAX_SIZE) {
-          onError(
+          reportError(
             `Batch exceeds ${formatBytes(CHAT_BATCH_MAX_SIZE)}. Remaining files skipped.`
           );
           break;
         }
 
         const built = await buildPendingCandidate(file, seenHashes);
+        if (generation !== generationRef.current) {
+          for (const candidate of [...candidates, built.candidate]) {
+            if (candidate.previewUrl?.startsWith('blob:'))
+              URL.revokeObjectURL(candidate.previewUrl);
+          }
+          return;
+        }
         if (built.candidate.status === 'failed') {
-          onError(built.candidate.error ?? `Could not attach ${file.name}.`);
+          reportError(
+            built.candidate.error ?? `Could not attach ${file.name}.`
+          );
         }
 
         fileById.set(built.candidate.id, built.file);
@@ -671,17 +511,22 @@ export function useChatFileAttachments({
 
       const planLimit = fileUploadLimit ?? MAX_FILES_PER_MESSAGE;
       const hardCap = MAX_FILES_PER_MESSAGE;
-      let markedToAdd: PendingFile[] = [];
-
-      setPendingFiles(prev => {
-        markedToAdd = markCandidatesForPlanQuota(
-          candidates,
-          prev,
-          planLimit,
-          hardCap
-        );
-        return [...prev, ...markedToAdd];
-      });
+      const markedToAdd = markCandidatesForPlanQuota(
+        candidates,
+        pendingFilesRef.current,
+        planLimit,
+        hardCap
+      );
+      const acceptedIds = new Set(markedToAdd.map(file => file.id));
+      for (const candidate of candidates) {
+        if (
+          !acceptedIds.has(candidate.id) &&
+          candidate.previewUrl?.startsWith('blob:')
+        )
+          URL.revokeObjectURL(candidate.previewUrl);
+      }
+      pendingFilesRef.current = [...pendingFilesRef.current, ...markedToAdd];
+      setPendingFiles(pendingFilesRef.current);
 
       const toUpload = markedToAdd.filter(
         c =>
@@ -691,16 +536,15 @@ export function useChatFileAttachments({
       );
       if (toUpload.length === 0) return;
 
-      setIsUploading(true);
       const MAX_CONCURRENT = 6;
       const queue = [...toUpload];
 
       const runNext = async (): Promise<void> => {
         const next = queue.shift();
-        if (!next) return;
+        if (!next || generation !== generationRef.current) return;
         const queuedFile = fileById.get(next.id);
         if (queuedFile) {
-          await uploadSingleFile(queuedFile, next.id, next.kind);
+          await uploadSingleFile(queuedFile, next.id, next.kind, generation);
         }
         if (queue.length > 0) await runNext();
       };
@@ -710,7 +554,6 @@ export function useChatFileAttachments({
         () => runNext()
       );
       await Promise.all(workers);
-      setIsUploading(false);
     },
     [onError, uploadSingleFile, fileUploadLimit]
   );
@@ -720,9 +563,13 @@ export function useChatFileAttachments({
       if (disabled) return;
       const fileArray = Array.from(files);
       if (fileArray.length === 0) return;
-      processBatch(fileArray).catch(() => setIsUploading(false));
+      const generation = generationRef.current;
+      void processBatch(fileArray).catch(() => {
+        if (generation === generationRef.current)
+          onError('Could not prepare these files. Please try again.');
+      });
     },
-    [disabled, processBatch]
+    [disabled, onError, processBatch]
   );
 
   useEffect(() => {
@@ -730,23 +577,29 @@ export function useChatFileAttachments({
   }, [addFiles]);
 
   const removeFile = useCallback((id: string) => {
-    setPendingFiles(prev => {
-      const file = prev.find(f => f.id === id);
-      if (file?.previewUrl?.startsWith('blob:'))
-        URL.revokeObjectURL(file.previewUrl);
-      return prev.filter(f => f.id !== id);
-    });
+    uploadControllersRef.current.get(id)?.abort();
+    uploadControllersRef.current.delete(id);
+    const file = pendingFilesRef.current.find(pending => pending.id === id);
+    if (file?.previewUrl?.startsWith('blob:'))
+      URL.revokeObjectURL(file.previewUrl);
+    pendingFilesRef.current = pendingFilesRef.current.filter(
+      file => file.id !== id
+    );
+    setPendingFiles(pendingFilesRef.current);
   }, []);
 
   const clearFiles = useCallback(() => {
-    setPendingFiles(prev => {
-      prev.forEach(f => {
-        if (f.previewUrl?.startsWith('blob:'))
-          URL.revokeObjectURL(f.previewUrl);
-      });
-      return [];
-    });
-    setIsUploading(false);
+    generationRef.current += 1;
+    for (const controller of uploadControllersRef.current.values()) {
+      controller.abort();
+    }
+    uploadControllersRef.current.clear();
+    for (const file of pendingFilesRef.current) {
+      if (file.previewUrl?.startsWith('blob:'))
+        URL.revokeObjectURL(file.previewUrl);
+    }
+    pendingFilesRef.current = [];
+    setPendingFiles([]);
   }, []);
 
   const toFileUIParts = useCallback(
@@ -768,8 +621,9 @@ export function useChatFileAttachments({
   );
 
   useEffect(() => {
+    clearFiles();
     setIsDragOver(false);
-  }, [resetKey]);
+  }, [resetKey, clearFiles]);
 
   const aggregate = useMemo(() => {
     const total = pendingFiles.length;

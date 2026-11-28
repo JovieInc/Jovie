@@ -58,7 +58,6 @@
     "components/features/admin/investors/HypotheticalDilutionPreview.tsx": 1,
     "components/features/dashboard/dashboard-analytics/DashboardAnalytics.tsx": 3,
     "components/features/dashboard/organisms/account-settings/utils.ts": 1,
-    "components/features/dashboard/organisms/ai-crawler/AiCrawlerDetailPanel.tsx": 1,
     "components/features/dashboard/organisms/audience-member-sidebar/utils.ts": 1,
     "components/features/dashboard/organisms/contacts-table/columns.tsx": 3,
     "components/features/dashboard/organisms/dashboard-audience-table/cells/AudienceLastCell.tsx": 3,

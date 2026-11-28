@@ -348,7 +348,7 @@ def _demand(name: str, obs: dict, now: float | None = None) -> int | None:
     """Pending work this lane could start now: routable Todo issues plus repair demand.
 
     Intake reads the local Linear mirror (#21304) and claims through the local ledger, so
-    Linear quota is not an intake limit, and open-PR counts are not a ceiling on new work."""
+    Linear quota is not an intake limit. A lane at its WIP cap is held by pr_wip.intake_blockers, not here."""
     budget = _obj(_obj(obs.get("newIssueBudgetByProvider")).get(name))
     maint = _count(_obj(obs.get("maintenanceQueueByProvider")).get(name))
     if budget.get("reason") == "provider-disabled":

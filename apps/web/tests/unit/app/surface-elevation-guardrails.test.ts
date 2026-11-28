@@ -278,7 +278,7 @@ describe('surface elevation guardrails', () => {
     expect(presenceView).toContain("data-testid='dsp-presence-content-panel'");
     expect(earningsView).toContain('PageShell');
     expect(earningsView).toContain("maxWidth='wide'");
-    expect(earningsView).toContain("contentPadding='compact'");
+    expect(earningsView).toContain("contentPadding='default'");
     expect(earningsView).toContain(
       "data-testid='dashboard-earnings-content-panel'"
     );

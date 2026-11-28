@@ -8,6 +8,7 @@ import {
   ConfirmDialog,
   Input,
   Label,
+  PlainButton,
 } from '@jovie/ui';
 import { parseISO } from 'date-fns';
 import { Globe, MapPin } from 'lucide-react';
@@ -23,14 +24,13 @@ import { toast } from '@/components/feedback';
 import { DatePicker } from '@/components/molecules/DatePicker';
 import {
   DrawerAnalyticsSummaryCard,
-  DrawerCardActionBar,
   DrawerSection,
-  DrawerSurfaceCard,
   EntityHeaderThumbnail,
   EntitySidebarShell,
   ShareableLinkRow,
 } from '@/components/molecules/drawer';
 import { EntityHeader } from '@/components/molecules/drawer/EntityHeader';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { convertToCommonDropdownItems } from '@/components/organisms/table';
 import { CANONICAL_METRICS } from '@/lib/analytics/metrics';
@@ -252,7 +252,7 @@ export function TourDateSidebar({
         onClose={onClose}
         headerMode='minimal'
         hideMinimalHeaderBar
-        workspaceSurface='raised'
+        workspaceSurface='flat'
         entityHeaderSurface='flat'
         isEmpty={!tourDate}
         emptyMessage='Select a tour date to edit'
@@ -260,53 +260,49 @@ export function TourDateSidebar({
         entityHeader={
           tourDate ? (
             <>
-              <DrawerSurfaceCard variant='card' className='overflow-hidden p-3'>
-                <EntityHeader
-                  title={tourDate.title?.trim() || tourDate.venueName}
-                  stableLayout
-                  titleLineClamp={1}
-                  subtitleLineClamp={1}
-                  reserveSubtitleSlot
-                  reserveMetaSlot
-                  metaOverflow='scroll'
-                  thumbnail={
-                    <EntityHeaderThumbnail
-                      variant='event'
-                      name={tourDate.title?.trim() || tourDate.venueName}
-                      eventDate={tourDate.startDate}
-                      size={44}
-                    />
-                  }
-                  subtitle={
-                    <>
-                      {formatISODate(tourDate.startDate)} · {tourDate.city}
-                      {tourDate.region ? `, ${tourDate.region}` : ''} ·{' '}
-                      {tourDate.country}
-                    </>
-                  }
-                  meta={
-                    tourDate.provider === 'bandsintown' ? (
-                      <span className='inline-flex items-center gap-1.5 text-2xs text-secondary-token'>
-                        <Icon name='Link' className='h-3 w-3' />
-                        Synced from Bandsintown
-                      </span>
-                    ) : null
-                  }
-                  actions={
-                    <DrawerCardActionBar
-                      primaryActions={[]}
-                      menuItems={contextMenuItems}
-                      onClose={onClose}
-                      overflowTriggerPlacement='card-top-right'
-                      overflowTriggerIcon='vertical'
-                      className='border-0 bg-transparent px-0 py-0'
-                    />
-                  }
-                  bodyClassName='pr-9'
-                  data-testid='tour-date-entity-header'
-                />
-              </DrawerSurfaceCard>
+              <EntityHeader
+                layout='grid'
+                className='px-3 pt-3'
+                title={tourDate.title?.trim() || tourDate.venueName}
+                stableLayout
+                titleLineClamp={1}
+                subtitleLineClamp={1}
+                reserveSubtitleSlot
+                reserveMetaSlot
+                metaOverflow='scroll'
+                thumbnail={
+                  <EntityHeaderThumbnail
+                    variant='event'
+                    name={tourDate.title?.trim() || tourDate.venueName}
+                    eventDate={tourDate.startDate}
+                  />
+                }
+                subtitle={
+                  <>
+                    {formatISODate(tourDate.startDate)} · {tourDate.city}
+                    {tourDate.region ? `, ${tourDate.region}` : ''} ·{' '}
+                    {tourDate.country}
+                  </>
+                }
+                meta={
+                  tourDate.provider === 'bandsintown' ? (
+                    <span className='inline-flex items-center gap-1.5 text-2xs text-secondary-token'>
+                      <Icon name='Link' className='h-3 w-3' />
+                      Synced from Bandsintown
+                    </span>
+                  ) : null
+                }
+                actions={
+                  <DrawerHeaderActions
+                    primaryActions={[]}
+                    menuItems={contextMenuItems}
+                    onClose={onClose}
+                  />
+                }
+                data-testid='tour-date-entity-header'
+              />
               <DrawerAnalyticsSummaryCard
+                variant='flat'
                 testId='tour-date-summary'
                 stableLayout
                 reserveFooterSlot
@@ -351,8 +347,8 @@ export function TourDateSidebar({
         footerSurface='flat'
       >
         {tourDate && (
-          <div className='space-y-3'>
-            <DrawerSurfaceCard variant='card' className='space-y-3.5 p-3.5'>
+          <div className='space-y-4 px-3 pb-3'>
+            <div className='space-y-3'>
               {/* Title */}
               <div className='space-y-1.5'>
                 <Label htmlFor='title'>Event Title (Optional)</Label>
@@ -504,9 +500,8 @@ export function TourDateSidebar({
                 <div className='flex gap-2'>
                   {(['available', 'sold_out', 'cancelled'] as const).map(
                     status => (
-                      <button
+                      <PlainButton
                         key={status}
-                        type='button'
                         onClick={() =>
                           setFormData(prev => ({
                             ...prev,
@@ -524,21 +519,21 @@ export function TourDateSidebar({
                         {status === 'available' && 'On Sale'}
                         {status === 'sold_out' && 'Sold Out'}
                         {status === 'cancelled' && 'Cancelled'}
-                      </button>
+                      </PlainButton>
                     )
                   )}
                 </div>
               </div>
-            </DrawerSurfaceCard>
+            </div>
 
             {/* Analytics */}
-            <DrawerSection title='Analytics' surface='card'>
+            <DrawerSection title='Analytics' collapsible={false}>
               {analyticsLoading && (
-                <DrawerSurfaceCard className='space-y-2 p-3'>
+                <div className='space-y-2'>
                   <LoadingSkeleton height='h-5' width='w-20' rounded='sm' />
                   <LoadingSkeleton height='h-3' width='w-32' rounded='sm' />
                   <LoadingSkeleton height='h-3' width='w-24' rounded='sm' />
-                </DrawerSurfaceCard>
+                </div>
               )}
               {!analyticsLoading && analyticsError && (
                 <p className='text-xs text-tertiary-token'>
@@ -548,37 +543,33 @@ export function TourDateSidebar({
               {!analyticsLoading && !analyticsError && (
                 <div className='space-y-2'>
                   {(analyticsData?.topCities?.length ?? 0) > 0 && (
-                    <DrawerSurfaceCard className='p-2'>
-                      <MiniRankedList
-                        icon={MapPin}
-                        items={(analyticsData?.topCities ?? []).map(c => ({
-                          key: c.city,
-                          label: c.city,
-                          value: numberFormatter.format(c.count),
-                        }))}
-                        emptyMessage='No city data yet'
-                      />
-                    </DrawerSurfaceCard>
+                    <MiniRankedList
+                      icon={MapPin}
+                      items={(analyticsData?.topCities ?? []).map(c => ({
+                        key: c.city,
+                        label: c.city,
+                        value: numberFormatter.format(c.count),
+                      }))}
+                      emptyMessage='No city data yet'
+                    />
                   )}
 
                   {(analyticsData?.topReferrers?.length ?? 0) > 0 && (
-                    <DrawerSurfaceCard className='p-2'>
-                      <MiniRankedList
-                        icon={Globe}
-                        items={(analyticsData?.topReferrers ?? []).map(r => ({
-                          key: r.referrer || 'direct',
-                          label: r.referrer || 'Direct',
-                          value: numberFormatter.format(r.count),
-                        }))}
-                        emptyMessage='No referrer data yet'
-                      />
-                    </DrawerSurfaceCard>
+                    <MiniRankedList
+                      icon={Globe}
+                      items={(analyticsData?.topReferrers ?? []).map(r => ({
+                        key: r.referrer || 'direct',
+                        label: r.referrer || 'Direct',
+                        value: numberFormatter.format(r.count),
+                      }))}
+                      emptyMessage='No referrer data yet'
+                    />
                   )}
 
                   {(analyticsData?.ticketClicks ?? 0) === 0 && (
                     <p className='text-xs text-tertiary-token'>
-                      No ticket click data yet. Analytics will appear once fans
-                      click ticket links for this show.
+                      No ticket click data yet. Analytics will appear when your
+                      audience clicks ticket links for this show.
                     </p>
                   )}
                 </div>

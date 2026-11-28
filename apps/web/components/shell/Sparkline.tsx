@@ -1,17 +1,45 @@
 'use client';
 
-import { type MouseEvent as ReactMouseEvent, useRef } from 'react';
+import {
+  type MouseEvent as ReactMouseEvent,
+  useId,
+  useMemo,
+  useRef,
+} from 'react';
+import {
+  DELTA_FILL,
+  DELTA_STROKE,
+  deltaSentiment,
+  type MetricPolarity,
+} from '@/lib/design/metric-tone';
+import {
+  isMeasurement,
+  SPARKLINE_HEIGHT,
+  SPARKLINE_WIDTH,
+  sparklineGeometry,
+} from './sparkline-geometry';
 
 export type SparklineTrend = 'up' | 'down' | 'flat';
 
+export type SparklineVariant = 'area' | 'pulse';
+
 export interface SparklineProps {
   /**
-   * Y-values for each evenly-spaced x. Must contain at least two points;
-   * fewer entries collapse the chart into a single point.
+   * One observation per equal period. Use null for an unmeasured period.
    */
-  readonly points: readonly number[];
+  readonly points: readonly (number | null)[];
   /** Tone palette — tints the line, fill, and hover playhead. */
   readonly trend: SparklineTrend;
+  /**
+   * Whether a rise is good news (ASR-041). The line is green only when it
+   * moves the good way. Defaults to higher-is-better.
+   */
+  readonly polarity?: MetricPolarity;
+  /**
+   * `area` (default): filled track under the line.
+   * `pulse`: line-only glance chart — no fill panel (Story First flat rail).
+   */
+  readonly variant?: SparklineVariant;
   /** Index of the currently hovered point, or null when none. */
   readonly hoverIdx?: number | null;
   /** Called as the cursor moves over the chart; null on leave. */
@@ -21,22 +49,8 @@ export interface SparklineProps {
   readonly className?: string;
 }
 
-const VIEWBOX_W = 340;
-const VIEWBOX_H = 120;
-
-// Status TEXT tokens, not the neon accent fills: --color-accent-green is
-// about 1.3:1 on white cards, while the -text tokens hold contrast in light
-// and dark, so the line clears 3:1 for graphics in both modes.
-const STROKE_BY_TREND: Record<SparklineTrend, string> = {
-  up: 'var(--color-success-text)',
-  down: 'var(--color-error-text)',
-  flat: 'var(--color-text-tertiary-token)',
-};
-const FILL_BY_TREND: Record<SparklineTrend, string> = {
-  up: 'color-mix(in oklab, var(--color-success-text) 12%, transparent)',
-  down: 'color-mix(in oklab, var(--color-error-text) 12%, transparent)',
-  flat: 'color-mix(in oklab, var(--color-text-tertiary-token) 8%, transparent)',
-};
+// Colors come from the shared delta sentiment maps, which use the status
+// TEXT tokens (not the neon fills) so the line clears 3:1 in both modes.
 const PLAYHEAD_STROKE = 'var(--color-border-strong)';
 const POINT_OUTLINE = 'var(--color-bg-base)';
 
@@ -63,71 +77,80 @@ const POINT_OUTLINE = 'var(--color-bg-base)';
 export function Sparkline({
   points,
   trend,
+  polarity = 'higher-is-better',
+  variant = 'area',
   hoverIdx,
   onHover,
   ariaLabel = 'Trend over time',
   className,
 }: SparklineProps) {
-  const max = Math.max(...points, 1);
-  const min = Math.min(...points, 0);
-  const range = max - min || 1;
-  const xFor = (i: number) =>
-    points.length <= 1 ? VIEWBOX_W / 2 : (i / (points.length - 1)) * VIEWBOX_W;
-  const yFor = (v: number) => VIEWBOX_H - ((v - min) / range) * VIEWBOX_H;
-  const path = points
-    .map(
-      (p, i) =>
-        `${i === 0 ? 'M' : 'L'} ${xFor(i).toFixed(1)} ${yFor(p).toFixed(1)}`
-    )
-    .join(' ');
-  const fillPath = `${path} L ${VIEWBOX_W} ${VIEWBOX_H} L 0 ${VIEWBOX_H} Z`;
-  const stroke = STROKE_BY_TREND[trend];
-  const fill = FILL_BY_TREND[trend];
+  const { path, fillPath, description, samplingNote, xFor, yFor } = useMemo(
+    () => sparklineGeometry(points, variant),
+    [points, variant]
+  );
+  const descriptionId = useId();
+  const sentiment = deltaSentiment(trend, polarity);
+  const stroke = DELTA_STROKE[sentiment];
+  const fill = DELTA_FILL[sentiment];
+  const strokeWidth = variant === 'pulse' ? 2 : 1.5;
   const svgRef = useRef<SVGSVGElement>(null);
 
   function handleMove(e: ReactMouseEvent<SVGSVGElement>) {
     if (!onHover) return;
     const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const px = ((e.clientX - rect.left) / rect.width) * VIEWBOX_W;
+    if (!rect || rect.width <= 0 || points.length === 0) {
+      onHover(null);
+      return;
+    }
+    const fraction = (e.clientX - rect.left) / rect.width;
     const idx = Math.max(
       0,
-      Math.min(
-        points.length - 1,
-        Math.round((px / VIEWBOX_W) * (points.length - 1))
-      )
+      Math.min(points.length - 1, Math.round(fraction * (points.length - 1)))
     );
     onHover(idx);
   }
 
   const playheadX = hoverIdx != null ? xFor(hoverIdx) : null;
-  const playheadY =
-    hoverIdx != null && points[hoverIdx] != null
-      ? yFor(points[hoverIdx])
-      : null;
+  const selectedValue = hoverIdx == null ? null : points[hoverIdx];
+  const playheadY = isMeasurement(selectedValue) ? yFor(selectedValue) : null;
 
   return (
     // biome-ignore lint/a11y/noNoninteractiveElementInteractions: chart canvas; hover is a mouse-only affordance, exact values are surfaced in adjacent Stat blocks
     <svg
       ref={svgRef}
-      viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`}
+      viewBox={`0 0 ${SPARKLINE_WIDTH} ${SPARKLINE_HEIGHT}`}
       className={className ?? 'mt-3 w-full h-32 block cursor-crosshair'}
       preserveAspectRatio='none'
       role='img'
       aria-label={ariaLabel}
+      aria-describedby={descriptionId}
       onMouseMove={handleMove}
       onMouseLeave={() => onHover?.(null)}
     >
-      <title>{ariaLabel}</title>
-      <path d={fillPath} fill={fill} />
-      <path d={path} fill='none' stroke={stroke} strokeWidth={1.5} />
+      <title>
+        {samplingNote ? `${ariaLabel}. ${samplingNote}` : ariaLabel}
+      </title>
+      <desc id={descriptionId}>{description}</desc>
+      {fillPath ? <path d={fillPath} fill={fill} /> : null}
+      {path ? (
+        <path
+          d={path}
+          fill='none'
+          stroke={stroke}
+          strokeWidth={strokeWidth}
+          strokeLinecap='round'
+          strokeLinejoin='round'
+          vectorEffect='non-scaling-stroke'
+          data-sparkline-variant={variant}
+        />
+      ) : null}
       {playheadX != null && playheadY != null && (
         <>
           <line
             x1={playheadX}
             y1={0}
             x2={playheadX}
-            y2={VIEWBOX_H}
+            y2={SPARKLINE_HEIGHT}
             stroke={PLAYHEAD_STROKE}
             strokeWidth={1}
             vectorEffect='non-scaling-stroke'

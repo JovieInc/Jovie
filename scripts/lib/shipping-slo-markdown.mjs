@@ -9,12 +9,12 @@ export function markdownSummary(report) {
   const lines = [
     '## Shipping SLO — rolling 7d',
     '',
-    '| Metric | p50 | p95 |',
-    '| --- | --- | --- |',
+    '| Metric | p50 | p95 | Samples |',
+    '| --- | --- | --- | --- |',
   ];
   const rows = [
-    ['CI wall time (pull_request)', report.metrics.ci?.pull_request],
-    ['CI wall time (merge_group)', report.metrics.ci?.merge_group],
+    ['Source PR Ready (bounded sample)', report.metrics.ci?.pull_request],
+    ['Combined-tree PR Ready (bounded sample)', report.metrics.ci?.merge_group],
     ['Merge-queue wait', report.metrics.mergeQueue?.wait],
     ['Lead time · devin', report.metrics.leadTime?.devin],
     ['Lead time · codex', report.metrics.leadTime?.codex],
@@ -31,6 +31,15 @@ export function markdownSummary(report) {
     lines.push(
       `| ${label} | ${fmtSeconds(stat?.p50)} | ${fmtSeconds(stat?.p95)} | (n=${stat?.n ?? 0}) |`
     );
+  if (Object.keys(report.metrics.ci ?? {}).length) lines.push('');
+  for (const cohort of Object.values(report.metrics.ci ?? {})) {
+    const outcomes = Object.entries(cohort.outcomes ?? {})
+      .map(([outcome, count]) => `${outcome}: ${count}`)
+      .join(', ');
+    lines.push(
+      `- **${cohort.label} evidence:** ${cohort.coverage} · sampled ${cohort.sampled}/${cohort.availableRuns} recent listed runs · ${outcomes || 'no observations'}`
+    );
+  }
   const t = report.metrics.throughput ?? {};
   lines.push(
     '',
@@ -45,6 +54,16 @@ export function markdownSummary(report) {
     lines.push(
       `**CI rounds per merged PR:** mean ${cr.roundsMean.toFixed(2)} (target <= ${cr.target}) · p95 ${cr.roundsP95} · Source Validation first-push pass ${cr.firstPushPassRate === null ? 'n/a' : `${(cr.firstPushPassRate * 100).toFixed(0)}%`} (n=${cr.firstPushSamples})`
     );
+  const d = report.metrics.dora;
+  if (d) {
+    const why = reason => (reason ? ` (n/a: ${reason})` : '');
+    const cfr = d.changeFailureRate;
+    lines.push(
+      `**DORA:** deploys ${d.deployFrequency.perDay === null ? 'n/a' : `${d.deployFrequency.perDay.toFixed(1)}/day (n=${d.deployFrequency.promotions})`}${why(d.deployFrequency.reason)} · ` +
+        `change failure rate ${cfr.rate === null ? 'n/a' : `${(cfr.rate * 100).toFixed(1)}% (${cfr.failed}/${cfr.promotions}, ${cfr.provisional} provisional)`}${why(cfr.reason)} · ` +
+        `failed-deploy recovery p50 ${fmtSeconds(d.recovery.p50)} / p95 ${fmtSeconds(d.recovery.p95)} (n=${d.recovery.n}, open ${d.recovery.open ?? 'n/a'})${why(d.recovery.reason)}`
+    );
+  }
   const blog = report.blogPublishLatency;
   lines.push(
     '',

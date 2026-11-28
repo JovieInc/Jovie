@@ -37,8 +37,13 @@ export {
 export type {
   HostDrawnInputProps,
   HostDrawnSelectProps,
+  HostDrawnTextareaProps,
 } from './host-drawn-field';
-export { HostDrawnInput, HostDrawnSelect } from './host-drawn-field';
+export {
+  HostDrawnInput,
+  HostDrawnSelect,
+  HostDrawnTextarea,
+} from './host-drawn-field';
 export type {
   IconButtonFade,
   IconButtonName,

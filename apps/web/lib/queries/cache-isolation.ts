@@ -79,6 +79,15 @@ export function classifyCacheScopeChange(
     return 'sign-out';
   }
 
+  // First authentication (anonymous → account): withCacheScope already
+  // partitions keys by `anon` vs userId. Treating this as account-change
+  // bumps generation and makes QueryProvider render children=null +
+  // remount via key={generation}, which wipes OnboardingSessionBoundary's
+  // in-tab Keep freeze (ONB-52/54 / JOV-14959). Soft-hydrate instead.
+  if (!previous.userId && next.userId) {
+    return 'hydrate';
+  }
+
   if (previous.userId !== next.userId && next.userId) {
     return 'account-change';
   }

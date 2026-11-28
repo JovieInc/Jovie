@@ -1,0 +1,24 @@
+/* National flag fills for CountrySelector. Hex lives here so the
+   component TSX stays on semantic tokens for chrome; flag colours are
+   fixed heraldry, not design-system interactive tokens. */
+
+.country-flag-ca-white {
+  fill: #fff;
+}
+
+.country-flag-ca-red {
+  fill: #d52b1e;
+}
+
+.country-flag-us-red {
+  fill: #bd3d44;
+}
+
+.country-flag-us-white {
+  stroke: #fff;
+  fill: #fff;
+}
+
+.country-flag-us-navy {
+  fill: #192f5d;
+}

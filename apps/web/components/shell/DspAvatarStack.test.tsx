@@ -9,6 +9,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { describe, expect, it } from 'vitest';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   DSP_GLYPH_ON_BRAND_TEXT_CLASS,
   type DspAvatarItem,
@@ -375,5 +376,23 @@ describe('DspAvatarStack', () => {
     );
     expect(avatar?.className).toContain('opacity-40');
     expect(avatar?.className).not.toContain('opacity-75');
+  });
+
+  it('paints glyph type with the on-media token and no palette white', () => {
+    expect(DSP_GLYPH_ON_BRAND_TEXT_CLASS).toBe('text-on-media');
+  });
+
+  it('opens its details from the trigger button and has no a11y violations', async () => {
+    const { container } = render(<DspAvatarStack dsps={ITEMS} />);
+    await expectNoA11yViolations(container);
+    const dialog = await revealDetails();
+    expect(dialog).toBeInTheDocument();
+  });
+
+  it('keeps the trigger a type=button control', () => {
+    render(<DspAvatarStack dsps={ITEMS} />);
+    expect(
+      screen.getByRole('button', { name: /^View DSP Distribution Details/i })
+    ).toHaveAttribute('type', 'button');
   });
 });

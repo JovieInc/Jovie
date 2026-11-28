@@ -79,7 +79,7 @@ function ChapterRule({
 /**
  * Hero: the locked line beside the lede and actions, then Jovie for Mac shot
  * straight on, its release page lifted out of the window, standing in one
- * key light from above. No rings or glow blobs: light, edge and shadow only.
+ * key light from above. No rings or glow blobs: hairline light, edge and shadow only.
  */
 export function HomepageStoryHero({
   copy = HOMEPAGE_EDITORIAL_COPY.hero,

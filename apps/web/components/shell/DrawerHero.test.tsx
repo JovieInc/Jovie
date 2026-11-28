@@ -167,3 +167,13 @@ describe('DrawerHero scale tokens', () => {
     expect(source).toContain('leading-4');
   });
 });
+
+describe('DrawerHero play glyph', () => {
+  it('draws the play triangle through PlayIcon (JOV-12568)', () => {
+    const source = readFileSync(resolve(__dirname, './DrawerHero.tsx'), 'utf8');
+
+    expect(source).toContain('<PlayIcon');
+    expect(source).toContain("from '@/components/atoms/PlayIcon'");
+    expect(source).not.toContain('translate-x-px');
+  });
+});

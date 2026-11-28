@@ -21,7 +21,7 @@ const BRAND_LOGO_PRODUCTION_SOURCES = [
   'components/atoms/LogoLoader.tsx',
   'components/features/auth/AuthUnavailableCard.tsx',
   'components/features/onboarding/OnboardingChatEmptyIntro.tsx',
-  'components/organisms/UnifiedSidebar.tsx',
+  'components/shell/SidebarOPresence.tsx',
   'components/molecules/WorkspaceSelector.tsx',
   'components/molecules/FooterBranding.tsx',
   'components/molecules/ProfileNavButton.tsx',
@@ -133,7 +133,7 @@ describe('brand mark size ladder', () => {
     expect(
       readWebSource('components/molecules/ProfileNavButton.tsx')
     ).toContain('BrandLogo');
-    expect(readWebSource('components/organisms/UnifiedSidebar.tsx')).toContain(
+    expect(readWebSource('components/shell/SidebarOPresence.tsx')).toContain(
       'BrandLogo'
     );
   });

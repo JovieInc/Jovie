@@ -5,6 +5,7 @@
 import {
   IconButton,
   Input,
+  PlainButton,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -101,6 +102,11 @@ export const AvailabilityCell = memo(function AvailabilityCell({
     });
     return linked.slice(0, 4);
   }, [allProviders, providerMap]);
+
+  // Move focus into the inline URL field when it appears.
+  useEffect(() => {
+    if (addingProvider) inputRef.current?.focus();
+  }, [addingProvider]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -205,8 +211,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type='button'
+        <PlainButton
           aria-haspopup='listbox'
           aria-expanded={open}
           className='inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-subtle bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] px-1.5 py-1 text-xs font-normal tracking-tight text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:border-(--color-accent) focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--color-accent)'
@@ -244,11 +249,12 @@ export const AvailabilityCell = memo(function AvailabilityCell({
             className='h-3 w-3 text-tertiary-token'
             aria-hidden='true'
           />
-        </button>
+        </PlainButton>
       </PopoverTrigger>
 
       <PopoverContent
         align='end'
+        aria-label='Platform Availability'
         className='w-80 rounded-xl border border-subtle bg-surface-1 p-0 shadow-popover'
       >
         <div className='border-b border-subtle px-3 py-2'>
@@ -372,8 +378,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                             setValidationError('');
                           }}
                           disabled={isAddingUrl}
-                          className='h-8 w-38 rounded-full border-subtle bg-surface-1 text-xs'
-                          autoFocus
+                          className='h-8 w-38 rounded-full bg-surface-1 text-xs'
                         />
                         <DrawerButton
                           type='submit'

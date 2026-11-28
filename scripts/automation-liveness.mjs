@@ -41,6 +41,10 @@ import {
   validateRegistry,
 } from './lib/automation-registry.mjs';
 import {
+  observeGithubWorkflowJob,
+  observeWorkflowFailureStreak as readWorkflowFailureStreak,
+} from './lib/automation-workflow-observation.mjs';
+import {
   githubHeaders,
   githubReadFailure,
   landedOnMainAt,
@@ -67,50 +71,8 @@ const SHA_RE = /^[0-9a-f]{40}$/;
 // Overridable per observer for tests; one literal for the external-api guard.
 const GITHUB_API = 'https://api.github.com';
 
-/**
- * Controller failure streak: healthy unless the newest `receipt.streak` (default 3) conclusive runs (success or
- * failure; skipped and cancelled runs carry no verdict) all failed. A streak reports the newest success time (or
- * epoch when none), which is always older than the entry's silence budget, so it goes silent with the run ids named.
- * @returns {Promise<{ok: boolean, reason?: string, deferred?: boolean, lastProofAt?: string, startedAt?: string, endedAt?: string, ref?: string, outcome?: string, url?: string, streak?: ReturnType<typeof redGate.summarizeRunStreak>, detailOnStale?: boolean, quotaEvidence?: object, recoveryEvidence?: object}>}
- */
-export async function observeWorkflowFailureStreak(
-  receipt,
-  { fetchImpl, token, nowMs, apiUrl = GITHUB_API }
-) {
-  const streak = receipt.streak ?? 3;
-  const branch = receipt.branch
-    ? `&branch=${encodeURIComponent(receipt.branch)}`
-    : '';
-  const url = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs?status=completed&per_page=50${branch}`;
-  const read = await readGithubJson(url, { fetchImpl, token, apiUrl, nowMs });
-  if (!read.ok) return githubReadFailure(read);
-  if (!Array.isArray(read.body?.workflow_runs))
-    return { ok: false, reason: 'github-runs-unreadable' };
-  const conclusive = read.body.workflow_runs
-    .filter(
-      row => row?.conclusion === 'success' || row?.conclusion === 'failure'
-    )
-    .sort((a, b) =>
-      String(b?.created_at ?? '').localeCompare(String(a?.created_at ?? ''))
-    );
-  const newest = conclusive.slice(0, streak);
-  if (
-    newest.length === streak &&
-    newest.every(row => row.conclusion === 'failure')
-  ) {
-    const lastSuccess = conclusive.find(row => row.conclusion === 'success');
-    return {
-      ok: true,
-      lastProofAt: lastSuccess?.updated_at ?? new Date(0).toISOString(),
-      detailOnStale: true,
-      reason: `${streak}-consecutive-failures[${newest.map(row => row.id).join(',')}]`,
-    };
-  }
-  return {
-    ok: true,
-    lastProofAt: new Date(nowMs).toISOString(),
-    reason: 'no-failure-streak',
-  };
+export function observeWorkflowFailureStreak(receipt, context) {
+  return readWorkflowFailureStreak(receipt, { apiUrl: GITHUB_API, ...context });
 }
 
 /** Last run of a workflow whose conclusion is one of `receipt.conclusions`.
@@ -126,6 +88,15 @@ export async function observeGithubWorkflow(
     : '';
   const base = `${apiUrl}/repos/${receipt.repo}/actions/workflows/${encodeURIComponent(receipt.workflow)}/runs`;
   const events = receipt.events ?? null;
+  if (receipt.job)
+    return observeGithubWorkflowJob(receipt, {
+      fetchImpl,
+      token,
+      nowMs,
+      apiUrl,
+      base,
+      branch,
+    });
   const acceptsRun = row =>
     conclusions.includes(row?.conclusion) &&
     (!events || events.includes(row?.event));
@@ -869,6 +840,7 @@ function readPrevious(path) {
 }
 
 function summary(report) {
+  const unknown = report.unmeasured.filter(row => row.status === 'unknown');
   const rows = report.results
     .map(
       row =>
@@ -882,7 +854,11 @@ function summary(report) {
     '|---|---|---|---|---|---|',
     rows,
     '',
-    `${report.unmeasured.length} live entries have no hosted-readable receipt (see registry \`gap\`).`,
+    `**Evidence gaps:** ${unknown.length} live entries are unknown (no receipt). ${report.unmeasured.length - unknown.length} entries have host-local receipts outside this hosted check.`,
+    ...unknown.map(
+      row =>
+        `- \`${row.id}\` (${row.owner}) · ${row.gap ?? 'no measurement gap recorded'}${row.purpose ? ` · ${row.purpose}` : ''}`
+    ),
     '',
   ].join('\n');
 }
@@ -954,6 +930,9 @@ export async function main({
   const quotaDeferred = report.results
     .filter(isQuotaDeferredRow)
     .map(row => row.id);
+  const unknownReceipts = report.unmeasured.filter(
+    row => row.status === 'unknown'
+  ).length;
   const full = {
     ...report,
     startedAt,
@@ -976,6 +955,11 @@ export async function main({
     appendFileSync(
       env.GITHUB_STEP_SUMMARY,
       summary(report) + redGate.redMonitorSummary(report.redMonitors)
+    );
+  if (env.GITHUB_OUTPUT)
+    appendFileSync(
+      env.GITHUB_OUTPUT,
+      `receipt_coverage_complete=${unknownReceipts === 0}\n`
     );
   process.stdout.write(redGate.redMonitorAnnotations(report.redMonitors));
 
@@ -1014,6 +998,17 @@ export async function main({
         state[decision.fingerprint] =
           decisionPrevious[decision.fingerprint] ?? 'unknown';
     }
+    // Busy unattended workflows report through one sweep (JOV-14467).
+    const { SWEEP_STATE_KEY, sweepOutcomes } = await import(
+      './lib/outcome-sweep.mjs'
+    );
+    state[SWEEP_STATE_KEY] = await sweepOutcomes({
+      root: REPO_ROOT,
+      previous: decisionPrevious[SWEEP_STATE_KEY] ?? null,
+      env,
+      fetchImpl,
+      log: line => process.stdout.write(`${line}\n`),
+    });
     if (args.previous)
       writeFileSync(args.previous, `${JSON.stringify(state, null, 2)}\n`);
   }
@@ -1024,7 +1019,7 @@ export async function main({
         'not a silence verdict. The next 20-minute bucket re-reads them.\n'
     );
   process.stdout.write(
-    `${JSON.stringify({ status: report.status, red: report.results.filter(row => !['fresh', 'deferred'].includes(row.status) && !isQuotaDeferredRow(row)).map(row => row.id), quotaDeferred })}\n`
+    `${JSON.stringify({ status: report.status, red: report.results.filter(row => !['fresh', 'deferred'].includes(row.status) && !isQuotaDeferredRow(row)).map(row => row.id), quotaDeferred, unknownReceipts })}\n`
   );
   return full;
 }

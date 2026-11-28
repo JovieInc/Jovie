@@ -110,6 +110,7 @@ in the merge queue, while network/deploy/exhaustive depth runs later.
 | **Deep / nightly** | CodeQL, Trivy, full-history secret scans, Scorecard, SonarCloud, full E2E matrix, exhaustive suites | schedule, event, or explicit manual dispatch |
 
 Rules:
+- On an explicit structural skip from Path Changes, Python and coverage shards publish receipts without preparing workspaces.
 - **Heavy scans never gate a source PR or a merge-queue batch.** Running CodeQL
   ×5 + the full security suite per-PR saturated the runner pool and made the
   native queue retry-storm itself into a 6-hour stall. CodeQL / Trivy / Scorecard scan the
@@ -508,24 +509,53 @@ Related: [`pr-stacking.md`](../.claude/rules/pr-stacking.md),
 ## Local AI review (Sentry Warden)
 
 AI code review runs LOCALLY through Sentry Warden (`warden.toml`), never as a
-remote gate. The husky hooks run it for you:
-`warden --staged` on pre-commit (staged diff), `warden` on pre-push (branch vs
-`main`), via `scripts/hooks/warden-local-review.sh` (advisory rung
-`warden-local-review` in the gate ladder). A missing `warden` CLI or model
-credentials only warns — commits and pushes proceed, and Warden must never be
-wired as a status check, branch-protection rule, or merge gate (no
-`.github/workflows/warden.yml` in this repo). `WARDEN_LOCAL_REVIEW` switches
-behavior: `off` skips, `warn` (default) reports findings and proceeds, `strict`
-fails the hook on a non-zero Warden exit.
+remote gate. The husky pre-commit hook runs `warden --staged` on the staged diff
+through `scripts/hooks/warden-local-review.sh` (advisory rung
+`warden-local-review` in the gate ladder). The pre-push branch review is off by
+default, because every commit was already reviewed; `WARDEN_PUSH_REVIEW=on`
+turns it on. A missing key or CLI only warns: commits and pushes proceed, and
+Warden must never be wired as a status check, branch-protection rule, or merge
+gate (no `.github/workflows/warden.yml` in this repo). `WARDEN_LOCAL_REVIEW`
+switches behavior: `off` skips, `warn` (default) reports findings and proceeds,
+`strict` fails the hook on a non-zero Warden exit.
+
+**Model and cost.** Every Warden call (agent and auxiliary) uses Claude Haiku
+5.5, pinned in `warden.toml` and paid by the Anthropic API credits that come
+with the Claude plan. Haiku 5.5 is newer than Warden's built-in model catalog,
+so the hook gives Warden's pi runtime `scripts/hooks/warden-pi-models.json`
+through an isolated `PI_CODING_AGENT_DIR` (your own `~/.pi/agent` is untouched).
+The plan credits expire each cycle; when they run out, requests stop and the
+hook says so, and nothing is charged unless the linked Console org also holds
+paid credits (then set a spend limit on the Warden workspace).
+
+**Free first pass.** Before any model call, `scripts/hooks/warden-triage.mjs`
+skips ordinary docs, lockfiles and assets before checking credentials.
+Executable, instruction, configuration and test changes are selected regardless
+of size; rename sources are checked as well as destinations.
+`WARDEN_TRIAGE=off` reviews everything. `WARDEN_TIMEOUT_SECONDS` (default 180,
+`0` disables) uses a portable Node deadline with process cleanup.
+
+The hook records truthful local observations and n/p50/p95/missingness through
+the [canonical stage-event consumer](metrics/STAGE_EVENTS.md#local-advisory-review-local-review).
+Only complete supported Warden JSONL results qualify for exact-input reuse;
+replay preserves findings and the original strict-mode exit. A process exit
+alone never proves a clean result, findings count, provider model identity or
+billing cost. Requested selectors with observed usage and validated runtime
+accounting estimates are labeled separately; local skill overrides or external
+service memory disable reuse. PATH Warden installations also disable reuse
+because launcher bytes do not bind their imported package and bundled policy.
 
 One-time local setup (not committed):
 
-```sh
-pnpm add -g @sentry/warden
-export WARDEN_MODEL=openai/gpt-5.5        # or anthropic/claude-sonnet-4-6
-export WARDEN_OPENAI_API_KEY=sk-...       # or WARDEN_ANTHROPIC_API_KEY=...
-warden                                    # review the current branch
-```
+1. Link a Console org to the Claude plan's API credits (claude.ai Settings >
+   Billing > API credits).
+2. In that org, create a key (ideally in a `Warden` workspace with a spend
+   limit).
+3. Put it in your environment, or the cloud environment's variables, as
+   `WARDEN_ANTHROPIC_API_KEY`. Never name it `ANTHROPIC_API_KEY`: Claude Code
+   would pick that up and bill its own work to the key.
 
-Without a provider key, Warden falls back to local Claude Code auth when
-available. Never commit keys.
+The hook runs Warden `0.54.0` through `npm exec` (downloaded once, then cached)
+unless a `warden` is already on `PATH`. To review the whole branch by hand:
+`WARDEN_PUSH_REVIEW=on bash scripts/hooks/warden-local-review.sh branch`.
+Never commit keys.

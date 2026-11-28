@@ -25,6 +25,8 @@ export function resolveProfileAccess(input: {
   userRows: ReadonlyArray<{ id: string }>;
   profileRows: ReadonlyArray<{ id: string; legacyUserId: string | null }>;
   claimRows: ReadonlyArray<{ userId: string; role: string }>;
+  /** External owner actions require a current claim, not legacy ownership. */
+  requireOwnerClaim?: boolean;
 }): ProfileAccessDecision {
   if (!isCanonicalUuid(input.appUserId) || !isCanonicalUuid(input.profileId)) {
     return { ok: false, reason: 'invalid' };
@@ -46,7 +48,8 @@ export function resolveProfileAccess(input: {
     const writableClaims = input.claimRows.filter(
       claim =>
         claim.userId === input.appUserId &&
-        (claim.role === 'owner' || claim.role === 'manager')
+        (claim.role === 'owner' ||
+          (!input.requireOwnerClaim && claim.role === 'manager'))
     );
     if (writableClaims.length !== 1) {
       return {
@@ -67,7 +70,8 @@ export function resolveProfileAccess(input: {
     };
   }
 
-  return input.profileRows[0]?.legacyUserId === input.appUserId
+  return !input.requireOwnerClaim &&
+    input.profileRows[0]?.legacyUserId === input.appUserId
     ? {
         ok: true,
         profileId: input.profileId,
@@ -84,7 +88,8 @@ export function resolveProfileAccess(input: {
 export async function getExactProfileAccess(
   tx: DbOrTransaction,
   appUserId: string,
-  profileId: string
+  profileId: string,
+  options?: { requireOwnerClaim?: boolean }
 ): Promise<ProfileAccessDecision> {
   if (!isCanonicalUuid(appUserId) || !isCanonicalUuid(profileId)) {
     return { ok: false, reason: 'invalid' };
@@ -107,6 +112,7 @@ export async function getExactProfileAccess(
     .where(eq(users.id, appUserId));
 
   return resolveProfileAccess({
+    requireOwnerClaim: options?.requireOwnerClaim,
     appUserId,
     profileId,
     userRows: Array.from(

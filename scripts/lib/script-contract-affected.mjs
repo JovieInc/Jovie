@@ -213,6 +213,20 @@ function run(command, args) {
   });
 }
 
+/**
+ * Bound explicit local fan-out without changing CI, defaults or test selection.
+ * @param {'node' | 'vitest'} runner
+ * @param {string[]} args
+ * @param {Record<string, string | undefined>} [env]
+ */
+export function localContractWorkerArgs(runner, args, env = process.env) {
+  const limit = Number(env.VITEST_LOCAL_MAX_WORKERS);
+  if (env.CI === 'true' || !Number.isInteger(limit) || limit < 1) return args;
+  const flag = runner === 'node' ? '--test-concurrency' : '--maxWorkers';
+  if (args.some(arg => arg === flag || arg.startsWith(`${flag}=`))) return args;
+  return [`${flag}=${Math.min(limit, 4)}`, ...args];
+}
+
 /** @param {string[]} args */
 async function main(args) {
   const paths = args.filter(arg => !arg.startsWith('--'));
@@ -230,12 +244,13 @@ async function main(args) {
   }
   const runs = [];
   for (const args of scriptContractNodeArgs(node))
-    runs.push(run(process.execPath, args));
+    runs.push(run(process.execPath, localContractWorkerArgs('node', args)));
   if (vitest.length > 0)
     runs.push(
       run('pnpm', [
         'exec',
         'vitest',
+        ...localContractWorkerArgs('vitest', []),
         '--root',
         'scripts',
         '--config',

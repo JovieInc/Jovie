@@ -84,7 +84,7 @@ export const LOCAL_GUARDS = Object.freeze([
   {
     id: 'dead-ends',
     name: 'rendered dead-end copy, controls and links',
-    command: 'pnpm design:no-dead-ends:check',
+    command: 'node --import tsx packages/copy/dead-ends.ts check',
     when: p =>
       /^(?:apps\/web|apps\/desktop\/src|packages\/ui)\/.+\.[jt]sx?$/.test(p) ||
       /^packages\/copy\/(?:dead-ends|rules)/.test(p),

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -37,6 +38,7 @@ vi.mock('@/app/r/[slug]/ReleaseLandingPage', () => ({
   ),
 }));
 
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { DemoReleaseLandingSurface } from './DemoReleaseLandingSurface';
 
 describe('DemoReleaseLandingSurface', () => {
@@ -67,5 +69,30 @@ describe('DemoReleaseLandingSurface', () => {
       screen.getByRole('link', { name: /use this sound/i })
     ).toBeInTheDocument();
     expect(screen.queryByTestId('release-landing-page')).toBeNull();
+  });
+
+  it('reaches the sounds link by keyboard in the creator-menu capture with token classes', async () => {
+    const user = userEvent.setup();
+    searchParams.capture = 'creator-menu';
+    const { container } = render(<DemoReleaseLandingSurface />);
+
+    await user.tab();
+
+    const link = screen.getByRole('link', { name: /use this sound/i });
+    expect(link).toHaveFocus();
+    expect(link.getAttribute('href')).toMatch(/\/sounds$/);
+    const capture = screen.getByTestId('demo-release-creator-capture');
+    expect(capture.className).toContain('border-subtle');
+    expect(capture.className).not.toMatch(/white\//);
+    await expectNoA11yViolations(container);
+  });
+
+  it('has no a11y violations on the default landing state', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<DemoReleaseLandingSurface />);
+
+    await user.tab();
+
+    await expectNoA11yViolations(container);
   });
 });

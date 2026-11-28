@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import {
+  type ClaimWalkFn,
+  createCanaryClaimWalk,
+  shouldInjectCanaryClaimWalk,
+} from './cert-claim-walk';
+import {
   CERT_DEFAULT_ARTIST_URL,
   CERT_DEFAULT_RELEASE_METADATA,
   type CertReleaseMetadata,
@@ -31,6 +36,11 @@ export interface CertOptions {
   readonly run?: string;
   readonly now?: () => Date;
   readonly env?: Readonly<Record<string, string | undefined>>;
+  /**
+   * JOV-9760 claim+cleanup walker. When omitted and claim-walk env is present,
+   * the Golden Path canary walk is injected automatically.
+   */
+  readonly walk?: ClaimWalkFn;
 }
 
 export function normalizeBase(base: string): string {
@@ -329,12 +339,19 @@ export async function runCert(opts: CertOptions) {
       );
 
     // JOV-9760 creator outcomes: never promote claim_url 200 into a claim.
+    const env = opts.env ?? process.env;
+    const walk =
+      opts.walk ??
+      (shouldInjectCanaryClaimWalk(env, opts.walk)
+        ? createCanaryClaimWalk({ env, fetchImpl })
+        : undefined);
     for (const outcome of await exerciseClaimOutcomes({
       origin: ORIGIN,
       run: RUN,
       draftId,
       claimUrl,
-      env: opts.env,
+      env,
+      walk,
     }))
       checks.push(outcome);
 

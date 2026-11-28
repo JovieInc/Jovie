@@ -108,7 +108,7 @@ describe('DashboardShellPrivacyBoundary certificate', () => {
     expect(screen.getByRole('main')).toHaveAttribute('data-locked', 'true');
     expect(screen.queryByText('Private page content')).not.toBeInTheDocument();
     expect(screen.queryByText('Private shell chrome')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button').length).toBeGreaterThan(0);
+    expect((await screen.findAllByRole('button')).length).toBeGreaterThan(0);
     await expectNoA11yViolations(container);
   });
 

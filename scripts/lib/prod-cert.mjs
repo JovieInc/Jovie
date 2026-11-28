@@ -418,6 +418,8 @@ export async function runProductionCertification({
   producerSourceSha = null,
   /** JOV-6920 full-cone checks; the runner enables them, legacy callers keep the legacy set. */
   coneCases = false,
+  /** JOV-14402: certify only these steps; the rest carry forward (prod-cert-carry.mjs). */
+  surfaces = SURFACE_IDS,
 } = {}) {
   const served = await readServedBuild(origin, fetchImpl);
   const pen = await loadPenInputs();
@@ -431,7 +433,7 @@ export async function runProductionCertification({
     coneCases,
   });
   const receipts = [];
-  for (const surface of SURFACE_IDS) {
+  for (const surface of SURFACE_IDS.filter(id => surfaces.includes(id))) {
     const startedAt = now();
     let checks = [];
     if (expectedSha && served.sha !== expectedSha) {
@@ -492,14 +494,12 @@ export async function runProductionCertification({
 /**
  * One verdict for everything that depends on the production golden path
  * (recovery email gate, marketplace listing, launch certification): every
- * surface passed on the served SHA within the freshness window.
+ * surface passed, or carried a pass forward, on the served SHA. A
+ * certification belongs to its release and never ages out (JOV-14402).
  * @param {any[]} receipts
- * @param {{ servedSha: string, nowMs?: number, maxAgeMs?: number }} options
+ * @param {{ servedSha: string }} options
  */
-export function certificationVerdict(
-  receipts,
-  { servedSha, nowMs = Date.now(), maxAgeMs = 24 * 60 * 60 * 1000 }
-) {
+export function certificationVerdict(receipts, { servedSha }) {
   const bySurface = new Map(receipts.map(r => [r.surface, r]));
   const notGreen = [];
   for (const surface of SURFACE_IDS) {
@@ -508,8 +508,6 @@ export function certificationVerdict(
     else if (r.status !== 'passed') notGreen.push({ surface, why: r.status });
     else if (r.sha !== servedSha)
       notGreen.push({ surface, why: `passed on ${r.sha.slice(0, 8)}` });
-    else if (nowMs - Date.parse(r.endedAt) > maxAgeMs)
-      notGreen.push({ surface, why: 'older than 24h' });
   }
   return { certified: notGreen.length === 0, servedSha, notGreen };
 }

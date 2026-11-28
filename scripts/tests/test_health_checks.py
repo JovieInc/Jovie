@@ -1,15 +1,61 @@
 """Health composition keeps all existing doctor signals and main certification."""
 from __future__ import annotations
 
+import json
 import os
 import sys
 import unittest
 from contextlib import ExitStack
+from datetime import datetime
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
+SCRIPTS = Path(__file__).resolve().parents[1]
+sys.path[:0] = [str(SCRIPTS / "lanes"), str(SCRIPTS)]
 import health_checks as health  # noqa: E402
+
+
+class AutomationLivenessReceiptTests(unittest.TestCase):
+    now = datetime.fromisoformat("2026-11-27T09:00:00+00:00").timestamp()
+
+    def artifact(self, *, branch="main", head_repo=1030964787, **overrides):
+        return {
+            "id": 15180208296, "name": "automation-liveness-receipts", "size_in_bytes": 12553,
+            "created_at": "2026-11-27T07:43:33Z", "expires_at": "2027-02-25T07:42:06Z", "expired": False,
+            "url": "https://api.github.com/repos/JovieInc/Jovie/actions/artifacts/15180208296",
+            "workflow_run": {"id": 45960270786, "head_branch": branch, "head_sha": "a" * 40,
+                             "repository_id": 1030964787, "head_repository_id": head_repo},
+            **overrides,
+        }
+
+    def observation(self, rows, *, total=None, code=0):
+        payload = json.dumps({"artifacts": rows, "total_count": len(rows) if total is None else total})
+        lane = SimpleNamespace(REPO_SLUG="JovieInc/Jovie", shared=lambda _key, _ttl, fetch: fetch())
+        with mock.patch("apiclient.gh.run_gh", return_value={"code": code, "stdout": payload}) as shell:
+            observed = health.automation_liveness(lane, self.now)
+        shell.assert_called_once_with(["api", "repos/JovieInc/Jovie/actions/artifacts"
+                                              "?name=automation-liveness-receipts&per_page=20"], priority="poll",
+                                      max_attempts=1, max_wait_ms=0, run=mock.ANY)
+        return observed
+
+    def test_stale_detector_report_is_preserved_without_looking_at_wrapper_conclusion(self):
+        newer = "2026-11-27T08:59:00Z"
+        rows = [self.artifact(branch="topic", created_at=newer), self.artifact(head_repo=9, created_at=newer),
+                self.artifact(expired=True, created_at=newer), self.artifact()]
+        self.assertEqual(self.observation(rows), {"installed": True, "lastRunAt": "2026-11-27T07:43:33Z"})
+        self.assertEqual(self.observation([self.artifact(created_at=newer), *rows]),
+                         {"installed": True, "lastRunAt": newer})
+
+    def test_absent_or_untrusted_receipt_never_refreshes_the_detector(self):
+        self.assertEqual(self.observation([]), {"installed": True, "lastRunAt": None})
+        for invalid in (self.artifact(workflow_run={}), self.artifact(size_in_bytes=0),
+                        self.artifact(url="https://elsewhere.test/artifact"), self.artifact(created_at="soon"),
+                        self.artifact(created_at="2026-11-27T09:01:00Z"), self.artifact(expires_at="2026-11-27T08:00:00Z")):
+            with self.subTest(invalid=invalid):
+                self.assertEqual(self.observation([invalid]), {"installed": None})
+        self.assertEqual(self.observation([self.artifact(branch="topic")], total=2), {"installed": None})
+        self.assertEqual(self.observation([], code=1), {"installed": None})
 
 
 class HealthChecksTests(unittest.TestCase):

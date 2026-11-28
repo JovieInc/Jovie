@@ -8,8 +8,28 @@ PR instead of re-arming forever (JOV-10504 -- the loop posted 'Claim expired wit
 PR. Escalated ... re-arming claim.' every CLAIM_S on an open issue), else re-arm the
 window and escalate once. advance() treats status 'parked' like 'claimed' for PR
 binding, so a later open/merged PR unparks the entry; parked entries never re-enter
-this expiry branch, so no further comments or alerts fire while parked."""
+this expiry branch, so no further comments or alerts fire while parked.
+
+Terminal notices (stand-down / park) are one-shot per episode: ledger flags plus a
+Linear comment-body check so competing writers / lost closed|parked status cannot
+re-post the same notice while still allowing a genuine new regression (handle_issue
+clears the flags on reopen)."""
 from __future__ import annotations
+
+STAND_DOWN_NEEDLE = "standing the claim down, no further claim-expired alerts"
+PARK_NEEDLE = "Parking this claim; a fix PR re-opens it."
+
+
+def _already_notified(linear, ident: str | None, needle: str, ledger_flag) -> bool:
+    if ledger_flag:
+        return True
+    if not ident:
+        return False
+    try:
+        bodies = linear.comment_bodies(ident) if hasattr(linear, "comment_bodies") else []
+    except Exception:
+        return False
+    return any(needle in (b or "") for b in bodies)
 
 
 def escalate_or_park(sid: str, e: dict, linear, at: float, state, pe=None) -> int:
@@ -31,7 +51,11 @@ def escalate_or_park(sid: str, e: dict, linear, at: float, state, pe=None) -> in
         # while this claim was live, the merged fix PR sitting outside the PR fetch
         # window). Respect it and stand down: escalating re-files a duplicate
         # claim-expired alert on a DONE issue every cycle (JOV-10213).
-        e.update(status="closed", closedAt=at)
+        notified = _already_notified(linear, e.get("linear"), STAND_DOWN_NEEDLE,
+                                     e.get("standDownNotifiedAt"))
+        e.update(status="closed", closedAt=at, standDownNotifiedAt=e.get("standDownNotifiedAt") or at)
+        if notified:
+            return 0
         try:
             linear.comment(e["linear"], "prod-errors loop: the linked issue is already "
                            "completed/canceled -- standing the claim down, no further "
@@ -45,7 +69,11 @@ def escalate_or_park(sid: str, e: dict, linear, at: float, state, pe=None) -> in
         # stops getting a claim-expired comment + alert every CLAIM_S. advance()
         # unparks when a later open/merged PR binds; a parked entry skips the expiry
         # branch entirely.
-        e.update(status="parked", parkedAt=at, parkReason="claim-expired-cap")
+        notified = _already_notified(linear, e.get("linear"), PARK_NEEDLE, e.get("parkNotifiedAt"))
+        e.update(status="parked", parkedAt=at, parkReason="claim-expired-cap",
+                 parkNotifiedAt=e.get("parkNotifiedAt") or at)
+        if notified:
+            return 0
         try:
             linear.comment(e["linear"], f"Claim expired with no PR {pe.MAX_CLAIM_ESCALATIONS} times "
                            f"(Sentry {sid}). Parking this claim; a fix PR re-opens it.")

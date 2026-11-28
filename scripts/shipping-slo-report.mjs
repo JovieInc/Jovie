@@ -10,7 +10,7 @@
  *
  *   node scripts/shipping-slo-report.mjs report [--input raw.json]
  *          [--workflows ci.yml,...] [--days 21] [--write-latest]
- *          [--ratchet] [--json out.json]
+ *          [--ratchet] [--json out.json] [--lanes lanes-view.json]
  *       Collect GitHub signals (or read a previously-collected raw snapshot),
  *       compute rolling 7d p50/p95 metrics, evaluate them against the
  *       committed baseline, and print a verdict. Options:
@@ -24,6 +24,7 @@
  * Raw input shape (produced by `collect` / consumed by `report`):
  *   { collectedAt, runs: {pull_request:[], merge_group:[], main:[]},
  *     mergedPrs: [{number,title,headRefName,createdAt,mergedAt,mergeCommitSha}],
+ *     ciGateEvidence: { basis, collectedAt, cohorts },
  *     timelines: { <prNumber>: [{type, at}] },
  *     deployments: [{status, createdAt, sha}],
  *     productionVerifications: [{sha, verifiedAt}] }
@@ -38,15 +39,23 @@ import {
   findBlogQualificationRun,
   isStrictBlogContentPr,
 } from './lib/blog-publish-latency.mjs';
+import {
+  ciGateSnapshot,
+  readCiGateEvidence,
+  summarizeCiGateEvidence,
+} from './lib/ci-gate-timing.mjs';
 import { ciRoundsMetrics, flattenCiRounds } from './lib/ci-rounds.mjs';
 import { formatBiomeJson } from './lib/format-biome-json.mjs';
 import { digestBlock } from './lib/merge-queue-speed.mjs';
 import {
   appendDailyHistory,
   buildGistSloBlock,
-  ciWalltimeByEvent,
+  doraGistBlock,
+  doraMetrics,
   evaluateShippingSlo,
+  flattenDora,
   flattenMetrics,
+  lanesFlowBlock,
   leadTimeByLane,
   leadTimeByProvider,
   mergeQueueStats,
@@ -435,6 +444,8 @@ export function buildReport(
     stageManifest = null,
     ciCapacity = null,
     mergeQueueSpeed = null,
+    lanesView = null,
+    previousCiGateTiming = null,
   } = {}
 ) {
   const nowMs = typeof now === 'number' ? now : Date.parse(now);
@@ -442,11 +453,7 @@ export function buildReport(
   const sinceMs = nowMs - weekMs;
 
   const prRuns = [...(raw.runs?.pull_request ?? [])];
-  const ci = ciWalltimeByEvent(
-    [...prRuns, ...(raw.runs?.merge_group ?? [])],
-    sinceMs,
-    nowMs
-  );
+  const ci = summarizeCiGateEvidence(raw.ciGateEvidence, nowMs);
   const merged = raw.mergedPrs ?? [];
   // Unified "production verified" event stream: GitHub Deployments (when a
   // provider emits them), Production Controller `Production Verified` job
@@ -494,6 +501,26 @@ export function buildReport(
         ),
     }),
   };
+  // DORA keys from the controller runs the stage collector already reads.
+  // A snapshot taken before unsuccessful runs were kept would undercount
+  // failed deployments, so it reads as not measured rather than as healthy.
+  const controllers = raw.stages?.controllers;
+  metrics.dora = doraMetrics({
+    runs: controllers
+      ? [
+          ...(controllers.production ?? []),
+          ...(controllers.productionUnsuccessful ?? []),
+        ]
+      : undefined,
+    mergedPrs: merged,
+    sinceMs,
+    nowMs,
+    controllerSource: raw.stages?.sources?.['github-controller'] ?? null,
+    missing:
+      controllers && !Array.isArray(controllers.productionUnsuccessful)
+        ? 'unsuccessful production controller runs not collected'
+        : null,
+  });
   const blogPublishLatency = buildBlogPublishLatency(raw);
 
   // Top offenders for regression-issue bodies: slowest PRs by lead time and
@@ -510,15 +537,9 @@ export function buildReport(
     .filter(r => Number.isFinite(r.leadTimeSeconds) && r.leadTimeSeconds > 0)
     .sort((a, b) => b.leadTimeSeconds - a.leadTimeSeconds)
     .slice(0, 5);
-  const slowRuns = prRuns
-    .filter(r => r.status === 'completed')
-    .map(r => ({
-      id: r.id,
-      head_branch: r.head_branch,
-      conclusion: r.conclusion,
-      seconds: (Date.parse(r.updated_at) - Date.parse(r.created_at)) / 1000,
-    }))
-    .filter(r => Number.isFinite(r.seconds) && r.seconds > 0)
+  const slowRuns = Object.values(ci)
+    .flatMap(cohort => cohort.successful)
+    .map(row => ({ id: row.runId, ...row }))
     .sort((a, b) => b.seconds - a.seconds)
     .slice(0, 5);
 
@@ -526,6 +547,7 @@ export function buildReport(
   const flat = {
     ...flattenMetrics(metrics),
     ...flattenCiRounds(metrics.ciRounds),
+    ...flattenDora(metrics.dora),
   };
   // When no verification evidence was collected at all, a 0 is a collector
   // gap, not a throughput signal — null the derived keys so the evaluator
@@ -549,9 +571,6 @@ export function buildReport(
     from7d: countMergedBetween(sinceMs, nowMs) / (7 * 24),
   };
 
-  const evaluation = evaluateShippingSlo(flat, baseline, {});
-  const gistSlo = buildGistSloBlock(flat, evaluation, { now: nowMs });
-  gistSlo.leadTimeByProvider = metrics.leadTimeByProvider;
   const stageTimings =
     raw.stages && stageManifest
       ? computeStageTimings(
@@ -572,17 +591,25 @@ export function buildReport(
     if (lag?.['7d']?.n) {
       metrics.productionLag.lag = lag['7d'];
       flat['production_lag.merged_to_verified.p95'] = lag['7d'].p95;
-      const refreshed = evaluateShippingSlo(flat, baseline, {});
-      evaluation.regressions = refreshed.regressions;
-      evaluation.tightenCandidates = refreshed.tightenCandidates;
-      evaluation.flatStall = refreshed.flatStall;
-      Object.assign(
-        gistSlo,
-        buildGistSloBlock(flat, evaluation, { now: nowMs })
-      );
     }
-    gistSlo.stages = buildStageSummary(stageTimings);
   }
+  const gateTiming = ciGateSnapshot(
+    ci,
+    raw.ciGateEvidence,
+    previousCiGateTiming,
+    nowMs
+  );
+  const evaluation = evaluateShippingSlo(flat, baseline, {
+    ciGateHistory: gateTiming.daily.slice(0, -1),
+  });
+  const gistSlo = buildGistSloBlock(flat, evaluation, { now: nowMs });
+  gistSlo.ciGateTiming = gateTiming;
+  gistSlo.leadTimeByProvider = metrics.leadTimeByProvider;
+  if (stageTimings) gistSlo.stages = buildStageSummary(stageTimings);
+  // DORA four keys and per-lane flow in the one central snapshot. The lanes
+  // block is filled from the lanes doctor's view (work_lane.py `view()`).
+  gistSlo.dora = doraGistBlock(metrics.dora, flat);
+  gistSlo.lanes = lanesFlowBlock(lanesView, { nowMs });
   // Escape tracking (scripts/review-escapes.mjs) writes its snapshot before
   // this report runs; Summer reads it through the same lanes status feed.
   if (existsSync(ESCAPES_PATH)) {
@@ -660,10 +687,21 @@ export function buildReport(
       timelines: Object.keys(raw.timelines ?? {}).length,
       deployments: (raw.deployments ?? []).length,
       productionVerifications: (raw.productionVerifications ?? []).length,
+      productionControllerRuns: controllers
+        ? (controllers.production?.length ?? 0) +
+          (controllers.productionUnsuccessful?.length ?? 0)
+        : null,
       blogContentPrs: blogPublishLatency.sampleCount,
     },
     offenders: { slowestPrs: leadTimeRows, slowestCiRuns: slowRuns },
   };
+}
+
+async function collectCurrentRaw(options) {
+  const raw = collectRaw(options);
+  const token = process.env.STAGE_GH_TOKEN || process.env.GH_TOKEN;
+  const ciGateEvidence = await readCiGateEvidence(raw.runs, repo(), token);
+  return { ...raw, ciGateEvidence };
 }
 
 export async function main(args = process.argv.slice(2)) {
@@ -731,7 +769,7 @@ export async function main(args = process.argv.slice(2)) {
       .map(s => s.trim())
       .filter(Boolean);
     const days = Number(argValue(args, '--days', '21'));
-    const raw = collectRaw({ workflows, days });
+    const raw = await collectCurrentRaw({ workflows, days });
     const out = argValue(args, '--out', null);
     if (out) writeFileSync(out, JSON.stringify(raw, null, 2));
     else process.stdout.write(JSON.stringify(raw, null, 2));
@@ -747,7 +785,7 @@ export async function main(args = process.argv.slice(2)) {
   const inputPath = argValue(args, '--input', null);
   const raw = inputPath
     ? JSON.parse(readFileSync(inputPath, 'utf8'))
-    : collectRaw({
+    : await collectCurrentRaw({
         workflows: String(argValue(args, '--workflows', DEFAULT_WORKFLOWS))
           .split(',')
           .map(s => s.trim())
@@ -799,10 +837,33 @@ export async function main(args = process.argv.slice(2)) {
   } catch {
     // No merge-queue speed sample this run; the SLO report is unaffected.
   }
+  // Lanes doctor view ({team: {at, lanes}}), written where the doctor runs.
+  let lanesView = null;
+  const lanesPath = argValue(args, '--lanes', null);
+  if (lanesPath)
+    try {
+      lanesView = JSON.parse(readFileSync(lanesPath, 'utf8'));
+    } catch (error) {
+      console.error(
+        `[shipping-slo] warn: lanes view unreadable: ${error.message}`
+      );
+    }
+  let previousCiGateTiming = null;
+  if (!inputPath && existsSync(LATEST_PATH)) {
+    try {
+      previousCiGateTiming = JSON.parse(
+        readFileSync(LATEST_PATH, 'utf8')
+      ).ciGateTiming;
+    } catch {
+      // A missing or unreadable previous snapshot cannot establish a streak.
+    }
+  }
   const report = buildReport(raw, baseline, {
     stageManifest,
     ciCapacity,
     mergeQueueSpeed,
+    lanesView,
+    previousCiGateTiming,
   });
 
   let baselineDoc = baseline;

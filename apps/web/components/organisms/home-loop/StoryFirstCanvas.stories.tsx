@@ -144,20 +144,3 @@ export const Bottleneck: Story = {
     inFlightHref: '/app/ov/shipping',
   },
 };
-
-export const Melting: Story = {
-  args: {
-    ...Bottleneck.args,
-    melting: true,
-    answer: (
-      <div className='text-sm text-secondary-token'>
-        <span className='text-2xs font-medium tracking-wide text-tertiary-token'>
-          You
-        </span>
-        <p className='mt-1 text-primary-token'>
-          Why is checkout blocking revenue?
-        </p>
-      </div>
-    ),
-  },
-};

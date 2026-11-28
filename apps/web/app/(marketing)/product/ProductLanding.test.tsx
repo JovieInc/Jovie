@@ -219,6 +219,7 @@ describe('ProductLanding explore links', () => {
       '/product/command-palette',
       '/product/release-scheduling',
       '/solutions/artists',
+      '/instant-merch',
       '/launch',
       '/compare',
       '/alternatives',

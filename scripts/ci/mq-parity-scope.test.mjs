@@ -12,11 +12,13 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
+import { selectLanes } from '../ci-fast-lanes.mjs';
+import { parseSkipLaneIds } from '../lib/ci-fast-skip-lanes.mjs';
 import { selectMqParityScope } from './mq-parity-scope.mjs';
 
 const { load } = createRequire(import.meta.url)('js-yaml');
 
-test('CLI git diff uses --no-renames so rename-out of the graph still selects typecheck', () => {
+test('CLI git diff uses --no-renames so rename-out of the graph still selects twins', () => {
   const source = readFileSync(
     new URL('./mq-parity-scope.mjs', import.meta.url),
     'utf8'
@@ -24,12 +26,21 @@ test('CLI git diff uses --no-renames so rename-out of the graph still selects ty
   assert.match(source, /\['diff', '--no-renames', '--name-only', '-z'/);
 });
 
-test('docs and unrelated native changes allocate no typecheck parity work', () => {
-  assert.deepEqual(
-    selectMqParityScope(['docs/guide.md', 'apps/ios/Jovie/App.swift']),
-    { typecheck: false }
-  );
-  assert.deepEqual(selectMqParityScope([]), { typecheck: false });
+test('docs-only changes allocate no MQ parity work', () => {
+  assert.deepEqual(selectMqParityScope(['docs/guide.md']), {
+    typecheck: false,
+    remaining: false,
+  });
+  assert.deepEqual(selectMqParityScope([]), {
+    typecheck: false,
+    remaining: false,
+  });
+});
+
+test('iOS sources skip typecheck but select remaining (ios-fast)', () => {
+  const scope = selectMqParityScope(['apps/ios/Jovie/App.swift']);
+  assert.equal(scope.typecheck, false);
+  assert.equal(scope.remaining, true);
 });
 
 test('TypeScript and typecheck graph inputs select the typecheck twin', () => {
@@ -42,17 +53,93 @@ test('TypeScript and typecheck graph inputs select the typecheck twin', () => {
   );
 });
 
-test('source-validation wires the typecheck twin onto Affected Unit Tests', () => {
+test('remaining lane inputs select the remaining twin', () => {
+  assert.equal(selectMqParityScope(['apps/web/lib/foo.ts']).remaining, true);
+  assert.equal(
+    selectMqParityScope(['.github/workflows/ci.yml']).remaining,
+    true
+  );
+  assert.equal(selectMqParityScope(['DESIGN.md']).remaining, true);
+  assert.equal(selectMqParityScope(['docs/guide.md']).remaining, false);
+  assert.equal(
+    selectMqParityScope(['scripts/ci-fast-lanes.mjs']).remaining,
+    true
+  );
+});
+
+test('source-validation wires typecheck and remaining twins onto Affected Unit Tests', () => {
   const root = resolve(import.meta.dirname, '../..');
   const workflow = load(
     readFileSync(join(root, '.github/workflows/source-validation.yml'), 'utf8')
   );
   const steps = workflow.jobs.unit.steps;
-  const twin = steps.find(step => step.name === 'Run typecheck lane parity');
-  assert.ok(twin, 'typecheck lane parity step missing');
-  assert.equal(twin.run, 'node scripts/ci-fast-lanes.mjs');
-  assert.equal(twin.env.CI_FAST_LANE_GROUP, 'typecheck');
-  assert.match(String(twin.if), /mq-parity\.outputs\.typecheck == 'true'/);
+  const typecheck = steps.find(
+    step => step.name === 'Run typecheck lane parity'
+  );
+  assert.ok(typecheck, 'typecheck lane parity step missing');
+  assert.equal(typecheck.run, 'node scripts/ci-fast-lanes.mjs');
+  assert.equal(typecheck.env.CI_FAST_LANE_GROUP, 'typecheck');
+  assert.match(String(typecheck.if), /mq-parity\.outputs\.typecheck == 'true'/);
+
+  const remaining = steps.find(
+    step => step.name === 'Run remaining lane parity'
+  );
+  assert.ok(remaining, 'remaining lane parity step missing');
+  assert.equal(remaining.run, 'node scripts/ci-fast-lanes.mjs');
+  assert.equal(remaining.env.CI_FAST_LANE_GROUP, 'remaining');
+  assert.equal(remaining.env.CI_FAST_SKIP_STRUCTURAL, 'true');
+  assert.match(String(remaining.if), /mq-parity\.outputs\.remaining == 'true'/);
+  assert.match(String(remaining.if), /matrix\.shard == '1\/4'/);
+  const exclusions = parseSkipLaneIds(remaining.env.CI_FAST_SKIP_LANE_IDS);
+  assert.deepEqual([...exclusions], ['source-guards']);
+  const nativeLanes = selectLanes('remaining').map(lane => lane.id);
+  const sourceLanes = nativeLanes.filter(lane => !exclusions.has(lane));
+  // The same runner command still includes disk-read guards without the
+  // source-step override; never change the native remaining group.
+  assert.ok(nativeLanes.includes('source-guards'));
+  assert.deepEqual(
+    sourceLanes,
+    nativeLanes.filter(lane => lane !== 'source-guards')
+  );
+  const guard = steps.find(
+    step =>
+      step.name === 'Validate disk-read source contracts from trusted base'
+  );
+  assert.ok(guard);
+  assert.equal(
+    guard.if,
+    "matrix.shard == '4/4' && steps.reuse.outputs.reuse != 'true'"
+  );
+  assert.equal(guard.env.CI_FAST_SKIP_LANE_IDS, undefined);
+  assert.equal(workflow.env?.CI_FAST_SKIP_LANE_IDS, undefined);
+  assert.equal(workflow.jobs.unit.env?.CI_FAST_SKIP_LANE_IDS, undefined);
+  const ready = workflow.jobs.ready;
+  const fanIn = ready.steps.find(
+    step => step.name === 'Require every source proof'
+  );
+  assert.ok(fanIn);
+  assert.equal(ready.needs.filter(job => job === 'unit').length, 1);
+  for (const unitResult of ['success', 'failure', 'skipped', 'cancelled', '']) {
+    const results = ready.needs
+      .map(job => (job === 'unit' ? unitResult : 'success'))
+      .join(',');
+    // Execute the shipped fan-in with all other checks green. A failed or
+    // absent required unit outcome can never inherit a passing parity result.
+    const result = spawnSync('/bin/bash', ['-c', fanIn.run], {
+      env: { RESULTS: results },
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, unitResult === 'success' ? 0 : 1, unitResult);
+  }
+  // Source parity has no published native lane receipt. Its only artifact
+  // within the unit matrix is the nonblocking retry observation.
+  const uploads = steps.filter(step =>
+    step.uses?.startsWith('actions/upload-artifact@')
+  );
+  assert.deepEqual(
+    uploads.map(step => step.with.path),
+    ['apps/web/test-report.*.flaky.json']
+  );
 });
 
 test('older PR heads load new parity tools from trusted base without dirtying the source checkout', () => {
@@ -113,6 +200,7 @@ test('older PR heads load new parity tools from trusted base without dirtying th
     );
     assert.equal(scope.status, 0, scope.stdout + scope.stderr);
     assert.match(scope.stdout, /typecheck=false/);
+    assert.match(scope.stdout, /remaining=false/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -165,12 +253,13 @@ test('older PR heads skip the twin when base also lacks MQ parity tools', () => 
     );
     assert.equal(scope.status, 0, scope.stdout + scope.stderr);
     assert.match(scope.stdout, /typecheck=false/);
+    assert.match(scope.stdout, /remaining=false/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('queue parity policy maps ci-fast-typecheck to the source twin', () => {
+test('queue parity policy maps ci-fast typecheck and remaining shards to the source twin', () => {
   const policy = JSON.parse(
     readFileSync(
       new URL('../../.github/merge-queue-parity.json', import.meta.url),
@@ -181,8 +270,20 @@ test('queue parity policy maps ci-fast-typecheck to the source twin', () => {
     pr: 'source-validation.yml#unit',
     command: 'node scripts/ci-fast-lanes.mjs',
   });
+  assert.deepEqual(policy.parity['ci.yml#ci-fast-remaining-shards'], {
+    pr: 'source-validation.yml#unit',
+    command: 'node scripts/ci-fast-lanes.mjs',
+  });
   assert.equal(
     policy.exemptions.some(e => e.job === 'ci.yml#ci-fast-typecheck'),
     false
   );
+  assert.equal(
+    policy.exemptions.some(e => e.job === 'ci.yml#ci-fast-remaining-shards'),
+    false
+  );
+  const remainingFanIn = policy.exemptions.find(
+    e => e.job === 'ci.yml#ci-fast-remaining'
+  );
+  assert.equal(remainingFanIn?.kind, 'combined-head');
 });

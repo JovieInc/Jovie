@@ -506,6 +506,8 @@ const nextConfig = {
       },
       // Keep legacy Needs You links opening the canonical Inbox.
       { source: '/app/ov/needs-you', destination: '/app/ov/inbox' },
+      // Fleet lives at Operations; /app/ov/fleet has no route of its own.
+      { source: '/app/ov/fleet', destination: '/app/ov/operations' },
       { source: '/app/admin/needs-you', destination: '/app/ov/inbox' },
       {
         source: '/app/admin/:path*',

@@ -19,8 +19,9 @@ describe('DspPresenceSidebar remove platform source contract', () => {
   });
 
   it('only offers remove for linked (non-suggested) matches', () => {
-    expect(source).toContain('isLinked');
-    expect(source).toContain('!isSuggested');
-    expect(source).toContain('SuggestedMatchActions');
+    expect(source).toContain('profileId && (isSuggested || isLinked)');
+    expect(source).toMatch(
+      /\{isSuggested \? \(\s*<SuggestedMatchActions[\s\S]*?\) : \(\s*<RemovePlatformAction/
+    );
   });
 });

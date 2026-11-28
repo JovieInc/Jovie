@@ -36,9 +36,10 @@ import gh_app_token  # noqa: E402  (canonical GitHub read-budget floor)
 import merge_evidence  # noqa: E402  (shared complete merge-window reader)
 import file_overlap  # noqa: E402
 import fleet_ledger  # noqa: E402  (claim ledger view, ready-work recorder)
+import factory_visibility  # noqa: E402  (factory adoption evidence projection)
 import factory_intake  # noqa: E402  (fleet-improvement signals -> agent-ready issues)
 import factory_signals  # noqa: E402  (recurring-alarm adapter)
-import linear_sync, urgent_sla  # noqa: E402  (local Linear mirror and outbox status; Urgent SLA)
+import linear_sync, urgent_sla, work_lane  # noqa: E402  (local Linear mirror and outbox status; Urgent SLA; per-lane measure)
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
 from atomic_state import atomic_write_text  # noqa: E402
@@ -56,8 +57,10 @@ import stage_events  # noqa: E402  (jovie-stage-event/v1 rows for the stage coll
 import ledger_archive  # noqa: E402  (bounded runs/ledger.jsonl)
 import throughput_sentinel  # noqa: E402
 import health_checks  # noqa: E402  (source certification and release health providers)
+import doctor_sweep_hold  # noqa: E402
 import credentials_spend  # noqa: E402  (shared redacted Linear app metadata)
 import integration_probes  # noqa: E402  (synthetic probes of the Gem integrations fleet work depends on)
+import repo_headroom  # noqa: E402  (tracked-bytes headroom of origin/main)
 
 COOL_OFF_S = 6 * 3600
 # High (P1), not Urgent, though under an Urgent prefix: a stale build is a lag signal, not an outage.
@@ -237,7 +240,6 @@ OUTCOME_OWED_MAX_S = 24 * 3600
 OUTCOME_QUEUE_SILENT_S = 2 * 3600
 AUTOMATION_LIVENESS_WORKFLOW = "automation-liveness.yml"
 AUTOMATION_LIVENESS_MAX_S = 60 * 60
-AUTOMATION_LIVENESS_TTL_S = 600
 
 
 def _iso_epoch(value) -> float | None:
@@ -366,27 +368,6 @@ def automation_watch(rows: list[dict] | None, host_name: str, now: float, home: 
     return {"known": True, "silent": silent}
 
 
-def automation_liveness(lane, now: float) -> dict:
-    """Latest *successful* run of the hosted automation-liveness workflow (Gem watches it back).
-
-    It follows Production Continuity Guard and runs its job only every 5th trigger, so most
-    runs are job-skipped: the latest run of any conclusion would make a dead check look alive."""
-    def fetch():
-        result = lane.sh(["gh", "api", f"repos/{lane.REPO_SLUG}/actions/workflows/{AUTOMATION_LIVENESS_WORKFLOW}"
-                          "/runs?branch=main&status=success&per_page=1",
-                          "--jq", "[.workflow_runs[0].created_at // \"\"]"], timeout=30)
-        if result.returncode != 0:
-            text = f"{result.stdout or ''} {result.stderr or ''}"
-            return {"installed": False} if "404" in text or "Not Found" in text else None
-        try:
-            created = json.loads(result.stdout)[0]
-        except (ValueError, IndexError, TypeError):
-            return None
-        return {"installed": True, "lastRunAt": created or None}
-    found = lane.shared("automation-liveness-success", AUTOMATION_LIVENESS_TTL_S, fetch)
-    return found if isinstance(found, dict) else {"installed": None}
-
-
 def automation_observation(host, lane, now: float) -> dict:
     """Registry watch for observe(); fixtures and self-tests read no registry or GitHub."""
     if os.environ.get("LANES_SELFTEST") or os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
@@ -396,8 +377,20 @@ def automation_observation(host, lane, now: float) -> dict:
         watch = automation_watch(automation_registry(host.repo), lane.HOST, now)
     except Exception as error:  # observability never takes the doctor down
         watch = {"known": False, "silent": {}, "error": type(error).__name__}
+    # gem:waste-loop: capacity SHARE historically omitted waste.py (#23933). Heal from
+    # origin/main into SHARE and re-check so silence clears inside the same observe.
+    if "gem:waste-loop" in (watch.get("silent") or {}):
+        try:
+            import waste_loop_heal
+            heal = waste_loop_heal.heal(host)
+            watch["wasteLoopHeal"] = heal
+            if heal.get("status") == "ok":
+                watch = automation_watch(automation_registry(host.repo), lane.HOST, now)
+                watch["wasteLoopHeal"] = heal
+        except Exception as error:  # noqa: BLE001
+            watch["wasteLoopHeal"] = {"status": "error", "error": type(error).__name__}
     try:
-        liveness = automation_liveness(lane, now)
+        liveness = health_checks.automation_liveness(lane, now)
     except Exception as error:
         liveness = {"installed": None, "error": type(error).__name__}
     try:
@@ -635,6 +628,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "rejectedIssues": dict(sorted(rejected_issues.items())[:20]),
         "designGate": design_census,
         "fileOverlap": file_overlap.doctor_view(state),
+        "ycCorpusState": yc_corpus_observation(state),
         **automation_observation(host, lane, now),
         "outcomeQueue": read_json(state / "outcome-queue.json", {}),
         "integrationProbes": integration_probes.observe(state, lane.HOST, now),
@@ -645,6 +639,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
             fetch_remote=not os.environ.get("LANES_SELFTEST")),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": {**linear_sync.status(state, now), "urgentSla": urgent_sla.view(state)},
+        # Per-lane queue age, throughput and blocked count (Tim 2026-11-22): a stuck lane shows up here.
+        "laneMetrics": work_lane.view(state),
         "publicFeed": read_json(state / "public-feed-sizes.json", {}),
         "installLag": {key: read_json(state / "update.json", {}).get(key) for key in ("behindS", "behindCommit", "error", "at")},
         "linearAppCredential": _linear_app_credential(lane),
@@ -659,8 +655,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "mergedWindow": ({k: v for k, v in merged_window.items() if k != "prs"} if merged_window else None),
         "diskFreePct": disk_pct,
         "diskMounts": disk_mounts,
-        "sweepSecretHeld": [row for row in (read_json(state / "worktree-sweep.json", {}).get("secretHeld") or [])
-                            if isinstance(row, dict) and row.get("path") and Path(row["path"]).exists()],
+        "repoHeadroom": repo_headroom.measure(host.repo) if getattr(host, "repo", None) else None,
+        **doctor_sweep_hold.observe(state),
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
         "heldByReason": pr_events.by_reason(held, open_numbers),
         "reconcile": read_json(state / "reconcile.json", {}),
@@ -1152,6 +1148,18 @@ INSTALL_LAG_ALERT_S = 90 * 60
 # or backing off the cause is a defect, not a wait, so it is critical and owned (2026-10-26 to 10-29:
 # Gem sat three days on one release while `install-lag` stayed a degraded alert nobody acted on).
 INSTALL_LAG_P0_S = 2 * 3600
+# The YC corpus refresh is daily; three days without a finished run is a broken loop (JOV-14457).
+YC_CORPUS_STALE_S = 50 * 3600  # a daily refresh that missed two runs
+
+
+def yc_corpus_observation(state: Path) -> dict | None:
+    """The YC refresher's own state file, so a tick that never reached it still shows its age."""
+    data = read_json(state / "yc-corpus.json", None)
+    if not isinstance(data, dict):
+        return None
+    last = data.get("lastRun") if isinstance(data.get("lastRun"), dict) else {}
+    return {"lastRun": {"status": last.get("status"), "at": last.get("at"),
+                        "failures": list(last.get("failures") or [])[:5]}}
 
 
 def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
@@ -1160,6 +1168,20 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     tick = obs.get("tick") or {}
     if tick.get("error"):
         alerts["tick-error"] = f"last dispatch tick failed: {tick['error'][:140]}"
+    # The tick reaches the YC refresher last, so a held tick (disk admission, code-prep error)
+    # skips it; the refresher's own state file still shows how long it has been (JOV-14457).
+    yc, yc_file = tick.get("ycCorpus") or {}, obs.get("ycCorpusState") or {}
+    yc_last = yc.get("lastRun") or yc_file.get("lastRun") or {}
+    yc_broken = [failure for failure in yc_last.get("failures") or []  # page fetch misses retry next run
+                 if failure.startswith(("discovery:", "spawn:")) or "gbrain" in failure]
+    yc_watched = yc.get("status") in {"current", "scheduled"} or (not yc and bool(yc_file))
+    yc_age = age_s(yc_last.get("at"), obs["now"]) if yc_watched else None
+    if tick.get("ycCorpusError") or yc_broken or (yc_age or 0) > YC_CORPUS_STALE_S:
+        held = tick.get("admissionDenied") or tick.get("error")
+        alerts["yc-corpus-refresh"] = ("YC knowledge refresh into GBrain is failing: " +
+                                       (tick.get("ycCorpusError") or "; ".join(yc_broken) or
+                                        f"last run {int(yc_age // 3600)}h ago" +
+                                        (f", skipped while the tick is held ({str(held)[:80]})" if not yc and held else "")))[:200]
     if tick.get("uncleanPreviousRun"):
         # A run-intent marker survived its own tick: that tick was killed (crash, SIGKILL,
         # power loss). Its bounded recovery already refunded stranded fix-attempt charges.
@@ -1242,7 +1264,8 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                 continue
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
-    alerts.update({**linear_sync.alerts(obs.get("linearSync") or {}), **urgent_sla.alerts(obs.get("linearSync") or {})})
+    alerts.update({**linear_sync.alerts(obs.get("linearSync") or {}), **urgent_sla.alerts(obs.get("linearSync") or {}),
+                   **work_lane.alerts(obs.get("laneMetrics") or {})})
     gaps = alert_issue_gaps(dict(alerts), ((previous or {}).get("issues") or {}), time.time())
     if gaps:
         shown = "; ".join(f"{key} ({why[:80]})" for key, why in list(gaps.items())[:4])
@@ -1423,16 +1446,15 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                                           "infrastructure, not the PRs, is exhausting them")
     # No design-brief-stale alert: since 2026-10-11 no issue is held for a brief (the
     # claiming run writes it), so a held brief is no longer a condition to watch.
-    for row in obs.get("sweepSecretHeld") or []:
-        # The public repo's refs/jovie-preserved/* must never carry a secret; the checkout is kept.
-        alerts[f"sweep-snapshot-secret:{row.get('name')}"] = (
-            f"worktree sweep did not publish a snapshot of {row.get('path')}: {row.get('reason')}; "
-            "the checkout is kept untouched until its owner reviews it")
+    if hold := doctor_sweep_hold.alert(obs, previous):
+        alerts[doctor_sweep_hold.KEY] = hold
     if obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_CRIT_PCT:
         alerts["disk-critical"] = (f"lanes disk {obs['diskFreePct']}% free ({_lowest_mount(obs)}) even after the disk-pressure "
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
     elif obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_MIN_PCT:
         alerts["disk-low"] = f"lanes disk {obs['diskFreePct']}% free ({_lowest_mount(obs)}); worktrees and installs will start failing"
+    if headroom_line := repo_headroom.alert_line(obs.get("repoHeadroom")):
+        alerts["repo-headroom-low"] = headroom_line
     held_since = (previous or {}).get("diskHeldSince")
     if disk_held(obs) and isinstance(held_since, (int, float)) and obs["now"] - held_since >= DISK_HELD_S:
         top = obs.get("diskTop") or (previous or {}).get("diskTop") or []
@@ -1525,7 +1547,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
 
     Evidence timestamps use the observation COMPLETION stamp (obs['observationCompletedAt'])
     so a report's freshness is its delivery lag, not the pass's own runtime."""
-    prior = previous.get("conditions") or {}
+    prior = doctor_sweep_hold.without_legacy(previous.get("conditions") or {})
     receipts: dict[str, dict] = {}
     now = float(obs["now"])
     # Report freshness measures delivery lag from completed observation.
@@ -1546,6 +1568,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "delivery-stalled": "investigate-repair-and-verify-native-delivery",
         "remediation-delivery": "repair-and-read-back-existing-event-delivery",
         "install-lag-refused": "repair-updater-refusal-and-install-current-main",
+        "yc-corpus-refresh": "repair-yc-corpus-refresh-and-verify-gbrain-read-back",
     }
     resources = {
         "linear-down": ["linear", "pool"],
@@ -1556,6 +1579,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "no-landing": ["shipping-throughput"],
         "delivery-stalled": ["local-useful-execution", "native-merge", "deployed-verification"],
         "bottleneck:merge-queue": ["merge-queue", "lane-slots"],
+        "yc-corpus-refresh": ["yc-corpus", "gbrain"],
     }
     for key, evidence in alerts.items():
         old = prior.get(key) or {}
@@ -1992,10 +2016,14 @@ def alert_issue_gaps(alerts: dict, issues: dict, now: float, grace_s: int = ALER
 
 
 def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, now: float,
-              conditions: dict[str, dict] | None = None) -> dict:
+              conditions: dict[str, dict] | None = None, *, sweep_delivery=None) -> dict:
     """Carry issue ids across ticks; acknowledge remote transitions before advancing receipts."""
-    issues = {key: dict(entry) for key, entry in previous.get("issues", {}).items()}
+    alerts = doctor_sweep_hold.without_legacy(alerts)
+    issues = {key: dict(entry) for key, entry in doctor_sweep_hold.without_legacy(previous.get("issues", {})).items()}
+    sweep_key = doctor_sweep_hold.KEY
     for key, text in alerts.items():
+        if key == sweep_key:
+            continue
         entry = issues.get(key)
         if entry and entry.get("closedAt") is None and entry.get("id") and not entry.get("pendingAction"):
             continue  # still open
@@ -2031,14 +2059,18 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
             if contradict:
                 contradict(conditions[key])
     for key, entry in issues.items():
-        if key not in alerts and (entry.get("closedAt") is None or entry.get("pendingAction")):
+        if key != sweep_key and key not in alerts and (entry.get("closedAt") is None or entry.get("pendingAction")):
             if not entry.get("id") or (tracker and tracker.close(entry["id"], key) is True):
                 entry["closedAt"] = now
                 entry.pop("pendingAction", None)
             else:
                 entry["pendingAction"] = "close"
+    # Sweep status is informational; never delay ordinary create/reopen/close side effects.
+    sweep_entry = doctor_sweep_hold.reconcile(alerts.get(sweep_key), issues.get(sweep_key), now, sweep_delivery)
+    if sweep_entry:
+        issues[sweep_key] = sweep_entry
     receipts = {}
-    for key, event in (conditions or {}).items():
+    for key, event in doctor_sweep_hold.without_legacy(conditions or {}).items():
         prior_event = (previous.get("conditions") or {}).get(key) or {}
         if (not event.get("writingReview") and prior_event.get("writingReview")
                 and prior_event.get("idempotencyKey") == event.get("idempotencyKey")):
@@ -2504,7 +2536,7 @@ def locked_doctor_write(state: Path, write) -> None:
 
 def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     path = host.state / "doctor.json"
-    previous = read_json(path, {})
+    previous = doctor_sweep_hold.migrate(read_json(path, {}))
     rotation = None
     if not os.environ.get("LANES_SELFTEST") and ledger_archive.due(host.state, time.time()):
         try:
@@ -2545,7 +2577,11 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
             tracker = Tracker(lane.Linear(host.linear_env), lane.HOST)
         except Exception:
             tracker = None
-    result = reconcile(alerts, previous, tracker, obs["now"], conditions)
+    linear = getattr(tracker, "linear", None)
+    def sweep_delivery(text):
+        return doctor_sweep_hold.note(linear, lane.HOST, host.state, time.time(), text,
+                                      doctor_sweep_hold.names(obs.get("sweepSecretHeld")))
+    result = reconcile(alerts, previous, tracker, obs["now"], conditions, sweep_delivery=sweep_delivery)
     try:  # incident stage events (detected, filed, cleared); a lost row only drops a sample
         stage_events.journal_incidents(host.state, previous, result, lane.HOST, obs["now"])
     except Exception:  # noqa: BLE001
@@ -2556,7 +2592,9 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         except Exception:  # an adapter fault never fails the doctor
             pass
     if getattr(tracker, "linear", None) is not None:
-        result["factoryIntake"] = factory_intake.run_pass(host.state, tracker.linear)
+        previous_adoption = (previous.get("factoryIntake") or {}).get("adoption") or ()
+        result["factoryIntake"] = factory_intake.run_pass(
+            host.state, tracker.linear, previous_adoption=previous_adoption, now=obs["now"])
     result["poolEmptySince"] = previous["poolEmptySince"]
     result["admissionRepairSince"] = previous.get("admissionRepairSince")
     for key in ("diskHeldSince", "diskTop", "diskTopAt"):
@@ -2585,6 +2623,7 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
             feed = status_feed(host, lane, obs, alerts, obs.get("tick") or {}, previous, result["conditions"])
             result["idleQualifiedSince"] = feed.pop("_idleQualifiedSince", {})
             result["capacity"] = feed["capacity"]
+            feed["factoryIntake"] = factory_visibility.public_view(result.get("factoryIntake"))
             result["statusFeed"] = publish_status(host, lane, feed)
         except Exception as error:  # a broken feed never blocks the doctor
             result["statusFeedError"] = f"{type(error).__name__}: {error}"[:120]

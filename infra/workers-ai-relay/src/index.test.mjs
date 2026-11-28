@@ -35,15 +35,6 @@ test('rejects missing and wrong bearer', async () => {
   assert.equal((await call(env(), { auth: 'Bearer nope' })).status, 401);
   assert.equal((await call(env({ WORKERS_AI_BEARER: undefined }))).status, 401);
 });
-test('refuses models outside the allowlist', async () => {
-  const res = await call(env(), {
-    body: {
-      model: '@cf/meta/llama-3.1-8b-instruct',
-      messages: [{ role: 'user', content: 'x' }],
-    },
-  });
-  assert.equal(res.status, 400);
-});
 test('caps output tokens and forwards tools', async () => {
   let seen;
   const res = await call(

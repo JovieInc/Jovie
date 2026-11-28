@@ -5,6 +5,13 @@ import { OutreachKpis } from './OutreachKpis';
 
 const counts = { email: 24, dm: 9, manualReview: 3, total: 36 };
 
+function manualReviewIcon(container: HTMLElement) {
+  const card = screen
+    .getByText('Manual Review')
+    .closest('div[class*="rounded"]');
+  return (card ?? container).querySelector('svg');
+}
+
 describe('OutreachKpis', () => {
   it('renders the pipeline card with all four counts', async () => {
     const { container } = render(<OutreachKpis counts={counts} />);
@@ -33,5 +40,17 @@ describe('OutreachKpis', () => {
     );
     expect(screen.getAllByText('0')).toHaveLength(4);
     await expectNoA11yViolations(container);
+  });
+
+  it('flags Manual Review with the warning token only when items wait', () => {
+    const { container, rerender } = render(
+      <OutreachKpis counts={counts} embedded />
+    );
+    expect(manualReviewIcon(container)).toHaveClass('text-warning-text');
+
+    rerender(<OutreachKpis counts={{ ...counts, manualReview: 0 }} embedded />);
+    const icon = manualReviewIcon(container);
+    expect(icon).toHaveClass('text-tertiary-token');
+    expect(icon).not.toHaveClass('text-warning-text');
   });
 });

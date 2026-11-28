@@ -12,7 +12,7 @@ import {
   publicationPriority,
   recordPublication,
 } from './lib/pr-publication.mjs';
-import { wipGate } from './lib/pr-wip-gate.mjs';
+import { wipGate, withSessionMarker } from './lib/pr-wip-gate.mjs';
 import { isRepairPr } from './lib/preflight-changed.mjs';
 import { requiresWin } from './lib/wins-ledger.mjs';
 import { gate, PR_URL_PLACEHOLDER } from './pr-body-lint.mjs';
@@ -787,7 +787,7 @@ export async function main(
     const dir = mkdtempSync(path.join(tmpdir(), 'pr-open-create-'));
     try {
       const bodyFile = path.join(dir, 'body.md');
-      writeFileSync(bodyFile, body);
+      writeFileSync(bodyFile, withSessionMarker(body));
       const branchResult = git(['branch', '--show-current']);
       const branch = branchResult.stdout.trim();
       const local = git(['rev-parse', 'HEAD']);

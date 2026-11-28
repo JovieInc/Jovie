@@ -1,0 +1,158 @@
+{
+  "gates": {
+    "apps/web/components/features/dashboard/organisms/DashboardAudienceClient.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/SettingsSmsAccessSection.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/dashboard-theme-toggle/DashboardThemeToggle.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/FilterSubmenu.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseFilterDropdown.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/releases/cells/PopularityIcon.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/organisms/releases/cells/ReleaseCell.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/release-tasks/ReleaseTaskExplainerPopover.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/tasks/TaskDescriptionHelper.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/tasks/TaskListRow.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/tasks/TaskRowActionMenu.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/dashboard/youtube/YouTubeChannelPilotPanel.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/feedback/ErrorDialog.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/home/TestimonialCard.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ],
+    "apps/web/components/features/onboarding/OnboardingTurnstile.tsx": [
+      "ds-owner",
+      "tokens",
+      "states",
+      "tests",
+      "a11y",
+      "frontend-rules",
+      "forced-caps"
+    ]
+  },
+  "waivers": {
+    "apps/web/components/features/dashboard/organisms/dashboard-theme-toggle/DashboardThemeToggle.tsx": {
+      "empty": "The theme options come from the fixed THEME_OPTIONS constant, so the list is never empty."
+    },
+    "apps/web/components/features/dashboard/organisms/release-provider-matrix/FilterSubmenu.tsx": {
+      "permission-denied": "The submenu has no role or plan gating; the parent menu decides whether it renders through isVisible."
+    },
+    "apps/web/components/features/dashboard/organisms/releases/cells/ReleaseCell.tsx": {
+      "error": "A failed preview raises a toast from the player hook; the cell renders no inline error UI."
+    },
+    "apps/web/components/features/dashboard/youtube/YouTubeChannelPilotPanel.tsx": {
+      "offline": "The panel renders server-provided workspace data and never fetches; sync freshness shows through the last-sync copy."
+    },
+    "apps/web/components/features/onboarding/OnboardingTurnstile.tsx": {
+      "error": "Hard failures surface through onStateChange to the OnboardingShell toast; the widget host renders no inline error UI.",
+      "offline": "The host never fetches; Cloudflare's script owns network failure and reports it through onStateChange.",
+      "permission-denied": "The widget has no role or plan gating."
+    }
+  }
+}

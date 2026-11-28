@@ -3,6 +3,8 @@
  * CI Duration Ratchet CLI
  *
  * Usage:
+ *   node scripts/ci-duration-ratchet.mjs check-snapshot
+ *       Check fresh source and combined gate cohorts from the Shipping SLO snapshot.
  *   node scripts/ci-duration-ratchet.mjs validate
  *       Validate the baseline file structure. Exit 1 on error.
  *
@@ -28,6 +30,7 @@ import {
   formatDuration,
   validateDurationRatchet,
 } from './lib/ci-duration-ratchet.mjs';
+import { checkCiGateSnapshot } from './lib/ci-gate-timing.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
@@ -173,10 +176,41 @@ function runUpdate(args) {
   );
 }
 
+function runCheckSnapshot() {
+  const load = path =>
+    JSON.parse(readFileSync(resolve(REPO_ROOT, path), 'utf8'));
+  const cohorts = checkCiGateSnapshot(
+    load('docs/metrics/shipping-slo-latest.json'),
+    load('docs/metrics/shipping-slo-baseline.json')
+  );
+  console.log('## CI Duration Ratchet');
+  console.log('');
+  console.log('| Gate | p95 (s) | Ceiling (s) | Successful samples | Status |');
+  console.log('| --- | --- | --- | --- | --- |');
+  for (const cohort of cohorts) {
+    console.log(
+      `| ${cohort.label} | ${cohort.p95 ?? '—'} | ${cohort.ceiling ?? '—'} | ${cohort.sampleSize} | ${cohort.status} |`
+    );
+  }
+  for (const cohort of cohorts) {
+    const outcomes = Object.entries(cohort.outcomes)
+      .map(([outcome, count]) => `${outcome}: ${count}`)
+      .join(', ');
+    console.log(
+      `- ${cohort.label} evidence: ${cohort.coverage}, latest success ${cohort.lastSuccessAt ?? 'unavailable'}, ${outcomes || 'no recorded outcomes'}.`
+    );
+  }
+  if (cohorts.some(cohort => cohort.status !== 'within SLO'))
+    process.exitCode = 1;
+}
+
 function main() {
   const [, , command, ...args] = process.argv;
 
   switch (command) {
+    case 'check-snapshot':
+      runCheckSnapshot();
+      break;
     case 'validate':
       runValidate();
       break;
@@ -188,7 +222,7 @@ function main() {
       break;
     default:
       console.error(
-        'Usage: node scripts/ci-duration-ratchet.mjs <validate|check|update>'
+        'Usage: node scripts/ci-duration-ratchet.mjs <check-snapshot|validate|check|update>'
       );
       process.exitCode = 1;
   }

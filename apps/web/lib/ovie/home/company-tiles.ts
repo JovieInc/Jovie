@@ -6,7 +6,7 @@
  * stay "Not measured"; a stub never reads as a real zero.
  */
 
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, OVIE_METRIC_ANCHORS } from '@/constants/routes';
 import {
   HOME_LOOP_NOT_MEASURED,
   type HomeLoopTile,
@@ -77,7 +77,7 @@ export function buildCompanyTiles(input: {
   readonly goldenPath: readonly OvieGoldenPathRow[] | null;
 }): readonly OvieCompanyTile[] {
   const { overview, funnel, goldenPath } = input;
-  const ops = APP_ROUTES.ADMIN_OPERATIONS;
+  const ops = `${APP_ROUTES.ADMIN_OPS}#${OVIE_METRIC_ANCHORS.companyNow}`;
   const finance = overview?.financialDataAvailable ? overview : null;
   const revenue =
     overview?.financialDataAvailable || overview?.mrrAvailable

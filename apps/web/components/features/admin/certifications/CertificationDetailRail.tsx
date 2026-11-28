@@ -194,6 +194,7 @@ function HistorySection({ row }: { readonly row: OvieCertificationRow }) {
   return (
     <DrawerSection
       title='History'
+      collapsible
       defaultOpen={false}
       surface='plain'
       testId='certification-history'
@@ -230,7 +231,7 @@ function HistorySection({ row }: { readonly row: OvieCertificationRow }) {
 
 function SourceSection({ row }: { readonly row: OvieCertificationRow }) {
   return (
-    <DrawerSection title='Source' surface='plain' defaultOpen={false}>
+    <DrawerSection title='Source' surface='plain'>
       <div className='space-y-1'>
         <DrawerPropertyRow
           label='Subject'

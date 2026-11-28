@@ -291,7 +291,7 @@ const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
   ['tests/unit/ci/deploy-workflow.test.ts']
 );
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
-  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-source-guard-pool.test.mjs lib/__tests__/ci-source-guard-pool.path-gates.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs lib/__tests__/ci-fast-merge-queue-compatibility.test.mjs lib/__tests__/ci-fast-shard-fanin-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
+  'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-fast-public-openapi-guard.test.mjs lib/__tests__/ci-source-guard-pool.test.mjs lib/__tests__/ci-source-guard-pool.path-gates.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs lib/__tests__/ci-fast-merge-queue-compatibility.test.mjs lib/__tests__/ci-fast-shard-fanin-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.include=lib/ci-failure-excerpts.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
 const SUMMER_BRIDGE_COVERAGE_COMMAND =
   'pnpm --dir apps/web exec vitest run --config vitest.config.fast.mts app/api/internal/ovie/summer-bottleneck/route.test.ts --coverage --coverage.include=app/api/internal/ovie/summer-bottleneck/route.ts --coverage.include=lib/ovie/summer-admissions.ts --coverage.include=lib/ovie/summer-ci-audit.ts';
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -2349,15 +2349,28 @@ describe('source-read guard selection', () => {
     ],
     ['apps/web/tests/e2e/public-profile-smoke.spec.ts', ['anti-slop']],
     ['apps/ios/Jovie/App.swift', ['native-design-system', 'anti-slop']],
+    [
+      'packages/ui/atoms/button-contract.ts',
+      ['native-design-system', 'merge-group-unit-guards', 'anti-slop'],
+    ],
     // OutboundRail.tsx text-destructive ejected group pr-21458 (10-13).
     [
       'apps/web/components/features/admin/outbound/OutboundRail.tsx',
-      ['merge-group-unit-guards', 'static-revalidate-policy', 'anti-slop'],
+      [
+        'merge-group-unit-guards',
+        'static-revalidate-policy',
+        'art-direction',
+        'anti-slop',
+      ],
     ],
     ['packages/ui/src/button.tsx', ['merge-group-unit-guards', 'anti-slop']],
   ])('selects the guards that read %s on a PR', (path, guards) => {
     // PR-wide guards narrow inside their scripts.
-    expect(selected('pull_request', [path])).toEqual([
+    // art-direction (press-state) rides every UI path; it reads no source here.
+    const picked = selected('pull_request', [path]).filter(
+      id => id !== 'art-direction' || guards.includes(id)
+    );
+    expect(picked).toEqual([
       ...guards,
       ...apiGuard(path),
       ...domainGuard(path),
@@ -2378,33 +2391,6 @@ describe('source-read guard selection', () => {
         : []),
       'gate-weakening-detector',
     ]);
-  });
-
-  it.each([
-    'apps/web/app/api/agents/creator-lookup/route.ts',
-    'apps/web/app/api/agents/feedback/route.ts',
-    'apps/web/app/api/agents/profiles/route.ts',
-    'apps/web/app/api/music/mcp/route.ts',
-    'apps/web/app/api/v1/openapi.json/route.ts',
-    'apps/web/app/openapi.json/route.ts',
-    'apps/web/lib/api/public-agent-openapi.ts',
-    'apps/web/lib/api/v1/openapi.ts',
-    'apps/web/lib/music-resolver/public-schemas.ts',
-    'apps/web/tests/unit/api/v1/public-command-openapi.test.ts',
-    'apps/web/tests/utils/public-openapi.ts',
-    'packages/jovie-cli/src/client.ts',
-    'packages/jovie-cli/src/commands.ts',
-    'packages/jovie-cli/src/mcp.ts',
-  ])('runs public command/OpenAPI parity on PR changes to %s', path => {
-    expect(selected('pull_request', [path])).toContain(
-      'public-command-openapi'
-    );
-    expect(selected('merge_group', [path])).not.toContain(
-      'public-command-openapi'
-    );
-    expect(
-      SOURCE_GUARDS.find(guard => guard.id === 'public-command-openapi').command
-    ).toContain('public-command-openapi.test.ts');
   });
 
   it.each([
@@ -2468,6 +2454,7 @@ describe('source-read guard selection', () => {
       'capacity-forecast',
       'native-design-system',
       'artist-launch-contract',
+      'outcome-coverage',
       'privacy-input-route-trackers',
       'privacy-compliance',
       'artist-profile-conformance',
@@ -2559,8 +2546,10 @@ describe('source-read guard selection', () => {
         ).toContain("from 'node:test'");
         continue;
       }
-      if (guard.id === 'artist-launch-contract') {
-        expect(guard.command).toContain('node scripts/artist-');
+      if (['artist-launch-contract', 'outcome-coverage'].includes(guard.id)) {
+        expect(guard.command).toMatch(
+          /node scripts\/(?:artist-|outcome-coverage\.mjs --check)/u
+        );
         expect(
           readFileSync(join(REPO_ROOT, `scripts/${guard.id}.test.mjs`), 'utf8')
         ).toContain("from 'node:test'");

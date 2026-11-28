@@ -1168,6 +1168,7 @@ test('trusted context guard works for old heads and still rejects oversized merg
 // 262 of 303 same-head Source Validation reruns in 24h were PR body edits.
 test('a metadata-only edit reuses the newest green exact-head proof', () => {
   const result = runProofReuse({
+    liveBase: 'b'.repeat(40),
     runs: [
       proofRun(300, 'success'),
       proofRun(400, 'success'),
@@ -1209,12 +1210,16 @@ test('healthy or unreadable quota never bypasses exact-head proof selection', ()
   }
 });
 
-test('exact-head proof without a successful unit 4/4 fails closed to full validation', () => {
-  /** @type {Array<[string, { guardJobConclusion?: string, jobsFail?: boolean }]>} */
+test('exact-head proof without a successful fourth shard with the same base fails closed to full validation', () => {
+  /** @type {Array<[string, Partial<Parameters<typeof runProofReuse>[0]>]>} */
   const cases = [
-    ['missing 4/4 job', { guardJobConclusion: '' }],
-    ['failed 4/4 job', { guardJobConclusion: 'failure' }],
-    ['skipped 4/4 job', { guardJobConclusion: 'skipped' }],
+    ['missing 4/4 job', { unitJobConclusion: '' }],
+    ['failed 4/4 job', { unitJobConclusion: 'failure' }],
+    ['skipped 4/4 job', { unitJobConclusion: 'skipped' }],
+    ['wrong base', { proofBase: 'a'.repeat(40) }],
+    ['skipped base receipt', { proofStepConclusion: 'skipped' }],
+    ['advanced base', { liveBase: 'a'.repeat(40) }],
+    ['unreadable base', { liveBase: '' }],
     ['jobs inventory unreadable', { jobsFail: true }],
   ];
   for (const [name, options] of cases) {
@@ -1542,14 +1547,17 @@ test('affected unit tests gate PR Ready and select only unit-affecting diffs (JO
   assert.equal(shardOf('Run packages/ui unit tests'), '1/4');
   assert.equal(shardOf('Run Ovie route and private-boundary coverage'), '2/4');
   assert.equal(shardOf('Run CI contract tests read from disk'), '3/4');
-  const web = job.steps.find(
+  const webStep = job.steps.find(
     step => step.name === 'Run web unit tests related to the exact PR diff'
-  ).run;
+  );
+  const web = webStep.run;
+  assert.match(webStep.if, /matrix\.shard != '4\/4'/);
+  assert.equal(webStep.env.UNIT_RUNNER, '${{ matrix.shard }}');
   // Same fast config and quarantine as the merge-group shards, narrowed to
   // the module graph the exact diff reaches.
   assert.match(web, /pnpm --filter @jovie\/web test:fast --/);
   assert.match(web, /--changed "\$BASE_SHA"/);
-  assert.match(web, /--shard=\$\{\{ matrix\.shard \}\}/);
+  assert.match(web, /--shard="\$\{UNIT_RUNNER%\/\*\}\/3"/);
   assert.match(web, /unit_excludes/);
   // The merge-group Unit Tests job is unchanged: the combined head still owns
   // exact integration evidence.

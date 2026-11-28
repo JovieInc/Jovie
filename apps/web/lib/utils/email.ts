@@ -57,11 +57,20 @@ export function isReservedTestEmailDomain(domain: string): boolean {
 }
 
 /**
- * Synthetic canary mailboxes on jov.ie (`browse-ready+...`) have no inbox: sends
- * bounce, burn the transactional quota and hurt sender reputation. The canaries
- * read their sign-in code from the verification table, never from mail.
+ * Synthetic canary and fixture mailboxes on jov.ie have no inbox: sends bounce,
+ * burn the transactional quota and hurt sender reputation. Every one of them
+ * reads its sign-in code from the verification table, never from mail.
+ *
+ *   - `browse-ready+...` (returning, chat-health, claim, per-run prodcert and
+ *     admitted canaries);
+ *   - `browse+clerk_test` and `browse-admin+clerk_test`, the creator and admin
+ *     dev-test fixtures. The production smoke signs in as the admin fixture
+ *     for its certifications readback; before it was listed here every smoke
+ *     run tried to mail it, hit the hard-bounce suppression and filed Sentry
+ *     JOVIE-WEB-10N (~500 events in 9 days, none from a real artist).
  */
-const SYNTHETIC_CANARY_RECIPIENT = /^browse-ready\+[^@]+@jov\.ie$/u;
+const SYNTHETIC_CANARY_RECIPIENT =
+  /^(?:browse-ready\+[^@]+|browse(?:-admin)?\+clerk_test)@jov\.ie$/u;
 
 export function isSyntheticCanaryRecipient(email: string): boolean {
   return SYNTHETIC_CANARY_RECIPIENT.test(normalizeEmail(email));

@@ -78,6 +78,10 @@ jobs:
             echo "::warning::Runner heartbeat API is uncertain; new CI unit runs route to ubuntu-latest."
           fi
 
+      - name: Confirm fresh runner heartbeat
+        if: ${{ steps.runners.outputs.health == 'up' }}
+        run: echo "Recovery evidence is an exact, fresh, successful heartbeat."
+
       - name: Open one fixed-runner degradation incident
         continue-on-error: true
         # Retired: Linear is the only backlog. The workflow summary and run

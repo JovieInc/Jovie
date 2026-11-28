@@ -19,6 +19,8 @@ const REPORT_CARD: OpportunityInboxCardViewModel = {
     deltaPercent: 5.4,
     deltaDisplay: '+5.4%',
     direction: 'up',
+    polarity: 'higher-is-better',
+    sentiment: 'positive',
     series: [120, 132, 128, 150, 171],
     items: [
       { label: 'Challenger A', deltaPercent: 5.4, detail: 'promoted' },

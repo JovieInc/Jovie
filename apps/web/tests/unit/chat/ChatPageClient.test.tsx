@@ -1,11 +1,7 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  ChatPageClient,
-  resetWelcomeChatBootstrapState,
-  shouldRetryWelcomeChatBootstrap,
-} from '@/app/app/(shell)/chat/ChatPageClient';
+import { ChatPageClient } from '@/app/app/(shell)/chat/ChatPageClient';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { APP_ROUTES } from '@/constants/routes';
@@ -13,7 +9,9 @@ import {
   FounderDoorProvider,
   useFounderDoor,
 } from '@/contexts/FounderDoorContext';
+import { requestNewChat } from '@/lib/chat/new-chat-intent';
 import { fastRender } from '@/tests/utils/fast-render';
+import { baseDashboardData } from './chat-page.test-fixtures';
 
 // Controllable mocks
 const mockReplace = vi.fn();
@@ -150,6 +148,7 @@ vi.mock('@/components/jovie/JovieChat', () => ({
 vi.mock('@/lib/hooks/useNotifications', () => ({
   useNotifications: () => ({
     success: mockSuccessNotification,
+    info: vi.fn(),
     error: mockErrorNotification,
   }),
 }));
@@ -191,42 +190,6 @@ vi.mock('@/lib/queries/useChatMutations', () => ({
   useCreateConversationMutation: () => ({ mutateAsync: vi.fn() }),
   useAddMessagesMutation: () => ({ mutateAsync: vi.fn() }),
 }));
-
-const baseDashboardData: DashboardData = {
-  user: { id: 'user_123' },
-  creatorProfiles: [
-    {
-      id: 'profile-1',
-      displayName: 'Test Artist',
-      username: 'testartist',
-    } as DashboardData['creatorProfiles'][0],
-  ],
-  selectedProfile: {
-    id: 'profile-1',
-    displayName: 'Test Artist',
-    username: 'testartist',
-  } as DashboardData['selectedProfile'],
-  needsOnboarding: false,
-  sidebarCollapsed: false,
-  hasSocialLinks: false,
-  hasMusicLinks: false,
-  isAdmin: false,
-  tippingStats: {
-    tipClicks: 0,
-    qrTipClicks: 0,
-    linkTipClicks: 0,
-    tipsSubmitted: 0,
-    totalReceivedCents: 0,
-    monthReceivedCents: 0,
-  },
-  profileCompletion: {
-    percentage: 57,
-    completedCount: 4,
-    totalCount: 6,
-    steps: [],
-    profileIsLive: true,
-  },
-};
 
 function renderChatPage(conversationId?: string, isFirstSession?: boolean) {
   return fastRender(
@@ -417,6 +380,7 @@ describe('ChatPageClient', () => {
         props: expect.objectContaining({ title: 'Artwork Conversation' }),
       })
     );
+    expect(document.title).toBe('Artwork Conversation | Jovie');
 
     rerender(
       <DashboardDataProvider value={baseDashboardData}>
@@ -426,6 +390,7 @@ describe('ChatPageClient', () => {
 
     expect(mockSetHeaderBadge.mock.lastCall?.[0]?.props.title).toBeNull();
     expect(mockSetHeaderActions).toHaveBeenLastCalledWith(null);
+    expect(document.title).toBe('New Chat | Jovie');
   });
 
   it('sets header badge when title changes to non-null', async () => {
@@ -442,6 +407,28 @@ describe('ChatPageClient', () => {
         })
       );
     });
+  });
+
+  it('updates the browser title when a live conversation receives its title', () => {
+    renderChatPage();
+    act(() => capturedOnTitleChange?.('Release plan'));
+    expect(document.title).toBe('Release plan | Jovie');
+  });
+
+  it('clears a chat created in place when New Chat targets the same route', () => {
+    renderChatPage();
+    const previousChat = screen.getByTestId('jovie-chat');
+    act(() => {
+      capturedOnConversationCreate?.('created-in-place', 'completed');
+      capturedOnTitleChange?.('Previous conversation');
+    });
+
+    act(() => requestNewChat());
+
+    expect(screen.getByTestId('jovie-chat')).not.toBe(previousChat);
+    expect(mockSetHeaderBadge.mock.lastCall?.[0]?.props.title).toBeNull();
+    expect(mockSetHeaderActions).toHaveBeenLastCalledWith(null);
+    expect(document.title).toBe('New Chat | Jovie');
   });
 
   it('preserves the server title when an existing chat briefly reports null', async () => {
@@ -659,20 +646,6 @@ describe('ChatPageClient', () => {
       'Chat selectedProfile missing due to dashboard load failure',
       expect.any(Object)
     );
-  });
-
-  it('treats onboarding profile-missing 404s as retryable', () => {
-    expect(shouldRetryWelcomeChatBootstrap(404)).toBe(true);
-  });
-
-  it('resets scheduled bootstrap state during cleanup', () => {
-    const stateRef = { current: 'scheduled' as const };
-    const retryCountRef = { current: 2 };
-
-    resetWelcomeChatBootstrapState(stateRef, retryCountRef);
-
-    expect(stateRef.current).toBe('idle');
-    expect(retryCountRef.current).toBe(0);
   });
 
   it('announces welcome chat bootstrap progress without changing layout', async () => {

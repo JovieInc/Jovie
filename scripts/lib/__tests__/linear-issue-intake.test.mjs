@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   clearRemediationLabelCache,
-  closeLinearIssueByFingerprint,
   ensureLinearLabel,
   LINEAR_LABEL_NAME_MAX,
   remediationKey,
@@ -173,13 +172,13 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
         fetchImpl,
         reopenTerminal,
       });
-    await expect(upsert('new occurrence', true)).resolves.toMatchObject({
+    await expect(upsert('verify: re-red', true)).resolves.toMatchObject({
       ok: true,
       reopened: true,
     });
     expect(
       JSON.parse(String(fetchImpl.mock.calls[1][1].body)).variables.input
-    ).toEqual({ description: 'new occurrence', stateId: 'backlog-state' });
+    ).toEqual({ description: 'verify: re-red', stateId: 'backlog-state' });
     states = [];
     await expect(upsert('missing backlog', true)).resolves.toEqual({
       ok: false,
@@ -187,13 +186,13 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
     });
     expect(fetchImpl).toHaveBeenCalledTimes(3);
     states = [{ id: 'backlog-state', name: 'Queued', type: 'backlog' }];
-    await expect(upsert('terminal remains closed')).resolves.toMatchObject({
+    await expect(upsert('closed; verify')).resolves.toMatchObject({
       ok: true,
       reopened: false,
     });
     expect(
       JSON.parse(String(fetchImpl.mock.calls.at(-1)[1].body)).variables.input
-    ).toEqual({ description: 'terminal remains closed' });
+    ).toEqual({ description: 'closed; verify' });
   });
 
   function linearFetch(routes) {
@@ -224,7 +223,7 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
     expect(remediationKey(exact)).toBe(exact);
   });
 
-  it('reopens after Done and re-files the same remediation label', async () => {
+  it('reopens after Done into Backlog and re-files the remediation label', async () => {
     const labelName = remediationKey(fingerprint);
     expect(remediationKey(labelName)).toBe(labelName);
     const team = {
@@ -260,7 +259,7 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
       upsertLinearIssueByTitleFingerprint({
         fingerprint,
         title: done.title,
-        description: 'still red',
+        description: 'still red, verify',
         createStateName: 'Todo',
         reopenTerminal: true,
         apiKey: 'lin-key',
@@ -270,8 +269,8 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
     expect(
       JSON.parse(String(byTitle.mock.calls[1][1].body)).variables.input
     ).toEqual({
-      description: 'still red',
-      stateId: 'todo-state',
+      description: 'still red, verify',
+      stateId: 'backlog-state',
       labelIds: ['label-other', 'label-1'],
     });
     const fp = 'remediation:flaky-test-filing';
@@ -609,132 +608,6 @@ describe('ensureLinearLabel', () => {
         fetchImpl,
       })
     ).resolves.toEqual({ ok: true, id: 'label-raced' });
-  });
-});
-
-describe('closeLinearIssueByFingerprint', () => {
-  it('no-ops when nothing is open', async () => {
-    const fetchImpl = vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({
-            data: {
-              team: { states: { nodes: [] }, labels: { nodes: [] } },
-              issues: { nodes: [] },
-            },
-          })
-        )
-    );
-    await expect(
-      closeLinearIssueByFingerprint({
-        fingerprint: 'billing-health-public',
-        labelKey: 'billing-health-public',
-        runId: 'run-1',
-        apiKey: 'lin-key',
-        fetchImpl,
-      })
-    ).resolves.toMatchObject({ ok: true, action: 'noop', reason: 'none_open' });
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
-  });
-
-  it('comments once per run and moves the open issue to Done', async () => {
-    const open = {
-      id: 'lin-1',
-      identifier: 'JOV-1',
-      title: 'billing-health-public',
-      state: { id: 'todo', name: 'Todo', type: 'unstarted' },
-      labels: {
-        nodes: [{ id: 'lab', name: 'remediation:billing-health-public' }],
-      },
-    };
-    const fetchImpl = vi.fn(async (_url, init) => {
-      const payload = JSON.parse(String(init.body));
-      if (payload.query.includes('FindIssueToClose')) {
-        return new Response(
-          JSON.stringify({
-            data: {
-              team: {
-                states: {
-                  nodes: [{ id: 'done', name: 'Done', type: 'completed' }],
-                },
-                labels: { nodes: [] },
-              },
-              issues: { nodes: [open] },
-            },
-          })
-        );
-      }
-      if (payload.query.includes('ListLinearIssueComments')) {
-        const commented = fetchImpl.mock.calls.some(call =>
-          JSON.parse(String(call[1].body)).query.includes('commentCreate')
-        );
-        return new Response(
-          JSON.stringify({
-            data: {
-              issue: {
-                comments: {
-                  nodes: commented
-                    ? [
-                        {
-                          id: 'c1',
-                          body: 'cleared\n\n<!-- recovered-run:run-9 -->',
-                        },
-                      ]
-                    : [],
-                },
-              },
-            },
-          })
-        );
-      }
-      if (payload.query.includes('commentCreate')) {
-        return new Response(
-          JSON.stringify({
-            data: { commentCreate: { success: true, comment: { id: 'c1' } } },
-          })
-        );
-      }
-      return new Response(
-        JSON.stringify({
-          data: {
-            issueUpdate: {
-              success: true,
-              issue: { id: 'lin-1', identifier: 'JOV-1' },
-            },
-          },
-        })
-      );
-    });
-
-    const first = await closeLinearIssueByFingerprint({
-      fingerprint: 'billing-health-public',
-      runId: 'run-9',
-      apiKey: 'lin-key',
-      fetchImpl,
-    });
-    expect(first).toMatchObject({
-      ok: true,
-      action: 'resolved',
-      commented: true,
-    });
-    const comment = fetchImpl.mock.calls
-      .map(call => JSON.parse(String(call[1].body)))
-      .find(payload => payload.query.includes('commentCreate'));
-    expect(comment.variables.body).toContain('recovered-run:run-9');
-
-    open.state = { id: 'done', name: 'Done', type: 'completed' };
-    const second = await closeLinearIssueByFingerprint({
-      fingerprint: 'billing-health-public',
-      runId: 'run-9',
-      apiKey: 'lin-key',
-      fetchImpl,
-    });
-    expect(second).toMatchObject({ ok: true, action: 'noop' });
-    expect(
-      fetchImpl.mock.calls.filter(call =>
-        JSON.parse(String(call[1].body)).query.includes('commentCreate')
-      )
-    ).toHaveLength(1);
   });
 });
 

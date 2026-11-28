@@ -53,7 +53,7 @@ export function TableRowActions({
         <Star
           className={cn(
             'h-3.5 w-3.5',
-            isClaimed ? 'fill-current text-yellow-500' : 'opacity-40'
+            isClaimed ? 'fill-current text-primary-token' : 'opacity-40'
           )}
         />
       </IconButton>
@@ -86,9 +86,9 @@ export function TableRowActions({
           className={cn(
             'h-3.5 w-3.5',
             isVerificationLoading && 'animate-pulse',
-            // Pre-migration AppIconButton used fill-info + stroke-white so the
-            // checkmark stays visible against the filled badge.
-            isVerified && 'fill-info text-info stroke-white'
+            // The checkmark stays white (same value in both themes) so it is
+            // visible against the filled badge.
+            isVerified && 'fill-info text-info stroke-on-media'
           )}
         />
       </IconButton>

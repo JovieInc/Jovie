@@ -28,6 +28,7 @@ import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity
 import { useAppFlag } from '@/lib/flags/client';
 import { usePendingOpportunityCardsQuery, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { ChatComposerDockSlot } from './ChatComposerDockSlot';
 import { getChatEmptyStateFirstName } from './chat-empty-greeting';
 import { DESKTOP_CONTENT_GRID_ANCHOR } from './chat-empty-starters';
 import { CHAT_CONTENT_SHELL_CLASSNAME } from './chat-layout';
@@ -80,6 +81,7 @@ export function JovieChat({
   homeCanvas,
   homeCanvasMode = 'empty-state',
   ambientOwnedByShell = false,
+  composerDock,
 }: JovieChatProps) {
   // TanStack Virtual returns fresh rows from a stable `virtualizer` object. React
   // Compiler caches reads keyed on that object; compiled, ChatThreadMessages froze
@@ -115,6 +117,7 @@ export function JovieChat({
     conversationTitle,
     status,
     activeConversationId,
+    conversationResetKey,
     inputRef,
     handleSubmit,
     handleRetry,
@@ -215,7 +218,6 @@ export function JovieChat({
     hasReadyFiles,
     addFiles,
     removeFile,
-    clearFiles,
     toFileUIParts,
     dropZoneRef,
     accept: fileAccept,
@@ -224,7 +226,7 @@ export function JovieChat({
     fileUploadLimit: chatFileUploadLimit,
     onError: handleUploadError,
     onAudioUploaded: handleAudioUploaded,
-    resetKey: activeConversationId ?? conversationId ?? null,
+    resetKey: String(conversationResetKey),
   });
 
   // Manifest collapse state: when uploading and user scrolls/types, show collapsed bar
@@ -269,24 +271,48 @@ export function JovieChat({
   );
 
   const handleSubmitWithFiles = useCallback(
-    (e?: React.FormEvent) => {
-      if (isLoading || isSubmitting) return;
+    async (e?: React.FormEvent, interrupt = false) => {
+      e?.preventDefault();
+      if ((isLoading || isSubmitting) && !interrupt) return;
       const files = toFileUIParts();
+      const sentFileIds = pendingFiles
+        .filter(file => file.status === 'ready' && file.blobUrl)
+        .map(file => file.id);
       notifyJankSend();
-      handleSubmit(e, files.length > 0 ? files : undefined);
-      clearFiles();
-      setManifestCollapsed(false);
+      const submitted = interrupt
+        ? await handleInterruptAndSubmit(files.length > 0 ? files : undefined)
+        : await handleSubmit(e, files.length > 0 ? files : undefined);
+      if (submitted) {
+        // A rejected send keeps its attachments. Remove only the accepted files,
+        // so files added or uploaded while submission settles stay in the draft.
+        sentFileIds.forEach(removeFile);
+        setManifestCollapsed(false);
+      }
     },
     [
       handleSubmit,
+      handleInterruptAndSubmit,
       toFileUIParts,
-      clearFiles,
+      pendingFiles,
+      removeFile,
       setManifestCollapsed,
       isLoading,
       isSubmitting,
       notifyJankSend,
     ]
   );
+
+  const handleInterruptWithFiles = useCallback(() => {
+    void handleSubmitWithFiles(undefined, true);
+  }, [handleSubmitWithFiles]);
+
+  const handleRetryWithFiles = useCallback(async () => {
+    const failedUrls = new Set(chatError?.failedFiles?.map(file => file.url));
+    const retryFileIds = pendingFiles
+      .filter(file => file.blobUrl && failedUrls.has(file.blobUrl))
+      .map(file => file.id);
+    if (await handleRetry()) retryFileIds.forEach(removeFile);
+  }, [chatError?.failedFiles, pendingFiles, handleRetry, removeFile]);
 
   // Notify parent when the conversation title changes
   const prevTitleRef = useRef<string | null>(null);
@@ -525,6 +551,13 @@ export function JovieChat({
   // stays above the transcript, matching inbox → pinned-card behavior.
   const livingCanvas = homeCanvas != null && homeCanvasMode === 'living';
   const [transcriptOpen, setTranscriptOpen] = useState(false);
+  // A turn on a living canvas hands the whole surface to the chat: the board
+  // steps aside for the normal transcript, and Back To Home returns to it
+  // (Tim 2026-11-22: "this chat should take over the dashboard").
+  const turnRunning = status === 'submitted' || status === 'streaming';
+  useEffect(() => {
+    if (livingCanvas && turnRunning) setTranscriptOpen(true);
+  }, [livingCanvas, turnRunning]);
   const hasThread =
     conversationExists || conversationInProgress || pinnedOpportunity !== null;
   // A living canvas keeps owning the surface after messages arrive; the
@@ -669,7 +702,7 @@ export function JovieChat({
       ref: inputRef,
       onChange: setInput,
       onSubmit: handleSubmitWithFiles,
-      onInterruptAndSend: handleInterruptAndSubmit,
+      onInterruptAndSend: handleInterruptWithFiles,
       isLoading,
       isSubmitting,
       isStreaming,
@@ -693,7 +726,7 @@ export function JovieChat({
       inputRef,
       setInput,
       handleSubmitWithFiles,
-      handleInterruptAndSubmit,
+      handleInterruptWithFiles,
       isLoading,
       isSubmitting,
       isStreaming,
@@ -757,13 +790,20 @@ export function JovieChat({
     />
   );
 
+  const dockSlot = (measure = false) =>
+    composerDock ? (
+      <ChatComposerDockSlot measure={measure}>
+        {composerDock()}
+      </ChatComposerDockSlot>
+    ) : null;
+
   const inlineChatError =
     chatError &&
     !chatError.suppressComposerPause &&
     !isWeeklyPlanLimitError(chatError) ? (
       <ChatInlineError
         chatError={chatError}
-        onRetry={handleRetry}
+        onRetry={handleRetryWithFiles}
         isLoading={isLoading}
         isSubmitting={isSubmitting}
         chatMode={chatMode}
@@ -883,6 +923,7 @@ export function JovieChat({
                     }
                   >
                     <div className={CHAT_CONTENT_SHELL_CLASSNAME}>
+                      {dockSlot()}
                       {composerSurface}
                       {inlineChatError ? (
                         <div className='mt-3 w-full'>{inlineChatError}</div>
@@ -903,6 +944,7 @@ export function JovieChat({
                     }
                   >
                     <div className={CHAT_CONTENT_SHELL_CLASSNAME}>
+                      {dockSlot()}
                       {composerSurface}
                       {inlineChatError ? (
                         <div className='mt-3 w-full'>{inlineChatError}</div>
@@ -1000,6 +1042,7 @@ export function JovieChat({
                 className={CHAT_COMPOSER_DOCK_CLASSNAME}
                 data-testid='chat-composer-dock'
               >
+                {dockSlot(true)}
                 {composerSurface}
               </div>
             </>

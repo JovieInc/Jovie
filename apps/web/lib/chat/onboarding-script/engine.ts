@@ -28,6 +28,11 @@ import {
 import { loadScriptBank, pickFromBank } from './line-source';
 import { renderLine, type ScriptLine, type ScriptStepId } from './script';
 import {
+  buildSpotifySkipTurn,
+  historyShowsSpotifySkip,
+  isNoneOfTheseEvent,
+} from './spotify-skip-turn';
+import {
   isHandleConfirmIntent,
   isIncompleteAdvanceMessage,
   ONBOARDING_WIDGET_EVENTS,
@@ -164,6 +169,16 @@ function findWidgetEventInHistory(
     if (event?.onboardingEvent === eventType) return event;
   }
   return null;
+}
+
+function skippedSpotifyInHistory(messages: readonly UIMessage[]): boolean {
+  return historyShowsSpotifySkip(
+    findLatestToolOutput(messages, WIDGET_COMPLETION_ACTIONS.SPOTIFY_SKIPPED),
+    findWidgetEventInHistory(
+      messages,
+      ONBOARDING_WIDGET_EVENTS.ARTIST_NONE_OF_THESE
+    )
+  );
 }
 
 function hasHandleConfirmed(messages: readonly UIMessage[]): boolean {
@@ -340,6 +355,9 @@ export function resolveGuardedStep(input: {
   }
 
   if (!state.spotifyArtistId && !selectedArtistId) {
+    if (skippedSpotifyInHistory(uiMessages)) {
+      return hasHandleConfirmed(uiMessages) ? 'contact' : 'handle';
+    }
     if (
       findLatestToolOutput(uiMessages, 'open_artist_picker') ||
       state.turnCount > 1
@@ -692,29 +710,18 @@ export async function decideFallbackTurn(
     ? parseWidgetEventFromMetadata(latest.metadata)
     : null;
 
-  // "None of these" — re-open artist search without treating as selection.
-  if (
-    latestEvent?.onboardingEvent ===
-    ONBOARDING_WIDGET_EVENTS.ARTIST_NONE_OF_THESE
-  ) {
-    const query = '';
-    const line = pick('get_artist');
-    return {
-      line,
-      text: renderLine(line, {}),
-      toolEvents: [
-        {
-          toolName: 'searchSpotifyArtist',
-          input: { query },
-          output: {
-            action: 'open_artist_picker',
-            query: null,
-            summary: 'Pick the matching Spotify artist.',
-          },
-        },
-      ],
-      guardedStep: 'artist_search',
-    };
+  // None of These skips Spotify → handle (JOV-14240).
+  if (isNoneOfTheseEvent(latestEvent)) {
+    const priorPicker = findLatestToolOutput(uiMessages, 'open_artist_picker');
+    const queryHint =
+      typeof priorPicker?.query === 'string' ? priorPicker.query : '';
+    return buildSpotifySkipTurn({
+      pick,
+      handle:
+        requestedHandleFrom(uiMessages, latest, true) ??
+        handleFromArtistName(queryHint),
+      queryHint,
+    });
   }
 
   // The visitor just picked an artist — confirm it (Spotify enrichment).
@@ -749,7 +756,7 @@ export async function decideFallbackTurn(
   }
 
   // No artist yet: greet on the very first turn, otherwise open the picker.
-  if (!state.spotifyArtistId) {
+  if (!state.spotifyArtistId && !skippedSpotifyInHistory(uiMessages)) {
     if (state.turnCount <= 1 && input.openPickerQuery === undefined) {
       const line = pick('greet');
       return {

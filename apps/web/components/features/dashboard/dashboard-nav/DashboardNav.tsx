@@ -24,7 +24,9 @@ import {
 } from '@/components/shell/SidebarThreadsSection';
 import { useChatThreadContextMenu } from '@/components/shell/useChatThreadContextMenu';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
+import { requestNewChat } from '@/lib/chat/new-chat-intent';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
+import { formatInboxPendingWorkLabel } from '@/lib/inbox/navigation-availability';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { useChatConversationsQuery } from '@/lib/queries/useChatConversationsQuery';
 import {
@@ -38,7 +40,7 @@ import {
   artistSettingsNavigation,
   canonicalSidebarNavigation,
   chatNavItem,
-  inboxNavItem,
+  homeNavItem,
   userSettingsNavigation,
 } from './config';
 import { InboxAttentionLink } from './InboxAttentionLink';
@@ -50,6 +52,20 @@ import {
 } from './navigation-state';
 import type { DashboardNavProps, NavItem } from './types';
 import { usePendingNavigation } from './use-pending-navigation';
+
+/** Rail Home bell name — never bare "Home" beside the Home nav row. */
+function homeAttentionLabel(
+  state: string | undefined,
+  pendingCount: number
+): string {
+  if (state === 'available' && pendingCount > 0) {
+    return `Home — ${formatInboxPendingWorkLabel(pendingCount)}`;
+  }
+  if (state === 'empty') {
+    return 'Home — all caught up';
+  }
+  return 'Home — notifications';
+}
 
 type DashboardNavSection = {
   readonly key: string;
@@ -261,6 +277,7 @@ export function DashboardNav({
     }
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
       return;
+    if (event.button === 0 && item.id === chatNavItem.id) requestNewChat();
     if (event.button === 0 && currentNavigationHref !== item.href) {
       beginPendingNavigation(item.id);
     }
@@ -318,14 +335,16 @@ export function DashboardNav({
           onActivate={
             demoUnavailable
               ? undefined
-              : inputMethod =>
+              : inputMethod => {
+                  if (isNewThreadItem) requestNewChat();
                   startNavigationTelemetry({
                     itemId: isInSettings ? 'settings' : item.id,
                     sourcePathname: currentNavigationHref,
                     destinationHref: item.href,
                     inputMethod,
                     context: telemetryContext,
-                  })
+                  });
+                }
           }
           preventNavigation={demoUnavailable}
           renderAsButton={false}
@@ -405,18 +424,23 @@ export function DashboardNav({
         {headerOwnsInbox ? null : (
           <InboxAttentionLink
             // App updates surface in the shell's update pill, not on the
-            // Inbox: the Inbox page shows no update, so the bell names only
-            // pending work.
-            label={inboxNavItem.name}
-            itemId={inboxNavItem.id}
+            // Home bell. Qualify the accessible name so it does not collide
+            // with the Home nav row (exact name "Home").
+            label={homeAttentionLabel(
+              inboxNavigation?.state,
+              inboxNavigation?.state === 'available'
+                ? (inboxNavigation.pendingCount ?? 0)
+                : 0
+            )}
+            itemId={homeNavItem.id}
             attention={inboxNavigation?.state ?? 'unknown'}
             pendingCount={
               inboxNavigation?.state === 'available'
                 ? (inboxNavigation.pendingCount ?? 0)
                 : 0
             }
-            navigationPending={pendingNavigation?.itemId === inboxNavItem.id}
-            onClick={event => handleCommandClick(event, inboxNavItem)}
+            navigationPending={pendingNavigation?.itemId === homeNavItem.id}
+            onClick={event => handleCommandClick(event, homeNavItem)}
           />
         )}
       </RailStagedContent>

@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
+import { HOME_MARKETING_HEADER_CTA } from '@/data/marketing/headerCta';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 const { pathname, track } = vi.hoisted(() => ({
@@ -28,6 +29,21 @@ describe('MarketingHeader states', () => {
     pathname.mockReturnValue('/pricing');
     track.mockClear();
   });
+
+  it.each(['/', '/pricing', '/solutions/artists', '/support'])(
+    'uses the shared claim action and glass header on %s',
+    path => {
+      pathname.mockReturnValue(path);
+      render(<MarketingHeader canonicalMarketing />);
+      const header = screen.getByRole('banner');
+      expect(header).toHaveAttribute('data-presentation', 'marketing-glass');
+      expect(
+        within(header).getByRole('link', {
+          name: HOME_MARKETING_HEADER_CTA.label,
+        })
+      ).toHaveAttribute('href', HOME_MARKETING_HEADER_CTA.href);
+    }
+  );
 
   it('opens the mobile menu from the landing header by pointer and keyboard', async () => {
     const user = userEvent.setup();
@@ -79,6 +95,17 @@ describe('MarketingHeader states', () => {
     expect(
       within(banner).getAllByRole('link', { name: 'Pricing' }).length
     ).toBeGreaterThan(0);
+  });
+
+  it('keeps the glass nav free of a duplicate Jovie wordmark link (JOV-14240)', () => {
+    render(<MarketingHeader />);
+
+    const nav = document.querySelector('.marketing-glass-header__nav');
+    expect(nav?.textContent).not.toMatch(/(?:^|[^a-z])Jovie(?:[^a-z]|$)/i);
+    expect(
+      nav?.querySelector('.marketing-glass-header__brand-wordmark')
+    ).toBeNull();
+    expect(screen.getByTestId('site-logo-link')).toBeInTheDocument();
   });
 
   it('sends the default landing CTA into the one /start flow', () => {

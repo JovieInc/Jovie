@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
+import { readCiWorkflowShellSource } from './ci-workflow-shell-source.mjs';
 
 // Every repo workflow shares one GITHUB_TOKEN REST bucket (5,000 calls/h per
 // repo), and merge-group rebuilds multiply each call. This ledger is the
@@ -21,7 +22,7 @@ import { describe, expect, it } from 'vitest';
 // API calls, so `git-auth` steps cost nothing against the bucket.
 const ROOT = resolve(import.meta.dirname, '../../..');
 const CI = /** @type {{ jobs: Record<string, any> }} */ (
-  load(readFileSync(resolve(ROOT, '.github/workflows/ci.yml'), 'utf8'))
+  load(readCiWorkflowShellSource(resolve(ROOT, '.github/workflows/ci.yml')))
 );
 const FAIL_FAST_STEP = 'Post a failing PR Ready on the combined head';
 
@@ -66,11 +67,21 @@ const LEDGER = {
     kind: 'on-download-failure',
     greenGroupCalls: 0,
   },
+  // JOV-12618: lists Source Validation runs only when MG tree == source tree
+  // (~3/10 groups per JOV-13081). Typical green groups pay 0 REST here.
+  'ci-fast-typecheck/Decide typecheck/lint reuse': {
+    kind: 'same-tree-proof',
+    greenGroupCalls: 0,
+  },
+  'ci-fast-remaining-shards/Decide typecheck/lint reuse': {
+    kind: 'same-tree-proof',
+    greenGroupCalls: 0,
+  },
   'ci-fast-remaining-shards/Start base-branch history fetch': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-remaining-shards/Decide structural lane': {
+  'ci-path-changes/Decide structural lane': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
@@ -82,11 +93,11 @@ const LEDGER = {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-structural-python/Start base-branch history fetch': {
+  'ci-profile-viewport-sweep/Fetch base-branch history': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-structural-python/Decide structural lane': {
+  'ci-fast-structural-python/Start base-branch history fetch': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
@@ -98,19 +109,11 @@ const LEDGER = {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
-  'ci-fast-structural-web/Decide structural lane': {
-    kind: 'git-auth',
-    greenGroupCalls: 0,
-  },
   'ci-fast-structural-web/Run structural web commands': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
   'ci-fast-structural-lanes-shards/Start base-branch history fetch': {
-    kind: 'git-auth',
-    greenGroupCalls: 0,
-  },
-  'ci-fast-structural-lanes-shards/Decide structural lane': {
     kind: 'git-auth',
     greenGroupCalls: 0,
   },
@@ -224,10 +227,16 @@ describe('ci.yml merge-group GITHUB_TOKEN budget', () => {
   it('uses the token only for git in git-auth shell steps', () => {
     for (const { key, step } of tokenSteps()) {
       if (LEDGER[key]?.kind !== 'git-auth') continue;
-      const run = String(step.run ?? '');
-      if (run.trim() === 'node scripts/ci-fast-lanes.mjs') continue;
-      expect(run, key).not.toMatch(/\bgh\s|\bcurl\b|api\.github\.com|octokit/);
-      expect(run, key).toContain('extraheader');
+      const run = String(step.run ?? '').trim();
+      if (run === 'node scripts/ci-fast-lanes.mjs') continue;
+      const script = /^bash (\.github\/scripts\/[\w-]+\.sh)$/.exec(run);
+      const source = script
+        ? readFileSync(resolve(ROOT, script[1]), 'utf8')
+        : run;
+      expect(source, key).not.toMatch(
+        /\bgh\s|\bcurl\b|api\.github\.com|octokit/
+      );
+      expect(source, key).toContain('extraheader');
     }
   });
 
@@ -254,7 +263,7 @@ describe('ci.yml merge-group GITHUB_TOKEN budget', () => {
 
   it('makes no REST call when a merge group decides the structural lane', () => {
     const decide = tokenSteps().find(
-      ({ key }) => key === 'ci-fast-structural-web/Decide structural lane'
+      ({ key }) => key === 'ci-path-changes/Decide structural lane'
     )?.step.run;
     expect(decide).toBeTruthy();
     const dir = mkdtempSync(join(tmpdir(), 'mg-token-budget-'));
@@ -268,18 +277,19 @@ describe('ci.yml merge-group GITHUB_TOKEN budget', () => {
       writeFileSync(calls, '');
       const output = join(dir, 'output');
       writeFileSync(output, '');
-      const script = String(decide).replaceAll(
-        '${{ github.event_name }}',
-        'merge_group'
+      const result = spawnSync(
+        'bash',
+        ['-euo', 'pipefail', '-c', String(decide)],
+        {
+          env: {
+            GITHUB_EVENT_NAME: 'merge_group',
+            PATH: `${dir}:${process.env.PATH}`,
+            GH_TOKEN: 'test-token',
+            GITHUB_OUTPUT: output,
+          },
+          encoding: 'utf8',
+        }
       );
-      const result = spawnSync('bash', ['-euo', 'pipefail', '-c', script], {
-        env: {
-          PATH: `${dir}:${process.env.PATH}`,
-          GH_TOKEN: 'test-token',
-          GITHUB_OUTPUT: output,
-        },
-        encoding: 'utf8',
-      });
       expect(result.status, result.stderr).toBe(0);
       expect(readFileSync(output, 'utf8')).toContain('skip=false');
       expect(readFileSync(calls, 'utf8')).toBe('');

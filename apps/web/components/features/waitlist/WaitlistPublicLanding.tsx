@@ -36,6 +36,7 @@ export function WaitlistPublicLanding({
     <AuthenticatedAuthEntryGuard>
       <AuthLayout
         formTitle='Continue to Jovie'
+        chrome='splash-b'
         showFormTitle={false}
         showFooterPrompt={signupClosed}
         footerPrompt='Already have an account?'

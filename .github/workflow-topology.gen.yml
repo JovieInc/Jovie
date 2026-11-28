@@ -102,7 +102,18 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:reconcile
+    terminalReceipt: job:report-outcome
+    jobCount: 2
+  - name: Assistants scheduled check
+    path: .github/workflows/assistants-scheduled-check.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:assistants-scheduled-check
     jobCount: 1
   - name: Auto-Merge Base Guard
     path: .github/workflows/auto-merge-base-guard.yml
@@ -137,8 +148,8 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:liveness
-    jobCount: 3
+    terminalReceipt: job:synthetic-canary-catchup
+    jobCount: 5
   - name: Buyer Eval Gate
     path: .github/workflows/buyer-eval-gate.yml
     active: true
@@ -160,6 +171,17 @@ nodes:
     triggeringStateTransition:
       - workflow_call
     terminalReceipt: job:canary-health-gate
+    jobCount: 1
+  - name: Chat first-token sample
+    path: .github/workflows/chat-first-token-sample.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:chat-first-token-sample
     jobCount: 1
   - name: Cheap Fixer
     path: .github/workflows/cheap-fixer.yml
@@ -183,8 +205,8 @@ nodes:
       - push
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:fan-out-budget
-    jobCount: 3
+    terminalReceipt: job:report-outcome
+    jobCount: 4
   - name: CI Shard Contract Canary
     path: .github/workflows/ci-shard-contract-canary.yml
     active: true
@@ -221,7 +243,7 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
-    jobCount: 74
+    jobCount: 75
   - name: Claim Checkout Dogfood
     path: .github/workflows/claim-checkout-dogfood.yml
     active: true
@@ -331,6 +353,17 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:ai-routing-drift
     jobCount: 2
+  - name: Crawl content fixture
+    path: .github/workflows/crawl-content-fixture.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:reconcile
+    jobCount: 1
   - name: Native Security Advisory
     path: .github/workflows/deepsec-native.yml
     active: true
@@ -341,8 +374,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:native
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: Delivery Control Receipts
     path: .github/workflows/delivery-control-receipts.yml
     active: true
@@ -376,8 +409,8 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - workflow_run
-    terminalReceipt: job:commit
-    jobCount: 2
+    terminalReceipt: job:report-outcome
+    jobCount: 3
   - name: Deprecation Intake (Linear devin lane)
     path: .github/workflows/deprecation-intake.yml
     active: true
@@ -388,8 +421,8 @@ nodes:
     triggeringStateTransition:
       - push
       - workflow_dispatch
-    terminalReceipt: job:intake
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: Design gate
     path: .github/workflows/design-gate.yml
     active: true
@@ -450,7 +483,18 @@ nodes:
     triggeringStateTransition:
       - push
       - workflow_dispatch
-    terminalReceipt: job:garden
+    terminalReceipt: job:report-outcome
+    jobCount: 2
+  - name: Dogfood Feed Bind
+    path: .github/workflows/dogfood-feed-bind.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:bind
     jobCount: 1
   - name: E2E Full Browser Matrix
     path: .github/workflows/e2e-full-matrix.yml
@@ -463,8 +507,8 @@ nodes:
     triggeringStateTransition:
       - repository_dispatch
       - workflow_dispatch
-    terminalReceipt: job:notify
-    jobCount: 3
+    terminalReceipt: job:report-outcome
+    jobCount: 4
   - name: Eve Pilot
     path: .github/workflows/eve-pilot.yml
     active: true
@@ -576,8 +620,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:golden-path
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: Golden Path Prod Autofix
     path: .github/workflows/golden-path-prod-autofix.yml
     active: true
@@ -601,6 +645,17 @@ nodes:
       - push
     terminalReceipt: job:affected-articles
     jobCount: 1
+  - name: Helpfulness live CI-subset
+    path: .github/workflows/helpfulness-live-ci-subset.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:helpfulness-ci-subset
+    jobCount: 1
   - name: Hermes CLI Worker
     path: .github/workflows/hermes-cli-worker.yml
     active: true
@@ -611,8 +666,8 @@ nodes:
     triggeringStateTransition:
       - repository_dispatch
       - workflow_dispatch
-    terminalReceipt: job:worker
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: Interaction latency audit
     path: .github/workflows/interaction-latency-audit.yml
     active: true
@@ -623,8 +678,8 @@ nodes:
     triggeringStateTransition:
       - push
       - workflow_dispatch
-    terminalReceipt: job:measure
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: iOS App Store Graphics
     path: .github/workflows/ios-app-store-graphics.yml
     active: true
@@ -747,8 +802,8 @@ nodes:
       - schedule
       - workflow_call
       - workflow_dispatch
-    terminalReceipt: job:m2-revenue-path
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: Mac Lane Route
     path: .github/workflows/mac-lane-route.yml
     active: true
@@ -784,8 +839,8 @@ nodes:
       - Mac Lane Route
     triggeringStateTransition:
       - workflow_call
-    terminalReceipt: job:startup-budget
-    jobCount: 3
+    terminalReceipt: job:performance-cert
+    jobCount: 4
   - name: Main Health
     path: .github/workflows/main-health.yml
     active: true
@@ -862,8 +917,8 @@ nodes:
       - push
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:verify
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: Mutation Diff
     path: .github/workflows/mutation-diff.yml
     active: true
@@ -925,8 +980,8 @@ nodes:
     triggeringStateTransition:
       - repository_dispatch
       - workflow_dispatch
-    terminalReceipt: job:notify
-    jobCount: 4
+    terminalReceipt: job:report-outcome
+    jobCount: 5
   - name: Node Runtime Compatibility
     path: .github/workflows/node-runtime-compatibility.yml
     active: true
@@ -937,8 +992,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:promotion-readiness
-    jobCount: 3
+    terminalReceipt: job:report-outcome
+    jobCount: 4
   - name: Node Runtime Freshness
     path: .github/workflows/node-runtime-freshness.yml
     active: true
@@ -949,8 +1004,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:bump
-    jobCount: 3
+    terminalReceipt: job:report-outcome
+    jobCount: 4
   - name: Publish @jovie/cli to npm
     path: .github/workflows/npm-publish.yml
     active: true
@@ -962,8 +1017,8 @@ nodes:
     triggeringStateTransition:
       - push
       - workflow_dispatch
-    terminalReceipt: job:publish
-    jobCount: 3
+    terminalReceipt: job:report-outcome
+    jobCount: 4
   - name: Observability Report (Linear)
     path: .github/workflows/observability-issue.yml
     active: true
@@ -973,8 +1028,8 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - repository_dispatch
-    terminalReceipt: job:sync-issue
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: Ovie Summer Canary
     path: .github/workflows/ovie-summer-canary.yml
     active: true
@@ -987,6 +1042,17 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:canary
     jobCount: 1
+  - name: Pen draft accept
+    path: .github/workflows/pen-draft-accept.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:accept
+    jobCount: 1
   - name: Pen draft pictures to Linear
     path: .github/workflows/pen-draft-publish.yml
     active: true
@@ -997,8 +1063,8 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:publish
-    jobCount: 3
+    terminalReceipt: job:report-outcome
+    jobCount: 4
   - name: Pen draft missing frames
     path: .github/workflows/pen-draft.yml
     active: true
@@ -1062,7 +1128,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:notify-failure
-    jobCount: 10
+    jobCount: 9
   - name: PR Conflict Handler
     path: .github/workflows/pr-conflict-handler.yml
     active: false
@@ -1075,8 +1141,8 @@ nodes:
       - push
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:deliver
-    jobCount: 5
+    terminalReceipt: job:report-outcome
+    jobCount: 6
   - name: PR Fleet Rules
     path: .github/workflows/pr-fleet-rules.yml
     active: true
@@ -1110,8 +1176,8 @@ nodes:
     triggeringStateTransition:
       - repository_dispatch
       - workflow_dispatch
-    terminalReceipt: job:report
-    jobCount: 3
+    terminalReceipt: job:report-outcome
+    jobCount: 4
   - name: PR Size Guard Label Override
     path: .github/workflows/pr-size-guard-label-override.yml
     active: true
@@ -1287,8 +1353,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:benchmark
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: Quality Gap Finder
     path: .github/workflows/quality-gap-finder.yml
     active: true
@@ -1313,8 +1379,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:time-bombs-file
-    jobCount: 3
+    terminalReceipt: job:report-outcome
+    jobCount: 4
   - name: Repository documentation shadow
     path: .github/workflows/repository-docs-shadow.yml
     active: true
@@ -1337,8 +1403,8 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - workflow_run
-    terminalReceipt: job:terminal
-    jobCount: 6
+    terminalReceipt: job:report-outcome
+    jobCount: 7
   - name: Runner Autoscaler Canary
     path: .github/workflows/runner-autoscaler-canary.yml
     active: true
@@ -1386,8 +1452,8 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - workflow_run
-    terminalReceipt: job:commit
-    jobCount: 4
+    terminalReceipt: job:report-outcome
+    jobCount: 5
   - name: Product Screenshots
     path: .github/workflows/screenshots.yml
     active: true
@@ -1398,8 +1464,8 @@ nodes:
     triggeringStateTransition:
       - push
       - workflow_dispatch
-    terminalReceipt: job:certify
-    jobCount: 3
+    terminalReceipt: job:report-outcome
+    jobCount: 4
   - name: Security Advisory Loop (Summer owned)
     path: .github/workflows/security-advisory-loop.yml
     active: true
@@ -1411,8 +1477,8 @@ nodes:
       - push
       - repository_dispatch
       - workflow_dispatch
-    terminalReceipt: job:loop
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: Security Suppression Audit
     path: .github/workflows/security-suppression-audit.yml
     active: true
@@ -1474,8 +1540,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:measure
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: SonarCloud
     path: .github/workflows/sonarcloud.yml
     active: true
@@ -1486,8 +1552,8 @@ nodes:
     triggeringStateTransition:
       - workflow_dispatch
       - workflow_run
-    terminalReceipt: job:sonarcloud
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: Source Admission Review Signal
     path: .github/workflows/source-admission-review-signal.yml
     active: true
@@ -1554,8 +1620,20 @@ nodes:
     triggeringStateTransition:
       - repository_dispatch
       - workflow_dispatch
-    terminalReceipt: job:sweep
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
+  - name: Storybook Host
+    path: .github/workflows/storybook-host.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: Summer Eve identity check
     path: .github/workflows/summer-eve-pin.yml
     active: true
@@ -1603,8 +1681,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:docs-deploy-jovie
-    jobCount: 6
+    terminalReceipt: job:report-outcome
+    jobCount: 9
   - name: Test Coverage Audit
     path: .github/workflows/test-coverage-audit.yml
     active: true
@@ -1617,8 +1695,8 @@ nodes:
     triggeringStateTransition:
       - repository_dispatch
       - workflow_dispatch
-    terminalReceipt: job:audit
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: Test Flakiness Report
     path: .github/workflows/test-flakiness-report.yml
     active: true
@@ -1714,7 +1792,7 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:report-scheduled-failure
-    jobCount: 6
+    jobCount: 9
   - name: VOC Mine
     path: .github/workflows/voc-mine.yml
     active: true
@@ -1725,8 +1803,8 @@ nodes:
     triggeringStateTransition:
       - schedule
       - workflow_dispatch
-    terminalReceipt: job:mine
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: Comparative Claims Re-measure
     path: .github/workflows/vs-linktree-claims.yml
     active: true
@@ -1737,8 +1815,8 @@ nodes:
     triggeringStateTransition:
       - repository_dispatch
       - workflow_dispatch
-    terminalReceipt: job:remeasure
-    jobCount: 1
+    terminalReceipt: job:report-outcome
+    jobCount: 2
   - name: Wins Ledger
     path: .github/workflows/wins-ledger.yml
     active: true

@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { SHORTCUTS } from '@/lib/shortcuts';
 import { cn } from '@/lib/utils';
@@ -104,7 +105,7 @@ export function ContextMenuOverlay({
 
   return (
     <div className='fixed inset-0 z-[110]'>
-      <button
+      <PlainButton
         type='button'
         aria-label='Close Menu'
         tabIndex={-1}
@@ -135,7 +136,7 @@ export function ContextMenuOverlay({
           const Icon = item.icon;
           const sc = resolveShortcut(item.shortcut);
           return (
-            <button
+            <PlainButton
               // biome-ignore lint/suspicious/noArrayIndexKey: groupId+label disambiguates duplicate labels; items array does not reorder mid-render
               key={`${groupId}-item-${index}-${item.label}`}
               type='button'
@@ -170,11 +171,11 @@ export function ContextMenuOverlay({
               )}
               <span className='flex-1 truncate'>{item.label}</span>
               {sc && (
-                <kbd className='ml-auto inline-flex items-center h-4 min-w-4 px-1 rounded-xs text-3xs font-caption uppercase tracking-[0.04em] text-tertiary-token bg-surface-0/80 border border-(--app-shell-border)/60 leading-none'>
+                <kbd className='ml-auto inline-flex items-center h-4 min-w-4 px-1 rounded-xs text-3xs font-caption text-tertiary-token bg-surface-0/80 border border-(--app-shell-border)/60 leading-none'>
                   {sc.keys}
                 </kbd>
               )}
-            </button>
+            </PlainButton>
           );
         })}
       </div>

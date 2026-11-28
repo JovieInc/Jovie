@@ -30,6 +30,8 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+from waste_debt import CERT_SCREENS, col_debt, debt_closure, debt_receipts, debt_signal_context
+
 HERE = Path(__file__).resolve().parent
 REPO = Path(os.environ.get("CAPACITY_REPO") or HERE.parents[1])
 REGISTRY = REPO / "ops/registry/waste.json"
@@ -71,7 +73,6 @@ def gh_json(args: list[str]):
         return json.loads(raw or "")
     except ValueError:
         return None
-
 
 # ---- collectors: name -> {key: number}; a missing key is a GAP ----
 
@@ -195,20 +196,6 @@ def col_storage() -> dict:
     return {"staleCheckouts": len(stale), "staleCheckoutGiB": kib / 2**20}
 
 
-def col_debt() -> dict:
-    files = sh(["git", "ls-files", "*.ts", "*.tsx", "*.mjs", "*.py"], 30, REPO)
-    if files is None:
-        return {}
-    big = 0
-    for f in files.splitlines():
-        try:
-            with open(REPO / f, "rb") as h:
-                big += sum(1 for _ in h) > 1500
-        except OSError:
-            pass
-    return {"oversizedFiles": big}
-
-
 def read_feed(name: str, key: str) -> float | None:
     for base in (lanes_state(), state_dir()):
         try:
@@ -285,7 +272,6 @@ def reading(spec: dict, data: dict) -> float | None:
     v = data.get(group, {}).get(key)
     return None if v is None else float(v)
 
-
 # ---- detectors ----
 
 def detect(spec: dict, value: float | None, den: float | None, week_ago: float | None) -> dict:
@@ -333,14 +319,16 @@ def evaluate(reg: dict, data: dict, hist: dict[str, float]) -> list[dict]:
             v = reading(m, data)
             den = users if m.get("den") else None
             res = detect(m, v, den, hist.get(m["id"]))
+            evidence = data.get("debt", {}).get("evidence", {}).get(m["id"])
             rows.append({"id": m["id"], "class": cls["id"], "owner": cls["owner"], "label": m["label"],
-                         "unit": m["unit"], "value": v, **res})
+                         "unit": m["unit"], "value": v, **res,
+                         **{k: m[k] for k in ("repairOwner", "settleAtCeiling") if k in m},
+                         **({"evidence": evidence} if evidence else {})})
     return rows
 
 
 def ranking(rows: list[dict]) -> list[dict]:
     return sorted((r for r in rows if r["status"] == "WASTE"), key=lambda r: -r["excess"])
-
 
 # ---- fix stream: signals, wins, store, digest ----
 
@@ -351,7 +339,7 @@ def signal(reg: dict, row: dict, spec: dict) -> dict:
     return {"schema": "jovie-factory-signal/v1", "fingerprint": "waste-" + row["id"].replace(".", "-").replace("_", "-"),
             "source": "waste-loop", "extraLabels": ["waste"],
             "title": f"waste: {row['label']} ({row['why']})",
-            "problem": f"Waste class `{row['class']}`, metric `{row['id']}`: {row['why']}. Owner: {row['owner']}.",
+            "problem": f"Waste class `{row['class']}`, metric `{row['id']}`: {row['why']}. Owner: {row['owner']}.{debt_signal_context(row)}",
             "acceptance": [f"Root cause fixed at the highest layer that removes it, not this one instance",
                            *[f"{x[0].upper()}{x[1:]}" for x in fs["everyFixMust"][1:3]],
                            "The unit metric is back under its threshold in the next waste.py report; the wins store records before and after"],
@@ -398,8 +386,8 @@ def store_put(rel: str, obj: dict, create: bool, env=os.environ, opener=urllib.r
 STORE_SETTLED = ("recorded", "already recorded", "store not configured")  # anything else is retried next pass
 
 
-def settle_wins(reg: dict, rows: list[dict], state: Path, now: float) -> list[dict]:
-    """A flagged metric that drops 20%+ under its flagged baseline is a fix: record before/after."""
+def settle_wins(reg: dict, rows: list[dict], state: Path, now: float, *, repo: Path = REPO) -> list[dict]:
+    """Record before/after when a flagged metric meets its closure criterion."""
     path = state / "waste-open.json"
     try:
         openf = json.loads(path.read_text())
@@ -409,13 +397,17 @@ def settle_wins(reg: dict, rows: list[dict], state: Path, now: float) -> list[di
     by = {r["id"]: r for r in rows}
     for mid, base in list(openf.items()):
         r = by.get(mid)
-        if r and r["value"] is not None and r["status"] == "OK" and r["value"] <= base["value"] * 0.8:
+        if r and r["value"] is not None and r["status"] == "OK" and debt_closure(r, base, repo):
             day = iso(now)[:10]
-            win = {"schema": "jovie.win/v1", "id": f"win-{day}-waste-{mid.replace('.', '-').replace('_', '-')}", "date": day,
+            slug = mid.replace(".", "-").replace("_", "-")
+            suffix = f"-{r['evidence']['sha'][:12]}" if r.get("settleAtCeiling") else ""
+            win = {"schema": "jovie.win/v1", "id": f"win-{day}-waste-{slug}{suffix}", "date": day,
                    "area": "waste", "theme": "waste-" + r["class"], "claim": f"{r['label']} fell back under its threshold.", "prs": [],
                    "metrics": [{"name": mid, "unit": r["unit"], "better": "lower", "before": base["value"], "after": r["value"],
                                 "source": "scripts/capacity/waste.py", "query": "python3 scripts/capacity/waste.py report"}],
-                   "story": "Detected by the continuous waste loop and fixed through the factory-signal stream.", "receipts": []}
+                   "story": ("Measured before and after by the continuous waste loop." if suffix else
+                             "Detected by the continuous waste loop and fixed through the factory-signal stream."),
+                   "receipts": debt_receipts(r, base, iso(now))}
             win["store"] = store_put(reg["fixStream"]["winsStorePrefix"] + win["id"] + ".json", win, True)
             if win["store"] not in STORE_SETTLED:
                 continue  # transient store failure: keep the open flag so the win is recorded next pass
@@ -424,7 +416,8 @@ def settle_wins(reg: dict, rows: list[dict], state: Path, now: float) -> list[di
             wins.append(win)
             del openf[mid]
     for r in ranking(rows):
-        openf.setdefault(r["id"], {"value": r["value"], "since": iso(now)})
+        openf.setdefault(r["id"], {"value": r["value"], "since": iso(now),
+                                    **({"evidence": r["evidence"]} if "evidence" in r else {})})
     path.write_text(json.dumps(openf))
     return wins
 
@@ -440,7 +433,8 @@ def digest(reg: dict, rows: list[dict], state: Path, now: float) -> dict:
     trend = {"flagged": len(ranking(rows)), "gaps": sum(r["status"] == "GAP" for r in rows), "metrics": len(rows)}
     return {"schema": "jovie.waste-digest/v1", "at": iso(now),
             "top": [{k: r[k] for k in ("id", "class", "label", "value", "unit", "excess", "why", "owner")} for r in top],
-            "fixesShippedThisWeek": [{"id": w["id"], "metric": w["metrics"][0]} for w in shipped],
+            "techDebt": [r for r in rows if r["class"] == "tech-debt"],
+            "fixesShippedThisWeek": [{"id": w["id"], "metric": w["metrics"][0], "receipts": w.get("receipts", [])} for w in shipped],
             "trend": trend, "seeds": [{"id": s["id"], "status": s["status"], "outcome": s["outcome"]} for s in reg["seeds"]]}
 
 
@@ -483,7 +477,6 @@ def run_pass(publish: bool = True, now: float | None = None) -> dict:
         (lanes_state() / "waste-latest.json").write_text(json.dumps(d, indent=1))
     result["digest"] = digest(reg, rows, state, now)
     return result
-
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])

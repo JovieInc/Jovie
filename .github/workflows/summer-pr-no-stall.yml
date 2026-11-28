@@ -57,8 +57,9 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      # github-token-budget: 8 calls/run - one open-PR inventory via the classifier,
-      # then at most five empty-head pushes via git (no extra REST) plus optional re-read
+      # github-token-budget: 8 calls/run - one light open-PR list (two gh pages), at
+      # most six check-rollup reads for idle ready PRs, then at most five
+      # empty-head pushes via git (no extra REST)
       - name: Inventory (report)
         id: inventory
         env:
@@ -109,3 +110,24 @@ jobs:
           IDLE="${{ github.event.inputs.idle_hours || '6' }}"
           node scripts/summer/pr-no-stall.mjs --apply --limit="$LIMIT" --idle-hours="$IDLE" --json | tee "$RUNNER_TEMP/no-stall-apply.json"
           jq -e '.applied | length >= 0' "$RUNNER_TEMP/no-stall-apply.json" >/dev/null
+
+      # Old-PR rule (Tim 2026-11-22, JOV-INV-011 v5): one last repair try at 7 days, close at 10.
+      - name: Generate Jovie Bot token for the old-PR rule
+        id: age-token
+        if: ${{ !cancelled() && (github.event_name == 'push' || github.event.inputs.apply != 'false') }}
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+
+      # github-token-budget: 0 calls/run - the old-PR rule uses the Jovie Bot token: 2 list pages,
+      # then at most 3 calls per last try (5) and 1 per close (15)
+      - name: Apply the old-PR rule (bounded)
+        if: ${{ !cancelled() && (github.event_name == 'push' || github.event.inputs.apply != 'false') }}
+        env:
+          GH_TOKEN: ${{ steps.age-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+        run: |
+          set -euo pipefail
+          node scripts/summer/pr-age-rule.mjs --apply | tee -a "$GITHUB_STEP_SUMMARY"

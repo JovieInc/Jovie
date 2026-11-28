@@ -20,6 +20,11 @@ export const CAPS = {
   dataDir: 'data',
 };
 
+/** Read an immutable attempt rather than the run's changing latest jobs. */
+export function attemptJobsPath(runId, attempt) {
+  return `/repos/{owner}/{repo}/actions/runs/${runId}/attempts/${attempt}/jobs?per_page=${CAPS.jobsPerPage}`;
+}
+
 /** Backfill scope: the PR-gate workflows the timing layer measures. */
 const BACKFILL_WORKFLOW_PATHS = new Set([
   '.github/workflows/ci.yml',

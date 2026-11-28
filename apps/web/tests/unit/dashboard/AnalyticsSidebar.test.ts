@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { calculateConversionRate } from '@/features/dashboard/organisms/AnalyticsSidebar';
+import { formatAnalyticsStageRate as calculateConversionRate } from '@/lib/utils/analytics-growth';
 
-// calculateConversionRate now delegates to formatAnalyticsStageRate, which
+// formatAnalyticsStageRate
 // SUPPRESSES vanity percents on small bases (base < MIN_SAMPLE_FOR_PERCENT_DELTA,
 // currently 30). A small denominator turns conversion into noise like "1200%",
 // so we hide the percent entirely (return null) until the base is large enough

@@ -81,26 +81,37 @@ Rules:
 
 ### Press feedback
 
-Press feedback is opt-in, not a default. Do not compress controls when the
-action already supplies immediate state feedback: play/pause, toggles,
-accordions, menus, navigation, and submitting controls remain static. When a
-standalone action has no other immediate cue and tactile compression materially
-helps, use the shared **`var(--scale-press)` (0.98)** token. That value is the
-cross-platform SoT (Drift W1 / T0.5): web owns it in `design-system.css`; native
-clients project `0.98` — never `0.96` or a hardcoded fork.
+Every clickable presses (Tim 2026-11-22, JOV-14459). The press is felt, not
+seen: on pointer down the control scales to **`var(--scale-press)` (0.98)** and
+darkens to `var(--press-brightness)` (0.94) instantly, with no transition on
+the way in, then springs back over `var(--press-release-duration)` (160ms,
+`--duration-normal`) with `var(--ease-press-release)`, a slightly underdamped
+`cubic-bezier(0.34, 1.3, 0.64, 1)`. No ripple, no glow, no visible effect.
+`--scale-press` is the cross-platform SoT (Drift W1 / T0.5): web owns it in
+`design-system.css`; native clients project `0.98`. Never `0.96`.
 
-```css
-.button {
-  transition: transform var(--duration-normal) var(--ease-out);
-}
-.button:active {
-  transform: scale(var(--scale-press));
-}
+The press lives in one place: the **`press`** utility in
+`styles/tailwind-foundation.css`. It also owns the control's transitions
+(colors, shadow, opacity, scale, filter), so a primitive carries `press` and no
+`transition-*` of its own.
+
+```tsx
+<button className='press ...'>Save</button>
 ```
 
-Press feedback must be tactile and interruptible; the shared Button defaults to
-`pressFeedback={false}`. Use that default for self-evident controls, and never
-hardcode a scale value or apply press scale to every pressable element.
+- Button (including the morph path), IconButton, PlainButton, the menu,
+  overflow and title triggers, close buttons and radio items press by default.
+  A raw `<button>`, `role="button"` or clickable link either goes through one
+  of those or adds `press`.
+- Disabled, `aria-disabled="true"`, `data-static="true"` (the `static` prop,
+  for non-interactive display) and `aria-busy="true"` controls never press;
+  the utility gates them, do not re-implement the gate.
+- Under `prefers-reduced-motion` the darken stays and the scale is dropped.
+- `pressFeedback` on Button is a deprecated no-op.
+- Never hardcode a press scale (`active:scale-95`, `active:scale-[0.97]`,
+  `whileTap` scale, `:active { transform: scale(...) }`). The art-direction
+  `press-state` invariant fails on it and on a new raw clickable that skips
+  `press`; its baseline only shrinks.
 
 ### Never animate from `scale(0)`
 
@@ -159,7 +170,7 @@ When reviewing animation code, output a single markdown table with `| Before | A
 | UI duration > 300ms outside CINEMATIC intent | `--duration-subtle`/`--duration-slow` |
 | Hover animation without media query | `@media (hover: hover) and (pointer: fine)` |
 | Keyframes on rapidly-triggered element | CSS transitions |
-| Press scale on a self-evident state change | Remove it; state change is the feedback |
-| Tactile press feedback needed without another cue | Opt in with `scale(var(--scale-press))` |
+| Clickable without a press | Use a shared primitive or add `press`; never a hardcoded press scale |
+| Ripple, glow or visible press effect | Remove it; the press is felt, not seen |
 | Same enter/exit speed on hold patterns | Exit faster than enter |
 | List items all appear at once | 30–80ms stagger |

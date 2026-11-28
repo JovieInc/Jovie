@@ -29,6 +29,7 @@ import {
 } from '../changed-test-coverage.mjs';
 import { execFileSync, spawnSync } from '../child-process.mjs';
 import { NATIVE_QUEUE_POLICY } from '../merge-queue-guard.mjs';
+import { readCiWorkflowShellSource } from './ci-workflow-shell-source.mjs';
 
 const path = 'apps/web/lib/example.ts';
 
@@ -424,9 +425,8 @@ const rule = require('./no-hardcoded-theme-colors.js');`,
   });
 
   it('deliberate red: requires exact-head coverage before source or merge promotion', () => {
-    const workflow = readFileSync(
-      resolve(import.meta.dirname, '../../../.github/workflows/ci.yml'),
-      'utf8'
+    const workflow = readCiWorkflowShellSource(
+      resolve(import.meta.dirname, '../../../.github/workflows/ci.yml')
     );
     // The V8 run is sharded; the gate job merges the shards and ratchets.
     const shard = workflow.slice(
@@ -565,9 +565,8 @@ const rule = require('./no-hardcoded-theme-colors.js');`,
   });
 
   it('deliberate red: the gate merges exactly one coverage report per shard', () => {
-    const workflow = readFileSync(
-      resolve(import.meta.dirname, '../../../.github/workflows/ci.yml'),
-      'utf8'
+    const workflow = readCiWorkflowShellSource(
+      resolve(import.meta.dirname, '../../../.github/workflows/ci.yml')
     );
     const shard = workflow.slice(
       workflow.indexOf('  ci-exact-head-coverage-shard:'),

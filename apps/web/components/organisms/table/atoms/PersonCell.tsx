@@ -53,7 +53,7 @@ export const PersonCell = React.memo(function PersonCell({
           columns from min-content, and nowrap text widens the table past its
           scroller so focusing a trailing action scrolls the face away. */}
       <span className='min-w-0 line-clamp-1 whitespace-normal break-all'>
-        <span className='font-medium text-primary-token'>
+        <span className='system-b-table-primary-text font-medium text-primary-token'>
           {nameHref ? (
             <Link href={nameHref} onClick={event => event.stopPropagation()}>
               {name}

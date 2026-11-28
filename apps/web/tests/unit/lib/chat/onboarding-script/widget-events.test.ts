@@ -10,6 +10,7 @@ import {
   ONBOARDING_GUARDED_STEPS,
   ONBOARDING_WIDGET_EVENTS,
   parseWidgetEventFromMetadata,
+  WIDGET_COMPLETION_ACTIONS,
   widgetEventDisplayText,
 } from '@/lib/chat/onboarding-script/widget-events';
 
@@ -30,6 +31,7 @@ describe('onboarding widget events', () => {
     expect(HANDLE_ACCEPT_COPY).toBe('Keep');
     expect(ATTACH_ACCOUNT_CTA_LABEL).toBe('Attach Account');
     expect(NONE_OF_THESE_CTA_LABEL).toBe('None of These');
+    expect(WIDGET_COMPLETION_ACTIONS.SPOTIFY_SKIPPED).toBe('spotify_skipped');
   });
 
   it('parses handle_confirmed metadata', () => {

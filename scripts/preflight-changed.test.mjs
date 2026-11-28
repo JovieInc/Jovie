@@ -644,14 +644,14 @@ for (const mode of ['SIGTERM', 'SIGINT', 'exit']) {
     const pidFile = path.join(directory, 'child.pid');
     const moduleUrl = new URL('./preflight-changed.mjs', import.meta.url).href;
     const command = `node scripts/typecheck-slot.mjs -- bash -c 'echo $$ > "$GEM_TEST_PID_FILE"; exec sleep 30'`;
-    const source = `import { sh } from ${JSON.stringify(moduleUrl)}; ${mode === 'exit' ? 'setTimeout(() => process.exit(0), 500);' : ''} await sh(${JSON.stringify(command)}, { cwd: process.cwd(), env: process.env, timeoutMs: 30000 });`;
+    const source = `import { sh } from ${JSON.stringify(moduleUrl)}; ${mode === 'exit' ? "process.stdin.once('data', () => process.exit(0));" : ''} await sh(${JSON.stringify(command)}, { cwd: process.cwd(), env: process.env, timeoutMs: 30000 });`;
     const outer = spawn(
       process.execPath,
       ['--input-type=module', '-e', source],
       {
         cwd: process.cwd(),
         detached: true,
-        stdio: 'ignore',
+        stdio: mode === 'exit' ? ['pipe', 'ignore', 'ignore'] : 'ignore',
         env: {
           ...process.env,
           GEM_TEST_PID_FILE: pidFile,
@@ -665,10 +665,20 @@ for (const mode of ['SIGTERM', 'SIGINT', 'exit']) {
     let stopped = false;
     try {
       const startedDeadline = Date.now() + 4000;
-      while (!existsSync(pidFile) && Date.now() < startedDeadline)
-        await new Promise(resolve => setTimeout(resolve, 20));
+      while (
+        (!Number.isSafeInteger(childPid) || childPid < 1) &&
+        Date.now() < startedDeadline
+      ) {
+        if (existsSync(pidFile))
+          childPid = Number(readFileSync(pidFile, 'utf8'));
+        if (!Number.isSafeInteger(childPid) || childPid < 1)
+          await new Promise(resolve => setTimeout(resolve, 20));
+      }
       assert.ok(existsSync(pidFile), 'host-slot child must start');
-      childPid = Number(readFileSync(pidFile, 'utf8'));
+      assert.ok(
+        Number.isSafeInteger(childPid) && childPid > 0,
+        'host-slot child must publish its PID'
+      );
       const closed = new Promise((resolve, reject) => {
         const watchdog = setTimeout(
           () => reject(new Error('outer process did not terminate')),
@@ -679,7 +689,9 @@ for (const mode of ['SIGTERM', 'SIGINT', 'exit']) {
           resolve({ code, signal });
         });
       });
-      if (mode !== 'exit') process.kill(-outer.pid, mode);
+      // Exit only after real startup and the close handler are both ready.
+      if (mode === 'exit') outer.stdin.end('exit\n');
+      else process.kill(-outer.pid, mode);
       const result = await closed;
       if (mode !== 'exit') assert.equal(result.signal, mode);
       else assert.equal(result.code, 0);

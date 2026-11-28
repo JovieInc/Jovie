@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
   Input,
   Label,
+  PlainButton,
 } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -39,10 +40,11 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
+import { BANDSINTOWN_BRAND_COLOR } from '@/constants/platforms/brand-colors';
 import { queryKeys, useBandsintownConnectionQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
-const BANDSINTOWN_ACCENT = '#00B4B3';
+const BANDSINTOWN_ACCENT = `#${BANDSINTOWN_BRAND_COLOR}`;
 
 interface SettingsTouringSectionProps {
   readonly profileId: string;
@@ -208,8 +210,7 @@ function BandsintownConnectionPill({
     return (
       <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger asChild>
-          <button
-            type='button'
+          <PlainButton
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             className={cn(
@@ -251,7 +252,7 @@ function BandsintownConnectionPill({
                 style={{ color: accent }}
               />
             )}
-          </button>
+          </PlainButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align='start' sideOffset={4}>
           <DropdownMenuItem onClick={onSyncNow} disabled={isSyncing}>
@@ -271,8 +272,7 @@ function BandsintownConnectionPill({
   }
 
   return (
-    <button
-      type='button'
+    <PlainButton
       onClick={onConnect}
       className={cn(
         'inline-flex h-7 items-center gap-1.5 rounded-full border border-subtle bg-surface-1 px-2.5 text-xs text-secondary-token transition-colors',
@@ -288,7 +288,7 @@ function BandsintownConnectionPill({
       <Calendar className='h-3.5 w-3.5 shrink-0' style={{ color: accent }} />
       <span>Bandsintown</span>
       <Plus className='h-3.5 w-3.5 shrink-0' />
-    </button>
+    </PlainButton>
   );
 }
 

@@ -13,6 +13,7 @@ import { AGENT_OS_ADMIN_FIXTURE_ARTIFACTS } from '@/lib/agent-os/fixtures';
 import { authorizeHud } from '@/lib/auth/hud';
 import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
+import { loadGoldenPathFunnel } from '@/lib/ovie/certifications/golden-path-funnel.server';
 import {
   OVIE_OPS_PRODUCT_NAME,
   ovieOpsKioskHref,
@@ -59,11 +60,12 @@ export default async function HudPage({
     if (requestedKiosk) redirect(APP_ROUTES.ADMIN_OPS);
   }
 
-  const [metrics, funnel] = await Promise.all([
+  const [metrics, funnel, goldenPath] = await Promise.all([
     getHudMetrics(tokenOk ? 'kiosk' : 'admin'),
     tokenOk
       ? Promise.resolve(null)
       : getFounderFunnelData('30d').catch(() => null),
+    tokenOk ? Promise.resolve(null) : loadGoldenPathFunnel(),
   ]);
   const dashboard = (
     <HudDashboardClient
@@ -84,6 +86,7 @@ export default async function HudPage({
           : undefined
       }
       initialFunnel={funnel}
+      goldenPath={goldenPath}
     />
   );
 

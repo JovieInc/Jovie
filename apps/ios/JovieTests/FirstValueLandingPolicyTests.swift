@@ -116,6 +116,7 @@ private struct FirstValueLandingStubRepository: AppStateRepository {
   }
 
   func clearCachedUser(_: String) async {}
+  func clearCachedUser(_: String, ifOwnedBy _: NativeSessionOwnership) async {}
 }
 
 private final class FirstValueLandingStubBrightness: BrightnessControlling, @unchecked Sendable {

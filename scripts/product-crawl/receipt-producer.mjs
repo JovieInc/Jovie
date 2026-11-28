@@ -13,8 +13,13 @@ export const SIGNED_IN_TARGET = {
   '/onboarding/checkout':
     '/onboarding/checkout?source=intent&plan=pro&interval=month',
 };
+// The request ceiling is a runaway guard per shard, not a coverage limit.
+// A full shard of today's inventory takes about 24k request attempts (about
+// 47 a visit, 510 visits on the heaviest shard, Nov 23 production run), so
+// 20k stopped 220 visits before they started. 40k covers every visit with
+// room for route growth, and still stops a page that loops on requests.
 export const CRAWL_DEFAULTS = {
-  maxInterceptedRequests: 20_000,
+  maxInterceptedRequests: 40_000,
   pageIntervalMs: 1000,
 };
 export const WORKFLOW = '.github/workflows/postdeploy-probes.yml';

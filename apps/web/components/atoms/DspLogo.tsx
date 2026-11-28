@@ -173,6 +173,26 @@ function DspLogoInner({
 export const DspLogo = memo(DspLogoInner);
 DspLogo.displayName = 'DspLogo';
 
+/** Icon-only brand glyph from `DSP_LOGO_CONFIG` (live smart-link path/color). */
+export function DspServiceIcon({
+  provider,
+  className = 'h-7 w-7 shrink-0',
+}: Readonly<{ provider: string; className?: string }>) {
+  const config = DSP_LOGO_CONFIG[provider];
+  if (!config?.iconPath) return null;
+  return (
+    <svg
+      viewBox='0 0 24 24'
+      fill='currentColor'
+      className={`system-b-dsp-service-icon ${className}`}
+      aria-hidden='true'
+      data-dsp-icon={provider}
+    >
+      <path d={config.iconPath} />
+    </svg>
+  );
+}
+
 /**
  * Brand logo configuration for video providers (short-form "Use this sound").
  * Separate from DSP_LOGO_CONFIG since these are video platforms, not music DSPs.

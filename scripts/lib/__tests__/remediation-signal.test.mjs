@@ -238,13 +238,13 @@ describe('red remediation is agent-ready', () => {
     fetchImpl: run.fetchImpl,
   });
 
-  it('creates the deduped P0 in Todo with agent-ready and the run url', async () => {
+  it('creates the deduped P0 in Backlog with agent-ready and the run url', async () => {
     clearRemediationLabelCache();
     const run = linearStub([]);
     const result = await applyRemediationDecision(red, context(run));
     expect(result.ok).toBe(true);
     const create = run.calls.find(call => call.query.includes('issueCreate'));
-    expect(create.variables.stateId).toBe('st-todo');
+    expect(create.variables.stateId).toBe('st-backlog');
     expect(create.variables.labelIds).toEqual(
       expect.arrayContaining(['lbl-ready', 'lbl-key'])
     );
@@ -253,7 +253,7 @@ describe('red remediation is agent-ready', () => {
     );
   });
 
-  it('re-adds agent-ready when a closed signal reopens', async () => {
+  it('re-adds agent-ready when a closed signal reopens into Backlog', async () => {
     clearRemediationLabelCache();
     const run = linearStub([
       {
@@ -280,7 +280,7 @@ describe('red remediation is agent-ready', () => {
       reopened: true,
     });
     const update = run.calls.find(call => call.query.includes('issueUpdate'));
-    expect(update.variables.input.stateId).toBe('st-todo');
+    expect(update.variables.input.stateId).toBe('st-backlog');
     expect(update.variables.input.labelIds).toEqual(
       expect.arrayContaining(['lbl-ready', 'lbl-key'])
     );

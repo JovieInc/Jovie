@@ -10,6 +10,8 @@ const baseReport: Report = {
   deltaPercent: 18,
   deltaDisplay: '+18%',
   direction: 'up',
+  polarity: 'higher-is-better',
+  sentiment: 'positive',
   series: [4, 5, 5, 6, 7, 8, 9],
   items: [
     { label: 'Mobile', deltaPercent: 22, detail: '1,204 visitors' },

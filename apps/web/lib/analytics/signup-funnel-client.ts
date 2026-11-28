@@ -111,6 +111,15 @@ export function markSignupFirstValuePending(): void {
   }
 }
 
+/** True while a claim in this browser is still waiting for `first_value`. */
+export function peekSignupFirstValuePending(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(PENDING_FIRST_VALUE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 /** Fire `first_value` once if a claim in this browser is pending it. */
 export function consumeSignupFirstValue(): void {
   try {

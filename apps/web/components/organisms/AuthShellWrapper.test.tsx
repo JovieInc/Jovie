@@ -66,11 +66,13 @@ vi.mock('./AuthShell', () => ({
     breadcrumbs,
     headerAction,
     onSidebarOpenChange,
+    framePlaceholder,
     children,
   }: {
     breadcrumbs: { label: string }[];
     headerAction?: ReactNode;
     onSidebarOpenChange?: (open: boolean) => void;
+    framePlaceholder?: boolean;
     children: ReactNode;
   }) => (
     <>
@@ -85,7 +87,7 @@ vi.mock('./AuthShell', () => ({
         </button>
         {headerAction}
       </header>
-      <main>{children}</main>
+      <main data-frame-placeholder={String(framePlaceholder)}>{children}</main>
     </>
   ),
 }));
@@ -135,6 +137,21 @@ beforeEach(() => {
 });
 
 describe('AuthShellWrapper accessibility', () => {
+  it.each([true, false])(
+    'forwards the streamed placeholder state (%s)',
+    framePlaceholder => {
+      render(
+        <AuthShellWrapper framePlaceholder={framePlaceholder}>
+          <p>Route content</p>
+        </AuthShellWrapper>
+      );
+      expect(screen.getByRole('main')).toHaveAttribute(
+        'data-frame-placeholder',
+        String(framePlaceholder)
+      );
+    }
+  );
+
   it('persists a collapsed sidebar and survives an offline save', async () => {
     const persist = vi.fn(async () => {
       throw new TypeError('Failed to fetch');

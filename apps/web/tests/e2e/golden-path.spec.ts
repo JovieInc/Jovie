@@ -11,9 +11,8 @@ import {
   prepareBetterAuthEmailOtp,
 } from '../helpers/auth';
 import {
-  releaseGoldenPathTestBindings,
   selectGoldenPathArtist,
-  unpublishGoldenPathTestProfiles,
+  teardownGoldenPathRun,
 } from './helpers/claim-dogfood-fixtures';
 import { completeGoldenPathBillingJourney } from './helpers/golden-path-billing';
 import { openHomeWelcome } from './helpers/golden-path-home-welcome';
@@ -62,6 +61,8 @@ let TEST_SPOTIFY_ARTIST: { id: string; name: string; url: string } = {
   name: '',
   url: '',
 };
+/** Journey identities this run created; teardown touches only these. */
+const GOLDEN_PATH_RUN_EMAILS = new Set<string>();
 
 const IS_LOCAL_AUTH_BYPASS =
   process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
@@ -197,7 +198,10 @@ async function verifyHomeWelcome(page: Page) {
       await page.emulateMedia({
         reducedMotion: viewport.width === 615 ? 'reduce' : 'no-preference',
       });
-      const { initialGreeting, before } = await openHomeWelcome(page);
+      const { initialGreeting, before } = await openHomeWelcome(
+        page,
+        TEST_SPOTIFY_ARTIST.name.split(' ')[0]
+      );
       await expect(heading).toHaveText(initialGreeting!);
       // Same chunk-swap race as the helper's `before` read: re-read the box
       // until the mounted composer yields a real one, never a single sample.
@@ -507,6 +511,7 @@ async function recordOperatorApproval(
 /** Visible email-OTP sign-in; seeds invitation only when closed-signup kill switch is on. */
 async function createFreshUserOnce(page: import('@playwright/test').Page) {
   const email = `gp-${Date.now().toString(36)}+e2e@test.jovie.com`;
+  GOLDEN_PATH_RUN_EMAILS.add(email);
   const sql = neon(process.env.DATABASE_URL!);
   if (process.env.FEATURE_PUBLIC_SIGNUP_CLOSED === 'true') {
     await issueGoldenPathInvitation(async (q, p) => sql.query(q, p), email);
@@ -642,9 +647,7 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
   // JOV-9758 guard: value before paywall. The preview shows a real release,
   // a painted portrait and artwork, and no forced caps, before any pricing.
   const previewRail = page
-    .locator(
-      '[data-testid="onboarding-profile-rail"], [data-testid="onboarding-profile-rail-inline"]'
-    )
+    .locator('[data-testid="onboarding-profile-rail"]')
     .filter({ visible: true })
     .first();
   await expect
@@ -835,13 +838,12 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
   // Fresh browser — no inherited auth state
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  // Teardown: release the fixture binding this run created so the next run
-  // (or the prod-cert pool) starts from an unclaimed artist.
+  // Teardown: release only the bindings of identities this run created. The
+  // CI Neon branch is shared with smoke lanes that skip this journey.
   test.afterAll(async () => {
     if (!process.env.DATABASE_URL) return;
     const teardownSql = neon(process.env.DATABASE_URL);
-    await releaseGoldenPathTestBindings(teardownSql);
-    await unpublishGoldenPathTestProfiles(teardownSql);
+    await teardownGoldenPathRun(teardownSql, [...GOLDEN_PATH_RUN_EMAILS]);
   });
 
   test.beforeEach(() => {

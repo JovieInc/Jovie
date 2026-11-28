@@ -17,6 +17,7 @@
  *   - `SlashMenuItem` shape (for tests + sibling consumers)
  */
 
+import { HostDrawnInput } from '@jovie/ui';
 import {
   Calendar,
   Layers,
@@ -563,8 +564,8 @@ export function SlashCommandMenu({
         variant={variant}
         header={
           onQueryChange ? (
-            <div className='system-b-slash-header'>
-              <input
+            <div className='system-b-slash-header text-primary-token'>
+              <HostDrawnInput
                 ref={filterInputRef}
                 role='combobox'
                 aria-expanded='true'
@@ -576,7 +577,7 @@ export function SlashCommandMenu({
                 }
                 aria-autocomplete='list'
                 aria-label='Filter Commands And References'
-                className='min-w-0 flex-1 bg-transparent text-primary-token outline-none'
+                className='min-w-0 flex-1'
                 placeholder='Filter files, skills and references'
                 value={query}
                 onChange={event => onQueryChange(event.target.value)}

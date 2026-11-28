@@ -38,6 +38,7 @@ import type {
 } from '@/lib/ovie/shipping-state/contract';
 import { fleetVerdict } from './fleet-verdict';
 import {
+  formatPerDay,
   perDay,
   shippingSnapshotCaption,
   toneAtLeast,
@@ -301,7 +302,8 @@ function rawPulse(
     {
       key: 'merges-day',
       label: 'Org merges / day (7d)',
-      value: mergesPerDay === null ? OVIE_NOT_MEASURED : String(mergesPerDay),
+      value:
+        mergesPerDay === null ? OVIE_NOT_MEASURED : formatPerDay(mergesPerDay),
       measured: mergesPerDay !== null,
       tone:
         mergesPerDay === null
@@ -387,7 +389,7 @@ function sourceWas(
 ): string | null {
   if (key === 'merges-day') {
     const prior = perDay(delivery.merges.prior7Days);
-    return prior === null ? null : `${prior} prior 7d`;
+    return prior === null ? null : `${formatPerDay(prior)} prior 7d`;
   }
   return null;
 }

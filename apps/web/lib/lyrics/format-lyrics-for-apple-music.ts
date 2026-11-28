@@ -70,6 +70,14 @@ export function formatLyricsForAppleMusic(raw: string): {
     changes.push('Trimmed trailing whitespace');
   }
 
+  // 8b. Trim leading whitespace per line (Apple Music wants no indented
+  // lines; a removed timestamp like "[0:42] " otherwise leaves one behind)
+  const hadLeadingWhitespace = /^[ \t]+/m.test(text);
+  text = text.replaceAll(/^[ \t]+/gm, '');
+  if (hadLeadingWhitespace) {
+    changes.push('Trimmed leading whitespace');
+  }
+
   // 9. Collapse 3+ consecutive blank lines to 1 blank line
   const hadExcessiveBlanks = /\n{4,}/.test(text);
   text = text.replaceAll(/\n{4,}/g, '\n\n');
@@ -79,7 +87,8 @@ export function formatLyricsForAppleMusic(raw: string): {
 
   // 10. Remove leading/trailing blank lines
   const trimmed = text.replace(/^\n+/, '').replace(/\n+$/, '');
-  if (trimmed.length !== text.length) {
+  // A single final newline is kept (step 11), so it is not a change.
+  if (trimmed !== text.replace(/\n$/, '')) {
     changes.push('Removed leading/trailing blank lines');
   }
   text = trimmed;

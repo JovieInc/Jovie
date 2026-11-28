@@ -56,18 +56,15 @@ export async function certifyFix(
 /**
  * Whole golden path verdict. Reads the production golden-path ledger and
  * reuses `certificationVerdict` (scripts/lib/prod-cert.mjs), the one function
- * that decides "all 8 surfaces passed on the served SHA within 24h". The logic
- * is not duplicated here. A missing ledger or unknown SHA is a no.
+ * that decides "all 8 surfaces passed, or carried a pass forward, on the
+ * served SHA" (JOV-14402: release-bound, no time window). The logic is not
+ * duplicated here. A missing ledger or unknown SHA is a no.
  */
 export function isGoldenPathGreen(
   ledger: ProdGoldenPathLedger | null,
-  sha: string | null,
-  now: Date = new Date()
+  sha: string | null
 ): boolean {
   if (!ledger || !sha) return false;
   const receipts = Object.values(ledger.surfaces).map(record => record.latest);
-  return certificationVerdict(receipts, {
-    servedSha: sha,
-    nowMs: now.getTime(),
-  }).certified;
+  return certificationVerdict(receipts, { servedSha: sha }).certified;
 }

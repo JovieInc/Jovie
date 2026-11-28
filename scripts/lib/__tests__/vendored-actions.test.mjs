@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import {
   checkVendored,
   loadManifest,
+  minifyBundle,
   pinConsumerUpdates,
   stripBuildDirectives,
   VENDOR_ROOT,
@@ -255,5 +256,39 @@ describe('vendored actions (JOV-8754)', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('minifies bundles but keeps names, license comments and behaviour', () => {
+    const source = [
+      '/*! @license MIT keep-me */',
+      'class CacheServiceError extends Error {}',
+      'export function longFunctionName(value) {',
+      '  const doubled = value * 2;',
+      '  return `${new CacheServiceError("x").constructor.name}:${doubled}`;',
+      '}',
+      '',
+    ].join('\n');
+    const output = minifyBundle(source);
+    expect(output).toContain('keep-me');
+    expect(output).toContain('CacheServiceError');
+    const cjs = minifyBundle(
+      'module.exports = function add(a, b) { return a + b; };\n'
+    );
+    expect(
+      runInNewContext(
+        `const module = { exports: {} }; ${cjs}; module.exports(2, 3)`
+      )
+    ).toBe(5);
+  });
+
+  it('keeps the minified actions-cache bundles small (repo-size budget)', () => {
+    const cache = loadManifest(repoRoot).actions.find(
+      action => action.dir === 'actions-cache'
+    );
+    expect(cache.processing).toBe('minify/v1');
+    for (const file of Object.keys(cache.files).filter(f => f.endsWith('.js')))
+      expect(
+        readFileSync(resolve(repoRoot, VENDOR_ROOT, cache.dir, file)).length
+      ).toBeLessThan(1_600_000);
   });
 });

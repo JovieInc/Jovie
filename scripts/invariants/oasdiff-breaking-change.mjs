@@ -22,9 +22,10 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { downloadReleaseAsset } from '../lib/github-release-asset.mjs';
 
@@ -95,24 +96,30 @@ export function changedFilesSince(repoRoot, baseRef) {
     .filter(Boolean);
 }
 
-function tsxBinary(repoRoot) {
-  return join(repoRoot, 'apps/web/node_modules/.bin/tsx');
-}
-
-/** Render the public OpenAPI document from a checkout via the repo tsx. */
-export function renderSpecAt(repoRoot, treeRoot) {
-  const tsx = tsxBinary(repoRoot);
-  if (!existsSync(tsx)) {
+/** Render the public OpenAPI document from a checkout via the repo tsx.
+ * @param {string} repoRoot
+ * @param {string} treeRoot
+ * @param {(command: string, args: string[], options: import('node:child_process').SpawnSyncOptionsWithStringEncoding) => import('node:child_process').SpawnSyncReturns<string>} [run]
+ */
+export function renderSpecAt(repoRoot, treeRoot, run = spawnSync) {
+  let tsx;
+  try {
+    tsx = createRequire(join(repoRoot, 'apps/web/package.json')).resolve('tsx');
+  } catch {
     return {
       code: 1,
       error: `${SPEC_RENDERER} needs apps/web/node_modules (pnpm install) at ${repoRoot}`,
     };
   }
-  const result = spawnSync(tsx, ['scripts/render-public-openapi.ts'], {
-    cwd: join(treeRoot, 'apps/web'),
-    encoding: 'utf8',
-    maxBuffer: 32 * 1024 * 1024,
-  });
+  const result = run(
+    process.execPath,
+    ['--import', pathToFileURL(tsx).href, 'scripts/render-public-openapi.ts'],
+    {
+      cwd: join(treeRoot, 'apps/web'),
+      encoding: 'utf8',
+      maxBuffer: 32 * 1024 * 1024,
+    }
+  );
   if (result.status !== 0) {
     return {
       code: 1,
@@ -148,7 +155,7 @@ export function renderBaseSpec(repoRoot, baseRef) {
     if (!existsSync(modules)) {
       symlinkSync(join(repoRoot, 'apps/web/node_modules'), modules);
     }
-    // pnpm's .bin/tsx shim resolves tsx through <root>/node_modules/.pnpm.
+    // Historical root-level modules share the same installed workspace dependencies.
     const rootModules = join(worktree, 'node_modules');
     if (!existsSync(rootModules) && existsSync(join(repoRoot, 'node_modules')))
       symlinkSync(join(repoRoot, 'node_modules'), rootModules);

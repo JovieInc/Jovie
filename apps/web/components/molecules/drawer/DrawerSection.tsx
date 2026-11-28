@@ -18,13 +18,13 @@ export interface DrawerSectionProps {
   readonly surface?: 'plain' | 'card';
   readonly surfaceClassName?: string;
   readonly testId?: string;
-  /** Whether the section can be collapsed. Defaults to true when title is provided. */
+  /** Opt into disclosure. Titled sections stay visible unless explicitly grouped. */
   readonly collapsible?: boolean;
-  /** Whether the section starts open. Defaults to true. */
+  /** Whether a collapsible section starts open. Defaults to true. */
   readonly defaultOpen?: boolean;
   /** Stable id used by DrawerSectionGroup for single-open accordion behavior. */
   readonly sectionId?: string;
-  /** Delay mounting collapsed content until the first time it opens. */
+  /** Delay collapsed content until it first opens; static content always mounts. */
   readonly lazyMount?: boolean;
   readonly headingTestId?: string;
 }
@@ -67,7 +67,7 @@ function DrawerSectionHeadingSlot({
   }
 
   return (
-    <DrawerSectionHeading className='min-w-0 flex-1'>
+    <DrawerSectionHeading as='h3' className='min-w-0 flex-1'>
       {title}
     </DrawerSectionHeading>
   );
@@ -146,14 +146,15 @@ export function DrawerSection({
 }: DrawerSectionProps) {
   const sectionGroup = useDrawerSectionGroup();
   const isGrouped = Boolean(sectionGroup && sectionId);
-  const isCollapsible = collapsible ?? !!title;
+  const isCollapsible = Boolean(title) && (collapsible ?? isGrouped);
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [hasOpened, setHasOpened] = useState(defaultOpen);
   const contentId = useId();
   const resolvedIsOpen = isGrouped
     ? sectionGroup?.openSectionId === sectionId
     : isOpen;
-  const shouldRenderContent = !lazyMount || resolvedIsOpen || hasOpened;
+  const shouldRenderContent =
+    !isCollapsible || !lazyMount || resolvedIsOpen || hasOpened;
   const handleToggle = useCallback(() => {
     if (isGrouped && sectionId) {
       sectionGroup?.toggleSection(sectionId);

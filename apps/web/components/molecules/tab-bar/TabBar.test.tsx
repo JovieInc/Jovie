@@ -3,13 +3,14 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 describe('TabBar task density contract', () => {
-  it('keeps segment overflow controls at 32px on desktop', () => {
+  it('keeps segment overflow controls at 28px on desktop', () => {
     const source = readFileSync(resolve(__dirname, './TabBar.tsx'), 'utf8');
 
     expect(source).toContain(
       'const TAB_BAR_SEGMENT_OVERFLOW_TRIGGER_CLASSNAME'
     );
-    expect(source).toContain("'h-8 w-8 sm:before:h-8 sm:before:w-8'");
+    expect(source).toContain("'h-7 w-7 sm:before:h-7 sm:before:w-7'");
+    expect(source).not.toContain("'h-8 w-8 sm:before:h-8 sm:before:w-8'");
     expect(source).toContain('const overflowTriggerClassName =');
     expect(source).toContain('className={overflowTriggerClassName}');
     expect(source).toContain(

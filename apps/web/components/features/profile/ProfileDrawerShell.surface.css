@@ -1,0 +1,48 @@
+/* Scenic drawer chrome (white hairlines, black scrims, soft shadows).
+   Colour lives here so ProfileDrawerShell.tsx stays on semantic tokens. */
+
+.profile-drawer-shell-surface {
+  border-color: rgb(255 255 255 / 0.08);
+  box-shadow: 0 -8px 40px rgb(0 0 0 / 0.4);
+}
+
+.profile-drawer-shell-surface::before {
+  pointer-events: none;
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 6rem;
+  background: linear-gradient(to bottom, rgb(255 255 255 / 0.04), transparent);
+}
+
+.profile-drawer-shell-surface-card {
+  border-color: rgb(255 255 255 / 0.08);
+  box-shadow: 0 34px 96px rgb(0 0 0 / 0.48);
+}
+
+.profile-drawer-shell-surface-card::before {
+  pointer-events: none;
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 6rem;
+  background: linear-gradient(to bottom, rgb(255 255 255 / 0.04), transparent);
+}
+
+.profile-drawer-shell-hairline {
+  background-color: rgb(255 255 255 / 0.1);
+}
+
+.profile-drawer-shell-handle {
+  background-color: rgb(255 255 255 / 0.22);
+}
+
+.profile-drawer-shell-scrim-light {
+  background-color: rgb(0 0 0 / 0.24);
+}
+
+.profile-drawer-shell-scrim-heavy {
+  background-color: rgb(0 0 0 / 0.6);
+}

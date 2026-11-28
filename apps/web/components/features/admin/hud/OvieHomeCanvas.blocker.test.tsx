@@ -36,7 +36,7 @@ const BLOCKED = {
     kind: 'certification',
     step: 'public_profile',
     tone: 'bad',
-    text: 'The public profile fails certification, so no artist can be sent their profile yet',
+    text: 'The latest available public profile certification report shows a failed check. See Certifications for details.',
     detailsHref: APP_ROUTES.ADMIN_CERTIFICATIONS,
     since: null,
     nextAction: null,
@@ -73,12 +73,15 @@ describe('OvieHomeCanvas revenue blocker (Story First)', () => {
     return screen.getByTestId('story-first-bottleneck');
   }
 
-  it('leads the Story First hero with the revenue blocker', async () => {
+  it('leads with failed public profile certification without asserting a revenue outage', async () => {
     responses['/api/ovie/home/blocker'] = BLOCKED;
     const hero = renderCanvas();
     await waitFor(() =>
-      expect(hero).toHaveTextContent('The public profile is blocking revenue')
+      expect(hero).toHaveTextContent(
+        'Public profile certification needs attention'
+      )
     );
+    expect(hero).not.toHaveTextContent('blocking revenue');
     expect(hero).toHaveAttribute('data-tone', 'bad');
     expect(hero).toHaveTextContent(BLOCKED.blocker.text);
     expect(screen.getByRole('link', { name: 'Details' })).toHaveAttribute(

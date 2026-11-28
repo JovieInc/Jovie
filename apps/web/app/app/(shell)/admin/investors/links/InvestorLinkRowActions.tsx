@@ -1,9 +1,8 @@
 'use client';
 
-import { IconButton, SimpleTooltip } from '@jovie/ui';
 import { Check, CheckCircle2, CircleSlash, Copy, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
+import { TableRowActionBar } from '@/components/organisms/table';
 import { BASE_URL } from '@/constants/app';
 
 export interface InvestorLinkRowActionsLink {
@@ -23,22 +22,6 @@ export function InvestorLinkRowActions({
 }) {
   const [copied, setCopied] = useState(false);
   const shareableUrl = `${BASE_URL}/investor-portal?t=${link.token}`;
-  const actionItems = [
-    {
-      id: link.isActive ? 'deactivate' : 'reactivate',
-      label: link.isActive ? 'Deactivate' : 'Reactivate',
-      icon: link.isActive ? CircleSlash : CheckCircle2,
-      onClick: () => onToggleActive(link.id, !link.isActive),
-    },
-    { id: 'separator', label: '' },
-    {
-      id: 'delete',
-      label: 'Delete',
-      icon: Trash2,
-      variant: 'destructive' as const,
-      onClick: onRequestDelete,
-    },
-  ];
 
   const handleCopy = async () => {
     try {
@@ -51,25 +34,35 @@ export function InvestorLinkRowActions({
   };
 
   return (
-    <div className='flex items-center gap-2'>
-      <SimpleTooltip content='Copy shareable URL'>
-        <IconButton
-          variant='secondary'
-          size='lg'
-          ariaLabel='Copy shareable URL'
-          onClick={event => {
-            event.stopPropagation();
+    <TableRowActionBar
+      overflowAriaLabel='Investor link actions'
+      actions={[
+        {
+          id: 'copy',
+          label: 'Copy Shareable URL',
+          icon: copied ? Check : Copy,
+          priority: 10,
+          placement: 'primary',
+          isActive: copied,
+          onClick: () => {
             void handleCopy();
-          }}
-        >
-          {copied ? (
-            <Check className='h-3.5 w-3.5 text-success' />
-          ) : (
-            <Copy className='h-3.5 w-3.5' />
-          )}
-        </IconButton>
-      </SimpleTooltip>
-      <TableActionMenu items={actionItems} align='end' />
-    </div>
+          },
+        },
+        {
+          id: link.isActive ? 'deactivate' : 'reactivate',
+          label: link.isActive ? 'Deactivate' : 'Reactivate',
+          icon: link.isActive ? CircleSlash : CheckCircle2,
+          priority: 20,
+          onClick: () => onToggleActive(link.id, !link.isActive),
+        },
+        {
+          id: 'delete',
+          label: 'Delete',
+          icon: Trash2,
+          variant: 'destructive',
+          onClick: onRequestDelete,
+        },
+      ]}
+    />
   );
 }

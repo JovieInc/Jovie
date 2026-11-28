@@ -71,6 +71,24 @@ const response = (cases: readonly OvieInboxCase[]) =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Ovie Inbox', () => {
+  it('preserves Refresh when the page supplies the Inbox heading', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response([])));
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <OvieInbox showHeading={false} />
+      </QueryClientProvider>
+    );
+
+    expect(screen.queryByRole('heading', { name: 'Inbox' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+    expect(
+      await screen.findByText('Summer has nothing for you right now.')
+    ).toBeVisible();
+  });
+
   it('reserves decision content while loading without moving Refresh', async () => {
     let resolveRead!: (response: Response) => void;
     vi.stubGlobal(
@@ -99,7 +117,7 @@ describe('Ovie Inbox', () => {
     const refresh = screen.getByRole('button', { name: 'Refresh' });
     resolveRead(Response.json({ cases: [], issues: [] }));
     expect(
-      await screen.findByText('No pending founder decisions.')
+      await screen.findByText('Summer has nothing for you right now.')
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh' })).toBe(refresh);
     expect(container.querySelector('[data-empty-state-card]')).toBeNull();
@@ -134,6 +152,9 @@ describe('Ovie Inbox', () => {
     expect(screen.getByRole('textbox', { name: /Decision notes/ })).toBe(notes);
     expect(notes).toHaveValue('Looks right');
     expect(notes).toHaveFocus();
+    // The canonical Textarea atom owns the surface, not caller classes.
+    expect(notes.className).toContain('border-subtle');
+    expect(notes.className).toContain('min-h-15');
     await expectNoA11yViolations(container);
   });
 
@@ -218,6 +239,31 @@ describe('Ovie Inbox', () => {
     expect(summary).toHaveTextContent('27 source issues need attention.');
     expect(summary).not.toHaveTextContent('Marketing component');
     expect(disclosure.querySelectorAll('li')).toHaveLength(27);
+  });
+  it('keeps Refresh and decisions enabled during a background refetch', async () => {
+    let resolvePoll!: (response: Response) => void;
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(response([item]))
+      .mockImplementationOnce(
+        () => new Promise<Response>(resolve => (resolvePoll = resolve))
+      );
+    vi.stubGlobal('fetch', fetcher);
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <OvieInbox />
+      </QueryClientProvider>
+    );
+    await screen.findByText('First decision');
+    // A poll, not a click: the query refetches with nobody asking.
+    void client.refetchQueries();
+    await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeEnabled();
+    resolvePoll(response([item]));
   });
   it('keeps the requested case across a reordered refresh', async () => {
     const other = { ...item, id: 'summer:other', title: 'Other decision' };
@@ -351,12 +397,12 @@ describe('Ovie Inbox', () => {
     mount(new Response('{}', { status: 503 }), response([]));
     await screen.findByRole('alert');
     expect(
-      screen.queryByText('No pending founder decisions.')
+      screen.queryByText('Summer has nothing for you right now.')
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() =>
       expect(
-        screen.getByText('No pending founder decisions.')
+        screen.getByText('Summer has nothing for you right now.')
       ).toBeInTheDocument()
     );
   });
@@ -380,6 +426,14 @@ describe('Ovie Inbox', () => {
     await screen.findByTestId('ovie-inbox-decision');
     expect(scrollport).toContainElement(
       screen.getByTestId('ovie-inbox-decision')
+    );
+  });
+
+  it('shows the swipe card Discuss link for the current decision', async () => {
+    mount(response([item]));
+    expect(await screen.findByTestId('decision-card-discuss')).toHaveAttribute(
+      'href',
+      expect.stringContaining('discuss=summer%3Aone')
     );
   });
 });

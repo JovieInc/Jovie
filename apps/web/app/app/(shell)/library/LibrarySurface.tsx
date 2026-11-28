@@ -255,10 +255,10 @@ const LIBRARY_CARD_FOCUS_CLASS =
 const LIBRARY_BUTTON_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface) outline-none';
 const LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS =
-  'h-8 min-h-8 lg:before:h-8 lg:before:min-w-0';
+  'h-7 min-h-7 lg:before:h-7 lg:before:min-w-0';
 const LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS = cn(
   LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS,
-  'w-8 min-w-8'
+  'w-7 min-w-7'
 );
 
 type LibraryPresetId = LibraryView;
@@ -1903,9 +1903,9 @@ function LibraryReleaseTable({
       containerClassName='h-full'
       skeletonRows={SKELETON_ROW_COUNT.TABLE}
       skeletonColumnConfig={
-        rowMode === LIBRARY_CATALOG_ROW_MODE
-          ? LIBRARY_CATALOG_SKELETON_CONFIG
-          : LIBRARY_TABLE_SKELETON_CONFIG
+        hideHeader
+          ? LIBRARY_TABLE_SKELETON_CONFIG
+          : LIBRARY_CATALOG_SKELETON_CONFIG
       }
     />
   );
@@ -2264,6 +2264,20 @@ function AssetDrawer({
   const workKind = current ? getLibraryItemKind(current) : null;
   const isMerch = workKind === 'merch';
   const isYouTubeVideo = current?.source?.provider === 'youtube';
+  const summary = current
+    ? [
+        formatLibraryItemType(current),
+        (workKind === 'release' || workKind === 'audio') &&
+        current.trackCount > 0
+          ? `${current.trackCount} ${current.trackCount === 1 ? 'track' : 'tracks'}`
+          : null,
+        current.totalDurationMs != null && current.totalDurationMs > 0
+          ? formatLibraryDuration(current.totalDurationMs)
+          : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : '';
   const [tabSelection, setTabSelection] = useState<{
     readonly objectId: string | null;
     readonly tab: WorkInspectorTabId;
@@ -2279,19 +2293,28 @@ function AssetDrawer({
     },
     [currentId]
   );
-  // One share concept: the link row owns private file sharing too.
+  // The pinned link row also opens the separate private-file share flow.
   const [privateShareObjectId, setPrivateShareObjectId] = useState<
     string | null
   >(null);
+  const privateShareRef = useRef<HTMLDivElement>(null);
   const privateShareOpen =
     currentId !== null && privateShareObjectId === currentId;
   const openPrivateShare = useCallback(() => {
+    if (!currentId) return;
+    setTabSelection({ objectId: currentId, tab: 'overview' });
     setPrivateShareObjectId(currentId);
+    privateShareRef.current?.scrollIntoView({ block: 'nearest' });
   }, [currentId]);
   const handlePrivateShareOpenChange = useCallback(
     (next: boolean) => setPrivateShareObjectId(next ? currentId : null),
     [currentId]
   );
+  useEffect(() => {
+    if (open && privateShareOpen && activeTab === 'overview') {
+      privateShareRef.current?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [activeTab, open, privateShareOpen]);
   // One attach concept: ⌘U from anywhere in the open inspector.
   const [attachRequested, setAttachRequested] = useState(false);
   const clearAttachRequest = useCallback(() => setAttachRequested(false), []);
@@ -2411,17 +2434,18 @@ function AssetDrawer({
       tabsAriaLabel='Inspector tabs'
       objectHeader={
         current ? (
-          <EntityHeader
-            className='px-3 pt-3'
-            thumbnail={
-              <div className='h-12 w-12 shrink-0 overflow-hidden'>
-                <LibraryMediaThumbnail asset={current} size='drawer' />
-              </div>
-            }
-            title={current.title}
-            subtitle={current.artist}
-            meta={
-              <div className='-ml-1 flex h-6 min-w-0 items-center'>
+          <div className='space-y-3'>
+            <EntityHeader
+              layout='grid'
+              className='px-3 pt-3'
+              thumbnail={
+                <div className='size-14 shrink-0 overflow-hidden'>
+                  <LibraryMediaThumbnail asset={current} size='drawer' />
+                </div>
+              }
+              title={current.title}
+              subtitle={current.artist}
+              statusGlyph={
                 <LibraryStatusGlyph
                   asset={current}
                   showLabel
@@ -2432,18 +2456,38 @@ function AssetDrawer({
                       : formatLibraryStatus(current)
                   }
                 />
+              }
+              meta={
+                <span className='system-b-library-drawer-panel-copy text-secondary-token'>
+                  {summary}
+                </span>
+              }
+              stableLayout
+              titleLineClamp={1}
+              subtitleLineClamp={1}
+              reserveSubtitleSlot
+              reserveMetaSlot
+              metaOverflow='scroll'
+              actions={drawerHeaderActions}
+              data-testid='library-asset-entity-header'
+            />
+            {!isMerch && !isTake ? (
+              <div className='px-3' data-testid='work-inspector-share'>
+                <LibraryAssetSharePanel
+                  key={current.id}
+                  asset={current}
+                  profileId={profileId}
+                  artistHandle={artistHandle}
+                  disabled={!open}
+                  initialShare={current.share}
+                  onShareChange={onShareChange}
+                  onSharePrivately={
+                    isYouTubeVideo ? undefined : openPrivateShare
+                  }
+                />
               </div>
-            }
-            stableLayout
-            titleLineClamp={1}
-            subtitleLineClamp={1}
-            reserveSubtitleSlot
-            reserveMetaSlot
-            metaOverflow='scroll'
-            actions={drawerHeaderActions}
-            bodyClassName='pr-8'
-            data-testid='library-asset-entity-header'
-          />
+            ) : null}
+          </div>
         ) : undefined
       }
     >
@@ -2458,21 +2502,20 @@ function AssetDrawer({
             key={current.id}
             data-inspector-object-id={current.id}
             className={cn(
-              activeTab === 'overview'
-                ? 'divide-y divide-subtle'
-                : 'space-y-2.5'
+              activeTab === 'overview' ? 'space-y-4' : 'space-y-2.5'
             )}
           >
             {activeTab === 'overview' ? (
               <>
                 <LibraryTakeActions asset={current} open={open} />
                 {!isMerch && !isTake ? (
-                  <InspectorSection title='Actions' className='py-3 first:pt-0'>
+                  <InspectorSection>
                     <WorkInspectorActions
                       asset={current}
                       launches={workLaunches}
                       canPublish={profileId !== null}
                       disabled={!open}
+                      showSharingActions={false}
                       onSharePrivately={openPrivateShare}
                       onAskJovie={
                         askJovieAction &&
@@ -2495,80 +2538,8 @@ function AssetDrawer({
                   </InspectorSection>
                 ) : null}
 
-                {presentation ? (
-                  <InspectorSection
-                    title='Public Presentation'
-                    className='py-3 first:pt-0'
-                    data-testid='work-inspector-presentation'
-                  >
-                    <dl>
-                      <MetadataRow
-                        label='Public Page'
-                        value={
-                          presentation.pagePublication === 'live'
-                            ? 'Live'
-                            : presentation.pagePublication === 'not_public'
-                              ? 'Not public'
-                              : 'Unknown'
-                        }
-                      />
-                      <MetadataRow
-                        label='Profile'
-                        value={
-                          presentation.profileVisibility === 'visible'
-                            ? 'Shown on profile'
-                            : 'Hidden from profile'
-                        }
-                      />
-                      <MetadataRow
-                        label='Visitor Action'
-                        value={presentation.primaryVisitorAction}
-                      />
-                      {/* field-once-ok: row and Destinations section are exclusive */}
-                      {showDestinationsSection ? null : (
-                        <MetadataRow
-                          label='Destinations'
-                          value={
-                            presentation.destinationState === 'connected'
-                              ? presentation.destinations.join(', ')
-                              : presentation.destinationState === 'disconnected'
-                                ? 'Disconnected'
-                                : 'Not supported'
-                          }
-                        />
-                      )}
-                    </dl>
-                    {contextualBlockers.length > 0 ? (
-                      <div className='space-y-1 border-l-2 border-warning pl-2'>
-                        {contextualBlockers.map(blocker => (
-                          <p
-                            key={blocker.id}
-                            className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'
-                          >
-                            {blocker.title}
-                          </p>
-                        ))}
-                      </div>
-                    ) : null}
-                    {!isMerch ? (
-                      <LibraryAssetSharePanel
-                        key={current.id}
-                        asset={current}
-                        profileId={profileId}
-                        artistHandle={artistHandle}
-                        disabled={!open}
-                        initialShare={current.share}
-                        onShareChange={onShareChange}
-                        onSharePrivately={
-                          isYouTubeVideo ? undefined : openPrivateShare
-                        }
-                      />
-                    ) : null}
-                  </InspectorSection>
-                ) : null}
-
                 {privateShareOpen && !isMerch && !isYouTubeVideo ? (
-                  <div className='py-3' data-testid='work-private-share'>
+                  <div ref={privateShareRef} data-testid='work-private-share'>
                     <LibraryShareDropCreator
                       key={current.id}
                       open
@@ -2584,8 +2555,7 @@ function AssetDrawer({
                 ) : null}
 
                 <InspectorSection
-                  title='About'
-                  className='py-3'
+                  title='Details'
                   data-testid='work-inspector-about'
                 >
                   {current.description ? (
@@ -2596,7 +2566,7 @@ function AssetDrawer({
                   <dl>
                     {isTake ? null : (
                       <MetadataRow
-                        label='Review Status'
+                        label='Approval'
                         value={
                           <ApprovalStatusEditor
                             asset={current}
@@ -2608,10 +2578,6 @@ function AssetDrawer({
                         }
                       />
                     )}
-                    <MetadataRow
-                      label='Type'
-                      value={formatLibraryItemType(current)}
-                    />
                     {current.releaseDate ? (
                       <MetadataRow
                         label={
@@ -2621,15 +2587,9 @@ function AssetDrawer({
                               ? 'Updated'
                               : 'Release Date'
                         }
-                        value={
-                          <span
-                            title={formatLibraryReleaseDateTitle(
-                              current.releaseDate
-                            )}
-                          >
-                            {formatLibraryReleaseDate(current.releaseDate)}
-                          </span>
-                        }
+                        value={formatLibraryReleaseDateTitle(
+                          current.releaseDate
+                        )}
                       />
                     ) : null}
                     {isMerch ? (
@@ -2661,21 +2621,6 @@ function AssetDrawer({
                       </>
                     ) : (
                       <>
-                        {(workKind === 'release' || workKind === 'audio') &&
-                        current.trackCount > 0 ? (
-                          <MetadataRow
-                            label='Tracks'
-                            value={current.trackCount}
-                          />
-                        ) : null}
-                        {current.totalDurationMs != null ? (
-                          <MetadataRow
-                            label='Duration'
-                            value={formatLibraryDuration(
-                              current.totalDurationMs
-                            )}
-                          />
-                        ) : null}
                         {current.genres.length > 0 ? (
                           <MetadataRow
                             label='Genres'
@@ -2720,6 +2665,57 @@ function AssetDrawer({
                       />
                     ) : null}
                   </dl>
+                  {presentation ? (
+                    <dl data-testid='work-inspector-presentation'>
+                      {!isMerch ? (
+                        <MetadataRow
+                          label='Link Access'
+                          value={
+                            current.share
+                              ? capitalizeFirst(current.share.visibility)
+                              : 'Unknown'
+                          }
+                        />
+                      ) : null}
+                      <MetadataRow
+                        label='Profile'
+                        value={
+                          presentation.profileVisibility === 'visible'
+                            ? 'Shown on profile'
+                            : 'Hidden from profile'
+                        }
+                      />
+                      <MetadataRow
+                        label='Page Action'
+                        value={presentation.primaryVisitorAction}
+                      />
+                      {/* field-once-ok: row and Destinations section are exclusive */}
+                      {showDestinationsSection ? null : (
+                        <MetadataRow
+                          label='Destinations'
+                          value={
+                            presentation.destinationState === 'connected'
+                              ? presentation.destinations.join(', ')
+                              : presentation.destinationState === 'disconnected'
+                                ? 'Disconnected'
+                                : 'Not supported'
+                          }
+                        />
+                      )}
+                    </dl>
+                  ) : null}
+                  {contextualBlockers.length > 0 ? (
+                    <div className='space-y-1 border-l-2 border-warning pl-2'>
+                      {contextualBlockers.map(blocker => (
+                        <p
+                          key={blocker.id}
+                          className='system-b-library-drawer-panel-copy leading-5 text-secondary-token'
+                        >
+                          {blocker.title}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
                   {!isMerch ? (
                     <RightsholdersList
                       asset={current}
@@ -2729,7 +2725,7 @@ function AssetDrawer({
                 </InspectorSection>
 
                 {showDestinationsSection ? (
-                  <InspectorSection title='Destinations' className='py-3'>
+                  <InspectorSection title='Destinations'>
                     <div className='space-y-0.5'>
                       {current.providers.map(provider => (
                         <DspQuietRow
@@ -2757,7 +2753,7 @@ function AssetDrawer({
                     relationship =>
                       relationship.subjectId === current.source?.canonicalId
                   )) ? (
-                  <InspectorSection title='Related work' className='py-3'>
+                  <InspectorSection title='Related Work'>
                     <YouTubeMerchRelationshipEditor
                       key={current.id}
                       profileId={profileId}
@@ -2770,7 +2766,7 @@ function AssetDrawer({
                 ) : null}
 
                 {isYouTubeVideo && current.source ? (
-                  <InspectorSection title='Jovie link' className='py-3'>
+                  <InspectorSection title='Jovie Link'>
                     <YouTubeLinkPanel
                       key={current.id}
                       profileId={profileId}
@@ -2781,7 +2777,7 @@ function AssetDrawer({
                 ) : null}
 
                 {isYouTubeVideo && current.source ? (
-                  <InspectorSection title='Results' className='py-3'>
+                  <InspectorSection title='Results'>
                     <YouTubeOptimizationPanel
                       key={current.id}
                       profileId={profileId}
@@ -2792,7 +2788,7 @@ function AssetDrawer({
                 ) : null}
 
                 {!isMerch && hasPostReleaseActivity ? (
-                  <InspectorSection title='Activity' className='pt-3 last:pb-0'>
+                  <InspectorSection title='Activity'>
                     <PostReleasePanel
                       key={current.id}
                       asset={current}

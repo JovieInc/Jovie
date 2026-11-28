@@ -10,18 +10,6 @@ const { mockUseDashboardData, mockUseDspMatchActions } = vi.hoisted(() => ({
   mockUseDspMatchActions: vi.fn(),
 }));
 
-vi.mock('@jovie/ui', async () => {
-  const actual = await vi.importActual<object>('@jovie/ui');
-  return {
-    ...actual,
-    Button: ({ children, ...props }: ComponentProps<'button'>) => (
-      <button type='button' {...props}>
-        {children}
-      </button>
-    ),
-  };
-});
-
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   DashboardDataContext: {
     Provider: ({ children }: { children: React.ReactNode }) => children,
@@ -29,21 +17,6 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
     displayName: 'DashboardDataContext',
   },
   useDashboardData: mockUseDashboardData,
-}));
-
-vi.mock('@/components/molecules/drawer/DrawerSection', () => ({
-  DrawerSection: ({
-    children,
-    title,
-  }: {
-    children: ReactNode;
-    title: string;
-  }) => (
-    <section>
-      <h2>{title}</h2>
-      {children}
-    </section>
-  ),
 }));
 
 vi.mock('@/components/molecules/drawer/EntitySidebarShell', () => ({
@@ -141,11 +114,19 @@ describe('DspPresenceSidebar certificate', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('flags a missing artist image with the warning tokens', () => {
+  it('keeps match facts and missing-photo context visible without a disclosure', () => {
     render(<DspPresenceSidebar item={suggested} onClose={() => undefined} />);
-    const badge = screen.getByRole('img', { name: 'Profile Image Missing' });
-    expect(badge).toHaveClass('bg-warning-subtle');
-    expect(badge.className).not.toMatch(/amber/);
+
+    expect(screen.getByText('Verified by ISRC matching')).toBeVisible();
+    expect(screen.getByText('Tracks Verified')).toBeVisible();
+    expect(screen.getByText('Profile Image')).toBeVisible();
+    expect(screen.getByText('Missing')).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Match Status' })
+    ).not.toBeInTheDocument();
+    const link = screen.getByRole('link', { name: /View On Spotify/ });
+    expect(link).toHaveAttribute('href', suggested.externalArtistUrl);
+    expect(link.querySelector('button')).toBeNull();
   });
 
   it('shows pending labels and disables actions while a match is saving', async () => {

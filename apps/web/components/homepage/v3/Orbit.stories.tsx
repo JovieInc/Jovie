@@ -32,3 +32,13 @@ export const ProfileArc: Story = {
 export const ClosedRing: Story = {
   args: { id: 'story-orbit-closed', rings: [600], arc: [0, 360], closed: true },
 };
+
+/** The footer orbit lights neutral grey, not an accent. */
+export const NeutralFooter: Story = {
+  args: {
+    id: 'story-orbit-neutral',
+    rings: [2800],
+    arc: [346, 28],
+    accent: 'neutral',
+  },
+};

@@ -22,8 +22,9 @@ export default defineConfig({
   expect: {
     timeout: 25_000,
     toHaveScreenshot: {
-      maxDiffPixelRatio: 0.08, // 8% pixel difference allowed (cross-platform font rendering)
-      threshold: 0.2, // Per-pixel color threshold
+      // Same tolerance as playwright.config.ts (see the note there).
+      maxDiffPixelRatio: 0.02,
+      threshold: 0.1,
       animations: 'disabled',
     },
   },

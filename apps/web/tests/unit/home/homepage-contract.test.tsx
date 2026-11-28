@@ -12,6 +12,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ABOUT_FACTS } from '@/data/aboutCopy';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing';
 import { getMarketingRecipe } from '@/data/marketing/recipes';
 import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
@@ -318,6 +319,11 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     ].map(script => JSON.parse(script.textContent ?? '{}'));
     const website = schemas.find(s => s['@type'] === 'WebSite');
     const software = schemas.find(s => s['@type'] === 'SoftwareApplication');
+    const organization = schemas.find(s => s['@type'] === 'Organization');
+    expect(organization).toMatchObject({
+      '@id': website.publisher['@id'],
+      sameAs: ABOUT_FACTS.organizationSameAs,
+    });
 
     // The homepage WebSite schema speaks with the approved artist-profile
     // landing-page copy, verbatim (JOV-8565) — not a hand-rolled line.
@@ -391,11 +397,11 @@ describe('homepage contract', { timeout: 60_000 }, () => {
       /@supports \(animation-timeline: view\(\)\)\s*\{\s*\.hv3-hero,\s*\.hv3-chapter\s*\{\s*overflow: clip;\s*\}/
     );
     // The horizon line paints above the chapter rule's hairline, which would
-    // otherwise cover it; the glow stays behind the copy.
+    // otherwise cover it; the point of light sits on the rule, above it.
     expect(css).toMatch(
       /\.hv3-chapter::after\s*\{[^}]*z-index:\s*1;[^}]*height:\s*1px;/
     );
-    expect(css).toMatch(/\.hv3-chapter::before\s*\{[^}]*z-index:\s*-1;/);
+    expect(css).toMatch(/\.hv3-chapter::before\s*\{[^}]*z-index:\s*2;/);
     // Keyframes touch only compositor properties, and never fade to nothing.
     for (const [, body] of css.matchAll(
       /@keyframes [\w-]+\s*\{([\s\S]*?\})\s*\}/g

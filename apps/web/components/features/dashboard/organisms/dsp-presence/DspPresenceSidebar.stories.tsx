@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fn } from 'storybook/test';
+import { expect, fn, within } from 'storybook/test';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import type { DspPresenceItem } from '@/app/app/(shell)/dashboard/presence/actions';
@@ -73,7 +73,22 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const SuggestedMatch: Story = {};
+export const SuggestedMatch: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement.ownerDocument.body);
+    await expect(
+      canvas.getByTestId('dsp-presence-entity-header')
+    ).toHaveAttribute('data-layout', 'grid');
+    await expect(canvas.getByText('Verified by ISRC matching')).toBeVisible();
+    await expect(canvas.getByText('Profile Image')).toBeVisible();
+    await expect(
+      canvas.getByRole('link', { name: /View On Spotify/ })
+    ).toHaveAttribute('href', suggestedItem.externalArtistUrl);
+    await expect(
+      canvas.queryByRole('button', { name: 'Match Status' })
+    ).not.toBeInTheDocument();
+  },
+};
 
 export const Empty: Story = {
   args: {

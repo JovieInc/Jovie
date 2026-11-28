@@ -30,8 +30,8 @@ describe('golden path certification after the Pen export', () => {
 
   // A not-certified verdict (rc=1) must fail the job (never swallow rc=1 into
   // exit 0 as a false-green workflow run) while still uploading receipts via
-  // `if: ${{ always() }}` and blocking reuse stamping (`steps.certify.outcome == 'success'`).
-  const runCertify = (code, writeReceipts = true) => {
+  // `if: ${{ always() }}`.
+  const runCertify = (code, writeReceipts = true, env = {}) => {
     const steps = Object.values(workflow.jobs).flatMap(job => job.steps ?? []);
     const run = steps.find(
       s => s.name === 'Certify the golden path on production'
@@ -60,7 +60,12 @@ describe('golden path certification after the Pen export', () => {
       : `node() { return ${code}; }\n`;
     const result = spawnSync('bash', ['-e', '-c', stub + run], {
       encoding: 'utf8',
-      env: { ...process.env, RUNNER_TEMP: temp, GITHUB_STEP_SUMMARY: summary },
+      env: {
+        ...process.env,
+        RUNNER_TEMP: temp,
+        GITHUB_STEP_SUMMARY: summary,
+        ...env,
+      },
     });
     return {
       status: result.status,
@@ -83,11 +88,37 @@ describe('golden path certification after the Pen export', () => {
     const upload = certSteps.find(
       s => s.name === 'Upload certification receipts'
     );
-    const stamp = certSteps.find(
-      s => s.name === 'Stamp the receipts certified for reuse'
-    );
     expect(upload?.if).toBe('${{ always() }}');
-    expect(stamp?.if).toBe("${{ steps.certify.outcome == 'success' }}");
+    // JOV-14402: no reuse stamp; the ledger itself records each step's pass.
+    expect(certSteps.map(s => s.name ?? '').join('\n')).not.toMatch(/stamp/iu);
+  });
+
+  it('passes the decoded carry plan to prod-cert, and none without a plan', () => {
+    const steps = Object.values(workflow.jobs).flatMap(job => job.steps ?? []);
+    const run = steps.find(
+      s => s.name === 'Certify the golden path on production'
+    )?.run;
+    const argsOf = env => {
+      const temp = mkdtempSync(join(tmpdir(), 'prod-cert-carry-'));
+      const stub = `node() { printf '%s\\n' "$@" > "$RUNNER_TEMP/args"; return 0; }\n`;
+      const result = spawnSync('bash', ['-e', '-c', stub + run], {
+        encoding: 'utf8',
+        env: { ...process.env, RUNNER_TEMP: temp, ...env },
+      });
+      expect(result.status).toBe(0);
+      return {
+        args: readFileSync(join(temp, 'args'), 'utf8').trim().split('\n'),
+        temp,
+      };
+    };
+    const plan = '{"schema":"jovie.golden-path-carry/v1"}';
+    const carried = argsOf({
+      CERT_PLAN_B64: Buffer.from(plan).toString('base64'),
+    });
+    const at = carried.args.indexOf('--carry');
+    expect(at).toBeGreaterThan(0);
+    expect(readFileSync(carried.args[at + 1], 'utf8')).toBe(plan);
+    expect(argsOf({ CERT_PLAN_B64: '' }).args).not.toContain('--carry');
   });
 
   it('fails closed on rc=1 even when no receipt file was written and on rc=2 crashes', () => {

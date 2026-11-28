@@ -1,27 +1,21 @@
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   downloadingUpdate,
   installDesktopUpdateBridge,
   uninstallDesktopUpdateBridge,
 } from '@/lib/desktop/desktop-updates.test-utils';
+import { renderWithQueryClient as render } from '@/tests/utils/test-utils';
 import { SidebarDockBridge } from './SidebarDockBridge';
 
-vi.mock('./release-sidebar/useTrackAudioPlayer', () => ({
-  useTrackAudioPlayer: () => ({
-    playbackState: { activeTrackId: null, trackTitle: null },
-    stop: vi.fn(),
-    toggleTrack: vi.fn(),
-  }),
+vi.mock('./release-sidebar/useTrackAudioSnapshot', () => ({
+  selectNowPlaying: () => ({}),
+  useTrackAudioSnapshot: () => ({ activeTrackId: null, trackTitle: null }),
+  useTrackAudioActions: () => ({ stop: vi.fn(), toggleTrack: vi.fn() }),
 }));
 vi.mock('./audio-chrome-state', () => ({
   useAudioChromeSnapshot: () => ({ fullPlayerVisible: false }),
+  useMediaCanvasTransport: () => null,
   requestFullAudioPlayer: vi.fn(),
 }));
 vi.mock('@/lib/desktop/electron-bridge', () => ({
@@ -38,7 +32,6 @@ const props = {
   userId: 'one',
   collapsed: false,
   fetchImpl: vi.fn(async () => Response.json(null)),
-  children: () => null,
 };
 
 beforeEach(() => {
@@ -109,4 +102,36 @@ it('shows nothing in a browser tab', async () => {
   const { container } = render(<SidebarDockBridge {...props} />);
   await waitFor(() => expect(props.fetchImpl).toHaveBeenCalledOnce());
   expect(container.querySelector('[data-dock-card="update"]')).toBeNull();
+});
+
+it('uses the editorial card for restart and keeps the same action through IPC', async () => {
+  const { bridge } = installDesktopUpdateBridge(READY);
+  render(<SidebarDockBridge {...props} penRail />);
+  const restart = await screen.findByRole('button', {
+    name: 'Restart to update',
+  });
+  expect(restart).toHaveTextContent('Restart to update');
+  expect(screen.getByText(READY.version)).toBeVisible();
+  await act(async () => {
+    fireEvent.click(restart);
+  });
+  expect(bridge.install).toHaveBeenCalledOnce();
+  expect(screen.getByRole('button', { name: 'Restart to update' })).toBe(
+    restart
+  );
+  expect(restart).toHaveAttribute('aria-busy', 'true');
+});
+
+it('dismisses the ready card without starting the update', async () => {
+  const { bridge, emit } = installDesktopUpdateBridge(READY);
+  render(<SidebarDockBridge {...props} penRail />);
+  const dismiss = await screen.findByRole('button', { name: 'Dismiss Update' });
+  fireEvent.click(dismiss);
+  expect(
+    screen.queryByRole('button', { name: 'Restart to update' })
+  ).toBeNull();
+  expect(bridge.install).not.toHaveBeenCalled();
+
+  act(() => emit({ state: 'ready', version: '26.11.13' }));
+  expect(await screen.findByText('26.11.13')).toBeVisible();
 });

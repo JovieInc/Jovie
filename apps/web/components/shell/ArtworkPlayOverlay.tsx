@@ -1,5 +1,6 @@
 'use client';
 
+import { PlainButton } from '@jovie/ui';
 import { Pause, Play } from 'lucide-react';
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -26,11 +27,11 @@ export const ArtworkPlayOverlay = React.memo(function ArtworkPlayOverlay({
   readonly className?: string;
 }) {
   return (
-    <button
+    <PlainButton
       type='button'
       onClick={onPlay}
       className={cn(
-        'absolute inset-0 grid place-items-center bg-black/50 text-white dark:text-white transition-opacity duration-subtle ease-subtle hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none',
+        'absolute inset-0 grid place-items-center bg-ink-on-media/50 text-on-media transition-opacity duration-subtle ease-subtle hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page) outline-none',
         visible ? 'opacity-100' : 'opacity-0',
         className
       )}
@@ -42,6 +43,6 @@ export const ArtworkPlayOverlay = React.memo(function ArtworkPlayOverlay({
       ) : (
         <Play className='h-3.5 w-3.5' />
       )}
-    </button>
+    </PlainButton>
   );
 });

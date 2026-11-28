@@ -18,7 +18,6 @@ import { useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { CheckoutUnlockCards } from '@/components/organisms/billing/CheckoutUnlockCards';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { APP_ROUTES } from '@/constants/routes';
@@ -29,16 +28,14 @@ import {
   ARTIST_VISIBILITY_ACTIVATION_COPY,
   ARTIST_VISIBILITY_ACTIVATION_STEPS,
   ARTIST_VISIBILITY_SHARE_PROMPT,
-  fetchValidatedSession,
   getPaidSuccessPrimaryHref,
   getPaidSuccessPrimaryLabel,
   isArtistVisibilityPlan,
-  type PaidPlanId,
-  resolveCanonicalPlan,
   resolveCheckoutSuccessCopy,
   resolveCheckoutSuccessView,
   shouldCelebratePaidSuccess,
 } from './checkout-success-state';
+import { useCheckoutConfirmation } from './use-checkout-confirmation';
 
 const MAX_UNLOCK_TILES = [
   {
@@ -98,36 +95,17 @@ export default function CheckoutSuccessPage() {
   const searchParams = useSearchParams();
   const isOnboardingUpgrade = searchParams.get('source') === 'onboarding';
   const checkoutSessionId = searchParams.get('session_id');
-  const rawPlanIdParam = searchParams.get('plan_id');
   const [requestState, setRequestState] = useState<
     'idle' | 'submitting' | 'success' | 'error'
   >('idle');
-  const {
-    data: billingData,
-    isLoading: isBillingLoading,
-    isFetched: isBillingFetched,
-    error: billingError,
-  } = useBillingStatusQuery();
+  const { data: billingData } = useBillingStatusQuery();
   const [feedback, setFeedback] = useState<string | null>(null);
   const [hasHydrated, setHasHydrated] = useState(false);
-  const [isSessionPlanPending, setIsSessionPlanPending] = useState(
-    Boolean(checkoutSessionId)
-  );
-  const [validatedSessionPlan, setValidatedSessionPlan] =
-    useState<PaidPlanId | null>(null);
-  const [needsProfile, setNeedsProfile] = useState(false);
-  // Private until we confirm it is the artist's: never say "live".
-  const [proofPending, setProofPending] = useState(false);
-  const [profileLive, setProfileLive] = useState<boolean | null>(null);
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [sessionStatus, setSessionStatus] = useState<string | null>(null);
-  const [openCheckoutUrl, setOpenCheckoutUrl] = useState<string | null>(null);
-  const isBillingPending =
-    !checkoutSessionId &&
-    isBillingLoading === true &&
-    billingData === undefined &&
-    isBillingFetched !== true &&
-    billingError == null;
+  const {
+    receipt,
+    pending: isSessionPlanPending,
+    retry,
+  } = useCheckoutConfirmation(checkoutSessionId);
   const conversionTrackedRef = useRef(false);
   const onboardingTrackedRef = useRef(false);
   const celebrationTrackedRef = useRef(false);
@@ -136,72 +114,16 @@ export default function CheckoutSuccessPage() {
     setHasHydrated(true);
   }, []);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    if (checkoutSessionId) {
-      setIsSessionPlanPending(true);
-    } else {
-      setIsSessionPlanPending(false);
-      setValidatedSessionPlan(null);
-    }
-
-    void fetchValidatedSession(checkoutSessionId, controller.signal)
-      .then(session => {
-        if (controller.signal.aborted || !session) return;
-        if (checkoutSessionId) {
-          setValidatedSessionPlan(session.plan);
-          setSessionStatus(session.sessionStatus);
-          setOpenCheckoutUrl(session.checkoutUrl);
-        }
-        setNeedsProfile(session.needsProfile);
-        setProofPending(session.proofPending);
-        setProfileLive(session.profileLive);
-        setShareUrl(session.shareUrl);
-      })
-      .catch(error => {
-        if (controller.signal.aborted) return;
-        console.error(
-          '[billing/success] checkout session validation failed',
-          error
-        );
-        if (checkoutSessionId) setValidatedSessionPlan(null);
-      })
-      .finally(() => {
-        if (controller.signal.aborted || !checkoutSessionId) return;
-        setIsSessionPlanPending(false);
-      });
-
-    return () => controller.abort();
-  }, [checkoutSessionId]);
-
   const view = useMemo(
     () =>
       resolveCheckoutSuccessView({
         checkoutSessionId,
         isSessionPlanPending,
-        validatedSessionPlan,
-        billingPlan: billingData?.plan,
-        isBillingPending,
+        validatedSessionPlan: receipt.plan,
+        confirmationStatus: receipt.status,
+        paymentStatus: receipt.paymentStatus,
       }),
-    [
-      billingData?.plan,
-      checkoutSessionId,
-      isBillingPending,
-      isSessionPlanPending,
-      validatedSessionPlan,
-    ]
-  );
-
-  const resolvedPlan = useMemo(
-    () =>
-      view.kind === 'success'
-        ? resolveCanonicalPlan(
-            billingData?.plan,
-            rawPlanIdParam,
-            validatedSessionPlan
-          )
-        : { canonical: null, displayName: null },
-    [billingData?.plan, rawPlanIdParam, validatedSessionPlan, view.kind]
+    [checkoutSessionId, isSessionPlanPending, receipt]
   );
 
   useEffect(() => {
@@ -279,9 +201,13 @@ export default function CheckoutSuccessPage() {
     }
   };
 
-  const paidDisplayName =
-    resolvedPlan.displayName ??
-    (view.kind === 'success' ? view.displayName : null);
+  const needsProfile = receipt.needsProfile;
+  const proofPending = receipt.proofPending;
+  const profileLive = receipt.profileLive;
+  const shareUrl = receipt.shareUrl;
+  const sessionStatus = receipt.sessionStatus;
+  const openCheckoutUrl = receipt.checkoutUrl;
+  const paidDisplayName = view.kind === 'success' ? view.displayName : null;
   const isArtistVisibilitySuccess =
     view.kind === 'success' && isArtistVisibilityPlan(view.plan);
   const canClaimProfileLive =
@@ -337,7 +263,9 @@ export default function CheckoutSuccessPage() {
               data-testid='checkout-success-status'
             >
               <CircleCheck className='h-3.5 w-3.5' aria-hidden='true' />
-              Payment confirmed
+              {view.paymentStatus === 'paid'
+                ? 'Payment confirmed'
+                : 'Checkout confirmed — no payment due'}
             </p>
           ) : (
             <div
@@ -408,13 +336,20 @@ export default function CheckoutSuccessPage() {
                     </a>
                   </Button>
                 ) : null}
-                <UpgradeButton
-                  className='w-full sm:w-auto [&_button]:w-full'
-                  variant={openCheckoutUrl ? 'secondary' : 'primary'}
-                  size='lg'
-                >
-                  Retry checkout
-                </UpgradeButton>
+                {checkoutSessionId ? (
+                  <Button
+                    type='button'
+                    size='lg'
+                    variant={openCheckoutUrl ? 'secondary' : 'primary'}
+                    onClick={retry}
+                    data-testid='checkout-check-again'
+                  >
+                    Check Again
+                  </Button>
+                ) : null}
+                <Button asChild variant='secondary' size='lg'>
+                  <Link href={APP_ROUTES.BILLING}>View Billing</Link>
+                </Button>
                 <Button asChild variant='secondary' size='lg'>
                   <Link href={APP_ROUTES.SUPPORT}>Contact support</Link>
                 </Button>

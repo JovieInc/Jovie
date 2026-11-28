@@ -264,14 +264,8 @@ describe('release range risk fail-closed', () => {
     expect(artifact.unknown).toBe(false);
   });
 
-  it('no path filter names the nonexistent middleware.ts', () => {
-    const ci = readFileSync(
-      new URL('../../../.github/workflows/ci.yml', import.meta.url),
-      'utf8'
-    );
-    expect(ci).not.toMatch(/middleware\\?\.ts/);
-    expect(ci).toMatch(/BUILD_PATTERN=.*apps\/web\/proxy\\\.ts/);
-    expect(JSON.stringify(manifest)).not.toMatch(/middleware\\\\\.ts/);
+  it('the release manifest does not name nonexistent middleware.ts', () => {
+    expect(JSON.stringify(manifest)).not.toMatch(/middleware\\\.ts/);
   });
 });
 

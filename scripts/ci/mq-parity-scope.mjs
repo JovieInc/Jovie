@@ -3,8 +3,7 @@
  *
  * JOV-13071 / release autonomy: close queue-only `gap` exemptions by running
  * the same command on pull_request when the diff touches that lane's inputs.
- * This module starts with the typecheck twin (highest first-pass leverage after
- * the already-landed JOV-6834 affected unit shards).
+ * Twins: typecheck (Wave 2) and remaining cheap lanes (Wave 3).
  */
 import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
@@ -14,9 +13,16 @@ import {
   affectsWebTestTypecheck,
 } from '../lib/ci-repo-lanes.mjs';
 
+const MQ_PARITY_TOOLING =
+  /^(scripts\/ci-fast-lanes\.mjs|scripts\/ci\/mq-parity-|\.github\/workflows\/(?:ci|source-validation)\.yml$)/;
+
+/** Paths the remaining ci-fast group (biome, guards, design, ios-fast, …) reads. */
+const REMAINING_INPUTS =
+  /^(?:apps\/|packages\/|scripts\/|\.github\/|pnpm-lock\.yaml$|package\.json$|turbo\.json$|tsconfig|DESIGN\.md$|design\.tokens\.json$|biome\.json|\.nvmrc$|\.npmrc$)/;
+
 /**
  * @param {readonly string[]} files
- * @returns {{ typecheck: boolean }}
+ * @returns {{ typecheck: boolean, remaining: boolean }}
  */
 export function selectMqParityScope(files) {
   return {
@@ -24,9 +30,10 @@ export function selectMqParityScope(files) {
       file =>
         affectsJovieTypecheck(file) ||
         affectsWebTestTypecheck(file) ||
-        /^(scripts\/ci-fast-lanes\.mjs|scripts\/ci\/mq-parity-|\.github\/workflows\/(?:ci|source-validation)\.yml$)/.test(
-          file
-        )
+        MQ_PARITY_TOOLING.test(file)
+    ),
+    remaining: files.some(
+      file => REMAINING_INPUTS.test(file) || MQ_PARITY_TOOLING.test(file)
     ),
   };
 }
@@ -39,8 +46,8 @@ if (
   if (!/^[0-9a-f]{40}$/.test(base ?? '')) {
     throw new Error('Exact diff base SHA required');
   }
-  // --no-renames: rename-out of the typecheck graph must still surface the
-  // deleted source path (repo convention; see resolve-merge-group-path-diff).
+  // --no-renames: rename-out of a twin graph must still surface the deleted
+  // source path (repo convention; see resolve-merge-group-path-diff).
   const files = execFileSync(
     'git',
     ['diff', '--no-renames', '--name-only', '-z', base, 'HEAD'],

@@ -65,6 +65,8 @@ type SecondaryAction =
 interface EmptyStateBaseProps {
   readonly icon?: React.ReactNode;
   readonly heading: string;
+  /** Heading level, so the empty state fits the page outline (default 3). */
+  readonly headingLevel?: 2 | 3 | 4;
   readonly description?: string;
   readonly variant?: EmptyStateVariant;
   /** Button size - use 'sm' for less padding */
@@ -159,6 +161,7 @@ function parseShortcut(shortcut: string): React.ReactNode {
 export function EmptyState({
   icon,
   heading,
+  headingLevel = 3,
   description,
   action,
   actionSlot,
@@ -272,7 +275,7 @@ export function EmptyState({
 
   // Quiet work surfaces share the home state's single-line anatomy.
   const isQuiet = presentation === 'quiet';
-  const Heading = isQuiet ? 'p' : 'h3';
+  const Heading = isQuiet ? 'p' : (`h${headingLevel}` as 'h2' | 'h3' | 'h4');
 
   const content = (
     <>
@@ -338,8 +341,8 @@ export function EmptyState({
     >
       {isWorkspacePresentation ? (
         <div
-          data-empty-state-card=''
-          className='w-full max-w-md rounded-md border border-subtle bg-surface-0 p-6 text-left'
+          data-empty-state-content='workspace'
+          className='w-full max-w-md text-left'
         >
           {content}
         </div>

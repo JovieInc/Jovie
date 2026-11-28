@@ -1,5 +1,4 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { loadDspPresenceForProfile } from '@/app/app/(shell)/dashboard/presence/actions';
 import { getTasks } from '@/app/app/(shell)/dashboard/tasks/task-actions';
 import { loadTourDates } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { loadReleaseMatrix } from '@/lib/releases/release-matrix-loader';
@@ -64,23 +63,18 @@ export function prefetchForRoute(
       });
       break;
     case 'audience':
-      // Audience uses cursor-based pagination — prefetch the first page
-      queryClient.prefetchQuery({
-        queryKey: queryKeys.audience.members(profileId),
-        queryFn: ({ signal }) =>
-          fetchWithTimeout<unknown>(
-            `/api/dashboard/audience/members?profileId=${encodeURIComponent(profileId)}`,
-            { signal }
-          ),
-        staleTime,
-      });
+      // Audience is SSR-first (first page awaited on the route). A hover warm
+      // can occupy the infinite-query cache and block newer SSR initialData
+      // (Tim native-first audit / JOV-12668). Stock/SSR-only wins ties — do
+      // not reintroduce a nav warm without a matched authenticated
+      // hover→navigate A/B proving faster first usable rows, no request-budget
+      // regression, and correct freshness when SSR is newer. ASR-043.
       break;
     case 'presence':
-      queryClient.prefetchQuery({
-        queryKey: queryKeys.dspEnrichment.presence(profileId),
-        queryFn: () => loadDspPresenceForProfile(profileId),
-        staleTime,
-      });
+      // Identity (/app/presence) is ProfilesWorkspace (connection suggestions),
+      // not the legacy DSP presence loader. Warming dspEnrichment.presence is a
+      // dead cache write that burns the request budget (ASR-043). Identity is
+      // SSR-first via loadProfilesWorkspaceData; do not invent a second warm.
       break;
     case 'earnings':
       queryClient.prefetchQuery({

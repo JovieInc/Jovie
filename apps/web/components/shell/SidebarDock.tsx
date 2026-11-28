@@ -1,7 +1,7 @@
 'use client';
 
 import { shortTooltipTitle } from '@jovie/copy/tooltip-copy';
-import { ArrowUp, AudioLines, Download } from 'lucide-react';
+import { ArrowUp, Download } from 'lucide-react';
 import {
   type ReactNode,
   useEffect,
@@ -14,7 +14,6 @@ import { banner } from '@/components/feedback/banner-store';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import type { WhatsNewEntry } from '@/lib/whats-new';
 import { InstallBanner } from './InstallBanner';
-import { SidebarBottomNowPlaying } from './SidebarBottomNowPlaying';
 import { DockUpdateCard, DockWhatsNewCard } from './SidebarDockCards';
 
 export interface SidebarDockStatus {
@@ -25,18 +24,19 @@ export interface SidebarDockStatus {
 export interface SidebarDockProps {
   readonly userId: string;
   readonly collapsed?: boolean;
+  readonly penRail?: boolean;
+  readonly enabled?: boolean;
   /** The desktop app's one update control; absent in web builds. */
   readonly updateControl?: SidebarDockUpdateControl;
   readonly release?: WhatsNewEntry | null;
-  readonly audio?: React.ComponentProps<typeof SidebarBottomNowPlaying> & {
-    readonly reserved?: boolean;
-  };
   readonly install?: {
     readonly isIOS?: boolean;
     readonly onInstall: () => void;
     readonly onDismiss: () => void;
   };
   readonly children?: (status: SidebarDockStatus | undefined) => ReactNode;
+  /** Called when the icon-rail status label changes, for a row elsewhere. */
+  readonly onStatusChange?: (status: SidebarDockStatus | undefined) => void;
 }
 
 export interface SidebarDockUpdateControl {
@@ -47,6 +47,7 @@ export interface SidebarDockUpdateControl {
   /** A failure outranks the other sidebar notices. */
   readonly urgent: boolean;
   readonly node: ReactNode;
+  readonly onDismiss?: () => void;
 }
 
 export function sidebarDockSeenKey(userId: string): string {
@@ -57,11 +58,13 @@ export function sidebarDockSeenKey(userId: string): string {
 export function SidebarDock({
   userId,
   collapsed = false,
+  penRail = false,
+  enabled = true,
   updateControl,
   release,
-  audio,
   install,
   children,
+  onStatusChange,
 }: SidebarDockProps) {
   const regionRef = useRef<HTMLElement>(null);
   const positions = useRef(new Map<string, number>());
@@ -81,9 +84,10 @@ export function SidebarDock({
   }, [key]);
 
   const showRelease = Boolean(
-    userId && release && seen?.key === key && seen.id !== release.id
+    enabled && userId && release && seen?.key === key && seen.id !== release.id
   );
-  const updateLabel = updateControl?.visible ? updateControl.label : null;
+  const updateLabel =
+    enabled && updateControl?.visible ? updateControl.label : null;
   const updateUrgent = updateControl?.urgent ?? false;
   const showUpdate = Boolean(updateLabel);
   const activeNotice = useSyncExternalStore(
@@ -114,7 +118,7 @@ export function SidebarDock({
       });
     return () => banner.dismiss(id);
   }, [noticePrefix, showRelease, collapsed]);
-  const hasInstall = Boolean(install);
+  const hasInstall = enabled && Boolean(install);
   useEffect(() => {
     const id = `${noticePrefix}install`;
     if (hasInstall && !collapsed)
@@ -128,17 +132,12 @@ export function SidebarDock({
   }, [noticePrefix, hasInstall, collapsed]);
   const selected = (kind: string) =>
     activeNotice?.id === `${noticePrefix}${kind}`;
-  const showAudio = Boolean(audio?.track.trackTitle || audio?.track.artworkUrl);
-  const audioLabel = audio
-    ? `${audio.isPlaying ? 'Playing' : 'Paused'}: ${audio.track.trackTitle ?? 'Audio'}`
-    : '';
   const statusLabels = [
     showUpdate && updateLabel,
     // Tooltip copy rule: a short title only. The story lives on /changelog,
     // which the expanded What's new card links to.
     showRelease && `What's new: ${shortTooltipTitle(release?.title ?? '')}`,
-    showAudio && audioLabel,
-    install && 'Install Jovie',
+    hasInstall && 'Install Jovie',
   ].filter(Boolean);
 
   // FLIP only the cards' paint positions. Footer geometry resolves locally;
@@ -229,9 +228,6 @@ export function SidebarDock({
                   className='size-1.5 rounded-full bg-primary'
                 />
               ) : null}
-              {showAudio ? (
-                <AudioLines data-dock-badge='audio' className='size-2.5' />
-              ) : null}
               {install ? (
                 <Download data-dock-badge='install' className='size-2.5' />
               ) : null}
@@ -240,43 +236,58 @@ export function SidebarDock({
         }
       : undefined;
 
+  const statusRef = useRef(badgeStatus);
+  useEffect(() => {
+    statusRef.current = badgeStatus;
+  });
+  const statusLabel = badgeStatus?.label;
+  useEffect(() => {
+    onStatusChange?.(statusRef.current);
+  }, [onStatusChange, statusLabel]);
+
+  if (!enabled) return null;
+
   return (
     <>
       <section
         ref={regionRef}
         data-sidebar-dock='true'
         aria-label='Sidebar Dock'
-        className='flex shrink-0 flex-col gap-1 overflow-visible px-3 pb-(--space-2-5) empty:pb-0'
+        className={
+          penRail && !collapsed
+            ? 'sidebar-editorial-slot'
+            : 'flex shrink-0 flex-col gap-1 overflow-visible px-3 pb-(--space-2-5) empty:pb-0'
+        }
       >
         {!collapsed && showUpdate && selected('update') ? (
-          <DockUpdateCard>{updateControl?.node}</DockUpdateCard>
+          <DockUpdateCard
+            penRail={penRail}
+            onDismiss={
+              updateControl?.onDismiss &&
+              (() => {
+                returnFocus();
+                updateControl.onDismiss?.();
+              })
+            }
+          >
+            {updateControl?.node}
+          </DockUpdateCard>
         ) : null}
         {!collapsed && showRelease && release && selected('release') ? (
           <DockWhatsNewCard
+            penRail={penRail}
             title={release.title}
+            deck={
+              release.summary.trim() !== release.title.trim()
+                ? release.summary.trim()
+                : undefined
+            }
             onOpen={markSeen}
             onDismiss={() => {
               returnFocus();
               markSeen();
             }}
           />
-        ) : null}
-        {!collapsed && showAudio && audio ? (
-          <div
-            data-dock-card='now-playing'
-            data-state={audio.reserved ? 'reserved' : 'visible'}
-            aria-hidden={audio.reserved || undefined}
-            inert={audio.reserved || undefined}
-            className={`rounded-md border border-subtle bg-sidebar ${audio.reserved ? 'invisible' : ''}`}
-          >
-            <SidebarBottomNowPlaying
-              {...audio}
-              onDismiss={() => {
-                returnFocus();
-                audio.onDismiss?.();
-              }}
-            />
-          </div>
         ) : null}
         {!collapsed && install && selected('install') ? (
           <div data-dock-card='install'>

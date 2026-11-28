@@ -2,7 +2,8 @@
   "$schema": "jovie.surface-ia/v1",
   "_comment": "One canonical shell and IA registry for every Jovie surface (app, Ovie, public profile, smart link, marketing). Human contract: docs/design-system/shell-ia.md. Enforced by JOV-INV-047 (scripts/invariants/shell-ia.mjs). Paths are relative to apps/web. App screen recipes stay in data/appScreens; route scaffolds stay in docs/design-system/app-shell-route-scaffold-matrix.md.",
   "iaContracts": {
-    "_comment": "Drift W1 documentation pointers — not executable wiring. Profile isomorphism (C2), Audience absorption (C3), settings admission monopoly (C4) live in docs/design-system/shell-ia.md. Home vs Inbox root label (T0.2) is Tim-gated and omitted here.",
+    "_comment": "Drift documentation pointers — not executable wiring. Creator root Home (C1), Profile isomorphism (C2), Audience absorption (C3), settings admission monopoly (C4) live in docs/design-system/shell-ia.md.",
+    "creatorRootHome": "docs/design-system/shell-ia.md#c1--creator-root-job-tuple-home",
     "profileRepresentation": "docs/design-system/shell-ia.md#c2--profile-representation-isomorphism",
     "audienceAbsorption": "docs/design-system/shell-ia.md#c3--audience-absorption",
     "settingsAdmission": "docs/design-system/shell-ia.md#c4--settings-admission-monopoly",

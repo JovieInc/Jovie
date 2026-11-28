@@ -1544,11 +1544,27 @@ def breaker_streak(runs: list, now: float) -> int:
     return streak
 
 
+# A fingerprint trip holds its head for one breaker window, then the PR re-enters repair at the
+# back of the fair order (repair_order: most head claims last), so it only takes a spare seat.
+# 2026-11-22: the hold had no end. 14 Nov 19 PRs (e.g. #26066, seven same-head claims, then
+# nothing for 50h+) sat red with no label, no claim and no exit; the machine-gap issue the trip
+# files is about the failure class, not the PR, so nothing ever released the head.
+FP_HOLD_S = int(os.environ.get("LANES_FP_BREAKER_HOLD_S", str(BREAKER_WINDOW_S)))
+
+
+def fp_hold_open(entry: dict, head: str | None, now: float) -> bool:
+    """The fingerprint hold on `head` is live. The hold starts at the run that tripped it, the
+    entry's last run (a held head gets no further runs), and ends FP_HOLD_S later."""
+    runs = [float(row[0]) for row in entry.get("runs", []) if isinstance(row, (list, tuple)) and row]
+    return bool(head) and entry.get("fpOpenHead") == head and bool(runs) and 0 <= now - max(runs) < FP_HOLD_S
+
+
 def pr_breaker_open(host, number: int, now: float, head: str | None = None) -> bool:
-    """Open after BREAKER_STREAK unproductive runs, or for the exact head a fingerprint breaker tripped on."""
+    """Open after BREAKER_STREAK unproductive runs, or for FP_HOLD_S on the exact head a
+    fingerprint breaker tripped on."""
     try:
         entry = json.loads((host.state / "pr-breaker.json").read_text()).get(str(number)) or {}
-        if head and entry.get("fpOpenHead") == head:
+        if fp_hold_open(entry, head, now):
             return True
         return breaker_streak(entry.get("runs") or [], now) >= BREAKER_STREAK
     except (OSError, ValueError, AttributeError, TypeError):

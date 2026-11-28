@@ -109,9 +109,6 @@
     ".github/workflows/agent-harness-health-report.yml": {
       "gh-shell": 3
     },
-    ".github/workflows/ci-duration-ratchet.yml": {
-      "gh-shell": 1
-    },
     ".github/workflows/ci.yml": {
       "gh-shell": 2,
       "github-script": 1,
@@ -445,7 +442,7 @@
       "provider-host": 1
     },
     "scripts/lanes/doctor.py": {
-      "gh-subprocess": 4
+      "gh-subprocess": 3
     },
     "scripts/lanes/execution_attempt.py": {
       "gh-subprocess": 1

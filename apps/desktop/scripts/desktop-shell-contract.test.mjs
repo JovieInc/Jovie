@@ -347,6 +347,18 @@ test('automatic update checks defer initial work while manual and nightly checks
     mainSource,
     /powerMonitor\.on\('unlock-screen', checkAfterWake\)/
   );
+  assert.match(mainSource, /scheduleWakeRendererRecovery\(\{/);
+  assert.match(mainSource, /recoverMainWindowAfterWake/);
+  assert.match(mainSource, /createRecoverAfterWake\(/);
+  assert.match(mainSource, /DESKTOP_LOAD_FAILURE_DOCUMENT_MARKER/);
+  assert.match(mainSource, /rendererEverBooted = false/);
+  const wakeSource = await readFile(
+    join(desktopRoot, 'src/renderer-wake-recovery.ts'),
+    'utf8'
+  );
+  assert.match(wakeSource, /export function decideWakeRendererRecovery\(/);
+  assert.match(wakeSource, /export function scheduleWakeRendererRecovery\(/);
+  assert.match(wakeSource, /export function createRecoverAfterWake\(/);
   assert.match(mainSource, /shouldInstallDownloadedUpdateWhileRunning\(/);
   assert.match(mainSource, /autoUpdater\.quitAndInstall\(true, true\)/);
   const schedule = mainSource.match(
@@ -502,6 +514,8 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /describeDesktopLoadFailure/);
   assert.match(mainSource, /decideHostedLoadRetry/);
   assert.match(mainSource, /rendererEverBooted/);
+  assert.match(mainSource, /recoverAfterWake/);
+  assert.match(mainSource, /from '\.\/renderer-wake-recovery'/);
   assert.match(mainSource, /function isAppOriginReachable\(\)/);
   assert.match(mainSource, /function findReachableHostedUrl\(/);
   assert.match(mainSource, /beginRecoveryUnlatch/);
@@ -571,6 +585,20 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.match(mainSource, /function buildDesktopBootSplashUrl\(\)/);
   assert.match(mainSource, /function buildDesktopBootSplashHtml\(\)/);
   assert.match(mainSource, /function loadHostedUrlAfterSplash\(/);
+  assert.match(mainSource, /navigateHostedAfterSplash\(/);
+  assert.match(mainSource, /primeHostedLaunch\(/);
+  // Splash→hosted overlap lives in hosted-launch-prime (JOV-14776).
+  const primeSource = await readFile(
+    join(desktopRoot, 'src/hosted-launch-prime.ts'),
+    'utf8'
+  );
+  assert.match(primeSource, /export function loadHostedUrlAfterSplash\(/);
+  assert.match(primeSource, /primeHostedLaunchCache\(/);
+  assert.match(primeSource, /once\('dom-ready',\s*navigateToHosted\)/);
+  assert.doesNotMatch(
+    primeSource,
+    /once\('did-finish-load',\s*navigateToHosted\)/
+  );
   assert.match(mainSource, /Jovie for Mac is loading/);
   assert.match(
     mainSource,
@@ -747,12 +775,13 @@ test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark',
     );
     assert.match(config, /to: Jovie-Wordmark-Cream\.svg/);
   }
-  assert.match(tokenSource, /macCornerMarkSizePx: 40/);
+  assert.doesNotMatch(tokenSource, /macCornerMarkSizePx/);
   assert.match(tokenSource, /macCornerMarkOpacity: 0\.35/);
   assert.match(tokenSource, /markCream: '#F5F4F0'/);
-  assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.macCornerMarkSizePx/);
+  assert.doesNotMatch(splashFn, /corner-mark|macCornerMarkSizePx/);
   assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.macCornerMarkOpacity/);
   assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.markCream/);
+  assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.textSecondary/);
   assert.match(splashFn, /data-desktop-splash="cinematic"/);
   assert.match(splashFn, /aria-label="Jovie for Mac is loading"/);
   const wordmarkPathFn = mainSource.match(
@@ -809,7 +838,7 @@ test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark',
   assert.match(splashFn, /data-splash-settled="o"/);
   assert.match(
     splashFn,
-    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?animation: none;[\s\S]*?\.settled-mark \{ opacity: 1; \}/
+    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?animation: none;[\s\S]*?\.settled-mark \{ opacity: \$\{mutedMarkOpacity\}; \}/
   );
   assert.doesNotMatch(splashFn, /180px/);
   assert.doesNotMatch(splashFn, /<h1>/);
@@ -820,7 +849,7 @@ test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark',
   assert.doesNotMatch(mainSource, /height:\s*180px/);
 });
 
-test('Mac cinematic splash renders the wordmark lockup that settles to the 32px cream O', async () => {
+test('Mac cinematic splash renders the wordmark lockup that settles to the 32px muted O', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
   const splashFn = mainSource.match(
     /function buildDesktopBootSplashHtml\(\): string \{[\s\S]*?\n\}/
@@ -855,8 +884,8 @@ test('Mac cinematic splash renders the wordmark lockup that settles to the 32px 
     { compilerOptions: { target: ts.ScriptTarget.ES2022 } }
   ).outputText;
   const tokens = {
-    macCornerMarkSizePx: 40,
     macCornerMarkOpacity: 0.35,
+    textSecondary: '#a0a5af',
     macCinematicCanvas: '#030406',
     markCream: '#F5F4F0',
     splashMarkSizePx: 32,
@@ -889,14 +918,18 @@ test('Mac cinematic splash renders the wordmark lockup that settles to the 32px 
   assert.match(before, /class="fallback-mark"/);
   assert.match(html, /data-desktop-splash="cinematic"/);
   assert.match(html, /opacity: 0\.35/);
-  assert.match(html, /width: min\(40px, 1\.786vw\)/);
+  assert.doesNotMatch(html, /corner-mark|min\(40px, 1\.786vw\)/);
+  assert.doesNotMatch(html, /11AFFF|--mac-ion|rgba\(17,175,255/i);
+  assert.equal(html.match(/<svg class="settled-mark"/g)?.length, 1);
   assert.doesNotMatch(html, /translateX\(|sunburst|conic-gradient/);
   assert.match(html, /class="suffix">for Mac<\/span>/);
-  // Settled state: the 32px cream O on the empty field.
+  // Settled state: the 32px muted O (textSecondary at 0.35) on the empty field.
   assert.match(
     html,
-    /\.settled-mark \{ width: 32px; height: 32px; color: var\(--mac-cream\)/
+    /\.settled-mark \{ width: 32px; height: 32px; color: var\(--mac-muted\)/
   );
+  assert.match(html, /--mac-muted: #a0a5af/);
+  assert.match(html, /\.progress \{[^}]*height: 1px/);
   assert.match(html, /--mac-cream: #F5F4F0/);
   assert.match(html, /<svg class="settled-mark"[^>]*data-splash-settled="o"/);
   assert.doesNotMatch(html, /<h1>|Loading Jovie|180px/);

@@ -148,6 +148,11 @@ if (process.argv[2] === '--version') {
       `${actionRoot}setup-playwright/action.yml`,
       readFileSync(`${actionRoot}setup-playwright/action.yml`)
     );
+    // setup-playwright pulls the Git LFS visual baselines through this action.
+    write(
+      `${actionRoot}lfs-pull/action.yml`,
+      readFileSync(`${actionRoot}lfs-pull/action.yml`)
+    );
     write(
       `${actionRoot}prime-node-toolcache/action.yml`,
       'runs:\n  using: composite\n  steps: []\n'

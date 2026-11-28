@@ -62,6 +62,18 @@ export const WhatsNew: Story = {
     />
   ),
 };
+
+/** A title-only update keeps its CTA and dismiss target in the shared slot. */
+export const PartialEditorialCopy: Story = {
+  render: () => (
+    <DockWhatsNewCard
+      penRail
+      title='Your latest releases'
+      onOpen={fn()}
+      onDismiss={fn()}
+    />
+  ),
+};
 /** A long release title truncates before the trailing arrow. */
 export const LongContentWhatsNew: Story = {
   render: () => (

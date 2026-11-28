@@ -1,4 +1,5 @@
 import Foundation
+import JovieKit
 
 /// Honest post-Identity chat stages for TTMV observation (JOV-13858).
 /// Screen view is never activation. Cancel is never fail. Live launch only.
@@ -241,6 +242,10 @@ enum PostIdentityChatMeasurement {
 
   /// Stable machine token — never prompt text or localized error copy.
   static func failureReason(for error: Error) -> String {
+    // Checked first: missingToken is also a terminal auth failure but keeps its own token.
+    if case APIClientError.missingToken = error {
+      return "missing_token"
+    }
     if isTerminalChatAuthFailure(error) {
       return "terminal_auth"
     }
@@ -249,9 +254,6 @@ enum PostIdentityChatMeasurement {
     }
     if case let APIClientError.requestFailed(statusCode: code) = error {
       return "http_\(code)"
-    }
-    if case APIClientError.missingToken = error {
-      return "missing_token"
     }
     return "send_failed"
   }

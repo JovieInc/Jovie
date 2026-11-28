@@ -19,8 +19,8 @@ export interface AudienceLtvCellProps {
 const TIER_STYLES = {
   none: 'text-tertiary-token',
   low: 'text-secondary-token',
-  medium: 'text-amber-600 dark:text-amber-400 font-caption',
-  high: 'text-emerald-600 dark:text-emerald-400 font-semibold',
+  medium: 'text-warning-text font-caption',
+  high: 'text-success-text font-semibold',
 } as const;
 
 export function formatDollars(cents: number): string {

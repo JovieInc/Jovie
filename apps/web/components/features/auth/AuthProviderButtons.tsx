@@ -1,4 +1,5 @@
 // @coverage-via apps/web/tests/unit/auth/AuthProviderButtons.test.tsx
+import { PlainButton } from '@jovie/ui';
 import Image from 'next/image';
 import type { PrimaryAuthOAuthProvider } from '@/lib/auth/oauth-providers';
 import { getAuthOAuthProviderLabel } from '@/lib/auth/oauth-providers';
@@ -17,7 +18,9 @@ interface AuthProviderButtonSlotProps {
  * Shared geometry and type live in styles/theme.css.
  */
 const AUTH_PROVIDER_BUTTON_CLASS = cn(
-  'auth-provider-button w-full',
+  // The face draws its own focus ring in theme.css; this keeps PlainButton
+  // from adding a second one.
+  'auth-provider-button w-full focus-visible:outline-none',
   'transition-opacity duration-subtle ease-out'
 );
 
@@ -46,7 +49,7 @@ export function AuthProviderButtonSlot({
   const isDisabled = disabled || pending;
 
   return (
-    <button
+    <PlainButton
       type='button'
       disabled={isDisabled}
       aria-label={pending ? `${label} loading` : undefined}
@@ -73,7 +76,7 @@ export function AuthProviderButtonSlot({
         )}
         <span>{label}</span>
       </span>
-    </button>
+    </PlainButton>
   );
 }
 

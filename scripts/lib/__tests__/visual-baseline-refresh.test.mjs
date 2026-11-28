@@ -311,6 +311,7 @@ describe('visual baseline refresh (JOV-12638)', () => {
       'admin-visual-regression.spec.ts',
       'storybook-elevation.spec.ts',
       'storybook-chat-history-switcher.spec.ts',
+      'storybook-audience-table.spec.ts',
     ]);
     for (const entry of entries) {
       expect(

@@ -183,6 +183,9 @@ output/
 # QA swarm runtime artifacts (findings, remediation manifests, Eve queue)
 /.context/qa-swarm/
 
+# Design audit swarm runtime (read-only propose receipts)
+/.context/design-audit-swarm/
+
 # Journey scout reports + evidence (Production Journey Auditor)
 .context/journey-scout/
 
@@ -233,6 +236,7 @@ apps/desktop/src/*
 !apps/desktop/src/visual-activity.ts
 !apps/desktop/src/renderer-recovery.ts
 !apps/desktop/src/renderer-recovery-unlatch.ts
+!apps/desktop/src/renderer-wake-recovery.ts
 !apps/desktop/src/tray.ts
 !apps/desktop/src/ovie-door.ts
 !apps/desktop/src/operator-launch.ts
@@ -250,6 +254,7 @@ apps/desktop/src/*
 !apps/desktop/src/window-state-store.ts
 !apps/desktop/src/desktop-launch-readiness.ts
 !apps/desktop/src/startup-maintenance.ts
+!apps/desktop/src/hosted-launch-prime.ts
 !apps/desktop/src/main-liveness.ts
 !apps/desktop/src/voice-session.ts
 !apps/desktop/scripts/desktop-tray-contract.test.mjs

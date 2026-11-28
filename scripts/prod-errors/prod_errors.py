@@ -357,17 +357,26 @@ class Linear:
         d = self.gql("query($i:String!){issue(id:$i){state{type}}}", {"i": ident})
         return (d["issue"].get("state") or {}).get("type")
 
+    def comment_bodies(self, ident: str, limit: int = 30) -> list[str]:
+        """Newest-first comment bodies on a Linear issue (for terminal-notice idempotency)."""
+        d = self.gql("query($i:String!,$n:Int!){issue(id:$i){comments(first:$n){nodes{body}}}}",
+                     {"i": ident, "n": limit})
+        return [c.get("body") or "" for c in (d["issue"].get("comments") or {}).get("nodes") or []]
+
 
 def fetch_prs() -> list[dict]:
     """PR list a claim can bind to, deduped across two searches. 'Sentry in:body' alone excluded
     merged fix PRs whose body references the Linear identifier but never says 'Sentry' -- e.g.
     #21394 ('Refs JOV-8073') -- so those claims expired forever, re-firing claim-expired alerts
-    on Done issues every cycle (JOV-10213). Fetch the issue-reference convention too."""
+    on Done issues every cycle (JOV-10213). Fetch the issue-reference convention too.
+
+    Include closedAt so advance() can ignore closed-unmerged PRs: those must not unpark a
+    parked claim (false re-arm → duplicate 'Parking this claim' every CLAIM_S)."""
     prs: list[dict] = []
     seen: set[int] = set()
     for term in ("Sentry in:body", "JOV in:body"):
         for p in gh_json(["pr", "list", "-R", REPO, "--state", "all", "--search", term, "--limit", "100",
-                          "--json", "number,title,body,headRefName,mergedAt"]) or []:
+                          "--json", "number,title,body,headRefName,mergedAt,closedAt"]) or []:
             if p["number"] not in seen:
                 seen.add(p["number"])
                 prs.append(p)
@@ -494,6 +503,9 @@ def handle_issue(issue: dict, ledger: dict, sentry: Sentry, linear: Linear, merg
     entry.update(users=issue.get("userCount"), lastSeen=last_seen)
     if entry["status"] in ("closed", "deployed") and last_seen > (entry.get("closedAt") or entry.get("deployedAt") or at):
         entry.update(status="claimed", reopenedAt=at, claimExpiresAt=at + CLAIM_S, reopens=entry.get("reopens", 0) + 1)
+        # Genuine new event: allow a fresh terminal stand-down/park notice on this episode.
+        entry.pop("standDownNotifiedAt", None)
+        entry.pop("parkNotifiedAt", None)
         relink = False
         if entry.get("linear"):
             try:
@@ -525,9 +537,12 @@ def advance(ledger: dict, linear: Linear, sentry: Sentry, prs: list[dict], at: f
                        or f"sentry:{sid}" in p.get("body", "")), None)
             if pr and pr.get("mergedAt"):
                 e.update(status="deployed", deployedAt=parse_ts(pr["mergedAt"]), pr=pr["number"])
-            elif pr:
+            elif pr and not pr.get("closedAt"):
+                # OPEN fix PR only. Closed-unmerged PRs (mergedAt null, closedAt set) must not
+                # unpark: that re-armed parked claims and re-posted 'Parking this claim'.
                 if e["status"] == "parked":  # a later open PR unparks; the claim window re-arms
                     e.update(status="claimed", claimExpiresAt=at + CLAIM_S)
+                    e.pop("parkNotifiedAt", None)  # a real open PR may park again with a fresh notice
                 e.update(pr=pr["number"], prOpenedAt=e.get("prOpenedAt") or at)
             elif e["status"] == "claimed" and at > e["claimExpiresAt"] and not e.get("gate"):
                 # Pass the live module so claim_parking catches our LinearIssueMissing and

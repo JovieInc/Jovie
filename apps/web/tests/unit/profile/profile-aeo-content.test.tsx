@@ -1,9 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cleanup, render, screen } from '@testing-library/react';
-import { renderToStaticMarkup } from 'react-dom/server';
+import { cleanup } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ProfileAeoContent } from '@/features/profile/ProfileAeoContent';
 import { projectStructuredReleaseCollaborators } from '@/lib/discography/artist-queries/artist-search';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import {
@@ -144,7 +142,7 @@ function buildContent(): ProfileAeoContentModel {
 describe('Profile AEO content', () => {
   afterEach(cleanup);
 
-  it('keeps dark AEO and light claim-card colors stable across app themes', () => {
+  it('keeps dark AEO colors and ships no light claim-card block', () => {
     const css = readFileSync(
       join(process.cwd(), 'styles', 'design-system.css'),
       'utf8'
@@ -153,12 +151,7 @@ describe('Profile AEO content', () => {
     expect(css).toMatch(
       /\.profile-aeo-content\)[\s\S]*?--profile-aeo-text:\s*var\(--color-text-tooltip\)/
     );
-    expect(css).toMatch(
-      /\.profile-aeo-claim-card\)[\s\S]*?--profile-aeo-claim-ink:\s*var\(--system-b-cinematic-black\)/
-    );
-    expect(css).toMatch(
-      /\.profile-aeo-claim-card__domain\)[\s\S]*?var\(--profile-aeo-claim-ink\)\s+(?:4[8-9]|[5-9]\d|100)%/
-    );
+    expect(css).not.toContain('profile-aeo-claim-card');
   });
 
   it('builds per-artist description and the four sourced canonical FAQ answers', () => {
@@ -631,11 +624,6 @@ describe('Profile AEO content', () => {
     // Malformed URL is skipped before platform dedupe; valid website remains.
     expect(content.followLinks.map(link => link.platform)).toEqual(['website']);
     expect(content.followLinks[0]?.url).toBe('https://itstimwhite.com/');
-
-    render(<ProfileAeoContent content={content} />);
-    expect(
-      screen.getByRole('link', { name: "Visit DJ Test's website" })
-    ).toHaveAttribute('href', 'https://itstimwhite.com/');
   });
 
   it('omits empty touring, merch, and unknown-release FAQs from the public surface', () => {
@@ -673,185 +661,6 @@ describe('Profile AEO content', () => {
       'youtube',
     ]);
     expect(content.followLinks).toEqual([]);
-  });
-
-  it('renders the facts strip, listen, follow, and share controls', () => {
-    const content = buildProfileAeoContent({
-      artist: baseArtist,
-      genres: ['tech house'],
-      socialLinks: [
-        ...socialLinks,
-        {
-          id: 'link-2',
-          artist_id: 'artist-1',
-          platform: 'instagram',
-          url: 'https://instagram.com/djtest',
-          clicks: 0,
-          created_at: '2024-01-01T00:00:00.000Z',
-        },
-      ],
-      now,
-    });
-
-    render(<ProfileAeoContent content={content} />);
-
-    const facts = screen.getByTestId('profile-about-facts');
-    expect(facts).toBeVisible();
-    expect(facts).toHaveTextContent('Genre');
-    expect(facts).toHaveTextContent('Active Since');
-    expect(facts).toHaveTextContent('Hometown');
-    expect(facts).toHaveTextContent('Based In');
-    expect(facts.querySelectorAll('dt')).toHaveLength(4);
-    expect(facts.querySelectorAll('dd')).toHaveLength(4);
-    for (const definition of facts.querySelectorAll('dd')) {
-      expect(
-        definition.querySelector('.profile-aeo-content__fact-value')
-      ).not.toBeNull();
-    }
-
-    const listen = screen.getByTestId('profile-about-listen');
-    expect(listen).toBeVisible();
-    const spotifyLink = screen.getByRole('link', {
-      name: 'Listen to DJ Test on Spotify (opens in a new tab)',
-    });
-    expect(spotifyLink).toHaveAttribute(
-      'href',
-      'https://open.spotify.com/artist/test'
-    );
-    expect(spotifyLink).toHaveAttribute('target', '_blank');
-    expect(spotifyLink).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(spotifyLink).toHaveClass('h-11', 'w-11');
-    expect(spotifyLink).not.toHaveTextContent(/^Spotify$/);
-
-    const appleMusicLink = screen.getByRole('link', {
-      name: 'Listen to DJ Test on Apple Music (opens in a new tab)',
-    });
-    expect(appleMusicLink).toHaveAttribute(
-      'href',
-      'https://music.apple.com/artist/test'
-    );
-    expect(appleMusicLink).toHaveClass('h-11', 'w-11');
-
-    const follow = screen.getByTestId('profile-about-follow');
-    expect(follow).toBeVisible();
-    expect(
-      screen.getByRole('link', { name: 'Follow DJ Test on Instagram' })
-    ).toHaveAttribute('href', 'https://instagram.com/djtest');
-
-    expect(screen.getByTestId('profile-about-share')).toBeVisible();
-  });
-
-  it('keeps every canonical music service icon-only, named, and 44px', () => {
-    const services = [
-      ['soundcloud', 'SoundCloud', 'https://soundcloud.com/dj-test'],
-      ['spotify', 'Spotify', 'https://open.spotify.com/artist/test'],
-      ['apple_music', 'Apple Music', 'https://music.apple.com/artist/test'],
-      [
-        'youtube_music',
-        'YouTube Music',
-        'https://music.youtube.com/channel/test',
-      ],
-      ['amazon_music', 'Amazon Music', 'https://music.amazon.com/artists/test'],
-      ['tidal', 'Tidal', 'https://tidal.com/browse/artist/test'],
-      ['deezer', 'Deezer', 'https://www.deezer.com/artist/test'],
-      ['netease', 'NetEase Music', 'https://music.163.com/artist?id=1'],
-      ['qq_music', 'QQ Music', 'https://y.qq.com/n/ryqq/singer/test'],
-    ] as const;
-    const content = buildProfileAeoContent({
-      artist: {
-        ...baseArtist,
-        spotify_url: undefined,
-        apple_music_url: undefined,
-        youtube_url: undefined,
-      },
-      socialLinks: services.map(([platform, , url], index) => ({
-        id: `service-${index}`,
-        artist_id: baseArtist.id,
-        platform,
-        url,
-        clicks: 0,
-        created_at: '2024-01-01T00:00:00.000Z',
-      })),
-      now,
-    });
-
-    expect(content.listenLinks.map(link => link.label)).toEqual(
-      services.map(([, label]) => label)
-    );
-
-    render(<ProfileAeoContent content={content} />);
-
-    for (const [, label, url] of services) {
-      const accessibleName = `Listen to DJ Test on ${label} (opens in a new tab)`;
-      const link = screen.getByRole('link', { name: accessibleName });
-      expect(link).toHaveAttribute('href', url);
-      expect(link).toHaveAttribute('target', '_blank');
-      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
-      expect(link).toHaveClass('h-11', 'w-11');
-      expect(link.querySelector('.sr-only')).toHaveTextContent(accessibleName);
-      expect(link.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
-      expect(link.querySelector('svg')).toHaveAttribute('fill', 'currentColor');
-    }
-  });
-
-  it('keeps long localized fact values inside the semantic badge grid', () => {
-    const longLocation =
-      '東京都渋谷区神宮前・Berlin Kreuzberg・مدينة لوس أنجلوس الطويلة';
-    const content = buildProfileAeoContent({
-      artist: {
-        ...baseArtist,
-        hometown: longLocation,
-        location: null,
-      },
-      genres: ['música electrónica experimental de larga duración'],
-      now,
-    });
-
-    render(<ProfileAeoContent content={content} />);
-
-    const facts = screen.getByTestId('profile-about-facts');
-    const locationValue = screen.getByTitle(longLocation);
-    expect(facts.tagName).toBe('DL');
-    expect(facts).toHaveClass(
-      'grid-cols-2',
-      'sm:grid-cols-3',
-      'lg:grid-cols-2'
-    );
-    expect(locationValue.parentElement).toHaveClass('max-w-full');
-    expect(locationValue).toHaveClass('min-w-0', 'truncate');
-    expect(locationValue.closest('dd')).not.toBeNull();
-  });
-
-  it('hides the facts, listen, and follow sections when there is no data', () => {
-    const content = buildProfileAeoContent({
-      artist: {
-        ...baseArtist,
-        hometown: null,
-        location: null,
-        active_since_year: null,
-        genres: null,
-        spotify_id: '',
-        spotify_url: undefined,
-        apple_music_url: undefined,
-        youtube_url: undefined,
-        deezer_id: undefined,
-        tidal_id: undefined,
-        youtube_music_id: undefined,
-        soundcloud_id: undefined,
-      },
-      socialLinks: [],
-      now,
-    });
-
-    render(<ProfileAeoContent content={content} />);
-
-    expect(screen.queryByTestId('profile-about-facts')).toBeNull();
-    expect(screen.queryByTestId('profile-about-listen')).toBeNull();
-    expect(screen.queryByTestId('profile-about-follow')).toBeNull();
-    // No sourced facts means no FAQ block — sparse stays sparse.
-    expect(screen.queryByText('DJ Test FAQ')).toBeNull();
-    expect(screen.getByTestId('profile-about-share')).toBeVisible();
-    expect(screen.getByTestId('profile-aeo-content')).toBeVisible();
   });
 
   it('keeps sparse profiles unique and sourced instead of using duplicate boilerplate', () => {
@@ -903,29 +712,18 @@ describe('Profile AEO content', () => {
     expect(second.faqs).toHaveLength(0);
   });
 
-  it('renders visible FAQ and source links into static HTML', () => {
+  it('emits the sourced FAQs as FAQPage JSON-LD (nothing renders below the footer)', () => {
     const content = buildContent();
+    const jsonLd = buildProfileAeoFaqStructuredData(content);
 
-    render(<ProfileAeoContent content={content} />);
-
-    expect(screen.getByTestId('profile-aeo-content')).toBeInTheDocument();
-    expect(
-      screen.getByRole('heading', { name: 'About DJ Test' })
-    ).toBeVisible();
-    expect(screen.getByText('Where is DJ Test from?')).toBeVisible();
-    const releaseSource = screen.getByRole('link', {
-      name: 'Source: Jovie release page',
-    });
-    expect(releaseSource).toHaveAttribute('href', '/dj-test/neon-circuit');
-    expect(releaseSource).toHaveClass('min-h-11');
-
-    const html = renderToStaticMarkup(<ProfileAeoContent content={content} />);
-    expect(html).toContain('data-testid="profile-aeo-content"');
-    expect(html).toContain('Where can I buy DJ Test merch?');
-    expect(html).toContain('Source: Official merch card');
-    expect(
-      screen.getByRole('link', { name: 'Guest Vocalist' })
-    ).toHaveAttribute('href', '/guestvocalist');
+    expect(jsonLd['@type']).toBe('FAQPage');
+    const names = jsonLd.mainEntity.map(question => question.name);
+    expect(names).toContain('Where is DJ Test from?');
+    expect(names).toContain('Where can I buy DJ Test merch?');
+    expect(jsonLd.mainEntity).toHaveLength(content.faqs.length);
+    for (const question of jsonLd.mainEntity) {
+      expect(question.acceptedAnswer.text.length).toBeGreaterThan(0);
+    }
   });
 
   it('links entity mentions in the description while keeping plain-text paragraphs', () => {
@@ -972,24 +770,28 @@ describe('Profile AEO content', () => {
       href: '/guestvocalist',
     });
 
-    render(<ProfileAeoContent content={content} />);
-
-    // The release title appears in both the tagline and the generated
-    // latest-release sentence — every mention is linked.
-    const releaseLinks = screen.getAllByRole('link', { name: 'Neon Circuit' });
-    expect(releaseLinks.length).toBeGreaterThan(0);
-    for (const link of releaseLinks) {
-      expect(link).toHaveAttribute('href', '/dj-test/neon-circuit');
-      expect(link).toHaveAttribute('data-entity-kind', 'release');
+    // Every release-title mention is linked, in the tagline and in the
+    // generated latest-release sentence alike.
+    const mentions = content.descriptionSegments.flat();
+    const releaseMentions = mentions.filter(
+      segment => segment.text === 'Neon Circuit'
+    );
+    expect(releaseMentions.length).toBeGreaterThan(0);
+    for (const segment of releaseMentions) {
+      expect(segment).toMatchObject({
+        type: 'release',
+        href: '/dj-test/neon-circuit',
+      });
     }
-
-    const artistLinks = screen.getAllByRole('link', {
-      name: 'Guest Vocalist',
-    });
-    expect(artistLinks.length).toBeGreaterThan(0);
-    for (const link of artistLinks) {
-      expect(link).toHaveAttribute('href', '/guestvocalist');
-      expect(link).toHaveAttribute('data-entity-kind', 'artist');
+    const artistMentions = mentions.filter(
+      segment => segment.text === 'Guest Vocalist'
+    );
+    expect(artistMentions.length).toBeGreaterThan(0);
+    for (const segment of artistMentions) {
+      expect(segment).toMatchObject({
+        type: 'artist',
+        href: '/guestvocalist',
+      });
     }
   });
 
@@ -1146,17 +948,19 @@ describe('Profile AEO content', () => {
       now,
     });
 
-    render(<ProfileAeoContent content={content} />);
-    expect(screen.getByTestId('profile-aeo-content')).toHaveTextContent(
-      'Credit Only Artist'
-    );
+    const segments = content.descriptionSegments.flat();
+    expect(content.description.join(' ')).toContain('Credit Only Artist');
     expect(
-      screen.queryByRole('link', { name: 'Credit Only Artist' })
-    ).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Quiet Signal' })).toHaveAttribute(
-      'href',
-      '/dj-test/quiet-signal'
-    );
+      segments.some(
+        segment =>
+          segment.text === 'Credit Only Artist' && segment.type !== 'text'
+      )
+    ).toBe(false);
+    expect(segments).toContainEqual({
+      type: 'release',
+      text: 'Quiet Signal',
+      href: '/dj-test/quiet-signal',
+    });
   });
 
   it('defaults to plain-text segments when no entity context is provided', () => {
@@ -1170,32 +974,6 @@ describe('Profile AEO content', () => {
         { type: 'text', text: content.description[index] },
       ]);
     }
-  });
-
-  it('renders the editorial claim card only when a claim destination is provided', () => {
-    const content = buildContent();
-    const { rerender } = render(
-      <ProfileAeoContent
-        content={content}
-        claimHref='/dj-test/claim?next=auth'
-      />
-    );
-
-    expect(screen.getByTestId('profile-aeo-claim-card')).toBeVisible();
-    expect(
-      screen.getByRole('heading', {
-        name: 'jov.ie/you',
-      })
-    ).toBeVisible();
-    expect(screen.getByText('Free · Claim with Spotify')).toBeVisible();
-    expect(
-      screen.getByRole('link', {
-        name: 'Claim the DJ Test profile and sign up for Jovie',
-      })
-    ).toHaveAttribute('href', '/dj-test/claim?next=auth');
-
-    rerender(<ProfileAeoContent content={content} />);
-    expect(screen.queryByTestId('profile-aeo-claim-card')).toBeNull();
   });
 
   it('keeps a complete product optimization contract on existing surfaces', () => {

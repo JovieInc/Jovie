@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { AlertTriangle, ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
@@ -162,9 +162,10 @@ function JudgmentRow({
                 <span className='sr-only'>
                   Note for {DECISION_LABELS[armedKind]}
                 </span>
-                <input
+                <Input
                   id={noteId}
                   type='text'
+                  inputSize='sm'
                   value={note}
                   disabled={pendingKind !== null}
                   onChange={event => setNote(event.target.value)}
@@ -173,7 +174,6 @@ function JudgmentRow({
                       ? 'What should change? (required)'
                       : 'Why reject? (optional)'
                   }
-                  className='w-full rounded-lg border border-(--app-shell-border) bg-surface-1 px-3 py-1.5 text-xs text-primary-token outline-none placeholder:text-tertiary-token focus-visible:ring-2 focus-visible:ring-ring'
                 />
               </label>
               <div className='flex items-center gap-2'>

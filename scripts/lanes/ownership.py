@@ -27,10 +27,12 @@ to the repair owner. Claims whose run is provably over are released here as well
 """
 from __future__ import annotations
 
+from contextlib import ExitStack
 import fcntl
 import json
 import os
 import re
+import secrets
 import subprocess
 import time
 from datetime import datetime
@@ -76,9 +78,27 @@ def acquire_run_lease(state: Path, issue_id: str, identifier: str, lane: str):
         return None
     handle.seek(0)
     handle.truncate()
-    handle.write(json.dumps({"issue": identifier, "lane": lane, "pid": os.getpid(), "at": time.time()}))
+    receipt = json.dumps({"issue": identifier, "lane": lane, "pid": os.getpid(), "at": time.time(),
+                          "nonce": secrets.token_hex(16)})
+    handle.write(receipt)
     handle.flush()
-    return handle
+    # Separate readiness lock prevents stale receipt adoption before a new worker publishes
+    # its receipt. Its nonce must match the one in the primary run lease.
+    ready = ExitStack()
+    try:
+        proof = ready.enter_context(path.with_suffix(".ready").open("a+"))
+        fcntl.flock(proof, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        proof.seek(0)
+        proof.truncate()
+        proof.write(receipt)
+        proof.flush()
+    except OSError:
+        ready.close()
+        return handle  # The existing ownership guarantee still holds.
+    lease = ExitStack()
+    lease.enter_context(handle)
+    lease.callback(ready.close)
+    return lease
 
 
 def _flock_state(path: Path) -> str:
@@ -113,13 +133,50 @@ def run_lease(state: Path, issue_id: str) -> str | None:
     try:
         with open(path, "a") as handle:
             try:
-                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(handle, fcntl.LOCK_SH | fcntl.LOCK_NB)
             except BlockingIOError:
                 return "live"
             fcntl.flock(handle, fcntl.LOCK_UN)
     except OSError:
         return "live"  # unreadable lease evidence never releases ownership
     return "ended"
+
+
+def accepted_run_lease(state: Path, issue_id: str | None, identifier: str, *, now: float) -> dict:
+    """Positive factory adoption evidence, unlike run_lease's conservative no-release fallback."""
+    if not isinstance(issue_id, str) or not re.fullmatch(r"[a-zA-Z0-9-]+", issue_id):
+        return {"status": "unknown"}
+    path = _lease_dir(state) / f"{issue_id}.lock"
+    try:
+        with path.open("r") as handle:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_SH | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return _accepted_receipt(path, handle, identifier, now)
+    except FileNotFoundError:
+        pass
+    except (OSError, ValueError):
+        return {"status": "unknown"}
+    return {"status": "awaiting-verified-local-lease"}
+
+
+def _accepted_receipt(path, handle, identifier, now):
+    try:
+        with path.with_suffix(".ready").open("r") as proof:
+            try:
+                fcntl.flock(proof, fcntl.LOCK_SH | fcntl.LOCK_NB)
+            except BlockingIOError:
+                receipt = json.load(handle)
+                ready = json.load(proof)
+                if (isinstance(receipt, dict) and receipt == ready and receipt.get("issue") == identifier and
+                        isinstance(receipt.get("nonce"), str) and re.fullmatch(r"[a-f0-9]{32}", receipt["nonce"]) and
+                        isinstance(receipt.get("lane"), str) and receipt["lane"].strip() and
+                        type(receipt.get("pid")) is int and receipt["pid"] > 0 and
+                        type(receipt.get("at")) in (int, float) and 0 < receipt["at"] <= now):
+                    return {"status": "accepted", "lane": receipt["lane"], "at": receipt["at"]}
+    except (OSError, ValueError):
+        pass
+    return {"status": "unknown"}
 
 
 def merged_identifiers(repo: Path, run=subprocess.run) -> set[str] | None:

@@ -9,6 +9,7 @@ import {
   buildStoryFirstGlance,
   buildStoryFirstStages,
   issueLabel,
+  plainTitle,
   stripIssueId,
 } from './story-first';
 
@@ -54,10 +55,10 @@ describe('buildStoryFirstGlance', () => {
       'users',
     ]);
     expect(glance[0]).toMatchObject({
-      value: '14',
-      delta: '+4',
+      value: '98',
+      delta: '+28',
       measured: true,
-      points: [10, 14],
+      points: [70, 98],
       trend: 'up',
     });
     expect(glance[1]).toMatchObject({
@@ -165,14 +166,14 @@ describe('buildStoryFirstBottleneck', () => {
     kind: 'certification',
     step: 'checkout_payment_entitlement',
     tone: 'bad',
-    text: 'Checkout fails certification, so nobody can pay yet',
+    text: 'The latest available certification report for checkout shows a failed check. See Certifications for details.',
     detailsHref: APP_ROUTES.ADMIN_CERTIFICATIONS,
     since: '2026-11-18T00:00:00.000Z',
     nextAction: 'Certify payment path',
     observedAt: '2026-11-21T00:00:00.000Z',
   };
 
-  it('names the revenue blocker as the hero story', () => {
+  it('names checkout certification as the hero story and links its evidence', () => {
     const story = buildStoryFirstBottleneck({
       revenue: checkout,
       revenueRead: true,
@@ -185,12 +186,105 @@ describe('buildStoryFirstBottleneck', () => {
     });
     expect(story).toMatchObject({
       tone: 'bad',
-      eyebrow: 'Bottleneck · Checkout',
-      title: 'Checkout is blocking revenue',
+      eyebrow: 'Certification · Checkout',
+      title: 'Checkout certification needs attention',
+      body: checkout.text,
+      detailsHref: APP_ROUTES.ADMIN_CERTIFICATIONS,
       needs: 'Certify payment path',
       since: 'Nov 18',
-      moving: { label: 'JOV-13192 · Checkout cert' },
+      moving: { label: 'Checkout cert' },
     });
+  });
+
+  it.each([
+    ['homepage_entry', 'Homepage', 'Homepage entry'],
+    ['onboarding_auth_claim', 'Claim', 'Sign-up and claim'],
+    ['activation_dashboard', 'Activation', 'First use after paying'],
+  ] as const)('names %s as a certification issue', (step, eyebrow, name) => {
+    const story = buildStoryFirstBottleneck({
+      revenue: { ...checkout, id: `certification:${step}`, step },
+      revenueRead: true,
+      constraint: null,
+      highlight: null,
+    });
+    expect(story).toMatchObject({
+      eyebrow: `Certification · ${eyebrow}`,
+      title: `${name} certification needs attention`,
+    });
+  });
+
+  const row = (identifier: string, title: string, complete = false) => ({
+    id: identifier,
+    identifier,
+    title,
+    url: null,
+    stage: 'building' as const,
+    stageIndex: 1,
+    complete,
+    attention: null,
+    updatedAt: null,
+  });
+
+  it('links only shipping work on the blocker as Moving', () => {
+    const lanes = row(
+      'JOV-10172',
+      'feat(lanes): gem-default worktree hosts, fallback cap'
+    );
+    const unrelated = buildStoryFirstBottleneck({
+      revenue: checkout,
+      revenueRead: true,
+      constraint: null,
+      highlight: {
+        identifier: lanes.identifier,
+        title: lanes.title,
+        href: null,
+      },
+      rows: [lanes],
+    });
+    expect(unrelated.moving).toBeNull();
+    const related = buildStoryFirstBottleneck({
+      revenue: checkout,
+      revenueRead: true,
+      constraint: null,
+      highlight: {
+        identifier: lanes.identifier,
+        title: lanes.title,
+        href: null,
+      },
+      rows: [
+        lanes,
+        row('JOV-1', 'Stripe checkout copy', true),
+        row('JOV-2', 'fix(billing): success page receipt'),
+      ],
+    });
+    expect(related.moving).toEqual({
+      label: 'Success page receipt',
+      href: null,
+    });
+  });
+
+  it.each([
+    ['homepage_entry', 'Polish homepage navigation'],
+    ['visits', 'Improve landing page navigation'],
+    ['eligible_entries', 'Improve eligible-entry navigation'],
+  ] as const)('links entry work in shipping order for %s', (step, title) => {
+    const sentry = row('JOV-3', 'Fix Sentry error grouping');
+    const completed = row('JOV-4', 'Update homepage copy', true);
+    const entry = row('JOV-5', title);
+    const later = row('JOV-6', 'Tidy landing page copy');
+    const moving = (rows: ReturnType<typeof row>[]) =>
+      buildStoryFirstBottleneck({
+        revenue: { ...checkout, step },
+        revenueRead: true,
+        constraint: null,
+        highlight: null,
+        rows,
+      }).moving;
+
+    expect([
+      moving([sentry]),
+      moving([sentry, completed, entry, later]),
+    ]).toEqual([null, { label: title, href: null }]);
   });
 
   it('keeps funnel title distinct from the measured body', () => {
@@ -215,6 +309,7 @@ describe('buildStoryFirstBottleneck', () => {
     expect(story.title).toBe('Claim Attempted is blocking revenue');
     expect(story.body).toBe(funnel.text);
     expect(story.title).not.toBe(story.body);
+    expect(story.detailsHref).toBe(APP_ROUTES.ADMIN_GROWTH);
   });
 
   it('reads clear when revenue and shipping are quiet', () => {
@@ -343,7 +438,19 @@ describe('issue id de-duplication', () => {
   it('strips a trailing (ID) that repeats the identifier', () => {
     expect(
       issueLabel('JOV-10172', 'feat(lanes): split lanes (JOV-10172)')
-    ).toBe('JOV-10172 · feat(lanes): split lanes');
+    ).toBe('Split lanes');
+  });
+
+  it('reads as a plain title: no issue key, no commit prefix', () => {
+    expect(
+      plainTitle(
+        'JOV-10172',
+        'JOV-10172 feat(lanes): gem-default worktree hosts'
+      )
+    ).toBe('Gem-default worktree hosts');
+    expect(plainTitle('', 'fix!: drop the cache')).toBe('Drop the cache');
+    expect(plainTitle('JOV-1', 'Checkout copy')).toBe('Checkout copy');
+    expect(plainTitle('JOV-1', 'feat: ')).toBe('feat:');
   });
 
   it('strips a leading "ID: " and leaves other titles alone', () => {

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
@@ -35,7 +37,22 @@ describe('EntitySidebarShell', () => {
     await expectNoA11yViolations(container);
   });
 
-  it('keeps one card seam: the nested tab divider is transparent, not a second border', () => {
+  it('leaves inspector elevation with RightDrawer by default', () => {
+    render(
+      <EntitySidebarShell isOpen ariaLabel='Details drawer' title='Details'>
+        <p>Body content</p>
+      </EntitySidebarShell>
+    );
+
+    const workspace = screen
+      .getByTestId('right-drawer')
+      .querySelector('[data-right-rail-workspace]');
+    expect(workspace).toHaveAttribute('data-surface-variant', 'flat');
+    expect(workspace?.querySelector('[data-variant="card"]')).toBeNull();
+    expect(workspace).not.toHaveClass('rounded-(--linear-app-shell-radius)');
+  });
+
+  it('keeps the tab divider transparent within the shared surface', () => {
     render(
       <EntitySidebarShell
         isOpen
@@ -53,7 +70,7 @@ describe('EntitySidebarShell', () => {
     expect(divider?.className).not.toContain('border-(--app-shell-frame-seam)');
   });
 
-  it('keeps the header band 1px seam as padding so the card is the only bordered surface', () => {
+  it('preserves the header band geometry without another border', () => {
     const { container } = render(
       <EntitySidebarShell
         isOpen
@@ -128,5 +145,18 @@ describe('EntitySidebarShell', () => {
     );
     fireEvent.keyDown(screen.getByTestId('right-drawer'), { key: 'Escape' });
     expect(onClose).toHaveBeenCalledOnce();
+  });
+});
+
+describe('EntitySidebarShell control heights (JOV-12567)', () => {
+  it('sits on the 28px control and 44px bar contract', () => {
+    const source = readFileSync(
+      resolve(__dirname, './EntitySidebarShell.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain("'min-h-(--app-shell-header-height)',");
+    expect(source).toContain("isMinimalHeader && 'px-3'");
+    expect(source).not.toContain('min-h-9 px-2.5 py-1');
   });
 });

@@ -1,3 +1,4 @@
+import { act } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createComposerDraft } from '@/components/jovie/hooks/useComposerDraft';
 import { JovieChat } from '@/components/jovie/JovieChat';
@@ -19,6 +20,7 @@ const { mockChatState, mockFileState, useChatFileAttachmentsSpy } = vi.hoisted(
       conversationTitle: null,
       status: 'ready' as 'ready' | 'streaming',
       activeConversationId: null as string | null,
+      conversationResetKey: 0,
       inputRef: { current: null },
       handleSubmit: vi.fn(),
       handleRetry: vi.fn(),
@@ -200,6 +202,7 @@ describe('JovieChat transient surfaces (JOV-5413)', () => {
     mockChatState.hasMessages = true;
     mockChatState.status = 'ready';
     mockChatState.activeConversationId = null;
+    mockChatState.conversationResetKey = 0;
     mockFileState.isDragOver = false;
   });
 
@@ -236,7 +239,24 @@ describe('JovieChat transient surfaces (JOV-5413)', () => {
         Node.DOCUMENT_POSITION_PRECEDING
     ).toBe(Node.DOCUMENT_POSITION_PRECEDING);
     expect(useChatFileAttachmentsSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ resetKey: 'thread-1' })
+      expect.objectContaining({ resetKey: '0' })
+    );
+  });
+
+  it('resets attachments for an intentional thread change while retaining a reserved conversation', () => {
+    const view = renderWithQueryClient(<JovieChat profileId='profile-1' />);
+    mockChatState.activeConversationId = 'reserved-thread';
+    view.rerender(<JovieChat profileId='profile-1' />);
+    expect(useChatFileAttachmentsSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ resetKey: '0' })
+    );
+
+    mockChatState.conversationResetKey = 1;
+    view.rerender(
+      <JovieChat profileId='profile-1' conversationId='other-thread' />
+    );
+    expect(useChatFileAttachmentsSpy).toHaveBeenLastCalledWith(
+      expect.objectContaining({ resetKey: '1' })
     );
   });
 
@@ -273,5 +293,50 @@ describe('JovieChat transient surfaces (JOV-5413)', () => {
       '[data-testid="chat-drop-zone-overlay"]'
     ) as HTMLElement;
     expect(dragOverlay).not.toContainElement(dragDock as HTMLElement);
+  });
+
+  it('renders composerDock directly above the composer in the thread layout and nothing without it', () => {
+    const withDock = renderWithQueryClient(
+      <JovieChat
+        profileId='profile-1'
+        composerDock={() => <div data-testid='dock-fixture'>Ask</div>}
+      />
+    );
+    const dock = withDock.container.querySelector(
+      '[data-testid="chat-composer-dock"]'
+    ) as HTMLElement;
+    const fixture = withDock.getByTestId('dock-fixture');
+    expect(dock).toContainElement(fixture);
+    expect(
+      fixture.compareDocumentPosition(withDock.getByTestId('chat-input')) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    withDock.unmount();
+
+    const without = renderWithQueryClient(<JovieChat profileId='profile-1' />);
+    expect(without.queryByTestId('dock-fixture')).toBeNull();
+    expect(without.queryByTestId('chat-composer-dock-slot')).toBeNull();
+  });
+
+  it('hands a living Home to the normal chat once a turn runs, with a way back', () => {
+    mockChatState.isLoading = true;
+    mockChatState.status = 'streaming';
+    const view = renderWithQueryClient(
+      <JovieChat
+        profileId='profile-1'
+        chatMode='ov'
+        homeCanvasMode='living'
+        homeCanvas={() => <div data-testid='living-board-fixture' />}
+      />
+    );
+
+    // Tim 2026-11-22: the chat takes over the dashboard, never floats below.
+    expect(view.queryByTestId('chat-empty-state-viewport')).toBeNull();
+    expect(view.queryByTestId('living-board-fixture')).toBeNull();
+
+    act(() => {
+      view.getByRole('button', { name: 'Back To Home' }).click();
+    });
+    expect(view.getByTestId('living-board-fixture')).toBeTruthy();
   });
 });

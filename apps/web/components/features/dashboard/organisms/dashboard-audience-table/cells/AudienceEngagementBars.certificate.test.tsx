@@ -14,7 +14,7 @@ describe('AudienceEngagementBars certificate', () => {
   ])('score %i lights %i of 5 bars and stays axe-clean', async (score, lit) => {
     const { container } = render(<AudienceEngagementBars score={score} />);
     const meter = screen.getByRole('img', { name: `Engagement ${lit} of 5` });
-    expect(meter.querySelectorAll('.bg-success\\/70')).toHaveLength(lit);
+    expect(meter.querySelectorAll('.bg-success-text')).toHaveLength(lit);
     await expectNoA11yViolations(container);
   });
 

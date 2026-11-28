@@ -17,7 +17,16 @@ const SETUP_MERGED_BROWSERS = 'Setup merged source browsers';
 const MQ_PARITY_TOOLS = 'Resolve MQ parity tools for older source heads';
 const MQ_PARITY_SCOPE = 'Select MQ parity scope';
 const TYPECHECK_TWIN = 'Run typecheck lane parity';
+const REMAINING_TWIN = 'Run remaining lane parity';
+const TWIN_TSC_HOUR = 'Resolve parity tsc cache hour';
+const TWIN_TSC_RESTORE =
+  'Restore web tsc incremental state for typecheck parity';
 const UNIT_FLAKY_UPLOAD = 'Preserve retried-then-passed unit tests';
+const UNIT_QUARANTINE = 'Load quarantined unit tests';
+const UNIT_WEB = 'Run web unit tests related to the exact PR diff';
+const BASE_PROOF =
+  'Bind merged guard proof to base ${{ github.event.pull_request.base.sha }}';
+const WEB_RUNNER_GATE = " && matrix.shard != '4/4'";
 const REUSE_STEP = 'Reuse exact-head proof for a metadata-only edit';
 
 /** Serial → pooled disk-read step is an owned migration (same guards, first
@@ -61,13 +70,27 @@ function normalizeReuseStep(step, opts = {}) {
   assert.match(run, /\.conclusion == "success"/);
   if (opts.requireCi28 || /Affected Unit Tests \(4\/4\)/.test(run)) {
     assert.match(run, /Affected Unit Tests \(4\/4\)/);
-    assert.match(run, /guard_job=/);
-    assert.match(run, /\[\[\s*"\$guard_job"\s*==\s*success\s*\]\]/);
     assert.match(run, /api-client\/cli\.ts/);
+    if (opts.requireCi28) {
+      assert.match(run, /Bind merged guard proof to base \$BASE_SHA/);
+      assert.match(run, /git -C .* ls-remote --exit-code origin/);
+      assert.match(run, /"\$live_base" == "\$BASE_SHA"/);
+      assert.deepEqual(step.env, {
+        ...step.env,
+        BASE_REF: '${{ github.base_ref }}',
+        BASE_SHA: '${{ github.event.pull_request.base.sha }}',
+        REQUIRE_LIVE_BASE:
+          "${{ github.job == 'unit' && contains(toJSON(matrix), '\"4/4\"') }}",
+      });
+    }
   } else {
     assert.match(run, /reuse=true/);
   }
-  return { ...step, run: 'PROOF_REUSE_NORMALIZED' };
+  const env = { ...step.env };
+  delete env.BASE_REF;
+  delete env.BASE_SHA;
+  delete env.REQUIRE_LIVE_BASE;
+  return { ...step, env, run: 'PROOF_REUSE_NORMALIZED' };
 }
 
 /**
@@ -110,10 +133,10 @@ function ensureMergedReuseGate(ifExpr) {
 }
 
 /**
- * Owned typecheck twin may also provision Node. Strip that clause so deepEqual
- * still pins the rest of the Setup Node step against origin/main.
+ * Owned MQ parity twins may also provision Node. Strip those clauses so
+ * deepEqual still pins the rest of the Setup Node step against origin/main.
  * @param {Step} step
- * @param {{ requireTypecheck?: boolean, requireCi28?: boolean }} [opts]
+ * @param {{ requireTypecheck?: boolean, requireRemaining?: boolean, requireCi28?: boolean }} [opts]
  */
 function normalizeSetupNodeStep(step, opts = {}) {
   if (step?.name !== SETUP_NODE && step?.name !== SETUP_PLAYWRIGHT) return step;
@@ -126,9 +149,14 @@ function normalizeSetupNodeStep(step, opts = {}) {
     if (opts.requireTypecheck) {
       assert.match(ifExpr, /steps\.mq-parity\.outputs\.typecheck == 'true'/);
     }
+    if (opts.requireRemaining) {
+      assert.match(ifExpr, /steps\.mq-parity\.outputs\.remaining == 'true'/);
+    }
     ifExpr = ifExpr
       .replace(/\s*\|\|\s*steps\.mq-parity\.outputs\.typecheck == 'true'/, '')
-      .replace(/steps\.mq-parity\.outputs\.typecheck == 'true'\s*\|\|\s*/, '');
+      .replace(/steps\.mq-parity\.outputs\.typecheck == 'true'\s*\|\|\s*/, '')
+      .replace(/\s*\|\|\s*steps\.mq-parity\.outputs\.remaining == 'true'/, '')
+      .replace(/steps\.mq-parity\.outputs\.remaining == 'true'\s*\|\|\s*/, '');
   }
   return { ...step, if: ifExpr };
 }
@@ -171,26 +199,43 @@ function normalizeUnit4x4ReuseGate(step, opts = {}) {
   return step;
 }
 
-/** @param {Job} job @param {{ requireTypecheck?: boolean, requireCi28?: boolean }} [opts] */
+/** @param {Step} step */
+function normalizeWebPartition(step) {
+  if (![UNIT_WEB, UNIT_FLAKY_UPLOAD, UNIT_QUARANTINE].includes(step.name))
+    return step;
+  const ifExpr = String(step.if ?? '').replace(WEB_RUNNER_GATE, '');
+  if (step.name !== UNIT_WEB) return { ...step, if: ifExpr };
+  const env = { ...step.env };
+  delete env.UNIT_RUNNER;
+  const run = String(step.run).replace(
+    '--shard="${UNIT_RUNNER%/*}/3"',
+    '--shard=${{ matrix.shard }}'
+  );
+  return { ...step, if: ifExpr, env, run };
+}
+
+/** @param {Job} job @param {{ requireTypecheck?: boolean, requireRemaining?: boolean, requireCi28?: boolean }} [opts] */
 function normalizeUnitJob(job, opts = {}) {
   return {
     ...job,
-    steps: job.steps.map(step => {
-      let next = normalizeReuseStep(step, opts);
-      next = normalizeUnit4x4ReuseGate(next, opts);
-      if (next.name === DISK_READ_GUARD) {
-        const gatedIf = String(next.if ?? '');
-        next = { ...normalizeDiskReadStep(next), if: gatedIf };
-        if (opts.requireCi28) {
-          assert.match(gatedIf, /steps\.reuse\.outputs\.reuse != 'true'/);
+    steps: job.steps
+      .filter(step => step.name !== BASE_PROOF)
+      .map(step => {
+        let next = normalizeWebPartition(normalizeReuseStep(step, opts));
+        next = normalizeUnit4x4ReuseGate(next, opts);
+        if (next.name === DISK_READ_GUARD) {
+          const gatedIf = String(next.if ?? '');
+          next = { ...normalizeDiskReadStep(next), if: gatedIf };
+          if (opts.requireCi28) {
+            assert.match(gatedIf, /steps\.reuse\.outputs\.reuse != 'true'/);
+          }
+          return next;
+        }
+        if (next.name === SETUP_NODE || next.name === SETUP_PLAYWRIGHT) {
+          return normalizeSetupNodeStep(next, opts);
         }
         return next;
-      }
-      if (next.name === SETUP_NODE || next.name === SETUP_PLAYWRIGHT) {
-        return normalizeSetupNodeStep(next, opts);
-      }
-      return next;
-    }),
+      }),
   };
 }
 
@@ -215,6 +260,9 @@ export function assertOriginalJobsRetained(current, baseline) {
     MQ_PARITY_TOOLS,
     MQ_PARITY_SCOPE,
     TYPECHECK_TWIN,
+    REMAINING_TWIN,
+    TWIN_TSC_HOUR,
+    TWIN_TSC_RESTORE,
     UNIT_FLAKY_UPLOAD,
   ]);
   const strip = job => ({
@@ -232,6 +280,7 @@ export function assertOriginalJobsRetained(current, baseline) {
       id === 'unit'
         ? normalizeUnitJob(actual, {
             requireTypecheck: true,
+            requireRemaining: true,
             requireCi28: true,
           })
         : normalizeSourceJob(actual, { requireCi28: true });
@@ -247,15 +296,64 @@ export function assertOriginalJobsRetained(current, baseline) {
             (name === MQ_PARITY_TOOLS ||
               name === MQ_PARITY_SCOPE ||
               name === TYPECHECK_TWIN ||
+              name === REMAINING_TWIN ||
+              name === TWIN_TSC_HOUR ||
+              name === TWIN_TSC_RESTORE ||
               name === UNIT_FLAKY_UPLOAD))) &&
         !kept.length &&
         added.length === 1;
       assert.ok(kept.length === added.length || firstLanding, `${id}: ${name}`);
-      if (kept.length) assert.deepEqual(added, kept, `${id}: ${name}`);
+      if (!kept.length) continue;
+      // Tools stub may grow twin keys without rewriting the rest of the step.
+      if (name === MQ_PARITY_TOOLS && id === 'unit') {
+        assert.equal(added[0]?.id, 'mq-parity-tools');
+        assert.equal(added[0]?.if, kept[0]?.if);
+        assert.deepEqual(added[0]?.env, kept[0]?.env);
+        assert.match(String(added[0]?.run), /mq-parity-scope\.mjs/);
+        assert.match(String(added[0]?.run), /typecheck=false/);
+        assert.match(String(added[0]?.run), /remaining=false/);
+        continue;
+      }
+      if (name === REMAINING_TWIN && id === 'unit') {
+        const env = { ...added[0].env };
+        delete env.CI_FAST_SKIP_LANE_IDS;
+        const original = { ...kept[0].env };
+        delete original.CI_FAST_SKIP_LANE_IDS;
+        assert.deepEqual({ ...added[0], env }, { ...kept[0], env: original });
+        continue;
+      }
+      assert.deepEqual(
+        added.map(normalizeWebPartition),
+        kept.map(normalizeWebPartition),
+        `${id}: ${name}`
+      );
     }
   }
 
   const unitSteps = current.jobs.unit.steps;
+  const web = unitSteps.find(step => step.name === UNIT_WEB);
+  assert.ok(web?.if?.includes(WEB_RUNNER_GATE));
+  assert.equal(
+    unitSteps.find(step => step.name === UNIT_QUARANTINE)?.if,
+    web?.if
+  );
+  assert.equal(web?.env?.UNIT_RUNNER, '${{ matrix.shard }}');
+  assert.ok(web?.run?.includes('--shard="${UNIT_RUNNER%/*}/3"'));
+  const receipt = unitSteps.find(step => step.name === BASE_PROOF);
+  assert.ok(receipt);
+  assert.ok(
+    unitSteps.indexOf(receipt) >
+      unitSteps.findIndex(step => step.id === 'source_guard_proof')
+  );
+  assert.equal(
+    receipt.if,
+    "matrix.shard == '4/4' && (steps.reuse.outputs.reuse == 'true' || (steps.source_guard_merge.outputs.prepared == 'true' && steps.source_guard_merge.outputs.trusted_ref == github.event.pull_request.base.sha))"
+  );
+  assert.deepEqual(receipt.env, {
+    TRUSTED_BASE: '${{ github.event.pull_request.base.sha }}',
+  });
+  assert.ok(receipt.run?.includes('[[ "$TRUSTED_BASE" =~ ^[0-9a-f]{40}$ ]]'));
+
   const tools = unitSteps.find(step => step.name === MQ_PARITY_TOOLS);
   assert.equal(tools?.id, 'mq-parity-tools');
   assert.equal(tools?.if, "steps.reuse.outputs.reuse != 'true'");
@@ -272,6 +370,34 @@ export function assertOriginalJobsRetained(current, baseline) {
     /steps\.mq-parity\.outputs\.typecheck == 'true'/
   );
   assert.match(String(twin?.if), /matrix\.shard == '2\/4'/);
+  const remaining = unitSteps.find(step => step.name === REMAINING_TWIN);
+  assert.equal(remaining?.run, 'node scripts/ci-fast-lanes.mjs');
+  assert.equal(remaining?.env?.CI_FAST_LANE_GROUP, 'remaining');
+  assert.equal(remaining?.env?.CI_FAST_SKIP_STRUCTURAL, 'true');
+  assert.equal(remaining?.env?.CI_FAST_SKIP_LANE_IDS, 'source-guards');
+  assert.match(
+    String(remaining?.if),
+    /steps\.mq-parity\.outputs\.remaining == 'true'/
+  );
+  assert.match(String(remaining?.if), /matrix\.shard == '1\/4'/);
+  // Warm start for the twin's overlapped tsc programs: read-only restore of
+  // the main-scoped buildinfo, gated exactly like the twin, placed before it.
+  const restore = unitSteps.find(step => step.name === TWIN_TSC_RESTORE);
+  if (restore) {
+    const hour = unitSteps.find(step => step.name === TWIN_TSC_HOUR);
+    assert.equal(hour?.id, 'parity-tsc-cache-hour');
+    assert.equal(hour?.if, twin?.if);
+    assert.equal(restore.if, twin?.if);
+    assert.match(String(restore.uses), /^actions\/cache\/restore@[a-f0-9]{40}/);
+    assert.equal(restore.with?.path, 'apps/web/.cache/tsbuildinfo*');
+    assert.match(String(restore.with?.key), /^jovie-web-tsbuildinfo-v2-/);
+    assert.equal(restore['continue-on-error'], undefined);
+    assert.ok(
+      unitSteps.indexOf(hour) < unitSteps.indexOf(restore) &&
+        unitSteps.indexOf(restore) < unitSteps.indexOf(twin),
+      'parity tsc restore must run before the typecheck twin'
+    );
+  }
   // Observability-only artifact upload (JOV-12621): never blocks, never
   // uploads more than the retry sidecar, never fails on a missing file.
   const flaky = unitSteps.find(step => step.name === UNIT_FLAKY_UPLOAD);
@@ -281,6 +407,7 @@ export function assertOriginalJobsRetained(current, baseline) {
     assert.equal(flaky.with?.['if-no-files-found'], 'ignore');
     assert.match(String(flaky.with?.name), /^unit-flaky-/);
     assert.equal(flaky['continue-on-error'], undefined);
+    assert.ok(flaky.if?.includes(WEB_RUNNER_GATE));
     assert.match(String(flaky.if), /steps\.reuse\.outputs\.reuse != 'true'/);
   }
 

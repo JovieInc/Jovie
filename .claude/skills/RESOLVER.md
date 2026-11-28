@@ -15,6 +15,7 @@ Nested `.bak` / `.cursor` / `.factory` / `src` / `test` / `bin` copies are not c
 - **connect-chrome**: .agents/skills/gstack/connect-chrome/SKILL.md
 - **copywriting**: .claude/skills/copywriting/SKILL.md
 - **cso**: .agents/skills/gstack/cso/SKILL.md
+- **design-audit-swarm**: .claude/skills/design-audit-swarm/SKILL.md
 - **design-canonical**: .claude/skills/design-canonical/SKILL.md | .agents/skills/gstack/design-canonical/SKILL.md
 - **design-consultation**: .agents/skills/gstack/design-consultation/SKILL.md
 - **design-html**: .agents/skills/gstack/design-html/SKILL.md

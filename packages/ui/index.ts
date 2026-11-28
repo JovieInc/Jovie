@@ -94,10 +94,12 @@ export type {
   CardDescriptionProps,
   CardFooterProps,
   CardHeaderProps,
+  CardIntent,
   CardProps,
   CardTitleProps,
 } from './atoms/card';
 export {
+  CARD_INTENTS,
   Card,
   CardContent,
   CardDescription,
@@ -233,8 +235,13 @@ export {
 export type {
   HostDrawnInputProps,
   HostDrawnSelectProps,
+  HostDrawnTextareaProps,
 } from './atoms/host-drawn-field';
-export { HostDrawnInput, HostDrawnSelect } from './atoms/host-drawn-field';
+export {
+  HostDrawnInput,
+  HostDrawnSelect,
+  HostDrawnTextarea,
+} from './atoms/host-drawn-field';
 export type {
   IconButtonFade,
   IconButtonName,
@@ -406,6 +413,7 @@ export { TooltipShortcut } from './atoms/tooltip-shortcut';
 // Confirm Dialog
 export type { ConfirmDialogProps } from './confirm-dialog';
 export { ConfirmDialog } from './confirm-dialog';
+export * from './lib/action-ranking';
 export {
   CHECKBOX_RADIO_ITEM_BASE,
   contextMenuContentClasses,

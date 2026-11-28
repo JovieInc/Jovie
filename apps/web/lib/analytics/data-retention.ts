@@ -23,6 +23,7 @@ import {
 } from 'drizzle-orm';
 import { getTableConfig, type PgTable } from 'drizzle-orm/pg-core';
 import { db } from '@/lib/db';
+import { unwrapPgError } from '@/lib/db/errors';
 import { adminAuditLog } from '@/lib/db/schema/admin';
 import {
   audienceMembers,
@@ -49,6 +50,7 @@ import { env } from '@/lib/env-server';
 const DEFAULT_RETENTION_DAYS = 90;
 const CHAT_RETENTION_DAYS = 365;
 const BATCH_SIZE = 1000;
+const DEADLOCK_RETRY_DELAY_MS = 25;
 
 // Get configured retention period
 export function getRetentionDays(): number {
@@ -100,6 +102,20 @@ export interface RetentionCleanupResult {
   duration: number;
 }
 
+async function executeDeleteBatch(statement: SQL) {
+  try {
+    return await db.execute(statement);
+  } catch (error) {
+    // A deadlock aborts this standalone statement. Replay it once, not the
+    // cleanup or any preceding committed batch. Other outcomes are not replayed.
+    if (unwrapPgError(error).code !== '40P01') throw error;
+    await new Promise<void>(resolve =>
+      setTimeout(resolve, DEADLOCK_RETRY_DELAY_MS)
+    );
+    return db.execute(statement);
+  }
+}
+
 /**
  * Batch delete rows matching a condition to avoid table locks and timeouts.
  * Uses ctid-based subquery to delete in chunks without needing column references.
@@ -114,7 +130,7 @@ async function batchDelete(
   let totalDeleted = 0;
   let deleted: number;
   do {
-    const result = await db.execute(
+    const result = await executeDeleteBatch(
       drizzleSql`DELETE FROM ${tableRef}
         WHERE ctid IN (
           SELECT ctid FROM ${tableRef}

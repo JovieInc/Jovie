@@ -14,7 +14,7 @@ const bookingContact: PublicContact = {
 };
 
 describe('AboutSection', () => {
-  it('renders selected credits and booking/contact entries when provided', () => {
+  it('renders booking/contact entries and keeps credits out of About (JOV-14241)', () => {
     render(
       <AboutSection
         artist={PROFILE_STORY_ARTIST}
@@ -40,15 +40,8 @@ describe('AboutSection', () => {
       />
     );
 
-    const credits = screen.getByTestId('profile-about-credits');
-    expect(credits).toBeVisible();
-    expect(
-      screen.getByRole('link', { name: 'Guest Vocalist' })
-    ).toHaveAttribute('href', '/guestvocalist');
-    expect(screen.getByRole('link', { name: 'Neon Circuit' })).toHaveAttribute(
-      'href',
-      '/timwhite/neon-circuit'
-    );
+    expect(screen.queryByTestId('profile-about-credits')).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Guest Vocalist' })).toBeNull();
 
     const contacts = screen.getByTestId('profile-about-contacts');
     expect(contacts).toBeVisible();
@@ -58,14 +51,14 @@ describe('AboutSection', () => {
     );
   });
 
-  it('omits credits and contact blocks on sparse profiles', () => {
+  it('omits contact blocks on sparse profiles', () => {
     render(<AboutSection artist={PROFILE_STORY_ARTIST} contacts={[]} />);
 
     expect(screen.queryByTestId('profile-about-credits')).toBeNull();
     expect(screen.queryByTestId('profile-about-contacts')).toBeNull();
   });
 
-  it('renders one row per contact role and wraps credits for prose links', () => {
+  it('renders one row per contact role', () => {
     render(
       <AboutSection
         artist={PROFILE_STORY_ARTIST}
@@ -86,9 +79,7 @@ describe('AboutSection', () => {
       screen.getAllByRole('link', { name: /Brand partnerships/ })
     ).toHaveLength(1);
     expect(screen.getByText('Maverick')).toBeVisible();
-    expect(screen.getByTestId('profile-about-credits')).toHaveClass(
-      'profile-about-credits'
-    );
+    expect(screen.queryByTestId('profile-about-credits')).toBeNull();
   });
 
   it('skips contacts with no reachable channel', () => {
@@ -119,18 +110,14 @@ describe('AboutSection text contrast contract (JOV-8873)', () => {
     expect(source).not.toContain('text-white/40');
   });
 
-  it('styles credit mentions with the prose link treatment', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    const webRoot = process.cwd().endsWith('/apps/web')
-      ? process.cwd()
-      : resolve(process.cwd(), 'apps/web');
-    const css = readFileSync(
-      resolve(webRoot, 'styles/design-system.css'),
-      'utf8'
+  it('does not render Selected Credits in About (credits live in the release menu)', () => {
+    render(
+      <AboutSection
+        artist={PROFILE_STORY_ARTIST}
+        creditSegments={[{ type: 'text', text: 'Credits.' }]}
+      />
     );
-    expect(css).toMatch(
-      /\.profile-about-credits \.profile-entity-mention \{\s*color: var\(--color-text-tooltip\);/
-    );
+    expect(screen.queryByText('Selected Credits')).toBeNull();
+    expect(screen.queryByTestId('profile-about-credits')).toBeNull();
   });
 });

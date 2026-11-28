@@ -13,6 +13,7 @@ import {
   getCacheGeneration,
   resetCacheIsolationForTests,
 } from '@/lib/queries/cache-isolation';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import {
   type ArrivalProjection,
   type ArrivalRowActions,
@@ -168,6 +169,14 @@ afterEach(() => {
 });
 
 describe('LibraryFirstArrivalAdapter', () => {
+  it('renders the introduction rows and the no-projection fallback without a11y violations', async () => {
+    const withIntro = mount();
+    await expectNoA11yViolations(withIntro.container);
+    withIntro.unmount();
+
+    const fallback = mount({ projection: null, onEvent: undefined });
+    await expectNoA11yViolations(fallback.container);
+  });
   it('keeps rows usable and unknown metrics null when authoritative ports are absent', () => {
     mount({ projection: null, onEvent: undefined });
     expect(releaseButton()).toBeEnabled();

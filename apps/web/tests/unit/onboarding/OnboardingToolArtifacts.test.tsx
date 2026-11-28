@@ -127,7 +127,7 @@ describe('onboarding tool artifacts', () => {
     );
 
     const picker = screen.getByTestId('onboarding-artist-picker');
-    expect(picker).toHaveClass('min-h-42');
+    expect(picker).toHaveClass('min-h-40');
     expect(picker).not.toHaveClass('h-42');
   });
 
@@ -320,7 +320,7 @@ describe('onboarding tool artifacts', () => {
       />
     );
 
-    expect(screen.getByText('is not available')).toBeDefined();
+    expect(screen.getByText('is taken')).toBeDefined();
     // A taken name offers one way forward, not a disabled confirm.
     expect(screen.queryByTestId('onboarding-confirm-handle')).toBeNull();
     expect(screen.getByRole('button', { name: 'Change Handle' })).toBeDefined();

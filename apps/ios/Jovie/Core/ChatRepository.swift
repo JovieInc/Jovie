@@ -20,7 +20,7 @@ final class ChatRepository {
   private(set) var hasMoreOlder = false
   private(set) var isOffline = false
   private(set) var sessionExpired = false
-  private(set) var lastErrorMessage: String?
+  internal(set) var lastErrorMessage: String?
   private var olderCursor: String?
   private var sendGeneration = 0
   private var selectionRevision = 0

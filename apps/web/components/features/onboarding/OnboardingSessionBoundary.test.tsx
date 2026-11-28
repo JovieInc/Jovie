@@ -160,6 +160,79 @@ describe('onboarding identity boundary', () => {
     });
   });
 
+  it('keeps the frozen Keep when account-link restore aborts, with honest retry (ONB-52 / JOV-14959)', async () => {
+    mocks.auth.isSignedIn = false;
+    mocks.auth.userId = null;
+    mocks.fetch.mockResolvedValue(snapshot(null, history, false));
+    const { rerender } = render(
+      <OnboardingSessionBoundary sessionLabel='pending' />
+    );
+    await screen.findByText('Saved artist progress');
+    mocks.fetch.mockRejectedValueOnce(
+      new DOMException('The operation was aborted.', 'AbortError')
+    );
+    mocks.auth.isSignedIn = true;
+    mocks.auth.userId = 'account-a';
+    rerender(<OnboardingSessionBoundary sessionLabel='pending' />);
+    // Freeze survives: Keep history still painted, not cold restore alert.
+    expect(
+      await screen.findByText(
+        /could not link this conversation to your account/i
+      )
+    ).toBeVisible();
+    expect(screen.getByTestId('history')).toHaveTextContent(
+      'Saved artist progress'
+    );
+    expect(screen.queryByTestId('onboarding-session-boundary')).toBeNull();
+    const retry = screen.getByTestId('onboarding-link-restore-retry');
+    expect(retry).toBeVisible();
+    mocks.fetch.mockResolvedValue(snapshot('account-a'));
+    fireEvent.click(retry);
+    await waitFor(() =>
+      expect(mocks.shell.mock.lastCall?.[0]).toMatchObject({
+        isSignedIn: true,
+        conversationId: 'conversation-a',
+      })
+    );
+  });
+
+  it('keeps the frozen Keep when account-link restore hits a network error', async () => {
+    mocks.auth.isSignedIn = false;
+    mocks.auth.userId = null;
+    mocks.fetch.mockResolvedValue(snapshot(null, history, false));
+    const { rerender } = render(
+      <OnboardingSessionBoundary sessionLabel='pending' />
+    );
+    await screen.findByText('Saved artist progress');
+    mocks.fetch.mockRejectedValueOnce(new TypeError('fetch failed'));
+    mocks.auth.isSignedIn = true;
+    mocks.auth.userId = 'account-a';
+    rerender(<OnboardingSessionBoundary sessionLabel='pending' />);
+    expect(
+      await screen.findByText(
+        /could not link this conversation to your account/i
+      )
+    ).toBeVisible();
+    expect(screen.getByTestId('history')).toHaveTextContent(
+      'Saved artist progress'
+    );
+    expect(screen.getByTestId('onboarding-link-restore-retry')).toBeVisible();
+  });
+
+  it('still shows cold restore failure when a signed-in restore aborts without a frozen Keep', async () => {
+    mocks.fetch.mockRejectedValueOnce(
+      new DOMException('The operation was aborted.', 'AbortError')
+    );
+    render(<OnboardingSessionBoundary sessionLabel='pending' />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'could not be restored'
+    );
+    expect(screen.getByTestId('onboarding-session-boundary')).toHaveAttribute(
+      'data-restore-error',
+      'restore-abort'
+    );
+  });
+
   it('does not read or display history until auth initialization finishes', () => {
     mocks.auth.isLoaded = false;
     render(<OnboardingSessionBoundary sessionLabel='pending' />);

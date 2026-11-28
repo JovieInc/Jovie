@@ -18,6 +18,7 @@ export type CheckoutSuccessView =
       readonly kind: 'success';
       readonly plan: PaidPlanId;
       readonly displayName: string;
+      readonly paymentStatus: 'paid' | 'no_payment_required';
     };
 
 export const CHECKOUT_PENDING_COPY = {
@@ -38,68 +39,6 @@ export function normalizeOpenCheckoutUrl(url: unknown): string | null {
     url.startsWith('https://checkout.stripe.com/')
     ? url
     : null;
-}
-
-export async function fetchValidatedSession(
-  sessionId: string | null,
-  signal: AbortSignal
-): Promise<{
-  plan: PaidPlanId | null;
-  needsProfile: boolean;
-  proofPending: boolean;
-  profileLive: boolean | null;
-  shareUrl: string | null;
-  sessionStatus: string | null;
-  checkoutUrl: string | null;
-} | null> {
-  if (typeof fetch !== 'function') return null;
-  const endpoint = sessionId
-    ? `/api/billing/checkout-session?session_id=${encodeURIComponent(sessionId)}`
-    : '/api/billing/checkout-session';
-  const response = await Promise.resolve(
-    fetch(endpoint, { cache: 'no-store', signal })
-  );
-  if (!response) return null;
-  if (!response.ok) {
-    return {
-      plan: null,
-      needsProfile: false,
-      proofPending: false,
-      profileLive: false,
-      shareUrl: null,
-      sessionStatus: null,
-      checkoutUrl: null,
-    };
-  }
-  const body = (await response.json()) as {
-    plan?: string | null;
-    needsProfile?: boolean;
-    proofPending?: boolean;
-    profileLive?: boolean;
-    profileShareUrl?: string | null;
-    sessionStatus?: string | null;
-    checkoutUrl?: string | null;
-  };
-  const proofPending = body.proofPending === true;
-  const needsProfile = body.needsProfile === true;
-  const profileLive =
-    typeof body.profileLive === 'boolean' ? body.profileLive : null;
-  return {
-    plan: resolvePaidPlan(body.plan ?? null),
-    needsProfile,
-    proofPending,
-    profileLive,
-    shareUrl:
-      !proofPending &&
-      !needsProfile &&
-      profileLive !== false &&
-      typeof body.profileShareUrl === 'string'
-        ? body.profileShareUrl
-        : null,
-    sessionStatus:
-      typeof body.sessionStatus === 'string' ? body.sessionStatus : null,
-    checkoutUrl: normalizeOpenCheckoutUrl(body.checkoutUrl),
-  };
 }
 
 /**
@@ -173,60 +112,32 @@ export function resolvePaidPlan(
   return canonical && canonical !== 'free' ? canonical : null;
 }
 
-export function resolveCanonicalPlan(
-  billingPlan: string | null | undefined,
-  rawPlanIdParam: string | null,
-  validatedSessionPlan: PaidPlanId | null
-): {
-  readonly canonical: PaidPlanId | null;
-  readonly displayName: string | null;
-} {
-  const fromBilling = resolvePaidPlan(billingPlan ?? null);
-  const fromParam = resolvePaidPlan(rawPlanIdParam);
-  const validatedParam =
-    fromParam &&
-    (fromParam === validatedSessionPlan ||
-      (!validatedSessionPlan && fromParam === fromBilling))
-      ? fromParam
-      : null;
-  const canonicalPlan = validatedParam ?? validatedSessionPlan ?? fromBilling;
-  return canonicalPlan
-    ? {
-        canonical: canonicalPlan,
-        displayName: getPlanDisplayName(canonicalPlan),
-      }
-    : { canonical: null, displayName: null };
-}
-
 export function resolveCheckoutSuccessView(input: {
   readonly checkoutSessionId: string | null;
   readonly isSessionPlanPending: boolean;
   readonly validatedSessionPlan: PaidPlanId | null;
-  readonly billingPlan: string | null | undefined;
-  readonly isBillingPending: boolean;
+  readonly confirmationStatus: 'pending' | 'unconfirmed' | 'confirmed' | null;
+  readonly paymentStatus: 'paid' | 'no_payment_required' | null;
 }): CheckoutSuccessView {
-  const billingEntitlement = resolvePaidPlan(input.billingPlan);
-  if (input.checkoutSessionId) {
-    if (input.isSessionPlanPending)
-      return { kind: 'pending', reason: 'session' };
-    if (!input.validatedSessionPlan) {
-      return { kind: 'recovery', reason: 'session_unconfirmed' };
-    }
+  if (!input.checkoutSessionId) {
+    return { kind: 'recovery', reason: 'not_entitled' };
+  }
+  if (input.isSessionPlanPending) {
+    return { kind: 'pending', reason: 'session' };
+  }
+  if (
+    input.confirmationStatus === 'confirmed' &&
+    input.validatedSessionPlan &&
+    input.paymentStatus
+  ) {
     return {
       kind: 'success',
       plan: input.validatedSessionPlan,
       displayName: getPlanDisplayName(input.validatedSessionPlan),
+      paymentStatus: input.paymentStatus,
     };
   }
-  if (input.isBillingPending) return { kind: 'pending', reason: 'billing' };
-  if (billingEntitlement) {
-    return {
-      kind: 'success',
-      plan: billingEntitlement,
-      displayName: getPlanDisplayName(billingEntitlement),
-    };
-  }
-  return { kind: 'recovery', reason: 'not_entitled' };
+  return { kind: 'recovery', reason: 'session_unconfirmed' };
 }
 
 export function isArtistVisibilityPlan(plan: PaidPlanId): boolean {

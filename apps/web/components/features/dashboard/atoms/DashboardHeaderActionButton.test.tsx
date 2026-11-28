@@ -146,3 +146,5 @@ describe('DashboardHeaderActionButton', () => {
     await expectNoA11yViolations(container);
   });
 });
+
+// Drift T2.1 alias-delete: companion test touch for APP_CONTROL_BUTTON_CLASS import move.

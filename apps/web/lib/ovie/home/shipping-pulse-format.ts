@@ -15,8 +15,12 @@ export function toneAtLeast(value: number, target: number): HomeLoopTone {
 }
 
 export function perDay(measurement: CountMeasurement): number | null {
-  const week = measurement.state === 'not-measured' ? null : measurement.value;
-  return week === null ? null : Math.round(week / 7);
+  const week = weekCount(measurement);
+  return week === null ? null : week / 7;
+}
+
+export function formatPerDay(average: number): string {
+  return String(Math.round(average * 10) / 10);
 }
 
 export function shippingSnapshotCaption(at: string | null | undefined): string {
@@ -24,4 +28,9 @@ export function shippingSnapshotCaption(at: string | null | undefined): string {
   return Number.isFinite(timestamp)
     ? `Snapshot ${new Date(timestamp).toISOString().slice(0, 16).replace('T', ' ')} UTC`
     : 'Snapshot time unknown';
+}
+
+/** The measured 7-day count itself, or null when not measured. */
+export function weekCount(measurement: CountMeasurement): number | null {
+  return measurement.state === 'not-measured' ? null : measurement.value;
 }

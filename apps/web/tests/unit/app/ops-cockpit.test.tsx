@@ -105,9 +105,7 @@ describe('Ops cockpit sections', () => {
   it('shows LogYourBody behind main as not measured until the feed publishes it', () => {
     render(<HudShippingStrip view={cockpitShipping} />);
 
-    expect(
-      screen.getByTestId('hud-shipping-chip-lyb-behind')
-    ).toHaveTextContent('—');
+    expect(screen.queryByTestId('hud-shipping-chip-lyb-behind')).toBeNull();
   });
 
   it('renders a nominal exceptions strip when nothing needs attention', () => {

@@ -1,0 +1,140 @@
+.sidebar-editorial-slot {
+  flex: 0 0 164px;
+  min-width: 0;
+  padding: 0 var(--space-2) var(--space-2);
+}
+
+.sidebar-editorial-card {
+  --editorial-ink: #f8fafd;
+  --editorial-base: #101318;
+  --editorial-highlight: #252e3a;
+  position: relative;
+  display: grid;
+  grid-template-rows: 28px 40px 28px 44px;
+  box-sizing: border-box;
+  height: 156px;
+  padding: var(--space-3) var(--space-3) var(--space-1);
+  border-radius: var(--radius-xl);
+  background-color: var(--editorial-base);
+  color: var(--editorial-ink);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in oklab, var(--editorial-ink) 11%, transparent);
+}
+
+.sidebar-editorial-release {
+  background-image:
+    radial-gradient(ellipse 85% 95% at 12% 48%, rgb(0 0 0 / 78%), transparent),
+    url("/images/changelog/sidebar-announcement.webp");
+  background-position: center;
+  background-size: cover;
+}
+
+.sidebar-editorial-update {
+  --color-btn-primary-bg: var(--editorial-ink);
+  --color-btn-primary-fg: var(--color-ink-on-media);
+  --color-btn-primary-hover: color-mix(
+    in oklab,
+    var(--editorial-ink),
+    var(--editorial-base) 8%
+  );
+  display: block;
+  background-image: radial-gradient(
+    ellipse 85% 95% at 88% 8%,
+    var(--editorial-highlight),
+    transparent
+  );
+}
+
+.sidebar-editorial-update-control {
+  display: grid;
+  height: 100%;
+  grid-template-rows: 28px 40px 28px 44px;
+}
+
+.sidebar-editorial-eyebrow {
+  display: flex;
+  align-items: start;
+  gap: var(--space-1-5);
+  min-width: 0;
+  padding-inline-end: var(--space-7);
+  font-size: var(--text-xs);
+  line-height: 16px;
+}
+
+.sidebar-editorial-eyebrow svg {
+  flex: none;
+  margin-block-start: 1px;
+}
+
+.sidebar-editorial-title {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: 20px;
+  font-weight: normal;
+}
+
+.sidebar-editorial-deck {
+  overflow: hidden;
+  margin: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--text-xs);
+  line-height: 16px;
+}
+
+.sidebar-editorial-card .sidebar-editorial-action {
+  grid-row: 4;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.sidebar-editorial-card a.sidebar-editorial-action {
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-ink-on-media);
+  box-shadow: none;
+}
+
+.sidebar-editorial-pill {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: var(--app-shell-control-height-sm);
+  border-radius: var(--radius-full);
+  background: var(--editorial-ink);
+  font-weight: normal;
+  font-size: var(--text-xs);
+  line-height: 16px;
+}
+
+.sidebar-editorial-card
+  .sidebar-editorial-action:hover
+  .sidebar-editorial-pill {
+  background: color-mix(
+    in oklab,
+    var(--editorial-ink),
+    var(--editorial-base) 8%
+  );
+}
+
+.sidebar-editorial-dismiss {
+  --color-text-secondary-token: color-mix(
+    in oklab,
+    var(--editorial-ink) 48%,
+    transparent
+  );
+  --color-text-primary-token: var(--editorial-ink);
+  position: absolute;
+  inset-block-start: var(--space-1);
+  inset-inline-end: var(--space-1);
+}
+
+.sidebar-editorial-card a.sidebar-editorial-action:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: -2px;
+  box-shadow: none;
+}
