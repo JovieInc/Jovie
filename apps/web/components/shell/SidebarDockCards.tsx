@@ -5,7 +5,6 @@ import {
   InsetPanel,
   InsetPanelHeader,
   InsetPanelRow,
-  PlainButton,
 } from '@jovie/ui';
 import { ArrowUpRight, Sparkles, X } from 'lucide-react';
 import Link from 'next/link';
@@ -33,37 +32,29 @@ export function DockUpdateCard({
   penRail = false,
   onDismiss,
 }: DockUpdateCardProps) {
-  if (penRail) {
-    return (
-      <section
-        data-dock-card='update'
-        aria-label='App Update'
-        className='sidebar-editorial-card sidebar-editorial-update'
-      >
-        {children}
-        {onDismiss ? (
-          <EditorialDismiss label='Dismiss Update' onDismiss={onDismiss} />
-        ) : null}
-      </section>
-    );
-  }
   return (
-    <InsetPanel asChild tone='gradient'>
-      <section data-dock-card='update' aria-label='App Update'>
-        {/*
-          Update region. Fixed 32px footprint so an updater state change, or
-          the control's chunk arriving, never moves the account row below.
-          The control owns its status line and single action; the row only
-          sizes it to the panel's 32px rhythm.
-        */}
+    <DockCardFrame kind='update' label='App Update' penRail={penRail}>
+      {penRail ? (
+        <>
+          {children}
+          {onDismiss ? (
+            <DockCardDismiss
+              ariaLabel='Dismiss Update'
+              onDismiss={onDismiss}
+              penRail
+            />
+          ) : null}
+        </>
+      ) : (
+        // Keep the account row steady while the updater changes state.
         <div
           data-dock-update-slot
           className='flex h-8 min-w-0 items-center [&>[data-desktop-update-control]]:h-8'
         >
           {children}
         </div>
-      </section>
-    </InsetPanel>
+      )}
+    </DockCardFrame>
   );
 }
 
@@ -82,77 +73,115 @@ export function DockWhatsNewCard({
   onOpen,
   onDismiss,
 }: DockWhatsNewCardProps) {
-  if (penRail) {
-    return (
-      <section
-        data-dock-card='whats-new'
-        aria-label="What's New"
-        className='sidebar-editorial-card sidebar-editorial-release'
-      >
-        <div className='sidebar-editorial-eyebrow'>
-          What’s new <Sparkles size={14} aria-hidden='true' />
-        </div>
-        <p className='sidebar-editorial-title'>{title}</p>
-        {deck ? <p className='sidebar-editorial-deck'>{deck}</p> : null}
-        <Link
-          href={APP_ROUTES.CHANGELOG}
-          prefetch={false}
-          onClick={onOpen}
-          className='sidebar-editorial-action'
-          aria-label={`Read update: ${title}`}
-        >
-          <span className='sidebar-editorial-pill'>Read update</span>
-        </Link>
-        <EditorialDismiss label="Dismiss What's New" onDismiss={onDismiss} />
-      </section>
-    );
-  }
-
   return (
-    <InsetPanel asChild tone='gradient'>
-      <section data-dock-card='whats-new' aria-label="What's New">
-        <InsetPanelHeader
-          // The link below carries the same accessible name as before
-          // ("What's new" + release title); the visible heading is not
-          // announced twice.
-          title={<span aria-hidden='true'>What&apos;s new</span>}
-          trailing={
-            <IconButton
-              size='sm'
-              ariaLabel="Dismiss what's new"
-              onClick={onDismiss}
-            >
-              <X className='size-3' />
-            </IconButton>
-          }
-        />
-        <InsetPanelRow
-          asChild
-          icon={<Sparkles />}
-          trailing={<ArrowUpRight aria-hidden='true' />}
-        >
-          <Link href={APP_ROUTES.CHANGELOG} prefetch={false} onClick={onOpen}>
-            <span className='sr-only'>What&apos;s new </span>
-            {title}
+    <DockCardFrame kind='whats-new' label="What's New" penRail={penRail}>
+      {penRail ? (
+        <>
+          <div className='sidebar-editorial-eyebrow'>
+            What’s new <Sparkles size={14} aria-hidden='true' />
+          </div>
+          <h2 className='sidebar-editorial-title line-clamp-2'>{title}</h2>
+          {deck ? <p className='sidebar-editorial-deck'>{deck}</p> : null}
+          <Link
+            href={APP_ROUTES.CHANGELOG}
+            prefetch={false}
+            onClick={onOpen}
+            className='sidebar-editorial-action'
+            aria-label={`Read update: ${title}`}
+          >
+            <span className='sidebar-editorial-pill'>Read update</span>
           </Link>
-        </InsetPanelRow>
-      </section>
+          <DockCardDismiss
+            ariaLabel="Dismiss What's New"
+            onDismiss={onDismiss}
+            penRail
+          />
+        </>
+      ) : (
+        <>
+          <InsetPanelHeader
+            title={<span aria-hidden='true'>What&apos;s new</span>}
+            trailing={
+              <DockCardDismiss
+                ariaLabel="Dismiss what's new"
+                onDismiss={onDismiss}
+              />
+            }
+          />
+          <InsetPanelRow
+            asChild
+            icon={<Sparkles />}
+            trailing={<ArrowUpRight aria-hidden='true' />}
+          >
+            <Link href={APP_ROUTES.CHANGELOG} prefetch={false} onClick={onOpen}>
+              <span className='sr-only'>What&apos;s new </span>
+              {title}
+            </Link>
+          </InsetPanelRow>
+        </>
+      )}
+    </DockCardFrame>
+  );
+}
+
+function DockCardFrame({
+  kind,
+  label,
+  penRail,
+  children,
+}: Readonly<{
+  kind: 'update' | 'whats-new';
+  label: string;
+  penRail: boolean;
+  children: ReactNode;
+}>) {
+  const editorialSurface =
+    kind === 'update'
+      ? 'sidebar-editorial-update'
+      : 'sidebar-editorial-release';
+  const region = (
+    <section
+      data-dock-card={kind}
+      aria-label={label}
+      className={
+        penRail ? `sidebar-editorial-card ${editorialSurface}` : undefined
+      }
+    >
+      {children}
+    </section>
+  );
+  return penRail ? (
+    region
+  ) : (
+    <InsetPanel asChild tone='gradient'>
+      {region}
     </InsetPanel>
   );
 }
 
-function EditorialDismiss({
-  label,
+function DockCardDismiss({
+  ariaLabel,
   onDismiss,
-}: Readonly<{ label: string; onDismiss: () => void }>) {
-  return (
-    <PlainButton
+  penRail = false,
+}: Readonly<{ ariaLabel: string; onDismiss: () => void; penRail?: boolean }>) {
+  const dismiss = (
+    <IconButton
       type='button'
-      className='sidebar-editorial-dismiss'
-      aria-label={label}
+      size={penRail ? 'xl' : 'sm'}
+      static={penRail}
+      ariaLabel={ariaLabel}
       onClick={onDismiss}
     >
-      <X aria-hidden='true' size={16} />
-    </PlainButton>
+      <X
+        aria-hidden='true'
+        size={16}
+        className={penRail ? undefined : 'size-3'}
+      />
+    </IconButton>
+  );
+  return penRail ? (
+    <div className='sidebar-editorial-dismiss'>{dismiss}</div>
+  ) : (
+    dismiss
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, PlainButton, ProgressBar } from '@jovie/ui';
+import { Button, ProgressBar } from '@jovie/ui';
 import { Download } from 'lucide-react';
 import type {
   DesktopUpdateControlKind,
@@ -182,7 +182,7 @@ export function DesktopUpdateControl({
         <p
           className={
             editorial
-              ? 'sidebar-editorial-title'
+              ? 'sidebar-editorial-title line-clamp-2'
               : 'min-w-0 flex-1 text-xs text-primary-token'
           }
         >
@@ -208,20 +208,23 @@ export function DesktopUpdateControl({
         ) : null}
       </div>
       {editorial ? (
-        <PlainButton
-          type='button'
-          aria-label={view.actionAriaLabel}
-          aria-busy={view.busy || undefined}
-          aria-disabled={view.busy || undefined}
-          onClick={view.busy ? undefined : act}
-          className='sidebar-editorial-action'
-        >
-          <span className='sidebar-editorial-pill tabular-nums'>
+        <div className='sidebar-editorial-action'>
+          <Button
+            type='button'
+            variant='primary'
+            size='sm'
+            static
+            aria-label={view.actionAriaLabel}
+            aria-busy={view.busy || undefined}
+            aria-disabled={view.busy || undefined}
+            onClick={view.busy ? undefined : act}
+            className='w-full'
+          >
             {view.intent === 'restart'
               ? view.actionAriaLabel
               : view.actionLabel}
-          </span>
-        </PlainButton>
+          </Button>
+        </div>
       ) : (
         <Button
           type='button'
