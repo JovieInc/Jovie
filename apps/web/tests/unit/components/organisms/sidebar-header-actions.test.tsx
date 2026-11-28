@@ -157,12 +157,10 @@ function headerControls() {
     throw new Error('sidebar header actions are not mounted');
   }
   const bell = actions.querySelector('[data-inbox-attention]');
-  const search = actions.querySelector('[data-app-search-trigger]');
   const toggle = screen.getByTestId('sidebar-rail-toggle');
-  if (!(bell instanceof HTMLElement) || !(search instanceof HTMLElement)) {
-    throw new Error('bell or search trigger is missing');
-  }
-  return { header, actions, controls: { bell, search, toggle } };
+  if (!(bell instanceof HTMLElement))
+    throw new Error('sidebar bell is missing');
+  return { header, actions, controls: { bell, toggle } };
 }
 
 /** The geometry that decides box, radius, and hit area. */
@@ -184,7 +182,7 @@ describe('sidebar header actions row', () => {
     document.cookie = 'sidebar:state=; path=/; max-age=0';
   });
 
-  it('gives the bell, search and rail toggle one icon-button contract', () => {
+  it('gives the bell and rail toggle one icon-button contract', () => {
     renderHeader();
     const { controls } = headerControls();
     const shapes = Object.fromEntries(
@@ -193,7 +191,6 @@ describe('sidebar header actions row', () => {
         geometry(element),
       ])
     );
-    expect(shapes.search).toEqual(shapes.bell);
     expect(shapes.toggle).toEqual(shapes.bell);
     expect(shapes.bell.box).toEqual(['size-7']);
     expect(shapes.bell.radius).toEqual(['rounded-md']);
@@ -227,27 +224,16 @@ describe('sidebar header actions row', () => {
     }
   });
 
-  it('spaces the three controls evenly and centers them on the logo row', () => {
+  it('keeps the actions at opposite ends of the approved header and search outside it', () => {
     renderHeader();
     const { actions, controls } = headerControls();
     const brandRow = actions.closest('[data-sidebar-brand-row]');
     expect(brandRow).toHaveClass('items-center');
-    expect(actions).toHaveClass('items-center');
-
-    const gap = activeTokens(actions).find(token => /^gap-/.test(token));
-    expect(gap, 'header actions need an explicit gap').toBeDefined();
-    const toggleSlot = controls.toggle.closest(
-      '[data-sidebar-header-toggle-slot]'
-    );
-    expect(toggleSlot).not.toBeNull();
-    const lead = activeTokens(toggleSlot as Element).find(token =>
-      /^ml-/.test(token)
-    );
-    // Search -> toggle must match bell -> search.
-    expect(lead?.replace(/^ml-/, '')).toBe(gap?.replace(/^gap-/, ''));
-
-    const logoRow = brandRow?.firstElementChild?.firstElementChild;
-    expect(logoRow).toHaveClass('h-7');
+    expect(actions).toHaveClass('sidebar-pen-header-bell');
+    expect(
+      controls.toggle.closest('[data-sidebar-header-toggle-slot]')
+    ).toHaveClass('sidebar-pen-header-toggle');
+    expect(brandRow?.querySelector('[data-app-search-trigger]')).toBeNull();
   });
 
   it('sizes the sidebar header like the content header so their rows share a center line', () => {
@@ -308,10 +294,10 @@ describe('sidebar header brand', () => {
     document.cookie = 'sidebar:state=; path=/; max-age=0';
   });
 
-  it('shows the customer brand word as plain text with no glyph or popover', () => {
+  it('keeps the single-workspace customer header clear of a redundant wordmark', () => {
     renderHeader();
     const row = document.querySelector('[data-sidebar-brand-row]');
-    expect(row).toHaveTextContent('Jovie');
+    expect(row).not.toHaveTextContent('Jovie');
     expect(row?.querySelector('[data-brand-variant]')).toBeNull();
     expect(
       screen.queryByRole('button', { name: 'Ask Jovie' })

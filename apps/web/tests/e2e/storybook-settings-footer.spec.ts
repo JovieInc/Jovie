@@ -79,28 +79,30 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
       expect(phases).not.toContain('closing');
       expect(phases).not.toContain('opening');
     }
-    // Record the real Better Auth client's local sign-out request and fulfill it
-    // through the preview's documented API mock, then observe its hard navigation.
+    let signOutObserved = false;
+    await page.exposeFunction('recordSettingsSignOut', () => {
+      signOutObserved = true;
+    });
     await page.evaluate(() => {
       const fixture = window as Window & {
+        recordSettingsSignOut: () => Promise<void>;
         __jovieApiMock?: (request: {
           url: URL;
           init?: RequestInit;
         }) => Response | Promise<Response> | undefined;
       };
       const previous = fixture.__jovieApiMock;
-      fixture.__jovieApiMock = request =>
-        request.url.pathname.endsWith('/sign-out')
-          ? Response.json({ success: true })
-          : previous?.(request);
+      fixture.__jovieApiMock = async request => {
+        if (!request.url.pathname.endsWith('/sign-out'))
+          return previous?.(request);
+        await fixture.recordSettingsSignOut();
+        return Response.json({ success: true });
+      };
     });
     await account.click();
     const logout = page.getByRole('menuitem', { name: /^Sign Out/i });
     await expect(logout).toBeVisible();
-    await logout.focus();
-    await Promise.all([
-      page.waitForURL(url => url.pathname === '/signin'),
-      page.keyboard.press('Enter'),
-    ]);
+    await logout.press('Enter');
+    await expect.poll(() => signOutObserved).toBe(true);
   });
 }

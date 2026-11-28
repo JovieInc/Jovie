@@ -457,5 +457,9 @@ it('keeps Home alongside the three workspace destinations on the Pen rail', () =
       .map(link => link.getAttribute('data-navigation-item-id'))
   ).toEqual(['chat', 'home', 'presence', 'library', 'audience']);
   expect(screen.getByRole('button', { name: 'Search Jovie' })).toBeVisible();
+  fireEvent.keyDown(screen.getByRole('link', { name: 'Chat' }), {
+    key: 'ArrowRight',
+  });
+  expect(screen.getByRole('searchbox', { name: 'Search Chats' })).toBeVisible();
   expect(screen.queryByRole('button', { name: 'Chat History' })).toBeNull();
 });

@@ -62,7 +62,7 @@
 - `border-subtle`, `border-default`, `border-strong`
 - `focus-ring-themed` or `focus-visible:*` on interactive elements
 
-## Design Tokens (295 contract tokens; 602 total in CSS)
+## Design Tokens (296 contract tokens; 603 total in CSS)
 
 Contract tokens below are the semantic surface for AI edits. DSP brand colors and extended accent palettes live in `apps/web/styles/design-system.css` only.
 
@@ -250,6 +250,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--app-shell-sidebar-background-rgb`: 247 248 248
 - `--app-shell-sidebar-badge-font-size`: 0.5rem
 - `--app-shell-sidebar-border-rgb`: 0 0 0 / 0.06
+- `--app-shell-sidebar-chat-history-width`: 280px
 - `--app-shell-sidebar-floating-radius`: 14px
 - `--app-shell-sidebar-foreground-rgb`: 18 18 20
 - `--app-shell-sidebar-history-font-size`: 0.78125rem

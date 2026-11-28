@@ -171,11 +171,6 @@
   padding-inline: 0;
 }
 
-[data-rail-preview="true"] [data-pen-sidebar],
-[data-rail-preview="true"] [data-pen-sidebar] [data-sidebar="sidebar"] {
-  border-radius: var(--app-shell-sidebar-floating-radius);
-}
-
 .sidebar-pen-settings [data-sidebar="menu"] {
   gap: 0;
 }

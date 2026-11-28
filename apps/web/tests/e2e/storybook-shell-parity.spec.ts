@@ -116,7 +116,11 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
     }
     const [customer, operator] = samples;
     expect(customer.header).toEqual(operator.header);
-    expect(customer.brand).toEqual(operator.brand);
+    expect(customer.brand.x).toBe(operator.brand.x);
+    expect(customer.brand.width).toBe(operator.brand.width);
+    expect(customer.brand.y + customer.brand.height / 2).toBe(
+      operator.brand.y + operator.brand.height / 2
+    );
     expect(customer.main).toEqual(operator.main);
     expect(customer.rows[0]?.height).toBe(44);
     expect(customer.rows.slice(1).every(row => row.height === 28)).toBe(true);

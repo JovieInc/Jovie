@@ -111,9 +111,6 @@ export function DashboardNav({
     usePendingNavigation(currentNavigationHref);
   const queryClient = useQueryClient();
   const isElectron = useIsElectronRuntime();
-  // Persisted navigation state is a client-only enhancement. Reading it during
-  // the first render would make a returning browser render different badges
-  // from the server markup and can force React to abandon hydration.
   const [threadReadAtById, setThreadReadAtById] = useState<
     Record<string, string>
   >({});
@@ -200,7 +197,6 @@ export function DashboardNav({
     },
   ];
 
-  // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
     () => () => {
@@ -300,7 +296,6 @@ export function DashboardNav({
     });
   };
 
-  // Memoize renderNavItem to prevent creating new functions on every render
   const renderNavItem = useCallback(
     (item: NavItem, _index: number) => {
       const isNewThreadItem =
@@ -311,7 +306,6 @@ export function DashboardNav({
         : isNavigationItemActive(item, pathname, searchParams);
       const shortcut = NAV_SHORTCUTS[item.id];
 
-      // The demo fixture only implements Work content; other roots stay disabled.
       const demoUnavailable = isDemo && item.id !== 'library';
 
       return (
@@ -403,7 +397,6 @@ export function DashboardNav({
     </Link>
   );
 
-  // Header owns bell and search: New Chat takes a labelled row (shell-ia.md).
   const newChatOwnsRow = headerOwnsInbox && !searchSurface;
 
   const commandSlot = (
@@ -411,8 +404,6 @@ export function DashboardNav({
       data-sidebar-search-slot='true'
       className={cn(
         'flex h-9 shrink-0 items-center gap-(--space-2-5) pr-1.5 lg:overflow-hidden',
-        // The command slot keeps its vertical allocation while the
-        // surrounding rail narrows; navigation below never moves.
         'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:border-transparent group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:pr-0'
       )}
     >
@@ -458,7 +449,6 @@ export function DashboardNav({
     </div>
   );
 
-  // Memoize renderSection to prevent creating new functions on every render
   const renderSection = useCallback(
     (items: readonly NavItem[]) => (
       <SidebarMenu className={penRail ? 'gap-0' : 'gap-1 lg:gap-px'}>
@@ -468,16 +458,31 @@ export function DashboardNav({
     [penRail, renderNavItem]
   );
 
-  const recentChats =
-    !conversationsLoading &&
-    !conversationsError &&
-    conversations?.length === 0 ? (
-      <p className='px-(--app-shell-sidebar-inset) text-xs text-tertiary-token'>
-        No chats yet
-      </p>
-    ) : (
+  const renderRecentChats = (query = '') => {
+    const needle = query.trim().toLocaleLowerCase();
+    const threads = needle
+      ? sidebarThreads.filter(thread =>
+          thread.title.toLocaleLowerCase().includes(needle)
+        )
+      : sidebarThreads;
+    if (
+      !conversationsLoading &&
+      !conversationsError &&
+      conversations &&
+      !threads.length
+    ) {
+      return (
+        <p
+          role='status'
+          className='px-(--app-shell-sidebar-inset) text-xs text-tertiary-token'
+        >
+          {needle ? 'No chats match' : 'No chats yet'}
+        </p>
+      );
+    }
+    return (
       <SidebarThreadsSection
-        threads={sidebarThreads}
+        threads={threads}
         activeThreadId={activeThreadId}
         allThreadsActive={normalizeTrailingSlash(pathname) === APP_ROUTES.CHATS}
         onThreadContextMenu={onThreadContextMenu}
@@ -494,6 +499,7 @@ export function DashboardNav({
         collapsed={false}
       />
     );
+  };
 
   return (
     <>
@@ -529,7 +535,9 @@ export function DashboardNav({
                     normalizeTrailingSlash(pathname) === APP_ROUTES.CHAT &&
                     searchParams.get('panel') !== 'profile'
                   }
-                  recentChats={threadsVisible ? recentChats : null}
+                  renderRecentChats={
+                    threadsVisible ? renderRecentChats : undefined
+                  }
                   pending={pendingNavigation?.itemId === chatNavItem.id}
                   onActivate={event => handleCommandClick(event, chatNavItem)}
                 />
@@ -538,7 +546,6 @@ export function DashboardNav({
                 </div>
               </>
             ) : newChatOwnsRow ? (
-              // Keep creation on the shared navigation row and icon column.
               <div data-nav-section='create' className='[&_a]:after:-inset-y-2'>
                 {renderSection([NEW_CHAT_ROW_ITEM])}
               </div>
@@ -565,7 +572,7 @@ export function DashboardNav({
             dismissOnEscape
             unmountWhenClosed
           >
-            {recentChats}
+            {renderRecentChats()}
           </SidebarCollapsibleGroup>
         ) : null}
       </nav>

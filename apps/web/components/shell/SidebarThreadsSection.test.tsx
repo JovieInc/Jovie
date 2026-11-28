@@ -512,8 +512,12 @@ describe('founder-locked calm sidebar history', () => {
     const create = screen.getByRole('button', { name: 'New Chat' });
     expect(create.querySelector('svg')).not.toBeNull();
     expect(create.parentElement).toHaveAttribute('data-sidebar-history-header');
-    expect(screen.getByText('Today')).toBeInTheDocument();
-    expect(screen.getByText('Earlier')).toBeInTheDocument();
+    expect(
+      screen.getByText('Today').closest('[data-sidebar-history-header]')
+    ).not.toBeNull();
+    expect(
+      screen.getByText('Earlier').closest('[data-sidebar-history-header]')
+    ).not.toBeNull();
     expect(screen.getByText('2m')).toHaveAttribute(
       'datetime',
       current[0].updatedAt
@@ -528,7 +532,6 @@ describe('founder-locked calm sidebar history', () => {
       screen.queryByRole('button', { name: 'Filter Unread Chats' })
     ).toBeNull();
   });
-
   it('retains retry and context actions and hides history when collapsed', () => {
     const retry = vi.fn();
     const context = vi.fn();

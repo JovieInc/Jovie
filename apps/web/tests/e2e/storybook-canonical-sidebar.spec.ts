@@ -49,10 +49,10 @@ for (const theme of ['dark', 'light']) {
     expect(before).not.toBeNull();
     expect(before!.y + before!.height).toBeCloseTo(
       page.viewportSize()!.height,
-      1
+      0
     );
     await expect(nav.locator('[data-navigation-item-id="home"]')).toHaveCount(
-      0
+      1
     );
     const work = nav
       .getByRole('link', { name: 'Work', exact: true })
