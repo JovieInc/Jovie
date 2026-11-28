@@ -92,12 +92,12 @@ describe('sidebar optical alignment ratchet (shrink-only)', () => {
     expect(measured).toBe(0);
   });
 
-  it('keeps history on the nav grid and the rail at 224px', () => {
+  it('keeps history on the nav grid and the rail at 244px', () => {
     const css = readFileSync(
       resolve(appRoot, 'styles/design-system.css'),
       'utf8'
     );
-    expect(css).toMatch(/--app-shell-sidebar-width:\s*224px;/);
+    expect(css).toMatch(/--app-shell-sidebar-width:\s*244px;/);
     expect(css).toMatch(
       /--app-shell-sidebar-history-grid:\s*var\(--app-shell-sidebar-nav-grid\);/
     );

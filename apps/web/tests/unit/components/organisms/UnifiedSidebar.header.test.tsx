@@ -324,3 +324,22 @@ describe('UnifiedSidebar header', () => {
     ).toBeNull();
   });
 });
+
+it('opts customer App into the Pen editorial dock and keeps the operator dock', () => {
+  const { container, unmount } = renderUnifiedSidebar({
+    pathname: APP_ROUTES.DASHBOARD,
+    section: 'dashboard',
+  });
+  expect(container.querySelector('[data-sidebar="footer"]')).toContainElement(
+    screen.getByTestId('sidebar-whats-new')
+  );
+  unmount();
+  const operator = renderUnifiedSidebar({
+    pathname: APP_ROUTES.OV,
+    section: 'ov',
+    variant: 'ov',
+  });
+  expect(
+    operator.container.querySelector('[data-sidebar="footer"]')
+  ).toContainElement(screen.getByTestId('sidebar-whats-new'));
+});

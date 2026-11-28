@@ -24,6 +24,8 @@ export interface SidebarDockStatus {
 export interface SidebarDockProps {
   readonly userId: string;
   readonly collapsed?: boolean;
+  readonly penRail?: boolean;
+  readonly enabled?: boolean;
   /** The desktop app's one update control; absent in web builds. */
   readonly updateControl?: SidebarDockUpdateControl;
   readonly release?: WhatsNewEntry | null;
@@ -45,6 +47,7 @@ export interface SidebarDockUpdateControl {
   /** A failure outranks the other sidebar notices. */
   readonly urgent: boolean;
   readonly node: ReactNode;
+  readonly onDismiss?: () => void;
 }
 
 export function sidebarDockSeenKey(userId: string): string {
@@ -55,6 +58,8 @@ export function sidebarDockSeenKey(userId: string): string {
 export function SidebarDock({
   userId,
   collapsed = false,
+  penRail = false,
+  enabled = true,
   updateControl,
   release,
   install,
@@ -79,9 +84,10 @@ export function SidebarDock({
   }, [key]);
 
   const showRelease = Boolean(
-    userId && release && seen?.key === key && seen.id !== release.id
+    enabled && userId && release && seen?.key === key && seen.id !== release.id
   );
-  const updateLabel = updateControl?.visible ? updateControl.label : null;
+  const updateLabel =
+    enabled && updateControl?.visible ? updateControl.label : null;
   const updateUrgent = updateControl?.urgent ?? false;
   const showUpdate = Boolean(updateLabel);
   const activeNotice = useSyncExternalStore(
@@ -112,7 +118,7 @@ export function SidebarDock({
       });
     return () => banner.dismiss(id);
   }, [noticePrefix, showRelease, collapsed]);
-  const hasInstall = Boolean(install);
+  const hasInstall = enabled && Boolean(install);
   useEffect(() => {
     const id = `${noticePrefix}install`;
     if (hasInstall && !collapsed)
@@ -131,7 +137,7 @@ export function SidebarDock({
     // Tooltip copy rule: a short title only. The story lives on /changelog,
     // which the expanded What's new card links to.
     showRelease && `What's new: ${shortTooltipTitle(release?.title ?? '')}`,
-    install && 'Install Jovie',
+    hasInstall && 'Install Jovie',
   ].filter(Boolean);
 
   // FLIP only the cards' paint positions. Footer geometry resolves locally;
@@ -239,20 +245,43 @@ export function SidebarDock({
     onStatusChange?.(statusRef.current);
   }, [onStatusChange, statusLabel]);
 
+  if (!enabled) return null;
+
   return (
     <>
       <section
         ref={regionRef}
         data-sidebar-dock='true'
         aria-label='Sidebar Dock'
-        className='flex shrink-0 flex-col gap-1 overflow-visible px-3 pb-(--space-2-5) empty:pb-0'
+        className={
+          penRail && !collapsed
+            ? 'sidebar-editorial-slot'
+            : 'flex shrink-0 flex-col gap-1 overflow-visible px-3 pb-(--space-2-5) empty:pb-0'
+        }
       >
         {!collapsed && showUpdate && selected('update') ? (
-          <DockUpdateCard>{updateControl?.node}</DockUpdateCard>
+          <DockUpdateCard
+            penRail={penRail}
+            onDismiss={
+              updateControl?.onDismiss &&
+              (() => {
+                returnFocus();
+                updateControl.onDismiss?.();
+              })
+            }
+          >
+            {updateControl?.node}
+          </DockUpdateCard>
         ) : null}
         {!collapsed && showRelease && release && selected('release') ? (
           <DockWhatsNewCard
+            penRail={penRail}
             title={release.title}
+            deck={
+              release.summary.trim() !== release.title.trim()
+                ? release.summary.trim()
+                : undefined
+            }
             onOpen={markSeen}
             onDismiss={() => {
               returnFocus();

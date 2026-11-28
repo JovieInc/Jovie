@@ -74,6 +74,7 @@ export function SidebarDockBridge(
 function SidebarDockBridgeInner({
   userId,
   collapsed,
+  penRail = false,
   fetchImpl = fetch,
   userState,
   oHref = APP_ROUTES.CHAT,
@@ -83,6 +84,7 @@ function SidebarDockBridgeInner({
   readonly userId: string;
   readonly userState?: WhatsNewUserState;
   readonly collapsed: boolean;
+  readonly penRail?: boolean;
   /** Where the O leads: the main chat page of the current workspace. */
   readonly oHref?: string;
   readonly variant?: BrandVariant;
@@ -91,16 +93,27 @@ function SidebarDockBridgeInner({
   const updateControl = useDesktopUpdateState();
   const { update: oUpdate, clear: clearOUpdate } = useOUpdates();
   const updateControlKind = updateControl.state.kind;
+  const [dismissedReadyVersion, setDismissedReadyVersion] = useState<string>();
+  const readyVersion =
+    updateControl.state.kind === 'ready'
+      ? updateControl.state.version
+      : undefined;
   const dockUpdateControl: SidebarDockUpdateControl =
-    updateControlKind === 'hidden'
+    updateControlKind === 'hidden' ||
+    (readyVersion !== undefined && readyVersion === dismissedReadyVersion)
       ? { visible: false, label: null, urgent: false, node: null }
       : {
           visible: true,
           label: UPDATE_CONTROL_NOTICE[updateControlKind],
           urgent: updateControlKind === 'failed',
+          onDismiss:
+            penRail && readyVersion
+              ? () => setDismissedReadyVersion(readyVersion)
+              : undefined,
           node: (
             <DesktopUpdateControl
               state={updateControl.state}
+              editorial={penRail}
               onDownload={updateControl.download}
               onRestart={updateControl.restart}
               onRetry={updateControl.retry}
@@ -136,6 +149,7 @@ function SidebarDockBridgeInner({
       <SidebarDock
         userId={userId}
         collapsed={collapsed}
+        penRail={penRail}
         updateControl={dockUpdateControl}
         release={
           release && userState && isWhatsNewActionComplete(release, userState)

@@ -425,3 +425,28 @@ describe('SidebarDock', () => {
     );
   });
 });
+
+it('uses one editorial slot as updater eligibility changes', async () => {
+  const { container, rerender } = render(
+    <SidebarDock
+      userId='one'
+      penRail
+      release={release}
+      updateControl={update}
+    />
+  );
+  const slot = container.querySelector('[data-sidebar-dock]');
+  expect(cards(container)).toEqual(['update']);
+  rerender(<SidebarDock userId='one' penRail release={release} />);
+  await screen.findByRole('link', { name: /Read update/ });
+  expect(cards(container)).toEqual(['whats-new']);
+  expect(container.querySelector('[data-sidebar-dock]')).toBe(slot);
+});
+
+it('suppresses the editorial notice and card together when a route disables the slot', () => {
+  const { container } = render(
+    <SidebarDock userId='one' penRail enabled={false} updateControl={update} />
+  );
+  expect(container.querySelector('[data-sidebar-dock]')).toBeNull();
+  expect(banner.getActiveBanner()).toBeNull();
+});

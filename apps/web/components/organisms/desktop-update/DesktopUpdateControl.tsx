@@ -1,6 +1,7 @@
 'use client';
 
-import { Button, ProgressBar } from '@jovie/ui';
+import { Button, PlainButton, ProgressBar } from '@jovie/ui';
+import { Download } from 'lucide-react';
 import type {
   DesktopUpdateControlKind,
   DesktopUpdateControlState,
@@ -125,6 +126,7 @@ export interface DesktopUpdateControlProps {
   readonly onRestart: () => void;
   readonly onRetry: () => void;
   readonly className?: string;
+  readonly editorial?: boolean;
 }
 
 /**
@@ -144,6 +146,7 @@ export function DesktopUpdateControl({
   onRestart,
   onRetry,
   className,
+  editorial = false,
 }: DesktopUpdateControlProps) {
   const view = describeDesktopUpdateControl(state);
   if (!view) return null;
@@ -157,10 +160,32 @@ export function DesktopUpdateControl({
       data-desktop-update-control=''
       data-state={state.kind}
       data-testid='desktop-update-control'
-      className={cn('flex h-9 w-full min-w-0 items-center gap-1', className)}
+      className={cn(
+        editorial
+          ? 'sidebar-editorial-update-control'
+          : 'flex h-9 w-full min-w-0 items-center gap-1',
+        className
+      )}
     >
-      <div className='relative flex h-full min-w-0 flex-1 items-center'>
-        <p className='min-w-0 flex-1 text-xs text-primary-token'>
+      {editorial ? (
+        <div className='sidebar-editorial-eyebrow'>
+          {state.kind === 'ready' ? 'Update available' : view.announcement}
+          <Download size={14} aria-hidden='true' />
+        </div>
+      ) : null}
+      <div
+        className={cn(
+          'relative min-w-0',
+          !editorial && 'flex h-full flex-1 items-center'
+        )}
+      >
+        <p
+          className={
+            editorial
+              ? 'sidebar-editorial-title'
+              : 'min-w-0 flex-1 text-xs text-primary-token'
+          }
+        >
           {/* Keyed by state, not by label: a new state fades in once, and
               percent ticks update in place without replaying the fade. */}
           <span
@@ -168,7 +193,7 @@ export function DesktopUpdateControl({
             data-part='status'
             className='block truncate tabular-nums transition-opacity duration-subtle ease-out starting:opacity-0 motion-reduce:transition-none'
           >
-            {view.label}
+            {editorial && state.kind === 'ready' ? state.version : view.label}
           </span>
         </p>
         {state.kind === 'downloading' ? (
@@ -182,20 +207,36 @@ export function DesktopUpdateControl({
           </div>
         ) : null}
       </div>
-      <Button
-        type='button'
-        size='sm'
-        variant={view.primary ? 'primary' : 'secondary'}
-        pendingPresentation='morph'
-        loading={view.busy}
-        // The status line already announces progress; keep the button quiet.
-        stateLabels={{ pending: '' }}
-        aria-label={view.actionAriaLabel}
-        onClick={act}
-        className='w-20 shrink-0'
-      >
-        {view.actionLabel}
-      </Button>
+      {editorial ? (
+        <PlainButton
+          type='button'
+          aria-label={view.actionAriaLabel}
+          aria-busy={view.busy || undefined}
+          aria-disabled={view.busy || undefined}
+          onClick={view.busy ? undefined : act}
+          className='sidebar-editorial-action'
+        >
+          <span className='sidebar-editorial-pill tabular-nums'>
+            {view.intent === 'restart'
+              ? view.actionAriaLabel
+              : view.actionLabel}
+          </span>
+        </PlainButton>
+      ) : (
+        <Button
+          type='button'
+          size='sm'
+          variant={view.primary ? 'primary' : 'secondary'}
+          pendingPresentation='morph'
+          loading={view.busy}
+          stateLabels={{ pending: '' }}
+          aria-label={view.actionAriaLabel}
+          onClick={act}
+          className='w-20 shrink-0'
+        >
+          {view.actionLabel}
+        </Button>
+      )}
       <span
         role='status'
         aria-live='polite'

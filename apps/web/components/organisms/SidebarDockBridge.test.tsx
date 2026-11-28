@@ -269,3 +269,14 @@ describe('SidebarDockBridge accessibility', () => {
     await expectNoA11yViolations(container);
   });
 });
+
+it('keeps existing release eligibility when painting the Pen action', async () => {
+  const { rerender } = render(<SidebarDockBridge {...props} penRail />);
+  expect(
+    await screen.findByRole('link', {
+      name: /Read update: Your latest releases/,
+    })
+  ).toHaveAttribute('href', '/changelog');
+  rerender(<SidebarDockBridge {...props} penRail collapsed />);
+  expect(screen.queryByRole('link', { name: /Read update/ })).toBeNull();
+});
