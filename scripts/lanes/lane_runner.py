@@ -177,7 +177,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
               "scripts/tests/test_pytest_hook_names.py", "scripts/tests/test_fix_red_missing_contract.py"]
 # Dependencies outside scripts/lanes for source admission and HUD PROMOTION (JOV-6836).
-RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-host-git.sh",
+RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/hostops/install-lane-host-git.sh", "scripts/hooks/configure-git-hooks.sh", "scripts/hooks/verify-git-hooks.sh",
                   "scripts/lib/api-quota-report.mjs", "scripts/lib/api-quota-tally.mjs",
                   # Installed self-tests retain immutable Design evidence and stale-size routing fixtures.
                   "scripts/tests/design_gate_git_evidence.py", "scripts/tests/test_size_500_stale.py",
