@@ -8,14 +8,38 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const cli = fileURLToPath(new URL('./lint.mjs', import.meta.url));
-const rectangle = (id, props = {}) => ({ type: 'rectangle', id, ...props });
-const frame = (id, props = {}) => ({ type: 'frame', id, ...props });
-const ref = (id, origin, props = {}) => ({
-  type: 'ref',
-  id,
-  ref: origin,
-  ...props,
-});
+/**
+ * @template {object} [Props={}]
+ * @param {string} id
+ * @param {Props} [props]
+ * @returns {{type: 'rectangle', id: string} & Props}
+ */
+const rectangle = (id, props) =>
+  Object.assign({ type: /** @type {const} */ ('rectangle'), id }, props);
+
+/**
+ * @template {object} [Props={}]
+ * @param {string} id
+ * @param {Props} [props]
+ * @returns {{type: 'frame', id: string} & Props}
+ */
+const frame = (id, props) =>
+  Object.assign({ type: /** @type {const} */ ('frame'), id }, props);
+
+/**
+ * @template {object} [Props={}]
+ * @param {string} id
+ * @param {string} origin
+ * @param {Props} [props]
+ * @returns {{type: 'ref', id: string, ref: string} & Props}
+ */
+const ref = (id, origin, props) =>
+  Object.assign({ type: /** @type {const} */ ('ref'), id, ref: origin }, props);
+
+/** @typedef {{type: 'frame', id: string, name?: string, fill?: string}
+ * | {type: 'ref', id: string, ref: string, variant?: Record<string, string>}
+ * | {type: 'text', id: string, content: string, fill: string}} FixtureRailChild */
+
 const page = (id, children) => ({ type: 'page', id, children });
 const doc = children => ({
   version: '2.26',
@@ -73,19 +97,19 @@ function fixtures() {
     fill: '$surface',
     children: [frame('holder', { slot: ['tabs-origin'] })],
   });
-  const panel = frame('rail', {
-    layout: 'vertical',
-    children: [
-      ref('entity', 'card-origin', {
-        descendants: { holder: { children: [rectangle('slot-asset')] } },
-      }),
-      frame('share', { fill: '$share-fill' }),
-      ref('tabs', 'tabs-origin', {
-        variant: { size: 'compact' },
-        descendants: { label: { content: 'Specific details' } },
-      }),
-    ],
+  /** @type {Record<string, {children?: ReturnType<typeof rectangle>[], fill?: string}>} */
+  const entityOverrides = { holder: { children: [rectangle('slot-asset')] } };
+  const entity = ref('entity', 'card-origin', { descendants: entityOverrides });
+  const share = frame('share', { fill: '$share-fill' });
+  const tabsInstance = ref('tabs', 'tabs-origin', {
+    variant: { size: 'compact' },
+    descendants: { label: { content: 'Specific details' } },
   });
+  /** @type {FixtureRailChild[]} */
+  const children = [entity, share, tabsInstance];
+  /** @type {{layout: 'vertical' | 'none', children: FixtureRailChild[]}} */
+  const railProps = { layout: 'vertical', children };
+  const panel = frame('rail', railProps);
   const proof = doc([
     frame('current', {
       name: 'A working label, not authority',
@@ -139,7 +163,7 @@ function fixtures() {
       },
     ],
   };
-  return { proof, policy, panel };
+  return { proof, policy, panel, entity, share, tabsInstance };
 }
 
 test('valid native slots, local aliases, overrides and approved inactive designs pass', t => {
@@ -194,9 +218,9 @@ test('an existing detached or lookalike layer and a valid but wrong variant fail
 });
 
 test('rejects invalid native variant, non-origin ref and override into unrelated node', t => {
-  const { proof, panel } = fixtures();
-  panel.children[0].descendants.variant = { fill: '#FFFFFF' };
-  panel.children[2].variant = { size: 'xlarge' };
+  const { proof, panel, entity, tabsInstance } = fixtures();
+  entity.descendants.variant = { fill: '#FFFFFF' };
+  tabsInstance.variant = { size: 'xlarge' };
   panel.children.push(ref('bad', 'before'));
   const r = input(t, proof);
   assert.deepEqual(r.codes, [
@@ -307,8 +331,8 @@ test('rejects wrong structural order; explicit alternate counts; arbitrary geome
 });
 
 test('allows one explicit literal, preserves unrelated literals and rejects lookalike token values', t => {
-  const { proof, policy, panel } = fixtures();
-  panel.children[1].fill = '#111111';
+  const { proof, policy, panel, share } = fixtures();
+  share.fill = '#111111';
   panel.children.push({
     type: 'text',
     id: 'price',
@@ -316,7 +340,7 @@ test('allows one explicit literal, preserves unrelated literals and rejects look
     fill: '#333333',
   });
   assert.deepEqual(input(t, proof, policy).findings, []);
-  panel.children[1].fill = '#222222'; // same color, but no binding
+  share.fill = '#222222'; // same color, but no binding
   assert.deepEqual(input(t, proof, policy).codes, ['policy.binding']);
 });
 
