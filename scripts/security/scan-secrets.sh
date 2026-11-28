@@ -28,11 +28,10 @@ ensure_gitleaks() {
   if [[ -n "${GITLEAKS_BIN:-}" ]]; then
     return
   fi
-  if command -v gitleaks >/dev/null 2>&1; then
-    GITLEAKS_BIN="$(command -v gitleaks)"
-    return
-  fi
-
+  # Pinned-first (JOV-13084): never silently trust whatever gitleaks is on
+  # PATH — an unpinned install drifts from CI. fetch_scanner resolves the
+  # pinned binary, verifies its sha256, and fails closed when no pin exists
+  # for this platform ("no sha256 pin for <tool> <version> <os>/<arch>").
   GITLEAKS_BIN="$(fetch_scanner gitleaks "$GITLEAKS_VERSION")" || exit 1
 }
 
@@ -40,11 +39,9 @@ ensure_trufflehog() {
   if [[ -n "${TRUFFLEHOG_BIN:-}" ]]; then
     return
   fi
-  if command -v trufflehog >/dev/null 2>&1; then
-    TRUFFLEHOG_BIN="$(command -v trufflehog)"
-    return
-  fi
-
+  # Pinned-first (JOV-13084): same contract as ensure_gitleaks — the pinned,
+  # checksum-verified binary is the only silent default; a missing platform
+  # pin is a hard failure, never a PATH fallback.
   TRUFFLEHOG_BIN="$(fetch_scanner trufflehog "$TRUFFLEHOG_VERSION")" || exit 1
 }
 
