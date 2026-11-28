@@ -1,7 +1,7 @@
 name: Claim Checkout Dogfood
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# necessary-trust-boundary: Staging Controller completion is the only event that says a new main generation reached staging; this hop runs the $12 claim journey in a browser for that exact SHA against an ephemeral Neon branch with Stripe test mode and the local test-auth bypass. It holds Stripe test, Neon, protected database comparison references and existing Linear/Slack intake secrets; no deploy permission.
+# necessary-trust-boundary: Staging Controller completion binds the staged SHA; PRs exercise their merge revision. The journey uses an ephemeral Neon branch, Stripe test mode and the local test-auth bypass. Linear/Slack intake runs only outside PRs; no deploy permission.
 # removal-trigger: Remove the hop when Staging Controller runs the claim dogfood as its own post-alias job.
 #
 # Tim, 2026-10-21: the end-to-end claim check is a dogfood process run by
@@ -19,6 +19,7 @@ name: Claim Checkout Dogfood
 # one fingerprinted Linear issue and post to Slack; green runs resolve it.
 
 on:
+  pull_request:
   workflow_run:
     workflows: ['Staging Controller', 'Golden Path Nightly']
     types: [completed]
@@ -33,20 +34,62 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  # One run at a time. Never cancel mid-run: an interrupted run would leave a
-  # Stripe test subscription behind. GitHub keeps only the newest pending run.
-  group: claim-checkout-dogfood
-  cancel-in-progress: false
-
 jobs:
+  pr-paths:
+    name: Detect claim checkout changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Compare the PR merge revision with its base
+        id: diff
+        run: |
+          # Use Git so the trigger also sees paths beyond GitHub's 300-file filter limit.
+          status=0
+          git diff --quiet --no-renames HEAD^1 HEAD -- \
+            ':(glob,icase)apps/web/**/*claim*' \
+            ':(glob,icase)apps/web/**/*claim*/**' \
+            ':(glob,icase)apps/web/**/*onboarding*' \
+            ':(glob,icase)apps/web/**/*onboarding*/**' \
+            ':(glob,icase)apps/web/**/*pricing*' \
+            ':(glob,icase)apps/web/**/*pricing*/**' \
+            ':(glob,icase)apps/web/**/*checkout*' \
+            ':(glob,icase)apps/web/**/*checkout*/**' \
+            ':(glob,icase)apps/web/**/*billing*/**' \
+            ':(glob,icase)apps/web/**/*stripe*/**' \
+            apps/web/tests/e2e/helpers/stripe-helpers.ts \
+            apps/web/tests/helpers/auth.ts apps/web/tests/global-setup.ts \
+            apps/web/playwright.config.ts scripts/claim-test-environment.mjs \
+            scripts/lib/claim-test-environment.mjs \
+            .github/workflows/claim-checkout-dogfood.yml || status=$?
+          case "$status" in
+            0) echo "changed=false" >> "$GITHUB_OUTPUT" ;;
+            1) echo "changed=true" >> "$GITHUB_OUTPUT" ;;
+            *) exit "$status" ;;
+          esac
+
   dogfood:
     name: Claim checkout dogfood (Stripe test mode)
+    needs: pr-paths
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.head_branch == 'main' &&
-       (github.event.workflow_run.name == 'Golden Path Nightly' ||
-        github.event.workflow_run.conclusion == 'success'))
+      !cancelled() &&
+      ((github.event_name == 'pull_request' && needs.pr-paths.outputs.changed == 'true') ||
+       github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.head_branch == 'main' &&
+        (github.event.workflow_run.name == 'Golden Path Nightly' ||
+         github.event.workflow_run.conclusion == 'success')))
+    # The tests share Stripe fixture customers, so finish each run before starting another.
+    concurrency:
+      group: claim-checkout-dogfood
+      queue: max
+      cancel-in-progress: false
     environment: Preview – jovie
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -54,11 +97,17 @@ jobs:
       layout_outcome: ${{ steps.journey.outputs.layout_outcome }}
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
-      DOGFOOD_SHA: ${{ (github.event.workflow_run.name == 'Staging Controller' && github.event.workflow_run.head_sha) || inputs.ref || 'main' }}
+      DOGFOOD_SHA: ${{ (github.event_name == 'pull_request' && github.sha) || (github.event.workflow_run.name == 'Staging Controller' && github.event.workflow_run.head_sha) || inputs.ref || 'main' }}
       DOGFOOD_TRIGGER: ${{ github.event.workflow_run.name || github.event_name }}
       # Staging Controller completion (or dispatch time) is when the run became due.
       DOGFOOD_DUE_AT: ${{ github.event.workflow_run.updated_at || '' }}
     steps:
+      - name: Require a same-repository PR for secret-backed checkout
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Claim checkout requires Stripe test and Neon credentials, which are unavailable to fork PRs."
+          exit 1
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.DOGFOOD_SHA }}
@@ -112,7 +161,7 @@ jobs:
           node scripts/ci/preview-env-admission.mjs emit-admission \
             --kind neon-branch --work-id scheduled-evidence \
             --sha "$DOGFOOD_RESOLVED_SHA" \
-            --policy "event-driven or manual claim checkout dogfood" \
+            --policy "PR, staging, nightly or manual claim checkout dogfood" \
             --reason "Isolated synthetic claim and Stripe test persistence; shared staging is production-backed." \
             --evidence "Claim/billing integration, local auth bypass and signed fixture webhook; not real OTP signup." \
             --owner "revenue path / checkout-dogfood" \
@@ -177,6 +226,7 @@ jobs:
           STRIPE_TEST_ACCOUNT_ID: acct_1T1DV0ASl9B9udHv
           SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
           FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
+          CLAIM_CHECKOUT_REQUIRE_STRIPE: ${{ github.event_name == 'pull_request' && '1' || '0' }}
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
         run: |
           cd apps/web
@@ -224,6 +274,10 @@ jobs:
           tail -n 120 "$RECEIPT_DIR/playwright.log"
           echo "JOURNEY_FINISHED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
 
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            exit "$status"
+          fi
+
           # Perf class, measured on the same server and reported by the
           # layout-budget job, never by this one (one spec asserts one class).
           # Green only when both layout tests ran: a skipped test (Stripe test
@@ -244,7 +298,7 @@ jobs:
           exit "$status"
 
       - name: Emit stage events (claim-dogfood)
-        if: ${{ always() }}
+        if: ${{ always() && env.RECEIPT_DIR != '' }}
         env:
           JOURNEY_OUTCOME: ${{ steps.journey.outcome }}
           RUN_ID: ${{ github.run_id }}
@@ -253,7 +307,7 @@ jobs:
         run: node scripts/claim-dogfood-report.mjs stage-events
 
       - name: Upload receipts
-        if: ${{ always() }}
+        if: ${{ always() && env.RECEIPT_DIR != '' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: claim-dogfood-receipts
@@ -274,7 +328,7 @@ jobs:
           retention-days: 7
 
       - name: File, reopen or resolve the Linear issue
-        if: ${{ always() && !cancelled() }}
+        if: ${{ always() && !cancelled() && github.event_name != 'pull_request' }}
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -295,7 +349,7 @@ jobs:
           retention-days: 7
 
       - name: File, reopen or resolve the layout-budget Linear issue
-        if: ${{ always() && !cancelled() && steps.journey.outputs.layout_outcome != '' }}
+        if: ${{ always() && !cancelled() && github.event_name != 'pull_request' && steps.journey.outputs.layout_outcome != '' }}
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -322,7 +376,7 @@ jobs:
   layout-budget:
     name: Claim checkout layout budget (perf)
     needs: dogfood
-    if: ${{ !cancelled() && needs.dogfood.result != 'skipped' }}
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && needs.dogfood.result != 'skipped' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

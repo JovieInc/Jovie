@@ -1,13 +1,14 @@
-import { spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { validateClaimTestEnvironment } from '../claim-test-environment.mjs';
 import { buildPreviewEnvAdmission } from '../preview-env-contract.mjs';
@@ -383,5 +384,53 @@ describe('runner preflight and workflow boundary', () => {
     expect(workflow).toContain(
       'CLAIM_CONNECTION_FILE: ${{ steps.neon-branch.outputs.connection_file }}'
     );
+  });
+});
+
+describe('claim checkout PR path selection', () => {
+  const workflow = readFileSync(
+    resolve(
+      import.meta.dirname,
+      '../../../.github/workflows/claim-checkout-dogfood.yml'
+    ),
+    'utf8'
+  );
+  const classifier = workflow
+    .split('      - name: Compare the PR merge revision with its base')[1]
+    .split('        run: |')[1]
+    .split('  dogfood:')[0];
+
+  it.each([
+    ['apps/web/app/claim/start/route.ts', true],
+    ['apps/web/app/onboarding/actions/post-onboarding.ts', true],
+    ['apps/web/app/(marketing)/pricing/page.tsx', true],
+    ['apps/web/app/api/billing/checkout-session/route.ts', true],
+    ['apps/web/app/api/stripe/webhooks/route.ts', true],
+    ['apps/web/tests/e2e/helpers/stripe-helpers.ts', true],
+    ['apps/web/app/help/page.tsx', false],
+  ])('classifies %s as relevant=%s', (file, changed) => {
+    const cwd = mkdtempSync(join(tmpdir(), 'jovie-claim-paths-'));
+    try {
+      const git = (...args) =>
+        execFileSync('git', args, { cwd, stdio: 'pipe' });
+      git('init', '--quiet');
+      git('config', 'user.name', 'Claim checkout fixture');
+      git('config', 'user.email', 'claim-paths@example.invalid');
+      git('commit', '--quiet', '--allow-empty', '-m', 'Base');
+      const target = join(cwd, file);
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, 'fixture');
+      git('add', '--', file);
+      git('commit', '--quiet', '-m', 'Candidate');
+
+      const output = join(cwd, 'github-output');
+      execFileSync('bash', ['-e', '-c', classifier], {
+        cwd,
+        env: { ...process.env, GITHUB_OUTPUT: output },
+      });
+      expect(readFileSync(output, 'utf8')).toBe(`changed=${changed}\n`);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 });

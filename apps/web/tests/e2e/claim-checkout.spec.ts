@@ -24,6 +24,7 @@ import {
   detachCustomerPaymentMethods,
   expireRunOwnedTestCheckoutSession,
   getBillingStatus,
+  getRequiredStripeTestContext,
   getStripeContextOrSkip,
   interceptTrackingRoutes,
   materializeTestCheckoutCompletion,
@@ -31,13 +32,18 @@ import {
   sendSubscriptionWebhook,
 } from './helpers/stripe-helpers';
 
+function getClaimCheckoutStripeContext() {
+  return process.env.CLAIM_CHECKOUT_REQUIRE_STRIPE === '1'
+    ? getRequiredStripeTestContext()
+    : getStripeContextOrSkip();
+}
+
 /**
  * $12/month self-serve artist profile (EVENT: Tim, 2026-10-20):
  * /pricing → /claim → claim start → sign-in → Stripe test checkout →
  * signed webhook → Pro entitlement → claim success state.
  *
- * Runs only against Stripe test mode (getStripeContextOrSkip fails closed on
- * a live key, another account, or a price that is not the $12 fixture).
+ * Runs only against Stripe test mode and requires valid fixtures in the PR workflow.
  * Stripe forbids automating its hosted Checkout UI, so payment is completed
  * with Stripe's documented test PaymentMethod and the signed event goes
  * through the real webhook route.
@@ -72,7 +78,7 @@ test.describe('Self-serve artist profile checkout', () => {
     page,
   }) => {
     test.setTimeout(180_000);
-    const { stripeClient, priceId } = await getStripeContextOrSkip();
+    const { stripeClient, priceId } = await getClaimCheckoutStripeContext();
     await interceptTrackingRoutes(page);
     await setTestAuthBypassSession(page, 'creator');
     await ensureUserIsFree(
@@ -186,7 +192,7 @@ test.describe('Self-serve artist profile checkout', () => {
 
 /**
  * Dogfood of the live claim offer (Tim, 2026-10-21): the same journey a buyer
- * takes, run by a browser on a schedule and after every staging deploy
+ * takes, run on golden-path PRs, on a schedule and after every staging deploy
  * (.github/workflows/claim-checkout-dogfood.yml). Fixture artists only; the
  * artist search is served by the test, Stripe is test mode, and the synthetic
  * acquisition journey is revoked afterwards so it never counts as a visitor.
@@ -297,7 +303,7 @@ test.describe('Claim checkout dogfood', () => {
     baseURL,
   }) => {
     test.setTimeout(300_000);
-    const { stripeClient, priceId } = await getStripeContextOrSkip();
+    const { stripeClient, priceId } = await getClaimCheckoutStripeContext();
     await seedDogfoodArtists();
     const artist = DOGFOOD_HIGH_REACH_ARTIST;
     const buyerEmail = DEFAULT_DEV_TEST_AUTH_EMAILS['creator-ready'];
